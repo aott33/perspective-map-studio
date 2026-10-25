@@ -38,7 +38,7 @@ These are advantages of execution, not a moat: anyone with the same toolchain co
 
 - **Admins**, the primary users. They keep a running system's map right (a new pad, a rerouted line, a geofence) and also build a new system's map from nothing, in the browser. They might never touch a CSV or a script, so the editor alone has to be enough to lay out a whole field.
 - **Integrators** provisioning a project. Most of a field arrives by script or CSV import; they need to correct, extend and bulk-edit it on the map without touching props.
-- **Operators**, occasionally, on a phone: they move a pin that is in the wrong place, and nothing more.
+- **Operators**, occasionally, on a phone: they move a pin that is in the wrong place or correct an item's properties.
 
 ## Success criteria
 
@@ -46,7 +46,7 @@ The first version is done when all four criteria hold. The target is the end of 
 
 1. **It replaces the template's `/map/edit`.** The template's map editing runs on Map Studio, the Leaflet drawing layer is gone, and the draft, change set and `prov` path work unchanged.
 2. **An admin builds a field from nothing in 30 minutes.** An admin who has not seen the Mesa demo field (the template's sample field) lays it out (sites, pipelines split at taps, one geofence) with the editor alone, without help, in under 30 minutes.
-3. **A point moves on a phone.** At 390 px, touch only, a pin is moved and the edit reaches the page.
+3. **A point moves and its properties change on a phone.** At 390 px, touch only, a pin is moved and a property edited, and both edits reach the page.
 4. **The demo field sets the scale.** Editing on the demo field stays responsive; 300 sites and 2,000 segments are a later target.
 
 Open-source readiness, meaning a stranger can install it from the README, comes after the owner has validated it in the template.
@@ -66,7 +66,7 @@ Before any feature work, spend one to two days building a blank component module
 - Fast entry for building a field by hand, and bulk editing of shared properties across selected items.
 - CSV import of points; the template's GeoJSON import stays in `prov`.
 - Every edit sent to the page as an event, with no storage in the module.
-- On phones: view, and move a point. Drawing and forms stay on larger screens.
+- On phones: view, move a point, and edit an item's properties. Drawing stays on larger screens.
 - Supporting: object kinds from a list the host supplies (form fields and an icon per kind), a small core icon set in one minimalist style for oil and gas objects, and the basemaps the template already uses (none, OpenStreetMap, Mapbox).
 
 **Later, each its own decision:** flow animation (direction and rate along lines); the full icon library and other industries' kinds; a time slider replaying history; clustering; offline basemap tiles; a second renderer.
