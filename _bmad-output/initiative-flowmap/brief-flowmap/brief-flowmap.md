@@ -9,9 +9,9 @@ updated: 2026-10-25
 
 ## Executive summary
 
-Map Studio is an open-source Ignition 8.3 Perspective component for drawing and editing maps in the browser. Ignition's built-in Map shows places but offers no way to change them except editing props, so every project that needs a usable map editor builds one around it or buys one: packaged Perspective projects sell to integrators for about 25,000 USD.
+Map Studio is an open-source Ignition 8.3 Perspective component: the project's map, showing each site's live state, with tools to build and edit the map in the browser for those allowed to. Ignition's built-in Map shows places but offers no way to change them except editing props, so every project that needs a usable map editor builds one around it or buys one: packaged Perspective projects sell to integrators for about 25,000 USD.
 
-Map Studio puts editing on the map itself, in a modern, minimal UI. Its first user is the owner's oil and gas template, where it replaces a working but cobbled-together editor. It is built to be open-sourced once proven there, and to show flow on the same map later.
+Map Studio puts editing on the map itself, links every item to the project's assets and tags, and shows comms, a key value and details in a popup, in a modern, minimal UI. Its first user is the owner's oil and gas template, where it replaces a working but cobbled-together editor. It is built to be open-sourced once proven there, and to show flow on the same map later.
 
 ## The problem
 
@@ -23,9 +23,9 @@ Today's alternatives are a packaged Perspective project, such as Nader Chinichia
 
 ## The solution
 
-Map Studio is a Perspective component module (`ao.mapstudio`) that draws a map and lets people edit it in place. A view places it, binds what to show and handles what comes back, as with any Perspective component. It uses an open-source map stack (MapLibre GL JS, with deck.gl for display), styled by the host project's theme tokens.
+Map Studio is a Perspective component module (`ao.mapstudio`): the project's map view, with role-gated editing tools. Everyone sees the configured map; each icon shows comms status and one key value, and a click opens a popup with details, values and an optional link to a page. Admins and integrators also see the Map Studio tools. It uses an open-source map stack (MapLibre GL JS, with deck.gl for display), styled by the host project's theme tokens.
 
-People draw and edit on the map itself: drop a point, draw a line or an area vertex by vertex, drag a vertex, snap to existing sites, select many items and change their properties together, and import a CSV. Every change goes back to the page as an event, and the module stores nothing. The host project decides what an edit means. In the template, edits feed the existing draft, change set and review path of `prov` (the template's provisioning tool), so the registry in git stays the authority. Another project could write edits straight to its own database.
+With the tools, people draw and edit on the map itself: drop a point, draw a line or an area vertex by vertex, drag a vertex, snap to existing sites, select many items and change their properties together, and import files. Each item links to an asset in the project, and its icon and popup are bound to that asset's tags. Map Studio saves the map as you work to a database the project names, and that database is the map's source of truth; the project supplies its assets through a published contract.
 
 **What makes it different:**
 
@@ -44,7 +44,7 @@ These are advantages of execution, not a moat: anyone with the same toolchain co
 
 The first version is done when all four criteria hold. The target is the end of January 2027; it is a target, not a deadline.
 
-1. **It replaces the template's `/map/edit`.** The template's map editing runs on Map Studio, the Leaflet drawing layer is gone, and the draft, change set and `prov` path work unchanged.
+1. **It replaces the template's map pages.** The template's map and map editing run on Map Studio, the Leaflet map and its drawing layer are gone, and the map lives in Map Studio's database instead of the git registry.
 2. **An admin builds a field from nothing in 30 minutes.** An admin who has not seen the Mesa demo field (the template's sample field) lays it out (sites, pipelines split at taps, one geofence) with the editor alone, without help, in under 30 minutes.
 3. **A point moves and its properties change on a phone.** At 390 px, touch only, a pin is moved and a property edited, and both edits reach the page.
 4. **The demo field sets the scale.** Editing on the demo field stays responsive; 300 sites and 2,000 segments are a later target.
@@ -60,18 +60,20 @@ Before any feature work, spend one to two days building a blank component module
 
 ## Scope
 
-**First version: the editor.**
+**First version: the map and its editor.**
 
 - Draw and edit points, lines (pipelines, routes) and areas (geofences, regions): add, move, delete, drag and insert vertices, snap to sites and vertices, undo.
 - Fast entry for building a field by hand, and bulk editing of shared properties across selected items.
-- CSV import of points; the template's GeoJSON import stays in `prov`.
-- Every edit sent to the page as an event, with no storage in the module.
+- Viewing for every role: icons with comms status and one key value, and popups with details, values and an optional link to a page.
+- Linking each item to a project asset and binding its icon and popup to tag paths, with a tag browser.
+- Import of CSV, KML and GeoJSON, with features matched to existing assets, and a downloadable CSV template.
+- Saving as you work to a database the project names, so leaving halfway loses nothing.
 - On phones: view, move a point, and edit an item's properties. Drawing stays on larger screens.
 - Supporting: object kinds from a list the host supplies (form fields and an icon per kind), a small core icon set in one minimalist style for oil and gas objects, and the basemaps the template already uses (none, OpenStreetMap, Mapbox).
 
 **Later, each its own decision:** flow animation (direction and rate along lines); the full icon library and other industries' kinds; a time slider replaying history; clustering; offline basemap tiles; a second renderer.
 
-**Out:** storing or approving edits (the host's job); any write to a device; replacing the alarm table; Edge Gateways (built-in components only there).
+**Out:** an approval workflow for edits; any write to a device; replacing the alarm table; Edge Gateways (built-in components only there).
 
 ## Design principles
 
@@ -87,6 +89,7 @@ The editor follows map editing practice, ISA-101 and WCAG 2.2. The ranked list a
 
 - **Toolchain weight:** the build needs Java 17, Gradle with Inductive Automation's module plugin, Node and module signing, and one person has to keep it all working. The spike tests this first.
 - **Perspective client coupling:** the client bundle (the browser-side code) compiles against Inductive Automation's Perspective client packages, so an 8.3.x upgrade can break it.
+- **Alarm presentation:** icons and colours that change with a value's set point are alarm presentation and need the template's engineering review.
 - **Basemap privacy:** map tiles are requested from outside the customer's network, and Mapbox needs a token that every viewer's browser can read.
 
 ## Vision

@@ -9,6 +9,14 @@ updated: 2026-10-25
 
 Draft. Sections are filled in on the coaching path.
 
+## 1. Vision
+
+Map Studio is the map of an Ignition 8.3 Perspective project: one component everyone opens. Viewers and operators see their sites and assets on a map, each icon showing its comms status and one key value, and a click opens a popup with the critical information (metadata, comms, a few key values) and, where configured, a link to the asset's own page.
+
+Admins and integrators see the same map plus the Map Studio tools. With them they build the map for a new field, map a field that runs in Ignition but has no map yet, and keep an existing map right: add and change items, draw lines and areas, import files, link each item to an asset in the project and choose which tags feed its icon and popup. Map Studio saves the map as they work, to a database the project names, and that database is the map's source of truth.
+
+Linking the map to the project's data is the main benefit: a map that is quick to build and stays connected to live values.
+
 ## 2. Target User
 
 ### 2.1 Roles
@@ -16,6 +24,7 @@ Draft. Sections are filled in on the coaching path.
 - **Map editor** - an admin or an integrator. Builds a map for a new field, builds a map for an existing field that has no map yet, and changes an existing map. An integrator who supports a project is a map editor too.
 - **Integrator** - everything a map editor does, plus mass provisioning by CSV import.
 - **Operator** - on a phone in the field: moves a point and edits an item's properties. Draws nothing.
+- **Viewer** - anyone without an editing role: sees the map, icons and popups, and follows a popup's link.
 
 ### 2.3 Key User Journeys
 
@@ -28,9 +37,9 @@ Draft. Sections are filled in on the coaching path.
     3. Sam sets its location either by typing latitude and longitude or by picking the point on the map, the way you set a stop in map directions. Typed coordinates show their country, province or state, and city, so Sam sees at once whether they are roughly right; "Zoom to location" shows the spot on the map.
     4. Sam checks the layout against satellite imagery or an imported reference layer.
     5. Sam repeats until the field is laid out, or imports a file instead (UJ-3).
-  - **Climax:** [OPEN: how Sam knows the field is right. So far: other people review it against satellite imagery or a reference layer]
-  - **Resolution:** [OPEN: what Sam does to hand it over, for example send it for review in the template]
+  - **Climax:** the field is on the map and every item is linked to its asset. Others check it against satellite imagery or a reference layer, even while Sam is still working.
+  - **Resolution:** nothing to submit: the map is saved as Sam works. Sam shares it by adding the page to the project's navigation or sending its URL.
   - **Edge cases:**
     - A line end that snapped looks different from one left floating. An unconnected pipeline is allowed.
     - A name already in use gets a red underline and a tooltip ("already used by another item"). It is allowed when the items link to different assets.
-    - Sam leaves halfway through a large layout. [OPEN: how no work is lost]
+    - Sam leaves halfway through a large layout. Nothing is lost: the map was saved as Sam worked, and Sam carries on later from any computer.
