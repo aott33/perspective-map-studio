@@ -7,7 +7,9 @@ updated: 2026-10-25
 
 # PRD: Map Studio for Ignition Perspective
 
-Draft. Sections are filled in on the coaching path.
+## 0. Document purpose
+
+This PRD defines the first version of Map Studio for its owner and for the downstream BMAD steps: the initiative requirements (Sofia), the UX specification, the architecture and the epics. It builds on the final product brief (`../brief-flowmap/brief-flowmap.md`) and its addendum, and on the source idea (`docs/idea.md`), and does not repeat them. Section 3's Glossary sets the vocabulary every later section and document uses exactly. Features in section 4 nest numbered requirements (FR-n) that cite the journeys of section 2.3 (UJ-n); assumptions are tagged inline and indexed in section 9. Technical choices and reference material are in `addendum.md` beside this file.
 
 ## 1. Vision
 
@@ -224,7 +226,7 @@ The Map Studio tools appear only for users whose roles the project names as edit
 **Consequences (testable):**
 - A viewer sees no tools and no editing affordance; a map editor sees them.
 - A save attempted without an editing role is refused on the Gateway and nothing is written, whatever the page shows.
-- The project names separate roles for full editing and for phone editing (move a point, edit properties). [ASSUMPTION: operators get the phone edits through their own role, without full editing]
+- The project names separate roles for full editing and for phone editing (move a point, edit properties).
 
 #### FR-8: One clear mode
 
@@ -422,7 +424,7 @@ Every finished edit is saved to the map store without a save button. Realizes UJ
 **Consequences (testable):**
 - Closing the browser after an edit and opening the map on another computer shows the edit.
 - An edit that fails to save is shown as unsaved, with the reason, and is kept in the browser until it saves or the user discards it.
-- Other open components show a saved edit without a page reload. [ASSUMPTION: within a few seconds]
+- Other open components show a saved edit without a page reload. It appears within a few seconds.
 
 #### FR-30: Map store
 
@@ -450,3 +452,75 @@ The project offers none, OpenStreetMap, satellite and Mapbox basemaps; the user 
 **Consequences (testable):**
 - With no basemap, the map items still draw on a blank background, for sites without internet.
 - A basemap that needs a token reads it from the project's secret store, never from a view or a file in git.
+
+### 4.11 Cross-cutting requirements
+
+- **NFR-1 Responsiveness.** On the Mesa demo field, panning, zooming and dragging stay smooth on a laptop browser and a mid-range phone, and an edit shows on the map at once, before it is saved. 300 sites and 2,000 segments are a later target, not a first-version requirement.
+- **NFR-2 No Gateway call per click.** Drawing and editing run in the browser; the Gateway is called when an edit is finished, not on every click or vertex.
+- **NFR-3 Accessibility.** WCAG 2.2: a non-drag alternative for every drag (2.5.7); targets at least 24 px, 44 px on touch (2.5.8); 3:1 non-text contrast in both themes (1.4.11); the tools usable by keyboard.
+- **NFR-4 Theme.** Colours come only from the host project's theme tokens, in both the light and the dark theme; the module carries no colour of its own.
+- **NFR-5 Security.** Editing rights are checked on the Gateway for every save (FR-7). Tokens and credentials come from the project's secret store, never from views, files or git (FR-32). Map Studio writes only to its map store, never to tags or devices.
+- **NFR-6 Platform.** Ignition 8.3 full Gateways only; not Edge Gateways. The module is a signed `.modl`, installed through the host's module lock.
+- **NFR-7 Verified claims.** Every claim about the Perspective client API or the module SDK stays marked unverified until it is checked on a live 8.3 Gateway and recorded in claude-ignition-skills.
+- **NFR-8 Public contract.** The component's parameters, the asset contract, the kind list and the CSV template formats are documented and versioned; a breaking change needs a new major version. [ASSUMPTION: semantic versioning]
+
+## 5. Non-goals
+
+- Map Studio is not a GIS: no projections, topology editing, spatial analysis or survey-grade accuracy.
+- It does not create or change assets, tags or UDT instances; it links to what the project already has.
+- It does not write to devices or tags.
+- It is not an alarm system: alarm state and limits come from Ignition's alarms, and it does not replace the alarm table or the alarm pages.
+- It has no approval workflow, no draft and release split, and no version history of the map in the first version.
+- It does not run on Edge Gateways.
+
+## 6. MVP scope
+
+### 6.1 In scope
+
+- Section 4 in full: the map view and icons, popups, roles and tools, kinds and data links, drawing and editing, forms and location entry, import and bulk edit, phone editing, saving, basemaps.
+- A core icon set for the oil and gas kinds.
+- The template's map and map editing moved onto Map Studio (success metric SM-1).
+
+### 6.2 Out of scope for MVP
+
+- Flow animation (direction and rate along lines): the original idea, deferred so the map and editor ship first. [NOTE FOR PM] the reason the idea started; revisit first after the MVP.
+- The full icon library and other industries' kinds.
+- A time slider replaying history; map version history.
+- Clustering of map items at low zoom.
+- Offline basemap tiles.
+- A second renderer (MapWeave).
+- Open-source release (README, examples, Exchange listing): after the owner validates it in the template.
+- Scale beyond the demo field (300 sites, 2,000 segments).
+
+## 7. Success metrics
+
+**Primary**
+
+- **SM-1: It replaces the template's map pages.** The template's map and map editing run on Map Studio, the Leaflet map and drawing layer are retired, and the map lives in the map store. Validates FR-1 to FR-32.
+- **SM-2: A field from nothing in 30 minutes.** An admin who has not seen the Mesa demo field lays it out (sites, pipelines split at taps, one geofence, every item linked) with the tools alone, without help, in under 30 minutes. Validates FR-9 to FR-21.
+
+**Secondary**
+
+- **SM-3: Phone edits.** At 390 px, touch only, a pin is moved and a property edited, and both reach the map store. Validates FR-27, FR-28.
+- **SM-4: Nothing lost.** Closing the browser mid-layout and reopening on another computer loses no finished edit. Validates FR-29.
+- **SM-5: Alarm to page in two clicks.** From an icon with an alarm count, a viewer reaches the item's own page in two clicks. Validates FR-2, FR-4 to FR-6.
+
+**Counter-metrics (do not optimize)**
+
+- **SM-C1: Features per release.** Adding tools must not slow SM-2; a feature that makes the 30-minute build slower is a regression. Counterbalances SM-1.
+- **SM-C2: Colour on the map.** More colour is not more information; a normal field should look mostly grey. Counterbalances SM-5.
+
+Target date for SM-1 to SM-5: end of January 2027, a target and not a deadline.
+
+## 8. Open questions
+
+1. Which licence should the module use when it is open-sourced (MIT, as `docs/idea.md` proposed, or another)?
+2. Should the repository be renamed from `perspective-flowmap` to match Map Studio, and the module id and npm package with it?
+3. Which satellite basemap provider, on what terms?
+4. Where do the Map Studio tools live on the page (a toolbar on the map, a side panel, a separate page in the same component)? For the UX specification.
+5. How does the project supply its kinds and asset list (a named query, a script, a file), and in which format? For the architecture.
+6. Do alarm counts aggregate on tag folders and UDT instances at every level in 8.3? To check in the spike.
+
+## 9. Assumptions index
+
+- 4.11 NFR-8: the public contract follows semantic versioning.
