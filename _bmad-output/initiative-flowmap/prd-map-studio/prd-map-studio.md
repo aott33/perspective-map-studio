@@ -9,7 +9,7 @@ updated: 2026-10-25
 
 ## 0. Document purpose
 
-This PRD defines the first version of Map Studio for its owner and for the downstream BMAD steps: the initiative requirements (Sofia), the UX specification, the architecture and the epics. It builds on the final product brief (`../brief-flowmap/brief-flowmap.md`) and its addendum, and on the source idea (`docs/idea.md`), and does not repeat them. Section 3's Glossary sets the vocabulary every later section and document uses exactly. Features in section 4 nest numbered requirements (FR-n) that cite the journeys of section 2.3 (UJ-n); assumptions are tagged inline and indexed in section 10; claims about Perspective or the module SDK are tagged `[UNVERIFIED]` until checked on a live Gateway. Technical choices and reference material are in `addendum.md` beside this file.
+This PRD defines the first version of Map Studio for its owner and for the downstream BMAD steps: the initiative requirements (Sofia), the UX specification, the architecture and the epics. It builds on the final product brief (`../brief-flowmap/brief-flowmap.md`) and its addendum, and on the source idea (`docs/idea.md`), and does not repeat them. Section 3's Glossary sets the vocabulary every later section and document uses exactly. Features in section 4 nest numbered requirements (FR-n) that cite the journeys of section 2.3 (UJ-n); assumptions are tagged inline and indexed in section 10; claims about Perspective or the module SDK are tagged `[UNVERIFIED]` until checked on a live Gateway. Technical choices and reference material are in `addendum.md` beside this file. A two-day spike (6.4) gates the whole plan: a no-go replaces this scope with a better page on the built-in Map.
 
 ## 1. Vision
 
@@ -32,6 +32,8 @@ Linking the map to the project's data is the main benefit: a map that is quick t
 
 ### 2.2 Key User Journeys
 
+Terms such as map item, kind setup and linked are defined in section 3.
+
 - **UJ-1. Sam lays out a field that has no map.**
   - **Persona + context:** Sam is a map editor bringing a field onto the map: a new field, or an existing one that runs in Ignition but has no map. Before starting, Sam has researched every item to bring online, with its properties and its latitude and longitude, often already in a spreadsheet laid out like the import template.
   - **Entry state:** signed in on a laptop, on the map page, which is empty or nearly empty.
@@ -44,9 +46,9 @@ Linking the map to the project's data is the main benefit: a map that is quick t
   - **Climax:** the field is on the map and every item is linked to its asset. Others check it against satellite imagery or a reference layer, even while Sam is still working.
   - **Resolution:** nothing to submit: the map is saved as Sam works. Sam shares it by adding the page to the project's navigation or sending its URL.
   - **Edge cases:**
-    - A line end that snapped looks different from one left floating. An unconnected pipeline is allowed.
-    - A name already in use gets a red underline and a tooltip ("already used by another item"). It is allowed when the items link to different assets.
-    - Sam leaves halfway through a large layout. Nothing is lost: the map was saved as Sam worked, and Sam carries on later from any computer.
+    - A pipeline that did not snap to its pad is allowed and shows as floating (FR-16).
+    - A name already in use is allowed for a different asset and is flagged (FR-11).
+    - Sam leaves halfway through a large layout and carries on later from any computer, with nothing lost (FR-29).
 
 - **UJ-2. Sam keeps a running field's map right.**
   - **Persona + context:** Sam, a map editor, learns that a lateral was rerouted, a new pad P31 came online and the lease needs a geofence.
@@ -134,7 +136,7 @@ Every later section, and every document built from this PRD, uses these terms ex
 
 - **Icon** - how a point map item is drawn: its kind's glyph, with comms state, the icon KPI and the alarm state where configured.
 - **Popup** - the panel that opens when a map item is clicked or tapped: details, comms, KPIs, the alarm table and the popup link, each optional.
-- **Alarm table** - the built-in Perspective Alarm Status Table embedded in a popup, filtered to the item's alarms path. Acknowledging follows Ignition's own permissions.
+- **Alarm table** - the built-in Perspective Alarm Status Table embedded in a popup, filtered to the map item's alarms path.
 - **Popup link** - an optional button in a popup that goes to a project page or a URL. It may contain placeholders.
 - **Placeholder** - a name in braces in a popup link, filled from the clicked map item, for example `{asset.id}` or `{name}`.
 - **Basemap** - the map imagery under the map items: none, OpenStreetMap, satellite or Mapbox.
@@ -145,7 +147,7 @@ Every later section, and every document built from this PRD, uses these terms ex
 - **Import** - bringing map items in from a CSV, KML or GeoJSON file, then matching them to assets.
 - **CSV template** - the empty CSV for a kind, with the columns its import needs, that Map Studio lets the user download.
 - **Bulk edit** - changing a property on several selected map items at once. Geometry is not bulk edited.
-- **Place check** - the country, province or state and city shown for typed coordinates, looked up offline.
+- **Place check** - the country, province or state and city shown for typed coordinates.
 
 **Roles** (from 2.1): map editor, integrator, operator, viewer.
 
@@ -153,7 +155,9 @@ Every later section, and every document built from this PRD, uses these terms ex
 
 ### 4.1 Map view and icons
 
-**Description:** Every user sees the map: map items on a basemap, opening on the component's starting area. Point map items are drawn as icons that carry their kind's glyph, comms state, one KPI and the alarm count, each where the kind setup configures it. Normal items are neutral; state reads in words and glyphs, never colour alone. Realizes UJ-5.
+**Description:** Every user sees the map, its icons and their state, and can search it.
+
+**Engineering review:** icons, lines and popups that show state are alarm presentation. The template's engineering review (ER-27, `docs/ux.md` section 11) applies to FR-2, FR-4 to FR-6 and FR-34 before release.
 
 #### FR-1: Show the map
 
@@ -203,13 +207,9 @@ Map Studio shows everything the template's current map shows, as approved in its
 - Controls offer Fit to the starting area and Return to the selection, and toggles hide lines and names.
 - The template's `docs/map.md` section 5 is the checklist; each item there is met or listed as a deliberate change for engineering review.
 
-**Feature-specific NFRs:**
-- State and selection meet 3:1 contrast against the basemap in both the light and the dark theme (WCAG 1.4.11).
-- Colours come only from the host project's theme tokens.
-
 ### 4.2 Popups
 
-**Description:** Clicking or tapping a map item opens its popup: details, comms, KPIs, the alarm table and the popup link, each optional and set in the kind setup. Realizes UJ-5.
+**Description:** A click or tap on a map item opens its popup, with the parts its kind setup turns on.
 
 #### FR-4: Open a popup
 
@@ -236,8 +236,6 @@ Where configured, the popup shows a button that goes to a project page or a URL,
 - A link `/ctb/{asset.id}` on CTB1 goes to the project page `/ctb/CTB1`.
 - A placeholder with no value (for example `{asset.id}` on an unlinked item) hides the button rather than going to a broken page.
 - An outside URL opens as Perspective opens outside URLs.
-
-**Notes:** icons and popups that show state are alarm presentation: the template's engineering review (ER-27, `docs/ux.md` section 11) applies before release.
 
 ### 4.3 Roles and the Map Studio tools
 
@@ -503,13 +501,13 @@ The project offers none, OpenStreetMap, satellite and Mapbox basemaps; the user 
 
 - **NFR-1 Responsiveness.** On the template's 30-pad scale set, panning, zooming and dragging run at 60 frames per second in a laptop browser, and an edit shows on the map within 100 ms, before it is saved. Measured first in the spike. 300 sites and 2,000 segments are a later target; nothing in the first version may rule them out.
 - **NFR-2 No Gateway call per click.** Drawing and editing run in the browser; the Gateway is called when an edit is finished, not on every click or vertex.
-- **NFR-9 Live value load.** Icon live values arrive for the whole page in one batch every 10 seconds, never as a tag subscription per map item per session (the template's list rule). A popup's values are live while it is open. A live value the kind setup turns off is not read at all.
 - **NFR-3 Accessibility.** WCAG 2.2: a non-drag alternative for every drag (2.5.7); targets at least 24 px, 44 px on touch (2.5.8); 3:1 non-text contrast in both themes (1.4.11); the tools usable by keyboard.
 - **NFR-4 Theme.** Colours come only from the host project's theme tokens, in both the light and the dark theme; the module carries no colour of its own. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
-- **NFR-5 Security.** Editing rights are checked on the Gateway for every save (FR-7). Tokens and credentials come from the project's secret store, never from views, files or git (FR-32). Map Studio writes only to its map store, never to tags or devices; acknowledging in the embedded alarm table is Ignition's own write, under Ignition's permissions.
+- **NFR-5 Security.** Editing rights are checked on the Gateway on every save (FR-7); tokens and credentials come from the project's secret store (FR-32); Map Studio writes only to its map store (section 5), and acknowledging in the alarm table is Ignition's own write (FR-5).
 - **NFR-6 Platform and supply chain.** Ignition 8.3 full Gateways only; not Edge Gateways. Java 17 on the Gateway; the host's Jython is untouched. The module ships as a signed `.modl` from a GitHub release, pinned by SHA-256 and certificate fingerprint in the host's module lock and baked into its private Gateway image; never a `.modl` in git. The Perspective client package versions are pinned to the Gateway version, and every 8.3.x upgrade is checked on the test stack before release.
-- **NFR-7 Verified claims.** Every claim about the Perspective client API or the module SDK stays marked unverified until it is checked on a live 8.3 Gateway and recorded in claude-ignition-skills.
+- **NFR-7 Verified claims.** See section 10: claims tagged `[UNVERIFIED]` stay so until checked on a live 8.3 Gateway.
 - **NFR-8 Public contract.** The component's parameters and events, the asset contract, the kind list and the CSV template formats are documented and versioned; a breaking change needs a new major version. Versions follow semantic versioning.
+- **NFR-9 Live value load.** Icon live values arrive for the whole page in one batch every 10 seconds, never as a tag subscription per map item per session (the template's list rule). A popup's values are live while it is open. A live value the kind setup turns off is not read at all.
 - **NFR-10 Licences.** No dependency that charges per deployment (the template's UX-36). Libraries, icon sets and place-check data use permissive licences, with their attributions shipped; no icon is derived from the template's AGPL-window OpenBridge set.
 - **NFR-11 Look.** Modern, minimal and clean: one minimalist icon style, neutral normal states, no decoration that carries no information.
 
@@ -519,16 +517,14 @@ The project offers none, OpenStreetMap, satellite and Mapbox basemaps; the user 
 - It does not create or change assets, tags or UDT instances; it links to what the project already has.
 - It does not write to devices or tags.
 - It is not an alarm system: alarm state and limits come from Ignition's alarms, and it does not replace the alarm table or the alarm pages.
-- It has no approval workflow, no draft and release split, and no version history of the map in the first version (see "What live editing gives up" in section 1).
+- No approval workflow, draft and release split, or map version history in the first version (see section 1).
 - It does not run on Edge Gateways.
 
 ## 6. MVP scope
 
 ### 6.1 In scope
 
-- Section 4 in full: the map view, icons and search, popups, roles and tools, kinds and data links, drawing and editing, forms and location entry, import and bulk edit, phone editing, saving, basemaps.
-- A core icon set for the oil and gas kinds.
-- The template's map and map editing moved onto Map Studio (success metric SM-1).
+- Everything in section 4, including the core icon set (FR-9), and the template's map pages moved onto Map Studio (SM-1).
 
 ### 6.2 Build order
 
@@ -543,14 +539,14 @@ Not a cut line: every item in 6.1 ships. The order makes Map Studio useful on th
 
 ### 6.3 Out of scope for MVP
 
-- Flow animation (direction and rate along lines): the original idea, deferred so the map and editor ship first. [NOTE FOR PM] the reason the idea started; revisit first after the MVP.
+- Flow animation (direction and rate along lines). It was the original reason for the project and is the first thing to revisit after the MVP.
 - The full icon library and other industries' kinds.
 - A time slider replaying history; map version history.
 - Clustering of map items at low zoom.
 - Offline basemap tiles.
 - A second renderer (MapWeave).
-- Open-source release (README, examples, Exchange listing): after the owner validates it in the template.
-- Scale beyond the 30-pad scale set (300 sites, 2,000 segments), though nothing may rule it out (NFR-1).
+- Open-source release (README, examples, Exchange listing): after the owner validates it in the template (open question 1).
+- Scale beyond the 30-pad scale set (NFR-1).
 
 ### 6.4 First step: the spike
 
@@ -586,7 +582,7 @@ Target date for SM-1 to SM-5: end of January 2027, a target and not a deadline.
 - **Perspective client coupling:** the client bundle compiles against Inductive Automation's Perspective client packages, so an 8.3.x upgrade can break it (NFR-6).
 - **Designer props editing:** arrays of objects edit poorly in the Designer; parameters are kept small and the map lives in the map store, not in props.
 - **Basemap privacy:** tiles are requested from outside the customer's network, and a Mapbox token reaches every viewer's browser (FR-32).
-- **Alarm presentation:** icons and lines that show state go through the template's engineering review (ER-27) before release.
+- **Alarm presentation:** state on icons, lines and popups needs engineering review (see 4.1).
 - **A second product to maintain:** releases kept to a version bump and a test-stack run.
 
 ## 9. Open questions
@@ -609,4 +605,4 @@ Figures and limits chosen during discovery and confirmed by the owner (recorded 
 - 20 m for a shared marker (FR-34, from the template).
 - The offline place-check data adds a few megabytes to the module (addendum; an estimate).
 
-Unverified platform claims, tagged `[UNVERIFIED]` inline: FR-5, FR-6, FR-7, FR-27, FR-30, FR-32, NFR-4.
+Unverified platform claims, tagged `[UNVERIFIED]` inline: FR-5, FR-6, FR-7, FR-27, FR-30, FR-32, NFR-4. Each stays unverified until checked on a live 8.3 Gateway and recorded in claude-ignition-skills (NFR-7).
