@@ -17,7 +17,7 @@ Integrators who want better today buy a packaged Perspective project, such as Na
 
 ## Who This Serves
 
-- **Integrators** building or provisioning a project. Most of a field arrives by script or CSV import; they need to correct, extend and bulk-edit it on the map without touching props.
-- **Admins** keeping a running system's map right in the browser: a new pad, a rerouted line, a geofence.
+- **Admins**, the primary user. They keep a running system's map right (a new pad, a rerouted line, a geofence) and also build a new system's map from nothing, in the browser. They may never touch a CSV or a script: the editor alone has to be enough to lay out a whole field.
+- **Integrators** provisioning a project. Most of a field arrives by script or CSV import; they need to correct, extend and bulk-edit it on the map without touching props.
 - **Operators**, occasionally, on a phone: move a pin that is in the wrong place. Nothing more.
 - **First and only confirmed user:** the owner's own `ign-scada-template`. Other projects come later, when the module is open-sourced; it is built for that day but not released for it.
