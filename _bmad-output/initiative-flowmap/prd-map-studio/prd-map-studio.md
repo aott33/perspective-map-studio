@@ -43,3 +43,49 @@ Linking the map to the project's data is the main benefit: a map that is quick t
     - A line end that snapped looks different from one left floating. An unconnected pipeline is allowed.
     - A name already in use gets a red underline and a tooltip ("already used by another item"). It is allowed when the items link to different assets.
     - Sam leaves halfway through a large layout. Nothing is lost: the map was saved as Sam worked, and Sam carries on later from any computer.
+
+- **UJ-2. Sam keeps a running field's map right.**
+  - **Persona + context:** Sam, a map editor, learns that a lateral was rerouted, a new pad P31 came online and the lease needs a geofence.
+  - **Entry state:** signed in on a laptop, on the map page with the live field showing; Sam opens the Map Studio tools.
+  - **Path:**
+    1. Sam selects the lateral, drags two vertices to the new route and inserts a third on the line.
+    2. Sam adds P31 with "Add another like the last" from a neighbouring pad, sets its location and links it to the P31 asset; its base tag path comes from the asset, so its icon and popup work at once from the pad kind's setup.
+    3. Sam draws the lease geofence vertex by vertex and finishes it with a double-click.
+  - **Climax:** P31's icon shows its comms status and pressure as soon as it is linked; viewers see the new route and the geofence without a release step.
+  - **Resolution:** the changes are saved; Sam closes the tools and the page is the plain map again.
+  - **Edge case:** Sam drags the wrong vertex; one undo puts it back.
+
+- **UJ-3. Jordan provisions a field from files.**
+  - **Persona + context:** Jordan, an integrator, is bringing a 120-pad field onto the map from the engineering team's GIS export and a spreadsheet of meters.
+  - **Entry state:** signed in on a laptop, Map Studio tools open on an empty map.
+  - **Path:**
+    1. Jordan downloads the CSV template for the meter kind and fills it from the spreadsheet.
+    2. Jordan imports the GIS export (KML or GeoJSON) and the CSV; the features appear on the map as unlinked.
+    3. Jordan matches each feature to an existing asset, most of them by name in one pass, the rest one by one.
+    4. Jordan opens the pad kind's setup: comms, the pressure KPI and the alarms path as paths relative to each pad's base path, the popup's details and a link to `/pad/{asset.id}`.
+    5. Jordan selects twenty pads on one route and changes a shared property at once.
+  - **Climax:** every pad shows comms, pressure and its alarm count, from one kind setup.
+  - **Resolution:** the field is saved; Jordan shares the page URL with the operators.
+  - **Edge case:** some features have no matching asset; they stay on the map marked unlinked, and a count of unlinked items shows until they are matched or deleted.
+
+- **UJ-4. Alex fixes a pin from the field.**
+  - **Persona + context:** Alex, an operator standing at pad P12, sees on a phone that its pin sits 200 m off.
+  - **Entry state:** signed in on a 390 px phone, on the map page.
+  - **Path:**
+    1. Alex taps P12, long-presses its pin and drags it; the pin is drawn above Alex's finger so it stays visible.
+    2. An Undo bar appears after the drop.
+    3. Alex opens P12's properties in a bottom sheet and corrects its access road note.
+  - **Climax:** the pin sits on the pad in the satellite view.
+  - **Resolution:** both edits are saved; everyone sees the corrected pin.
+  - **Edge case:** Alex drops the pin in the wrong place; Undo puts it back.
+
+- **UJ-5. Riley follows an alarm from the map.**
+  - **Persona + context:** Riley, a viewer on the production team, watches the field map on a desktop.
+  - **Entry state:** signed in, on the map page; no editing role, so no Map Studio tools.
+  - **Path:**
+    1. CTB1's icon shows a comms glyph in its normal state, an alarm glyph and a count of 2.
+    2. Riley clicks CTB1: the popup shows its details, comms, its KPIs and the built-in alarm table filtered to CTB1.
+    3. Riley acknowledges one alarm in the table and clicks "Open CTB1", which goes to `/ctb/CTB1`.
+  - **Climax:** Riley is on CTB1's own page within two clicks of seeing the alarm.
+  - **Resolution:** the map shows the new count when Riley comes back.
+  - **Edge case:** CTB1's comms are lost; the icon and the popup say "Comms lost" in words, and its values show as stale, not as current.

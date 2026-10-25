@@ -53,7 +53,7 @@ Open-source readiness, meaning a stranger can install it from the README, comes 
 
 ## First step: the spike
 
-Before any feature work, spend one to two days building a blank component module and getting a MapLibre canvas onto a Perspective view on a live 8.3 Gateway, with one edit sent back to the page as an event.
+Before any feature work, spend one to two days building a blank component module and getting a MapLibre canvas onto a Perspective view on a live 8.3 Gateway, with one edit sent back to the page as an event. The spike also checks that alarm counts aggregate on tag folders and UDT instances, which the alarm features depend on.
 
 - **Go** when the module builds and runs within two days and the round trip (props in, event out) works.
 - **No-go** when the toolchain or the Perspective client API takes most of the two days. Then the answer is a better editor page on the built-in Map, and this brief records why.
