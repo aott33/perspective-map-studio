@@ -28,6 +28,23 @@ People draw and edit on the map itself: drop a point, draw a line or an area ver
 - **Operators**, occasionally, on a phone: move a pin that is in the wrong place. Nothing more.
 - **First and only confirmed user:** the owner's own `ign-scada-template`. Other projects come later, when the module is open-sourced; it is built for that day but not released for it.
 
+## Success Criteria
+
+The first version is done when all of these hold, by the end of January 2027 (three months at two days a week, about 26 working days):
+
+1. **It replaces the template's `/map/edit`.** The template's map editing runs on Map Studio, the Leaflet drawing layer is gone, and the draft, change set and `prov` path work unchanged.
+2. **An admin builds a field from nothing in 30 minutes.** The Mesa demo field (its sites, its pipelines split at taps, one geofence) laid out with the editor alone, no CSV and no script, in under 30 minutes, without help. [ASSUMPTION: tested on someone other than the owner; who is open]
+3. **A point moves on a phone.** At 390 px, touch only, a pin is moved and the edit reaches the page.
+4. **The demo field is the scale.** Smooth on the demo field; 300 sites and 2,000 segments are a later target.
+
+Open-source readiness (a stranger installs it from the README) comes after the owner has validated it in the template.
+
+## What Makes This Different
+
+- **Open source and free** where the alternative is a packaged project sold for about 25,000 USD.
+- **Editing on the map itself**, as a component, where the built-in Map and Perspective-only tools edit through props, forms and Gateway round trips.
+- **Storage stays with the host.** Edits are events, so a project keeps its own authority (in the template, git and `prov` review). Honest limit: this is execution, not a moat; anyone with the same toolchain could build it.
+
 ## Scope
 
 **First version: the editor.**
