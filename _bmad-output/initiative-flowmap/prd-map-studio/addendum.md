@@ -21,12 +21,12 @@ Also from the idea doc: Mustry's open-source Perspective component module, and I
 - Renderer: MapLibre GL JS, deck.gl for display; editing through Terra Draw's MapLibre adapter (to evaluate in the spike).
 - Place check offline: bundled country and province or state boundaries (Natural Earth, public domain) and a city list (GeoNames, attribution required), looked up in the browser. Size is an estimate of a few MB, unverified.
 - Map store: tables Map Studio creates in a database connection the project names; the mechanism (Gateway hook, named queries or scripts) is an architecture decision.
-- Live updates across components (FR-29): mechanism open (polling, a Gateway push, or a message handler).
+- Live updates across components (FR-29): mechanism open (polling, a Gateway push or a message handler).
 - Satellite basemap provider: open (Mapbox satellite on the existing token, or another provider with acceptable terms).
 
 ## Template follow-up (ign-scada-template)
 
-Moving the map's source of truth to the map store means a later pull request in the template that retires `prov`'s map steps (`add-pipeline`, `map import`, `map import-geojson`), the `map_draft` and `map_draft_event` tables and their named queries, `ops.mapedit` and `/map/edit`, and moves `/map` onto Map Studio. It must also cover the other consumers of the `_Model/Map` document, the view generators and their byte gates (`scripts/gen/check.py`), the committed Edge example (which keeps the built-in Map), and the PV-29 load harness with its 30-pad scale set, plus a cut-over plan for the Mesa demo field's data. Alarm presentation on the new map goes through the template's engineering review (ER-27), with `docs/map.md` section 5 as the parity checklist (FR-34).
+Moving the map's source of truth to the map store means a later pull request in the template that retires `prov`'s map steps (`add-pipeline`, `map import`, `map import-geojson`), the `map_draft` and `map_draft_event` tables and their named queries, `ops.mapedit` and `/map/edit`, and moves `/map` onto Map Studio. It must also cover the other consumers of the `_Model/Map` document, the view generators and their byte gates (`scripts/gen/check.py`), the committed Edge example (which keeps the built-in Map) and the PV-29 load harness with its 30-pad scale set, plus a cut-over plan for the Mesa demo field's data. Alarm presentation on the new map goes through the template's engineering review (ER-27), with `docs/map.md` section 5 as the parity checklist (FR-34).
 
 ## Signing key
 

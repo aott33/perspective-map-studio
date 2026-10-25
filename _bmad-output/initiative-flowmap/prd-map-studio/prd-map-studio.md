@@ -1,6 +1,6 @@
 ---
 title: Map Studio for Ignition Perspective - PRD
-status: draft
+status: final
 created: 2026-10-25
 updated: 2026-10-25
 ---
@@ -13,9 +13,9 @@ This PRD defines the first version of Map Studio for its owner and for the downs
 
 ## 1. Vision
 
-Map Studio is the map of an Ignition 8.3 Perspective project: one component everyone opens. Viewers and operators see their sites and assets on a map, each icon showing its comms status and one key value, and a click opens a popup with the critical information (metadata, comms, a few key values) and, where configured, a link to the asset's own page.
+Map Studio is the map of an Ignition 8.3 Perspective project: one component everyone opens. Viewers and operators see their sites and assets on a map, each icon showing its comms state and one key value, and a click opens a popup with the critical information (metadata, comms, a few key values) and, where configured, a link to the asset's own page.
 
-Map editors (admins and integrators) see the same map plus the Map Studio tools. With them they build the map for a new field, map a field that runs in Ignition but has no map yet, and keep an existing map right: add and change map items, draw lines and areas, import files, link each map item to an asset in the project and choose which tags feed its icon and popup. Map Studio saves the map as they work, to a database the project names, and that database is the map's source of truth.
+Map editors (admins and integrators) see the same map plus the Map Studio tools. With them they build the map for a new field, map a field that runs in Ignition but has no map yet, and keep an existing map right: add and change map items, draw lines and areas, import files, link each map item to an asset in the project and choose which tags feed its icon and popup. Map Studio saves the map as they work to the map store, a database the project names, which is the map's source of truth.
 
 Linking the map to the project's data is the main benefit: a map that is quick to build and stays connected to live values. It looks modern, minimal and clean, in one minimalist icon style, where the map it replaces looked cobbled together.
 
@@ -27,7 +27,7 @@ Linking the map to the project's data is the main benefit: a map that is quick t
 
 - **Map editor** - an admin or an integrator. Builds a map for a new field, builds a map for an existing field that has no map yet, and changes an existing map. An integrator who supports a project is a map editor too.
 - **Integrator** - a map editor who usually provisions by import. Every map editor can import, so the two roles share one set of rights; "integrator" names the job, not a separate permission.
-- **Operator** - on a phone in the field: moves a point and edits an item's properties. Draws nothing.
+- **Operator** - on a phone in the field: moves a point and edits a map item's properties. Draws nothing.
 - **Viewer** - anyone without an editing role: sees the map, icons and popups, and follows a popup's link.
 
 ### 2.2 Key User Journeys
@@ -35,11 +35,11 @@ Linking the map to the project's data is the main benefit: a map that is quick t
 Terms such as map item, kind setup and linked are defined in section 3.
 
 - **UJ-1. Sam lays out a field that has no map.**
-  - **Persona + context:** Sam is a map editor bringing a field onto the map: a new field, or an existing one that runs in Ignition but has no map. Before starting, Sam has researched every item to bring online, with its properties and its latitude and longitude, often already in a spreadsheet laid out like the import template.
+  - **Persona + context:** Sam is a map editor bringing a field onto the map: a new field, or an existing one that runs in Ignition but has no map. Before starting, Sam has researched every map item to bring online, with its properties and its latitude and longitude, often already in a spreadsheet laid out like the import template.
   - **Entry state:** signed in on a laptop, on the map page, which is empty or nearly empty.
   - **Path:**
     1. Sam picks what to add, in any order: a pipeline, a pad, a compressor station.
-    2. A form asks for the name and properties of that kind of item, and links it to an existing asset in the host system.
+    2. A form asks for the name and properties of that kind of map item, and links it to an existing asset in the project.
     3. Sam sets its location either by typing latitude and longitude or by picking the point on the map, the way you set a stop in map directions. Typed coordinates show their country, province or state, and city, so Sam sees at once whether they are roughly right; "Zoom to location" shows the spot on the map.
     4. Sam checks the layout against satellite imagery or an imported reference layer.
     5. Sam repeats until the field is laid out, or imports a file instead (UJ-3).
@@ -55,7 +55,7 @@ Terms such as map item, kind setup and linked are defined in section 3.
   - **Entry state:** signed in on a laptop, on the map page with the live field showing; Sam opens the Map Studio tools.
   - **Path:**
     1. Sam selects the lateral, drags two vertices to the new route and inserts a third on the line.
-    2. Sam adds P31 with "Add another like the last" from a neighbouring pad, sets its location and links it to the P31 asset; its base tag path comes from the asset, so its icon and popup work at once from the pad kind's setup.
+    2. Sam adds P31 with "Add another like the last" from a neighbouring pad, sets its location and links it to the P31 asset; its base path comes from the asset, so its icon and popup work at once from the pad kind's setup.
     3. Sam draws the lease geofence vertex by vertex and finishes it with a double-click.
   - **Climax:** P31's icon shows its comms status and pressure as soon as it is linked; viewers see the new route and the geofence without a release step.
   - **Resolution:** the changes are saved; Sam closes the tools and the page is the plain map again.
@@ -72,7 +72,7 @@ Terms such as map item, kind setup and linked are defined in section 3.
     5. Jordan selects twenty pads on one route and changes a shared property at once.
   - **Climax:** every pad shows comms, pressure and its alarm count, from one kind setup.
   - **Resolution:** the field is saved; Jordan shares the page URL with the operators.
-  - **Edge case:** some features have no matching asset; they stay on the map marked unlinked, and a count of unlinked items shows until they are matched or deleted.
+  - **Edge case:** some features have no matching asset; they stay on the map marked unlinked, and a count of unlinked map items shows until they are matched or deleted.
 
 - **UJ-4. Alex fixes a pin from the field.**
   - **Persona + context:** Alex, an operator standing at pad P12, sees on a phone that its pin sits 200 m off.
@@ -89,8 +89,8 @@ Terms such as map item, kind setup and linked are defined in section 3.
   - **Persona + context:** Riley, a viewer on the production team, watches the field map on a desktop.
   - **Entry state:** signed in, on the map page; no editing role, so no Map Studio tools.
   - **Path:**
-    1. CTB1's icon shows a comms glyph in its normal state, an alarm glyph and a count of 2.
-    2. Riley clicks CTB1: the popup shows its details, comms, its KPIs and the built-in alarm table filtered to CTB1.
+    1. CTB1's icon shows a normal comms glyph, an alarm glyph and a count of 2.
+    2. Riley clicks CTB1: the popup shows its details, comms and KPIs, and the built-in alarm table filtered to CTB1.
     3. Riley acknowledges one alarm in the table and clicks "Open CTB1", which goes to `/ctb/CTB1`.
   - **Climax:** Riley is on CTB1's own page within two clicks of seeing the alarm (acknowledging is optional and not counted).
   - **Resolution:** the map shows the new count when Riley comes back.
@@ -181,10 +181,10 @@ Each point map item is drawn as an icon showing its kind's glyph, its comms stat
 
 #### FR-3: Labels that thin out
 
-Map item names show as labels that give way to each other as the user zooms out, more important kinds winning. Realizes UJ-5.
+Map item names show as labels that give way to each other as the user zooms out; the kind list ranks kinds, and higher-ranked kinds keep their labels. Realizes UJ-5.
 
 **Consequences (testable):**
-- At the starting area's zoom no two labels overlap.
+- At the starting area's zoom, no two labels overlap.
 - The project can set, per kind, the zoom below which its labels and icons are hidden.
 
 #### FR-33: Search and zoom
@@ -193,19 +193,19 @@ Every user can search map items by name or asset; choosing a result zooms the ma
 
 **Consequences (testable):**
 - Typing part of a name lists matching map items with their kind, as the user types.
-- Choosing a result zooms to the item, selects it and shows its ring; a line or an area is fitted to the view.
+- Choosing a result zooms to the map item, selects it and shows its ring; a line or an area is fitted to the view.
 - Search works on a 390 px phone and by keyboard alone.
 
 #### FR-34: Match today's map
 
-Map Studio shows everything the template's current map shows, as approved in its engineering review (ER-27), so SM-1 can retire it. Realizes UJ-5.
+Map Studio shows everything the template's current map shows, as approved in its engineering review (ER-27), so SM-1 can retire the current map. Realizes UJ-5.
 
 **Consequences (testable):**
 - Lines carry state: weight by pipe size, the hue of the highest alarm on the line's alarms path, dashed for no data or comms lost, and the alarm glyph with its digit at the line's midpoint, so a line's alarm never reads by colour alone.
 - The flow direction shows as an arrow on the selected line only.
 - Map items within 20 m of each other draw as one shared marker; a tap lists them to pick from.
 - Controls offer Fit to the starting area and Return to the selection, and toggles hide lines and names.
-- The template's `docs/map.md` section 5 is the checklist; each item there is met or listed as a deliberate change for engineering review.
+- The template's `docs/map.md` section 5 is the checklist; each entry there is met or listed as a deliberate change for engineering review.
 
 ### 4.2 Popups
 
@@ -213,7 +213,7 @@ Map Studio shows everything the template's current map shows, as approved in its
 
 #### FR-4: Open a popup
 
-A user opens a map item's popup by clicking or tapping it; it shows the parts its kind setup enables, with live values updating while it is open. Realizes UJ-5.
+A user opens a map item's popup by clicking or tapping it; the popup shows the parts its kind setup enables, with live values updating while it is open. Realizes UJ-5.
 
 **Consequences (testable):**
 - A kind setup with no popup parts enabled opens no popup.
@@ -225,7 +225,7 @@ A user opens a map item's popup by clicking or tapping it; it shows the parts it
 Where enabled, the popup embeds the alarm table filtered to the map item's alarms path. Realizes UJ-5. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
 
 **Consequences (testable):**
-- The table lists only alarms under the item's alarms path.
+- The table lists only alarms under the map item's alarms path.
 - Acknowledging works as in the alarm table anywhere in the project and follows Ignition's acknowledge permissions; Map Studio adds no rules.
 
 #### FR-6: Popup link
@@ -234,7 +234,7 @@ Where configured, the popup shows a button that goes to a project page or a URL,
 
 **Consequences (testable):**
 - A link `/ctb/{asset.id}` on CTB1 goes to the project page `/ctb/CTB1`.
-- A placeholder with no value (for example `{asset.id}` on an unlinked item) hides the button rather than going to a broken page.
+- A placeholder with no value (for example `{asset.id}` on an unlinked map item) hides the button rather than going to a broken page.
 - An outside URL opens as Perspective opens outside URLs.
 
 ### 4.3 Roles and the Map Studio tools
@@ -260,7 +260,7 @@ The tools show the current mode in words and a glyph, and Esc returns to Select.
 
 #### FR-36: First run
 
-An empty map shows map editors a way in: "Draw your first site" and "Import CSV", and a short tour of points, lines and areas that can be skipped. Realizes UJ-1.
+An empty map shows map editors a way in: "Draw your first site" and "Import CSV", and a short tour of points, lines and areas, which can be skipped. Realizes UJ-1.
 
 **Consequences (testable):**
 - On a map with no map items, a map editor sees both actions; a viewer sees an empty map with a short note.
@@ -268,7 +268,7 @@ An empty map shows map editors a way in: "Draw your first site" and "Import CSV"
 
 ### 4.4 Kinds, kind setup and data links
 
-**Description:** The project supplies its kinds and its asset list. A map editor links map items to assets and writes each kind setup once; items inherit it, with overrides where needed. Realizes UJ-2, UJ-3.
+**Description:** The project supplies its kinds and its asset list. A map editor links map items to assets and writes each kind setup once; map items inherit it, with overrides where needed. Realizes UJ-2, UJ-3.
 
 #### FR-9: Kinds from the project
 
@@ -292,20 +292,20 @@ A map editor links a map item to an asset from the asset list, and can unlink it
 
 **Consequences (testable):**
 - A linked item takes its base path from its asset, and its icon and popup work at once from its kind setup.
-- Unlinked items are allowed; the tools show how many there are and can list them.
+- Unlinked map items are allowed; the tools show how many there are and can list them.
 - Two map items may share a name when they link to different assets; the name shows a red underline and a tooltip saying it is already in use.
 - When a linked asset disappears from the asset list or changes its id, the map item shows as unlinked with the reason, and keeps its location and properties.
 - A map item whose kind is no longer in the kind list stays on the map, marked "Unknown kind".
 
 #### FR-12: Write a kind setup
 
-A map editor writes a kind's setup once: comms path, up to 4 KPIs, alarms path, popup parts and popup link, as paths relative to each item's base path. Realizes UJ-3.
+A map editor writes a kind's setup once: comms path, up to 4 KPIs, alarms path, popup parts and popup link, as paths relative to each map item's base path. Realizes UJ-3.
 
 **Consequences (testable):**
 - Changing a kind setup changes every map item of that kind that has no override.
 - Each live value (comms, each KPI, the alarm count, the alarm table) has its own on and off switch.
 - A tag browser lets the editor pick a tag instead of typing a path.
-- A path that does not resolve for a map item is reported for that item, not silently left blank.
+- A path that does not resolve for a map item is reported for that map item, not silently left blank.
 
 #### FR-13: Override per item
 
@@ -347,9 +347,9 @@ Line ends and vertices snap to nearby map items and vertices while drawing, with
 A map editor deletes map items and undoes or redoes any edit: adds, geometry changes, deletes and property changes. Realizes UJ-2, UJ-4.
 
 **Consequences (testable):**
-- Delete asks for no confirmation; one undo restores the item with its link and properties.
+- Delete asks for no confirmation; one undo restores the map item with its link and properties.
 - Undo and redo work by buttons and by Ctrl+Z and Ctrl+Shift+Z.
-- Undo covers the user's own edits in the current session. Undoing an edit that is already saved saves the reverse, and is refused, as in FR-31, when another map editor has changed the map item since.
+- Undo covers the user's own edits in the current session. Undoing an edit that is already saved saves the reverse edit, and is refused, as in FR-31, when another map editor has changed the map item since.
 
 #### FR-18: Fast entry
 
@@ -361,7 +361,7 @@ A map editor duplicates a map item or adds another like the last, which copies t
 
 #### FR-19: Validation while drawing
 
-The tools check an item while it is drawn and say what is wrong in plain words beside it. Realizes UJ-1.
+The tools check a map item while it is drawn and say what is wrong in plain words beside it. Realizes UJ-1.
 
 **Consequences (testable):**
 - A self-intersecting area and a line with fewer than two vertices are flagged before they are finished.
@@ -400,18 +400,18 @@ A user downloads the CSV template for a kind, with the columns its import needs.
 
 #### FR-23: Import files
 
-A map editor imports map items from CSV, KML or GeoJSON. The import is a preview until the user adds it to the map; adding it saves it as one edit that one undo removes. Realizes UJ-3.
+A map editor imports map items from CSV, KML or GeoJSON. The import is a preview until the user adds it to the map; adding it saves it as one edit that a single undo removes. Realizes UJ-3.
 
 **Consequences (testable):**
-- The import shows how many items it found and lists rows it could not read, with the reason.
+- The import shows how many map items it found and lists rows it could not read, with the reason.
 - The user can cancel an import with nothing changed.
 
 #### FR-24: Match imported items to assets
 
-After an import, Map Studio links items to assets with the same name and lets the user match the rest by hand. Realizes UJ-3.
+After an import, Map Studio links map items to assets with the same name and lets the user match the rest by hand. Realizes UJ-3.
 
 **Consequences (testable):**
-- The match shows how many items it linked and how many remain unlinked.
+- The match shows how many map items it linked and how many remain unlinked.
 
 #### FR-25: Bulk edit
 
@@ -475,7 +475,7 @@ The project names a database connection; Map Studio creates and upgrades its own
 Two map editors working on the map at the same time never overwrite each other silently. Realizes UJ-2.
 
 **Consequences (testable):**
-- When both change the same map item, the second save is refused with a message, and the user sees the other's change.
+- When both change the same map item, the second save is refused with a message, and the user sees the other editor's change.
 
 #### FR-35: Export
 
@@ -567,7 +567,7 @@ One to two days before any feature: a blank component module built from an open-
 
 - **SM-3: Phone edits.** At 390 px, touch only, a pin is moved and a property edited, and both reach the map store. Validates FR-27, FR-28.
 - **SM-4: Nothing lost.** Closing the browser mid-layout and reopening on another computer loses no finished edit. Validates FR-29.
-- **SM-5: Alarm to page in two clicks.** From an icon with an alarm count, a viewer reaches the item's own page in two clicks. Validates FR-2, FR-4 to FR-6, FR-33.
+- **SM-5: Alarm to page in two clicks.** From an icon with an alarm count, a viewer reaches the map item's own page in two clicks. Validates FR-2, FR-4 to FR-6, FR-33.
 
 **Counter-metrics (do not optimize)**
 
