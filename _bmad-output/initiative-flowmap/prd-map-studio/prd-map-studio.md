@@ -9,26 +9,28 @@ updated: 2026-10-25
 
 ## 0. Document purpose
 
-This PRD defines the first version of Map Studio for its owner and for the downstream BMAD steps: the initiative requirements (Sofia), the UX specification, the architecture and the epics. It builds on the final product brief (`../brief-flowmap/brief-flowmap.md`) and its addendum, and on the source idea (`docs/idea.md`), and does not repeat them. Section 3's Glossary sets the vocabulary every later section and document uses exactly. Features in section 4 nest numbered requirements (FR-n) that cite the journeys of section 2.3 (UJ-n); assumptions are tagged inline and indexed in section 9. Technical choices and reference material are in `addendum.md` beside this file.
+This PRD defines the first version of Map Studio for its owner and for the downstream BMAD steps: the initiative requirements (Sofia), the UX specification, the architecture and the epics. It builds on the final product brief (`../brief-flowmap/brief-flowmap.md`) and its addendum, and on the source idea (`docs/idea.md`), and does not repeat them. Section 3's Glossary sets the vocabulary every later section and document uses exactly. Features in section 4 nest numbered requirements (FR-n) that cite the journeys of section 2.3 (UJ-n); assumptions are tagged inline and indexed in section 10; claims about Perspective or the module SDK are tagged `[UNVERIFIED]` until checked on a live Gateway. Technical choices and reference material are in `addendum.md` beside this file.
 
 ## 1. Vision
 
 Map Studio is the map of an Ignition 8.3 Perspective project: one component everyone opens. Viewers and operators see their sites and assets on a map, each icon showing its comms status and one key value, and a click opens a popup with the critical information (metadata, comms, a few key values) and, where configured, a link to the asset's own page.
 
-Admins and integrators see the same map plus the Map Studio tools. With them they build the map for a new field, map a field that runs in Ignition but has no map yet, and keep an existing map right: add and change items, draw lines and areas, import files, link each item to an asset in the project and choose which tags feed its icon and popup. Map Studio saves the map as they work, to a database the project names, and that database is the map's source of truth.
+Map editors (admins and integrators) see the same map plus the Map Studio tools. With them they build the map for a new field, map a field that runs in Ignition but has no map yet, and keep an existing map right: add and change map items, draw lines and areas, import files, link each map item to an asset in the project and choose which tags feed its icon and popup. Map Studio saves the map as they work, to a database the project names, and that database is the map's source of truth.
 
-Linking the map to the project's data is the main benefit: a map that is quick to build and stays connected to live values.
+Linking the map to the project's data is the main benefit: a map that is quick to build and stays connected to live values. It looks modern, minimal and clean, in one minimalist icon style, where the map it replaces looked cobbled together.
+
+**What live editing gives up.** There is no draft to review before others see a change, no approval and no rollback to an earlier map. Undo, the record of who changed what (FR-30) and export (FR-35) are the safety net.
 
 ## 2. Target User
 
 ### 2.1 Roles
 
 - **Map editor** - an admin or an integrator. Builds a map for a new field, builds a map for an existing field that has no map yet, and changes an existing map. An integrator who supports a project is a map editor too.
-- **Integrator** - everything a map editor does, plus mass provisioning by CSV import.
+- **Integrator** - a map editor who usually provisions by import. Every map editor can import, so the two roles share one set of rights; "integrator" names the job, not a separate permission.
 - **Operator** - on a phone in the field: moves a point and edits an item's properties. Draws nothing.
 - **Viewer** - anyone without an editing role: sees the map, icons and popups, and follows a popup's link.
 
-### 2.3 Key User Journeys
+### 2.2 Key User Journeys
 
 - **UJ-1. Sam lays out a field that has no map.**
   - **Persona + context:** Sam is a map editor bringing a field onto the map: a new field, or an existing one that runs in Ignition but has no map. Before starting, Sam has researched every item to bring online, with its properties and its latitude and longitude, often already in a spreadsheet laid out like the import template.
@@ -88,7 +90,7 @@ Linking the map to the project's data is the main benefit: a map that is quick t
     1. CTB1's icon shows a comms glyph in its normal state, an alarm glyph and a count of 2.
     2. Riley clicks CTB1: the popup shows its details, comms, its KPIs and the built-in alarm table filtered to CTB1.
     3. Riley acknowledges one alarm in the table and clicks "Open CTB1", which goes to `/ctb/CTB1`.
-  - **Climax:** Riley is on CTB1's own page within two clicks of seeing the alarm.
+  - **Climax:** Riley is on CTB1's own page within two clicks of seeing the alarm (acknowledging is optional and not counted).
   - **Resolution:** the map shows the new count when Riley comes back.
   - **Edge case:** CTB1's comms are lost; the icon and the popup say "Comms lost" in words, and its values show as stale, not as current.
 
@@ -121,15 +123,16 @@ Every later section, and every document built from this PRD, uses these terms ex
 - **Asset contract** - what the project must supply for each asset (at least an id, a name, a kind and a base path) and how.
 - **Linked** and **unlinked** - a map item is linked when it points to an asset, and unlinked otherwise. Unlinked items are allowed and counted.
 - **Base path** - the tag path of an asset, from which the kind setup's relative paths are resolved.
-- **Comms path** - the tag that gives a map item's communication state.
-- **KPI** - a key value shown on a map item's icon or in its popup, read from a tag path. A kind setup has up to 4.
+- **Comms path** - the tag whose value is a map item's communication state. The project decides how that tag is computed (in the template, from each source's `Heartbeat`).
+- **KPI** - a key value shown in a map item's popup, read from a tag path. A kind setup has up to 4; one of them may be marked as the **icon KPI**, shown on the icon.
 - **Alarms path** - the place in the tag hierarchy whose alarms belong to a map item. It drives the alarm count and the popup's alarm table.
 - **Alarm count** - the number of active alarms under an alarms path, optionally shown on the icon.
-- **Stale** - a value whose source has not updated in time, or whose comms are lost. Shown as stale, never as current.
+- **Live value** - any value Map Studio reads from a tag: comms state, a KPI, an alarm count. Each is optional in the kind setup.
+- **Stale** - a value whose tag quality is not good, or any value of a map item whose comms are lost. Shown as stale, never as current.
 
 **Viewing**
 
-- **Icon** - how a point map item is drawn: its kind's glyph, with comms state, one KPI and the alarm count where configured.
+- **Icon** - how a point map item is drawn: its kind's glyph, with comms state, the icon KPI and the alarm state where configured.
 - **Popup** - the panel that opens when a map item is clicked or tapped: details, comms, KPIs, the alarm table and the popup link, each optional.
 - **Alarm table** - the built-in Perspective Alarm Status Table embedded in a popup, filtered to the item's alarms path. Acknowledging follows Ignition's own permissions.
 - **Popup link** - an optional button in a popup that goes to a project page or a URL. It may contain placeholders.
@@ -150,7 +153,7 @@ Every later section, and every document built from this PRD, uses these terms ex
 
 ### 4.1 Map view and icons
 
-**Description:** Every user sees the map: map items on a basemap, opening on the component's starting area. Point map items are drawn as icons that carry their kind's glyph, comms state, one KPI and the alarm count, each where the kind setup configures it. Normal items are neutral; state reads in words and glyphs, never colour alone. Realizes UJ-2, UJ-3, UJ-5.
+**Description:** Every user sees the map: map items on a basemap, opening on the component's starting area. Point map items are drawn as icons that carry their kind's glyph, comms state, one KPI and the alarm count, each where the kind setup configures it. Normal items are neutral; state reads in words and glyphs, never colour alone. Realizes UJ-5.
 
 #### FR-1: Show the map
 
@@ -163,12 +166,13 @@ A Map Studio component shows the project's map, opening on the starting area it 
 
 #### FR-2: Draw icons with state
 
-Each point map item is drawn as an icon showing its kind's glyph, its comms state from the comms path, one KPI and its alarm count, each only where configured. Realizes UJ-5.
+Each point map item is drawn as an icon showing its kind's glyph, its comms state from the comms path, the icon KPI and its alarm state, each only where the kind setup turns it on. Realizes UJ-5.
 
 **Consequences (testable):**
-- An item with comms lost shows a comms-lost glyph and the words "Comms lost" on hover or in its label; its KPI shows as stale.
-- An item with active alarms under its alarms path shows an alarm glyph and, where enabled, the count; the glyph and count follow Ignition's alarm state, not limits set in Map Studio.
-- An item in its normal state is neutral grey; colour appears only for an abnormal state.
+- A map item with comms lost shows a comms-lost glyph and the words "Comms lost" on hover or in its label; its KPI shows as stale.
+- A map item with active alarms under its alarms path shows the alarm glyph of its highest priority, solid while unacknowledged and hollow once acknowledged, with the priority digit as a label and, where enabled, the count; all of it follows Ignition's alarm state, not limits set in Map Studio.
+- A map item in its normal state is neutral grey; colour appears only for an abnormal state.
+- A kind setup with every live value turned off draws a plain icon and reads no tags.
 - Lines and areas show their kind's style; a selected map item shows a ring and its name.
 
 #### FR-3: Labels that thin out
@@ -188,6 +192,17 @@ Every user can search map items by name or asset; choosing a result zooms the ma
 - Choosing a result zooms to the item, selects it and shows its ring; a line or an area is fitted to the view.
 - Search works on a 390 px phone and by keyboard alone.
 
+#### FR-34: Match today's map
+
+Map Studio shows everything the template's current map shows, as approved in its engineering review (ER-27), so SM-1 can retire it. Realizes UJ-5.
+
+**Consequences (testable):**
+- Lines carry state: weight by pipe size, the hue of the highest alarm on the line's alarms path, dashed for no data or comms lost, and the alarm glyph with its digit at the line's midpoint, so a line's alarm never reads by colour alone.
+- The flow direction shows as an arrow on the selected line only.
+- Map items within 20 m of each other draw as one shared marker; a tap lists them to pick from.
+- Controls offer Fit to the starting area and Return to the selection, and toggles hide lines and names.
+- The template's `docs/map.md` section 5 is the checklist; each item there is met or listed as a deliberate change for engineering review.
+
 **Feature-specific NFRs:**
 - State and selection meet 3:1 contrast against the basemap in both the light and the dark theme (WCAG 1.4.11).
 - Colours come only from the host project's theme tokens.
@@ -198,7 +213,7 @@ Every user can search map items by name or asset; choosing a result zooms the ma
 
 #### FR-4: Open a popup
 
-A user opens a map item's popup by clicking or tapping it; it shows the parts its kind setup enables, with live values. Realizes UJ-5.
+A user opens a map item's popup by clicking or tapping it; it shows the parts its kind setup enables, with live values updating while it is open. Realizes UJ-5.
 
 **Consequences (testable):**
 - A kind setup with no popup parts enabled opens no popup.
@@ -207,7 +222,7 @@ A user opens a map item's popup by clicking or tapping it; it shows the parts it
 
 #### FR-5: Alarm table in the popup
 
-Where enabled, the popup embeds the alarm table filtered to the map item's alarms path. Realizes UJ-5.
+Where enabled, the popup embeds the alarm table filtered to the map item's alarms path. Realizes UJ-5. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
 
 **Consequences (testable):**
 - The table lists only alarms under the item's alarms path.
@@ -215,7 +230,7 @@ Where enabled, the popup embeds the alarm table filtered to the map item's alarm
 
 #### FR-6: Popup link
 
-Where configured, the popup shows a button that goes to a project page or a URL, with placeholders filled from the clicked map item. Realizes UJ-5.
+Where configured, the popup shows a button that goes to a project page or a URL, with placeholders filled from the clicked map item, using Perspective's navigation. Realizes UJ-5. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
 
 **Consequences (testable):**
 - A link `/ctb/{asset.id}` on CTB1 goes to the project page `/ctb/CTB1`.
@@ -230,7 +245,7 @@ Where configured, the popup shows a button that goes to a project page or a URL,
 
 #### FR-7: Show the tools by role
 
-The Map Studio tools appear only for users whose roles the project names as editing roles, and every save checks the role on the Gateway. Realizes UJ-1, UJ-2.
+The Map Studio tools appear only for users whose roles the project names as editing roles, and every save checks the role on the Gateway. Realizes UJ-1, UJ-2. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
 
 **Consequences (testable):**
 - A viewer sees no tools and no editing affordance; a map editor sees them.
@@ -243,7 +258,15 @@ The tools show the current mode in words and a glyph, and Esc returns to Select.
 
 **Consequences (testable):**
 - At any moment exactly one mode is active and named on screen.
-- Esc from any drawing mode cancels the unfinished item and returns to Select.
+- Esc from any drawing mode cancels the unfinished map item and returns to Select.
+
+#### FR-36: First run
+
+An empty map shows map editors a way in: "Draw your first site" and "Import CSV", and a short tour of points, lines and areas that can be skipped. Realizes UJ-1.
+
+**Consequences (testable):**
+- On a map with no map items, a map editor sees both actions; a viewer sees an empty map with a short note.
+- The tour runs on a throwaway layer, saves nothing, and can be skipped or reopened.
 
 ### 4.4 Kinds, kind setup and data links
 
@@ -255,7 +278,7 @@ The project supplies the list of kinds, each with its geometry, icon and form fi
 
 **Consequences (testable):**
 - Adding a kind to the project's list makes it available in the tools without rebuilding the module.
-- Map Studio ships a core icon set for the oil and gas kinds; a kind may name any icon from it.
+- Map Studio ships a core icon set in one minimalist style for the oil and gas kinds: well pad, wellhead, tank battery, compressor station, booster station, meter station, pig launcher or receiver, line valve, tap, RTU or comms tower, pipeline, lateral, lease road, geofence, region and site footprint. A kind may name any icon from it.
 
 #### FR-10: Asset list through the asset contract
 
@@ -272,16 +295,19 @@ A map editor links a map item to an asset from the asset list, and can unlink it
 **Consequences (testable):**
 - A linked item takes its base path from its asset, and its icon and popup work at once from its kind setup.
 - Unlinked items are allowed; the tools show how many there are and can list them.
-- Two items may share a name when they link to different assets; the name shows a red underline and a tooltip saying it is already in use.
+- Two map items may share a name when they link to different assets; the name shows a red underline and a tooltip saying it is already in use.
+- When a linked asset disappears from the asset list or changes its id, the map item shows as unlinked with the reason, and keeps its location and properties.
+- A map item whose kind is no longer in the kind list stays on the map, marked "Unknown kind".
 
 #### FR-12: Write a kind setup
 
 A map editor writes a kind's setup once: comms path, up to 4 KPIs, alarms path, popup parts and popup link, as paths relative to each item's base path. Realizes UJ-3.
 
 **Consequences (testable):**
-- Changing a kind setup changes every item of that kind that has no override.
+- Changing a kind setup changes every map item of that kind that has no override.
+- Each live value (comms, each KPI, the alarm count, the alarm table) has its own on and off switch.
 - A tag browser lets the editor pick a tag instead of typing a path.
-- A path that does not resolve for an item is reported for that item, not silently left blank.
+- A path that does not resolve for a map item is reported for that item, not silently left blank.
 
 #### FR-13: Override per item
 
@@ -325,6 +351,7 @@ A map editor deletes map items and undoes or redoes any edit: adds, geometry cha
 **Consequences (testable):**
 - Delete asks for no confirmation; one undo restores the item with its link and properties.
 - Undo and redo work by buttons and by Ctrl+Z and Ctrl+Shift+Z.
+- Undo covers the user's own edits in the current session. Undoing an edit that is already saved saves the reverse, and is refused, as in FR-31, when another map editor has changed the map item since.
 
 #### FR-18: Fast entry
 
@@ -351,6 +378,7 @@ The form shows the kind's fields, the asset picker and the location, marks requi
 
 **Consequences (testable):**
 - Required fields are marked and the form says which are missing.
+- Opening the form again for the same kind prefills the last values entered, except the name, the location and the link.
 
 #### FR-21: Location by typing or picking
 
@@ -363,7 +391,7 @@ The location is set by typing latitude and longitude or by picking the point on 
 
 ### 4.7 Import and bulk edit
 
-**Description:** Integrators bring map items in from files, match them to assets and change many at once. Realizes UJ-3.
+**Description:** Map editors, integrators most often, bring map items in from files, match them to assets and change many at once. Realizes UJ-3.
 
 #### FR-22: CSV template
 
@@ -374,7 +402,7 @@ A user downloads the CSV template for a kind, with the columns its import needs.
 
 #### FR-23: Import files
 
-A map editor imports map items from CSV, KML or GeoJSON; they appear on the map, unlinked, before anything is saved. Realizes UJ-3.
+A map editor imports map items from CSV, KML or GeoJSON. The import is a preview until the user adds it to the map; adding it saves it as one edit that one undo removes. Realizes UJ-3.
 
 **Consequences (testable):**
 - The import shows how many items it found and lists rows it could not read, with the reason.
@@ -408,7 +436,7 @@ A map editor shows an imported KML or GeoJSON file as a reference layer under th
 
 #### FR-27: Move a point on a phone
 
-On a 390 px phone with touch only, a user with phone editing moves a point by long-press and drag. Realizes UJ-4.
+On a 390 px phone with touch only, a user with phone editing moves a point by long-press and drag. Realizes UJ-4. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
 
 **Consequences (testable):**
 - The point is drawn above the finger while dragging, so it stays visible.
@@ -420,7 +448,7 @@ On a 390 px phone with touch only, a user with phone editing moves a point by lo
 On a phone, a user with phone editing edits a map item's properties in a bottom sheet. Realizes UJ-4.
 
 **Consequences (testable):**
-- Drawing tools are not offered below a set screen width.
+- Below 768 px wide, drawing tools are not offered; moving a point and editing properties are.
 
 ### 4.9 Saving
 
@@ -433,11 +461,12 @@ Every finished edit is saved to the map store without a save button. Realizes UJ
 **Consequences (testable):**
 - Closing the browser after an edit and opening the map on another computer shows the edit.
 - An edit that fails to save is shown as unsaved, with the reason, and is kept in the browser until it saves or the user discards it.
-- Other open components show a saved edit without a page reload. It appears within a few seconds.
+- Other open components show a saved edit without a page reload, within a few seconds.
+- When the map store cannot be reached on load, the map says so, shows nothing stale as current, and the tools are disabled until it can.
 
 #### FR-30: Map store
 
-The project names a database connection; Map Studio creates and upgrades its own tables there. Realizes UJ-1.
+The project names a database connection; Map Studio creates and upgrades its own tables there. Realizes UJ-1. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
 
 **Consequences (testable):**
 - A new project with an empty database connection works without hand-written SQL.
@@ -450,28 +479,39 @@ Two map editors working on the map at the same time never overwrite each other s
 **Consequences (testable):**
 - When both change the same map item, the second save is refused with a message, and the user sees the other's change.
 
+#### FR-35: Export
+
+A map editor exports the map, or a selection of it, as GeoJSON or CSV, with each map item's kind, properties and asset link. Realizes UJ-1, UJ-3.
+
+**Consequences (testable):**
+- An exported map imported into an empty project's map store gives the same map items, so a map can seed another project; whether and how to do so is the project's choice.
+- An export is a file the user saves; Map Studio keeps no copy.
+
 ### 4.10 Basemaps
 
 **Description:** The map sits on a basemap the project chooses per Gateway. Realizes UJ-1, UJ-4.
 
 #### FR-32: Basemaps
 
-The project offers none, OpenStreetMap, satellite and Mapbox basemaps; the user switches between those offered. Realizes UJ-1.
+The project offers none, OpenStreetMap, satellite and Mapbox basemaps; the user switches between those offered. Realizes UJ-1. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
 
 **Consequences (testable):**
 - With no basemap, the map items still draw on a blank background, for sites without internet.
-- A basemap that needs a token reads it from the project's secret store, never from a view or a file in git.
+- A basemap that needs a token reads it from the project's secret store, never from a view or a file in git. The token still reaches every viewer's browser, so only a public, restricted token may be used.
 
 ### 4.11 Cross-cutting requirements
 
-- **NFR-1 Responsiveness.** On the Mesa demo field, panning, zooming and dragging stay smooth on a laptop browser and a mid-range phone, and an edit shows on the map at once, before it is saved. 300 sites and 2,000 segments are a later target, not a first-version requirement.
+- **NFR-1 Responsiveness.** On the template's 30-pad scale set, panning, zooming and dragging run at 60 frames per second in a laptop browser, and an edit shows on the map within 100 ms, before it is saved. Measured first in the spike. 300 sites and 2,000 segments are a later target; nothing in the first version may rule them out.
 - **NFR-2 No Gateway call per click.** Drawing and editing run in the browser; the Gateway is called when an edit is finished, not on every click or vertex.
+- **NFR-9 Live value load.** Icon live values arrive for the whole page in one batch every 10 seconds, never as a tag subscription per map item per session (the template's list rule). A popup's values are live while it is open. A live value the kind setup turns off is not read at all.
 - **NFR-3 Accessibility.** WCAG 2.2: a non-drag alternative for every drag (2.5.7); targets at least 24 px, 44 px on touch (2.5.8); 3:1 non-text contrast in both themes (1.4.11); the tools usable by keyboard.
-- **NFR-4 Theme.** Colours come only from the host project's theme tokens, in both the light and the dark theme; the module carries no colour of its own.
-- **NFR-5 Security.** Editing rights are checked on the Gateway for every save (FR-7). Tokens and credentials come from the project's secret store, never from views, files or git (FR-32). Map Studio writes only to its map store, never to tags or devices.
-- **NFR-6 Platform.** Ignition 8.3 full Gateways only; not Edge Gateways. The module is a signed `.modl`, installed through the host's module lock.
+- **NFR-4 Theme.** Colours come only from the host project's theme tokens, in both the light and the dark theme; the module carries no colour of its own. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
+- **NFR-5 Security.** Editing rights are checked on the Gateway for every save (FR-7). Tokens and credentials come from the project's secret store, never from views, files or git (FR-32). Map Studio writes only to its map store, never to tags or devices; acknowledging in the embedded alarm table is Ignition's own write, under Ignition's permissions.
+- **NFR-6 Platform and supply chain.** Ignition 8.3 full Gateways only; not Edge Gateways. Java 17 on the Gateway; the host's Jython is untouched. The module ships as a signed `.modl` from a GitHub release, pinned by SHA-256 and certificate fingerprint in the host's module lock and baked into its private Gateway image; never a `.modl` in git. The Perspective client package versions are pinned to the Gateway version, and every 8.3.x upgrade is checked on the test stack before release.
 - **NFR-7 Verified claims.** Every claim about the Perspective client API or the module SDK stays marked unverified until it is checked on a live 8.3 Gateway and recorded in claude-ignition-skills.
-- **NFR-8 Public contract.** The component's parameters, the asset contract, the kind list and the CSV template formats are documented and versioned; a breaking change needs a new major version. Versions follow semantic versioning.
+- **NFR-8 Public contract.** The component's parameters and events, the asset contract, the kind list and the CSV template formats are documented and versioned; a breaking change needs a new major version. Versions follow semantic versioning.
+- **NFR-10 Licences.** No dependency that charges per deployment (the template's UX-36). Libraries, icon sets and place-check data use permissive licences, with their attributions shipped; no icon is derived from the template's AGPL-window OpenBridge set.
+- **NFR-11 Look.** Modern, minimal and clean: one minimalist icon style, neutral normal states, no decoration that carries no information.
 
 ## 5. Non-goals
 
@@ -479,7 +519,7 @@ The project offers none, OpenStreetMap, satellite and Mapbox basemaps; the user 
 - It does not create or change assets, tags or UDT instances; it links to what the project already has.
 - It does not write to devices or tags.
 - It is not an alarm system: alarm state and limits come from Ignition's alarms, and it does not replace the alarm table or the alarm pages.
-- It has no approval workflow, no draft and release split, and no version history of the map in the first version.
+- It has no approval workflow, no draft and release split, and no version history of the map in the first version (see "What live editing gives up" in section 1).
 - It does not run on Edge Gateways.
 
 ## 6. MVP scope
@@ -490,7 +530,18 @@ The project offers none, OpenStreetMap, satellite and Mapbox basemaps; the user 
 - A core icon set for the oil and gas kinds.
 - The template's map and map editing moved onto Map Studio (success metric SM-1).
 
-### 6.2 Out of scope for MVP
+### 6.2 Build order
+
+Not a cut line: every item in 6.1 ships. The order makes Map Studio useful on the template early.
+
+1. The spike (6.4).
+2. Viewing: the map, icons, popups, search, basemaps (FR-1 to FR-6, FR-32 to FR-34).
+3. Data links: kinds, the asset contract, linking, kind setup, overrides (FR-9 to FR-13), and the map store and saving (FR-29 to FR-31).
+4. Drawing and editing, forms and location (FR-7, FR-8, FR-14 to FR-21, FR-36).
+5. Import, bulk edit, reference layer and export (FR-22 to FR-26, FR-35).
+6. Phone editing (FR-27, FR-28).
+
+### 6.3 Out of scope for MVP
 
 - Flow animation (direction and rate along lines): the original idea, deferred so the map and editor ship first. [NOTE FOR PM] the reason the idea started; revisit first after the MVP.
 - The full icon library and other industries' kinds.
@@ -499,37 +550,63 @@ The project offers none, OpenStreetMap, satellite and Mapbox basemaps; the user 
 - Offline basemap tiles.
 - A second renderer (MapWeave).
 - Open-source release (README, examples, Exchange listing): after the owner validates it in the template.
-- Scale beyond the demo field (300 sites, 2,000 segments).
+- Scale beyond the 30-pad scale set (300 sites, 2,000 segments), though nothing may rule it out (NFR-1).
+
+### 6.4 First step: the spike
+
+One to two days before any feature: a blank component module built from an open-source one (see the addendum), a MapLibre canvas on a Perspective view on a live 8.3 Gateway, one edit sent back to the Gateway, and a check that alarm counts aggregate on tag folders and UDT instances.
+
+- **Measures to record:** hours to a green build, bundle size, frame rate on the 30-pad scale set, the size of one batch of icon values, and what broke on the phone.
+- **Go** when the module builds and runs within two days and the round trip works.
+- **No-go** when the toolchain or the Perspective client API takes most of the two days. Then the answer is a better map page on the built-in Map, and this PRD records why.
 
 ## 7. Success metrics
 
 **Primary**
 
-- **SM-1: It replaces the template's map pages.** The template's map and map editing run on Map Studio, the Leaflet map and drawing layer are retired, and the map lives in the map store. Validates FR-1 to FR-32.
-- **SM-2: A field from nothing in 30 minutes.** An admin who has not seen the Mesa demo field lays it out (sites, pipelines split at taps, one geofence, every item linked) with the tools alone, without help, in under 30 minutes. Validates FR-9 to FR-21.
+- **SM-1: It replaces the template's map pages.** The template's map and map editing run on Map Studio, the Leaflet map and drawing layer are retired, and the map lives in the map store. Validates FR-1 to FR-36.
+- **SM-2: A field from nothing in 30 minutes.** A map editor who has not seen the Mesa demo field (the template's sample field) lays it out (sites, pipelines split at taps, one geofence, every map item linked) with the tools alone, without help, in under 30 minutes. Validates FR-9 to FR-21.
 
 **Secondary**
 
 - **SM-3: Phone edits.** At 390 px, touch only, a pin is moved and a property edited, and both reach the map store. Validates FR-27, FR-28.
 - **SM-4: Nothing lost.** Closing the browser mid-layout and reopening on another computer loses no finished edit. Validates FR-29.
-- **SM-5: Alarm to page in two clicks.** From an icon with an alarm count, a viewer reaches the item's own page in two clicks. Validates FR-2, FR-4 to FR-6.
+- **SM-5: Alarm to page in two clicks.** From an icon with an alarm count, a viewer reaches the item's own page in two clicks. Validates FR-2, FR-4 to FR-6, FR-33.
 
 **Counter-metrics (do not optimize)**
 
 - **SM-C1: Features per release.** Adding tools must not slow SM-2; a feature that makes the 30-minute build slower is a regression. Counterbalances SM-1.
-- **SM-C2: Colour on the map.** More colour is not more information; a normal field should look mostly grey. Counterbalances SM-5.
+- **SM-C2: Colour on the map.** More colour is not more information: with every map item in its normal state, no map item shows a hue. Counterbalances SM-5.
 
 Target date for SM-1 to SM-5: end of January 2027, a target and not a deadline.
 
-## 8. Open questions
+## 8. Risks
 
-1. Which licence should the module use when it is open-sourced (MIT, as `docs/idea.md` proposed, or another)?
-2. Should the repository be renamed from `perspective-flowmap` to match Map Studio, and the module id and npm package with it?
+- **Toolchain weight:** Java 17, Gradle with Inductive Automation's module plugin, Node and module signing, kept working by one person. The spike tests it first.
+- **Perspective client coupling:** the client bundle compiles against Inductive Automation's Perspective client packages, so an 8.3.x upgrade can break it (NFR-6).
+- **Designer props editing:** arrays of objects edit poorly in the Designer; parameters are kept small and the map lives in the map store, not in props.
+- **Basemap privacy:** tiles are requested from outside the customer's network, and a Mapbox token reaches every viewer's browser (FR-32).
+- **Alarm presentation:** icons and lines that show state go through the template's engineering review (ER-27) before release.
+- **A second product to maintain:** releases kept to a version bump and a test-stack run.
+
+## 9. Open questions
+
+1. Which licence should the module use when it is open-sourced (MIT, as `docs/idea.md` proposed, or another)? Not blocking: decide before the open-source release.
+2. Should the repository be renamed from `perspective-flowmap` to match Map Studio, and the module id and npm package with it? Not blocking: decide before the first signed release.
 3. Which satellite basemap provider, on what terms?
 4. Where do the Map Studio tools live on the page (a toolbar on the map, a side panel, a separate page in the same component)? For the UX specification.
 5. How does the project supply its kinds and asset list (a named query, a script, a file), and in which format? For the architecture.
 6. Do alarm counts aggregate on tag folders and UDT instances at every level in 8.3? To check in the spike.
 
-## 9. Assumptions index
+## 10. Assumptions index
 
-None open. Every assumption made during discovery was confirmed by the owner and is recorded in `.memlog.md`.
+Figures and limits chosen during discovery and confirmed by the owner (recorded in `.memlog.md`), listed so downstream readers can tell them from measured facts:
+
+- Up to 4 KPIs per kind setup (FR-12).
+- 44 px touch targets, a 390 px phone, 768 px as the width below which drawing is not offered (FR-27, FR-28).
+- 30 minutes for SM-2; the 30-pad scale set, 60 frames per second and 100 ms for NFR-1.
+- 10 seconds between icon value batches (NFR-9); "a few seconds" for live updates across components (FR-29).
+- 20 m for a shared marker (FR-34, from the template).
+- The offline place-check data adds a few megabytes to the module (addendum; an estimate).
+
+Unverified platform claims, tagged `[UNVERIFIED]` inline: FR-5, FR-6, FR-7, FR-27, FR-30, FR-32, NFR-4.
