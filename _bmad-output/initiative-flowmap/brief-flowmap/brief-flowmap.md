@@ -46,3 +46,10 @@ People draw and edit on the map itself: drop a point, draw a line or an area ver
 **Later, each its own decision:** flow animation (direction and rate along lines); the full icon library and other industries' kinds; a time slider replaying history; clustering; offline basemap tiles; a second renderer.
 
 **Out:** storing or approving edits (the host's job); any write to a device; replacing the alarm table; Edge Gateways (built-in components only there).
+
+## First Step: the Spike
+
+One to two days of work, before any feature: build a blank Perspective component module from an existing open-source one (Mustry's, with Inductive Automation's module starter), get a MapLibre canvas drawing a few sites and one line on a Perspective view on a live 8.3 Gateway, and send one edit back to the page as an event.
+
+- **Go** when the module builds and runs within the two days and the round trip (props in, event out) works.
+- **No-go** when the toolchain or the Perspective client API takes most of the time. Then the answer is a better editor page on the built-in Map, and this brief records why.
