@@ -89,3 +89,56 @@ Linking the map to the project's data is the main benefit: a map that is quick t
   - **Climax:** Riley is on CTB1's own page within two clicks of seeing the alarm.
   - **Resolution:** the map shows the new count when Riley comes back.
   - **Edge case:** CTB1's comms are lost; the icon and the popup say "Comms lost" in words, and its values show as stale, not as current.
+
+## 3. Glossary
+
+Every later section, and every document built from this PRD, uses these terms exactly.
+
+**The product and its parts**
+
+- **Map Studio** - the Perspective component module and its component, `ao.mapstudio`.
+- **Map** - one saved set of map items with its basemap and view settings, shown by one Map Studio component. [ASSUMPTION: a project can hold several maps, for example one per field; a component shows one map at a time]
+- **Map Studio tools** - the editing mode of the component, shown only to users with an editing role. Without the tools, the component is the plain map.
+- **Map store** - the database where Map Studio saves maps, map items and kind setups. The project names the database connection; Map Studio creates its own tables. The map store is the source of truth for a map.
+
+**What is on a map**
+
+- **Map item** - one thing on a map: a point (a pad, a station, a valve), a line (a pipeline, a route) or an area (a geofence, a region). Has a kind, a name, properties and a location, and may be linked to an asset.
+- **Kind** - the type of a map item, such as well pad or compressor station. A kind sets the item's geometry (point, line or area), its icon and its form fields. The project supplies the list of kinds.
+- **Kind setup** - the configuration shared by every map item of a kind: its comms path, KPIs, alarms path, popup contents and popup link, written relative to each item's base path.
+- **Override** - a value set on one map item that replaces its kind setup for that item only.
+- **Property** - a named value on a map item, entered in its form or imported.
+- **Vertex** - a point on a line or an area. A **midpoint handle** sits between two vertices of the selected item and adds a vertex there.
+- **Snapped end** and **floating end** - a line end attached to a map item or a vertex, and one that is not. They look different.
+
+**Links to the project's data**
+
+- **Asset** - a thing that already exists in the project, such as a pad's UDT instance. Map Studio does not create assets.
+- **Asset list** - the assets the project offers for linking, supplied in the form the asset contract defines.
+- **Asset contract** - what the project must supply for each asset (at least an id, a name, a kind and a base path) and how.
+- **Linked** and **unlinked** - a map item is linked when it points to an asset, and unlinked otherwise. Unlinked items are allowed and counted.
+- **Base path** - the tag path of an asset, from which the kind setup's relative paths are resolved.
+- **Comms path** - the tag that gives a map item's communication state.
+- **KPI** - a key value shown on a map item's icon or in its popup, read from a tag path. A kind setup has up to 4.
+- **Alarms path** - the place in the tag hierarchy whose alarms belong to a map item. It drives the alarm count and the popup's alarm table.
+- **Alarm count** - the number of active alarms under an alarms path, optionally shown on the icon.
+- **Stale** - a value whose source has not updated in time, or whose comms are lost. Shown as stale, never as current.
+
+**Viewing**
+
+- **Icon** - how a point map item is drawn: its kind's glyph, with comms state, one KPI and the alarm count where configured.
+- **Popup** - the panel that opens when a map item is clicked or tapped: details, comms, KPIs, the alarm table and the popup link, each optional.
+- **Alarm table** - the built-in Perspective Alarm Status Table embedded in a popup, filtered to the item's alarms path. Acknowledging follows Ignition's own permissions.
+- **Popup link** - an optional button in a popup that goes to a project page or a URL. It may contain placeholders.
+- **Placeholder** - a name in braces in a popup link, filled from the clicked map item, for example `{asset.id}` or `{name}`.
+- **Basemap** - the map imagery under the map items: none, OpenStreetMap, satellite or Mapbox.
+- **Reference layer** - an imported KML or GeoJSON file shown under the map items for comparison, not edited.
+
+**Editing**
+
+- **Import** - bringing map items in from a CSV, KML or GeoJSON file, then matching them to assets.
+- **CSV template** - the empty CSV for a kind, with the columns its import needs, that Map Studio lets the user download.
+- **Bulk edit** - changing a property on several selected map items at once. Geometry is not bulk edited.
+- **Place check** - the country, province or state and city shown for typed coordinates, looked up offline.
+
+**Roles** (from 2.1): map editor, integrator, operator, viewer.
