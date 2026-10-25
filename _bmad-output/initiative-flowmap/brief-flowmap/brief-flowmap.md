@@ -80,3 +80,9 @@ One to two days of work, before any feature: build a blank Perspective component
 ## Vision
 
 If the first version proves itself in the template, Map Studio becomes the open-source map component for Ignition Perspective: published for other projects once validated, then extended with what the original idea started from, flow on the map (direction and rate along lines, animated), a full minimalist icon library for oil and gas, water, power, gas distribution and fleets, and a time slider replaying history. Success in two to three years is integrators reaching for it before the built-in Map, and the owner known for it.
+
+## Open Questions
+
+- Who runs the 30-minute test (someone other than the owner).
+- The module's licence when it is open-sourced (MIT, as the idea doc proposed, or another).
+- Renaming the repository from `perspective-flowmap` to match Map Studio.

@@ -70,3 +70,16 @@ Source: research subagent, 2026-10-25. Most licence and maintenance claims are *
 - **Mapbox GL Draw:** ISC, built for mapbox-gl-js (fetched); MapLibre compatibility and snapping unconfirmed.
 - **Leaflet-Geoman:** MIT core with a paid Pro tier, Leaflet only (fetched); snapping, split, cut, drag.
 - **Patterns to copy (Esri editor, QGIS):** snapping to nodes and vertices; split a line at a point (two segments inheriting attributes, parent id plus sequence); bulk import GeoJSON, then CSV, KML, shapefile; multi-select with a shared attribute panel showing mixed values; undo and redo; validation before save (self-intersection, orphan nodes, duplicate ids).
+
+## Parked for the PRD and architecture
+
+From `docs/idea.md`, still valid but too detailed for the brief:
+
+- **Module shape:** Gateway hook (Java 17) registering the component and its props schema; client bundle (TypeScript, React) with MapLibre GL JS and deck.gl; optional Designer part. Renderer as a swappable layer inside the bundle.
+- **Data contract** (to be reworked for editing): `nodes`, `edges`, two-way `selected`, `basemap`, `options`, and events. The idea doc's events (`onSelect`, `onOpen`, `onViewport`) grow edit events. GeoJSON as the interchange format. One `runScript` binding per page, never a tag subscription per item.
+- **Supply chain:** signed `.modl` from a GitHub release, pinned by SHA-256 and certificate fingerprint in the host's `modules/modules.lock.json`, baked into the private Gateway image; never a `.modl` in git. Signing key custody and rotation open.
+- **Risks to carry into architecture:** toolchain weight (Java 17, Gradle with IA's module plugin, Node, signing); Perspective client package coupling across 8.3.x upgrades; Designer props editor for arrays of objects; basemap privacy (tiles leave the site, Mapbox token on the client); maintenance of a second product.
+- **Naming from the idea doc, to update for Map Studio:** module id `com.aoindustrial.perspective.flowmap`, npm package `@aoindustrial/perspective-flowmap`.
+- **Alarm presentation:** colour, glyphs and motion that mean state go through the template's engineering review (ER-27, `docs/ux.md` section 11). Matters most when flow arrives.
+- **Edge Gateways:** out; the template's Edge profile keeps the built-in Map.
+- **MapWeave:** commercial, ruled out by the template's no-licence-fee rule (UX-36); a possible second renderer only if its analytics ever earn the licence.
