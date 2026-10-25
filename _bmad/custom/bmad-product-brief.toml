@@ -1,0 +1,7 @@
+[workflow]
+persistent_facts = [
+  "No em dashes in any artifact. Use ' - ' (space, hyphen, space) instead.",
+  "Every claim about the Perspective client API or the Ignition module SDK is marked unverified until it is checked on a live Ignition 8.3 Gateway and recorded in claude-ignition-skills.",
+  "The source idea document was written by someone else; treat its decisions as proposals to examine, not as settled requirements.",
+  "file:{project-root}/docs/idea.md",
+]
