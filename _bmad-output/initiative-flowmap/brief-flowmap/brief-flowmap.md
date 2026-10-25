@@ -7,6 +7,12 @@ updated: 2026-10-25
 
 # Product Brief: Map Studio for Ignition Perspective
 
+## Executive Summary
+
+Map Studio is an open-source Ignition 8.3 Perspective component for drawing and editing maps in the browser. Ignition's built-in Map shows places but offers no way to change them except editing props, so every project that needs a usable map editor builds one around it or buys one: packaged Perspective projects sell to integrators for about 25,000 USD.
+
+Map Studio puts the editing on the map itself: points, lines and areas drawn, dragged and snapped in place, many items edited at once, a point moved on a phone, in a modern and minimal UI on the host project's theme. It stores nothing; every edit goes to the page as an event, and the host project decides what it means. Its first user is the owner's oil and gas template, where it replaces a working but cobbled-together editor and keeps the template's review path to the registry. It is built to be open-sourced once proven there, and to show flow on the same map later.
+
 ## The Problem
 
 Ignition's built-in Perspective Map shows places, but it is hard to change them. Adding a site, moving a pin or redrawing a pipeline means editing arrays of props in the Designer, or building a custom editor around the map. The map has no drawing tools of its own: no snapping, no dragging a vertex, no drawing an area. It is built on Leaflet and resists styling. It also cannot show flow: no animation, no styling along a line, no hover.
@@ -30,7 +36,7 @@ People draw and edit on the map itself: drop a point, draw a line or an area ver
 
 ## Success Criteria
 
-The first version is done when all of these hold, by the end of January 2027 (three months at two days a week, about 26 working days):
+The first version is done when all of these hold. The target is the end of January 2027 (three months at two days a week, about 26 working days); it is a target, not a deadline, and work continues until the criteria hold rather than cutting scope to meet the date.
 
 1. **It replaces the template's `/map/edit`.** The template's map editing runs on Map Studio, the Leaflet drawing layer is gone, and the draft, change set and `prov` path work unchanged.
 2. **An admin builds a field from nothing in 30 minutes.** The Mesa demo field (its sites, its pipelines split at taps, one geofence) laid out with the editor alone, no CSV and no script, in under 30 minutes, without help. [ASSUMPTION: tested on someone other than the owner; who is open]
@@ -70,3 +76,7 @@ One to two days of work, before any feature: build a blank Perspective component
 
 - **Go** when the module builds and runs within the two days and the round trip (props in, event out) works.
 - **No-go** when the toolchain or the Perspective client API takes most of the time. Then the answer is a better editor page on the built-in Map, and this brief records why.
+
+## Vision
+
+If the first version proves itself in the template, Map Studio becomes the open-source map component for Ignition Perspective: published for other projects once validated, then extended with what the original idea started from, flow on the map (direction and rate along lines, animated), a full minimalist icon library for oil and gas, water, power, gas distribution and fleets, and a time slider replaying history. Success in two to three years is integrators reaching for it before the built-in Map, and the owner known for it.
