@@ -1,11 +1,11 @@
 ---
-title: Flow Map module for Ignition Perspective - product brief
+title: Map Studio for Ignition Perspective - product brief
 status: draft
 created: 2026-10-25
 updated: 2026-10-25
 ---
 
-# Product Brief: Flow Map for Ignition Perspective
+# Product Brief: Map Studio for Ignition Perspective
 
 ## The Problem
 
@@ -15,9 +15,34 @@ The upstream oil and gas template shows the cost. It built its own editor on the
 
 Integrators who want better today buy a packaged Perspective project, such as Nader Chinichian's Map Administration Tool (an admin project plus an end-user project with icons, styles and widgets, sold to integrators; about 25,000 USD by the owner's account). Or they build their own, as the template did.
 
+## The Solution
+
+Map Studio is a Perspective component module (`ao.mapstudio`) that draws a map and lets people edit it in place. A view places it, binds what to show, and handles what comes back, as it would any Perspective component. It draws on an open-source map stack (MapLibre GL JS, with deck.gl for display) and looks modern, minimal and clean, styled by the host project's theme tokens.
+
+People draw and edit on the map itself: drop a point, draw a line or an area vertex by vertex, drag a vertex, snap to existing sites, select many items and change their properties together, import a CSV. Every change goes back to the page as an event; the module stores nothing. The host project decides what an edit means. In the template, edits feed the existing draft, change set and `prov` review path, so the registry in git stays the authority. Another project could write edits straight to its own database.
+
 ## Who This Serves
 
 - **Admins**, the primary user. They keep a running system's map right (a new pad, a rerouted line, a geofence) and also build a new system's map from nothing, in the browser. They may never touch a CSV or a script: the editor alone has to be enough to lay out a whole field.
 - **Integrators** provisioning a project. Most of a field arrives by script or CSV import; they need to correct, extend and bulk-edit it on the map without touching props.
 - **Operators**, occasionally, on a phone: move a pin that is in the wrong place. Nothing more.
 - **First and only confirmed user:** the owner's own `ign-scada-template`. Other projects come later, when the module is open-sourced; it is built for that day but not released for it.
+
+## Scope
+
+**First version: the editor.**
+
+- Draw and edit points, lines (pipelines, routes) and areas (geofences, regions): add, move, delete, drag and insert vertices, snap to sites and vertices, undo.
+- Fast entry for building a field by hand: duplicate an item, add another like the last, keyboard shortcuts on a laptop.
+- Select many items and edit their shared properties at once.
+- CSV import of points; the template's GeoJSON import stays in `prov`.
+- Every edit sent to the page as an event. No storage in the module.
+- Object kinds from a list the host supplies (fields and icon per kind), so new kinds need no module change.
+- A small core icon set in one minimalist style for the oil and gas objects.
+- Modern, minimal editor UI on the host's theme tokens; state shown by words and glyphs, never colour alone.
+- Phones: view, and move a point. Drawing and forms on larger screens.
+- Basemaps the template already uses: none, OpenStreetMap, Mapbox.
+
+**Later, each its own decision:** flow animation (direction and rate along lines); the full icon library and other industries' kinds; a time slider replaying history; clustering; offline basemap tiles; a second renderer.
+
+**Out:** storing or approving edits (the host's job); any write to a device; replacing the alarm table; Edge Gateways (built-in components only there).
