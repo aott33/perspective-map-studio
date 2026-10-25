@@ -83,3 +83,59 @@ From `docs/idea.md`, still valid but too detailed for the brief:
 - **Alarm presentation:** colour, glyphs and motion that mean state go through the template's engineering review (ER-27, `docs/ux.md` section 11). Matters most when flow arrives.
 - **Edge Gateways:** out; the template's Edge profile keeps the built-in Map.
 - **MapWeave:** commercial, ruled out by the template's no-licence-fee rule (UX-36); a possible second renderer only if its analytics ever earn the licence.
+
+## Research: map UI best practices
+
+Source: research subagent, 2026-10-25. Fetch coverage was partial; "confirmed" means the fetched source said it, everything else is unconfirmed background knowledge and is a recommendation, not a citation.
+
+### Map editing
+
+- **Modes:** Terra Draw has one `select` mode plus per-geometry draw modes; `editable: true` lets features be dragged without switching modes. (confirmed, https://raw.githubusercontent.com/JamesLMilner/terra-draw/main/guides/4.MODES.md)
+- **Vertices:** Terra Draw select flags `coordinates.midpoints`, `coordinates.draggable`, `coordinates.deletable`; ArcGIS Map Viewer shows nodes on a selected line and new midpoint nodes as you drag. (confirmed, Terra Draw guide; https://doc.arcgis.com/en/arcgis-online/manage-data/edit-features-mv.htm)
+- **Snapping:** Terra Draw `toCoordinate`, `toLine`, `toFeature` (with a filter), `toDegree`, and `showSnappingPoint`. ArcGIS has one "Enable snapping" toggle with per-layer snapping. Show the snap indicator always; offer a visible toggle. (confirmed)
+- **Finish and undo:** ArcGIS: click to add nodes, double-click to finish; undo and redo step through vertices while drawing; unsaved features listed. (confirmed) Terra Draw finish keys not confirmed. Support double-click, Enter, a Finish button, Esc to cancel, Backspace to remove the last vertex.
+- **Validation:** Terra Draw `validation(feature, {updateType: finish | commit | provisional})` with `ValidateMinAreaSquareMeters`, `ValidateMaxAreaSquareMeters`, `ValidateNotSelfIntersecting`. Validate on `provisional` to warn while drawing. (confirmed)
+- **Delete and save:** ArcGIS deletes are permanent and bulk deletes need a second confirmation. (confirmed) Map Studio keeps its own undo stack instead, so deletes are undoable.
+- **Multi-select:** ArcGIS selects by point, rectangle or lasso with replace, add and remove; attribute bulk edit capped at 500 features; one feature's geometry at a time. (confirmed) Bulk edit properties only, not geometry; show "N selected" and mixed-value placeholders (placeholders unconfirmed).
+- **Forms:** ArcGIS outlines required fields and marks them with an asterisk. (confirmed)
+- **Shortcuts:** iD opens its shortcut panel with `?`. (confirmed, https://raw.githubusercontent.com/openstreetmap/iD/develop/modules/ui/shortcuts.js) iD's key list (1, 2, 3 for point, line, area; Ctrl+Z; Delete) unconfirmed.
+- **Onboarding:** iD's walkthrough runs seven chapters (welcome, navigation, point, area, line, building, start editing) on sandbox data with saving blocked, progress kept, and the user's map restored afterwards. (confirmed, https://github.com/openstreetmap/iD/blob/develop/modules/ui/intro/intro.js) For Map Studio: a skippable three-chapter tour on a throwaway layer; an empty state with "Draw your first site" and "Import CSV" (recommendation).
+- Felt, Mapbox Studio, QGIS, Google My Maps, Placemark and Rapid were not fetched.
+
+### Operational cartography
+
+- **Collision and zoom:** MapLibre `symbol-sort-key` (lower places first), `icon-allow-overlap`, `icon-padding`, `text-variable-anchor`, layer `minzoom`. Sort by importance (stations before valves), let labels give way, set `minzoom` per class. (confirmed, https://maplibre.org/maplibre-style-spec/layers/#symbol)
+- **Halos:** label halos in the theme background colour for light and dark basemaps (unconfirmed; the template already does this with a 2 px backdrop halo).
+- **Basemap and hierarchy:** muted, low-saturation basemap under the data; cluster only past a count threshold; collapsible legend in words and glyphs (unconfirmed recommendations).
+- **Selection:** a ring or thicker outline plus a label, not only a colour shift.
+
+### Touch and mobile
+
+- Terra Draw touch is fully supported for select, point, line and polygon; `pointerDistance` defaults to 40 px. (confirmed, Terra Draw guide)
+- 44 px (Apple) and 48 px (Material) target sizes not fetched this session; the template already uses 44 px targets.
+- Recommendations (unconfirmed): long-press to pick up a point; draw the dragged point about 48 px above the finger with a leader line; an Undo or Confirm bar after the drop; properties in a bottom sheet with a handle and a visible close button.
+
+### Accessibility and ISA-101
+
+- **WCAG 2.5.7 Dragging Movements (AA):** every drag needs a single-pointer non-drag alternative; keyboard alone does not satisfy it; a text input counts. (confirmed, https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html)
+- **WCAG 2.5.8 Target Size (Minimum):** 24 by 24 CSS px or spacing; dense map pins are named under the essential exception. (confirmed, https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html) Use 24 px minimum for toolbar buttons and handles, 44 px as the product's touch target.
+- **WCAG 1.4.11 Non-text Contrast:** 3:1 for components, their states and needed graphics, in both themes. (confirmed, https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html)
+- **Keyboard (2.1.1):** arrow keys nudge a selected point, Tab cycles items, Enter finishes (unconfirmed).
+- **ISA-101 high-performance HMI:** grey normal state, colour, motion and blink reserved for abnormal, state coded twice (word plus shape). (vendor summaries via search snippets, not the standard: https://gojs.net/latest/samples/hmiOperatorScreen, https://www.emersonautomationexperts.com/?p=55403, https://docs.tatsoft.com/display/FX/ISA-101+HMI+Compliance+How-to)
+
+### Performance perception
+
+- Unconfirmed recommendations: keep drawing state in the browser; update the map source locally on pointer move (throttled to animation frames); one batched event on finish or drop; optimistic UI that rolls back with a message on failure; editing features in a separate source from the display layer.
+
+### Ranked for the first version
+
+1. Current mode shown in words and a glyph in a persistent toolbar; Esc returns to Select.
+2. All editing in the browser with one event per finished edit; no Gateway call per click.
+3. A non-drag alternative for every drag (WCAG 2.5.7).
+4. Vertex and midpoint handles on the selected item, a visible snap indicator and a snap toggle.
+5. Finish by double-click, Enter or a Finish button; Esc cancels; Backspace removes the last vertex.
+6. Full undo and redo covering moves, inserts, deletes and property edits.
+7. Validation while drawing, in plain words beside the item.
+8. A skippable three-step tour and an empty state with "Draw your first site" and "Import CSV".
+9. Neutral grey items, glyph-plus-word state, selection by ring and label, 3:1 contrast in both themes, label halos.
+10. Phone: 44 px targets, long-press pick up, offset drag, an Undo bar after the drop, a bottom sheet for properties.

@@ -51,6 +51,19 @@ Open-source readiness (a stranger installs it from the README) comes after the o
 - **Editing on the map itself**, as a component, where the built-in Map and Perspective-only tools edit through props, forms and Gateway round trips.
 - **Storage stays with the host.** Edits are events, so a project keeps its own authority (in the template, git and `prov` review). Honest limit: this is execution, not a moat; anyone with the same toolchain could build it.
 
+## Design Principles
+
+From map editing and map UI practice (detail and sources in the addendum):
+
+- **One clear mode at a time.** A persistent toolbar names the mode in words and a glyph; Esc always returns to Select.
+- **Editing is local and fast.** Every pointer move updates the map in the browser; nothing goes to the Gateway until an edit is finished.
+- **Every edit can be undone.** Undo and redo cover moves, vertex changes, deletes and property edits, so deleting needs no confirm dialogs.
+- **Drawing tells you where you are.** Vertex and midpoint handles on the selected item, a visible snap indicator, validation messages while drawing, and finish by double-click, Enter or a Finish button.
+- **No drag-only actions.** Every drag has a tap or typed alternative (WCAG 2.2, 2.5.7): Move then tap the destination, coordinate fields, click to insert a vertex.
+- **Grey is normal.** Items are neutral; colour is for problems only; state and selection carry words, glyphs and rings, at 3:1 contrast in both themes (ISA-101, WCAG 1.4.11).
+- **A first-run path.** An empty state that offers "Draw your first site" and "Import CSV", and a short skippable tour of point, line and area.
+- **Phone moves are safe.** 44 px targets, long-press to pick up, the point drawn above the finger, and an Undo bar after the drop.
+
 ## Scope
 
 **First version: the editor.**
