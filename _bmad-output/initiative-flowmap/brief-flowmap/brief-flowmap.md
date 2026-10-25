@@ -39,7 +39,7 @@ People draw and edit on the map itself: drop a point, draw a line or an area ver
 The first version is done when all of these hold. The target is the end of January 2027 (three months at two days a week, about 26 working days); it is a target, not a deadline, and work continues until the criteria hold rather than cutting scope to meet the date.
 
 1. **It replaces the template's `/map/edit`.** The template's map editing runs on Map Studio, the Leaflet drawing layer is gone, and the draft, change set and `prov` path work unchanged.
-2. **An admin builds a field from nothing in 30 minutes.** The Mesa demo field (its sites, its pipelines split at taps, one geofence) laid out with the editor alone, no CSV and no script, in under 30 minutes, without help. [ASSUMPTION: tested on someone other than the owner; who is open]
+2. **An admin builds a field from nothing in 30 minutes.** The Mesa demo field (its sites, its pipelines split at taps, one geofence) laid out with the editor alone, no CSV and no script, in under 30 minutes, without help. Tested by an admin who has not seen the Mesa field.
 3. **A point moves on a phone.** At 390 px, touch only, a pin is moved and the edit reaches the page.
 4. **The demo field is the scale.** Smooth on the demo field; 300 sites and 2,000 segments are a later target.
 
@@ -83,6 +83,5 @@ If the first version proves itself in the template, Map Studio becomes the open-
 
 ## Open Questions
 
-- Who runs the 30-minute test (someone other than the owner).
 - The module's licence when it is open-sourced (MIT, as the idea doc proposed, or another).
 - Renaming the repository from `perspective-flowmap` to match Map Studio.
