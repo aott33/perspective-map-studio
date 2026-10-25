@@ -65,6 +65,7 @@ Before any feature work, spend one to two days building a blank component module
 - Draw and edit points, lines (pipelines, routes) and areas (geofences, regions): add, move, delete, drag and insert vertices, snap to sites and vertices, undo.
 - Fast entry for building a field by hand, and bulk editing of shared properties across selected items.
 - Viewing for every role: icons with comms status and one key value, and popups with details, values and an optional link to a page.
+- Search for map items by name, with zoom to the chosen one.
 - Linking each item to a project asset and binding its icon and popup to tag paths, with a tag browser.
 - Import of CSV, KML and GeoJSON, with features matched to existing assets, and a downloadable CSV template.
 - Saving as you work to a database the project names, so leaving halfway loses nothing.

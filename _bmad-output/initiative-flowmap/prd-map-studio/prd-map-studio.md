@@ -179,6 +179,15 @@ Map item names show as labels that give way to each other as the user zooms out,
 - At the starting area's zoom no two labels overlap.
 - The project can set, per kind, the zoom below which its labels and icons are hidden.
 
+#### FR-33: Search and zoom
+
+Every user can search map items by name or asset; choosing a result zooms the map to it and selects it. Realizes UJ-5.
+
+**Consequences (testable):**
+- Typing part of a name lists matching map items with their kind, as the user types.
+- Choosing a result zooms to the item, selects it and shows its ring; a line or an area is fitted to the view.
+- Search works on a 390 px phone and by keyboard alone.
+
 **Feature-specific NFRs:**
 - State and selection meet 3:1 contrast against the basemap in both the light and the dark theme (WCAG 1.4.11).
 - Colours come only from the host project's theme tokens.
@@ -462,7 +471,7 @@ The project offers none, OpenStreetMap, satellite and Mapbox basemaps; the user 
 - **NFR-5 Security.** Editing rights are checked on the Gateway for every save (FR-7). Tokens and credentials come from the project's secret store, never from views, files or git (FR-32). Map Studio writes only to its map store, never to tags or devices.
 - **NFR-6 Platform.** Ignition 8.3 full Gateways only; not Edge Gateways. The module is a signed `.modl`, installed through the host's module lock.
 - **NFR-7 Verified claims.** Every claim about the Perspective client API or the module SDK stays marked unverified until it is checked on a live 8.3 Gateway and recorded in claude-ignition-skills.
-- **NFR-8 Public contract.** The component's parameters, the asset contract, the kind list and the CSV template formats are documented and versioned; a breaking change needs a new major version. [ASSUMPTION: semantic versioning]
+- **NFR-8 Public contract.** The component's parameters, the asset contract, the kind list and the CSV template formats are documented and versioned; a breaking change needs a new major version. Versions follow semantic versioning.
 
 ## 5. Non-goals
 
@@ -477,7 +486,7 @@ The project offers none, OpenStreetMap, satellite and Mapbox basemaps; the user 
 
 ### 6.1 In scope
 
-- Section 4 in full: the map view and icons, popups, roles and tools, kinds and data links, drawing and editing, forms and location entry, import and bulk edit, phone editing, saving, basemaps.
+- Section 4 in full: the map view, icons and search, popups, roles and tools, kinds and data links, drawing and editing, forms and location entry, import and bulk edit, phone editing, saving, basemaps.
 - A core icon set for the oil and gas kinds.
 - The template's map and map editing moved onto Map Studio (success metric SM-1).
 
@@ -523,4 +532,4 @@ Target date for SM-1 to SM-5: end of January 2027, a target and not a deadline.
 
 ## 9. Assumptions index
 
-- 4.11 NFR-8: the public contract follows semantic versioning.
+None open. Every assumption made during discovery was confirmed by the owner and is recorded in `.memlog.md`.
