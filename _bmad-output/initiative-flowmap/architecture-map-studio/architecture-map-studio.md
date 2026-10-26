@@ -173,6 +173,18 @@ Dependencies point inward to `common/`. `web/` never reaches the database, tags 
 - **Prevents:** stored derived fields, untyped properties, and duplicates on re-import.
 - **Rule:** The stored record is `{id, kind, name, geometry, properties, assetId, overrides, ends, version, deleted}`. Base path, unlinked reason and unknown kind are derived at read time from the adapter caches, never stored. Properties are keyed and typed by the kind list's form fields; the write service validates and normalises every op (CSV strings are converted there, once). Export writes ids, overrides and the exported kinds' setups; importing a known id is an update.
 
+### AD-21 - Operations [ADOPTED]
+
+- **Binds:** R32, R33, epic-map-store-and-data, every release
+- **Prevents:** a map lost without a backup, a half-created schema, and two Gateways writing at once.
+- **Rule:** Map Studio has no backup of its own: the site's PostgreSQL backups cover the map store, the docs say so, and export is the portable copy. On start the module creates or migrates its tables; when it lacks the rights or a migration fails, it logs an error naming the connection and the missing right, as the historian and alarm journal do, and the map store is unavailable (components say so, tools off) until fixed. A schema newer than the module knows makes the map read only, with the reason logged. In a redundant pair only the active Gateway subscribes and accepts writes; after a failover the new active Gateway rebuilds its caches from the database and the tags, and open maps reload.
+
+### AD-22 - The cut-over writes through the scripting API [ADOPTED]
+
+- **Binds:** epic-template-cutover
+- **Prevents:** the template's map seeded by SQL or by hand, and duplicates when the cut-over is re-run.
+- **Rule:** A one-time template script reads the registry and `_Model/Map` and writes the Mesa field through `system.mapstudio.applyEdits`, with UUIDv5 ids from each asset's name, so it can be re-run safely.
+
 ## Consistency Conventions
 
 | Concern | Convention |
@@ -276,7 +288,8 @@ erDiagram
 | R25, R26, R28, R29, R35 CSV templates, import, bulk edit, reference layer, export | `web/`, `gateway/` | AD-2, AD-9, AD-20 |
 | R30, R31 phone | `web/` | AD-2, AD-10, AD-19 |
 | Releases, upgrades, signing, docs | build, CI, `e2e/`, `docs/` | AD-13, AD-14, AD-15 |
-| Template cut-over | `ign-scada-template` | AD-2, AD-4, AD-5, AD-11, AD-18 |
+| Template cut-over | `ign-scada-template` | AD-2, AD-4, AD-5, AD-11, AD-18, AD-22 |
+| Operations: backup, schema rights, redundancy | `gateway/`, `docs/` | AD-3, AD-21 |
 
 ## Deferred
 
@@ -296,4 +309,3 @@ Open questions, each with its revisit point:
 - Can module code call project script functions and register `system.mapstudio.*` functions? The spike checks it; the adapter fallback is a named query.
 - Does the Perspective toolchain (React 16.14, TypeScript 4.9) build MapLibre 6 and Terra Draw? The spike checks it; if not, pin an older MapLibre.
 - Do Mapbox's current Product Terms allow `mapbox.satellite` raster tiles in MapLibre for client SCADA sites? The owner reads them before epic-viewing.
-- Operations: map store backup and restore, database rights for migrations and newer schemas, Gateway redundancy, how the cut-over loads the Mesa field. The owner decides before Finalize.
