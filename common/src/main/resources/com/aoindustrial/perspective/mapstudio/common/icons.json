@@ -129,38 +129,44 @@
             "geometry": null
         },
         {
-            "id": "alarm-1-solid",
-            "label": "Alarm priority 1, unacknowledged",
+            "id": "alarm-1-unacknowledged",
+            "label": "Alarm priority 1 (Critical, High), unacknowledged",
             "group": "state",
             "geometry": null
         },
         {
-            "id": "alarm-1-hollow",
-            "label": "Alarm priority 1, acknowledged",
+            "id": "alarm-1-acknowledged",
+            "label": "Alarm priority 1 (Critical, High), acknowledged",
             "group": "state",
             "geometry": null
         },
         {
-            "id": "alarm-2-solid",
-            "label": "Alarm priority 2, unacknowledged",
+            "id": "alarm-1-rectified",
+            "label": "Alarm priority 1 (Critical, High), cleared, not yet acknowledged",
             "group": "state",
             "geometry": null
         },
         {
-            "id": "alarm-2-hollow",
-            "label": "Alarm priority 2, acknowledged",
+            "id": "alarm-2-unacknowledged",
+            "label": "Alarm priority 2 (Medium), unacknowledged",
             "group": "state",
             "geometry": null
         },
         {
-            "id": "alarm-3-solid",
-            "label": "Alarm priority 3, unacknowledged",
+            "id": "alarm-2-acknowledged",
+            "label": "Alarm priority 2 (Medium), acknowledged",
             "group": "state",
             "geometry": null
         },
         {
-            "id": "alarm-3-hollow",
-            "label": "Alarm priority 3, acknowledged",
+            "id": "alarm-2-rectified",
+            "label": "Alarm priority 2 (Medium), cleared, not yet acknowledged",
+            "group": "state",
+            "geometry": null
+        },
+        {
+            "id": "alarm-3",
+            "label": "Alarm priority 3 (Low), every state; faded once acknowledged",
             "group": "state",
             "geometry": null
         }

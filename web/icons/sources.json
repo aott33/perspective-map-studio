@@ -1,5 +1,5 @@
 {
-    "comment": "Provenance of every Map Studio icon. One entry per file in src/. scripts/icons.mjs checks this list against the files and the licence allow list, and builds the sprite, the catalogue and the contact sheet from it. Nothing here is derived from OpenBridge.",
+    "comment": "Provenance of every Map Studio icon. One entry per file in src/. scripts/icons.mjs checks this list against the files, the licence allow list and NOTICE, and builds the sprite, the catalogue and the contact sheet from it. No icon is derived from any excluded set; see docs/icons.md.",
     "catalogueVersion": "0.2.0",
     "fallback": "point",
     "icons": [
@@ -8,7 +8,7 @@
         { "id": "tank-battery", "label": "Tank battery", "group": "kind", "geometry": "point", "origin": "drawn", "licence": "Apache-2.0" },
         { "id": "compressor-station", "label": "Compressor station", "group": "kind", "geometry": "point", "origin": "drawn", "licence": "Apache-2.0" },
         { "id": "booster-station", "label": "Booster station", "group": "kind", "geometry": "point", "origin": "drawn", "licence": "Apache-2.0" },
-        { "id": "meter-station", "label": "Meter station", "group": "kind", "geometry": "point", "origin": "tabler:gauge@3.49.0", "licence": "MIT", "modified": "attributes normalised, Tabler's empty bounding path removed" },
+        { "id": "meter-station", "label": "Meter station", "group": "kind", "geometry": "point", "origin": "drawn", "licence": "Apache-2.0" },
         { "id": "pig-trap", "label": "Pig launcher or receiver", "group": "kind", "geometry": "point", "origin": "drawn", "licence": "Apache-2.0" },
         { "id": "line-valve", "label": "Line valve", "group": "kind", "geometry": "point", "origin": "drawn", "licence": "Apache-2.0" },
         { "id": "tap", "label": "Tap", "group": "kind", "geometry": "point", "origin": "drawn", "licence": "Apache-2.0" },
@@ -24,11 +24,12 @@
         { "id": "point", "label": "Point (fallback)", "group": "kind", "geometry": "point", "origin": "drawn", "licence": "Apache-2.0" },
         { "id": "comms-lost", "label": "Comms lost", "group": "state", "geometry": null, "origin": "drawn", "licence": "Apache-2.0" },
         { "id": "stale", "label": "Stale", "group": "state", "geometry": null, "origin": "drawn", "licence": "Apache-2.0" },
-        { "id": "alarm-1-solid", "label": "Alarm priority 1, unacknowledged", "group": "state", "geometry": null, "origin": "drawn", "licence": "Apache-2.0", "review": "engineering review before release (ER-27)" },
-        { "id": "alarm-1-hollow", "label": "Alarm priority 1, acknowledged", "group": "state", "geometry": null, "origin": "drawn", "licence": "Apache-2.0", "review": "engineering review before release (ER-27)" },
-        { "id": "alarm-2-solid", "label": "Alarm priority 2, unacknowledged", "group": "state", "geometry": null, "origin": "drawn", "licence": "Apache-2.0", "review": "engineering review before release (ER-27)" },
-        { "id": "alarm-2-hollow", "label": "Alarm priority 2, acknowledged", "group": "state", "geometry": null, "origin": "drawn", "licence": "Apache-2.0", "review": "engineering review before release (ER-27)" },
-        { "id": "alarm-3-solid", "label": "Alarm priority 3, unacknowledged", "group": "state", "geometry": null, "origin": "drawn", "licence": "Apache-2.0", "review": "engineering review before release (ER-27)" },
-        { "id": "alarm-3-hollow", "label": "Alarm priority 3, acknowledged", "group": "state", "geometry": null, "origin": "drawn", "licence": "Apache-2.0", "review": "engineering review before release (ER-27)" }
+        { "id": "alarm-1-unacknowledged", "label": "Alarm priority 1 (Critical, High), unacknowledged", "group": "state", "geometry": null, "origin": "drawn", "licence": "Apache-2.0", "review": "engineering review before release (ER-27)" },
+        { "id": "alarm-1-acknowledged", "label": "Alarm priority 1 (Critical, High), acknowledged", "group": "state", "geometry": null, "origin": "drawn", "licence": "Apache-2.0", "review": "engineering review before release (ER-27)" },
+        { "id": "alarm-1-rectified", "label": "Alarm priority 1 (Critical, High), cleared, not yet acknowledged", "group": "state", "geometry": null, "origin": "drawn", "licence": "Apache-2.0", "review": "engineering review before release (ER-27)" },
+        { "id": "alarm-2-unacknowledged", "label": "Alarm priority 2 (Medium), unacknowledged", "group": "state", "geometry": null, "origin": "drawn", "licence": "Apache-2.0", "review": "engineering review before release (ER-27)" },
+        { "id": "alarm-2-acknowledged", "label": "Alarm priority 2 (Medium), acknowledged", "group": "state", "geometry": null, "origin": "drawn", "licence": "Apache-2.0", "review": "engineering review before release (ER-27)" },
+        { "id": "alarm-2-rectified", "label": "Alarm priority 2 (Medium), cleared, not yet acknowledged", "group": "state", "geometry": null, "origin": "drawn", "licence": "Apache-2.0", "review": "engineering review before release (ER-27)" },
+        { "id": "alarm-3", "label": "Alarm priority 3 (Low), every state; faded once acknowledged", "group": "state", "geometry": null, "origin": "drawn", "licence": "Apache-2.0", "review": "engineering review before release (ER-27)" }
     ]
 }

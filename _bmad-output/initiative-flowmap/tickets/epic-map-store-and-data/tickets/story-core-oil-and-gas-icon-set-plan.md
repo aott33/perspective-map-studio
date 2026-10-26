@@ -28,9 +28,9 @@ context:
 ## Boundaries & Constraints
 
 **Always:**
-- Icon ids, kebab-case, closed list. Kind icons (the sixteen FR-9 kinds plus `swd` and `separator`, and the fallback `point`): `well-pad`, `wellhead`, `tank-battery`, `compressor-station`, `booster-station`, `meter-station`, `pig-trap` (launcher or receiver), `line-valve`, `tap`, `rtu` (RTU or comms tower), `swd`, `separator`, `pipeline`, `lateral`, `lease-road`, `geofence`, `region`, `site-footprint`, `point`. State glyphs: `comms-lost`, `stale`, `alarm-1-solid`, `alarm-1-hollow`, `alarm-2-solid`, `alarm-2-hollow`, `alarm-3-solid`, `alarm-3-hollow` (triangle 1 for Critical and High, circle 2 for Medium, square 3 for Low, the template's ER-27 shapes, drawn new).
+- Icon ids, kebab-case, closed list. Kind icons (the sixteen FR-9 kinds plus `swd` and `separator`, and the fallback `point`): `well-pad`, `wellhead`, `tank-battery`, `compressor-station`, `booster-station`, `meter-station`, `pig-trap` (launcher or receiver), `line-valve`, `tap`, `rtu` (RTU or comms tower), `swd`, `separator`, `pipeline`, `lateral`, `lease-road`, `geofence`, `region`, `site-footprint`, `point`. State glyphs (coordinator correction 2026-10-26, owner to confirm): `comms-lost`, `stale`, `alarm-1-unacknowledged`, `alarm-1-acknowledged`, `alarm-1-rectified`, `alarm-2-unacknowledged`, `alarm-2-acknowledged`, `alarm-2-rectified`, `alarm-3` (triangle 1 for Critical and High, circle 2 for Medium, an outlined square 3 for Low in every state, the template's ER-27 set, drawn new). No kind icon's outline is a circle, square or triangle.
 - Seeds (Tabler 3.49.0 outline, modified): `meter-station` from `gauge`, `rtu` from `building-broadcast-tower`, `lease-road` from `road`, `geofence` from `fence`, `region` from `polygon`, `site-footprint` from `square-dashed`. Every other icon is drawn new for this module. Each seed is re-checked against the owner's look at review; a seed that does not fit is drawn new instead.
-- Every glyph: `viewBox="0 0 24 24"`, `stroke="currentColor"` or `fill="currentColor"` only (kind glyphs are stroke only, `fill="none"`, `stroke-width="2"`, round caps and joins; a solid alarm shape fills with `currentColor`), no other colour, no text, no `<style>`, no external reference; legible at 16 px.
+- Every glyph: `viewBox="0 0 24 24"`, `stroke="currentColor"` or `fill="currentColor"` only (kind glyphs are stroke only, `fill="none"`, `stroke-width="2"`, round caps and joins; a solid alarm shape fills with `currentColor`), paint values on an allow list (`none`, `currentColor`), no colour name, no `style`, no `url()`, no text, no external reference; legible at 16 px.
 - The alarm glyphs are alarm presentation: flagged for engineering review before release (CLAUDE.md alarm rule, ER-27) in this plan, `docs/icons.md` and the contact sheet.
 - Colour comes from theme tokens at draw time (AD-11): the sprite carries `currentColor` only; normal is the neutral token, never a hue.
 - Line and area icons (`pipeline` to `site-footprint`) are for the tools, legend, search and popups; the map draws those kinds as styled lines and fills (FR-2), not as point icons.
@@ -46,9 +46,10 @@ context:
 
 ## Decisions (owner, 2026-10-26, relayed by the coordinator at checkpoint 1)
 
-- State glyphs (comms lost, stale, alarm shapes by priority, solid and hollow) are drawn in this story's sprite; the alarm shapes are flagged for engineering review before release in this plan, `docs/icons.md` and the contact sheet.
+- State glyphs (comms lost, stale, alarm shapes by priority) are drawn in this story's sprite; the alarm shapes are flagged for engineering review before release in this plan, `docs/icons.md` and the contact sheet.
 - `swd` and `separator` are added: 19 kind icons (with `point`) plus the state glyphs. Wells by type stay assets inside a pad.
 - Marker look, for epic-viewing (this story only provides the glyphs): a neutral dot when normal and the kind glyph from zoom 14 in, matching the template's reviewed map (FR-34, template docs/map.md section 5).
+- Coordinator correction, 2026-10-26, for the owner to confirm: the owner's intent was to follow the template's reviewed alarm set, so the alarm glyphs are ER-27's (per priority unacknowledged, acknowledged, cleared and not yet acknowledged; priority 3 one outlined square, faded once acknowledged), superseding the solid and hollow wording above; shapes the template never shows are dropped.
 - The plan is kept whole (about 2,700 tokens, above the 1,600 target); phase B waits for story 3.
 - Phase A's Gateway checks run on the worktree's own dev Gateway (`MAPSTUDIO_CONTAINER=ms-e2s10`, `GATEWAY_HTTP_PORT=9130`); story 1 owns the other `common/` contracts, so this story adds only the icon catalogue files there.
 
@@ -79,14 +80,14 @@ context:
 ## Tasks & Acceptance
 
 **Execution (phase A, now):**
-- [x] `web/icons/src/*.svg` -- the 27 glyphs (19 kind icons, 8 state glyphs) to the rules above -- the one source of artwork.
+- [x] `web/icons/src/*.svg` -- the 28 glyphs (19 kind icons, 9 state glyphs) to the rules above -- the one source of artwork.
 - [x] `web/icons/sources.json` -- per icon: id, kind words, geometry (point, line, area), origin (`drawn` or `tabler:<name>@3.49.0`, modified), licence (`Apache-2.0` for drawn, `MIT` for Tabler) -- provenance kept beside the art.
 - [x] `web/scripts/icons.mjs` -- Node, no dependencies: validates every SVG against the rules (viewBox, `currentColor` only, no text, style or href), the allow list of licences (`MIT`, `Apache-2.0`, `ISC`, `CC0-1.0`), sources-to-files match; writes `mapstudio-icons.svg` (one `<symbol id="ms-<id>">` each) and the contact sheet into the mounted output; `--check` verifies the committed catalogue matches -- one gate for drift and licence.
 - [x] `common/src/main/resources/.../common/icons.json` -- catalogue `{version, icons: [{id, geometry, label}]}`, versioned with the public contract (NFR-8).
 - [x] `common/src/main/java/.../common/IconCatalogue.java` -- loads `icons.json`; `contains(id)`, `ids()`, `FALLBACK = "point"`.
 - [x] `web/icons/contact-sheet.html` -- every icon at 16, 24 and 44 px (44 px with its tap target outlined), on light and dark backgrounds, beside the state examples of Design Notes; colours from token custom properties with stand-in values declared once at the top.
 - [x] `web/package.json`, `web/build.gradle.kts` -- `icons` script run before webpack; `icons:check` in `npm test`.
-- [x] `web/typescript/__tests__/icons.test.ts` -- runs the checker; asserts 27 ids, each FR-9 kind covered, no colour literal in the sprite.
+- [x] `web/typescript/__tests__/icons.test.ts` -- runs the checker; asserts 28 ids, each FR-9 kind covered, no colour literal in the sprite.
 - [x] `gateway/src/test/java/.../IconCatalogueTest.java` -- loads the catalogue, known and unknown ids, fallback present.
 - [x] `e2e/tests/icons.spec.mjs` -- opens `/res/mapstudio/icons/contact-sheet.html` and `mapstudio-icons.svg` on the dev Gateway, checks 200 and content type, screenshots `docs/screenshots/icons-contact-sheet.png` at 1440 and 390 px.
 - [x] `docs/icons.md` -- the list (id, kind, geometry, origin, licence), the drawing rules for adding an icon, the state contract, the screenshot.
@@ -98,7 +99,7 @@ context:
 - [ ] `docs/` kind list contract (story 3's page) -- the `icon` field names an id from `docs/icons.md`.
 
 **Acceptance Criteria:**
-- Given the dev Gateway with the built module, when a browser opens `/res/mapstudio/icons/contact-sheet.html`, then all 27 icons show at 16, 24 and 44 px in both themes and the screenshot is in `docs/icons.md`.
+- Given the dev Gateway with the built module, when a browser opens `/res/mapstudio/icons/contact-sheet.html`, then all 28 icons show at 16, 24 and 44 px in both themes and the screenshot is in `docs/icons.md`.
 - Given the owner's review of the screenshot, when the owner approves the look, then the approval and its date are recorded in the plan's Implementation Notes (hitl).
 - Given NOTICE and `sources.json`, when a reviewer compares them, then every Tabler-derived icon is named with its licence and no source is OpenBridge.
 - Given a dev kind naming an unknown icon (phase B), when `map.load` runs, then its status reports the kind and the icon in words.
@@ -111,12 +112,12 @@ State contract for epic-viewing (drawn on the contact sheet so the owner reviews
 - Normal: the kind glyph in the neutral token with a 2 px backdrop halo, inside a 44 px touch target.
 - Comms lost: glyph dimmed, a comms-lost badge (top right) and the words "Comms lost" in the label or tip; the KPI shows as stale.
 - Stale value: the KPI text marked with a stale glyph and the word "stale" in the tip; never shown as current.
-- Alarm: the alarm shape of the highest priority, solid while unacknowledged, hollow once acknowledged, with the priority digit as a text label and the count where enabled; hue from the theme's alarm token.
+- Alarm: the alarm shape of the highest priority in its ER-27 state (unacknowledged, acknowledged, cleared and not yet acknowledged; priority 3 outlined, faded once acknowledged), with the priority digit as a text label and the count where enabled; hue from the theme's alarm token.
 
 ## Verification
 
 **Commands:**
-- `cd web && node scripts/icons.mjs --check` -- expected: exit 0, 27 icons, licences allowed.
+- `cd web && node scripts/icons.mjs --check` -- expected: exit 0, 28 icons, licences allowed, NOTICE in step.
 - `cd web && npx tsc --noEmit && npm test` -- expected: all Jest tests pass, including `icons.test.ts`.
 - `./gradlew build` -- expected: module builds; `IconCatalogueTest` passes.
 - `cd e2e && npm test -- icons.spec.mjs` and `npm run docs` -- expected: pass on the dev Gateway; screenshot written.
@@ -139,6 +140,25 @@ Phase A, 2026-10-26, implemented directly (no implementation subagent available 
 - Matrix audit: sprite drift and forbidden source are covered by `icons.test.ts` (ran, passed). Known, unknown and no icon are covered at the catalogue level by `IconCatalogueTest` (`resolve`, `contains`); their `map.load` status entry and log line are phase B, waiting for story 3.
 - Owner review of the look (hitl): pending.
 
+Quick review fixes, 2026-10-26 (findings in the Review Triage Log):
+
+- `icons.mjs`: attributes tokenised in every form (double, single, unquoted, bare; unreadable text is a problem); `style`, `url()`, `href`, `@import` and `script`, `image`, `use`, `foreignObject` refused anywhere; paint is an allow list (`none`, `currentColor`); a kind icon may not fill; a kind icon may not have a circle (radius 6 or more, also as two arcs) or square (side 12 or more) outline; the Tabler release is pinned to 3.49.0; NOTICE must list exactly the adapted icons (`    <id> from <name>`) with Tabler's release, copyright and MIT text; `FORBIDDEN_WORDS` also covers `oicl`, `upstream.svg` and `upstream/`.
+- Artwork: `meter-station` (now drawn, a meter on a pipe), `compressor-station` (trapezoid) and `booster-station` (double chevron on a base) redrawn without a circle; the alarm set redrawn to ER-27 (9 state glyphs, 28 icons). Five icons now come from Tabler; NOTICE lists them.
+- `sources.json` comment reworded; `grep -ri openbridge web/icons` finds nothing.
+- `docs/icons.md` lists the remaining differences from ER-27 and the triangle review item.
+- Verification run after the fixes: `icons.mjs --check` (28 icons); `npx tsc --noEmit`, `npm test` (6 suites, 48 tests passed); `./gradlew build` (BUILD SUCCESSFUL, `IconCatalogueTest` 6 of 6); Playwright contact sheet and catalogue tests 3 of 3 against the stand-in server, screenshots regenerated. Docker not started; the Gateway content-type check stays [UNVERIFIED].
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+Pass 1, 2026-10-26: lens `quick`, run context-free by the coordinator on commit 3248884. Verdicts: high 3, medium 2, low 1, false 0, maybe-false 0. All routed to patch (the coordinator directed the fixes; finding 6 also corrects the frozen intent, recorded in Decisions for the owner to confirm).
+
+| # | Finding | Verdict | Route | Evidence and action |
+|---|---------|---------|-------|---------------------|
+| 1 | `checkSvg`/`attrs` read only double-quoted attributes, so `fill='red'`, `style='stroke:red'`, `fill='url(...)'`, `stroke=red` and a root `style` passed | high | patch | Confirmed: the old regex matched `="..."` only. Tokeniser for every attribute form, `style`/`url()`/external references refused, paint allow list; five probe tests and a sprite paint test added. |
+| 2 | Kind icons could fill a child shape | medium | patch | Confirmed: only the root fill was checked. Child `fill` other than `none` refused on kind icons; test added. |
+| 3 | Tabler origin not pinned to 3.49.0; NOTICE not checked against sources; excluded-set words missed the template's `upstream` icons | medium | patch | Confirmed in `checkSources` and `FORBIDDEN_WORDS`. Release pinned, `checkNotice` added (names and count), words extended; tests for each. |
+| 4 | The `sources.json` comment names OpenBridge, so the plan's `grep -ri openbridge web/icons` check fails | low | patch | Confirmed. Comment reworded; the grep finds nothing and stays in Verification. |
+| 5 | `meter-station`, `compressor-station` and `booster-station` used a circular outline, the shape reserved for alarm priority 2 (template docs/ux.md, ER-27) | high | patch | Confirmed in the SVGs. Redrawn without circles; build check for circle and square outlines on kind icons, triangles listed in docs/icons.md as a review item. |
+| 6 | The alarm glyphs (solid and hollow, three shapes) did not match the template's reviewed ER-27 set (unacknowledged, acknowledged, rectified; priority 3 outlined in every state) | high | patch | Confirmed against template docs/ux.md (state table) and docs/map.md section 2. Redrawn to ER-27 with 7 alarm glyphs; differences listed in docs/icons.md; engineering review flag kept. |

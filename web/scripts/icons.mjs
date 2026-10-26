@@ -9,7 +9,7 @@
 //                                             catalogue in common/ with the sources
 //   node scripts/icons.mjs --write-catalogue  check, then rewrite the committed catalogue
 //
-// Options for tests: --src <dir> --sources <file> --catalogue <file> --out <dir>.
+// Options for tests: --src <dir> --sources <file> --catalogue <file> --out <dir> --notice <file>.
 // Exit code 0 when everything holds; 1 with one line per problem otherwise.
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -25,14 +25,20 @@ export const DEFAULTS = {
     sources: path.join(webDir, 'icons', 'sources.json'),
     catalogue: path.join(repoRoot, 'common', 'src', 'main', 'resources', 'com', 'aoindustrial', 'perspective',
         'mapstudio', 'common', 'icons.json'),
-    out: path.join(webDir, 'build', 'generated-resources', 'mounted', 'icons')
+    out: path.join(webDir, 'build', 'generated-resources', 'mounted', 'icons'),
+    notice: path.join(repoRoot, 'NOTICE')
 };
 
 /** Licences an icon may carry: permissive, no share-alike. */
 export const ALLOWED_LICENCES = ['Apache-2.0', 'MIT', 'ISC', 'CC0-1.0'];
-/** Sets an adapted icon may come from, with the licence that set carries. */
-export const SEED_SETS = { tabler: 'MIT' };
-const FORBIDDEN_WORDS = /openbridge|font-?awesome/i;
+/** Sets an adapted icon may come from: the licence and the one release NOTICE names. */
+export const SEED_SETS = { tabler: { licence: 'MIT', version: '3.49.0' } };
+/**
+ * Excluded sources, by any name they go by: OpenBridge (and its npm scope
+ * @oicl), the template's icon library generated from it (`upstream.svg`,
+ * `upstream/<name>`), and Font Awesome.
+ */
+export const FORBIDDEN_WORDS = /openbridge|oicl|upstream\.svg|upstream\/|font-?awesome/i;
 
 const ROOT_ATTRS = {
     'xmlns': ['http://www.w3.org/2000/svg'],
@@ -46,27 +52,68 @@ const ROOT_ATTRS = {
 const SHAPES = new Set(['path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse']);
 const SHAPE_ATTRS = new Set(['d', 'cx', 'cy', 'r', 'rx', 'ry', 'x', 'y', 'width', 'height', 'x1', 'y1', 'x2', 'y2',
     'points', 'fill-rule', 'fill', 'stroke']);
-const PAINT = new Set(['none', 'currentColor']);
 const ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
-function attrs(text) {
+/**
+ * The attributes of one tag's attribute text: double-quoted, single-quoted,
+ * unquoted and bare. Anything the tokenizer cannot read is returned in
+ * `rest`, which the caller treats as a problem.
+ */
+export function attrs(text) {
     const out = {};
-    const re = /([A-Za-z_:][\w:.-]*)\s*=\s*"([^"]*)"/g;
-    let m;
-    while ((m = re.exec(text)) !== null) out[m[1]] = m[2];
+    const re = /\s*([^\s"'=<>\/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/y;
+    let pos = 0;
+    let rest = '';
+    const body = text.replace(/\/\s*$/, '');
+    while (pos < body.length) {
+        re.lastIndex = pos;
+        const m = re.exec(body);
+        if (!m || m[0].length === 0) {
+            rest = body.slice(pos).trim();
+            break;
+        }
+        out[m[1]] = m[2] ?? m[3] ?? m[4] ?? '';
+        pos = re.lastIndex;
+    }
+    if (rest) out['\u0000rest'] = rest;
     return out;
+}
+
+/** Paint values an icon may use: an allow list, so named colours, url() and the rest fail. */
+const PAINT_VALUES = ['none', 'currentColor'];
+
+/**
+ * True when a kind icon's shape is a closed outline in the alarm shapes'
+ * family: a circle of radius 6 or more (two or more arcs of radius 6 or more
+ * in one path count as one), or a square rect of side 12 or more. The circle
+ * is alarm priority 2 and the square priority 3 (template docs/ux.md 5,
+ * ER-27). Triangles are not detected; docs/icons.md lists that as a review item.
+ */
+export function alarmLikeOutline(name, a) {
+    if (name === 'circle' && Number(a.r) >= 6) return `a circle of radius ${a.r}`;
+    if (name === 'ellipse' && Number(a.rx) >= 6 && a.rx === a.ry) return `a circle of radius ${a.rx}`;
+    if (name === 'rect' && a.width === a.height && Number(a.width) >= 12) return `a square of side ${a.width}`;
+    if (name === 'path' && a.d) {
+        const arcs = [...a.d.matchAll(/[aA]\s*([\d.]+)[\s,]+([\d.]+)/g)].filter((m) => Number(m[1]) >= 6 && m[1] === m[2]);
+        if (arcs.length >= 2) return `a circle drawn with arcs of radius ${arcs[0][1]}`;
+    }
+    return null;
 }
 
 /**
  * Problems with one icon's SVG text, as plain sentences. `group` is 'kind'
- * (stroke only) or 'state' (stroke, or a solid currentColor fill).
+ * (stroke only, no alarm-like outline) or 'state' (stroke, or a solid
+ * currentColor fill). Attributes and paint are allow lists.
  */
 export function checkSvg(id, text, group) {
     const problems = [];
     const say = (msg) => problems.push(`${id}.svg: ${msg}`);
     if (FORBIDDEN_WORDS.test(text)) say('names a forbidden source');
     if (/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i.test(text)) say('has a colour literal; use currentColor');
-    if (/<!--|<\?|<!DOCTYPE/i.test(text)) say('has a comment, processing instruction or doctype');
+    if (/\bstyle\b/i.test(text)) say('has a style attribute or element');
+    if (/url\s*\(/i.test(text)) say('has a url() reference');
+    if (/href|@import|<\s*(script|foreignObject|image|use)\b/i.test(text)) say('has an external reference');
+    if (/<!--|<\?|<!DOCTYPE|<!\[CDATA/i.test(text)) say('has a comment, processing instruction, CDATA or doctype');
     const root = /^<svg\b([^>]*)>/.exec(text.trim());
     if (!root) {
         say('does not start with an <svg> element');
@@ -74,7 +121,8 @@ export function checkSvg(id, text, group) {
     }
     const ra = attrs(root[1]);
     for (const [name, value] of Object.entries(ra)) {
-        if (!ROOT_ATTRS[name]) say(`root attribute ${name} is not allowed`);
+        if (name === '\u0000rest') say(`root has unreadable attribute text: ${value}`);
+        else if (!ROOT_ATTRS[name]) say(`root attribute ${name} is not allowed`);
         else if (!ROOT_ATTRS[name].includes(value)) say(`root ${name}="${value}" is not allowed`);
     }
     for (const name of ['xmlns', 'viewBox', 'fill', 'stroke']) if (!(name in ra)) say(`root ${name} is missing`);
@@ -99,9 +147,16 @@ export function checkSvg(id, text, group) {
         }
         if (tag.startsWith('</')) continue;
         shapes++;
-        for (const [a, v] of Object.entries(attrs(tag))) {
-            if (!SHAPE_ATTRS.has(a)) say(`attribute ${a} on <${name}> is not allowed`);
-            else if ((a === 'fill' || a === 'stroke') && !PAINT.has(v)) say(`${a}="${v}" on <${name}> is not allowed`);
+        const a = attrs(tag.replace(/^<\s*[A-Za-z][\w:-]*/, '').replace(/>$/, ''));
+        for (const [k, v] of Object.entries(a)) {
+            if (k === '\u0000rest') say(`<${name}> has unreadable attribute text: ${v}`);
+            else if (!SHAPE_ATTRS.has(k)) say(`attribute ${k} on <${name}> is not allowed`);
+            else if ((k === 'fill' || k === 'stroke') && !PAINT_VALUES.includes(v)) say(`${k}="${v}" on <${name}> is not allowed`);
+            else if (k === 'fill' && group === 'kind' && v !== 'none') say(`fill="${v}" on <${name}>: a kind icon is stroke only`);
+        }
+        if (group === 'kind') {
+            const outline = alarmLikeOutline(name, a);
+            if (outline) say(`<${name}> is ${outline}, an alarm shape outline (circle is priority 2, square priority 3)`);
         }
     }
     if (body.replace(/<[^>]+>/g, '').trim() !== '') say('has text content');
@@ -140,7 +195,11 @@ export function checkSources(sources, files) {
             const m = /^([a-z]+):([a-z0-9-]+)@(\d+\.\d+\.\d+)$/.exec(e.origin || '');
             if (!m) say(`${id} origin must be "drawn" or "<set>:<name>@<version>"`);
             else if (!SEED_SETS[m[1]]) say(`${id} comes from ${m[1]}, which is not an approved seed set`);
-            else if (SEED_SETS[m[1]] !== e.licence) say(`${id} comes from ${m[1]}, whose licence is ${SEED_SETS[m[1]]}`);
+            else {
+                const seed = SEED_SETS[m[1]];
+                if (seed.licence !== e.licence) say(`${id} comes from ${m[1]}, whose licence is ${seed.licence}`);
+                if (seed.version !== m[3]) say(`${id} comes from ${m[1]} ${m[3]}; only ${seed.version} is approved and named in NOTICE`);
+            }
             if (typeof e.modified !== 'string' || e.modified.trim() === '') say(`${id} is adapted and must say how it was modified`);
         }
     }
@@ -148,6 +207,42 @@ export function checkSources(sources, files) {
     if (!fallback || fallback.group !== 'kind') say('fallback must name a kind icon');
     for (const f of files) if (!seen.has(f)) say(`src/${f}.svg has no entry`);
     for (const id of seen) if (!files.includes(id)) say(`${id} has no src/${id}.svg`);
+    return problems;
+}
+
+/** The NOTICE line naming one adapted icon: four spaces, `<id> from <source name>`. */
+const NOTICE_LINE = /^ {4}([a-z0-9-]+) from ([a-z0-9-]+)$/;
+
+/**
+ * Problems with NOTICE against the sources: the adapted icons it lists must be
+ * exactly the adapted entries (same ids, same source names, so the count
+ * matches too), and each seed set's release and licence text must be there.
+ */
+export function checkNotice(sources, noticeText) {
+    const problems = [];
+    const say = (msg) => problems.push(`NOTICE: ${msg}`);
+    if (noticeText === null) return ['NOTICE: cannot be read'];
+    const expected = new Set();
+    const sets = new Set();
+    for (const e of sources.icons || []) {
+        const m = /^([a-z]+):([a-z0-9-]+)@/.exec((e && e.origin) || '');
+        if (m) {
+            expected.add(`${e.id} from ${m[2]}`);
+            sets.add(m[1]);
+        }
+    }
+    const listed = new Set();
+    for (const line of noticeText.split(/\r?\n/)) {
+        const m = NOTICE_LINE.exec(line);
+        if (m) listed.add(`${m[1]} from ${m[2]}`);
+    }
+    for (const x of expected) if (!listed.has(x)) say(`does not list "${x}" (add the line "    ${x}")`);
+    for (const x of listed) if (!expected.has(x)) say(`lists "${x}", which sources.json does not adapt`);
+    if (sets.has('tabler')) {
+        if (!noticeText.includes(`Tabler Icons ${SEED_SETS.tabler.version}`)) say(`does not name Tabler Icons ${SEED_SETS.tabler.version}`);
+        if (!noticeText.includes('Copyright (c) 2020-2026 Paweł Kuna')) say('does not carry Tabler\'s copyright line');
+        if (!noticeText.includes('MIT License')) say('does not carry the MIT licence text');
+    }
     return problems;
 }
 
@@ -221,10 +316,13 @@ export function contactSheetText(sources, svgs) {
         <div class="ex"><span class="marker halo">${sym('well-pad')}</span><p><b>Normal, zoom 14 and in</b> - the kind glyph, neutral, with a 2 px backdrop halo; label "P12"</p></div>
         <div class="ex"><span class="marker halo dim">${sym('well-pad')}<span class="badge">${sym('comms-lost')}</span></span><p><b>Comms lost</b> - glyph dimmed, comms-lost badge, label "P12 Comms lost"; its KPI shows as stale</p></div>
         <div class="ex"><span class="kpi">412 psi <span class="inline">${sym('stale')}</span></span><p><b>Stale value</b> - the stale glyph beside the value and the word "stale" in the tip, never shown as current</p></div>
-        <div class="ex"><span class="marker halo a1">${sym('alarm-1-solid')}</span><span class="digit">1</span><p><b>Priority 1, unacknowledged</b> - solid triangle, digit "1" as a label, count "2" where enabled</p></div>
-        <div class="ex"><span class="marker halo a1">${sym('alarm-1-hollow')}</span><span class="digit">1</span><p><b>Priority 1, acknowledged</b> - hollow triangle</p></div>
-        <div class="ex"><span class="marker halo a2">${sym('alarm-2-solid')}</span><span class="digit">2</span><p><b>Priority 2</b> - solid circle; hollow once acknowledged</p></div>
-        <div class="ex"><span class="marker halo a3">${sym('alarm-3-hollow')}</span><span class="digit">3</span><p><b>Priority 3</b> - square; the template's map outlines it in every state (docs/ux.md 5)</p></div>
+        <div class="ex"><span class="marker halo a1">${sym('alarm-1-unacknowledged')}</span><span class="digit">1</span><p><b>Priority 1, unacknowledged</b> - filled triangle with the unacknowledged mark, digit "1" as a label, count "2" where enabled</p></div>
+        <div class="ex"><span class="marker halo a1">${sym('alarm-1-acknowledged')}</span><span class="digit">1</span><p><b>Priority 1, acknowledged</b> - filled triangle with "!", full strength</p></div>
+        <div class="ex"><span class="marker halo a1">${sym('alarm-1-rectified')}</span><span class="digit">1</span><p><b>Priority 1, cleared, not yet acknowledged</b> - filled triangle with a check mark, full strength</p></div>
+        <div class="ex"><span class="marker halo a2">${sym('alarm-2-unacknowledged')}</span><span class="digit">2</span><p><b>Priority 2, unacknowledged</b> - filled circle; acknowledged and cleared as for priority 1</p></div>
+        <div class="ex"><span class="marker halo a3">${sym('alarm-3')}</span><span class="digit">3</span><p><b>Priority 3, unacknowledged</b> - outlined square in every state</p></div>
+        <div class="ex"><span class="marker halo a3 faded">${sym('alarm-3')}</span><span class="digit">3</span><p><b>Priority 3, acknowledged or cleared</b> - the same outlined square, faded</p></div>
+        <div class="ex"><span class="marker halo a1 faded">${sym('alarm-1-acknowledged')}</span><span class="digit">1</span><p><b>Alarm not live</b> (its rows in comms lost) - the glyph faded to 55 %</p></div>
       </div>`;
     const panel = (theme) => `
   <section class="panel ${theme}" aria-label="${theme} theme">
@@ -233,7 +331,7 @@ export function contactSheetText(sources, svgs) {
     <div class="grid">${kinds.map(cell).join('')}
     </div>
     <h3>State glyphs (${states.length})</h3>
-    <p class="review">The alarm glyphs are alarm presentation: they need the template's engineering review (ER-27) before release.</p>
+    <p class="review">The alarm glyphs are alarm presentation: they need the template's engineering review (ER-27) before release. They follow the template's reviewed set (unacknowledged, acknowledged and cleared per priority; priority 3 one outlined square, faded once acknowledged), drawn new; docs/icons.md lists the differences.</p>
     <div class="grid">${states.map(cell).join('')}
     </div>
     <h3>State examples for epic-viewing (colour never alone)</h3>${examples}
@@ -281,6 +379,7 @@ export function contactSheetText(sources, svgs) {
   .halo .g { filter: drop-shadow(2px 0 0 var(--containerRoot)) drop-shadow(-2px 0 0 var(--containerRoot))
                      drop-shadow(0 2px 0 var(--containerRoot)) drop-shadow(0 -2px 0 var(--containerRoot)); }
   .dim > .g { opacity: 0.5; }
+  .faded > .g { opacity: 0.55; }
   .badge { position: absolute; top: 0; right: 0; width: 16px; height: 16px; color: var(--label);
            background: var(--containerRoot); border-radius: 50%; padding: 1px; }
   .a1 { color: var(--ms-alarm-1); } .a2 { color: var(--ms-alarm-2); } .a3 { color: var(--ms-alarm-3); }
@@ -315,6 +414,7 @@ export function load(opts) {
         ? readdirSync(opts.src).filter((f) => f.endsWith('.svg')).map((f) => f.slice(0, -4)).sort()
         : [];
     problems.push(...checkSources(sources, files));
+    problems.push(...checkNotice(sources, existsSync(opts.notice) ? readFileSync(opts.notice, 'utf8') : null));
     const svgs = {};
     const groups = Object.fromEntries((sources.icons || []).map((e) => [e && e.id, e && e.group]));
     for (const id of files) {
@@ -331,7 +431,7 @@ export function parseArgs(argv) {
         const a = argv[i];
         if (a === '--check') opts.mode = 'check';
         else if (a === '--write-catalogue') opts.mode = 'catalogue';
-        else if (['--src', '--sources', '--catalogue', '--out'].includes(a)) opts[a.slice(2)] = path.resolve(argv[++i]);
+        else if (['--src', '--sources', '--catalogue', '--out', '--notice'].includes(a)) opts[a.slice(2)] = path.resolve(argv[++i]);
         else throw new Error(`unknown argument ${a}`);
     }
     return opts;

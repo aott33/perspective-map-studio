@@ -20,11 +20,17 @@ terra-draw-maplibre-gl-adapter
     file on GitHub; the npm packages ship no copy)
 
 This product's icon set (web/icons, served as /res/mapstudio/icons/) is drawn
-for Map Studio under the Apache License, Version 2.0, except six icons adapted
-from Tabler Icons 3.49.0 (https://github.com/tabler/tabler-icons):
-meter-station (from gauge), rtu (from building-broadcast-tower), lease-road
-(from road), geofence (from fence), region (from polygon) and site-footprint
-(from square-dashed), each modified (web/icons/sources.json says how).
+for Map Studio under the Apache License, Version 2.0, except the icons listed
+here, adapted from Tabler Icons 3.49.0 (https://github.com/tabler/tabler-icons)
+and modified (web/icons/sources.json says how; web/scripts/icons.mjs checks this
+list against it):
+
+    rtu from building-broadcast-tower
+    lease-road from road
+    geofence from fence
+    region from polygon
+    site-footprint from square-dashed
+
 Tabler Icons is licensed under the MIT License:
 
     MIT License

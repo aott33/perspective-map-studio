@@ -30,7 +30,7 @@ class IconCatalogueTest {
             assertEquals("kind", c.get(id).group, id);
         }
         assertTrue(c.contains(IconCatalogue.FALLBACK));
-        assertEquals(27, c.ids().size());
+        assertEquals(28, c.ids().size());
         assertEquals(19, c.kindIcons().size());
         assertEquals("0.2.0", c.version());
     }
@@ -38,8 +38,8 @@ class IconCatalogueTest {
     @Test
     void stateGlyphsAreNotKindIcons() {
         IconCatalogue c = IconCatalogue.shipped();
-        for (String id : List.of("comms-lost", "stale", "alarm-1-solid", "alarm-1-hollow", "alarm-2-solid",
-            "alarm-2-hollow", "alarm-3-solid", "alarm-3-hollow")) {
+        for (String id : List.of("comms-lost", "stale", "alarm-1-unacknowledged", "alarm-1-acknowledged",
+            "alarm-1-rectified", "alarm-2-unacknowledged", "alarm-2-acknowledged", "alarm-2-rectified", "alarm-3")) {
             assertEquals("state", c.get(id).group, id);
             assertNull(c.get(id).geometry, id);
             assertFalse(c.kindIcons().contains(id), id);
