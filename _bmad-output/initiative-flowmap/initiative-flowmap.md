@@ -58,7 +58,7 @@ Map editors build and keep a field's map in the browser and everyone reads live 
 - R37 (prd NFR-1): On the template's 30-pad scale set, pan, zoom and drag run at 60 frames per second in a laptop browser and an edit shows within 100 ms, before it is saved.
 - R38 (prd NFR-3): The map and tools meet WCAG 2.2 for dragging (2.5.7), target size (24 px, 44 px on touch; 2.5.8), non-text contrast 3:1 in both themes (1.4.11) and keyboard use.
 - R39 (prd FR-37): A kind setup may name a custom popup view that opens instead of the default popup and receives the documented map item object; an example view embeds the built-in alarm table, where acknowledging follows Ignition's permissions; a missing view falls back to the default popup.
-- R40 (prd FR-38, FR-39; proposed, pending owner approval 2026-10-26): A kind setup may bind a map item's look to one value (a tag relative to its base path, or one of its KPIs) by States or Bands, or an expression returning a preset name, each state or band mapped to a preset from a fixed reviewed list (normal neutral; attention, warning and fault each a theme token plus its glyph or word; dimmed or out of service; for lines solid, dashed, dotted and weight by pipe size), with a live preview of every state before saving and a per-item override; areas may take a category tint from a fixed low-saturation token palette, never points or lines; no colour code is accepted anywhere, and alarm state wins over a value style.
+- R40 (prd FR-38, FR-39): A kind setup may bind a map item's look to one value (a tag relative to its base path, or one of its KPIs) by States or Bands, or an expression returning a preset name, each state or band mapped to a preset from a fixed reviewed list (normal neutral; attention, warning and fault each a theme token plus its glyph or word; dimmed or out of service; for lines solid, dashed, dotted and weight by pipe size), with a live preview of every state before saving and a per-item override; areas may take a category tint from a fixed low-saturation token palette, never points or lines; no colour code is accepted anywhere, and alarm state wins over a value style; a stale value shows only as stale, with no value style, until a fresh value arrives.
 
 ## Constraints
 
@@ -91,12 +91,12 @@ Map editors build and keep a field's map in the browser and everyone reads live 
 
 ## References
 
-- prd - _bmad-output/initiative-flowmap/prd-map-studio/prd-map-studio.md, sections 2.2 (journeys), 3 (glossary), 4 (features and NFRs; FR-38 and FR-39 proposed), 6 (scope, build order, spike), 7 (success metrics), 8 (risks), 10 (assumptions)
+- prd - _bmad-output/initiative-flowmap/prd-map-studio/prd-map-studio.md, sections 2.2 (journeys), 3 (glossary), 4 (features and NFRs), 6 (scope, build order, spike), 7 (success metrics), 8 (risks), 10 (assumptions)
 - addendum - _bmad-output/initiative-flowmap/prd-map-studio/addendum.md, module references, technical leanings, template follow-up, signing key
 - brief - _bmad-output/initiative-flowmap/brief-flowmap/brief-flowmap.md
 - research - _bmad-output/initiative-flowmap/brief-flowmap/addendum.md, current state, icons, editing libraries, map UI practices
 - glossary - _bmad-output/initiative-flowmap/prd-map-studio/prd-map-studio.md, section 3
-- architecture - _bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md, AD-1 to AD-22 (adopted companion; epics cite its AD ids; AD-11 and AD-16 carry the proposed style rule extension)
+- architecture - _bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md, AD-1 to AD-22 (adopted companion; epics cite its AD ids; AD-11 and AD-16 carry the style rule and area tints)
 - contributor guide - docs/architecture.md
 
 ## Notes
@@ -111,6 +111,6 @@ Map editors build and keep a field's map in the browser and everyone reads live 
 - Decision: 2026-10-26 Satellite basemap: Mapbox Satellite on the template's existing Mapbox token and secret; architecture checks the terms (MapTiler or Esri World Imagery if they fail).
 - Open question: Where the Map Studio tools sit on the page; a UX workshop decides.
 - Decision: 2026-10-26 Kinds and assets come from project script functions in published shapes (architecture AD-4, AD-16).
-- Proposed (pending owner approval, 2026-10-26): Value-driven styles and area category tints (R40; prd FR-38, FR-39; architecture AD-11, AD-16), recommended to the owner as the colour approach. It extends AD-11 and does not relax "normal is neutral, hue only for abnormal state, always with a word or glyph": every possible look is a preset from a short reviewed list, the presets and tints get the same engineering review as the alarm glyphs (ER-27), and alarm state still wins. Planned as proposed work: epic-map-store-and-data entry 9 stores and validates the style rule; epic-viewing entry 1 renders it (blocked until approved). Until approved, R40 is covered by no epic.
-- Open question: Does the owner approve R40 (value-driven styles and area category tints) as proposed on 2026-10-26? Until then nothing builds on it.
-- Open question: If R40 is approved, does a stale value keep its last value style or show only as stale (prd section 9, question 8)? Proposed: only as stale.
+- Decision: 2026-10-26 The owner approved value-driven styles and area category tints as written (R40; prd FR-38, FR-39; architecture AD-11, AD-16), the colour approach Sofia recommended. It extends AD-11 and does not relax "normal is neutral, hue only for abnormal state, always with a word or glyph": every possible look is a preset from a short reviewed list, the presets and tints get the same engineering review as the alarm glyphs (ER-27), and alarm state still wins. Epic-map-store-and-data entry 9 stores and validates the style rule; epic-viewing (entry 1) draws it and the preview; epic-editing writes rules and overrides in the kind setup screen. R40 is covered by epic-viewing and epic-editing.
+- Decision: 2026-10-26 A stale value shows only as stale: the map item drops its last value style until a fresh value arrives (owner; prd section 9, question 8).
+- Open question: Where a style rule's expression is evaluated and in which expression language (unverified; architecture Deferred, settled when epic-viewing is refined).

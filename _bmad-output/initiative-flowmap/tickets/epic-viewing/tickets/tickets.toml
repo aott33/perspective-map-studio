@@ -1,16 +1,15 @@
 # Epic 3 entries. Table order is build order; ids are permanent.
 # The epic is not refined yet (refined: false); its stories are planned when it is.
-# Entry 1 is proposed work, pending owner approval (2026-10-26), held here so it is not lost;
-# its unknown blocks it until the owner approves initiative R40.
+# Entry 1 (owner-approved 2026-10-26, initiative R40) is held here ahead of refinement;
+# it cites initiative R40 until the epic has its own Requirements.
 
 [[entry]]
 id = 1
 type = "story"
 title = "Value-driven styles and area category tints drawn from live values"
-description = "Proposed, pending owner approval (2026-10-26; initiative R40; prd FR-38, FR-39; architecture AD-11, AD-16). Draws each map item's style rule from live values: the rule's source value arrives in the icon batch (AD-6), States, Bands or the expression pick a preset, and points, lines and areas draw it from the closed preset list in common/ (theme token plus glyph or word for attention, warning and fault; dimmed; solid, dashed, dotted and weight by pipe size for lines); alarm state draws over a value style, both over an area's category tint from the low-saturation palette; per-item overrides apply. Ships the preview component the kind setup screen embeds, drawing every state or band in its preset before saving (the screen and its rule editing are epic-editing's, R15, R16), and the docs page of every preset and tint in both themes for the engineering review (ER-27), which is a hitl step."
-verify = "On the dev Gateway with seeded kind setups: a States rule and a Bands rule change an icon's and a line's look as the source tag changes, within one refresh interval; an active alarm draws over the value style; an area takes its category tint and a point never does; the preview shows every state in its preset; no colour literal is in the stored rules or the module's styles; the owner's engineering review of the presets and tints (ER-27) is recorded."
-covers = []
+description = "Initiative R40 (owner, 2026-10-26; prd FR-38, FR-39; architecture AD-11, AD-16). Draws each map item's style rule from live values: the rule's source value arrives in the icon batch (AD-6), States, Bands or the expression pick a preset, and points, lines and areas draw it from the closed preset list in common/ (theme token plus glyph or word for attention, warning and fault; dimmed; solid, dashed, dotted and weight by pipe size for lines); alarm state draws over a value style, both over an area's category tint from the low-saturation palette; a stale source value draws only as stale, dropping the last value style until a fresh value arrives; per-item overrides apply. Ships the preview component the kind setup screen embeds, drawing every state or band in its preset before saving (the screen and its rule editing are epic-editing's, R15, R16), and the docs page of every preset and tint in both themes for the engineering review (ER-27), which is a hitl step."
+verify = "On the dev Gateway with seeded kind setups: a States rule and a Bands rule change an icon's and a line's look as the source tag changes, within one refresh interval; an active alarm draws over the value style; a stale source value drops the style and shows stale until a fresh value arrives; an area takes its category tint and a point never does; the preview shows every state in its preset; no colour literal is in the stored rules or the module's styles; the owner's engineering review of the presets and tints (ER-27) is recorded."
+covers = ["R40"]
 after = ["2.9"]
 hitl = true
 risk = "medium"
-unknown = "Does the owner approve value-driven styles and area category tints (initiative R40, proposed 2026-10-26)?"
