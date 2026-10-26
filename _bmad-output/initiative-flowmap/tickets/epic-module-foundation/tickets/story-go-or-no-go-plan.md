@@ -3,7 +3,7 @@ title: 'Go or no-go'
 type: 'chore'
 ticket: '9'
 created: '2026-10-26'
-status: 'built'
+status: done
 baseline_revision: '6d866163cf3af000c7970c14905c9f4bdd28f218'
 route: 'full'
 route_source: 'auto'

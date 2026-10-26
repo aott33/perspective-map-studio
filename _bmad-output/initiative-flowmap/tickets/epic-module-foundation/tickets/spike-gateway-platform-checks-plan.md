@@ -3,7 +3,7 @@ title: 'Gateway platform checks'
 type: 'feature'
 ticket: '3'
 created: '2026-10-26'
-status: 'built'
+status: done
 baseline_revision: 'dcb0479821a7517574e0743cc843370211af1859'
 route: 'full'
 route_source: 'auto'

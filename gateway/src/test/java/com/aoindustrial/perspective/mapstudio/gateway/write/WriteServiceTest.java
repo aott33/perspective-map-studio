@@ -1,0 +1,280 @@
+package com.aoindustrial.perspective.mapstudio.gateway.write;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import com.inductiveautomation.ignition.common.gson.JsonObject;
+import com.inductiveautomation.ignition.common.gson.JsonParser;
+
+import com.aoindustrial.perspective.mapstudio.common.Messages;
+import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
+import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
+import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
+import com.aoindustrial.perspective.mapstudio.gateway.setup.SetupRegistry;
+import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
+import com.aoindustrial.perspective.mapstudio.gateway.store.StoreState;
+
+/** The write path against {@link FakeMapStore}: every row of the plan's I/O matrix that needs no Gateway. */
+class WriteServiceTest {
+
+    static final String PROJECT = "mapstudio-dev";
+    static final String LINE = "{\"type\":\"LineString\",\"coordinates\":[[-104.99,39.74],[-104.98,39.75]]}";
+
+    FakeMapStore store;
+    SetupRegistry setups;
+    StoreState state;
+    List<ChangeHook.CommittedBatch> hooked;
+    WriteService writes;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        store = new FakeMapStore();
+        setups = new SetupRegistry(s -> { });
+        setups.put(PROJECT, Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\","
+            + "\"roles\":{\"full\":[\"MapEditor\"],\"phone\":[\"MapOperator\"]}}"));
+        state = StoreState.ready();
+        hooked = new ArrayList<>();
+        writes = new WriteService(new StoreGate(setups, c -> state), store, hooked::add);
+    }
+
+    static String uuid() {
+        return UUID.randomUUID().toString();
+    }
+
+    static JsonObject batch(String batchId, String... ops) {
+        return JsonParser.parseString("{\"batchId\":\"" + batchId + "\",\"ops\":[" + String.join(",", ops) + "]}")
+            .getAsJsonObject();
+    }
+
+    static String create(String id) {
+        return "{\"op\":\"create\",\"entity\":\"item\",\"id\":\"" + id + "\",\"baseVersion\":0,"
+            + "\"data\":{\"kind\":\"line\",\"name\":\"Line 1\",\"geometry\":" + LINE + "}}";
+    }
+
+    static String update(String id, int baseVersion, String data) {
+        return "{\"op\":\"update\",\"entity\":\"item\",\"id\":\"" + id + "\",\"baseVersion\":" + baseVersion
+            + ",\"data\":" + data + "}";
+    }
+
+    EditResult save(JsonObject batch) {
+        return writes.apply(PROJECT, batch, Actor.session("mapeditor"), Messages.LEVEL_FULL);
+    }
+
+    MapStudioException refused(JsonObject batch, String level) {
+        return assertThrows(MapStudioException.class,
+            () -> writes.apply(PROJECT, batch, Actor.session("someone"), level));
+    }
+
+    void assertNothingWritten(int edits, long seq) {
+        assertEquals(edits, store.committed.edits.size(), "edit rows");
+        assertEquals(seq, store.committed.seqs.getOrDefault(PROJECT, 0L), "seq");
+    }
+
+    @Test
+    void editorCreatesALineAtVersionOneAndItIsRecorded() {
+        String id = uuid();
+        String batchId = uuid();
+        EditResult result = save(batch(batchId, create(id)));
+        assertEquals(1, result.seq());
+        assertEquals(batchId, result.batchId());
+        assertEquals(1, result.results().get(0).version());
+        MapItemRecord stored = store.items(PROJECT).get(0);
+        assertEquals(id, stored.id());
+        assertEquals("line", stored.kind());
+        assertEquals(1, stored.version());
+        assertEquals(1, store.committed.edits.size());
+        var row = store.committed.edits.get(0);
+        assertEquals(PROJECT, row.project());
+        assertEquals(batchId, row.batchId());
+        assertEquals(1, row.seq());
+        assertEquals("item", row.entity());
+        assertEquals(id, row.entityId());
+        assertEquals("create", row.op());
+        assertEquals(1, row.version());
+        assertEquals("mapeditor", row.actor());
+        assertEquals("session", row.source());
+        assertEquals(1, store.committed.batches.size());
+        assertEquals(1, hooked.size(), "the change hook is called once per committed batch");
+        assertEquals(1, hooked.get(0).seq());
+        assertEquals(batchId, hooked.get(0).batchId());
+        assertEquals("mapeditor", hooked.get(0).actor().name());
+        assertEquals(stored, hooked.get(0).ops().get(0).record(), "the hook gets the full stored record");
+    }
+
+    @Test
+    void updateAtTheStoredVersionSavesVersionTwoAndReplacesOnlyTheFieldsItCarries() {
+        String id = uuid();
+        save(batch(uuid(), create(id)));
+        EditResult result = save(batch(uuid(), update(id, 1, "{\"name\":\"Renamed\"}")));
+        assertEquals(2, result.seq());
+        assertEquals(2, result.results().get(0).version());
+        MapItemRecord stored = store.items(PROJECT).get(0);
+        assertEquals("Renamed", stored.name());
+        assertEquals("line", stored.kind(), "fields the update does not carry stay");
+        assertEquals(JsonParser.parseString(LINE), stored.geometry());
+        assertEquals(2, store.committed.edits.size());
+        assertEquals(2, hooked.size());
+    }
+
+    @Test
+    void updateAtAnotherVersionIsAConflictAndNothingIsWritten() {
+        String id = uuid();
+        save(batch(uuid(), create(id)));
+        save(batch(uuid(), update(id, 1, "{\"name\":\"Second\"}")));
+        MapStudioException ex = refused(batch(uuid(), update(id, 1, "{\"name\":\"Stale\"}")), Messages.LEVEL_FULL);
+        assertEquals(Messages.CODE_CONFLICT, ex.code());
+        assertEquals(0, ex.opIndex());
+        assertEquals(id, ex.opId());
+        assertEquals("Second", store.items(PROJECT).get(0).name());
+        assertNothingWritten(2, 2);
+        assertEquals(2, hooked.size(), "no hook call for a refused batch");
+    }
+
+    @Test
+    void createOfAnExistingIdIsAConflict() {
+        String id = uuid();
+        save(batch(uuid(), create(id)));
+        assertEquals(Messages.CODE_CONFLICT, refused(batch(uuid(), create(id)), Messages.LEVEL_FULL).code());
+        assertNothingWritten(1, 1);
+    }
+
+    @Test
+    void aBatchWithOneValidOpAndAnUpdateOfAnUnknownIdWritesNothingAndNamesTheOp() {
+        String missing = uuid();
+        MapStudioException ex = refused(batch(uuid(), create(uuid()), update(missing, 1, "{\"name\":\"x\"}")),
+            Messages.LEVEL_FULL);
+        assertEquals(Messages.CODE_INVALID, ex.code());
+        assertEquals(1, ex.opIndex());
+        assertEquals(missing, ex.opId());
+        assertTrue(store.items(PROJECT).isEmpty(), "the valid create is not written either");
+        assertNothingWritten(0, 0);
+        assertTrue(store.committed.batches.isEmpty());
+    }
+
+    @Test
+    void aViewerAndAPhoneEditorAreRefusedWithRole() {
+        MapStudioException viewer = refused(batch(uuid(), create(uuid())), Messages.LEVEL_NONE);
+        assertEquals(Messages.CODE_ROLE, viewer.code());
+        assertTrue(viewer.plainMessage().contains("role"));
+        assertEquals(Messages.CODE_ROLE, refused(batch(uuid(), create(uuid())), Messages.LEVEL_PHONE).code());
+        assertNothingWritten(0, 0);
+        assertEquals(0, store.transactions, "no transaction is opened for a refused level");
+    }
+
+    @Test
+    void deleteAndKindSetupOpsAreRefusedAsNotSupported() {
+        String id = uuid();
+        save(batch(uuid(), create(id)));
+        MapStudioException delete = refused(batch(uuid(),
+            "{\"op\":\"delete\",\"entity\":\"item\",\"id\":\"" + id + "\",\"baseVersion\":1}"), Messages.LEVEL_FULL);
+        assertEquals(Messages.CODE_INVALID, delete.code());
+        assertTrue(delete.plainMessage().contains("not supported in this version"));
+        MapStudioException kind = refused(batch(uuid(),
+            "{\"op\":\"create\",\"entity\":\"kindSetup\",\"id\":\"pad\",\"baseVersion\":0,\"data\":{}}"),
+            Messages.LEVEL_FULL);
+        assertEquals(Messages.CODE_INVALID, kind.code());
+        assertTrue(kind.plainMessage().contains("not supported in this version"));
+        assertNothingWritten(1, 1);
+    }
+
+    @Test
+    void aScriptSaveIsRecordedUnderItsActor() {
+        writes.apply(PROJECT, batch(uuid(), create(uuid())), Actor.script("seed-script"), Messages.LEVEL_FULL);
+        var row = store.committed.edits.get(0);
+        assertEquals("seed-script", row.actor());
+        assertEquals("script", row.source());
+    }
+
+    @Test
+    void aSaveWithoutAnActorIsRefused() {
+        MapStudioException ex = assertThrows(MapStudioException.class,
+            () -> writes.apply(PROJECT, batch(uuid(), create(uuid())), Actor.script(" "), Messages.LEVEL_FULL));
+        assertEquals(Messages.CODE_INVALID, ex.code());
+        assertNothingWritten(0, 0);
+    }
+
+    @Test
+    void aProjectWithoutASetupOrWithoutAReadyStoreIsStoreUnreachable() {
+        MapStudioException noSetup = assertThrows(MapStudioException.class,
+            () -> writes.apply("other-project", batch(uuid(), create(uuid())), Actor.script("s"), Messages.LEVEL_FULL));
+        assertEquals(Messages.CODE_STORE_UNREACHABLE, noSetup.code());
+        assertTrue(noSetup.plainMessage().contains("other-project"));
+
+        state = StoreState.noConnection("MapStudio");
+        MapStudioException noConnection = refused(batch(uuid(), create(uuid())), Messages.LEVEL_FULL);
+        assertEquals(Messages.CODE_STORE_UNREACHABLE, noConnection.code());
+        assertTrue(noConnection.plainMessage().contains(PROJECT));
+        assertTrue(noConnection.plainMessage().contains("MapStudio"));
+
+        state = StoreState.starting("MapStudio");
+        assertEquals(Messages.CODE_STORE_UNREACHABLE, refused(batch(uuid(), create(uuid())), Messages.LEVEL_FULL).code());
+        state = StoreState.unavailable("no rights");
+        assertEquals("no rights", refused(batch(uuid(), create(uuid())), Messages.LEVEL_FULL).plainMessage());
+        assertNothingWritten(0, 0);
+    }
+
+    @Test
+    void malformedBatchesAreInvalid() {
+        String id = uuid();
+        assertEquals(Messages.CODE_INVALID, refused(JsonParser.parseString("{\"ops\":[" + create(id) + "]}")
+            .getAsJsonObject(), Messages.LEVEL_FULL).code());
+        assertEquals(Messages.CODE_INVALID, refused(batch("not-a-uuid", create(id)), Messages.LEVEL_FULL).code());
+        assertEquals(Messages.CODE_INVALID, refused(batch(uuid()), Messages.LEVEL_FULL).code());
+        assertEquals(Messages.CODE_INVALID, refused(batch(uuid(),
+            "{\"op\":\"move\",\"entity\":\"item\",\"id\":\"" + id + "\",\"baseVersion\":0}"), Messages.LEVEL_FULL).code());
+        assertEquals(Messages.CODE_INVALID, refused(batch(uuid(), create("p1")), Messages.LEVEL_FULL).code());
+        MapStudioException geometry = refused(batch(uuid(), "{\"op\":\"create\",\"entity\":\"item\",\"id\":\"" + id
+            + "\",\"baseVersion\":0,\"data\":{\"kind\":\"line\",\"geometry\":{\"type\":\"LineString\","
+            + "\"coordinates\":[[200,10],[1,1]]}}}"), Messages.LEVEL_FULL);
+        assertEquals(Messages.CODE_INVALID, geometry.code());
+        assertEquals(0, geometry.opIndex());
+        assertNothingWritten(0, 0);
+    }
+
+    @Test
+    void aBatchIdAlreadySavedIsRefusedAndNothingIsWritten() {
+        String batchId = uuid();
+        save(batch(batchId, create(uuid())));
+        assertEquals(Messages.CODE_INVALID, refused(batch(batchId, create(uuid())), Messages.LEVEL_FULL).code());
+        assertEquals(1, store.items(PROJECT).size());
+        assertNothingWritten(1, 1);
+    }
+
+    @Test
+    void aDatabaseFailureIsStoreUnreachableAndNothingIsWritten() {
+        store.failNextWrite = new SQLException("connection lost", "08006");
+        MapStudioException ex = refused(batch(uuid(), create(uuid())), Messages.LEVEL_FULL);
+        assertEquals(Messages.CODE_STORE_UNREACHABLE, ex.code());
+        assertNothingWritten(0, 0);
+        assertTrue(hooked.isEmpty());
+    }
+
+    @Test
+    void aFailingHookDoesNotUndoTheSave() {
+        writes = new WriteService(new StoreGate(setups, c -> state), store, b -> {
+            throw new IllegalStateException("hook failed");
+        });
+        EditResult result = save(batch(uuid(), create(uuid())));
+        assertEquals(1, result.seq());
+        assertEquals(1, store.items(PROJECT).size());
+    }
+
+    @Test
+    void geometryIsRoundedToSixDecimals() {
+        String id = uuid();
+        save(batch(uuid(), "{\"op\":\"create\",\"entity\":\"item\",\"id\":\"" + id + "\",\"baseVersion\":0,"
+            + "\"data\":{\"kind\":\"pad\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[-104.12345678,39.9876544]}}}"));
+        var coords = store.items(PROJECT).get(0).geometry().getAsJsonArray("coordinates");
+        assertEquals(-104.123457, coords.get(0).getAsDouble());
+        assertEquals(39.987654, coords.get(1).getAsDouble());
+    }
+}
