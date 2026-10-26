@@ -10,6 +10,7 @@ covers = ["R1", "R2"]
 after = []
 hitl = true
 risk = "high"
+refine = true
 
 [[entry]]
 id = 2

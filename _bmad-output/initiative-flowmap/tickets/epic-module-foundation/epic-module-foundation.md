@@ -63,3 +63,4 @@ The owner knows within two days whether the toolchain and the Perspective client
 - Decision: 2026-10-26 Entry 2 (MapLibre 6 on the Perspective toolchain) goes next, as the least certain part; entries 2 to 5 can run in parallel after entry 1.
 - Decision: 2026-10-26 A refactor sweep (entry 8) closes the build work before the go or no-go report (entry 9).
 - Decision: 2026-10-26 Entry 6 changes `ign-scada-template` (its module lock) through a template pull request; the template is a touch point this epic consumes.
+- Decision: 2026-10-26 The owner approved the nine stories; only story 1 is refined before it starts; building happens in the cloud session.
