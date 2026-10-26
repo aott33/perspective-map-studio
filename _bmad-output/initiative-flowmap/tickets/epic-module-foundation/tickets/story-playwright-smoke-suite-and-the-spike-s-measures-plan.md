@@ -3,7 +3,7 @@ title: "Playwright smoke suite and the spike's measures"
 type: 'feature'
 ticket: '7'
 created: '2026-10-26'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '0c6a191c0550beaa9aff02c2610bc16b87ab6541'
 route: 'full'
 route_source: 'auto'
@@ -29,6 +29,8 @@ context:
 **Always:** `@playwright/test` pinned to `1.63.0` (exact, lock file committed; the cloud box's Chromium 153 at `/opt/pw-browsers` is that release's browser); the suite fails on any browser console error or page error, as the scripts did; each measure carries `label` (`measured` or `stand-in`), `method`, and the environment it ran in (Chromium version, WebGL renderer string, CPU count, viewport, CI or local); a measure that cannot run is `{status: "unavailable", reason}`, never a number; software WebGL results are labelled as such and never presented as the NFR-1 verdict; claims about the Perspective client or the Ignition SDK stay marked unverified until seen live; no secrets, `.modl` or generated password in git or logs; theme tokens only in any CSS; no em dashes.
 
 **Never:** a Gateway Java change; a change to `ign-scada-template` or `claude-ignition-skills`; a `values.batch` message or any new message type; a test hook that reads MapLibre or the component store through React internals; CI committing screenshots; a fix for the CI failure on main (owner is checking); basemaps, icons, labels, signing changes; `retries` that hide a flaky measure.
+
+**Decisions (owner, 2026-10-26):** (1) The 30 pads are a seeded synthetic set, labelled stand-in. (2) Phone probes record only and never fail the suite. (3) The software-WebGL frame rate is recorded as is; NFR-1 stays unverified for story 9. (4) The 30 pads reach the component through a spike-only `testSet` prop in the closed schema, removed in the refactor sweep. (5) The `e2e` CI job runs on every push to `main` and every pull request, after `build`. The plan stays whole. CI on main failed only because the owner's Actions minutes ran out; the repository is going public.
 
 ## I/O & Edge-Case Matrix
 
@@ -79,6 +81,14 @@ context:
 
 ## Implementation Notes
 
+- Implemented directly in this session (no subagent tool available), 2026-10-26. Docker daemon was down at the start and was started with `dockerd`; dev Gateway `ms-s7` on 9107 from the ignored `.env`, `ops/up.sh --fresh`, no Map Studio warning or error in its log.
+- Suite: `e2e/` (`@playwright/test` 1.63.0 exact, lock committed). It runs on the cloud box's pre-installed Chromium 153 with no `executablePath` and no `playwright install`; `PW_CHROMIUM_PATH` is supported but was not needed. `playwright.config.mjs`, `global-setup.mjs` (stops with one line when the Gateway or the bundle is missing, checked with `GATEWAY_URL=http://localhost:1`), `lib/{env,geo,stats,valueBatch,measures}.mjs`, `lib/lib.test.mjs` (7 `node --test` tests), `tests/{fixtures,tracer,popup,scale,measures}.spec.mjs`. 10 Playwright tests, all pass (2.3 min); an `E2E_DOCS=1` run rewrote `docs/screenshots/*` and wrote `docs/spike-measures.json`.
+- App: spike-only `testSet` prop (`tracer` or `scale30`) in `mapstudio.props.json`, `MapStudio.tsx` and `web/typescript/{testSet,scaleData}.ts`; `data-test-set` and `data-feature-count` on `.mapstudio-map`. The scale set is seeded (mulberry32), 30 pads and 30 lines, inside the 1440 x 860 starting view at zoom 12 (Jest asserts it). Jest 32 of 32, `tsc --noEmit` clean, `./gradlew build` green (via `ops/up.sh`).
+- Dev project: views `MapStudioScale`, `MapStudioFallbackEmpty`, `MapStudioFallbackMissing` and pages `/scale`, `/fallback-empty`, `/fallback-missing`. The non-root session URL `/data/perspective/client/mapstudio-dev/<page>` works on 8.3.10 **[live 8.3.10]** (was unverified).
+- Surprises: Perspective's websocket frames are readable text on 8.3.10 **[live 8.3.10]** (`point.click` 261 bytes sent, reply 327 received). The frame rate varies a lot on the shared 4-CPU box: the same view gave 15.8 and then 5.8 fps pan median in two full runs, so the record states no cost per pad. Playwright reports 0 transferred bytes for the worker script (cause unverified). Phone probes: 7 pass, 2 fail (44 px targets; 21 x 22 px popup close button).
+- Deleted `ops/screenshot.mjs` and `ops/popup-check.mjs`; README, `docs/architecture.md`, `docs/platform-checks.md` (section "Story 7"), the story 1 walkthrough link and `ops/up.sh` point at `e2e/`. Deferred entries appended for the sweep, a laptop headed run, the real `values.batch` and the Gateway-side popup stop.
+- CI: job `e2e` added (`needs: build`, every push to `main` and pull request); YAML parsed, every step's command run locally except `download-artifact`, `setup-node`, the browser cache and `playwright install --with-deps`, which are **[unverified]** until a runner executes them.
+
 ## Plan Change Log
 
 ## Review Triage Log
@@ -105,11 +115,3 @@ context:
 
 **Manual checks (if no CLI):**
 - Owner reads the screenshots and `docs/spike-measures.json` labels; the CI run, once Actions works.
-
-## Open Questions
-
-1. **The 30-pad scale set.** The template checkout has 6 Mesa pads and no PV-29 harness. (a) Synthetic seeded 30 pads (default; labelled stand-in). (b) You point to the real set; its pads and routes replace the generator and the label becomes `measured`.
-2. **Phone probe failures.** (a) Record only (default; the suite stays green, findings feed story 9). (b) Fail the suite on a probe, so the phone must be fixed before merge, which later stories (bottom sheet, 44 px) would need anyway.
-3. **Frame rate for NFR-1.** CI and the cloud box only give software WebGL. (a) Record that and mark NFR-1 unverified for story 9 (default). (b) You run `E2E_HEADED=1` once on a laptop and its result joins the file.
-4. **How the 30 pads reach the component.** (a) Spike-only `testSet` prop in the closed schema (default; precedent `popupView`; removed in the sweep). (b) URL parameter read by the bundle (no schema change, but a hidden switch in shipped code).
-5. **When the CI job runs.** (a) Every push and pull request, after `build` (default; about 8 to 12 minutes more plus the 8.3.10 image pull, **[unverified]** timings). (b) Pull requests to `main` and manual runs only.

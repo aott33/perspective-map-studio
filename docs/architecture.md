@@ -107,7 +107,7 @@ The component's props and events, the message contract, the map item record and 
 
 ## Testing and proof
 
-Every documented behaviour has a Playwright test that records a screenshot, and the docs show it (AD-15). A behaviour without a passing test and screenshot is marked unverified. A release claims support for a new Ignition 8.3.x only after the `ign-scada-template` test stack and the Playwright suite pass on it (AD-13).
+Every documented behaviour has a Playwright test that records a screenshot, and the docs show it (AD-15). A behaviour without a passing test and screenshot is marked unverified. The suite lives in `e2e/`, runs against the dev Gateway from `ops/` (CI starts one in Docker), fails on any browser console error, and also writes `measures.json`: bundle size, frame rate, the size of a value batch and phone findings, each labelled `measured` or `stand-in` with its method. `npm run docs` in `e2e/` refreshes the screenshots the docs embed. A release claims support for a new Ignition 8.3.x only after the `ign-scada-template` test stack and the Playwright suite pass on it (AD-13).
 
 ## Releases
 

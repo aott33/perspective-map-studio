@@ -36,15 +36,14 @@ Layout:
 | `gateway/` | gateway hook and the component model delegate (`MapStudioDelegate`) |
 | `designer/` | the Designer palette entry |
 | `web/` | the TypeScript and React component, MapLibre map, Terra Draw line tool (`DrawControl.tsx`, `draw.ts`), message client (`messages.ts`), the point popup (`PointPopup.tsx`, `popupParams.ts`) and their tests |
-| `ops/` | the local development Gateway (Docker), its `mapstudio-dev` project (`MapStudioDev`, `Popups/PointDetails`) and the screenshot script |
+| `e2e/` | the Playwright suite (pinned `@playwright/test`): smoke tests at 1440 and 390 px, the popup checks and the spike's measures |
+| `ops/` | the local development Gateway (Docker) and its `mapstudio-dev` project (`MapStudioDev`, `MapStudioScale`, two popup fallback pages, `Popups/PointDetails`) |
 | `docs/` | contributor architecture, the platform checks and screenshots |
 
 ## Run the development Gateway
 
 ```bash
 ops/up.sh              # build, stage the .modl, start Ignition 8.3.10 in Docker, accept the module unattended
-node ops/screenshot.mjs   # click a point (popup) and draw a line in headless Chromium at 1440 and 390 px, save docs/screenshots/*.png (--url for another port)
-node ops/popup-check.mjs  # the popup view with its params, a second point, close (--expect-fallback for an empty or missing path)
 ops/logs.sh -n 200     # Gateway log
 ops/down.sh [--purge]  # stop; --purge also wipes the Gateway data (trial, acceptance)
 ```
@@ -56,6 +55,19 @@ The dev Gateway loads the unsigned build (`-Dignition.allowunsignedmodules=true`
 ### Platform checks
 
 `ops/checks.sh` answers the spike's Gateway questions on a live 8.3.10 Gateway: it adds PostgreSQL 16 beside the dev Gateway (`ops/docker-compose.checks.yml`), seeds the Gateway's core config collection from `ops/checks/config/core/` (a tag provider, a UDT whose alarm toggles every 30 s, a File secret provider and two database connections), and the module's `gateway/.../spike` package then logs one `CHECK <name> PASS|FAIL <evidence>` line per check for any project that holds a `com.aoindustrial.perspective.mapstudio/setup` resource (`ops/project/.../setup/setup.json`). The PostgreSQL passwords are generated into the git-ignored `ops/checks/secrets/` and reach the Gateway only through its File secret provider. While the checks stack exists, `ops/up.sh`, `down.sh` and `logs.sh` include it automatically and `ops/down.sh --purge` removes it, PostgreSQL volume included. The UDT's alarm is a dev-only test alarm, flagged for engineering review and never for a real Gateway. Results and evidence: [docs/platform-checks.md](docs/platform-checks.md). The spike package is removed by the refactor sweep.
+
+## Tests and proof
+
+The Playwright suite in `e2e/` runs against a dev Gateway that is already up (`ops/up.sh`); CI starts one in Docker for every push to `main` and every pull request.
+
+```bash
+cd e2e && npm ci
+npm test               # smoke tests, popup checks and measures; output in e2e/out (screenshots, measures.json, HTML report)
+npm run docs           # the same, rewriting docs/screenshots/*.png and docs/spike-measures.json
+npm run test:unit      # the suite's own helper tests (no Gateway needed)
+```
+
+The Gateway URL is `GATEWAY_URL`, else `http://localhost:` and `GATEWAY_HTTP_PORT` from `.env`, else 9088. The suite fails on any browser console or page error. It uses Playwright's own Chromium (`npx playwright install chromium`, run by CI); set `PW_CHROMIUM_PATH` to use a browser already on the machine, and `E2E_HEADED=1` to run with a visible browser (a real GPU gives a real frame rate). The measures it records, with their labels and limits, are in [docs/platform-checks.md](docs/platform-checks.md), section "Story 7".
 
 ## Releases and signing
 

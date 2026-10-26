@@ -2,7 +2,9 @@ name: CI
 
 # Builds and tests every push and pull request. Nothing here reads a secret: the
 # module is built unsigned, and the signing path is checked with a throwaway
-# certificate that is generated during the run and never stored.
+# certificate that is generated during the run and never stored. The e2e job
+# boots the dev Gateway in Docker with the unsigned build and runs the
+# Playwright suite in e2e/ (story 7).
 
 on:
   push:
@@ -75,3 +77,63 @@ jobs:
 
       - name: Sign with a throwaway certificate and verify
         run: scripts/ci/test-signing.sh
+
+  e2e:
+    name: Playwright suite on a dev Gateway
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Download the unsigned module
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: map-studio-unsigned-modl
+          path: ops/modules
+
+      - name: Set up Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      # Starts Ignition 8.3.10 in Docker (EULA, a generated admin password in the
+      # ignored .env, unsigned modules allowed: development only) and waits until
+      # the module's bundle is served. --no-build keeps the build job's module.
+      - name: Start the dev Gateway
+        run: ops/up.sh --no-build
+
+      - name: Install the suite
+        working-directory: e2e
+        run: npm ci --no-audit --no-fund
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
+
+      - name: Install Chromium
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the suite
+        working-directory: e2e
+        run: npm test
+
+      - name: Upload screenshots, measures and the report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-output
+          path: e2e/out
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Gateway log
+        if: failure()
+        run: ops/logs.sh -n 300
+
+      - name: Remove the dev Gateway
+        if: always()
+        run: ops/down.sh --purge

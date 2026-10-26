@@ -1,0 +1,88 @@
+// Unit tests for the suite's pure helpers: node --test lib/
+
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { project, pagePixel } from './geo.mjs';
+import { unavailable, validateMeasures } from './measures.mjs';
+import { frameStats, median, percentile } from './stats.mjs';
+import { batchSize, buildValuesBatch } from './valueBatch.mjs';
+
+test('median and percentile', () => {
+    assert.equal(median([3, 1, 2]), 2);
+    assert.equal(median([4, 1, 2, 3]), 2.5);
+    assert.equal(median([]), null);
+    assert.equal(percentile([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 95), 10);
+    assert.equal(percentile([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 50), 5);
+});
+
+test('frameStats on a steady 60 fps and on a slow window', () => {
+    const steady = Array.from({ length: 61 }, (_, i) => i * (1000 / 60));
+    const s = frameStats(steady);
+    assert.equal(s.frames, 61);
+    assert.ok(Math.abs(s.fps - 60) < 0.1);
+    assert.equal(s.shareOver20msPercent, 0);
+    const slow = frameStats([0, 50, 100, 150, 200], [60, 80]);
+    assert.equal(slow.fps, 20);
+    assert.equal(slow.shareOver20msPercent, 100);
+    assert.deepEqual(slow.longTasks, { count: 2, totalMs: 140 });
+});
+
+test('frameStats with too few frames is unavailable, not a number', () => {
+    assert.equal(frameStats([5]).status, 'unavailable');
+    assert.equal(frameStats([]).status, 'unavailable');
+});
+
+test('values.batch stand-in: full has every pad, changes-only a tenth, gzip is smaller', () => {
+    const full = buildValuesBatch({ pads: 30, full: true });
+    const delta = buildValuesBatch({ pads: 30, full: false, every: 10 });
+    assert.equal(full.type, 'values.batch');
+    assert.deepEqual(Object.keys(full), ['v', 'type', 'id', 'body']);
+    assert.equal(full.body.items.length, 30);
+    assert.equal(delta.body.items.length, 3);
+    const f = batchSize(full);
+    const d = batchSize(delta);
+    assert.ok(f.jsonBytes > d.jsonBytes && f.jsonBytes > 1000);
+    assert.ok(f.gzipBytes < f.jsonBytes);
+    assert.deepEqual(batchSize(buildValuesBatch({ pads: 30, full: true })), f);
+    for (const key of ['value', 'quality', 't', 'stale', 'reason']) {
+        assert.ok(key in full.body.items[0].comms);
+    }
+});
+
+test('project: the map centre lands on the middle of the map', () => {
+    const c = [-104.9725, 39.7445];
+    const [x, y] = pagePixel({ x: 10, y: 20, width: 100, height: 60 }, c, c, 12.5);
+    assert.equal(x, 60);
+    assert.equal(y, 50);
+    const [px] = project([0, 0], 0);
+    assert.equal(px, 256);
+});
+
+const goodEnv = { chromium: '153', renderer: 'SwiftShader' };
+const section = { label: 'measured', method: 'm' };
+
+test('validateMeasures accepts a complete file and an unavailable section', () => {
+    const ok = {
+        env: goodEnv,
+        bundle: section,
+        frameRate: unavailable('no WebGL'),
+        valueBatch: { label: 'stand-in', method: 'm' },
+        phone: section
+    };
+    assert.deepEqual(validateMeasures(ok), []);
+});
+
+test('validateMeasures refuses an unlabelled number, a missing section and a measured values.batch', () => {
+    const bad = {
+        env: goodEnv,
+        bundle: { method: 'm' },
+        frameRate: { status: 'unavailable' },
+        valueBatch: { label: 'measured', method: 'm' }
+    };
+    const problems = validateMeasures(bad).join('|');
+    assert.match(problems, /bundle: label/);
+    assert.match(problems, /frameRate: unavailable without a reason/);
+    assert.match(problems, /valueBatch: must be labelled stand-in/);
+    assert.match(problems, /phone: missing/);
+    assert.match(validateMeasures({}).join('|'), /env needs/);
+});

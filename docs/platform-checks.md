@@ -40,9 +40,9 @@ Measures:
 
 The baseline was measured by building the story 1 `web/` folder from commit `0fba47c` with the same webpack settings, outside the repository.
 
-Live run **[live 8.3.10]** (dev Gateway `ms-s2`, fresh volume, module accepted unattended): the Gateway log shows the module starting and the component registering with no Map Studio warning or error. `node ops/screenshot.mjs` at 1440 x 900 and 390 x 844: the point click reply arrived, a one-vertex drawing cancelled with Escape left the tool off with nothing drawn, and a two-vertex line finished with Enter gave "Line drawn with 2 points"; no browser console error or page error in either viewport (the script fails on one). The toggle, the Escape cancel and the finished line were seen through the DOM attributes the component sets (`data-drawing`, `data-line-points`, `aria-pressed`) and in the screenshots.
+Live run **[live 8.3.10]** (dev Gateway `ms-s2`, fresh volume, module accepted unattended): the Gateway log shows the module starting and the component registering with no Map Studio warning or error. the screenshot script (now the `e2e/` suite, story 7) at 1440 x 900 and 390 x 844: the point click reply arrived, a one-vertex drawing cancelled with Escape left the tool off with nothing drawn, and a two-vertex line finished with Enter gave "Line drawn with 2 points"; no browser console error or page error in either viewport (the script fails on one). The toggle, the Escape cancel and the finished line were seen through the DOM attributes the component sets (`data-drawing`, `data-line-points`, `aria-pressed`) and in the screenshots.
 
-Evidence: `docs/screenshots/mapstudio-dev-1440.png` and `docs/screenshots/mapstudio-dev-390.png` (point click reply and one line drawn with Terra Draw), written by `node ops/screenshot.mjs`, which fails on any browser console error.
+Evidence: `docs/screenshots/mapstudio-dev-1440.png` and `docs/screenshots/mapstudio-dev-390.png` (point click reply and one line drawn with Terra Draw), written by `e2e/tests/tracer.spec.mjs`, which fails on any browser console error (the ad-hoc script in `ops/` that first wrote them was replaced in story 7).
 
 Not covered here (later stories): frame rate, value batch size and phone breakage (story 7); saving, undo, snapping, select and edit modes (epic-editing).
 
@@ -163,3 +163,67 @@ One defect was found and fixed during the run: with MapLibre's `closeOnClick`, a
 - Content rendered through `ReactDOM.createPortal` keeps Perspective's React context; a second React root (the built-in Map's custom controls) needs `ClientStoreProviderContext.Provider`. **[bundle]**, portal path **[live 8.3.10]**
 - `View` reports `notFound`, `error` and `access-denied` through `onViewStateChange`; a component can fall back on them. A missing view reported `error` in 8.3.10, so a fallback must treat every failed state alike, not `notFound` alone. **[live 8.3.10]**
 - The `View` typings target `@types/react` 18 while a module built on the 16.14 typings needs one cast (`View as unknown as React.ComponentClass<ViewProps>`) **[client typings]**; the cast element rendered the view at runtime, where React is the one the Perspective client loads **[live 8.3.10]**.
+
+## Story 7 - Smoke suite and measures
+
+The Playwright suite in `e2e/` (`@playwright/test` 1.63.0, exact) replaces the two ad-hoc scripts of `ops/`: it renders the tracer view at 1440 and 390 px, saves the screenshots the docs embed, checks the popup (custom view, second point, close, and the text fallbacks for an empty and a missing view path, each on its own dev page so no Gateway restart is needed) and writes the measures below to `docs/spike-measures.json` (`npm run docs`; a plain `npm test` writes `e2e/out/measures.json`). It fails on any browser console or page error. Date: 2026-10-26; Gateway `inductiveautomation/ignition:8.3.10` (container `ms-s7`), Chromium 153.0.8010.12, 4 CPUs, software WebGL (`ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)`).
+
+Labels used here: **measured** was read from a running Gateway and browser; **stand-in** was built from a contract or a synthetic data set because the real feature or data does not exist yet; **[unverified]** was not checked. Every number in `docs/spike-measures.json` carries one of the first two and its method.
+
+Evidence: `docs/screenshots/mapstudio-dev-1440.png`, `docs/screenshots/mapstudio-dev-390.png` (the tracer after a point click, its popup view and a drawn line) and `docs/screenshots/mapstudio-scale-1440.png` (the 30-pad stand-in).
+
+### Bundle size (measured)
+
+Production webpack build, unsigned, as the Gateway served it on a page load (bytes decoded, gzip of that body, and delta against story 2):
+
+| File | Bytes | gzip | Story 2 | Delta |
+| --- | --- | --- | --- | --- |
+| `MapStudio.js` | 1,179,583 | 315,995 | 1,167,572 | +12,011 |
+| `MapStudio.css` | 72,208 | 10,591 | 70,976 | +1,232 |
+| `maplibre-gl-worker.js` | 517,065 | 147,896 | 517,065 | 0 |
+
+The staged `Map-Studio.unsigned.modl` is 509,949 bytes. The Gateway answered with `content-encoding: gzip` (transferred `MapStudio.js` body 314,937 bytes). No size budget exists, so none is asserted. Playwright reported 0 transferred body bytes for the worker request; why is **[unverified]**.
+
+### Frame rate on the 30-pad scale set (measured, with limits)
+
+Method: requestAnimationFrame timestamps and long tasks sampled in the page while Playwright drives a 4 s circular drag and a 4 s wheel zoom, after a 2 s warm-up, three runs per view. This is the page's frame cadence during the gesture, not MapLibre's own render count.
+
+| View | Pan median fps (runs) | Zoom median fps (runs) |
+| --- | --- | --- |
+| 30-pad stand-in (30 circles, 30 lines) | 5.8 (4.9, 5.8, 6.3) | 6.0 (6.0, 4.4, 14.3) |
+| Tracer (3 points, 1 line) | 15.2 (12.8, 17.7, 15.2) | 13.7 (15.9, 13.1, 13.7) |
+
+An earlier complete run of the same suite on the same box gave 15.8 fps (pan) and 13.7 fps (zoom) for the 30-pad view and 16.7 and 11.6 for the tracer. That spread, from 5.8 to 15.8 fps for the same view, means no cost per pad can be read from these numbers: the box shares its 4 CPUs and renders WebGL on the CPU.
+
+Limits: (1) software WebGL, so a laptop GPU is expected to do better, **[unverified]**; (2) circle and line layers only, with no icons, labels, KPI values or alarm styling, so this is a floor on the finished map's cost; (3) the pads are a seeded stand-in (`web/typescript/scaleData.ts`) for the template's 30-pad set, which this repository cannot read; (4) no run reached 60 fps. NFR-1 (60 fps in a laptop browser) is therefore **not decided** by this measure. Running `E2E_HEADED=1 npm test` on a laptop records a real renderer string beside its numbers.
+
+### Size of one value batch (stand-in)
+
+`values.batch` does not exist yet. The AD-6 envelope `{v, type, id, body: {seq, full, items}}` was built for 30 pads with three LiveValue slots each (comms, icon KPI, alarm count; `e2e/lib/valueBatch.mjs`):
+
+| Batch | Items | JSON bytes (UTF-8) | gzip bytes |
+| --- | --- | --- | --- |
+| Full (on open, reconnect) | 30 | 9,230 | 707 |
+| Changes only, every 10th pad | 3 | 1,019 | 236 |
+
+AD-6 fixes only the LiveValue fields `{value, quality, t, stale, reason}`; the item layout is this story's guess **[unverified]**. Whether Perspective compresses websocket frames is **[unverified]**, so the gzip figure is the best case, not the wire size. The one real message that exists was measured on the wire (Perspective session socket, readable text frames): `point.click` sent 261 bytes, `point.click.reply` received 327 bytes.
+
+### What broke on the phone (measured probes)
+
+390 x 844 px, device scale factor 2, `isMobile` and `hasTouch`, on the tracer view; touch moves go through the Chrome DevTools Protocol, which may differ from a real device **[unverified]**. Seven probes passed and two failed:
+
+| Probe | Result |
+| --- | --- |
+| No horizontal page overflow; the map fills the width | pass (scrollWidth 390; map 390 x 804) |
+| Tap a point: reply text and popup view | pass |
+| Touch drag pans, pinch zooms (canvas pixels compared before and after; not a read of the map centre) | pass |
+| Line tool finishes by touch alone (two vertex taps and a repeat tap on the last) | pass: 2 points |
+| No console or page errors | pass |
+| Touch targets of 44 px or more (PRD) | **fail**: zoom in and out 29 x 29, "Draw a line" 105 x 29 |
+| Popup inside the viewport with a 44 px close button | **fail**: the popup fits (x 70 to 292 of 390) but its close button is 21 x 22 |
+
+Findings feed the phone epic and the viewing epic's bottom sheet (PRD: touch targets of 44 px, popup as a bottom sheet on a phone); the probes record and never fail the suite.
+
+### Not covered
+
+Hours to a green build (story 9 compiles it); the 60 fps NFR-1 verdict on a real GPU; a value batch from a real `values.batch`; real touch hardware.
