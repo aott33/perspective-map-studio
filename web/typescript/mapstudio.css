@@ -1,0 +1,50 @@
+/* Map Studio component. Colours come only from the host theme's tokens. */
+.mapstudio {
+    position: relative;
+    overflow: hidden;
+    background: var(--containerRoot);
+    color: var(--label);
+}
+
+.mapstudio-map {
+    position: absolute;
+    inset: 0;
+}
+
+.mapstudio-map .maplibregl-canvas:focus {
+    outline: none;
+}
+
+.mapstudio-reply {
+    position: absolute;
+    left: 8px;
+    right: 56px;
+    bottom: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--borderRadius);
+    background: var(--container);
+    color: var(--label);
+    font-size: 13px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    pointer-events: none;
+}
+
+.mapstudio-reply--pending {
+    color: var(--label--disabled);
+}
+
+.mapstudio .maplibregl-ctrl-group {
+    background: var(--container);
+    border: 1px solid var(--border);
+    box-shadow: none;
+}
+
+.mapstudio .maplibregl-ctrl-group button + button {
+    border-top-color: var(--border);
+}
+
+.mapstudio .maplibregl-ctrl button .maplibregl-ctrl-icon {
+    filter: none;
+}

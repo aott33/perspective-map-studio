@@ -1,0 +1,11 @@
+{
+ "pages": {
+  "/": {
+   "viewPath": "MapStudioDev",
+   "viewParams": {}
+  }
+ },
+ "shared": {},
+ "defaultView": "MapStudioDev",
+ "props": {}
+}

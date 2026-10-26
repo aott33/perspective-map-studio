@@ -3,14 +3,14 @@ title: 'Tracer: a MapLibre map on a Perspective view, with one round trip'
 type: 'feature'
 ticket: '1'
 created: '2026-10-26'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '64d282043a05625e38871d0bfbcb31ac7fd17736'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md'
@@ -56,14 +56,14 @@ Reference repos (read only, never build from inside them) are cloned at `/tmp/cl
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `settings.gradle.kts`, `build.gradle.kts`, `gradle/wrapper/*`, `gradlew*` -- root build modelled on Mustry with Map Studio's ids, Ignition minimum 8.3.0, scopes, free module, signing skipped without properties.
-- [ ] `common/` -- `MapStudioModule` (ids, alias `mapstudio`, browser resources), `MapStudioComponent` descriptor for `ao.mapstudio`, `mapstudio.props.json` (closed schema, no props needed yet beyond style).
-- [ ] `gateway/` -- hook registering the component and its model delegate; `MapStudioDelegate` handling the envelope (`point.click`, unknown type, malformed) with logger `MapStudio.delegate`.
-- [ ] `designer/` -- hook registering the component in the Designer palette.
-- [ ] `web/` -- TypeScript and React component: MapLibre map, blank style, three fixed points and one line as GeoJSON layers, click sends the envelope through the client delegate, reply logged and shown as text; webpack, tsconfig, `.npmrc`, `build.gradle.kts`; unit test for the envelope builder and reply handling.
-- [ ] `ops/` -- `docker-compose.yml` on `inductiveautomation/ignition:8.3.10` with EULA, admin user and unsigned modules allowed (fallback: Mustry's dev keystore and signed dev build), external modules folder, unattended module acceptance, `ops/project/` holding a `mapstudio-dev` project with one view; scripts to build, stage and start.
-- [ ] `ops/screenshot.mjs` (or similar) -- headless Chromium captures the view at 1440 and 390 px after a point click; images saved to `docs/screenshots/`.
-- [ ] `LICENSE`, `NOTICE`, `README.md` -- Apache-2.0, MapLibre attribution, how to build and run the dev Gateway.
+- [x] `settings.gradle.kts`, `build.gradle.kts`, `gradle/wrapper/*`, `gradlew*` -- root build modelled on Mustry with Map Studio's ids, Ignition minimum 8.3.0, scopes, free module, signing skipped without properties.
+- [x] `common/` -- `MapStudioModule` (ids, alias `mapstudio`, browser resources), `MapStudioComponent` descriptor for `ao.mapstudio`, `mapstudio.props.json` (closed schema, no props needed yet beyond style).
+- [x] `gateway/` -- hook registering the component and its model delegate; `MapStudioDelegate` handling the envelope (`point.click`, unknown type, malformed) with logger `MapStudio.delegate`.
+- [x] `designer/` -- hook registering the component in the Designer palette.
+- [x] `web/` -- TypeScript and React component: MapLibre map, blank style, three fixed points and one line as GeoJSON layers, click sends the envelope through the client delegate, reply logged and shown as text; webpack, tsconfig, `.npmrc`, `build.gradle.kts`; unit test for the envelope builder and reply handling.
+- [x] `ops/` -- `docker-compose.yml` on `inductiveautomation/ignition:8.3.10` with EULA, admin user and unsigned modules allowed (fallback: Mustry's dev keystore and signed dev build), external modules folder, unattended module acceptance, `ops/project/` holding a `mapstudio-dev` project with one view; scripts to build, stage and start.
+- [x] `ops/screenshot.mjs` (or similar) -- headless Chromium captures the view at 1440 and 390 px after a point click; images saved to `docs/screenshots/`.
+- [x] `LICENSE`, `NOTICE`, `README.md` -- Apache-2.0, MapLibre attribution, how to build and run the dev Gateway.
 
 **Acceptance Criteria:**
 - Given a fresh clone, when `./gradlew build` runs, then a `.modl` for `com.aoindustrial.perspective.mapstudio` is produced and a broken web build fails it.
@@ -72,9 +72,40 @@ Reference repos (read only, never build from inside them) are cloned at `/tmp/cl
 
 ## Implementation Notes
 
+- Build: root `build.gradle.kts` (plugin `io.ia.sdk.modl` 0.5.0, Gradle 9.8 wrapper copied from Mustry), `sdk_version` 8.3.0 so Java compiles against the declared minimum; `requiredIgnitionVersion` 8.3.0; `freeModule`; `skipModlSigning` unless `-Pignition.signing.keystoreFile`; `license.html` (own Apache-2.0 notice, not Mustry's EULA text) staged into the module and referenced from `module.xml`. A plain build writes `build/Map-Studio.unsigned.modl`. The `:web` project declares a Java 17 toolchain too, or Gradle on a newer JDK refuses it as a dependency of `:gateway`.
+- `common/`: `MapStudioModule` (ids, alias `mapstudio`, `BROWSER_RESOURCES` at `/res/mapstudio/MapStudio.{js,css}`), `MapStudioComponent` (`ao.mapstudio`, Java2D palette icon), `Messages` (envelope keys, `mapstudio.message` event name, types `point.click`, `point.click.reply`, `error`, code `invalid`), `mapstudio.props.json` (closed schema, `style` only).
+- `gateway/`: hook registers the descriptor and `MapStudioDelegate::new`; the delegate's `reply(JsonObject)` is a pure static method; nothing escapes `handleEvent` (RuntimeException caught twice: building the reply and sending it). Logger `MapStudio.delegate`. `receivedAt` is ISO 8601 UTC truncated to milliseconds.
+- `web/`: TypeScript 4.9.5, webpack 5, React 16.14 as externals, `@inductiveautomation/perspective-client` pinned 2.3.10 (matches 8.3.10), `maplibre-gl` pinned 6.16.0. MapLibre 6 is ESM only, so `tsconfig.json` emits `es2020` modules for webpack and `tsconfig.test.json` overrides to `commonjs` for Jest. MapLibre 6 runs its worker from a separate file resolved from `import.meta.url`, which a bundle cannot satisfy: webpack copies `maplibre-gl-worker.mjs` beside the bundle as `maplibre-gl-worker.js` and the component calls `setWorkerUrl('/res/mapstudio/maplibre-gl-worker.js')`. The `.js` name matters: the Gateway serves `.mjs` with no content type under `nosniff`, and the browser refuses the worker. Colours: `themeColor()` reads `--containerRoot`, `--neutral-70`, `--label` from the component root's computed style (MapLibre paint cannot take `var()`); the overlay and controls use the tokens in `mapstudio.css`; no colour literal anywhere. Point labels are not drawn: a MapLibre symbol layer needs a glyph source, which the blank style has no business shipping yet. Unit tests: `web/typescript/__tests__/messages.test.ts` (8 tests: builder, uuid ids, reply reading, every malformed shape).
+- `ops/`: `docker-compose.yml` (Ignition 8.3.10, EULA, admin/password, standard edition, `-Dignition.allowunsignedmodules=true`, external modules folder, project bind mount). Unattended acceptance is the env variables `ACCEPT_MODULE_LICENSES` and `ACCEPT_MODULE_CERTS` (module id lists read by `ModuleUtil`, found in the 8.3.10 gateway jar): seeding `data/modules.json` with the licence CRC, as Mustry does, left an unsigned module parked in commissioning. `up.sh` (`--fresh`, `--no-build`), `down.sh [--purge]`, `logs.sh`, `lib.sh`; `ops/project` is the `mapstudio-dev` project with one flex view `MapStudioDev` at `/`. `ops/screenshot.mjs` projects the click target with the Web Mercator formula from the fixed centre and zoom, fails on any console error or page error, and writes `docs/screenshots/mapstudio-dev-{1440,390}.png`.
+- Env note: the Perspective runtime in 8.3.10 tags DOM nodes with `__reactFiber$` keys (React 17+ internals naming), useful for test scripts that need the component store.
+- Committing: WIP commits appeared on the branch during the build from outside this session; one of them swept `web/node_modules` (15,704 files) into git before `.gitignore` covered it. `git rm -r --cached web/node_modules` is staged so the next commit drops them; the history still carries them until it is rewritten or squashed.
+
+- Orchestrator after the implementer (2026-10-26): matrix audit found no committed Gateway-side test for the three I/O rows; added `gateway/src/test/.../MapStudioDelegateTest.java` (4 tests, JUnit 5, run by `./gradlew :gateway:test`, 4/4 pass). Dev Gateway admin password now generated into the git-ignored `.env` (was the literal `password`); host port bound to `127.0.0.1`; test line now between the first two points, per story criterion 3. Fresh `ops/up.sh --fresh`: no Map Studio warning or error; screenshots retaken.
+- Owner reviewed the screenshots on 2026-10-26 and confirmed they match criteria 3 and 4 (story criterion 5).
+
 ## Plan Change Log
 
+- Unattended module acceptance moved from a `data/modules.json` seed (Mustry's method, which assumes a signed module) to the Gateway's `ACCEPT_MODULE_LICENSES` / `ACCEPT_MODULE_CERTS` environment variables, so no stop, copy, chown and restart dance is needed. Same acceptance criterion, simpler scripts.
+- MapLibre's worker is published as a separate `.js` file beside the bundle (not in the plan; a consequence of MapLibre 6's split worker build). Noted in the README.
+
 ## Review Triage Log
+
+Pass 1 (quick lens, 2026-10-26): high 0, medium 0, low 7, false 2, maybe-false 0. Patched 5, rejected 4, deferred 1.
+
+| # | Finding | Verdict | Route | Evidence |
+|---|---|---|---|---|
+| 1 | Palette icon colour literal in `MapStudioComponent.paletteIcon()` | low | patch | Real literal against AD-11; now takes the Swing look-and-feel's `Label.foreground` (grey only as a fallback). |
+| 2 | A late reply clears the pending state of a newer click in `MapStudioStoreDelegate.handleEvent` | low | reject | Real but tracer-only (one test click); correlating replies adds logic the viewing epic replaces with `map.changed` and `values.batch`. |
+| 3 | Root-relative worker URL breaks under a context path | false | reject | Perspective serves every module bundle at root-relative `/res/<alias>/`, as `MapStudioModule.BROWSER_RESOURCES` does; a prefix would fail the bundle load first, so the worker adds no new failure. |
+| 4 | Theme colours read once at mount; a theme switch does not repaint; silent transparent fallback | low | reject | Real, but no story 1 criterion covers theme switching; the viewing epic owns theme following (AD-11) and will repaint on token change. |
+| 5a | Version check truncates `1.5` to `1` | low | patch | `getAsInt` truncates; now compares `getAsDouble`, with a test. |
+| 5b | `INBOUND_TYPES` unused, AD-8 list not enforced | low | patch | `reply()` now rejects any type outside `INBOUND_TYPES`. |
+| 5c | No tests for version mismatch and missing `pointId` | low | patch | Two tests added; 6/6 pass. |
+| 6 | README names the wrong `.modl` file | low | patch | Corrected to `build/Map-Studio.unsigned.modl`. |
+| 7 | Gradle web task inputs omit `.npmrc` | false | reject | The webpack task fails the build on a broken bundle (seen live); `.npmrc` changes the registry, not the bundle content. |
+| 8 | `.env` world-readable; unsigned-module flag Gateway-wide | low | patch (first part), reject (second) | `.env` now written with `umask 077` and `chmod 600`; the unsigned flag is the approved dev-only plan. |
+| 9 | `web/node_modules` remains in branch history | low | defer | Process, not code: an early WIP commit swept it in; removing it needs a history rewrite the owner must approve. |
+
 
 ## Design Notes
 
@@ -90,3 +121,10 @@ The round trip uses the component model delegate (IA's pattern), not a component
 
 **Manual checks (if no CLI):**
 - Owner reviews `docs/screenshots/` against story criteria 3 and 4.
+
+**Results (2026-10-26):**
+- `./gradlew build`: success; `build/Map-Studio.unsigned.modl` with `module.xml` carrying id, version 0.1.0, hooks, Perspective dependency and the licence. A webpack error fails the build (seen with the first MapLibre import).
+- `cd web && npx tsc --noEmit && npm test`: no type errors; 8 of 8 tests pass.
+- `ops/up.sh --fresh`: Gateway RUNNING with no wizard; log shows `Starting up module 'com.aoindustrial.perspective.mapstudio' v0.1.0` and `Registering the Map Studio component.`; no Map Studio warning or error.
+- `node ops/screenshot.mjs`: both screenshots written; reply text `Gateway received click on p1 at <ISO UTC>` on both; no console error (the script fails on one). Delegate log: `point.click <uuid> for point p1`.
+- I/O matrix exercised against the live Gateway by firing envelopes through the client delegate from a Playwright script: unknown type -> `Error (invalid): Unknown message type: nope` (warn logged); missing id or type -> `The message needs an id and a type.`; version 2 -> unsupported version; `point.click` without `pointId` -> `point.click needs a pointId.`; a valid `point.click` for p3 -> reply. No exception in the Gateway log.

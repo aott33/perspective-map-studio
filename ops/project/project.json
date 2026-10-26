@@ -1,0 +1,7 @@
+{
+  "title": "mapstudio-dev",
+  "description": "Map Studio development project, bind-mounted from the repository (ops/project). One view with the Map Studio component, for rendering in a browser session.",
+  "enabled": true,
+  "inheritable": false,
+  "parent": ""
+}
