@@ -1,0 +1,14 @@
+{
+  "scope": "A",
+  "description": "Map Studio dev map store: the owner role mapstudio (creates the mapstudio_ tables)",
+  "version": 1,
+  "restricted": false,
+  "overridable": true,
+  "files": [
+    "config.json"
+  ],
+  "attributes": {
+    "uuid": "bfb79e49-e8f7-4f6a-a2a9-2c3b1a194188",
+    "enabled": true
+  }
+}

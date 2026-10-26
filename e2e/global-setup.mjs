@@ -1,4 +1,5 @@
 // Stop before any test when the Gateway is not there, with one line saying why.
+// (The map editor signs in per editor test, in its own process: tests/fixtures.mjs.)
 
 import { gatewayUrl } from './lib/env.mjs';
 
