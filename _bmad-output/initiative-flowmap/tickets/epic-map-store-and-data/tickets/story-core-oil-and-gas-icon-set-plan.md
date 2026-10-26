@@ -3,14 +3,14 @@ title: 'Core oil and gas icon set'
 type: 'feature'
 ticket: '10'
 created: '2026-10-26'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '7c119d866014add0df7ec988e47dd78b2662d068'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md'
@@ -79,18 +79,18 @@ context:
 ## Tasks & Acceptance
 
 **Execution (phase A, now):**
-- [ ] `web/icons/src/*.svg` -- the 27 glyphs (19 kind icons, 8 state glyphs) to the rules above -- the one source of artwork.
-- [ ] `web/icons/sources.json` -- per icon: id, kind words, geometry (point, line, area), origin (`drawn` or `tabler:<name>@3.49.0`, modified), licence (`Apache-2.0` for drawn, `MIT` for Tabler) -- provenance kept beside the art.
-- [ ] `web/scripts/icons.mjs` -- Node, no dependencies: validates every SVG against the rules (viewBox, `currentColor` only, no text, style or href), the allow list of licences (`MIT`, `Apache-2.0`, `ISC`, `CC0-1.0`), sources-to-files match; writes `mapstudio-icons.svg` (one `<symbol id="ms-<id>">` each) and the contact sheet into the mounted output; `--check` verifies the committed catalogue matches -- one gate for drift and licence.
-- [ ] `common/src/main/resources/.../common/icons.json` -- catalogue `{version, icons: [{id, geometry, label}]}`, versioned with the public contract (NFR-8).
-- [ ] `common/src/main/java/.../common/IconCatalogue.java` -- loads `icons.json`; `contains(id)`, `ids()`, `FALLBACK = "point"`.
-- [ ] `web/icons/contact-sheet.html` -- every icon at 16, 24 and 44 px (44 px with its tap target outlined), on light and dark backgrounds, beside the state examples of Design Notes; colours from token custom properties with stand-in values declared once at the top.
-- [ ] `web/package.json`, `web/build.gradle.kts` -- `icons` script run before webpack; `icons:check` in `npm test`.
-- [ ] `web/typescript/__tests__/icons.test.ts` -- runs the checker; asserts 27 ids, each FR-9 kind covered, no colour literal in the sprite.
-- [ ] `gateway/src/test/java/.../IconCatalogueTest.java` -- loads the catalogue, known and unknown ids, fallback present.
-- [ ] `e2e/tests/icons.spec.mjs` -- opens `/res/mapstudio/icons/contact-sheet.html` and `mapstudio-icons.svg` on the dev Gateway, checks 200 and content type, screenshots `docs/screenshots/icons-contact-sheet.png` at 1440 and 390 px.
-- [ ] `docs/icons.md` -- the list (id, kind, geometry, origin, licence), the drawing rules for adding an icon, the state contract, the screenshot.
-- [ ] `NOTICE` -- Tabler Icons, MIT, `Copyright (c) 2020-2026 Paweł Kuna` (as in the 3.49.0 LICENSE) with the permission notice, naming the modified icons.
+- [x] `web/icons/src/*.svg` -- the 27 glyphs (19 kind icons, 8 state glyphs) to the rules above -- the one source of artwork.
+- [x] `web/icons/sources.json` -- per icon: id, kind words, geometry (point, line, area), origin (`drawn` or `tabler:<name>@3.49.0`, modified), licence (`Apache-2.0` for drawn, `MIT` for Tabler) -- provenance kept beside the art.
+- [x] `web/scripts/icons.mjs` -- Node, no dependencies: validates every SVG against the rules (viewBox, `currentColor` only, no text, style or href), the allow list of licences (`MIT`, `Apache-2.0`, `ISC`, `CC0-1.0`), sources-to-files match; writes `mapstudio-icons.svg` (one `<symbol id="ms-<id>">` each) and the contact sheet into the mounted output; `--check` verifies the committed catalogue matches -- one gate for drift and licence.
+- [x] `common/src/main/resources/.../common/icons.json` -- catalogue `{version, icons: [{id, geometry, label}]}`, versioned with the public contract (NFR-8).
+- [x] `common/src/main/java/.../common/IconCatalogue.java` -- loads `icons.json`; `contains(id)`, `ids()`, `FALLBACK = "point"`.
+- [x] `web/icons/contact-sheet.html` -- every icon at 16, 24 and 44 px (44 px with its tap target outlined), on light and dark backgrounds, beside the state examples of Design Notes; colours from token custom properties with stand-in values declared once at the top.
+- [x] `web/package.json`, `web/build.gradle.kts` -- `icons` script run before webpack; `icons:check` in `npm test`.
+- [x] `web/typescript/__tests__/icons.test.ts` -- runs the checker; asserts 27 ids, each FR-9 kind covered, no colour literal in the sprite.
+- [x] `gateway/src/test/java/.../IconCatalogueTest.java` -- loads the catalogue, known and unknown ids, fallback present.
+- [x] `e2e/tests/icons.spec.mjs` -- opens `/res/mapstudio/icons/contact-sheet.html` and `mapstudio-icons.svg` on the dev Gateway, checks 200 and content type, screenshots `docs/screenshots/icons-contact-sheet.png` at 1440 and 390 px.
+- [x] `docs/icons.md` -- the list (id, kind, geometry, origin, licence), the drawing rules for adding an icon, the state contract, the screenshot.
+- [x] `NOTICE` -- Tabler Icons, MIT, `Copyright (c) 2020-2026 Paweł Kuna` (as in the 3.49.0 LICENSE) with the permission notice, naming the modified icons.
 
 **Execution (phase B, after story 3 is merged, rebased on main):**
 - [ ] story 3's kind list validator -- check each kind's `icon` against `IconCatalogue`; an unknown name adds a plain-words status entry ("Kind Pad names icon wel-pad, which Map Studio does not have; it shows as a plain point.") and one log line; a missing icon means `point`.
@@ -126,6 +126,18 @@ State contract for epic-viewing (drawn on the contact sheet so the owner reviews
 - `grep -ri openbridge web/icons` finds nothing; NOTICE names Tabler and MIT.
 
 ## Implementation Notes
+
+Phase A, 2026-10-26, implemented directly (no implementation subagent available in this session).
+
+- 27 icons in `web/icons/src` (19 kind icons with `point`, 8 state glyphs); provenance in `web/icons/sources.json`; six adapted from Tabler 3.49.0 outline (MIT), the rest drawn new. The Tabler adaptations are attribute normalisation only, plus a building outline in `site-footprint`.
+- Deviation: the contact sheet is generated by `web/scripts/icons.mjs` (sprite inlined, so it renders from a file, the stand-in server or the Gateway) instead of a hand-kept `web/icons/contact-sheet.html`; it carries stand-in token values once per theme panel, and the alarm tokens are `--ms-alarm-1..3` placeholders [UNVERIFIED] until epic-viewing settles the theme names.
+- Deviation: `icons.mjs` runs after webpack (`npm run build`), not before, because webpack's `output.clean` empties `mounted/`. `npm test` runs `icons.mjs --check` before Jest; Gradle's webpack and jestTest tasks take `icons/`, `scripts/` and the catalogue as inputs.
+- `IconCatalogue` (common) reads `icons.json` beside it with Ignition's Gson; its tests live in `gateway/src/test` (common has no test source set). Common additions are the catalogue files only, as agreed with story 1.
+- Dev Gateway: not reachable. This box has no running Docker daemon to the sandbox, and starting containers outside the sandbox was refused, so `ops/up.sh` with `MAPSTUDIO_CONTAINER=ms-e2s10`, `GATEWAY_HTTP_PORT=9130` did not run. The Gateway's content types for `.svg`, `.json` and `.html` under `/res/mapstudio/` stay [UNVERIFIED]; the three content-type tests in `e2e/tests/icons.spec.mjs` did not run.
+- Screenshots `docs/screenshots/icons-contact-sheet-1440.png` and `-390.png` were taken by `icons.spec.mjs` (`E2E_DOCS=1`, `--grep "contact sheet|catalogue"`) against a stand-in Node static server serving the built `mounted/` folder at `/res/mapstudio/` (not the Gateway); docs/icons.md says so.
+- Verification run: `node scripts/icons.mjs --check` (27 icons, licences allowed); `npx tsc --noEmit` and `npm test` in `web/` (6 suites, 39 tests passed); `./gradlew build` (BUILD SUCCESSFUL; `IconCatalogueTest` 6 of 6, `MapStudioDelegateTest` 6 of 6; `mounted/icons/*` inside the web jar of the `.modl`); Playwright 3 of 6 icon tests against the stand-in, passed, no horizontal scroll at 390 px.
+- Matrix audit: sprite drift and forbidden source are covered by `icons.test.ts` (ran, passed). Known, unknown and no icon are covered at the catalogue level by `IconCatalogueTest` (`resolve`, `contains`); their `map.load` status entry and log line are phase B, waiting for story 3.
+- Owner review of the look (hitl): pending.
 
 ## Plan Change Log
 

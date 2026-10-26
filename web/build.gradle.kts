@@ -35,6 +35,11 @@ val webpack = tasks.register<NpmTask>("webpack") {
     dependsOn(tasks.named("npmInstall"))
     inputs.property("webDev", webDev)
     inputs.dir("typescript")
+    // The icon set (story 2.10): sources, artwork and the build script that writes
+    // mounted/icons/ after webpack, plus the catalogue it checks in common/.
+    inputs.dir("icons")
+    inputs.dir("scripts")
+    inputs.file("../common/src/main/resources/com/aoindustrial/perspective/mapstudio/common/icons.json")
     inputs.files("package.json", "package-lock.json", "webpack.config.js", "tsconfig.json")
     outputs.dir(projectOutput)
 }
@@ -45,6 +50,9 @@ val jestTest = tasks.register<NpmTask>("jestTest") {
     args.set(listOf("test"))
     dependsOn(tasks.named("npmInstall"))
     inputs.dir("typescript")
+    inputs.dir("icons")
+    inputs.dir("scripts")
+    inputs.file("../common/src/main/resources/com/aoindustrial/perspective/mapstudio/common/icons.json")
     inputs.files("package.json", "package-lock.json", "jest.config.js", "tsconfig.json", "tsconfig.test.json")
 }
 
