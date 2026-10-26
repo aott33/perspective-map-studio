@@ -1,0 +1,147 @@
+# Epic 2 stories in build order. Table order is build order; ids are permanent.
+# Parallel groups (epic Notes, Decision 2026-10-26): 1 alone; group A = 2 to 7 after 1;
+# group B = 8, 9, 10; group C = 11; then 12 (sweep) and 13 (closing release check).
+
+[[entry]]
+id = 1
+type = "story"
+title = "Tracer: one edit saved through the write path and read back"
+description = "Brings PostgreSQL back to the ops/ dev stack, reads the project setup resource at project start, creates the whole first mapstudio_ schema after waiting for the connection, and saves one map item edit through the write service from the browser (the spike's line tool) and from system.mapstudio.applyEdits, role-checked and recorded; map.load returns the stored map and the map draws it. Fixes the shared contracts: schema, message and op shapes, error codes, setup schema, per-batch seq with a no-op change hook. Group: alone, first."
+verify = "On the dev Gateway a map editor draws a line, reloads, and the line is still there; a viewer's save is refused with code role; psql shows the item and an edit record naming the editor and the time."
+covers = ["R1", "R3", "R4", "R12", "R13"]
+after = ["1.1"]
+hitl = true
+risk = "high"
+refine = true
+
+[[entry]]
+id = 2
+type = "story"
+title = "Conflicts, retries, deletes and the phone role"
+description = "Completes the write service on entry 1's contract: a stale baseVersion refuses the whole batch with code conflict, a plain-words message and the other editor's current record; a retried batchId returns its first result; deletes are tombstones with a version bump that a later batch restores; the role matrix adds phone editing (a point's geometry and a map item's properties only) and map.load reports level phone. Gateway write service only. Group A."
+verify = "Gateway tests and a live run show: two saves of one map item from two browsers, the second refused with the first's change; the same batchId sent twice writes once; a delete restored by a later batch; a phone editor's line refused with code role and a point move saved."
+covers = ["R3", "R4", "R5"]
+after = [1]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Kind list and asset list from the project"
+description = "Calls the kind and asset functions the setup names on a bounded pool with a timeout (getProjectScriptManager), caches both, refreshes on a timer and on demand, checks them against the published kind list and asset contract, and reports empty, failing, slow or incomplete lists in words in the Gateway log and in map.load. Adds a dev kind and asset adapter to the dev project, docs for both contracts and the two example adapters (UDT instances from the tag tree, a named-query wrapper) in Jython 2.7. Gateway adapter caller and map.load content; no write-path change. Group A."
+verify = "map.load in the dev session carries the dev kinds and assets with status ok; emptying, breaking or slowing the dev adapter shows the matching plain-words status in map.load and one log line, without a Gateway restart."
+covers = ["R8", "R10", "R14"]
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Saved edits reach every open map at once"
+description = "Replaces entry 1's no-op change hook with one in-process change event per committed batch; every open map of the project, in any session, receives map.changed {seq, ops} at once and applies it; a seq gap makes the browser reload the map. Gateway change events and delegate fan-out plus the browser's map.changed handling. Group A."
+verify = "With two browsers open on the dev view, a line saved in one appears in the other within a few seconds without a reload; a skipped seq in a Jest test triggers a reload."
+covers = ["R6"]
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Map store operations: rights, failed and newer schemas, redundancy"
+description = "Fills in the store states entry 1 defines: a role without CREATE or a failing migration logs one error naming the connection, statement and SQLState and leaves the store unavailable with no half-created schema; a schema newer than the module makes the map read only (saves refused, reason logged and in map.load); a standby Gateway in a redundant pair refuses writes. Adds docs/operations (backups through the site's PostgreSQL backups, rights, redundancy). Migrations and store state only. Group A."
+verify = "On the dev stack a CONNECT-only role gives one error line and map.load reports the store unavailable; a schema version set above the module's gives read only; Gateway tests cover the failed migration rollback and the standby refusal."
+covers = ["R2"]
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Setup: validation, live change and docs"
+description = "Validates the setup resource against its versioned schema with plain-words reasons for a missing, unreadable or invalid setup (store unavailable, reason in the log and in map.load); applies a changed setup without a Gateway restart through the lifecycle's resource-modified path (unverified in the spike, checked here live); documents the setup schema with an example. Setup loader and docs only. Group A."
+verify = "Editing the dev project's setup file and rescanning the project changes the refresh interval and roles seen by map.load without a restart; a setup with a bad field gives a plain-words reason in the log and in map.load."
+covers = ["R12", "R14"]
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Setup editor in the Designer"
+description = "A Designer workspace for the setup resource, modelled on IA's project-resource example (about 300 lines of Swing, docs/platform-checks.md check 4): a form for every setup field with plain-words validation, saved as the same resource file. Designer scope only. The owner checks it in a Designer. Group A. Owner may drop it for AD-5's script-function fallback (epic Notes, Open question)."
+verify = "In a Designer the owner creates and edits the dev project's setup through the form, saves, and the Gateway's map.load reflects the change."
+covers = ["R12"]
+after = [1]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 8
+type = "story"
+title = "Unsaved edits survive and replay"
+description = "The browser keeps unsent and refused batches in an ordered local-storage queue per project, replays them with their original versions and batchIds until saved or discarded, shows each as unsaved with its reason (a conflict names the other editor's change) and offers discard; when the map store is unreachable at load the map says so, draws no map item as current and turns editing off. Browser save client only. Group B (after 2 and 4)."
+verify = "A line drawn while the dev Gateway is stopped shows as unsaved, survives closing the browser, and saves on reopen once the Gateway is back; a conflicting save shows its reason and can be discarded; an unreachable store at load shows the message and no items."
+covers = ["R7", "R5"]
+after = [2, 4]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 9
+type = "story"
+title = "Kind setups in the map store, and items checked against the kind list"
+description = "Publishes the kind setup schema (comms path, up to 4 KPIs with one icon KPI, alarms path, popup parts, popup link, custom popup view, a switch per live value) in common/ and docs; kindSetup ops (one versioned row per project and kind id) go through the write service and come back in map.load and getMap; every map item op is validated and normalised against the cached kind list (known kind, geometry, form-field types) and refused with code invalid and the reason. Write service validation and kind setup storage. Group B (after 2 and 3)."
+verify = "Gateway tests and a live run: a kind setup saved by applyEdits returns in map.load; an item of an unknown kind, of the wrong geometry or with a mistyped property is refused with a plain-words reason; a CSV-style string number is stored as a number."
+covers = ["R8", "R11", "R14"]
+after = [2, 3]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 10
+type = "story"
+title = "Core oil and gas icon set"
+description = "Ships the sixteen FR-9 icons in one minimalist style as a sprite the module serves, with their source, licence and attribution in NOTICE, nothing derived from OpenBridge, and an icon catalogue in common/ that the kind list's icon names are checked against (an unknown name reported in the adapter status). The owner approves the look. Static assets, the catalogue and the adapter check only; epic-viewing draws them. Group B (after 3)."
+verify = "The sprite and catalogue are served by the dev Gateway, a docs page shows all sixteen icons, NOTICE carries their licence, and a dev kind naming an unknown icon is reported in map.load."
+covers = ["R9"]
+after = [3]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 11
+type = "story"
+title = "Scripting API documented, and the 30-pad set seeded through it"
+description = "Documents system.mapstudio.getMap and applyEdits (arguments, results, errors, the actor rule, UUIDv5 ids from a stable name and the re-run rule) with autocomplete docs in the Designer; a dev-project script seeds the 30-pad stand-in and the tracer's points through applyEdits, safe to re-run; removes the testSet prop, its stand-in data and the Scale view, and moves the e2e scale, measures and tracer specs onto store data. Group C (after 8 and 9)."
+verify = "Running the seed script twice leaves exactly 30 pads and 30 lines in the map store; the e2e suite passes with testSet gone and the frame-rate measure still runs on the 30-pad set."
+covers = ["R13", "R14", "R15"]
+after = [8, 9, "1.7"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 12
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up what the other stories deferred, scoped at its start from their plans and review findings; cleanup only."
+verify = "The build, the Gateway and Jest tests and the e2e suite still pass after the sweep."
+covers = []
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 13
+type = "story"
+title = "Release 0.2.0 on the template's test stack"
+description = "Tags and releases 0.2.0 (the public contract changed), checks the docs carry every contract with its version, updates the template's module lock (a template pull request the owner merges), and runs the template's test stack with a never-committed scratch project whose setup names a PostgreSQL connection: an edit saved in one browser shows in a second and survives a restart. Closing integrated check of the epic's Done when."
+verify = "scripts/test/stack.sh passes in the template with 0.2.0 installed, and on the scratch project an edit from one browser shows in another and is in the map store after a Gateway restart."
+covers = ["R14"]
+after = [12, "1.5", "1.6"]
+hitl = true
+risk = "medium"
