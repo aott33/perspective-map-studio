@@ -48,6 +48,19 @@ To run several dev Gateways side by side, give each its own `MAPSTUDIO_CONTAINER
 
 The dev Gateway loads the unsigned build (`-Dignition.allowunsignedmodules=true`), which is never acceptable outside development. Releases are signed `.modl` files on GitHub.
 
+## Releases and signing
+
+Releases are signed `.modl` files attached to GitHub releases, built by CI from a `vX.Y.Z` tag on `main` ([RELEASING.md](RELEASING.md)). Every release is signed with one self-signed certificate held by the project owner. Check a download against this fingerprint before you install it (the script checks structure and fingerprint only; the Gateway verifies the signatures cryptographically when you install the module):
+
+Signing certificate SHA-256: PENDING - the owner adds the fingerprint before the first release
+
+```bash
+scripts/ci/modl-verify.sh Map-Studio-<version>.modl "<fingerprint above>"   # structure and fingerprint check; needs unzip and a JDK's keytool
+sha256sum -c Map-Studio-<version>.modl.sha256                               # the file's own SHA-256
+```
+
+Install through a host's module lock by the file's SHA-256 and this certificate fingerprint. A certificate rotation is a documented release that carries the new fingerprint.
+
 ## Message contract
 
 Every message between the browser and the Gateway is `{v, type, id, body}` under the model event `mapstudio.message`; errors are `{code, message}`. The types this version knows are listed in `common/.../Messages.java` and `web/typescript/messages.ts`: `point.click`, `point.click.reply`, `error`.
