@@ -3,8 +3,8 @@ title: 'Tracer: one edit saved through the write path and read back'
 type: 'feature'
 ticket: '1'
 created: '2026-10-26'
-status: 'draft'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: 'a7fc0ba428c75bb96791653fe58e9c293b82c2c2'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
@@ -42,6 +42,12 @@ context:
 - Carry out a delete or any `kindSetup` op (refused `invalid`, "not supported in this version"), retried `batchId`s, the conflict reply's other record, the phone role matrix, kind-list validation, `map.changed` delivery, schema-newer or rights handling beyond the AD-21 error line, live setup change, the Designer setup editor, the unsaved-edit queue, or removal of `testSet` (entries 2 to 11).
 - Flyway, Liquibase or any new Gateway-wide module setting.
 - Keep `system.mapstudio.echo` (removed; `ping` stays as the health check).
+
+**Decisions (owner, 2026-10-26, answers to the plan's Open Questions):**
+- A project without a setup (or naming a missing connection) warns once per Gateway start, at its first `map.load` or `applyEdits`, not at project start.
+- If SCIM cannot make the dev user on 8.3.10, the dev setup also lists `Administrator` as a full-editing role and the e2e editor signs in as `admin` (password read from `.env`).
+- An update op's `data` replaces only the top-level fields it carries.
+- In the Designer, `getMap` and `applyEdits` autocomplete and raise "runs in Gateway scope only" when called; no RPC in this story.
 
 ## I/O & Edge-Case Matrix
 
@@ -119,7 +125,7 @@ context:
 - `mapstudio_edit (edit_id bigserial PK, project, batch_id uuid NOT NULL, seq bigint NOT NULL, entity text CHECK (entity IN ('item','kindSetup')), entity_id text NOT NULL, op text CHECK (op IN ('create','update','delete')), version int NOT NULL, actor text NOT NULL, source text CHECK (source IN ('session','script')), at timestamptz NOT NULL DEFAULT now())`, index `(project, seq)`.
 - `mapstudio_batch (project, batch_id uuid, seq bigint NOT NULL, actor text NOT NULL, result jsonb NOT NULL, committed_at timestamptz NOT NULL, PK (project, batch_id))` - written now, read by entry 2 for retries.
 
-**Contracts (0.2.0 draft).** Envelope `{v:1, type, id, body}`. `map.load {}` -> `map.load.reply {level: none|phone|full, seq, items: [MapItemRecord]}`. `edits.apply {batchId, ops:[{op, entity, id, baseVersion, data}]}` -> `edits.apply.reply {batchId, seq, results:[{entity, id, version}]}`. `map.changed {seq, ops}` declared, not sent. Error `{code, message, batchId?, op?: {index, id}}`; codes `conflict`, `role`, `invalid`, `stale`, `store-unreachable`. `MapItemRecord {id, kind, name, geometry, properties, assetId, overrides, ends, version, deleted}`. Create `data` is the record's fields minus `id`, `version`, `deleted`; update `data` replaces only the top-level fields it carries (Open Question 3). Setup v1 (`setup.json`):
+**Contracts (0.2.0 draft).** Envelope `{v:1, type, id, body}`. `map.load {}` -> `map.load.reply {level: none|phone|full, seq, items: [MapItemRecord]}`. `edits.apply {batchId, ops:[{op, entity, id, baseVersion, data}]}` -> `edits.apply.reply {batchId, seq, results:[{entity, id, version}]}`. `map.changed {seq, ops}` declared, not sent. Error `{code, message, batchId?, op?: {index, id}}`; codes `conflict`, `role`, `invalid`, `stale`, `store-unreachable`. `MapItemRecord {id, kind, name, geometry, properties, assetId, overrides, ends, version, deleted}`. Create `data` is the record's fields minus `id`, `version`, `deleted`; update `data` replaces only the top-level fields it carries. Setup v1 (`setup.json`):
 
 ```json
 {"schemaVersion": 1, "connection": "MapStudio",
@@ -131,13 +137,6 @@ context:
 **Levels.** `full` if the user holds a `roles.full` role, else `phone` if a `roles.phone` role, else `none`. In this story only `full` may save; `phone` is reported by `map.load` and refused `role` on save (entry 2 adds its matrix). Scripts run as `full` under their actor (owner decision 2026-10-26).
 
 **Units for parallel entries.** Setup loader, migrator, write service, change hook and `MapLoader` are separate classes in separate packages, so entries 2 to 7 edit different files.
-
-## Open Questions
-
-1. **When does a project without a setup warn?** (a) At project start, for every runnable project without a setup resource: matches the criterion's wording, but every unrelated project on a shared Gateway logs a Map Studio warning at each start. (b) Once per project start, at the first `map.load` or `applyEdits` for that project: only projects that use Map Studio warn (recommended).
-2. **Fallback if the dev user cannot be seeded through SCIM on 8.3.10** (the API key seeded at first boot, given the `Authenticated/Roles/Administrator` level to match the default permissions, is unverified). (a) The dev setup also lists `Administrator` as a full-editing role and the e2e editor signs in as `admin`, so `e2e/lib/env.mjs` reads the admin password from `.env` (today it never does). (b) Stop and report, and seed the user by hand on the owner's machine (CI e2e then cannot cover the editor).
-3. **Update op semantics (fixed here for entries 2 to 11).** (a) `data` replaces only the top-level fields it carries (a phone move sends only `geometry`; recommended). (b) `data` is the whole record, every field replaced.
-4. **Designer scope of `getMap` and `applyEdits`.** (a) Registered for autocomplete, raising "runs in Gateway scope only" when called in the Designer (recommended; no RPC in this story). (b) Forwarded to the Gateway over RPC now, as IA's example does.
 
 ## Verification
 
