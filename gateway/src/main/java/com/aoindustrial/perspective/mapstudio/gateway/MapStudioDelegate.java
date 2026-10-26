@@ -121,7 +121,8 @@ public class MapStudioDelegate extends ComponentModelDelegate {
         try {
             services.work.execute(() -> send(storeReply(services, view, type, id, body)));
         } catch (RejectedExecutionException ex) {
-            send(error(id, Messages.CODE_STORE_UNREACHABLE, "Map Studio is stopping; try again."));
+            log.debugf("%s %s refused: the work pool is full or stopping.", type, id);
+            send(busyReply(id));
         }
     }
 
@@ -153,6 +154,15 @@ public class MapStudioDelegate extends ComponentModelDelegate {
                 + ex.getClass().getSimpleName(), ex);
             return error(id, Messages.CODE_STORE_UNREACHABLE, "The map store failed; nothing was saved.");
         }
+    }
+
+    /**
+     * The answer when the module's bounded work pool is full or stopping: {@code store-unreachable}
+     * with the reason, so the browser shows it and nothing is saved (docs/contract.md).
+     */
+    static JsonObject busyReply(String id) {
+        return error(id, Messages.CODE_STORE_UNREACHABLE,
+            "Map Studio is busy with other map requests; nothing was saved. Try again in a moment.");
     }
 
     private static boolean isStoreType(String type) {

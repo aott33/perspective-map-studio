@@ -1,9 +1,12 @@
 package com.aoindustrial.perspective.mapstudio.gateway;
 
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.inductiveautomation.ignition.gateway.model.GatewayContext;
@@ -36,6 +39,8 @@ public final class MapStudioServices {
 
     /** Threads for the delegates' map.load and edits.apply work (database calls stay off Perspective's threads). */
     static final int WORK_THREADS = 4;
+    /** Waiting map.load and edits.apply messages beyond the busy threads; more are refused as busy. */
+    static final int WORK_QUEUE = 64;
 
     final ScheduledExecutorService scheduler;
     final ExecutorService work;
@@ -50,7 +55,7 @@ public final class MapStudioServices {
 
     MapStudioServices(GatewayContext context) {
         this.scheduler = Executors.newSingleThreadScheduledExecutor(daemon("MapStudio-store"));
-        this.work = Executors.newFixedThreadPool(WORK_THREADS, daemon("MapStudio-work"));
+        this.work = newWorkPool(WORK_THREADS, WORK_QUEUE, daemon("MapStudio-work"));
         ConnectionSource connections = new DatasourceConnections(context.getDatasourceManager());
         this.stores = new StoreRegistry(connections, new Migrator(Migrations.all(), moduleVersion()), scheduler,
             System::nanoTime, ConnectionWait.INTERVAL, ConnectionWait.MAX);
@@ -72,6 +77,16 @@ public final class MapStudioServices {
         lifecycles.shutdown();
         scheduler.shutdownNow();
         work.shutdownNow();
+    }
+
+    /**
+     * A fixed pool with a bounded queue: when every thread is busy and the queue is full,
+     * {@code execute} throws {@code RejectedExecutionException} (abort policy), and the
+     * delegate answers that message at once with a busy error rather than queueing without bound.
+     */
+    static ThreadPoolExecutor newWorkPool(int threads, int queue, ThreadFactory factory) {
+        return new ThreadPoolExecutor(threads, threads, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(queue),
+            factory, new ThreadPoolExecutor.AbortPolicy());
     }
 
     private static String moduleVersion() {

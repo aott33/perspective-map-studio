@@ -38,7 +38,17 @@ if [[ -z "${GATEWAY_ADMIN_PASSWORD:-}" ]]; then
   chmod 600 "${PROJECT_ROOT}/.env"
 fi
 export GATEWAY_ADMIN_PASSWORD
-CONTAINER_NAME="${MAPSTUDIO_CONTAINER:-mapstudio-ignition}"
+# Each checkout its own compose project, containers and volumes. MAPSTUDIO_CONTAINER
+# in .env (or the environment) names them; without it, a name derived from this
+# checkout's path is recorded in .env on first run, so two checkouts never share
+# (and never --fresh or --purge) each other's Gateway or PostgreSQL.
+if [[ -z "${MAPSTUDIO_CONTAINER:-}" ]]; then
+  MAPSTUDIO_CONTAINER="ms-$(printf '%s' "${PROJECT_ROOT}" | sha256sum | cut -c1-8)"
+  ( umask 077; echo "MAPSTUDIO_CONTAINER=${MAPSTUDIO_CONTAINER}" >> "${PROJECT_ROOT}/.env" )
+  chmod 600 "${PROJECT_ROOT}/.env"
+fi
+export MAPSTUDIO_CONTAINER
+CONTAINER_NAME="${MAPSTUDIO_CONTAINER}"
 # The dev map editor's password (user mapeditor, role MapEditor; ops/users.py), generated the same way.
 if [[ -z "${MAPSTUDIO_EDITOR_PASSWORD:-}" ]]; then
   MAPSTUDIO_EDITOR_PASSWORD="$(python3 -I -c 'import secrets, string
@@ -60,15 +70,10 @@ SESSION_URL="${GATEWAY_URL}/data/perspective/client/${PROJECT_NAME}"
 ADMIN_USER="admin"
 ADMIN_PASS="${GATEWAY_ADMIN_PASSWORD}"
 
-# docker compose, always pointed at this folder's compose file.
-# The compose project follows MAPSTUDIO_CONTAINER when set, so parallel Gateways
-# get separate volumes and networks; otherwise compose's default (this folder's
-# name, "ops") applies.
-COMPOSE=(docker compose)
-if [[ -n "${MAPSTUDIO_CONTAINER:-}" ]]; then
-  COMPOSE+=(-p "${MAPSTUDIO_CONTAINER}")
-fi
-COMPOSE+=(-f "${OPS_DIR}/docker-compose.yml")
+# docker compose, always pointed at this folder's compose file and at this
+# checkout's own compose project (MAPSTUDIO_CONTAINER, above), so parallel
+# Gateways get separate containers, volumes and networks.
+COMPOSE=(docker compose -p "${MAPSTUDIO_CONTAINER}" -f "${OPS_DIR}/docker-compose.yml")
 
 # --- logging --------------------------------------------------------------
 if [[ -t 1 ]]; then
@@ -90,17 +95,13 @@ require_docker() {
 }
 
 # --- secrets --------------------------------------------------------------
-# The compose project name: MAPSTUDIO_CONTAINER when set, else compose's default "ops".
-compose_project() {
-  echo "${MAPSTUDIO_CONTAINER:-ops}"
-}
-
 # Generate the dev stack's secrets (ops/gen_secrets.py) into the git-ignored
-# ops/secrets/. A kept PostgreSQL volume was initialised with the old password,
-# so a missing pg_password next to an existing volume is refused, not regenerated.
+# ops/secrets/. A kept PostgreSQL volume of this checkout's compose project was
+# initialised with the old password, so a missing pg_password next to it is
+# refused, not regenerated. Other checkouts' volumes are never looked at.
 ensure_secrets() {
   local volume
-  volume="$(compose_project)_postgres-data"
+  volume="${MAPSTUDIO_CONTAINER}_postgres-data"
   if [[ ! -f "${SECRETS_DIR}/pg_password" ]] && docker volume inspect "${volume}" >/dev/null 2>&1; then
     err "ops/secrets/pg_password is missing but the PostgreSQL volume ${volume} exists (it holds the old password)."
     err "Start from fresh volumes: ops/up.sh --fresh (or ops/down.sh --purge first)."

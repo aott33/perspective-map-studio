@@ -7,7 +7,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
 import { TRACER } from '../lib/geo.mjs';
-import { expect, mapLoaded, nextFrames, openMap, signInAsEditor, test } from './fixtures.mjs';
+import { EDITOR_USER, editorTest, expect, mapLoaded, nextFrames, openMap, test } from './fixtures.mjs';
 
 // Terra Draw shows no state between two vertex clicks; the pause only keeps two
 // clicks from reading as a double click (as in tracer.spec.mjs).
@@ -41,9 +41,10 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
     test.describe(`${width} px`, () => {
         test.use({ viewport: { width, height }, deviceScaleFactor: 1 });
 
-        test('a map editor saves a line and it comes back from the map store after a reload', async ({ page }) => {
-            await signInAsEditor(page);
+        editorTest('a map editor saves a line and it comes back from the map store after a reload', async ({ page }) => {
+            // Signed in by the global setup (lib/editorAuth.mjs): the password never passes through this test.
             let map = await openMap(page, '/edit');
+            await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
             const before = await mapLoaded(map);
             await expect(map).toHaveAttribute('data-edit-level', 'full');
 
@@ -90,8 +91,22 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
 test.describe('scripting API', () => {
     test.use({ viewport: { width: 1440, height: 900 } });
 
-    test('system.mapstudio.applyEdits and getMap use the same write path', async ({ page }) => {
+    test('the dev page\'s script checks write nothing for a session without MapEditor', async ({ page }) => {
         let map = await openMap(page, '/edit');
+        await expect(page.locator('#mapstudio-dev-user')).toContainText('Not signed in');
+        const before = await mapLoaded(map);
+        await page.locator('#mapstudio-dev-script-checks').click();
+        const out = page.locator('#mapstudio-dev-script-results');
+        await expect(out).toContainText('"refused"', { timeout: 60_000 });
+        expect(JSON.parse(await out.innerText()).refused).toMatch(/need the MapEditor role/);
+        await page.reload({ waitUntil: 'load' });
+        map = await openMap(page, '/edit');
+        expect(await mapLoaded(map)).toBe(before);
+    });
+
+    editorTest('system.mapstudio.applyEdits and getMap use the same write path', async ({ page }) => {
+        let map = await openMap(page, '/edit');
+        await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
         const before = await mapLoaded(map);
         await page.locator('#mapstudio-dev-script-checks').click();
         const out = page.locator('#mapstudio-dev-script-results');

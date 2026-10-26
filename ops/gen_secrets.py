@@ -11,8 +11,10 @@ Writes, each only when it is missing (so a kept PostgreSQL volume keeps matching
 - ops/secrets/core/ignition/api-token/dev/{config.json,resource.json}: the Gateway's API key resource,
   holding only the SHA-256 hash of the key; the init container copies it into the core collection.
   Format from ign-scada-template scripts/gw/make_api_key.py [live 8.3.9 there]. Its security level is
-  Authenticated/ApiKeys/MapStudioDev, which the seeded ops/config/core security-properties add to the
-  Gateway's Read and Write permissions (dev Gateway only). A key cannot carry
+  Authenticated/ApiKeys/MapStudioDev. After the first RUNNING, ensure_dev_security in ops/lib.sh copies the
+  Gateway's own core security-properties out, ops/dev_security.py adds that level to its Read and Write
+  permissions, and the file goes back with one restart (dev Gateway only; commissioning rewrites a copy
+  seeded before the first boot). A key cannot carry
   Authenticated/Roles/<role>: 8.3.10 logs "Security level 'Authenticated/Roles' cannot be granted via
   config and will be ignored" and answers 403 [live 8.3.10].
 

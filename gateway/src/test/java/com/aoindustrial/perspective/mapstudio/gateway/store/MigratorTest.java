@@ -21,24 +21,35 @@ class MigratorTest {
         Migrator.Result result = migrator().migrate(db.connection());
         assertEquals(List.of(1), result.applied());
         assertEquals(1, result.version());
-        assertEquals(Migrator.LOCK, db.executed.get(0), "the advisory lock comes first");
-        assertEquals(Migrator.CREATE_VERSION_TABLE, db.executed.get(1));
-        assertEquals(Migrator.READ_VERSION, db.executed.get(2));
+        assertEquals(Migrator.VERSION_TABLE_EXISTS, db.executed.get(0), "a read without a lock comes first");
+        assertEquals(Migrator.LOCK, db.executed.get(1), "then the advisory lock, before any DDL");
+        assertEquals(Migrator.CREATE_VERSION_TABLE, db.executed.get(2));
+        assertEquals(Migrator.READ_VERSION, db.executed.get(3));
         assertTrue(db.executed.containsAll(Migrations.all().get(0).statements()));
         assertEquals(Migrator.RECORD_VERSION, db.executed.get(db.executed.size() - 1));
-        assertEquals(List.of("commit"), db.events, "one commit, no rollback");
+        assertEquals(List.of("commit", "commit"), db.events,
+            "the read's commit, then one commit for the whole first schema; no rollback");
         assertTrue(db.autoCommit, "auto-commit is restored");
     }
 
     @Test
-    void aMigratedDatabaseChangesNothing() throws Exception {
+    void aMigratedDatabaseIsOnlyRead() throws Exception {
         FakeJdbc db = new FakeJdbc();
         db.version = 1;
         Migrator.Result result = migrator().migrate(db.connection());
         assertEquals(List.of(), result.applied());
         assertEquals(1, result.version());
-        assertEquals(List.of(Migrator.LOCK, Migrator.CREATE_VERSION_TABLE, Migrator.READ_VERSION), db.executed);
-        assertEquals(List.of("commit"), db.events);
+        assertEquals(List.of(Migrator.VERSION_TABLE_EXISTS, Migrator.READ_VERSION), db.executed,
+            "no lock and no CREATE on a migrated database");
+    }
+
+    @Test
+    void aRoleWithoutCreateComesUpOnAMigratedDatabase() throws Exception {
+        // The reviewer's case: a SELECT/INSERT/UPDATE role on PostgreSQL 16 gets 42501 on any CREATE.
+        FakeJdbc db = new FakeJdbc();
+        db.version = 1;
+        db.failOn = "CREATE";
+        assertEquals(1, migrator().migrate(db.connection()).version());
     }
 
     @Test
@@ -48,8 +59,8 @@ class MigratorTest {
         Migrator.SchemaNewerException ex = assertThrows(Migrator.SchemaNewerException.class,
             () -> migrator().migrate(db.connection()));
         assertEquals(2, ex.found());
-        assertTrue(db.events.contains("rollback"));
-        assertTrue(!db.events.contains("commit"));
+        assertEquals(List.of(Migrator.VERSION_TABLE_EXISTS, Migrator.READ_VERSION), db.executed,
+            "nothing is locked or changed");
     }
 
     @Test
@@ -61,7 +72,8 @@ class MigratorTest {
         assertEquals("42501", ex.getSQLState());
         assertTrue(ex.statement().startsWith("CREATE TABLE mapstudio_edit"));
         assertTrue(db.events.contains("rollback"));
-        assertTrue(!db.events.contains("commit"), "no half-created schema: nothing is committed");
+        assertEquals(List.of("commit", "rollback"), db.events,
+            "no half-created schema: only the read was committed, the migration rolled back");
         assertTrue(db.autoCommit);
     }
 }

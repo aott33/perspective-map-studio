@@ -1,0 +1,78 @@
+// The map editor's sign-in with a plain Playwright browser, run by lib/signInCli.mjs
+// in its own node process right before each editor test: outside the test runner,
+// so no trace, report or step title ever records the password (it is typed with a
+// fill() call that only this browser sees). The test's context starts from the
+// signed-in browser state (cookies, storageState). The state file holds dev session
+// cookies, never the password, and lives in the system temp folder, not e2e/out
+// (which CI uploads); the global teardown deletes it.
+
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import os from 'node:os';
+import path from 'node:path';
+import { chromium } from '@playwright/test';
+import { envFileValue, repoRoot, sessionUrl } from './env.mjs';
+
+/** The dev map editor (ops/users.py): user mapeditor, role MapEditor. */
+export const EDITOR_USER = 'mapeditor';
+
+/** Where the signed-in state lives for this checkout's run. */
+export const editorStateFile = path.join(os.tmpdir(),
+    'mapstudio-e2e-' + createHash('sha256').update(repoRoot).digest('hex').slice(0, 8), 'editor-state.json');
+
+/** The editor's password, from the environment or the git-ignored .env; never logged. */
+export function editorPassword() {
+    return process.env.MAPSTUDIO_EDITOR_PASSWORD ?? envFileValue('MAPSTUDIO_EDITOR_PASSWORD');
+}
+
+/** The browser launch options the suite uses (playwright.config.mjs). */
+export function launchOptions() {
+    const options = {
+        args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']
+    };
+    if (process.env.PW_CHROMIUM_PATH) options.executablePath = process.env.PW_CHROMIUM_PATH;
+    return options;
+}
+
+/**
+ * Sign in on the /edit page: its Log in button runs system.perspective.login(), the
+ * identity provider asks for the user name, then (after Enter) the password on a
+ * new page, and returns to the session (docs/platform-checks.md, epic 2 story 1).
+ * Writes the signed-in browser state to editorStateFile (mode 0600). Returns null,
+ * or the reason it could not sign in (no password in .env, or the sign-in failed).
+ */
+export async function signInEditorOnce() {
+    rmSync(editorStateFile, { force: true });
+    const password = editorPassword();
+    if (!password) {
+        return 'MAPSTUDIO_EDITOR_PASSWORD is not in .env: run ops/up.sh, which generates it and makes the user.';
+    }
+    const browser = await chromium.launch({ ...launchOptions(), headless: true });
+    try {
+        const context = await browser.newContext();
+        const page = await context.newPage();
+        await page.goto(sessionUrl('/edit'), { waitUntil: 'load' });
+        const login = page.locator('#mapstudio-dev-login');
+        await login.waitFor({ state: 'visible', timeout: 90_000 });
+        await login.click();
+        await page.waitForURL(/\/idp\//, { timeout: 30_000 });
+        await page.locator('input[type="text"], input[name="username"], input:not([type])').first().fill(EDITOR_USER);
+        await page.keyboard.press('Enter');
+        const field = page.locator('input[type="password"]').first();
+        await field.waitFor({ state: 'visible', timeout: 30_000 });
+        await field.fill(password);
+        await page.keyboard.press('Enter');
+        await page.waitForURL(/\/data\/perspective\/client\/mapstudio-dev\/edit/, { timeout: 30_000 });
+        await page.locator('#mapstudio-dev-user').filter({ hasText: 'Signed in as ' + EDITOR_USER })
+            .waitFor({ timeout: 60_000 });
+        const state = await context.storageState();
+        mkdirSync(path.dirname(editorStateFile), { recursive: true, mode: 0o700 });
+        writeFileSync(editorStateFile, JSON.stringify(state), { mode: 0o600 });
+        return null;
+    } catch (err) {
+        // The message names the step that failed; it never carries the password (fill values are not echoed).
+        return 'The map editor could not sign in: ' + String(err && err.message ? err.message.split('\n')[0] : err);
+    } finally {
+        await browser.close();
+    }
+}

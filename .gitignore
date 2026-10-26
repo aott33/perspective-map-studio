@@ -50,3 +50,6 @@ ops/secrets/
 # Removed platform checks (story 3, removed in story 8): a developer's old generated
 # PostgreSQL passwords must never be committed, so the folder stays ignored.
 ops/checks/secrets/
+
+# Python bytecode (ops/tests imports the ops scripts)
+__pycache__/

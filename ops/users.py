@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """Create or update the dev map editor on the local dev Gateway. Development only.
 
-Makes the user `mapeditor` in the internal user source behind the Gateway's system identity provider,
-gives it the role `MapEditor` (full editing in the dev project's Map Studio setup) and sets its password
+First makes sure the identity provider the dev project signs in with, `default` (pinned in the
+Gateway-written ops/project/ignition/global-props), exists: a fresh volume has once named its only provider
+`temp` instead [live 8.3.10], as ign-scada-template's GW-1 saw on 8.3.9. When `default` is missing and the
+Gateway's system identity provider is an internal one, it is copied under the name `default` (same user
+source, same settings; the template's scripts/gw/ensure_identity.py). Then it makes the user `mapeditor` in
+the internal user source behind `default`, gives it the role `MapEditor` (full editing in the dev project's Map Studio setup) and sets its password
 from MAPSTUDIO_EDITOR_PASSWORD (generated into the git-ignored .env by ops/lib.sh). Also makes the role
 `MapOperator` (phone editing) with no members. The password is never printed.
 
 Routes (adapted from ign-scada-template scripts/gw/render_users.py, [live 8.3.9 there]):
-GET /data/api/v1/resources/singleton/ignition/security-properties (the identity provider's name),
-GET .../list/ignition/identity-provider (that provider's config.settings.userSource; the template's
-.../find/ignition/identity-provider/<name> answers 404 on 8.3.10 [live 8.3.10]), then SCIM on that source:
+GET /data/api/v1/resources/singleton/ignition/security-properties (the system identity provider's name),
+GET .../list/ignition/identity-provider (every provider with its config), POST
+/data/api/v1/resources/ignition/identity-provider (the copy), then SCIM on the user source of `default`:
 GET and POST /data/api/v1/scim/<userSource>/v2/Users, PUT .../Users/<id>, GET and POST .../Groups,
 PUT .../Groups/<id>. Auth: the dev API key in ops/secrets/api-token (ops/gen_secrets.py).
 
@@ -63,14 +67,45 @@ def listing(path):
             return found
 
 
+PROJECT_IDP = 'default'
+
+
+def identity_plan(providers, system_name):
+    """What to do so the project's identity provider exists. Pure, so it is tested (ops/tests/test_users.py).
+
+    providers: {name: config} of the Gateway's identity providers; system_name: the system provider's name.
+    Returns ('ok', user_source), ('copy', source_name) or ('fail', reason).
+    """
+    if PROJECT_IDP in providers:
+        return 'ok', providers[PROJECT_IDP]['settings']['userSource']
+    source = providers.get(system_name)
+    if source is None:
+        return 'fail', ('neither %r nor the system identity provider %r exists; the Gateway has %s'
+                        % (PROJECT_IDP, system_name, sorted(providers) or 'none'))
+    kind = (source.get('profile') or {}).get('type')
+    if kind != 'internal':
+        return 'fail', ('the system identity provider %r is of type %s, not internal; make %r by hand'
+                        % (system_name, kind, PROJECT_IDP))
+    return 'copy', system_name
+
+
 def user_source():
-    wanted = api('GET', '/data/api/v1/resources/singleton/ignition/security-properties')['config']['systemIdentityProvider']
-    providers = api('GET', '/data/api/v1/resources/list/ignition/identity-provider').get('items') or []
-    for provider in providers:
-        if provider.get('name') == wanted:
-            return provider['config']['settings']['userSource']
-    raise RuntimeError('the system identity provider %r is not among the Gateway\'s identity providers %s'
-                       % (wanted, [p.get('name') for p in providers]))
+    """The user source behind the project's identity provider, creating that provider when it is missing."""
+    security = api('GET', '/data/api/v1/resources/singleton/ignition/security-properties')
+    system_name = security['config']['systemIdentityProvider']
+    items = api('GET', '/data/api/v1/resources/list/ignition/identity-provider').get('items') or []
+    providers = {i['name']: i['config'] for i in items}
+    action, value = identity_plan(providers, system_name)
+    if action == 'fail':
+        raise RuntimeError(value)
+    if action == 'copy':
+        api('POST', '/data/api/v1/resources/ignition/identity-provider', [{
+            'name': PROJECT_IDP, 'collection': 'core', 'enabled': True,
+            'description': 'Copy of %s made by ops/users.py: the dev project signs in with %s' % (value, PROJECT_IDP),
+            'config': providers[value]}])
+        print('ok   identity provider %s created as a copy of %s' % (PROJECT_IDP, value))
+        return providers[value]['settings']['userSource']
+    return value
 
 
 def ensure_group(scim, groups, role, member_ids):

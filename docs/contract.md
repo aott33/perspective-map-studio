@@ -30,7 +30,7 @@ Stable kebab-case words; the message is plain words for the person.
 | `role` | the session has no role that allows the op (checked on the Gateway against the session user's roles, never anything the browser sends) |
 | `invalid` | the message, batch or op is malformed, an update names a map item that does not exist, a `batchId` was already saved, or the op is not supported in this version (deletes and any `kindSetup` op, until entries 2 and 3) |
 | `stale` | the browser's map is behind (a gap in `seq`); used from entry 4 |
-| `store-unreachable` | the project has no setup, its setup names a connection the Gateway does not have, or the map store is starting or unavailable |
+| `store-unreachable` | the project has no setup, its setup names a connection the Gateway does not have, the map store is starting or unavailable, or the Gateway is busy: when the module's bounded work pool (4 threads, 64 waiting messages) is full, a `map.load` or `edits.apply` is answered at once with this code and "Map Studio is busy with other map requests; nothing was saved. Try again in a moment." (no separate `busy` code in 0.2.0) |
 
 ## Batches and ops
 
@@ -72,7 +72,7 @@ The project resource `com.aoindustrial.perspective.mapstudio/setup/` holding `se
 
 ## The map store, schema version 1 (AD-3, AD-21)
 
-PostgreSQL only. On start, for each connection a setup names, Map Studio waits for the connection to be usable (every 5 s, up to 2 minutes), then applies its versioned migrations (`gateway/src/main/resources/.../store/migrations/`), each in one transaction under `pg_advisory_xact_lock(hashtext('mapstudio_migrations'))`, and records the version **[live 8.3.10]**. When the connection never becomes usable it logs one error naming the connection; when a statement fails it logs one error naming the connection, the statement and the SQLState. Either way the map store is unavailable (`store-unreachable`), with no half-created schema. Map Studio has no backup of its own: the site's PostgreSQL backups cover these tables.
+PostgreSQL only. On start, for each connection a setup names, Map Studio waits for the connection to be usable (every 5 s, up to 2 minutes), then reads the recorded schema version with no lock and no DDL (`to_regclass`, then `max(version)`); only when a migration is pending does it apply its versioned migrations (`gateway/src/main/resources/.../store/migrations/`), each in one transaction under `pg_advisory_xact_lock(hashtext('mapstudio_migrations'))`, and records the version **[live 8.3.10]**. When the connection never becomes usable it logs one error naming the connection; when a statement fails it logs one error naming the connection, the statement and the SQLState. Either way the map store is unavailable (`store-unreachable`), with no half-created schema. Rights: the first start needs a role that may CREATE in the schema; after that a least-privilege runtime role with CONNECT, USAGE on the schema, SELECT, INSERT and UPDATE on the tables and USAGE and SELECT on the sequences is enough **[live 8.3.10]** (docs/platform-checks.md). Map Studio has no backup of its own: the site's PostgreSQL backups cover these tables.
 
 | Table | Key | Columns |
 | --- | --- | --- |
@@ -95,7 +95,7 @@ Gateway scope: Perspective session scripts **[live 8.3.10]**, and Gateway event 
 | `system.mapstudio.applyEdits(project, batch, actor)` | `{batchId, seq, results}`; `actor` is required and recorded in the edit record |
 | `system.mapstudio.ping()` | a short text with the Gateway time (a health check) |
 
-`applyEdits` trusts its caller, like `system.db` (owner decision, 2026-10-26): it saves with full editing under the actor it names. A Perspective session script runs on the Gateway, so a view author can expose saving to someone without an editing role; keep such scripts behind your own role checks. A refusal raises a Java exception whose message starts with the code (`role: ...`, `conflict: ...`), and nothing is written. Jython 2.7, catching both kinds of exception:
+`applyEdits` trusts its caller, like `system.db` (owner decision, 2026-10-26): it saves with full editing under the actor it names. A Perspective session script runs on the Gateway, so a view author can expose saving to someone without an editing role; keep such scripts behind your own role checks. The dev project's `/edit` page does: its "Run script checks" button reads the session user's roles (`session.props.auth.user.roles`, set by the Gateway at sign-in) and writes nothing unless the user holds `MapEditor` **[live 8.3.10]**. A refusal raises a Java exception whose message starts with the code (`role: ...`, `conflict: ...`), and nothing is written. Jython 2.7, catching both kinds of exception:
 
 ```python
 import java.lang

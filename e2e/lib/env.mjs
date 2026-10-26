@@ -1,5 +1,5 @@
 // Where the suite finds the Gateway and where it writes. From the git-ignored
-// .env it reads the host port and, for the map editor's sign-in (tests/store.spec.mjs),
+// .env it reads the host port and, for the map editor's sign-in in the global setup (lib/editorAuth.mjs),
 // MAPSTUDIO_EDITOR_PASSWORD; never the admin password. Passwords are never logged.
 
 import { existsSync, readFileSync } from 'node:fs';

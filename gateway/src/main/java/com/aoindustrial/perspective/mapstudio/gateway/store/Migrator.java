@@ -13,6 +13,11 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.Migrations.Migration
 /**
  * Creates or upgrades the {@code mapstudio_} tables on one connection (AD-3, AD-21).
  *
+ * <p>It first reads the recorded version with no lock and no DDL ({@code to_regclass},
+ * then {@code max(version)}), so a migrated database needs only SELECT and a
+ * least-privilege runtime role without CREATE comes up available. Only when a
+ * migration is pending does it take the lock and create anything.
+ *
  * <p>Each migration runs in its own transaction, under a PostgreSQL advisory lock
  * so two Gateways never migrate at once; inside the lock it reads the recorded
  * schema version again, so a second Gateway that waited on the lock applies
@@ -29,6 +34,8 @@ public final class Migrator {
         + "applied_at timestamptz NOT NULL DEFAULT now(), "
         + "module_version text NOT NULL)";
     static final String READ_VERSION = "SELECT coalesce(max(version), 0) FROM mapstudio_schema_version";
+    /** Whether the version table exists, without touching it (needs no right on it). */
+    static final String VERSION_TABLE_EXISTS = "SELECT to_regclass('mapstudio_schema_version') IS NOT NULL";
     static final String RECORD_VERSION = "INSERT INTO mapstudio_schema_version (version, module_version) VALUES (?, ?)";
 
     /** The schema is newer than this module knows (AD-21: the map is read only; entry 5 builds that). */
@@ -77,6 +84,16 @@ public final class Migrator {
         List<Integer> applied = new ArrayList<>();
         int version = 0;
         try {
+            // Read first, with no lock and no DDL: a migrated database needs only SELECT here,
+            // so a least-privilege runtime role (no CREATE) comes up available.
+            version = readVersion(connection);
+            connection.commit();
+            if (version > migrations.size()) {
+                throw new SchemaNewerException(version, migrations.size());
+            }
+            if (version >= migrations.size()) {
+                return new Result(List.of(), version);
+            }
             for (Migration migration : migrations) {
                 version = beginAndReadVersion(connection);
                 if (version > migrations.size()) {
@@ -101,10 +118,6 @@ public final class Migrator {
                 applied.add(migration.version());
                 version = migration.version();
             }
-            if (migrations.isEmpty()) {
-                version = beginAndReadVersion(connection);
-                connection.commit();
-            }
             return new Result(List.copyOf(applied), version);
         } catch (SQLException | SchemaNewerException | RuntimeException ex) {
             try {
@@ -119,6 +132,22 @@ public final class Migrator {
             } catch (SQLException ignored) {
                 // Best effort before the connection goes back to the pool.
             }
+        }
+    }
+
+    /** The recorded schema version, 0 when the version table does not exist; no lock, no DDL. */
+    private static int readVersion(Connection connection) throws SQLException {
+        try (Statement s = connection.createStatement(); ResultSet rs = s.executeQuery(VERSION_TABLE_EXISTS)) {
+            if (!rs.next() || !rs.getBoolean(1)) {
+                return 0;
+            }
+        } catch (SQLException ex) {
+            throw new MigrationFailure(VERSION_TABLE_EXISTS, ex);
+        }
+        try (Statement s = connection.createStatement(); ResultSet rs = s.executeQuery(READ_VERSION)) {
+            return rs.next() ? rs.getInt(1) : 0;
+        } catch (SQLException ex) {
+            throw new MigrationFailure(READ_VERSION, ex);
         }
     }
 

@@ -19,6 +19,8 @@ final class FakeJdbc {
     final List<String> executed = new ArrayList<>();
     final List<String> events = new ArrayList<>();
     int version;
+    /** Whether mapstudio_schema_version exists; null means "when version > 0". */
+    Boolean tableExists;
     String failOn;
     String failSqlState = "42501";
     boolean autoCommit = true;
@@ -88,6 +90,7 @@ final class FakeJdbc {
                     yield first;
                 }
                 case "getInt" -> version;
+                case "getBoolean" -> tableExists != null ? tableExists : version > 0;
                 case "close" -> null;
                 default -> throw new UnsupportedOperationException(method.getName());
             });

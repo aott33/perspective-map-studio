@@ -1,7 +1,13 @@
 // Shared test plumbing: error watching and opening the Map Studio view.
 
 import { expect, test as base } from '@playwright/test';
-import { envFileValue, sessionUrl } from '../lib/env.mjs';
+import { sessionUrl } from '../lib/env.mjs';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { EDITOR_USER, editorStateFile } from '../lib/editorAuth.mjs';
+
+const signInCli = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'lib', 'signInCli.mjs');
 
 /** Collect browser page errors and console errors, and Map Studio console warnings. */
 export function watch(page) {
@@ -70,35 +76,27 @@ export async function nextFrames(page) {
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
-/** The dev map editor (ops/users.py): user mapeditor, role MapEditor; its password from .env. */
-export const EDITOR_USER = 'mapeditor';
+export { EDITOR_USER };
 
 /**
- * Sign in as the dev map editor on the /edit page: its Log in button runs
- * system.perspective.login(), the identity provider asks for the user name, then
- * (after Enter) the password on a new page, and returns to the session
- * (docs/platform-checks.md, epic 2 story 1). The password is read here and never logged.
+ * `test` signed in as the dev map editor: right before the test, a separate node
+ * process (lib/signInCli.mjs) signs in with its own browser and saves the browser
+ * state, and the test's context starts from it. The sign-in runs outside this
+ * process, so no test step, trace or report ever sees the password. A sign-in saved
+ * once in the global setup was signed out by the time the full suite reached these
+ * tests (after the measures' two minutes; cause not established, [live 8.3.10]),
+ * hence one fresh sign-in per editor test.
  */
-export async function signInAsEditor(page) {
-    const password = process.env.MAPSTUDIO_EDITOR_PASSWORD ?? envFileValue('MAPSTUDIO_EDITOR_PASSWORD');
-    if (!password) {
-        throw new Error('MAPSTUDIO_EDITOR_PASSWORD is not in .env: run ops/up.sh, which generates it and makes the user.');
+export const editorTest = test.extend({
+    // eslint-disable-next-line no-empty-pattern
+    storageState: async ({}, use) => {
+        const run = spawnSync(process.execPath, [signInCli], { encoding: 'utf8', env: process.env, timeout: 180_000 });
+        if (run.status !== 0) {
+            throw new Error((run.stderr || '').trim() || 'The map editor could not sign in (lib/signInCli.mjs).');
+        }
+        await use(editorStateFile);
     }
-    await page.goto(sessionUrl('/edit'), { waitUntil: 'load' });
-    const login = page.locator('#mapstudio-dev-login');
-    await login.waitFor({ state: 'visible', timeout: 60_000 });
-    await expect(page.locator('#mapstudio-dev-user')).toContainText('Not signed in');
-    await login.click();
-    await page.waitForURL(/\/idp\//, { timeout: 30_000 });
-    await page.locator('input[type="text"], input[name="username"], input:not([type])').first().fill(EDITOR_USER);
-    await page.keyboard.press('Enter');
-    const field = page.locator('input[type="password"]').first();
-    await field.waitFor({ state: 'visible', timeout: 30_000 });
-    await field.fill(password);
-    await page.keyboard.press('Enter');
-    await page.waitForURL(/\/data\/perspective\/client\/mapstudio-dev\/edit/, { timeout: 30_000 });
-    await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER, { timeout: 60_000 });
-}
+});
 
 /** Wait until map.load has answered (loaded or failed) after openMap. */
 export async function mapLoaded(map) {
