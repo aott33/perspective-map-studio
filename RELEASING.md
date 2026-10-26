@@ -59,15 +59,15 @@ A host such as `ign-scada-template` pins the release in its lock file by SHA-256
   "version": "X.Y.Z",
   "requiredIgnitionVersion": "8.3.0",
   "file": "Map-Studio-X.Y.Z.modl",
-  "url": "https://github.com/aott33/perspective-flowmap/releases/download/vX.Y.Z/Map-Studio-X.Y.Z.modl",
+  "url": "https://github.com/aott33/perspective-map-studio/releases/download/vX.Y.Z/Map-Studio-X.Y.Z.modl",
   "sha256": "<the release's .sha256 file>",
   "certSha256": "<the README's Signing certificate SHA-256 line>",
   "licence": {"name": "Apache-2.0", "commercial": false},
-  "upstream": {"type": "github", "repo": "aott33/perspective-flowmap", "asset": "Map-Studio-.*\\.modl", "tag": "vX.Y.Z"}
+  "upstream": {"type": "github", "repo": "aott33/perspective-map-studio", "asset": "Map-Studio-.*\\.modl", "tag": "vX.Y.Z"}
 }
 ```
 
-Take `sha256` from the published release's `.sha256` file, `certSha256` from the README, and check both against the downloaded file with the host's own tool (`modl.py inspect`) and `scripts/ci/modl-verify.sh` before writing the entry. The rehearsal that proved this path is in [docs/template-install.md](docs/template-install.md).
+Take `sha256` from the published release's `.sha256` file, `certSha256` from the README, and check both against the downloaded file with the host's own tool (`modl.py inspect`) and `scripts/ci/modl-verify.sh` before writing the entry. The run that proved this path with the v0.1.0 release (and the earlier throwaway rehearsal) is in [docs/template-install.md](docs/template-install.md).
 
 ## Release approval (optional)
 
