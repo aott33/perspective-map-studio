@@ -1,6 +1,6 @@
 # Releasing Map Studio
 
-Releases are signed `.modl` files on GitHub. Signing happens only in the release workflow (`.github/workflows/release.yml`), from two repository secrets. No key, password or certificate is ever committed (`.gitignore` blocks `*.p12`, `*.jks`, `*.pem`, `*.modl`), and CI on every push and pull request signs only with a throwaway certificate that it generates and discards.
+Releases are signed `.modl` files on GitHub. Signing happens only in the release workflow (`.github/workflows/release.yml`), from two secrets of the `release` environment, which needs the owner's approval. No key, password or certificate is ever committed (`.gitignore` blocks `*.p12`, `*.jks`, `*.pem`, `*.modl`), and CI on every push and pull request signs only with a throwaway certificate that it generates and discards.
 
 ## One-time setup (the owner)
 
@@ -21,11 +21,11 @@ Do this on a trusted machine with a JDK 17 `keytool`.
    ```
 
 3. Back up `mapstudio-signing.p12` and its password in your password manager, plus an offline copy. A lost key means a rotation (below).
-4. Create the two repository secrets:
+4. Create the two secrets in the `release` environment (see Release approval):
 
    ```bash
-   base64 -w0 mapstudio-signing.p12 | gh secret set MODULE_SIGNING_KEYSTORE_B64 --repo aott33/perspective-flowmap
-   gh secret set MODULE_SIGNING_KEYSTORE_PASSWORD --repo aott33/perspective-flowmap   # paste at the prompt
+   base64 -w0 mapstudio-signing.p12 | gh secret set MODULE_SIGNING_KEYSTORE_B64 --env release --repo aott33/perspective-map-studio
+   gh secret set MODULE_SIGNING_KEYSTORE_PASSWORD --env release --repo aott33/perspective-map-studio   # paste at the prompt
    ```
 
 5. Replace the `PENDING` line in `README.md` with `Signing certificate SHA-256: <the fingerprint from step 2>` (uppercase, colon separated) in a normal pull request. The release workflow refuses to run while the line is missing, and refuses a signed module whose certificate differs from it.
@@ -46,7 +46,7 @@ Do this on a trusted machine with a JDK 17 `keytool`.
 
 `modl-verify.sh` is a structure and fingerprint check only: it does not verify the signatures cryptographically, so a forged module that carries the genuine certificate file would pass it. The cryptographic check happens when a Gateway installs the module, so install the signed build once on a dev Gateway before you rely on a new certificate. Real verification is a deferred item.
 
-Limit of this setup: the secrets are repository secrets, so anyone who can push a tag to the repository can start the release workflow (it still only creates a draft, and only for a tag on `main`).
+Anyone who can push a tag can start the release workflow, but the signing job waits for the owner's approval in the `release` environment, and it only ever creates a draft, for a tag on `main`.
 
 ## Installing through a host's module lock
 
@@ -59,26 +59,23 @@ A host such as `ign-scada-template` pins the release in its lock file by SHA-256
   "version": "X.Y.Z",
   "requiredIgnitionVersion": "8.3.0",
   "file": "Map-Studio-X.Y.Z.modl",
-  "url": "https://github.com/aott33/perspective-flowmap/releases/download/vX.Y.Z/Map-Studio-X.Y.Z.modl",
+  "url": "https://github.com/aott33/perspective-map-studio/releases/download/vX.Y.Z/Map-Studio-X.Y.Z.modl",
   "sha256": "<the release's .sha256 file>",
   "certSha256": "<the README's Signing certificate SHA-256 line>",
   "licence": {"name": "Apache-2.0", "commercial": false},
-  "upstream": {"type": "github", "repo": "aott33/perspective-flowmap", "asset": "Map-Studio-.*\\.modl", "tag": "vX.Y.Z"}
+  "upstream": {"type": "github", "repo": "aott33/perspective-map-studio", "asset": "Map-Studio-.*\\.modl", "tag": "vX.Y.Z"}
 }
 ```
 
 Take `sha256` from the published release's `.sha256` file, `certSha256` from the README, and check both against the downloaded file with the host's own tool (`modl.py inspect`) and `scripts/ci/modl-verify.sh` before writing the entry. The rehearsal that proved this path is in [docs/template-install.md](docs/template-install.md).
 
-## Release approval (optional)
+## Release approval
 
-The repository is public. The release workflow already never publishes by itself: the owner publishing the draft is the approval. To also gate the signing job itself, the owner may add a required reviewer:
+The signing job runs in the `release` environment, set up by the owner on 2026-10-26: the owner is its required reviewer, it only runs for `v*` tags, and the two signing secrets live only there (the repository copies are deleted). A release therefore pauses at "Waiting for review" until the owner approves it under Review deployments, and the owner still publishes the draft release afterwards.
 
-1. Settings, Environments: create `release`; set yourself as required reviewer; under deployment branches and tags choose "Selected" and add the tag rule `v*`.
-2. Move `MODULE_SIGNING_KEYSTORE_B64` and `MODULE_SIGNING_KEYSTORE_PASSWORD` into the `release` environment and delete the repository copies.
-3. In `release.yml` uncomment the one line `# environment: release` on the `build-sign` job.
-4. Settings, Rules, Rulesets: add a tag ruleset that restricts creation of `v*` tags to the owner.
+To change it: Settings, Environments, `release`. The one line `environment: release` on the `build-sign` job in `release.yml` ties the job to it; without that line the job cannot read the secrets.
 
-Until then the secrets are repository secrets, and anyone who can push a tag can start the release workflow (see "Cutting a release").
+Still optional: Settings, Rules, Rulesets, a tag ruleset that restricts creation of `v*` tags to the owner.
 
 ## Rotation or lost key
 
