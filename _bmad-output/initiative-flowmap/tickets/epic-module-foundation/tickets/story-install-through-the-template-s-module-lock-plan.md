@@ -3,7 +3,7 @@ title: "Install through the template's module lock"
 type: 'feature'
 ticket: '6'
 created: '2026-10-26'
-status: 'in-review'
+status: 'in-progress'
 baseline_revision: '0c6a191c0550beaa9aff02c2610bc16b87ab6541'
 route: 'full'
 route_source: 'pinned'
@@ -98,9 +98,22 @@ Rehearsal done 2026-10-26 (owner decisions 1 to 4 above); evidence in `docs/temp
 - The scratch project is a copy of `ops/project` (view, page config, popup view, `project.json`) copied into the kept test stack's `build/test-stack/projects/MapStudioScratch`, loaded by a project scan; it is never committed. `ops/screenshot.mjs` was run against it with the project name and output folder changed in a scratchpad copy.
 - One render failure in the first `stack.sh` run (`phone-native-night /well/Mesa/P12/P12-3H/trends`: `Cannot subscribe to "ProjectDefinition" state. "Parts/Asset/Trends/" does not exist`, an embed path whose type segment was still empty) looked like a template race, not Map Studio: the same page passed in `native-day`, and a re-run of the whole `phone-native-night` pass on the same stack had no failure. A full re-run on a fresh stack passed (`test stack: PASS`, exit 0). Not reproduced without the module: unverified whether the race predates Map Studio.
 
+- Status (bmad-build `in-progress`, because the story is not done): the rehearsal and the signing fix are built and reviewed (quick lens, four patches applied); the real template pull request, the real lock entry and the repeat against v0.1.0 wait for the signed release. This part merges first so v0.1.0 is built with the PKCS#7 fix. The repository is public now and CI on `main` is green (owner, 2026-10-26).
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+Pass 1, lens `quick` (context-free session, run by the coordinator on the rehearsal diff). The lens confirmed that the PKCS#7 DER wrapping is correct for `modl.py` and `keytool`, that `release.yml` and CI are unaffected, that temp files and secrets are handled, and that no throwaway value is committed. Four findings, all verified real and all routed `patch` (smallest fix, no public surface):
+
+| Verdict | Route | Finding and action |
+|---|---|---|
+| medium | patch | `modl-verify.sh` skipped the PKCS#7 check silently without openssl. Fixed: it now fails with "openssl is required". |
+| medium | patch | `test-signing.sh` had no negative case for the bare certificate. Added: swap `certificates.p7b` for a bare PEM certificate, expect refusal. |
+| low | patch | `RELEASING.md` still described the repository as private. Fixed: public wording; the old section is now "Release approval (optional)". |
+| low | patch | `modl-verify.sh` header did not mention the PKCS#7 requirement. Fixed, deferred-work pointer kept. |
+
+Deferred: the possible ign-scada-template race (phone-native-night trends page) as an entry in `_bmad-output/deferred-work.md`.
 
 ## Design Notes
 

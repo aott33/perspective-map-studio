@@ -1,3 +1,7 @@
 - source_plan: `_bmad-output/initiative-flowmap/tickets/epic-module-foundation/tickets/spike-render-a-project-view-by-path-as-a-popup-plan.md`
   summary: Confirm on the Gateway that the popup view's view model stops when the popup closes (and that a p1 to p2 switch, which reuses one mount path, stops the old one).
   evidence: Review finding 2 (quick lens): only the browser side was seen; the Gateway logs nothing at info for a view stop. Settle it with the Perspective session page's view count or a debug logger on `perspective.ViewModel` during `ops/popup-check.mjs`, and record it under "Story 4" in `docs/platform-checks.md`.
+
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-module-foundation/tickets/story-install-through-the-template-s-module-lock-plan.md`
+  summary: Possible race in the ign-scada-template (its owner to look): the phone-native-night render of `/well/Mesa/P12/P12-3H/trends` failed once with `Cannot subscribe to "ProjectDefinition" state. "Parts/Asset/Trends/" does not exist`, an embed path whose type segment was still empty.
+  evidence: Seen once in the first `scripts/test/stack.sh` run of the story 6 rehearsal; the same page passed in native-day, a re-run of the whole phone-native-night pass passed, and a fresh stack run passed (exit 0). Map Studio is not on that page. Not reproduced on a stack without the module, so unverified whether it predates Map Studio. Owner: `ign-scada-template` (generator `scripts/gen/hmi/pages/asset.py`, `Parts/Asset/Trends/<Type>` embed).

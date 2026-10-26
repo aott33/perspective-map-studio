@@ -50,7 +50,7 @@ Limit of this setup: the secrets are repository secrets, so anyone who can push 
 
 ## Installing through a host's module lock
 
-A host such as `ign-scada-template` pins the release in its lock file by SHA-256 and certificate fingerprint and downloads it from the public release URL (no credential; the repository is public). The lock entry for release `X.Y.Z`:
+A host such as `ign-scada-template` pins the release in its lock file by SHA-256 and certificate fingerprint and downloads it from the public release URL with no credential (the repository is public, so a host's `fetch` and its weekly update check work as for any public module). The lock entry for release `X.Y.Z`:
 
 ```json
 {
@@ -69,14 +69,16 @@ A host such as `ign-scada-template` pins the release in its lock file by SHA-256
 
 Take `sha256` from the published release's `.sha256` file, `certSha256` from the README, and check both against the downloaded file with the host's own tool (`modl.py inspect`) and `scripts/ci/modl-verify.sh` before writing the entry. The rehearsal that proved this path is in [docs/template-install.md](docs/template-install.md).
 
-## When the repo goes public or the plan allows
+## Release approval (optional)
 
-Move the secrets behind an environment with a required reviewer:
+The repository is public. The release workflow already never publishes by itself: the owner publishing the draft is the approval. To also gate the signing job itself, the owner may add a required reviewer:
 
 1. Settings, Environments: create `release`; set yourself as required reviewer; under deployment branches and tags choose "Selected" and add the tag rule `v*`.
 2. Move `MODULE_SIGNING_KEYSTORE_B64` and `MODULE_SIGNING_KEYSTORE_PASSWORD` into the `release` environment and delete the repository copies.
 3. In `release.yml` uncomment the one line `# environment: release` on the `build-sign` job.
 4. Settings, Rules, Rulesets: add a tag ruleset that restricts creation of `v*` tags to the owner.
+
+Until then the secrets are repository secrets, and anyone who can push a tag can start the release workflow (see "Cutting a release").
 
 ## Rotation or lost key
 
@@ -84,4 +86,4 @@ A rotation is a release: generate a new certificate (setup steps 1 to 4), change
 
 ## Testing the signing path
 
-`scripts/ci/test-signing.sh` (also the `signing-check` CI job) generates a throwaway certificate in a temporary directory, signs with the same script the release uses, and checks that a wrong fingerprint or version, empty arguments, the unsigned build, a module with an unsigned file and unsafe passwords are all refused. It needs JDK 17 on `PATH`.
+`scripts/ci/test-signing.sh` (also the `signing-check` CI job) generates a throwaway certificate in a temporary directory, signs with the same script the release uses, and checks that a wrong fingerprint or version, empty arguments, the unsigned build, a module with an unsigned file, a bare certificate in place of the PKCS#7 bundle and unsafe passwords are all refused. It needs JDK 17 and openssl on `PATH`.
