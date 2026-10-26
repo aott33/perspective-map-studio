@@ -16,3 +16,9 @@ Session: session_01DVAVWyHFvLKQeaRZ7Pw3zR · Timestamp: 2026-10-26T05:53:07Z
 - Action: owner cloned the branch and ran ops/up.sh --fresh on their own Ubuntu machine, clicked points with ops/logs.sh open.
 - Result: build, tests and Gateway start passed; delegate logged point.click for p2 and p3; owner: "overall seems to be working well". Warnings judged harmless; cleanup deferred to story 8.
 - Evidence: deferred-work.md entry; plan Implementation Notes.
+
+## 3 - block 1 - done
+
+Session: session_01DVAVWyHFvLKQeaRZ7Pw3zR · Timestamp: 2026-10-26T05:55:06Z
+
+- Result: owner accepted block 1. Owner noted map controls belong bottom-right like Google Maps; recorded as a UX direction in the initiative memlog with the reference image in ux-inputs/; not a story 1 change (tracer uses MapLibre's default top-right zoom).
