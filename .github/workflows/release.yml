@@ -1,0 +1,116 @@
+name: Release
+
+# A release is a tag vX.Y.Z on main. The workflow builds, signs with the owner's
+# certificate (repository secrets), checks the signature and that the
+# certificate fingerprint is the one in the README, and attaches the signed
+# .modl and its SHA-256 to a DRAFT GitHub release. It never publishes: the
+# owner publishing the draft is the approval. See RELEASING.md.
+#
+# Secrets (Settings, Secrets and variables, Actions):
+#   MODULE_SIGNING_KEYSTORE_B64       base64 of the PKCS12 keystore (alias "mapstudio")
+#   MODULE_SIGNING_KEYSTORE_PASSWORD  its password
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, sign and draft the release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # environment: release   # uncomment when the plan allows environments (RELEASING.md)
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Check the tag
+        id: tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Tag '$TAG' is not vX.Y.Z. Ignition's module version is numeric, so prerelease suffixes are not allowed."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Tag '$TAG' is not on main. Release only from main."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Read the fingerprint from the README
+        id: readme
+        run: |
+          line="$(grep -m1 '^Signing certificate SHA-256:' README.md || true)"
+          fp="$(printf '%s' "$line" | grep -oE '([0-9A-F]{2}:){31}[0-9A-F]{2}' || true)"
+          if [ -z "$fp" ]; then
+            echo "::error::README.md has no 'Signing certificate SHA-256:' fingerprint yet. The owner adds it before the first release."
+            exit 1
+          fi
+          echo "fingerprint=$fp" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache Gradle
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties', 'web/package-lock.json') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Decode the keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.MODULE_SIGNING_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.MODULE_SIGNING_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::Missing secret. Create MODULE_SIGNING_KEYSTORE_B64 and MODULE_SIGNING_KEYSTORE_PASSWORD (RELEASING.md)."
+            exit 1
+          fi
+          echo "::add-mask::$KEYSTORE_PASSWORD"
+          umask 077
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/mapstudio-signing.p12"
+
+      - name: Build and sign
+        env:
+          MODULE_SIGNING_KEYSTORE_PASSWORD: ${{ secrets.MODULE_SIGNING_KEYSTORE_PASSWORD }}
+        run: scripts/ci/build-signed.sh "$RUNNER_TEMP/mapstudio-signing.p12" mapstudio "${{ steps.tag.outputs.version }}"
+
+      - name: Verify the signature and the fingerprint
+        run: |
+          cp build/Map-Studio.modl "$RUNNER_TEMP/Map-Studio-${{ steps.tag.outputs.version }}.modl"
+          scripts/ci/modl-verify.sh "$RUNNER_TEMP/Map-Studio-${{ steps.tag.outputs.version }}.modl" "${{ steps.readme.outputs.fingerprint }}"
+          (cd "$RUNNER_TEMP" && sha256sum "Map-Studio-${{ steps.tag.outputs.version }}.modl" > "Map-Studio-${{ steps.tag.outputs.version }}.modl.sha256")
+          cat "$RUNNER_TEMP/Map-Studio-${{ steps.tag.outputs.version }}.modl.sha256"
+
+      - name: Remove the keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/mapstudio-signing.p12"
+
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          v="${{ steps.tag.outputs.version }}"
+          gh release create "$TAG" --draft --verify-tag --title "Map Studio $v" --generate-notes \
+            "$RUNNER_TEMP/Map-Studio-$v.modl" "$RUNNER_TEMP/Map-Studio-$v.modl.sha256"
