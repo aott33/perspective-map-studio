@@ -83,6 +83,8 @@ Reference repos (read only, never build from inside them) are cloned at `/tmp/cl
 - Orchestrator after the implementer (2026-10-26): matrix audit found no committed Gateway-side test for the three I/O rows; added `gateway/src/test/.../MapStudioDelegateTest.java` (4 tests, JUnit 5, run by `./gradlew :gateway:test`, 4/4 pass). Dev Gateway admin password now generated into the git-ignored `.env` (was the literal `password`); host port bound to `127.0.0.1`; test line now between the first two points, per story criterion 3. Fresh `ops/up.sh --fresh`: no Map Studio warning or error; screenshots retaken.
 - Owner reviewed the screenshots on 2026-10-26 and confirmed they match criteria 3 and 4 (story criterion 5).
 
+- Owner's fresh clone on their own Ubuntu machine (2026-10-26): `ops/up.sh --fresh` built, tested (Java and Jest pass), started 8.3.10 and loaded Map Studio; clicks logged by `MapStudio.delegate` for p2 and p3. This is the story's check beyond the criteria (rebuild from a fresh clone on another machine): passed. Warnings seen (Gradle deprecations, npm peer and audit) are deferred to the refactor sweep.
+
 ## Plan Change Log
 
 - Unattended module acceptance moved from a `data/modules.json` seed (Mustry's method, which assumes a signed module) to the Gateway's `ACCEPT_MODULE_LICENSES` / `ACCEPT_MODULE_CERTS` environment variables, so no stop, copy, chown and restart dance is needed. Same acceptance criterion, simpler scripts.
