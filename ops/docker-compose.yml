@@ -25,7 +25,8 @@ services:
 
   gateway:
     image: inductiveautomation/ignition:8.3.10
-    container_name: mapstudio-ignition
+    # Overridable so several dev Gateways can run side by side (one per worktree).
+    container_name: ${MAPSTUDIO_CONTAINER:-mapstudio-ignition}
     depends_on:
       init:
         condition: service_completed_successfully

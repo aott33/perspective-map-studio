@@ -9,7 +9,7 @@ MODULES_DIR="${OPS_DIR}/modules"
 
 # Must match MODULE_ID in common/.../MapStudioModule.java and the root build.
 MODULE_ID="com.aoindustrial.perspective.mapstudio"
-CONTAINER_NAME="mapstudio-ignition"
+CONTAINER_NAME="${MAPSTUDIO_CONTAINER:-mapstudio-ignition}"
 PROJECT_NAME="mapstudio-dev"
 BUNDLE_PATH="/res/mapstudio/MapStudio.js"
 
@@ -45,7 +45,8 @@ ADMIN_USER="admin"
 ADMIN_PASS="${GATEWAY_ADMIN_PASSWORD}"
 
 # docker compose, always pointed at this folder's compose file.
-COMPOSE=(docker compose -f "${OPS_DIR}/docker-compose.yml")
+# Project name follows the container, so parallel Gateways get separate volumes.
+COMPOSE=(docker compose -p "${MAPSTUDIO_CONTAINER:-mapstudio-ignition}" -f "${OPS_DIR}/docker-compose.yml")
 
 # --- logging --------------------------------------------------------------
 if [[ -t 1 ]]; then
