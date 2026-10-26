@@ -1,0 +1,178 @@
+{
+ "custom": {},
+ "params": {},
+ "props": {
+  "defaultSize": {
+   "width": 1440,
+   "height": 900
+  }
+ },
+ "root": {
+  "type": "ia.container.flex",
+  "version": 0,
+  "props": {
+   "direction": "column"
+  },
+  "meta": {
+   "name": "root"
+  },
+  "position": {},
+  "custom": {},
+  "children": [
+   {
+    "type": "ia.container.flex",
+    "version": 0,
+    "props": {
+     "direction": "row",
+     "alignItems": "center",
+     "wrap": "wrap"
+    },
+    "meta": {
+     "name": "toolbar"
+    },
+    "position": {
+     "shrink": 0
+    },
+    "custom": {},
+    "children": [
+     {
+      "type": "ia.display.label",
+      "version": 0,
+      "props": {
+       "text": "",
+       "style": {
+        "padding": "4px 12px"
+       }
+      },
+      "meta": {
+       "name": "user",
+       "domId": "mapstudio-dev-user"
+      },
+      "position": {
+       "basis": "auto",
+       "shrink": 0
+      },
+      "custom": {},
+      "propConfig": {
+       "props.text": {
+        "binding": {
+         "type": "expr",
+         "config": {
+          "expression": "if({session.props.auth.authenticated}, 'Signed in as ' + {session.props.auth.user.userName}, 'Not signed in (viewer)')"
+         }
+        }
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Log in"
+      },
+      "meta": {
+       "name": "login",
+       "domId": "mapstudio-dev-login"
+      },
+      "position": {
+       "basis": "160px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\tif self.session.props.auth.authenticated:\n\t\tsystem.perspective.logout()\n\telse:\n\t\tsystem.perspective.login()"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      },
+      "propConfig": {
+       "props.text": {
+        "binding": {
+         "type": "expr",
+         "config": {
+          "expression": "if({session.props.auth.authenticated}, 'Log out', 'Log in')"
+         }
+        }
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Run script checks"
+      },
+      "meta": {
+       "name": "scriptChecks",
+       "domId": "mapstudio-dev-script-checks"
+      },
+      "position": {
+       "basis": "160px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev-only script checks for system.mapstudio (epic 2 story 1, criteria 4, 7 and 8).\n\t# A Perspective session script runs on the Gateway, so these calls take the same write\n\t# service as the browser, under the actor they name (the scripting API trusts its caller).\n\timport java.lang\n\timport uuid\n\n\tproject = 'mapstudio-dev'\n\tactor = 'seed-script'\n\tlogger = system.util.getLogger('MapStudio.devchecks')\n\tresults = []\n\n\tdef call(name, fn):\n\t\ttry:\n\t\t\tresults.append({'name': name, 'ok': True, 'value': fn()})\n\t\texcept java.lang.Throwable as ex:\n\t\t\tresults.append({'name': name, 'ok': False, 'error': ex.getMessage()})\n\t\texcept Exception as ex:\n\t\t\tresults.append({'name': name, 'ok': False, 'error': str(ex)})\n\n\tdef batch(ops):\n\t\treturn {'batchId': str(uuid.uuid4()), 'ops': ops}\n\n\tdef stored_version(item_id):\n\t\tfor item in system.mapstudio.getMap(project):\n\t\t\tif item['id'] == item_id:\n\t\t\t\treturn item['version']\n\t\treturn None\n\n\t# A new UUIDv5 per run (the run's time in the name), so the checks repeat on a kept volume.\n\trun = str(system.date.toMillis(system.date.now()))\n\tpoint_id = str(uuid.uuid5(uuid.NAMESPACE_URL, 'mapstudio-dev/script-check/' + run))\n\tpoint = {'kind': 'pad', 'name': 'Script check pad',\n\t\t'geometry': {'type': 'Point', 'coordinates': [-104.9650, 39.7360]}}\n\n\tcall('create', lambda: system.mapstudio.applyEdits(project, batch([\n\t\t{'op': 'create', 'entity': 'item', 'id': point_id, 'baseVersion': 0, 'data': point}]), actor))\n\tcall('getMapAfterCreate', lambda: stored_version(point_id))\n\tcall('updateAtStoredVersion', lambda: system.mapstudio.applyEdits(project, batch([\n\t\t{'op': 'update', 'entity': 'item', 'id': point_id, 'baseVersion': 1,\n\t\t'data': {'name': 'Script check pad (renamed)'}}]), actor))\n\tcall('updateAtOldVersion', lambda: system.mapstudio.applyEdits(project, batch([\n\t\t{'op': 'update', 'entity': 'item', 'id': point_id, 'baseVersion': 1,\n\t\t'data': {'name': 'Stale rename'}}]), actor))\n\tcall('delete', lambda: system.mapstudio.applyEdits(project, batch([\n\t\t{'op': 'delete', 'entity': 'item', 'id': point_id, 'baseVersion': 2, 'data': {}}]), actor))\n\tcall('noActor', lambda: system.mapstudio.applyEdits(project, batch([\n\t\t{'op': 'update', 'entity': 'item', 'id': point_id, 'baseVersion': 2,\n\t\t'data': {'name': 'No actor'}}]), None))\n\tcall('unknownProject', lambda: system.mapstudio.applyEdits('no-such-project', batch([\n\t\t{'op': 'create', 'entity': 'item', 'id': str(uuid.uuid4()), 'baseVersion': 0, 'data': point}]), actor))\n\tcall('getMapAtEnd', lambda: stored_version(point_id))\n\tcall('ping', lambda: system.mapstudio.ping())\n\n\tself.view.rootContainer.getChild('scriptResults').props.text = system.util.jsonEncode({'pointId': point_id, 'results': results})\n\tlogger.info('Dev script checks ran: %d calls' % len(results))"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     }
+    ]
+   },
+   {
+    "type": "ao.mapstudio",
+    "version": 0,
+    "props": {
+     "popupView": {
+      "path": "Popups/PointDetails",
+      "params": {
+       "source": "dev"
+      }
+     }
+    },
+    "meta": {
+     "name": "map"
+    },
+    "position": {
+     "basis": "0px",
+     "grow": 1
+    },
+    "custom": {}
+   },
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {
+     "text": "",
+     "style": {
+      "padding": "4px 12px"
+     }
+    },
+    "meta": {
+     "name": "scriptResults",
+     "domId": "mapstudio-dev-script-results"
+    },
+    "position": {
+     "basis": "24px",
+     "shrink": 0
+    },
+    "custom": {}
+   }
+  ]
+ }
+}

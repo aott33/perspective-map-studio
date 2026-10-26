@@ -255,3 +255,33 @@ The 8 remaining findings (`axios`, `lodash`, `moment`, `@babel/runtime` and the 
 **Verification:** `./gradlew build` green with Jest 32 and 6 Gateway tests (was 18); `npm test` in `e2e/` 10 of 10 on a fresh dev Gateway (`ms-s8`), no `CHECK` line and no Map Studio warning or error in the Gateway log; `scripts/ci/test-signing.sh` passes. A dev Gateway restarted with a leftover `setup` resource in the project started the project and the module, with no `CHECK` line and no Map Studio warning or error **[live 8.3.10]**.
 
 **Still with the owner (listed for Story 9):** the headed frame-rate run; the Designer checks for `system.mapstudio.` autocomplete and `CHECK setup-modified` (run the second on the v0.1.0 module or on `51104c8`: the code behind it is gone from the current tree). Story 9 update, 2026-10-26: the frame-rate reading (60 fps on an integrated laptop GPU, by eye) and the autocomplete check (yes) are done and recorded in `docs/spike-report.md`; `CHECK setup-modified` is still open.
+
+## Epic 2 story 1 - session roles on the Gateway
+
+**Question (epic-map-store-and-data, Notes; story 1, Notes):** how does the component's Gateway delegate read the Perspective session user's roles, so that the write path checks roles on the Gateway and never trusts anything the browser sends?
+
+**Answer:** through the component's session: `component.getSession().getWebAuthStatus().getUser()` gives an `Optional<WebAuthUser>`, and `WebAuthUser.getRoles()` the user's roles by name **[live 8.3.10]**. `Session.getProjectName()` gives the project the map is keyed by. No fallback was needed. Date: 2026-10-26. Gateway: `inductiveautomation/ignition:8.3.10`, container `ms-e2s1` on port 9121, module 0.1.0 built from this branch with a temporary probe in `MapStudioDelegate.onStartup` (removed after this record).
+
+| Session | `isAuthenticated()` | `getUser()` | `getRoles()` | `getSecurityLevels()` |
+| --- | --- | --- | --- | --- |
+| Anonymous (the viewer) | false | empty | (none) | `SecurityZones` only |
+| `mapeditor` signed in through the project's identity provider | true | `mapeditor` | `[MapEditor]` | `SecurityZones`, `Authenticated/Roles/MapEditor` |
+
+The probe line, as logged by the delegate of the `MapStudioEdit` view (`ops/project`), before and after the sign-in:
+
+```text
+I [M.roles] PROBE project mapstudio-dev authenticated=false user=<none> roles=<none> securityLevels=[{"name":"SecurityZones",...}]
+I [M.roles] PROBE project mapstudio-dev authenticated=true user=mapeditor roles=[MapEditor] securityLevels=[{"name":"SecurityZones",...}, {"name":"Authenticated",...,"children":[{"name":"Roles",...,"children":[{"name":"MapEditor","children":[]}]}]}]
+```
+
+- The sign-in goes through the identity provider's page (`/idp/default/authn/login`, user name then password) and returns to the session URL; the page reloads, so the view and its delegate start again with the signed-in status **[live 8.3.10]**. The write path still reads the roles on every message rather than once per delegate, since a session can change user without the component restarting (sign out from another view) **[unverified]**.
+- `getSecurityLevels()` carries the same roles as `Authenticated/Roles/<role>`, so it stays available as a fallback; it is not used.
+- Signatures were first read from the SDK jars (`perspective-gateway` 3.3.0, `common` 8.3.0 with `javap`): `Component.getSession()`, `Session.getWebAuthStatus()`, `WebAuthStatus.getUser()`, `WebAuthUser.getUserName()`, `WebAuthUser.getRoles(): ImmutableCollection<String>`.
+
+### Facts learned on the way (the dev stack's user and sign-in)
+
+- A project needs its own identity provider for `system.perspective.login()`: without one the session shows "No Identity Provider Configured" and stays anonymous **[live 8.3.10]**. The project property lives in the binary `ignition/global-props/data.bin`; it was written by the Gateway, not by hand, with `PUT /data/api/v1/projects/mapstudio-dev {"identityProvider": "default"}` (the Gateway needs write access to the bind-mounted project folder for that call), and is committed in `ops/project/ignition/global-props/`.
+- An API key resource cannot carry `Authenticated/Roles/<role>`: 8.3.10 logs `Security level 'Authenticated/Roles' cannot be granted via config and will be ignored` and the key gets 403 **[live 8.3.10]**. The dev key carries `Authenticated/ApiKeys/MapStudioDev`, which `ops/up.sh` adds to the Gateway's Read and Write permissions (`ops/dev_security.py`).
+- First-boot commissioning writes `core` `security-properties` itself, so a copy seeded into `core` before the first boot is replaced **[live 8.3.10]**; `ops/up.sh` patches the Gateway's own file after the first RUNNING and restarts once.
+- The identity provider a fresh volume gets was `default` on most first boots and once `temp` ("Temporary Ignition Identity Provider created during password reset") **[live 8.3.10]**, as `ign-scada-template` saw on 8.3.9 (its GW-1). `ops/users.py` reads the name from `security-properties` and fails in words when the provider it names is missing.
+- `GET /data/api/v1/resources/find/ignition/identity-provider/<name>` answers 404 on 8.3.10; `.../list/ignition/identity-provider` works **[live 8.3.10]**. The SCIM routes of an internal user source (`/data/api/v1/scim/<userSource>/v2/Users` and `/Groups`) created `mapeditor` and the roles `MapEditor` and `MapOperator` as on 8.3.9 **[live 8.3.10]**.

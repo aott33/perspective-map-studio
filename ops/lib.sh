@@ -9,7 +9,7 @@ MODULES_DIR="${OPS_DIR}/modules"
 
 # Must match MODULE_ID in common/.../MapStudioModule.java and the root build.
 MODULE_ID="com.aoindustrial.perspective.mapstudio"
-CONTAINER_NAME="${MAPSTUDIO_CONTAINER:-mapstudio-ignition}"
+# CONTAINER_NAME is set below, after .env is read (it may set MAPSTUDIO_CONTAINER).
 PROJECT_NAME="mapstudio-dev"
 BUNDLE_PATH="/res/mapstudio/MapStudio.js"
 
@@ -38,6 +38,22 @@ if [[ -z "${GATEWAY_ADMIN_PASSWORD:-}" ]]; then
   chmod 600 "${PROJECT_ROOT}/.env"
 fi
 export GATEWAY_ADMIN_PASSWORD
+CONTAINER_NAME="${MAPSTUDIO_CONTAINER:-mapstudio-ignition}"
+# The dev map editor's password (user mapeditor, role MapEditor; ops/users.py), generated the same way.
+if [[ -z "${MAPSTUDIO_EDITOR_PASSWORD:-}" ]]; then
+  MAPSTUDIO_EDITOR_PASSWORD="$(python3 -I -c 'import secrets, string
+a = string.ascii_letters + string.digits
+while True:
+    v = "".join(secrets.choice(a) for _ in range(20))
+    if any(c.islower() for c in v) and any(c.isupper() for c in v) and any(c.isdigit() for c in v) \
+            and not any(v[i] == v[i + 1] == v[i + 2] for i in range(18)):
+        print(v)
+        break')"
+  ( umask 077; echo "MAPSTUDIO_EDITOR_PASSWORD=${MAPSTUDIO_EDITOR_PASSWORD}" >> "${PROJECT_ROOT}/.env" )
+  chmod 600 "${PROJECT_ROOT}/.env"
+fi
+export MAPSTUDIO_EDITOR_PASSWORD
+SECRETS_DIR="${OPS_DIR}/secrets"
 GATEWAY_HTTP_PORT="${GATEWAY_HTTP_PORT:-9088}"
 GATEWAY_URL="http://localhost:${GATEWAY_HTTP_PORT}"
 SESSION_URL="${GATEWAY_URL}/data/perspective/client/${PROJECT_NAME}"
@@ -71,6 +87,58 @@ require_docker() {
     err "Docker does not appear to be running."
     exit 1
   fi
+}
+
+# --- secrets --------------------------------------------------------------
+# The compose project name: MAPSTUDIO_CONTAINER when set, else compose's default "ops".
+compose_project() {
+  echo "${MAPSTUDIO_CONTAINER:-ops}"
+}
+
+# Generate the dev stack's secrets (ops/gen_secrets.py) into the git-ignored
+# ops/secrets/. A kept PostgreSQL volume was initialised with the old password,
+# so a missing pg_password next to an existing volume is refused, not regenerated.
+ensure_secrets() {
+  local volume
+  volume="$(compose_project)_postgres-data"
+  if [[ ! -f "${SECRETS_DIR}/pg_password" ]] && docker volume inspect "${volume}" >/dev/null 2>&1; then
+    err "ops/secrets/pg_password is missing but the PostgreSQL volume ${volume} exists (it holds the old password)."
+    err "Start from fresh volumes: ops/up.sh --fresh (or ops/down.sh --purge first)."
+    exit 1
+  fi
+  python3 -I "${OPS_DIR}/gen_secrets.py"
+}
+
+# --- dev security properties ----------------------------------------------
+# The dev API key (security level Authenticated/ApiKeys/MapStudioDev) needs that
+# level in the Gateway's Read and Write permissions. The first boot's
+# commissioning writes core security-properties itself [live 8.3.10], so after
+# the first RUNNING the Gateway's own file is patched (ops/dev_security.py adds
+# that level and keeps everything else, the identity provider name included),
+# followed by one restart. Dev Gateway only.
+SECPROPS_PATH="/usr/local/bin/ignition/data/config/resources/core/ignition/security-properties"
+ensure_dev_security() {
+  if "${COMPOSE[@]}" exec -T gateway grep -q MapStudioDev "${SECPROPS_PATH}/config.json" 2>/dev/null; then
+    return 0
+  fi
+  info "Allowing the dev API key in the Gateway's security properties (one restart) ..."
+  local tmp="${SECRETS_DIR}/security-properties.json"
+  "${COMPOSE[@]}" cp "gateway:${SECPROPS_PATH}/config.json" "${tmp}"
+  python3 -I "${OPS_DIR}/dev_security.py" "${tmp}" || [[ $? -eq 3 ]]
+  "${COMPOSE[@]}" cp "${tmp}" "gateway:${SECPROPS_PATH}/config.json"
+  rm -f "${tmp}"
+  "${COMPOSE[@]}" exec -T -u root gateway chown -R ignition:ignition "${SECPROPS_PATH}"
+  "${COMPOSE[@]}" restart gateway
+  wait_for_commissioned 60
+  wait_for_bundle 24
+}
+
+# --- dev users ------------------------------------------------------------
+# Create or update the dev map editor (mapeditor, role MapEditor) and the empty
+# role MapOperator through the Gateway's SCIM routes (ops/users.py).
+ensure_dev_users() {
+  info "Creating the dev map editor user (mapeditor, role MapEditor) ..."
+  GW_URL="${GATEWAY_URL}" python3 -I "${OPS_DIR}/users.py"
 }
 
 # --- build and stage ------------------------------------------------------
