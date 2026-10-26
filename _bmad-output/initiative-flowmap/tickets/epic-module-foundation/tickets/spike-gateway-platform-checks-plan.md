@@ -3,14 +3,14 @@ title: 'Gateway platform checks'
 type: 'feature'
 ticket: '3'
 created: '2026-10-26'
-status: 'draft'
-baseline_revision: ''
+status: 'built'
+baseline_revision: 'dcb0479821a7517574e0743cc843370211af1859'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md'
@@ -27,6 +27,8 @@ context:
 ## Boundaries & Constraints
 
 **Always:** Java 17, SDK 8.3.0 jars; story 1's build, ops scripts and module ids untouched in behaviour; dev Gateway `MAPSTUDIO_CONTAINER=ms-s3`, `GATEWAY_HTTP_PORT=9103` in the git-ignored `.env`; every password generated into `.env` or a git-ignored secret file and reaching the Gateway only through a File secret provider (Referenced secret) and PostgreSQL through `POSTGRES_PASSWORD_FILE`; the Gateway's default connection settings (pool 0/8/8/0, `SELECT 1`, test on borrow) left as they are; loggers `MapStudio.check.<name>`; each recorded answer carries its evidence and label `[live 8.3.10]` and, where a check fails, the fallback taken; no em dashes; the claude-ignition-skills repository is not edited in this story (its entry is drafted in the record for the owner to land).
+
+**Decisions (owner, 2026-10-26):** the setup resource is read on the Gateway only; the Designer editor's cost is estimated from IA's example and the decision deferred to epic-map-store-and-data. The record is one shared file `docs/platform-checks.md`, section "Story 3 - Gateway platform checks" (stories 2 and 4 add their own sections; keep to this one), holding the drafted `Finding | Where it went` table that targets a new `ignition-dev/references/module-sdk.md` for story 9 to land. The plan is kept whole despite its length.
 
 **Never:** a Designer resource editor or workspace; writes to tags, devices or UDT instances; reading Alarm Metrics with `system.tag.read*`; passwords, API keys or tokens in any committed file; changes to `MapStudioDelegate`, `web/`, `common/` schemas or the `MapStudioDev` view; a `.modl` or JDBC driver in git (8.3.10 ships `PostgreSQL JDBC Driver Module.modl`); production code paths: the spike package is removed by the refactor sweep (story 8).
 
@@ -69,34 +71,58 @@ Repository:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `common/.../MapStudioModule.java` -- add `SETUP_RESOURCE_TYPE = new ResourceType(MODULE_ID, "setup")` -- shared by gateway now, designer later.
-- [ ] `gateway/.../spike/SetupResource.java` -- record parsed from `setup.json` (`connection`, `connectionNoRights`, `adapterFunction`, `alarmMetricPaths`) with `fromResource(Resource)` -- the custom resource check.
-- [ ] `gateway/.../spike/ChecksLifecycleFactory.java`, `ChecksLifecycle.java` -- filter on `SETUP_RESOURCE_TYPE`; `onStartup` runs the checks on a bounded executor and logs one `CHECK <name> PASS|FAIL <evidence>` line each; `onResourcesModified` logs the re-read; `onShutdown` unsubscribes -- checks 1, 2, 4, 5 need a loaded project.
-- [ ] `gateway/.../spike/AlarmMetricsCheck.java` -- subscribe to the two paths, collect events for 90 s, also `readAsync` them; result and qualities in the log line.
-- [ ] `gateway/.../spike/ProjectScriptCheck.java` -- `getProjectScriptManager(project)`, `runCode` importing the module and calling `adapterFunction`, result read from the locals map; record which of `runCode` and `runFunction(getGlobals()...)` works.
-- [ ] `gateway/.../spike/PostgresCheck.java` -- the two connections of the matrix; the rights failure logged with `errorf("Map Studio cannot create its tables on connection %s: %s (SQLState %s)")`.
-- [ ] `gateway/.../MapStudioScriptModule.java` + `MapStudioScriptModule.properties`, `MapStudioGatewayHook.java` -- `system.mapstudio.ping()` returning the module version; factory started in `startup`, stopped in `shutdown`.
-- [ ] `gateway/src/test/.../SetupResourceTest.java`, `PostgresCheckTest.java` -- parse a sample `setup.json`; the SQLState 42501 message formatting; both pure.
-- [ ] `ops/project/ignition/script-python/mapstudio_checks/{code.py,resource.json}` -- Jython 2.7: `kinds()` returns two dicts and the value of `system.mapstudio.ping()`; `system` not imported.
-- [ ] `ops/project/com.aoindustrial.perspective.mapstudio/setup/{setup.json,resource.json}` -- the dev setup naming the two connections, the function and the two metric paths.
-- [ ] `ops/checks/config/.../{tag-provider/default, tag-type-definition/default, tag-definition/default/Checks, secret-provider/MapStudioFiles, database-connection/MapStudio, database-connection/MapStudioNoRights}` -- the Gateway config files; passwords only as Referenced secrets.
-- [ ] `ops/checks/postgres-init.sql` -- creates `mapstudio_ro` (LOGIN, CONNECT only) reading its password from the mounted secret through a small init shell script; `mapstudio` is `POSTGRES_USER`.
-- [ ] `ops/docker-compose.checks.yml` -- `postgres:16` service (no host port) with `POSTGRES_PASSWORD_FILE`; `secrets:` for both passwords from git-ignored `ops/checks/secrets/`; the config folders bind-mounted into `data/config/resources/core/...`; `init` extended to chown them.
-- [ ] `ops/checks.sh`, `ops/lib.sh` -- generate the two PostgreSQL passwords into `ops/checks/secrets/` (mode 600, no newline), run `up.sh` with both compose files, wait, grep the wrapper log for the `CHECK` lines (fail if fewer than five), print them; `--scan` edits nothing but re-posts a project scan to show `onResourcesModified`.
-- [ ] `docs/spike/platform-checks.md` -- the record: environment (8.3.10, PostgreSQL version, date), one section per check with the log lines, the SDK calls that worked, fallbacks taken, and a drafted `Finding | Where it went` table for claude-ignition-skills (`ignition-architect/references/system-architectures.md` or a new `ignition-dev/references/module-sdk.md`, owner's call).
-- [ ] `.gitignore`, `README.md` -- ignore `ops/checks/secrets/` and write-back noise; a short "Platform checks" paragraph.
+- [x] `common/.../MapStudioModule.java` -- add `SETUP_RESOURCE_TYPE = new ResourceType(MODULE_ID, "setup")` -- shared by gateway now, designer later.
+- [x] `gateway/.../spike/SetupResource.java` -- record parsed from `setup.json` (`connection`, `connectionNoRights`, `adapterFunction`, `alarmMetricPaths`) with `fromResource(Resource)` -- the custom resource check.
+- [x] `gateway/.../spike/ChecksLifecycleFactory.java`, `ChecksLifecycle.java` -- filter on `SETUP_RESOURCE_TYPE`; `onStartup` runs the checks on a bounded executor and logs one `CHECK <name> PASS|FAIL <evidence>` line each; `onResourcesModified` logs the re-read; `onShutdown` unsubscribes -- checks 1, 2, 4, 5 need a loaded project.
+- [x] `gateway/.../spike/AlarmMetricsCheck.java` -- subscribe to the two paths, collect events for 90 s, also `readAsync` them; result and qualities in the log line.
+- [x] `gateway/.../spike/ProjectScriptCheck.java` -- `getProjectScriptManager(project)`, `runCode` importing the module and calling `adapterFunction`, result read from the locals map; record which of `runCode` and `runFunction(getGlobals()...)` works.
+- [x] `gateway/.../spike/PostgresCheck.java` -- the two connections of the matrix; the rights failure logged with `errorf("Map Studio cannot create its tables on connection %s: %s (SQLState %s)")`.
+- [x] `gateway/.../MapStudioScriptModule.java` + `MapStudioScriptModule.properties`, `MapStudioGatewayHook.java` -- `system.mapstudio.ping()` returning the module version; factory started in `startup`, stopped in `shutdown`.
+- [x] `gateway/src/test/.../SetupResourceTest.java`, `PostgresCheckTest.java` -- parse a sample `setup.json`; the SQLState 42501 message formatting; both pure.
+- [x] `ops/project/ignition/script-python/mapstudio_checks/{code.py,resource.json}` -- Jython 2.7: `kinds()` returns two dicts and the value of `system.mapstudio.ping()`; `system` not imported.
+- [x] `ops/project/com.aoindustrial.perspective.mapstudio/setup/{setup.json,resource.json}` -- the dev setup naming the two connections, the function and the two metric paths.
+- [x] `ops/checks/config/.../{tag-provider/default, tag-type-definition/default, tag-definition/default/Checks, secret-provider/MapStudioFiles, database-connection/MapStudio, database-connection/MapStudioNoRights}` -- the Gateway config files; passwords only as Referenced secrets.
+- [x] `ops/checks/postgres-init.sql` -- creates `mapstudio_ro` (LOGIN, CONNECT only) reading its password from the mounted secret through a small init shell script; `mapstudio` is `POSTGRES_USER`.
+- [x] `ops/docker-compose.checks.yml` -- `postgres:16` service (no host port) with `POSTGRES_PASSWORD_FILE`; `secrets:` for both passwords from git-ignored `ops/checks/secrets/`; the config folders bind-mounted into `data/config/resources/core/...`; `init` extended to chown them.
+- [x] `ops/checks.sh`, `ops/lib.sh` -- generate the two PostgreSQL passwords into `ops/checks/secrets/` (mode 600, no newline), run `up.sh` with both compose files, wait, grep the wrapper log for the `CHECK` lines (fail if fewer than five), print them; `--scan` edits nothing but re-posts a project scan to show `onResourcesModified`.
+- [x] `docs/platform-checks.md` -- the record, section "Story 3 - Gateway platform checks": environment (8.3.10, PostgreSQL version, date), one subsection per check with the log lines, the SDK calls that worked, fallbacks taken, the Designer editor estimate, and a drafted `Finding | Where it went` table targeting `ignition-dev/references/module-sdk.md`.
+- [x] `.gitignore`, `README.md` -- ignore `ops/checks/secrets/` and write-back noise; a short "Platform checks" paragraph.
 
 **Acceptance Criteria:**
 - Given a fresh clone with `.env` holding `MAPSTUDIO_CONTAINER=ms-s3` and `GATEWAY_HTTP_PORT=9103`, when `ops/checks.sh` runs, then the Gateway reaches RUNNING, the module starts without error, and the log holds five `CHECK` lines, each PASS or FAIL with evidence.
-- Given the record in `docs/spike/platform-checks.md`, when read against the architecture's open questions, then each of the five has an answer, its evidence and, for a FAIL, the fallback the architecture names, all labelled `[live 8.3.10]`.
+- Given the record in `docs/platform-checks.md`, when read against the architecture's open questions, then each of the five has an answer, its evidence and, for a FAIL, the fallback the architecture names, all labelled `[live 8.3.10]`.
 - Given `./gradlew build`, when it runs, then it succeeds and the new unit tests pass; `ops/up.sh` alone (story 1's path) still works without PostgreSQL.
 - Given the Designer connected to `ms-s3` (manual, owner), when `system.mapstudio.` is typed in the script console, then `ping` appears with its description.
 
 ## Implementation Notes
 
+- Implemented directly (no coding subagent available in this session). Environment: the sandbox had rebooted before implementation started; `dockerd` was down with a stale `/var/run/docker.pid` and was restarted by hand (log in the session scratchpad). The other worktrees' Gateways were not touched.
+- Gateway code: `gateway/.../spike/{SetupResource, CheckResult, ChecksLifecycleFactory, ChecksLifecycle, AlarmMetricsCheck, ProjectScriptCheck, PostgresCheck}.java`, `gateway/.../MapStudioScriptModule.java` + `.properties`, hook changes (`initializeScriptManager`, factory start/stop), `MapStudioModule.SETUP_RESOURCE_TYPE`. `ping()` returns "Map Studio pong at <UTC time>" (the module version is not in the SDK's `GatewayModule` surface read by javap; not worth the detour). Way 2 of the script check imports the module into a locals map first: project modules are not in `getGlobals()` until imported (first run showed `globals hold no 'mapstudio_checks'`).
+- Ops: `ops/docker-compose.checks.yml` seeds `core` by copy from an init container (see the three findings below), `ops/checks.sh`, `ensure_checks_secrets` and `MAPSTUDIO_CHECKS` in `ops/lib.sh`, `ops/checks/config/core/...`, `ops/checks/postgres-init.sh`, project resources `ops/project/ignition/script-python/mapstudio_checks/` and `ops/project/com.aoindustrial.perspective.mapstudio/setup/`.
+- Three runs failed before the passing one, each a Gateway fact now in `docs/platform-checks.md`: (1) secret files at 0600 are `Permission denied` for PostgreSQL's init user, so the files are 0644 in a 0700 folder (plan said 600); (2) a pre-filled `core` without `config-mode.json` faults a fresh Gateway; (3) named resources without `attributes.uuid` are skipped, and per-folder bind mounts leave root-owned parents the Gateway cannot write beside, so the config is copied in by the init service instead of bind-mounted (nothing is written back into the repository, so no new gitignore noise).
+- `--scan` was not implemented: a project scan needs an API key the fresh dev Gateway does not have; `onResourcesModified` is logged as `CHECK setup-modified` when the Designer saves the resource (owner's manual check, marked [not verified] in the record).
+- On story 1's plain path (`ops/up.sh --fresh` without the checks compose) the project still holds the setup resource, so the checks run and log `CHECK postgres FAIL no database connection named MapStudio` and the alarm-metrics FAIL at warn level: expected, no error, the tracer view is unaffected.
+- Unit tests: `SetupResourceTest` (4) and `PostgresCheckTest` (4) beside story 1's `MapStudioDelegateTest` (6): 14 of 14 pass in `./gradlew build`.
+
 ## Plan Change Log
 
+- Secret files are 0644 inside a 0700 folder, not 0600: Compose bind-mounts a file secret with its host mode and PostgreSQL's init runs as `postgres` (first run failed on `Permission denied`). Same guarantee (never committed, hidden from other local users).
+- Gateway config is seeded into `core` by copy from the init service rather than bind-mounted per folder: a fresh Gateway needs `core/config-mode.json` and owns its config tree (runs 2 and 3). `ops/checks/config/` now mirrors the `core` collection layout.
+- `ops/checks.sh --scan` dropped (no API key on a fresh dev Gateway); `--keep` and `--collect` added instead. `onResourcesModified` is the owner's Designer check.
+- `ping()` returns a text with the Gateway time rather than the module version.
+
 ## Review Triage Log
+
+Pass 1 (2026-10-26). No reviewer subagent is available in this session, so the Quick lens is staged as a standalone prompt beside this plan, `spike-gateway-platform-checks-plan-quick.md` (plan and diff inlined), for the owner to run in a separate session and paste back. The rows below are the implementer's own inspection of the diff against the plan and CLAUDE.md, marked `self`; they do not replace the lens.
+
+| # | Finding | Verdict | Route | Evidence |
+|---|---|---|---|---|
+| 1 (self) | `ops/checks.sh`: `line="$(grep ... \| tail -1)"` under lib.sh's `set -e` and `pipefail` ends the script when a CHECK line is missing, instead of reporting "no line in the log" | medium | patch | Real: `grep` exits 1, `pipefail` makes the substitution fail, `set -e` exits on the assignment. Patched with `\|\| true`; `bash -n` passes; the "missing line" branch now reports. |
+| 2 (self) | Acceptance criterion 4 (Designer autocomplete of `system.mapstudio.`) could not pass: the script module was registered only in the Gateway hook; the Designer's own script manager never saw it | medium | patch | Real: IA's scripting-function example registers the module in every scope. Patched: `MapStudioScriptModule` moved to `common/` and registered in `MapStudioDesignerHook.initializeScriptManager` too; build and tests pass; the final `ops/checks.sh` run (run 5) covers the Gateway side again. The Designer check itself stays with the owner. |
+| 3 (self) | `ops/checks.sh --keep` restarts the Gateway and collects from the whole container log, so lines of the previous start can satisfy the wait loop early | low | reject | Real but everyday use is the fresh run (the default); the fix (time-window the log) adds logic to a dev script. `tail -1` per name still shows the newest line. |
+| 4 (self) | `PostgresCheck.checkOwner` inserts a row into `mapstudio_schema_version` on every start, so the table grows with each run | low | reject | Real, spike only; the real migration (epic-map-store-and-data) owns that table's semantics. |
+| 5 (self) | On story 1's plain Gateway the checks log FAIL warnings (no connections, no provider) because the project carries the setup resource | low | reject | Expected by the plan's design (any project with a setup resource runs the checks); warn level, no error, the tracer view unaffected; the sweep removes the package. |
+| 6 (self) | `onResourcesModified` and the Designer autocomplete are unverified claims | maybe-false | defer | Marked [not verified] in `docs/platform-checks.md`; a Designer save of the setup resource and a look at the script console settle both. |
 
 ## Design Notes
 
@@ -107,14 +133,15 @@ The checks run from a `ResourceCollectionLifecycle`, not from `startup()`, becau
 **Commands:**
 - `./gradlew build` -- expected: success, `build/Map-Studio.unsigned.modl`, new tests pass.
 - `ops/checks.sh` -- expected: five `CHECK` lines printed; `ops/logs.sh -n 400 | grep MapStudio` shows no stack trace at error level beyond the planned rights error.
-- `ops/checks.sh --scan` -- expected: a `CHECK setup` line after `onResourcesModified`.
 - `ops/down.sh --purge` then `ops/up.sh --fresh` -- expected: story 1's path still passes without the checks compose file.
+
+**Results (2026-10-26):**
+- `./gradlew build`: success, `build/Map-Studio.unsigned.modl`; 14 of 14 Java tests pass (6 + 4 + 4), Jest 8 of 8.
+- `ops/checks.sh` (run 4, fresh volumes, `ms-s3` on 9103): all five `CHECK ... PASS` lines (quoted in `docs/platform-checks.md`); the only Map Studio error line is the planned AD-21 line for `MapStudioNoRights` (SQLState 42501); PostgreSQL shows `mapstudio_schema_version` owned by `mapstudio`, `mapstudio_ro` with CONNECT and no CREATE. Two transient `NoClassDefFoundError: org/postgresql/Driver$1` errors during the Gateway's own connection install at start-up, before the module ran; both connections `Valid` five seconds later (recorded, cause not established).
+- `MAPSTUDIO_CHECKS=1 ops/down.sh --purge` then `ops/up.sh --fresh --no-build`: Gateway RUNNING, module started, no Map Studio error (the checks log their FAIL lines at warn, see Implementation Notes).
+- After the review patches (`ops/checks.sh` exit bug, script module in `common/` + Designer registration): `./gradlew build` green, 14 of 14 tests; `ops/checks.sh` run 5 (fresh, 07:06 UTC): all five PASS again; the `ms-s3` checks stack is left running for the owner's Designer check.
+- No em dash in any file touched (the vendored `.claude/skills/bmad-deep-recon` files carry some; not this story's).
 - `grep -rnP '\xE2\x80\x94' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=build` -- expected: nothing (no em dash anywhere).
 
 **Manual checks (if no CLI):**
-- Owner opens the Designer on `ms-s3`, confirms `system.mapstudio.ping()` autocompletes and returns the version, and the Alarm Metrics folders exist under `Checks` and `Checks/Pump1`.
-
-## Open Questions
-
-1. **Designer side of the setup resource.** The spike reads the resource on the Gateway only and sizes the Designer editor from IA's example (about 300 lines of Swing: workspace, editor, search provider, icon). Options: (a) Gateway-only now, record the estimate, decide in epic-map-store-and-data (the plan above); (b) build a minimal Designer editor in this spike (adds a day and a `designer/` dependency on the SDK's `designer` jar). (a) keeps the two-day gate; (b) answers AD-5's "too costly" with code.
-2. **Where the skills entry lands.** The record drafts the `Finding | Where it went` rows, but the skills repository has no reference file for the module SDK. Options: (a) a new `ignition-dev/references/module-sdk.md`; (b) rows in `ignition-architect/references/system-architectures.md` and `ignition-ui/references/perspective-components.md` (Alarm Metrics). The owner lands it later either way; the draft names the chosen file.
+- Owner opens the Designer on `ms-s3` (after `ops/checks.sh`), confirms `system.mapstudio.ping()` autocompletes with its description and answers, that the Alarm Metrics folders exist under `Checks` and `Checks/Pump1`, and that saving the `setup` resource logs `CHECK setup-modified`.

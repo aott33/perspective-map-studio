@@ -48,6 +48,10 @@ To run several dev Gateways side by side, give each its own `MAPSTUDIO_CONTAINER
 
 The dev Gateway loads the unsigned build (`-Dignition.allowunsignedmodules=true`), which is never acceptable outside development. Releases are signed `.modl` files on GitHub.
 
+### Platform checks
+
+`ops/checks.sh` answers the spike's Gateway questions on a live 8.3.10 Gateway: it adds PostgreSQL 16 beside the dev Gateway (`ops/docker-compose.checks.yml`), seeds the Gateway's core config collection from `ops/checks/config/core/` (a tag provider, a UDT whose alarm toggles every 30 s, a File secret provider and two database connections), and the module's `gateway/.../spike` package then logs one `CHECK <name> PASS|FAIL <evidence>` line per check for any project that holds a `com.aoindustrial.perspective.mapstudio/setup` resource (`ops/project/.../setup/setup.json`). The PostgreSQL passwords are generated into the git-ignored `ops/checks/secrets/` and reach the Gateway only through its File secret provider. Results and evidence: [docs/platform-checks.md](docs/platform-checks.md). The spike package is removed by the refactor sweep.
+
 ## Message contract
 
 Every message between the browser and the Gateway is `{v, type, id, body}` under the model event `mapstudio.message`; errors are `{code, message}`. The types this version knows are listed in `common/.../Messages.java` and `web/typescript/messages.ts`: `point.click`, `point.click.reply`, `error`.

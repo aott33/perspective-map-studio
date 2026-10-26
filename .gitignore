@@ -34,3 +34,6 @@ signing/
 .vscode/
 bin/
 .DS_Store
+
+# Platform checks (story 3): generated PostgreSQL passwords
+ops/checks/secrets/

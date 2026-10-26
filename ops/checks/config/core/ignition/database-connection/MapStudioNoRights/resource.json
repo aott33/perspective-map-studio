@@ -1,0 +1,14 @@
+{
+  "scope": "A",
+  "description": "Map Studio platform checks: a CONNECT-only role (no CREATE on schema public)",
+  "version": 1,
+  "restricted": false,
+  "overridable": true,
+  "files": [
+    "config.json"
+  ],
+  "attributes": {
+    "uuid": "02f18638-bca1-4023-bcb8-39fa5b85a36d",
+    "enabled": true
+  }
+}

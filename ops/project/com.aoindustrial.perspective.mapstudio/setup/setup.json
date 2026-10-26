@@ -1,0 +1,9 @@
+{
+  "connection": "MapStudio",
+  "connectionNoRights": "MapStudioNoRights",
+  "adapterFunction": "mapstudio_checks.kinds",
+  "alarmMetricPaths": [
+    "[default]Checks/Alarm Metrics.HasActive",
+    "[default]Checks/Pump1/Alarm Metrics.HasActive"
+  ]
+}

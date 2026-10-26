@@ -5,3 +5,12 @@
 - source_plan: `_bmad-output/initiative-flowmap/tickets/epic-module-foundation/tickets/story-tracer-a-maplibre-map-on-a-perspective-view-with-one-round-t-plan.md`
   summary: For the epic 1 refactor sweep (story 8) - clear the Gradle 10 deprecations in the build scripts, bump webpack to 5.112 or later to end the npm peer warnings, and fix the build-tool npm audit findings.
   evidence: The owner's fresh-clone build on 2026-10-26 printed Gradle deprecation warnings (`by extra(...)`, `tasks.registering`, `moduleDependencies`) and npm peer warnings (webpack 5.101.3 pinned, plugins want ^5.112). `npm audit --omit=dev` findings (axios, lodash, moment, @babel/runtime) all come through `@inductiveautomation/perspective-client`, which webpack treats as an external the Gateway provides, so none of them ship in Map Studio's bundle; the rest are build tools only.
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-module-foundation/tickets/spike-gateway-platform-checks-plan.md`
+  summary: Verify in the Designer on the ms-s3 Gateway that `system.mapstudio.` autocompletes with its description and that saving the `setup` project resource logs `CHECK setup-modified` (the `onResourcesModified` path).
+  evidence: Both are claims the spike could not exercise without a Designer or an API key; the record marks them [not verified]. One Designer session settles both.
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-module-foundation/tickets/spike-gateway-platform-checks-plan.md`
+  summary: For the epic 1 refactor sweep (story 8) - remove the `gateway/.../spike` package, the `mapstudio_checks` project script and the `setup` resource of the dev project, or keep `ops/checks.sh` as a regression harness; decide once story 9 has compiled the record.
+  evidence: The spike code runs on every runnable project that holds a setup resource and logs FAIL warnings on story 1's plain dev Gateway; the real setup (AD-5), scripting API (AD-18) and migrations (AD-21) replace it in epic-map-store-and-data.
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-module-foundation/tickets/spike-gateway-platform-checks-plan.md`
+  summary: Decide the Designer editor for the setup resource in epic-map-store-and-data (about 300 lines of Swing from IA's project-resource example, or the script-function fallback of AD-5).
+  evidence: Owner's decision 2026-10-26 (Open Question 1, option a); the estimate is in `docs/platform-checks.md`, check 4.

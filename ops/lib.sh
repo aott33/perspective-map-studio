@@ -46,7 +46,33 @@ ADMIN_PASS="${GATEWAY_ADMIN_PASSWORD}"
 
 # docker compose, always pointed at this folder's compose file.
 # Project name follows the container, so parallel Gateways get separate volumes.
+# With MAPSTUDIO_CHECKS=1 (ops/checks.sh) the platform checks' compose file is
+# added: PostgreSQL and the checks' Gateway config on the same compose project.
 COMPOSE=(docker compose -p "${MAPSTUDIO_CONTAINER:-mapstudio-ignition}" -f "${OPS_DIR}/docker-compose.yml")
+if [[ "${MAPSTUDIO_CHECKS:-}" == "1" ]]; then
+  COMPOSE+=(-f "${OPS_DIR}/docker-compose.checks.yml")
+fi
+CHECKS_SECRETS_DIR="${OPS_DIR}/checks/secrets"
+
+# The PostgreSQL passwords of the platform checks: generated once into the
+# git-ignored ops/checks/secrets/ (letters and digits, no trailing newline
+# because the Gateway's File secret provider reads every byte) and handed to
+# the containers as Docker secrets. Never committed, never in a log.
+# Compose bind-mounts a file secret with its host mode, and the containers read
+# it as other users (postgres, ignition uid 2003), so the files are 0644 inside
+# a 0700 folder: hidden from other local users, readable inside the containers.
+ensure_checks_secrets() {
+  mkdir -p "${CHECKS_SECRETS_DIR}"
+  chmod 700 "${CHECKS_SECRETS_DIR}"
+  local name
+  for name in pg_password pg_ro_password; do
+    if [[ ! -s "${CHECKS_SECRETS_DIR}/${name}" ]]; then
+      ( umask 077; head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24 \
+          > "${CHECKS_SECRETS_DIR}/${name}" )
+    fi
+    chmod 644 "${CHECKS_SECRETS_DIR}/${name}"
+  done
+}
 
 # --- logging --------------------------------------------------------------
 if [[ -t 1 ]]; then
