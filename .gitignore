@@ -41,5 +41,8 @@ bin/
 # Agent worktrees (parallel stories), never committed
 .claude/worktrees/
 
+# Playwright suite output (story 7); docs/ gets screenshots and measures only with E2E_DOCS=1
+e2e/out/
+
 # Platform checks (story 3): generated PostgreSQL passwords
 ops/checks/secrets/

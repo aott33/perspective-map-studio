@@ -75,7 +75,7 @@ A disposable Ignition 8.3.10 Gateway in Docker that loads the freshly built modu
 - [ops/docker-compose.yml](../../../ops/docker-compose.yml) the Gateway, localhost only, generated password.
 - [ops/lib.sh](../../../ops/lib.sh) shared helpers; [ops/up.sh](../../../ops/up.sh) and [ops/down.sh](../../../ops/down.sh).
 - [ops/project/](../../../ops/project/) the dev project and its one view.
-- [ops/screenshot.mjs](../../../ops/screenshot.mjs) the screenshot run.
+- [e2e/tests/tracer.spec.mjs](../../../e2e/tests/tracer.spec.mjs) the screenshot run (story 7 moved it from `ops/`).
 
 ## Block 8 - Periphery
 

@@ -1,0 +1,63 @@
+{
+ "custom": {},
+ "params": {},
+ "props": {
+  "defaultSize": {
+   "width": 1440,
+   "height": 900
+  }
+ },
+ "root": {
+  "type": "ia.container.flex",
+  "version": 0,
+  "props": {
+   "direction": "column"
+  },
+  "meta": {
+   "name": "root"
+  },
+  "position": {},
+  "custom": {},
+  "children": [
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {
+     "text": "Map Studio scale set: 30 pads, for the frame rate measure.",
+     "style": {
+      "padding": "8px 12px"
+     }
+    },
+    "meta": {
+     "name": "title"
+    },
+    "position": {
+     "basis": "40px",
+     "shrink": 0
+    },
+    "custom": {}
+   },
+   {
+    "type": "ao.mapstudio",
+    "version": 0,
+    "props": {
+     "testSet": "scale30",
+         "popupView": {
+      "path": "Popups/PointDetails",
+      "params": {
+       "source": "dev"
+      }
+     }
+    },
+    "meta": {
+     "name": "map"
+    },
+    "position": {
+     "basis": "0px",
+     "grow": 1
+    },
+    "custom": {}
+   }
+  ]
+ }
+}

@@ -11,7 +11,12 @@
 # certificate in the archive has the expected fingerprint and that module.xml
 # has the expected version. A forged module that carries the genuine
 # certificates.p7b would pass. The cryptographic check is the Gateway's, when
-# the module is installed (see deferred-work.md).
+# the module is installed (see deferred-work.md: real signature verification
+# is a deferred item).
+#
+# certificates.p7b must be a PKCS#7 bundle (DER or PEM), not a bare certificate:
+# hosts that pin the module, such as the template's modl.py, read it with
+# `openssl pkcs7`. This needs openssl on PATH, as the template's modl.py does.
 set -euo pipefail
 
 modl="${1:?path to .modl}"
@@ -52,6 +57,13 @@ fi
 
 fp="$(keytool -printcert -file "$work/certificates.p7b" 2>/dev/null | sed -n 's/^[[:space:]]*SHA256: //p' | head -1)"
 [ -n "$fp" ] || fail "could not read the certificate fingerprint"
+
+# Hosts that pin the module (the template's modl.py) read certificates.p7b with
+# `openssl pkcs7`, so it must be a PKCS#7 bundle, not a bare certificate.
+command -v openssl >/dev/null 2>&1 || fail "openssl is required (it checks that certificates.p7b is a PKCS#7 bundle)"
+openssl pkcs7 -inform DER -in "$work/certificates.p7b" -noout >/dev/null 2>&1 ||
+  openssl pkcs7 -inform PEM -in "$work/certificates.p7b" -noout >/dev/null 2>&1 ||
+  fail "certificates.p7b is not a PKCS#7 bundle (a bare certificate fails host tools that use openssl pkcs7)"
 
 if [ "$#" -ge 2 ]; then
   norm() { printf '%s' "$1" | tr -d ': ' | tr 'a-f' 'A-F'; }
