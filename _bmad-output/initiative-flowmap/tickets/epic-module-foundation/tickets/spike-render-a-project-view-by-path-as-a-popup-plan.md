@@ -3,7 +3,7 @@ title: 'Render a project view by path as a popup'
 type: 'feature'
 ticket: '4'
 created: '2026-10-26'
-status: 'built'
+status: done
 baseline_revision: '0fba47cdb46cd4c75b7c24055d7b1489d41f834c'
 route: 'full'
 route_source: 'auto'

@@ -3,7 +3,7 @@ title: "Install through the template's module lock"
 type: 'feature'
 ticket: '6'
 created: '2026-10-26'
-status: 'built'
+status: done
 baseline_revision: '0c6a191c0550beaa9aff02c2610bc16b87ab6541'
 route: 'full'
 route_source: 'pinned'

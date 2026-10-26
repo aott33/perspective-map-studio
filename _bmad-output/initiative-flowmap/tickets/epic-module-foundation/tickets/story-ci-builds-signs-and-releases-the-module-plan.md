@@ -3,7 +3,7 @@ title: 'CI builds, signs and releases the module'
 type: 'feature'
 ticket: '5'
 created: '2026-10-26'
-status: 'built'
+status: done
 baseline_revision: '0fba47cdb46cd4c75b7c24055d7b1489d41f834c'
 route: 'full'
 route_source: 'auto'

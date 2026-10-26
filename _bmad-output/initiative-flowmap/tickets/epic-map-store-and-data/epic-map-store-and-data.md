@@ -92,7 +92,16 @@ Every later epic reads and writes one map through one contract, and nothing is l
 - Assumption: Migrations are versioned SQL statements shipped in the module and applied in order, each in its own transaction, under a PostgreSQL advisory lock so two Gateways never migrate at once; no Flyway or Liquibase.
 - Assumption: The start-up migration retries every 5 s for up to 2 minutes while the connection is not usable (the transient `Driver$1` error of docs/platform-checks.md, check 5), logging one warning, then one error, before it marks the store unavailable.
 - Assumption: The 30-pad seed is the spike's seeded stand-in geometry, written by a dev-project script through `applyEdits` with UUIDv5 ids, so frame rates stay comparable with epic 1's; the template's Mesa field reaches the store in epic-template-cutover (AD-22).
-- Open question: The Ignition role names for full and phone editing, and how the template's roles map to them; the dev Gateway uses `MapEditor` and `MapOperator` until the owner says otherwise.
-- Open question: The database connection the template's setup names (its existing PostgreSQL connection or a dedicated `MapStudio` connection and role); entry 13 needs the answer.
-- Open question: Whether the module's existing `system.mapstudio.ping` and `echo` scaffold functions go in entry 1 or stay as a health check.
+- Decision: 2026-10-26 Owner approved Sofia's slicing and all recommendations:
+  - Roles: `MapEditor` (full editing) and `MapOperator` (phone editing); the template maps its roles onto them.
+  - Setup editor: entry 7 builds the Designer editor; the script-function setup stays the fallback only.
+  - 30-pad seed: the spike's generated stand-in, written through `applyEdits` with UUIDv5 ids (entry 11).
+  - Template database: a dedicated `MapStudio` connection and database role with rights to create its tables, not the template's main connection (entry 13).
+  - Migrations: versioned SQL in the module, one transaction each, under a PostgreSQL advisory lock; no Flyway or Liquibase.
+  - Release: the epic ends with v0.2.0 on the template's test stack (entry 13).
+  - Scripting API trust: `applyEdits` trusts its caller, the same model as `system.db`; the actor is mandatory and recorded in the edit record; this is documented.
+  - Icons: adapt a permissive open set where it fits and draw the missing oil and gas symbols; never OpenBridge.
+  - `system.mapstudio`: keep `ping` as a health check, remove `echo` (entry 1).
+  - Inheritance: each project has its own map keyed by its own name, even when it inherits the setup.
+  - Redundancy: proven with Gateway tests only (no redundant pair available).
 - Open question: How the delegate reads the Perspective session user's roles on the Gateway is unverified; entry 1 answers it live before the role check is built on it.

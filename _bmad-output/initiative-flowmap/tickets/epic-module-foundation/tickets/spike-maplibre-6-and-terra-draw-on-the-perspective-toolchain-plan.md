@@ -3,7 +3,7 @@ title: 'MapLibre 6 and Terra Draw on the Perspective toolchain'
 type: 'feature'
 ticket: '2'
 created: '2026-10-26'
-status: 'built'
+status: done
 baseline_revision: '0fba47cdb46cd4c75b7c24055d7b1489d41f834c'
 route: 'full'
 route_source: 'auto'

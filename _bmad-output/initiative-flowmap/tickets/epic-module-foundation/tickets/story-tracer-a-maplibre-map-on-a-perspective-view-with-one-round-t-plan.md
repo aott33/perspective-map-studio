@@ -3,7 +3,7 @@ title: 'Tracer: a MapLibre map on a Perspective view, with one round trip'
 type: 'feature'
 ticket: '1'
 created: '2026-10-26'
-status: 'built'
+status: done
 baseline_revision: '64d282043a05625e38871d0bfbcb31ac7fd17736'
 route: 'full'
 route_source: 'auto'
