@@ -148,6 +148,8 @@ Quick review fixes, 2026-10-26 (findings in the Review Triage Log):
 - `docs/icons.md` lists the remaining differences from ER-27 and the triangle review item.
 - Verification run after the fixes: `icons.mjs --check` (28 icons); `npx tsc --noEmit`, `npm test` (6 suites, 48 tests passed); `./gradlew build` (BUILD SUCCESSFUL, `IconCatalogueTest` 6 of 6); Playwright contact sheet and catalogue tests 3 of 3 against the stand-in server, screenshots regenerated. Docker not started; the Gateway content-type check stays [UNVERIFIED].
 
+Owner's look feedback, 2026-10-26 (relayed by the coordinator): the `pipeline` icon (a "#" hash) did not say what it is. Redrawn as a horizontal pipe run, two parallel walls between a flange at each end, with a small flow arrow inside; stroke only, no circle or square outline, distinct from `lateral` (a branch off a main) and `lease-road` (two converging road edges). Sprite, catalogue copy and contact sheet regenerated; `icons.mjs --check` (28 icons), Jest (48 passed) and `./gradlew build` (BUILD SUCCESSFUL) re-run; contact sheet screenshots regenerated against the stand-in server. The committed catalogue did not change (labels and ids unchanged).
+
 ## Plan Change Log
 
 ## Review Triage Log
