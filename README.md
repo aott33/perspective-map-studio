@@ -13,6 +13,8 @@ The tracer: a MapLibre map on a blank style with three fixed points and one line
 
 The platform checks the spike answered, with their evidence, are in [docs/platform-checks.md](docs/platform-checks.md) (toolchain pins: MapLibre GL JS 6.16.0, Terra Draw 1.38.0, adapter 1.5.0).
 
+Story 4 (spike): a point click also opens a popup that renders a project view by path, the way the built-in Perspective Map renders a view from a `path`. The spike-only prop `popupView` (`path`, `params`) names the view; it receives the point as its `mapItem` parameter (`{id, name}`) beside `params`, and an empty or failing path falls back to a text popup. Its evidence is in the same file.
+
 ![mapstudio-dev at 1440 px](docs/screenshots/mapstudio-dev-1440.png)
 
 ## Build
@@ -33,15 +35,16 @@ Layout:
 | `common/` | component descriptor, props schema (`mapstudio.props.json`), the message contract (`Messages.java`) |
 | `gateway/` | gateway hook and the component model delegate (`MapStudioDelegate`) |
 | `designer/` | the Designer palette entry |
-| `web/` | the TypeScript and React component, MapLibre map, Terra Draw line tool (`DrawControl.tsx`, `draw.ts`), message client (`messages.ts`) and the tests |
-| `ops/` | the local development Gateway (Docker) and the screenshot script |
-| `docs/` | contributor architecture and screenshots |
+| `web/` | the TypeScript and React component, MapLibre map, Terra Draw line tool (`DrawControl.tsx`, `draw.ts`), message client (`messages.ts`), the point popup (`PointPopup.tsx`, `popupParams.ts`) and their tests |
+| `ops/` | the local development Gateway (Docker), its `mapstudio-dev` project (`MapStudioDev`, `Popups/PointDetails`) and the screenshot script |
+| `docs/` | contributor architecture, the platform checks and screenshots |
 
 ## Run the development Gateway
 
 ```bash
 ops/up.sh              # build, stage the .modl, start Ignition 8.3.10 in Docker, accept the module unattended
-node ops/screenshot.mjs   # click a point and draw a line in headless Chromium at 1440 and 390 px, save docs/screenshots/*.png (--url for another port)
+node ops/screenshot.mjs   # click a point (popup) and draw a line in headless Chromium at 1440 and 390 px, save docs/screenshots/*.png (--url for another port)
+node ops/popup-check.mjs  # the popup view with its params, a second point, close (--expect-fallback for an empty or missing path)
 ops/logs.sh -n 200     # Gateway log
 ops/down.sh [--purge]  # stop; --purge also wipes the Gateway data (trial, acceptance)
 ```

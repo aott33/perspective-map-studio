@@ -23,7 +23,7 @@
     "type": "ia.display.label",
     "version": 0,
     "props": {
-     "text": "Map Studio tracer: three points and one line; click a point for a Gateway round trip.",
+     "text": "Map Studio: click a point to open the project view Popups/PointDetails as a popup.",
      "style": {
       "padding": "8px 12px"
      }
@@ -40,7 +40,14 @@
    {
     "type": "ao.mapstudio",
     "version": 0,
-    "props": {},
+    "props": {
+     "popupView": {
+      "path": "Popups/PointDetails",
+      "params": {
+       "source": "dev"
+      }
+     }
+    },
     "meta": {
      "name": "map"
     },

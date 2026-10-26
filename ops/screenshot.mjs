@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Capture the mapstudio-dev view in headless Chromium at 1440 and 390 px wide,
-// after clicking one point and drawing one line with the line tool, and save
-// the images to docs/screenshots/.
+// after clicking one point (which opens the project view popup) and drawing
+// one line with the line tool, and save the images to docs/screenshots/.
 //
 // Usage: node ops/screenshot.mjs [--url http://localhost:9088]
 // The Gateway URL defaults to GATEWAY_URL, else http://localhost:9088; with a
@@ -76,6 +76,15 @@ async function capture(browser, width, height) {
     await reply.filter({ hasText: `Gateway received click on ${POINT.id}` }).waitFor({ timeout: 15_000 });
     const replyText = await reply.textContent();
 
+    // Story 4: the click also opens a popup rendering the project view
+    // Popups/PointDetails, whose label shows the point id from its mapItem
+    // parameter. The text fallback would also contain the id, so the check
+    // insists on the view's own label text.
+    const popup = page.locator('.maplibregl-popup .mapstudio-popup--view');
+    await popup.waitFor({ state: 'visible', timeout: 15_000 });
+    await popup.filter({ hasText: `Id: ${POINT.id}` }).waitFor({ timeout: 30_000 });
+    const popupText = (await popup.textContent()).replace(/\s+/g, ' ').trim();
+
     // Draw one line with Terra Draw: toggle the tool, click two spots clear of
     // the test points, press Enter to finish. The status line reports the count.
     const toggle = page.locator('.mapstudio-draw-button');
@@ -108,7 +117,7 @@ async function capture(browser, width, height) {
     const file = path.join(outDir, `mapstudio-dev-${width}.png`);
     await page.screenshot({ path: file, fullPage: false });
     await context.close();
-    return { file, text: `${replyText} | ${text}`, errors };
+    return { file, text: `${replyText} | ${text}`, popupText, errors };
 }
 
 async function main() {
@@ -121,9 +130,10 @@ async function main() {
     let failed = false;
     try {
         for (const [width, height] of [[1440, 900], [390, 844]]) {
-            const { file, text, errors } = await capture(browser, width, height);
+            const { file, text, popupText, errors } = await capture(browser, width, height);
             console.log(`${width}px: ${file}`);
             console.log(`  reply: ${text}`);
+            console.log(`  popup: ${popupText}`);
             if (errors.length) {
                 failed = true;
                 console.error(`  ${errors.length} error(s) in the session:`);
