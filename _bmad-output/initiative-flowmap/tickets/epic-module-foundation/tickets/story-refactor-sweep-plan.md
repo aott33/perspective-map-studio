@@ -55,14 +55,14 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] Baseline (before any change) -- build once, record `unzip -l` of `build/Map-Studio.unsigned.modl`, its `module.xml`, bundle sizes, Jest 32, Java 18, `npm audit` count (12), and `./gradlew help --warning-mode all` output, in Implementation Notes.
-- [ ] `_bmad-output/deferred-work.md` -- merge the 7 initiative entries, fold the duplicate story 4 entry, add `resolved:` or `goes_to:` per the table, `git rm` the initiative copy; `scripts/ci/modl-verify.sh` header names the surviving path.
-- [ ] `gateway/.../spike/**`, `gateway/src/test/.../spike/**`, `MapStudioGatewayHook.java`, `MapStudioModule.java` -- delete the package and its tests, remove the hook wiring and `SETUP_RESOURCE_TYPE`; the Gateway tests drop from 18 to 6.
-- [ ] `ops/**` and `.gitignore` -- delete the checks harness, PostgreSQL compose file, checks config, project script and `setup` resource; strip `lib.sh`, `up.sh`, `down.sh` of the checks logic (keep `--remove-orphans`).
-- [ ] `build.gradle.kts`, `web/build.gradle.kts` -- `extra["sdk_version"]`, `tasks.register<NpmTask>`, license staging as a `Copy` task and providers captured at configuration time (no `copy {}` or `layout` inside an action); drop the empty `moduleDependencies` line if a warning names it. Fix only what our scripts own.
-- [ ] `web/package.json`, lock -- webpack 5.112.2; `npm audit fix` without `--force`; leftover `serialize-javascript` findings via a plugin bump only if the build and bundle hold, else an `overrides` entry or a recorded exception; move `@inductiveautomation/perspective-client` to `devDependencies` (webpack externalises it).
-- [ ] `README.md`, `docs/architecture.md`, `docs/platform-checks.md` (new "Story 8" section and one sentence in its intro), `mapstudio.props.json` description text -- match the code; the platform-checks section lists the removed paths, the recovery commit `51104c8`, the bundle delta and the unfixable audit findings.
-- [ ] Verify (below) and append the results to Implementation Notes.
+- [x] Baseline (before any change) -- build once, record `unzip -l` of `build/Map-Studio.unsigned.modl`, its `module.xml`, bundle sizes, Jest 32, Java 18, `npm audit` count (12), and `./gradlew help --warning-mode all` output, in Implementation Notes.
+- [x] `_bmad-output/deferred-work.md` -- merge the 7 initiative entries, fold the duplicate story 4 entry, add `resolved:` or `goes_to:` per the table, `git rm` the initiative copy; `scripts/ci/modl-verify.sh` header names the surviving path.
+- [x] `gateway/.../spike/**`, `gateway/src/test/.../spike/**`, `MapStudioGatewayHook.java`, `MapStudioModule.java` -- delete the package and its tests, remove the hook wiring and `SETUP_RESOURCE_TYPE`; the Gateway tests drop from 18 to 6.
+- [x] `ops/**` and `.gitignore` -- delete the checks harness, PostgreSQL compose file, checks config, project script and `setup` resource; strip `lib.sh`, `up.sh`, `down.sh` of the checks logic (keep `--remove-orphans`).
+- [x] `build.gradle.kts`, `web/build.gradle.kts` -- `extra["sdk_version"]`, `tasks.register<NpmTask>`, license staging as a `Copy` task and providers captured at configuration time (no `copy {}` or `layout` inside an action); drop the empty `moduleDependencies` line if a warning names it. Fix only what our scripts own.
+- [x] `web/package.json`, lock -- webpack 5.112.2; `npm audit fix` without `--force`; leftover `serialize-javascript` findings via a plugin bump only if the build and bundle hold, else an `overrides` entry or a recorded exception; move `@inductiveautomation/perspective-client` to `devDependencies` (webpack externalises it).
+- [x] `README.md`, `docs/architecture.md`, `docs/platform-checks.md` (new "Story 8" section and one sentence in its intro), `mapstudio.props.json` description text -- match the code; the platform-checks section lists the removed paths, the recovery commit `51104c8`, the bundle delta and the unfixable audit findings.
+- [x] Verify (below) and append the results to Implementation Notes.
 
 **Acceptance Criteria:**
 - Given the sweep branch, when `./gradlew build --warning-mode all` runs, then it succeeds with Jest 32 and Java 6 passing and no deprecation names `build.gradle.kts` or `web/build.gradle.kts`.
@@ -73,6 +73,19 @@ context:
 - Given `grep -rn` for em dashes and for key material in the diff, then both find nothing.
 
 ## Implementation Notes
+
+Implemented directly in this session (no coding subagent available), 2026-10-26, on `ms-s8` (port 9108).
+
+- Baseline captured before any change: unsigned `.modl` 510,041 bytes; files `common`, `designer`, `gateway`, `web` jars, `license.html`, `module.xml`; `MapStudio.js` 1,179,848, `MapStudio.css` 72,208; Jest 32; Gateway tests 18; `npm audit` 12; Gradle warnings as in `docs/platform-checks.md` "Story 8".
+- Deviation: `.gitignore` keeps `ops/checks/secrets/` (comment reworded) instead of dropping it. A developer's old generated PostgreSQL passwords are untracked there and must never be committed; the plan said to remove the line.
+- Deviation: `ops/lib.sh` also lost `COMPOSE_PROJECT` (only the checks code used it). `--remove-orphans` stays in `up.sh --fresh` and `down.sh`.
+- The `stageLicense` `Copy` task runs `finalizedBy` of `assembleModlStructure` and `zipModule` depends on it. Built `module.xml` is identical to the baseline (`<license>` kept) and the `.modl` file list is identical.
+- A release-version build (`-PreleaseVersion`) leaves `common-0.1.0.jar` in `build/moduleContent`; a later plain `./gradlew build` then fails with "Library 'common' exists in multiple versions" until `clean`. Plugin behaviour, present before the sweep (`assembleModlStructure` was never cleaned); not touched.
+- `docs/platform-checks.md` got a "Story 8" section and one sentence in its intro; Story 2 to 7 sections are untouched. The deferred-work merge adds `resolved:`, `folded:` and `goes_to:` lines and two new entries (triage leftovers; unrun CI steps and linters).
+
+**Results.** `./gradlew clean build --warning-mode all`: success, Jest 32, Gateway tests 6 (was 18); remaining warnings are the plugin's `Project.getProperties` and `Task.project` (`:common:collectModlDependencies`). `npm ci` prints no peer warning; `npm audit` 12 to 8 (all through `perspective-client`), `--omit=dev` 0. `.modl` comparison: `module.xml` and file list identical; the only jar entries removed are the eight `gateway/.../spike` classes; `MapStudio.js` -34 bytes, `MapStudio.css` +310; unsigned `.modl` 510,041 to 488,266. `ops/up.sh --fresh` then `npm test` in `e2e/`: 10 of 10, no `CHECK` line and no Map Studio warning or error in the Gateway log. `scripts/ci/test-signing.sh`: OK. Dev Gateway restarted with a leftover `setup` resource copied into `ops/project` (then removed): project and module started, no `CHECK` line, no Map Studio warning or error **[live 8.3.10]**. Throwaway-signed build (`build-signed.sh`, 30-day throwaway certificate, scratch clone `tpl8` of `ign-scada-template` with only the Map Studio lock entry swapped, never pushed): `verify-lock` ok, `modl.py fetch` ok for all six modules, `modl.py inspect` 6 signatures, none bad.
+
+**Template stack.** `scripts/test/stack.sh --here` in that scratch clone (template main with Cirrus Link MQTT Engine in the lock; render limits `RENDER_PASSES=native-day,phone-native-night`, `RENDER_ROLES=engineer`, as the template's CI uses for its fieldsim job) printed `test stack: PASS`, exit 0, and `smoke.sh` reported `ok module com.aoindustrial.perspective.mapstudio` **[live 8.3.9]**. Two things happened first: the first attempt stopped at the image pull (Docker Hub answered 429 for the HiveMQ image; a retry loop pulled it on the sixth try), and the second stopped at the render suite because `--here` had no `tests/render/node_modules` (the default mode links them); `npm install` there and a full rerun passed. Not run: the full render matrix (all passes and roles), as in the story 6 rehearsal. The stack was built from the earlier throwaway `.modl` (before the `mapstudio.props.json` description text changed); the final tree was rebuilt and `./gradlew clean build` passes again, so the only difference is that description string.
 
 ## Plan Change Log
 
