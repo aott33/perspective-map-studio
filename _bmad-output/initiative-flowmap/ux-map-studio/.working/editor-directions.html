@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map Studio Layouts</title>
+<style>
+/*
+  Map Studio - editor layout directions (UX workshop, 2026-10-26)
+  Three LAYOUT directions on one fixed visual identity. Palette is not varied.
+
+  Theme tokens (Perspective light theme stand-ins; the module ships no colour, AD-11):
+    --neutral-10  #ffffff  panels, cards
+    --neutral-20  #eef0f2  basemap (flat light grey, no tiles)
+    --neutral-30  #e2e5e8  lease roads, dividers, hover
+    --neutral-40  #ccd1d6  borders
+    --neutral-50  #a9afb6  geofence outline, laterals
+    --neutral-60  #858c94  pipelines, dots below zoom 14
+    --neutral-70  #5f666e  secondary text, normal glyphs
+    --neutral-80  #3c4249  kind glyphs, strong text
+    --neutral-90  #1e2227  attention outline
+    --label          #1e2227  text
+    --container      #ffffff  component background
+    --callToAction   #2f6fdc  selection ring, primary buttons, snap indicator
+    --warning        #a86200  save conflict (always with glyph and words)
+    --error          #c62828  alarm priority 1 (always with triangle glyph and digit)
+  Tints are derived with color-mix from these tokens only.
+  Rules applied: normal items neutral grey; hue only for problems and always with a glyph or word;
+  comms lost and stale are words and shapes, never colour; styles come from presets, no colour pickers;
+  below zoom 14 sites are neutral dots, from 14 the kind icon; zoom top-right; bottom-right corner
+  kept clear for the Perspective App Bar toggle.
+  Icons: kind and state glyphs inlined from web/icons/src (approved set). UI chrome glyphs
+  (eye, list, layers, upload, undo...) are stand-ins drawn on the same 24 px / 2 px grid.
+*/
+:root{
+  --neutral-10:#ffffff; --neutral-20:#eef0f2; --neutral-30:#e2e5e8; --neutral-40:#ccd1d6; --neutral-50:#a9afb6;
+  --neutral-60:#858c94; --neutral-70:#5f666e; --neutral-80:#3c4249; --neutral-90:#1e2227;
+  --label:#1e2227; --container:#ffffff; --callToAction:#2f6fdc; --warning:#a86200; --error:#c62828;
+  --cta-tint:color-mix(in srgb, var(--callToAction) 12%, transparent);
+  --warn-tint:color-mix(in srgb, var(--warning) 10%, var(--container));
+  --err-tint:color-mix(in srgb, var(--error) 8%, var(--container));
+  --shadow:0 1px 2px rgba(30,34,39,.10), 0 4px 14px rgba(30,34,39,.10);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--neutral-30);color:var(--label);font:13px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+/* ---------- workshop switcher (outside the product) ---------- */
+.sw{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 16px;background:var(--neutral-90);color:var(--neutral-10)}
+.sw b{font-weight:600;margin-right:8px}
+.seg{display:inline-flex;border:1px solid var(--neutral-70);border-radius:8px;overflow:hidden}
+.seg button{background:transparent;border:0;padding:6px 12px;color:var(--neutral-40)}
+.seg button.on{background:var(--neutral-10);color:var(--neutral-90);font-weight:600}
+.sw .lbl{color:var(--neutral-50);font-size:12px}
+.wrap{padding:20px 16px 40px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.rat{max-width:1440px;width:100%;background:var(--neutral-10);border-radius:8px;padding:14px 18px;display:grid;grid-template-columns:200px 1fr;gap:16px}
+.rat h2{margin:0;font-size:16px}
+.rat p{margin:0;color:var(--neutral-80)}
+.rat .hint{grid-column:1/-1;color:var(--neutral-70);font-size:12px;border-top:1px solid var(--neutral-30);padding-top:8px}
+/* ---------- device frame: a Perspective page ---------- */
+.frame{position:relative;background:var(--container);border-radius:6px;overflow:hidden;box-shadow:0 2px 30px rgba(0,0,0,.18);display:flex;flex-direction:column;flex:none}
+.host{height:40px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid var(--neutral-30);background:var(--container)}
+.host .crumb{color:var(--neutral-70)} .host .crumb b{color:var(--label);font-weight:600}
+.host .who{margin-left:auto;color:var(--neutral-70);font-size:12px}
+.appbar{position:absolute;right:0;bottom:0;width:58px;height:22px;background:var(--neutral-80);color:var(--neutral-10);border-top-left-radius:6px;display:flex;align-items:center;justify-content:center;gap:4px;font-size:10px;z-index:40}
+.comp{position:relative;flex:1;display:flex;min-height:0;background:var(--container)}
+/* ---------- shared bits ---------- */
+.ic{display:inline-block;vertical-align:middle;flex:none}
+.btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--neutral-40);background:var(--neutral-10)}
+.btn:hover{background:var(--neutral-20)}
+.btn.pri{background:var(--callToAction);border-color:var(--callToAction);color:var(--neutral-10)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.sm{height:26px;padding:0 8px;font-size:12px}
+.ibtn{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:0;background:transparent;color:var(--neutral-80)}
+.ibtn:hover{background:var(--neutral-20)}
+.ibtn.on{background:var(--cta-tint);color:var(--callToAction)}
+.muted{color:var(--neutral-70)} .small{font-size:12px} .tiny{font-size:11px}
+.input{display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;border:1px solid var(--neutral-40);border-radius:6px;background:var(--neutral-10);color:var(--neutral-70)}
+.input.val{color:var(--label)}
+.field{margin-bottom:12px}
+.field>label{display:flex;justify-content:space-between;font-size:12px;color:var(--neutral-70);margin-bottom:4px}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:10px;background:var(--neutral-20);color:var(--neutral-80);font-size:11px;white-space:nowrap}
+.tag.ovr{background:var(--cta-tint);color:var(--callToAction)}
+.tag.err{background:var(--err-tint);color:var(--error)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:13px;border:1px solid var(--neutral-40);background:var(--neutral-10);font-size:12px;color:var(--neutral-80)}
+.chip.on{border-color:var(--neutral-90);background:var(--neutral-90);color:var(--neutral-10)}
+.chip .n{color:inherit;opacity:.7}
+.sect{padding:14px 16px;border-bottom:1px solid var(--neutral-30)}
+.sect h4{margin:0 0 10px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--neutral-70);display:flex;justify-content:space-between;align-items:center}
+.sect h4 .tag{text-transform:none;letter-spacing:0}
+.kv{display:flex;justify-content:space-between;align-items:center;padding:5px 0;gap:8px}
+.kv .k{color:var(--neutral-70)}
+.sw2{width:30px;height:18px;border-radius:9px;background:var(--neutral-40);position:relative;flex:none;border:0;padding:0}
+.sw2::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--neutral-10);transition:left .15s}
+.sw2.on{background:var(--neutral-90)} .sw2.on::after{left:14px}
+.check{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--neutral-60);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.check.on{background:var(--neutral-90);border-color:var(--neutral-90);color:var(--neutral-10)}
+.presets{display:inline-flex;border:1px solid var(--neutral-40);border-radius:6px;overflow:hidden}
+.presets span{padding:4px 9px;font-size:12px;color:var(--neutral-70);border-right:1px solid var(--neutral-40)}
+.presets span:last-child{border-right:0}
+.presets span.on{background:var(--neutral-90);color:var(--neutral-10)}
+.note{background:var(--neutral-20);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--neutral-80)}
+/* ---------- panels ---------- */
+.panel{background:var(--neutral-10);display:flex;flex-direction:column;min-height:0;flex:none;border-right:1px solid var(--neutral-30)}
+.panel.right{border-right:0;border-left:1px solid var(--neutral-30)}
+.ph{padding:12px 16px 10px;border-bottom:1px solid var(--neutral-30)}
+.ph .row{display:flex;align-items:center;gap:8px}
+.ph h3{margin:0;font-size:16px;font-weight:600}
+.pbody{flex:1;overflow:auto;min-height:0}
+.pfoot{padding:10px 16px;border-top:1px solid var(--neutral-30);display:flex;gap:8px;align-items:center}
+.tabs{display:flex;gap:18px;margin-top:10px}
+.tabs button{border:0;background:none;padding:6px 0;color:var(--neutral-70);border-bottom:2px solid transparent}
+.tabs button.on{color:var(--label);font-weight:600;border-bottom-color:var(--neutral-90)}
+.grp{padding:8px 8px 4px}
+.grp .gh{display:flex;justify-content:space-between;padding:4px 8px;font-size:11px;font-weight:600;color:var(--neutral-70);text-transform:uppercase;letter-spacing:.04em}
+.row-i{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;text-align:left;padding:7px 8px;border-radius:6px;color:var(--label)}
+.row-i:hover{background:var(--neutral-20)}
+.row-i.sel{background:var(--cta-tint);box-shadow:inset 3px 0 0 var(--callToAction)}
+.row-i .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-i .ki{color:var(--neutral-70)}
+.st{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--neutral-70);white-space:nowrap}
+.st.a1{color:var(--error);font-weight:600}
+/* ---------- rail ---------- */
+.rail{width:72px;flex:none;background:var(--neutral-10);border-right:1px solid var(--neutral-30);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:4px}
+.rail button{width:60px;border:0;background:none;border-radius:10px;padding:8px 0 6px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--neutral-70)}
+.rail button:hover{background:var(--neutral-20)}
+.rail button.on{background:var(--neutral-20);color:var(--label);font-weight:600}
+.rail.slim{width:56px} .rail.slim button{width:44px;font-size:10px}
+/* ---------- map ---------- */
+.map{position:relative;flex:1;min-width:0;overflow:hidden;background:var(--neutral-20)}
+.world{position:absolute;left:50%;top:50%;width:1400px;height:900px;transition:transform .25s}
+.world svg.base{position:absolute;inset:0}
+.mk{position:absolute;transform:translate(-50%,-50%);border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;cursor:pointer}
+.mk .disc{width:34px;height:34px;border-radius:50%;background:var(--neutral-10);border:1.5px solid var(--neutral-50);color:var(--neutral-80);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--neutral-20),0 1px 3px rgba(30,34,39,.18);position:relative}
+.mk.lost .disc{border-style:dashed;border-color:var(--neutral-70);color:var(--neutral-60)}
+.mk.sel .disc{box-shadow:0 0 0 2px var(--neutral-10),0 0 0 4px var(--callToAction)}
+.mk .badge{position:absolute;top:-9px;right:-14px;display:flex;align-items:center;gap:1px;font-weight:700;font-size:11px}
+.mk .badge.a1{color:var(--error)}
+.mk .badge.g{color:var(--neutral-80);background:var(--neutral-10);border-radius:50%;padding:1px}
+.mk .lab{margin-top:3px;font-size:12px;font-weight:600;color:var(--neutral-90);text-shadow:0 0 3px var(--neutral-20),0 0 3px var(--neutral-20),0 0 2px var(--neutral-20);white-space:nowrap;display:flex;gap:4px;align-items:center}
+.mk .lab .w{font-weight:500;font-size:11px;color:var(--neutral-80);background:var(--neutral-10);border:1px solid var(--neutral-50);border-radius:3px;padding:0 4px;text-shadow:none}
+.mk .dot{width:11px;height:11px;border-radius:50%;background:var(--neutral-60);box-shadow:0 0 0 2px var(--neutral-20)}
+.mk.lost .dot{background:var(--neutral-20);border:2px dashed var(--neutral-70)}
+.mk.sel .dot{box-shadow:0 0 0 2px var(--neutral-10),0 0 0 4px var(--callToAction)}
+.float{position:absolute;background:var(--neutral-10);border-radius:10px;box-shadow:var(--shadow);z-index:5}
+.toolbar{top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:4px}
+.toolbar .div{width:1px;height:22px;background:var(--neutral-30);margin:0 4px}
+.modepill{display:inline-flex;align-items:center;gap:6px;padding:0 10px 0 6px;height:32px;font-size:12px;font-weight:600;color:var(--neutral-80);white-space:nowrap}
+.strip{top:12px;left:12px;display:flex;flex-direction:column;gap:2px;padding:4px}
+.strip .div{height:1px;width:22px;background:var(--neutral-30);margin:4px auto}
+.tr{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;align-items:flex-end;gap:8px;z-index:6}
+.editsw{display:flex;align-items:center;gap:8px;height:36px;padding:0 10px 0 12px;font-weight:600;font-size:12px;border:0}
+.zoom{display:flex;flex-direction:column;align-items:center;padding:2px;border-radius:8px}
+.zoom .zl{font-size:10px;color:var(--neutral-70);padding:2px 0}
+.search{top:12px;left:12px;width:300px;display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;color:var(--neutral-70)}
+.legend{left:12px;bottom:12px;padding:10px 12px;width:208px;font-size:12px}
+.legend h5{margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--neutral-70);display:flex;justify-content:space-between}
+.legend .li{display:flex;align-items:center;gap:8px;padding:2px 0;color:var(--neutral-80)}
+.legend .tog{display:flex;gap:12px;border-top:1px solid var(--neutral-30);margin-top:6px;padding-top:6px}
+.popup{position:absolute;width:290px;transform:translate(-50%,calc(-100% - 30px));background:var(--neutral-10);border-radius:10px;box-shadow:var(--shadow);z-index:8;font-size:12px}
+.popup::after{content:"";position:absolute;left:50%;bottom:-7px;width:14px;height:14px;background:var(--neutral-10);transform:translateX(-50%) rotate(45deg);box-shadow:3px 3px 4px rgba(30,34,39,.06)}
+.popup .phd{display:flex;align-items:flex-start;gap:10px;padding:12px 12px 8px}
+.popup .phd h3{margin:0;font-size:16px}
+.popup .pb{padding:0 12px 8px}
+.popup .alm{margin:4px 12px 10px;padding:8px 10px;border-radius:6px;background:var(--err-tint);border-left:3px solid var(--error)}
+.popup .acts{display:flex;gap:8px;padding:0 12px 12px}
+.drawbar{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:8px 8px 8px 14px;white-space:nowrap;z-index:7}
+.snaphint{position:absolute;transform:translate(14px,-46px);background:var(--neutral-90);color:var(--neutral-10);font-size:11px;padding:4px 8px;border-radius:5px;white-space:nowrap;z-index:6}
+.save{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--neutral-70);border:0;background:none;padding:4px 6px;border-radius:6px;white-space:nowrap}
+.save:hover{background:var(--neutral-20)}
+.save.conf{color:var(--warning);background:var(--warn-tint);font-weight:600}
+.spin{width:12px;height:12px;border:2px solid var(--neutral-40);border-top-color:var(--neutral-80);border-radius:50%;animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.conflict{position:absolute;z-index:20;width:330px;padding:14px;border-left:3px solid var(--warning)}
+.conflict h4{margin:0 0 6px;font-size:13px;display:flex;gap:6px;align-items:center;color:var(--warning)}
+.conflict p{margin:0 0 8px;color:var(--neutral-80);font-size:12px}
+.toast{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:var(--neutral-90);color:var(--neutral-10);border-radius:8px;padding:8px 8px 8px 14px;display:flex;gap:12px;align-items:center;z-index:9}
+.toast .btn{background:transparent;color:var(--neutral-10);border-color:var(--neutral-70)}
+/* B slide panel */
+.slide{position:absolute;top:0;bottom:0;width:360px;background:var(--neutral-10);box-shadow:4px 0 18px rgba(30,34,39,.12);z-index:12;display:flex;flex-direction:column;transition:transform .25s}
+.slide.closed{transform:translateX(-110%)}
+/* kind preview */
+.pv{display:flex;flex-direction:column;align-items:center;gap:4px;width:64px}
+.pv .disc{width:34px;height:34px;border-radius:50%;background:var(--neutral-10);border:1.5px solid var(--neutral-50);color:var(--neutral-80);display:flex;align-items:center;justify-content:center}
+.pv.dim .disc{opacity:.5;border-style:dashed;border-color:var(--neutral-60)}
+.pv.att .disc{border:3px solid var(--neutral-90);color:var(--neutral-90)}
+.rule{display:grid;grid-template-columns:1fr 18px 1fr 64px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--neutral-30)}
+.rule:last-child{border-bottom:0}
+.sel-like{display:flex;align-items:center;justify-content:space-between;gap:6px;height:30px;padding:0 8px;border:1px solid var(--neutral-40);border-radius:6px;background:var(--neutral-10);font-size:12px}
+.empty{padding:28px 20px;text-align:center;color:var(--neutral-70)}
+.drop{border:1.5px dashed var(--neutral-50);border-radius:8px;padding:22px;text-align:center;color:var(--neutral-70)}
+.scale{position:absolute;left:236px;bottom:14px;font-size:10px;color:var(--neutral-70);display:flex;flex-direction:column;gap:2px;z-index:4}
+.scale i{display:block;width:80px;height:5px;border:1.5px solid var(--neutral-70);border-top:0}
+</style>
+</head>
+<body>
+<div class="sw" id="sw"></div>
+<div class="wrap">
+  <div class="rat" id="rat"></div>
+  <div class="frame" id="frame"></div>
+</div>
+<script>
+/* Interaction only: every click re-renders the mock from a small state object. No network. */
+var P = {
+  'well-pad':'<rect x="3" y="6" width="18" height="13" rx="2"/><circle cx="8.5" cy="12.5" r="1.5"/><circle cx="15.5" cy="12.5" r="1.5"/>',
+  'tank-battery':'<rect x="3" y="5" width="4" height="13" rx="1"/><rect x="10" y="5" width="4" height="13" rx="1"/><rect x="17" y="5" width="4" height="13" rx="1"/><path d="M2 21h20"/>',
+  'compressor-station':'<path d="M4 5l16 4.5v5l-16 4.5z"/><path d="M20 12h2"/><path d="M2 12h2"/>',
+  'swd':'<path d="M12 2.5c-2.2 2.8 -3.5 4.8 -3.5 6.3a3.5 3.5 0 0 0 7 0c0 -1.5 -1.3 -3.5 -3.5 -6.3z"/><path d="M3 15h6"/><path d="M15 15h6"/><path d="M12 14v7"/><path d="M9 18l3 3l3 -3"/>',
+  'pipeline':'<path d="M3 6v12"/><path d="M21 6v12"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M8.5 12h6"/><path d="M12.5 10l2 2l-2 2"/>',
+  'lateral':'<path d="M3 18h18"/><path d="M8 18l6 -9h7"/><circle cx="8" cy="18" r="1.5"/>',
+  'geofence':'<path d="M4 12v4h16v-4l-16 0"/><path d="M6 16v4h4v-4m0 -4v-6l-2 -2l-2 2v6"/><path d="M14 16v4h4v-4m0 -4v-6l-2 -2l-2 2v6"/>',
+  'wellhead':'<path d="M7 21h10"/><path d="M12 21v-17"/><path d="M10 4h4"/><rect x="9.5" y="14" width="5" height="3" rx="0.5"/><path d="M12 9h7"/><path d="M19 7v4"/>',
+  'comms-lost':'<path d="M12 11v10"/><path d="M9 21h6"/><path d="M8.5 5.5a5 5 0 0 0 0 7"/><path d="M15.5 5.5a5 5 0 0 1 0 7"/><circle cx="12" cy="9" r="1"/><path d="M3 3l18 18"/>',
+  'stale':'<path d="M7 3h10"/><path d="M7 21h10"/><path d="M8 3v2a4 4 0 0 0 2 3.5l2 3.5l2 -3.5a4 4 0 0 0 2 -3.5v-2"/><path d="M8 21v-2a4 4 0 0 1 2 -3.5l2 -3.5l2 3.5a4 4 0 0 1 2 3.5v2"/>',
+  'point':'<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>',
+  'region':'<path d="M10 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M3 11a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M13 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M6.5 9.5l3.5 -3"/><path d="M14 5.5l3 1.5"/><path d="M18.5 10l-2.5 7"/><path d="M13.5 17.5l-7 -5"/>',
+  /* UI chrome stand-ins, same grid */
+  'eye':'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  'list':'<path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
+  'kinds':'<rect x="3" y="3" width="7" height="7" rx="1.5"/><circle cx="17.5" cy="6.5" r="3.5"/><path d="M6.5 14l3.5 7h-7z"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  'layers':'<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
+  'import':'<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/>',
+  'search':'<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
+  'plus':'<path d="M12 5v14M5 12h14"/>', 'minus':'<path d="M5 12h14"/>',
+  'x':'<path d="M6 6l12 12M18 6L6 18"/>', 'back':'<path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/>',
+  'check':'<path d="M5 12.5l4.5 4.5L19 7.5"/>', 'cursor':'<path d="M5 3l14 8-6 2-2 6z"/>',
+  'undo':'<path d="M9 7L4 12l5 5"/><path d="M4 12h11a5 5 0 0 1 0 10h-2"/>', 'redo':'<path d="M15 7l5 5-5 5"/><path d="M20 12H9a5 5 0 0 0 0 10h2"/>',
+  'line':'<circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/><path d="M6.5 17.5l11-11"/>',
+  'chev':'<path d="M7 10l5 5 5-5"/>', 'chevr':'<path d="M10 7l5 5-5 5"/>', 'link':'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  'copy':'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
+  'trash':'<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
+  'pin':'<path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/>',
+  'magnet':'<path d="M5 4v8a7 7 0 0 0 14 0V4h-4v8a3 3 0 0 1-6 0V4z"/><path d="M5 8h4M15 8h4"/>',
+  'cloud':'<path d="M7 18h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.5 1.5A3.5 3.5 0 0 0 7 18z"/>',
+  'warn':'<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>',
+  'star':'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+  'tag':'<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1"/>',
+  'popout':'<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  'sort':'<path d="M7 4v16M3 16l4 4 4-4"/><path d="M14 6h7M14 12h5M14 18h3"/>',
+  'fit':'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'
+};
+var F = { /* filled alarm glyphs */
+  'a1u':'<path fill-rule="evenodd" d="M12 2.5l10 18h-20z M7.5 12.5h2.5l3.5 -3v9.5l-3.5 -3h-2.5z M15 12.5h1.5v4h-1.5z"/>',
+  'a2u':'<path fill-rule="evenodd" d="M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0 -20z M7 10.5h2.5l3.5 -3v9l-3.5 -3h-2.5z M14.5 10h1.5v4h-1.5z"/>',
+  'a1a':'<path fill-rule="evenodd" d="M12 2.5l10 18h-20z M10.75 8.5h2.5v6h-2.5z M10.75 16h2.5v2.5h-2.5z"/>'
+};
+function ic(n,s){s=s||18;return '<svg class="ic" width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+P[n]+'</svg>';}
+function fi(n,s){s=s||16;return '<svg class="ic" width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="currentColor">'+F[n]+'</svg>';}
+
+/* ---------- real content: field Mesa ---------- */
+var KINDS = {
+  pad:{label:'Well pad',icon:'well-pad',geo:'Point',n:3}, ctb:{label:'Tank battery',icon:'tank-battery',geo:'Point',n:1},
+  cs:{label:'Compressor station',icon:'compressor-station',geo:'Point',n:1}, swd:{label:'SWD',icon:'swd',geo:'Point',n:1},
+  pipe:{label:'Pipeline',icon:'pipeline',geo:'Line',n:2}, lat:{label:'Lateral',icon:'lateral',geo:'Line',n:2},
+  geo:{label:'Geofence',icon:'geofence',geo:'Area',n:1},
+  none:{label:'Point - pick a kind',icon:'point',geo:'Point',n:0}
+};
+var KORDER = ['pad','ctb','cs','swd','pipe','lat','geo'];
+var ITEMS = [
+  {id:'P12',kind:'pad',x:520,y:335,asset:'Mesa/P12',ll:'32.2361, -103.8714',kvn:'Casing pressure',kv:'860 psi',kv2:[['Tubing pressure','385 psi'],['Gas rate','1.2 MMcf/d']],wells:'P12-3H',status:'Running',comms:'OK - 9 s ago',chg:'Yesterday 16:20'},
+  {id:'P14',kind:'pad',x:575,y:580,asset:'Mesa/P14',ll:'32.2297, -103.8689',kvn:'Casing pressure',kv:'1,240 psi',kv2:[['Tubing pressure','410 psi'],['Gas rate','1.8 MMcf/d']],wells:'P14-2H',status:'Running',comms:'OK - 12 s ago',alarm:{p:1,text:'Casing pressure high',src:'P14-2H',age:'4 min'}},
+  {id:'P21',kind:'pad',x:885,y:300,asset:'Mesa/P21',ll:'32.2378, -103.8562',kvn:'Casing pressure',kv:'910 psi (last)',kv2:[['Tubing pressure','352 psi (last)']],wells:'P21-1H',status:'Running',lost:true,comms:'Comms lost - last heard 14 min ago'},
+  {id:'CTB1',kind:'ctb',x:720,y:445,asset:'Mesa/CTB1',ll:'32.2331, -103.8621',kvn:'Oil tank level',kv:'11.2 ft',kv2:[['Water tank level','8.4 ft'],['Oil today','412 bbl']],status:'Running',comms:'OK - 6 s ago',chg:'Today 09:12'},
+  {id:'CS01',kind:'cs',x:935,y:525,asset:'Mesa/CS01',ll:'32.2318, -103.8544',kvn:'Discharge pressure',kv:'1,050 psi',kv2:[['Suction pressure','62 psi'],['Units running','2 of 2']],status:'Running',comms:'OK - 4 s ago',chg:'Oct 22'},
+  {id:'SWD1',kind:'swd',x:830,y:665,asset:'Mesa/SWD1',ll:'32.2276, -103.8583',kvn:'Injection rate',kv:'4,120 bbl/d (last)',kv2:[['Injection pressure','1,380 psi']],status:'Running',stale:true,comms:'OK - 7 s ago'},
+  {id:'L-GL21',kind:'pipe',d:'M935 525 L965 410 L885 300',mid:[958,405],asset:'Mesa/L-GL21',svc:'Gas lift',size:'4 in',from:'CS01',to:'P21',len:'2.6 km'},
+  {id:'L-SWD',kind:'pipe',d:'M720 445 L760 560 L830 665',mid:[762,560],asset:'Mesa/L-SWD',svc:'Produced water',size:'6 in',from:'CTB1',to:'SWD1',len:'2.4 km'},
+  {id:'P12 lateral',kind:'lat',d:'M520 335 L640 360 L720 445',mid:[640,362],unlinked:true,svc:'Production',size:'3 in',from:'P12',to:'CTB1',len:'2.1 km'},
+  {id:'P14 lateral',kind:'lat',d:'M575 580 L650 520 L720 445',mid:[650,520],asset:'Mesa/P14-LAT',svc:'Production',size:'3 in',from:'P14',to:'CTB1',len:'1.9 km'},
+  {id:'Mesa lease',kind:'geo',d:'M455 255 L1010 240 L1035 520 L930 720 L470 700 Z',mid:[470,262],asset:'Mesa/Lease-North',area:'14.8 km2'}
+];
+function item(id){for(var i=0;i<ITEMS.length;i++)if(ITEMS[i].id===id)return ITEMS[i];return null;}
+
+/* ---------- state ---------- */
+var S = {dir:'A',w:1440,edit:true,rail:'items',sel:'P14',tab:'details',tool:'select',drawing:false,save:'saved',filter:'all',zoom:15,popup:'P14',panel:true,kindSel:'pad',sort:'attention',sortOpen:false,drawKind:'pipe',newN:0,conflictOpen:false,toast:false,legend:true};
+var DIRS = {
+  A:{name:'Direction A - Docked studio',sum:'Atlist-like: a rail of modes, a docked list and a docked properties panel, the map on the right.',
+     why:'Everything an editor needs stays on screen at once: modes on the rail, the field list, and the selected item. It reads as a finished studio rather than tools bolted onto a map, which answers the "cobbled together" complaint most directly. The cost is map width: at 1366 the map keeps about half the component.'},
+  B:{name:'Direction B - Map first',sum:'The map fills the component; one panel slides in from the left for the list, then the item, with a back arrow.',
+     why:'The map stays the hero in edit mode, so editing feels like the operator map with tools switched on, not a different screen. One panel holds list then details, so there is a single place to look and the 1366 laptop keeps most of the map. The cost is one extra step back to the list, and list and details are never visible together.'},
+  C:{name:'Direction C - Inspector',sum:'List left, map centre, an always-on inspector right (Figma-like); draw tools in a vertical strip on the map edge.',
+     why:'A fixed home for every kind of information: what exists on the left, where it is in the middle, what it is on the right. The inspector never jumps or covers the map, and an empty inspector gives a field summary. Two docked panels are always present, so the map is narrowest at 1366 when nothing is selected.'}
+};
+
+/* ---------- small renderers ---------- */
+function stBadge(it){
+  if(it.alarm)return '<span class="st a1">'+fi('a1u',14)+'1</span>';
+  if(it.lost)return '<span class="st">'+ic('comms-lost',13)+'Comms lost</span>';
+  if(it.stale)return '<span class="st">'+ic('stale',13)+'Stale</span>';
+  if(it.unlinked)return '<span class="tag">Unlinked</span>';
+  return '';
+}
+function saveEl(){
+  if(S.save==='saving')return '<button class="save" data-act="save"><span class="spin"></span>Saving...</button>';
+  if(S.save==='conflict')return '<button class="save conf" data-act="conflict">'+ic('warn',14)+'Not saved - conflict with Sam\'s change</button>';
+  return '<button class="save" data-act="save" title="Edits save as you go">'+ic('check',14)+'Saved</button>';
+}
+function editSwitch(){
+  return '<button class="float editsw" style="position:relative" data-act="edit">'+ic(S.edit?'kinds':'eye',16)+(S.edit?'Editing':'Edit map')+'<span class="sw2'+(S.edit?' on':'')+'"></span></button>';
+}
+function zoomCtl(){
+  return '<div class="float zoom"><button class="ibtn" data-act="zin" title="Zoom in">'+ic('plus',18)+'</button><span class="zl">z '+S.zoom+'</span><button class="ibtn" data-act="zout" title="Zoom out">'+ic('minus',18)+'</button><button class="ibtn" title="Fit field" data-act="nop">'+ic('fit',16)+'</button></div>';
+}
+function topRight(withSave){
+  return '<div class="tr">'+(withSave?'<div class="float" style="position:relative;padding:4px 4px">'+saveEl()+'</div>':'')+editSwitch()+zoomCtl()+'</div>';
+}
+var KTOOLS=[['pad','well-pad','Add a well pad'],['ctb','tank-battery','Add a tank battery'],['pipe','pipeline','Draw a pipeline']];
+var GTOOLS=[['point','point','Point - pick the kind after'],['line','line','Line - pick the kind after'],['area','region','Area - pick the kind after']];
+function tb(x){return '<button class="ibtn'+(S.tool===x[0]?' on':'')+'" data-act="tool" data-v="'+x[0]+'" title="'+x[2]+'">'+ic(x[1],18)+'</button>';}
+function toolBtns(vertical){
+  var h=tb(['select','cursor','Select'])+'<span class="div"></span>';
+  KTOOLS.forEach(function(x){h+=tb(x);});
+  h+='<span class="div"></span>';
+  GTOOLS.forEach(function(x){h+=tb(x);});
+  h+='<span class="div"></span><button class="ibtn" title="Undo (Ctrl+Z)" data-act="nop">'+ic('undo',18)+'</button><button class="ibtn" title="Redo (Ctrl+Shift+Z)" data-act="nop">'+ic('redo',18)+'</button>';
+  return h;
+}
+function placing(){return S.tool==='pad'||S.tool==='ctb'||S.tool==='point';}
+function modeLabel(){
+  if(S.drawing)return ic(S.tool==='pipe'?'pipeline':'line',16)+(S.tool==='pipe'?'Drawing a pipeline':'Drawing a line');
+  var nm={pad:'well pad',ctb:'tank battery',point:'point'}[S.tool];
+  if(nm)return ic(S.tool==='point'?'point':KINDS[S.tool].icon,16)+'Add a '+nm+' - click the map, then drag to fine-tune';
+  return {select:ic('cursor',16)+'Select',area:ic('region',16)+'Draw an area - kind picked after'}[S.tool]||'';
+}
+function toolbarTop(extra){
+  return '<div class="float toolbar">'+toolBtns()+(extra||'')+'</div><div class="float modepill" style="position:absolute;top:60px;left:50%;transform:translateX(-50%);height:28px;padding:0 12px">'+modeLabel()+'</div>';
+}
+function strip(){
+  return '<div class="float strip">'+toolBtns(true)+'</div><div class="float modepill" style="position:absolute;top:12px;left:64px;height:34px;padding:0 12px">'+modeLabel()+'</div>';
+}
+
+/* ---------- map ---------- */
+function mapWorld(dx){
+  var dots=S.zoom<14, h='';
+  h+='<svg class="base" width="1400" height="900" viewBox="0 0 1400 900">';
+  /* faint lease roads */
+  h+='<g stroke="var(--neutral-30)" stroke-width="5" fill="none" stroke-linecap="round"><path d="M0 470 C300 450 500 480 700 470 S1100 420 1400 440"/><path d="M610 0 C600 200 640 330 700 470 S760 760 740 900"/><path d="M700 470 L900 300 L1080 120"/><path d="M520 335 L640 470"/><path d="M830 665 L1000 820"/></g>';
+  h+='<g fill="var(--neutral-50)" font-size="11" font-family="system-ui"><text x="1110" y="430">CR 748</text><text x="655" y="120" transform="rotate(-86 655 120)">Lease Rd 3</text></g>';
+  /* geofence */
+  var gsel=S.sel==='Mesa lease'&&S.edit;
+  h+='<path d="'+item('Mesa lease').d+'" fill="var(--neutral-50)" fill-opacity=".07" stroke="'+(gsel?'var(--callToAction)':'var(--neutral-50)')+'" stroke-width="'+(gsel?3:1.5)+'" stroke-dasharray="6 5"/>';
+  h+='<path d="'+item('Mesa lease').d+'" fill="none" stroke="transparent" stroke-width="14" data-act="sel" data-id="Mesa lease" style="cursor:pointer"/>';
+  h+='<text x="478" y="275" font-size="11" font-weight="600" fill="var(--neutral-70)" font-family="system-ui">Mesa lease</text>';
+  /* lines */
+  ITEMS.forEach(function(it){
+    if(it.kind!=='pipe'&&it.kind!=='lat')return;
+    var w=it.kind==='pipe'?(it.size==='6 in'?6:4):3, col=it.kind==='pipe'?'var(--neutral-60)':'var(--neutral-50)';
+    var sel=S.sel===it.id&&S.edit;
+    if(sel)h+='<path d="'+it.d+'" stroke="var(--callToAction)" stroke-width="'+(w+6)+'" stroke-opacity=".35" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
+    h+='<path d="'+it.d+'" stroke="'+col+'" stroke-width="'+w+'" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
+    h+='<path d="'+it.d+'" stroke="transparent" stroke-width="16" fill="none" data-act="sel" data-id="'+it.id+'" style="cursor:pointer"/>';
+    if(sel&&it.kind==='pipe'){h+='<path d="M'+(it.mid[0]-6)+' '+(it.mid[1]+8)+' l6 -10 l6 10" fill="none" stroke="var(--neutral-90)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';}
+    if(it.kind==='pipe'&&!dots)h+='<g font-family="system-ui" font-size="11" font-weight="600"><rect x="'+(it.mid[0]+10)+'" y="'+(it.mid[1]-9)+'" width="'+(it.id.length*7+10)+'" height="17" rx="3" fill="var(--neutral-10)" stroke="var(--neutral-40)"/><text x="'+(it.mid[0]+15)+'" y="'+(it.mid[1]+4)+'" fill="var(--neutral-80)">'+it.id+'</text></g>';
+    if(S.edit&&sel){/* vertex handles */ it.d.replace(/[ML]/g,'').trim().split(/ (?=\d+ \d+)/).forEach(function(){});}
+  });
+  /* draft line while drawing */
+  if(S.drawing){
+    h+='<path d="M575 580 L650 512" stroke="var(--neutral-80)" stroke-width="3" fill="none" stroke-dasharray="7 5"/>';
+    h+='<path d="M650 512 L712 452" stroke="var(--neutral-60)" stroke-width="2" fill="none" stroke-dasharray="3 5"/>';
+    h+='<rect x="569" y="574" width="12" height="12" fill="var(--neutral-90)" stroke="var(--neutral-10)" stroke-width="2"/>';
+    h+='<circle cx="650" cy="512" r="5" fill="var(--neutral-10)" stroke="var(--neutral-90)" stroke-width="2"/>';
+    h+='<circle cx="720" cy="445" r="26" fill="var(--cta-tint)" stroke="var(--callToAction)" stroke-width="2" stroke-dasharray="4 3"/>';
+  }
+  h+='</svg>';
+  /* sites */
+  ITEMS.forEach(function(it){
+    if(!it.x)return;
+    var k=KINDS[it.kind], sel=(S.edit?S.sel:S.popup)===it.id;
+    var cls='mk'+(it.lost?' lost':'')+(sel?' sel':'')+(it.isNew?' new':'');
+    var b='';
+    if(it.alarm)b='<span class="badge a1">'+fi('a1u',18)+'1</span>';
+    else if(it.lost&&!dots)b='<span class="badge g">'+ic('comms-lost',14)+'</span>';
+    else if(it.stale&&!dots)b='<span class="badge g">'+ic('stale',14)+'</span>';
+    var word=it.lost?'<span class="w">Comms lost</span>':(it.stale?'<span class="w">Stale</span>':'');
+    if(dots){
+      h+='<button class="'+cls+'" style="left:'+it.x+'px;top:'+it.y+'px" data-act="sel" data-id="'+it.id+'" title="'+it.id+'"><span style="position:relative"><span class="dot"></span>'+(it.alarm?'<span class="badge a1" style="top:-12px;right:-20px">'+fi('a1u',16)+'1</span>':'')+'</span></button>';
+    }else{
+      h+='<button class="'+cls+'" style="left:'+it.x+'px;top:'+(it.y+10)+'px" data-act="sel" data-id="'+it.id+'"><span class="disc">'+ic(k.icon,19)+b+'</span><span class="lab">'+it.id+word+'</span></button>';
+    }
+  });
+  var ni=S.edit&&item(S.sel);if(ni&&ni.isNew)h+='<div class="snaphint" style="left:'+ni.x+'px;top:'+(ni.y-4)+'px">'+ic('pin',12)+' Drag to fine-tune, or type latitude and longitude</div>';
+  if(S.drawing)h+='<div class="snaphint" style="left:720px;top:445px">'+ic('magnet',12)+' Snap to CTB1 - click to connect</div>';
+  if(!S.edit&&S.popup)h+=popup(item(S.popup));
+  return '<div class="world" style="transform:translate(calc(-50% + '+(dx||0)+'px),-50%)">'+h+'</div>';
+}
+function popup(it){
+  if(!it||!it.x)return '';
+  var k=KINDS[it.kind], dim=it.lost||it.stale;
+  var h='<div class="popup" style="left:'+it.x+'px;top:'+(it.y-6)+'px">';
+  h+='<div class="phd"><span class="disc" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--neutral-50);display:flex;align-items:center;justify-content:center;color:var(--neutral-80)">'+ic(k.icon,17)+'</span><div style="flex:1"><h3>'+it.id+'</h3><div class="muted">'+k.label+(it.wells?' - '+it.wells:'')+'</div></div><button class="ibtn" title="Open the '+it.id+' page" data-act="nop">'+ic('popout',16)+'</button><button class="ibtn" data-act="pclose" title="Close">'+ic('x',16)+'</button></div>';
+  h+='<div class="pb"><div class="kv" style="border-bottom:1px solid var(--neutral-30);padding-bottom:7px;margin-bottom:3px"><span class="k">Comms</span><span style="display:flex;gap:4px;align-items:center;'+(it.lost?'font-weight:600':'')+'">'+(it.lost?ic('comms-lost',14):ic('check',14))+it.comms+'</span></div>';
+  var vals=[[it.kvn,it.kv]].concat(it.kv2||[]);
+  vals.forEach(function(v,i){h+='<div class="kv"><span class="k">'+v[0]+'</span><span style="font-weight:'+(i===0?600:500)+';display:flex;gap:4px;align-items:center'+(dim?';color:var(--neutral-70)':'')+'">'+(it.stale&&i===0?ic('stale',14)+'Stale - ':'')+v[1]+'</span></div>';});
+  h+='</div>';
+  if(it.alarm)h+='<div class="alm"><div style="display:flex;gap:6px;align-items:center;font-weight:600;color:var(--error)">'+fi('a1u',16)+'1 alarm - Priority 1, unacknowledged</div><div style="margin-top:3px">'+it.alarm.text+' - '+it.alarm.src+', '+it.alarm.age+' ago</div><button class="btn pri sm" style="margin-top:8px">View alarms</button></div>';
+  else h+='<div class="pb muted" style="padding-bottom:12px;display:flex;gap:6px;align-items:center">'+ic('check',14)+'No active alarms</div>';
+  return h+'</div>';
+}
+function legend(){
+  if(!S.legend)return '<button class="float btn" style="left:12px;bottom:12px" data-act="legend">'+ic('layers',16)+'Legend</button>';
+  return '<div class="float legend"><h5>Legend <button class="ibtn" style="width:20px;height:20px" data-act="legend" title="Collapse">'+ic('chev',14)+'</button></h5>'+
+   '<div class="li">'+ic('well-pad',16)+'Well pad</div><div class="li">'+ic('tank-battery',16)+'Tank battery</div><div class="li">'+ic('compressor-station',16)+'Compressor station</div><div class="li">'+ic('swd',16)+'SWD</div>'+
+   '<div class="li"><span style="color:var(--error)">'+fi('a1u',16)+'</span>Priority 1 alarm, digit beside</div><div class="li">'+ic('comms-lost',16)+'Comms lost</div><div class="li">'+ic('stale',16)+'Stale value</div>'+
+   '<div class="li"><svg width="16" height="8"><path d="M0 4h16" stroke="var(--neutral-60)" stroke-width="4"/></svg>Pipeline, weight by size</div>'+
+   '<div class="tog"><span style="display:flex;gap:5px;align-items:center"><span class="check on">'+ic('check',11)+'</span>Lines</span><span style="display:flex;gap:5px;align-items:center"><span class="check on">'+ic('check',11)+'</span>Names</span></div><div class="tiny muted" style="margin-top:4px">Below zoom 14 sites show as dots</div></div>';
+}
+function drawBar(){
+  var pk=S.tool==='pipe';
+  return '<div class="float drawbar"><span style="display:flex;gap:6px;align-items:center;font-weight:600">'+ic(pk?'pipeline':'line',16)+(pk?'New pipeline':'New line')+'</span>'+
+   (pk?'':'<span class="tag">Kind picked after Finish</span>')+
+   '<span class="muted small">2 points - 0.6 km - start snapped to P14</span>'+
+   '<span class="tag">'+ic('magnet',12)+'Snapping on</span>'+
+   '<span class="muted tiny">Double-click or Enter to finish</span>'+
+   '<button class="btn sm" data-act="dcancel">Cancel <span class="muted tiny">Esc</span></button><button class="btn sm pri" data-act="dfinish">Finish</button></div>';
+}
+function overlays(){
+  var h='';
+  if(S.drawing)h+=drawBar();
+  if(S.toast)h+='<div class="toast">'+ic('check',16)+''+S.toastMsg+'<button class="btn sm" data-act="toastx">Undo</button></div>';
+  return h;
+}
+function conflictCard(pos){
+  if(S.save!=='conflict'||!S.conflictOpen)return '';
+  return '<div class="float conflict" style="'+pos+'"><h4>'+ic('warn',16)+'Not saved - conflict with Sam\'s change</h4><p><b>Sam</b> moved P14 about 40 m north at 10:42, while you were editing it.</p><p>Your change, kept here and not saved: label position Right, Gas rate switched on.</p><div style="display:flex;gap:8px"><button class="btn sm" data-act="resolve">Use Sam\'s version</button><button class="btn sm pri" data-act="resolve">Apply mine on top</button></div></div>';
+}
+function viewMap(){
+  return '<div class="map">'+mapWorld(0)+'<div class="float search">'+ic('search',18)+'Search sites, wells or lines</div>'+legend()+topRight(false)+'<div class="scale"><span>500 m</span><i></i></div></div>';
+}
+
+/* ---------- list, details, kinds, layers, import ---------- */
+/* place tree: field, then site, then what is on it; attention first */
+var PLACES=[
+  {site:'P14',on:['P14 lateral'],wells:['P14-2H'],att:3},
+  {site:'P21',on:[],wells:['P21-1H'],att:2},
+  {site:'SWD1',on:[],att:1},
+  {site:'P12',on:['P12 lateral'],wells:['P12-3H'],att:1},
+  {site:'CTB1',on:['L-SWD'],att:0},
+  {site:'CS01',on:['L-GL21'],att:0}
+];
+var CHG={'P14':'Today 10:42 - Sam','P12 lateral':'Today 10:31 - you','P21':'Today 08:05 - you','SWD1':'Oct 24','L-SWD':'Oct 24','L-GL21':'Oct 23','P14 lateral':'Oct 23','Mesa lease':'Oct 20','P12':'Yesterday 16:20','CTB1':'Today 09:12','CS01':'Oct 22'};
+var SORTS=[['attention','Needs attention'],['place','Place'],['kind','Kind'],['name','Name'],['changed','Last changed']];
+function needs(it){return !!(it.alarm||it.lost||it.stale||it.unlinked);}
+function rowI(it,indent,extra){
+  var k=KINDS[it.kind];
+  return '<button class="row-i'+(S.sel===it.id?' sel':'')+'" style="padding-left:'+(8+indent)+'px" data-act="sel" data-id="'+it.id+'"><span class="ki">'+ic(k.icon,17)+'</span><span class="nm">'+it.id+(extra?' <span class="tiny muted">'+extra+'</span>':'')+'</span>'+stBadge(it)+'</button>';
+}
+function pass(it){return S.filter==='all'||S.filter===it.kind;}
+function listBody(){
+  var lab=SORTS.filter(function(x){return x[0]===S.sort;})[0][1];
+  var h='<div style="padding:12px 16px 8px;display:flex;gap:8px"><div class="input" style="flex:1;min-width:0">'+ic('search',16)+'Search items</div></div>';
+  h+='<div style="padding:0 16px 8px;display:flex;align-items:center;gap:6px;position:relative"><span class="small muted">Sort by</span><button class="sel-like" style="flex:1" data-act="sortopen">'+ic('sort',14)+'<span style="flex:1;text-align:left">'+lab+'</span>'+ic('chev',14)+'</button>';
+  if(S.sortOpen){h+='<div class="float" style="top:34px;left:62px;right:16px;padding:4px">'+SORTS.map(function(x){return '<button class="row-i'+(S.sort===x[0]?' sel':'')+'" data-act="sort" data-v="'+x[0]+'">'+x[1]+'</button>';}).join('')+'</div>';}
+  h+='</div>';
+  h+='<div class="chips" style="padding:0 16px 10px"><button class="chip'+(S.filter==='all'?' on':'')+'" data-act="filter" data-v="all">All <span class="n">11</span></button>';
+  KORDER.forEach(function(k){h+='<button class="chip'+(S.filter===k?' on':'')+'" data-act="filter" data-v="'+k+'">'+KINDS[k].label+' <span class="n">'+KINDS[k].n+'</span></button>';});
+  h+='</div><div style="border-top:1px solid var(--neutral-30)"></div>';
+  var extra=ITEMS.filter(function(i){return i.isNew&&pass(i);});
+  if(extra.length){h+='<div class="grp"><div class="gh"><span>Just added</span></div>';extra.forEach(function(it){h+=rowI(it,0);});h+='</div>';}
+  if(S.sort==='attention'||S.sort==='place'){
+    var pl=PLACES.slice(); if(S.sort==='place')pl.sort(function(a,b){return a.site<b.site?-1:1;});
+    var natt=ITEMS.filter(needs).length;
+    h+='<div class="grp"><div class="gh"><span>Mesa field</span><span>'+(S.sort==='attention'?natt+' need attention':'11 items')+'</span></div>';
+    pl.forEach(function(p){
+      var site=item(p.site), ons=p.on.map(item);
+      if(S.sort==='attention')ons.sort(function(a,b){return needs(b)-needs(a);});
+      var rows=[site].concat(ons).filter(pass); if(!rows.length)return;
+      if(S.sort==='attention'&&p.att===0&&!h.match(/data-sep/)){h+='<div data-sep class="tiny muted" style="padding:8px 10px 2px;border-top:1px solid var(--neutral-30);margin-top:4px">All normal</div>';}
+      if(pass(site))h+=rowI(site,0);
+      (p.wells||[]).forEach(function(w){if(S.filter==='all')h+='<div class="row-i" style="padding-left:34px;color:var(--neutral-70);cursor:default"><span class="ki">'+ic('wellhead',15)+'</span><span class="nm small">'+w+' <span class="tiny">well, on '+p.site+'</span></span></div>';});
+      ons.filter(pass).forEach(function(it){h+=rowI(it,26);});
+    });
+    var g=item('Mesa lease'); if(pass(g))h+='<div class="tiny muted" style="padding:8px 10px 2px;border-top:1px solid var(--neutral-30);margin-top:4px">Field-wide</div>'+rowI(g,0);
+    h+='</div>';
+  }else if(S.sort==='kind'){
+    KORDER.forEach(function(k){
+      var rows=ITEMS.filter(function(i){return i.kind===k&&!i.isNew&&pass(i);}); if(!rows.length)return;
+      h+='<div class="grp"><div class="gh"><span>'+KINDS[k].label+'</span><span>'+rows.length+'</span></div>';
+      rows.forEach(function(it){h+=rowI(it,0);});h+='</div>';
+    });
+  }else{
+    var rows=ITEMS.filter(function(i){return !i.isNew&&pass(i);});
+    if(S.sort==='name')rows.sort(function(a,b){return a.id<b.id?-1:1;});
+    else {var ord=['P14','P12 lateral','CTB1','P21','P12','SWD1','L-SWD','CS01','L-GL21','P14 lateral','Mesa lease'];rows.sort(function(a,b){return ord.indexOf(a.id)-ord.indexOf(b.id);});}
+    h+='<div class="grp">';rows.forEach(function(it){h+=rowI(it,0,S.sort==='changed'?CHG[it.id]:'');});h+='</div>';
+  }
+  return h;
+}
+function listFoot(){return '<div class="pfoot"><button class="btn" style="flex:1;justify-content:center" data-act="tool" data-v="point">'+ic('plus',16)+'Add item</button><span class="small muted">1 unlinked</span></div>';}
+function detailsHead(it,back,close){
+  var k=KINDS[it.kind];
+  return '<div class="ph">'+(back?'<button class="btn ghost sm" style="margin:-4px 0 6px -8px" data-act="back">'+ic('back',16)+'All items</button>':'')+
+   '<div class="row"><span style="color:var(--neutral-80)">'+ic(k.icon,22)+'</span><div style="flex:1;min-width:0"><h3>'+it.id+'</h3><div class="small muted">'+k.label+(it.asset?' - linked to '+it.asset:' - not linked')+'</div></div>'+(close?'<button class="ibtn" data-act="close" title="Close">'+ic('x',18)+'</button>':'')+'</div>'+
+   '<div class="tabs">'+['details','style','link'].map(function(t){return '<button class="'+(S.tab===t?'on':'')+'" data-act="tab" data-v="'+t+'">'+t.charAt(0).toUpperCase()+t.slice(1)+'</button>';}).join('')+'</div></div>';
+}
+function detailsBody(it){
+  var k=KINDS[it.kind], h='';
+  if(S.tab==='details'){
+    h+='<div class="sect"><div class="field"><label>Name <span>Required</span></label><div class="input val">'+it.id+'</div></div>';
+    h+='<div class="field"><label>Kind <span>Required</span></label><div class="sel-like"'+(it.kind==='none'?' style="border-color:var(--neutral-90);border-width:2px"':'')+'>'+ic(k.icon,15)+(it.kind==='none'?'Pick a kind: Well pad, Tank battery, Compressor station, SWD':k.label)+'<span style="margin-left:auto">'+ic('chev',14)+'</span></div></div>';
+    if(it.x){
+      h+='<div class="field"><label>Location <span>Latitude, longitude</span></label><div class="input val">'+ic('pin',15)+it.ll+'</div><div class="tiny muted" style="margin-top:4px">Click the map, then drag the pin to fine-tune. Type here as a backup.</div><div class="tiny muted" style="margin-top:4px;display:flex;justify-content:space-between"><span>Lea County, New Mexico, US</span><button class="btn ghost sm" style="height:18px;padding:0">Zoom to location</button></div></div>';
+      if(it.isNew)h+='<div class="field"><label>Asset</label><div class="note">Not linked yet - pick the asset on the Link tab.</div></div>';
+      if(it.wells)h+='<div class="field"><label>Wells on pad</label><div class="chips"><span class="tag">'+ic('wellhead',12)+it.wells+'</span></div></div>';
+      if(!it.isNew)h+='<div class="field" style="margin:0"><label>Access road note</label><div class="input val small">'+(it.id==='P14'?'Gate code at CR 748 turn-off':'Lease Rd 3')+'</div></div>';
+      h+='</div>';
+      if(!it.isNew)h+='<div class="sect"><h4>Live now <span class="tag">From kind</span></h4><div class="kv"><span class="k">Comms</span><span style="display:flex;gap:4px;align-items:center">'+(it.lost?ic('comms-lost',14):'')+it.comms+'</span></div><div class="kv"><span class="k">'+it.kvn+' '+ic('star',12)+'</span><b style="display:flex;gap:4px;align-items:center">'+(it.stale?ic('stale',14)+'Stale - ':'')+it.kv+'</b></div>'+
+        (it.alarm?'<div class="kv"><span class="k">Alarms</span><span class="st a1">'+fi('a1u',14)+'1 - '+it.alarm.text+'</span></div>':'<div class="kv"><span class="k">Alarms</span><span class="muted">None</span></div>')+'</div>';
+    }else if(it.kind==='geo'){
+      h+='<div class="field" style="margin:0"><label>Area</label><div class="input val">'+it.area+' - 5 points</div></div></div>';
+    }else{
+      h+='<div class="field"><label>Service</label><div class="input val">'+it.svc+'</div></div><div class="field"><label>Pipe size</label><div class="presets"><span'+(it.size==='3 in'?' class="on"':'')+'>3 in</span><span'+(it.size==='4 in'?' class="on"':'')+'>4 in</span><span'+(it.size==='6 in'?' class="on"':'')+'>6 in</span></div></div>';
+      h+='<div class="field" style="margin:0"><label>Ends</label><div class="kv"><span class="k">From</span><span style="display:flex;gap:6px;align-items:center"><svg width="10" height="10"><rect width="10" height="10" fill="var(--neutral-90)"/></svg>'+it.from+' - snapped</span></div><div class="kv"><span class="k">To</span><span style="display:flex;gap:6px;align-items:center"><svg width="10" height="10"><rect width="10" height="10" fill="var(--neutral-90)"/></svg>'+it.to+' - snapped</span></div><div class="kv"><span class="k">Length</span><span>'+it.len+'</span></div></div></div>';
+    }
+  }else if(S.tab==='style'){
+    h+='<div class="sect"><div class="note">Style comes from the <b>'+k.label+'</b> kind and applies to all '+k.n+'. Changes here apply to '+it.id+' only and are marked <span class="tag ovr">Override</span>.</div></div>';
+    if(it.x){
+      h+='<div class="sect"><h4>Icon <span class="tag">From kind</span></h4><div style="display:flex;gap:10px;align-items:center"><span class="pv"><span class="disc">'+ic(k.icon,19)+'</span></span><span class="small muted">'+k.label+' icon from zoom 14, neutral dot below</span></div></div>';
+      h+='<div class="sect"><h4>Size <span class="tag">From kind</span></h4><div class="presets"><span>Small</span><span class="on">Standard</span><span>Large</span></div></div>';
+      h+='<div class="sect"><h4>Label <span class="tag ovr">Override <button class="btn ghost sm" style="height:16px;padding:0 0 0 4px;color:inherit">Reset</button></span></h4><div class="kv"><span class="k">Shows</span><div class="presets"><span class="on">Name</span><span>Name and key value</span></div></div><div class="kv"><span class="k">Position</span><div class="presets"><span>Below</span><span class="on">Right</span></div></div></div>';
+      h+='<div class="sect"><h4>Style rule <span class="tag">From kind</span></h4><div class="kv"><span class="k">States on Status</span><span>Now: <b>Running</b> - Normal</span></div><button class="btn sm" data-act="rail" data-v="kinds">Edit the kind\'s rule</button></div>';
+    }else{
+      h+='<div class="sect"><h4>Line <span class="tag">From kind</span></h4><div class="kv"><span class="k">Weight</span><div class="presets"><span>Thin</span><span'+(it.size!=='6 in'?' class="on"':'')+'>By pipe size</span><span>Heavy</span></div></div><div class="kv"><span class="k">Pattern</span><div class="presets"><span class="on">Solid</span><span>Dashed</span><span>Dotted</span></div></div></div>';
+      h+='<div class="sect"><h4>Label <span class="tag">From kind</span></h4><div class="presets"><span class="on">Name at midpoint</span><span>None</span></div></div>';
+    }
+    h+='<div class="sect tiny muted">Styles are presets from the project theme. Alarm always wins over style.</div>';
+  }else{
+    h+='<div class="sect"><h4>Asset</h4>'+(it.asset?'<div class="input val">'+ic('link',15)+it.asset+'</div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm">Change</button><button class="btn sm ghost">Unlink</button></div>':'<div class="note" style="display:flex;gap:6px;align-items:center">'+ic('link',14)+'Not linked. Pick an asset to show live values.</div><button class="btn sm pri" style="margin-top:8px">Link to an asset</button>')+'</div>';
+    h+='<div class="sect"><h4>Page link <span class="tag">From kind</span></h4><div class="input val small">/'+(it.kind==='pad'?'pad':'site')+'/{asset.id}</div><div class="tiny muted" style="margin-top:4px">Opens /'+(it.kind==='pad'?'pad':'site')+'/'+it.id+'</div></div>';
+    h+='<div class="sect"><h4>View alarms <span class="tag">From kind</span></h4><div class="input val small">/alarms?source={asset.path}</div><div class="tiny muted" style="margin-top:4px">Shown in the popup only while '+it.id+' has alarms</div></div>';
+    h+='<div class="sect"><h4>Popup parts <span class="tag">From kind</span></h4>'+['Name and kind','Comms','Key values','Alarm summary','Buttons'].map(function(p){return '<div class="kv" style="justify-content:flex-start;gap:8px"><span class="check on">'+ic('check',11)+'</span>'+p+'</div>';}).join('')+'</div>';
+  }
+  return h;
+}
+function detailsFoot(){return '<div class="pfoot"><button class="btn sm">'+ic('copy',14)+'Add another like this</button><button class="btn sm ghost" style="margin-left:auto">'+ic('trash',14)+'Delete</button></div>';}
+
+function kindsList(){
+  var h='<div style="padding:12px 16px 4px" class="small muted">Setup applies to every item of a kind. Items can override.</div><div class="grp">';
+  KORDER.forEach(function(k){h+='<button class="row-i'+(S.kindSel===k?' sel':'')+'" data-act="kind" data-v="'+k+'"><span class="ki">'+ic(KINDS[k].icon,17)+'</span><span class="nm">'+KINDS[k].label+'</span><span class="tiny muted">'+KINDS[k].geo+' - '+KINDS[k].n+'</span></button>';});
+  return h+'</div>';
+}
+function pvState(cls,word){
+  return '<span class="pv '+cls+'"><span class="disc">'+ic('well-pad',19)+'</span><span class="tiny" style="font-weight:600">P12'+(word?' <span class="tag" style="font-size:10px;padding:0 4px">'+word+'</span>':'')+'</span></span>';
+}
+function kindHead(back){
+  return '<div class="ph">'+(back?'<button class="btn ghost sm" style="margin:-4px 0 6px -8px" data-act="back">'+ic('back',16)+'All kinds</button>':'')+'<div class="row"><span>'+ic('well-pad',22)+'</span><div style="flex:1"><h3>Well pad</h3><div class="small muted">Point - applies to 3 items - 1 override (P14 label)</div></div></div></div>';
+}
+function kindBody(){
+  var h='<div class="sect"><h4>Icon</h4><div style="display:flex;gap:8px">';
+  ['well-pad','wellhead','point'].forEach(function(n,i){h+='<span class="pv" style="width:auto"><span class="disc" style="'+(i===0?'box-shadow:0 0 0 2px var(--neutral-10),0 0 0 4px var(--neutral-90)':'')+'">'+ic(n,19)+'</span></span>';});
+  h+='</div><div class="tiny muted" style="margin-top:6px">From zoom 14 the icon, below a neutral dot. Label rank 2 of 7.</div></div>';
+  h+='<div class="sect"><h4>Key values <span class="tag">Up to 4</span></h4>';
+  [['Comms','{asset.path}/Heartbeat',1,0],['Casing pressure','{asset.path}/CasingPressure',1,1],['Tubing pressure','{asset.path}/TubingPressure',1,0],['Gas rate','{asset.path}/GasRate',0,0]].forEach(function(r){
+    h+='<div class="kv"><div style="min-width:0"><div style="display:flex;gap:4px;align-items:center">'+r[0]+(r[3]?' <span class="tag">'+ic('star',10)+'Icon value</span>':'')+'</div><div class="tiny muted" style="font-family:ui-monospace,monospace">'+r[1]+'</div></div><span class="sw2'+(r[2]?' on':'')+'"></span></div>';
+  });
+  h+='<button class="btn sm" style="margin-top:6px">'+ic('tag',14)+'Browse tags</button><div class="tiny muted" style="margin-top:6px">Resolves for 3 of 3 items.</div></div>';
+  h+='<div class="sect"><h4>Popup parts</h4>'+[['Name and kind',1],['Comms',1],['Key values',1],['Alarm summary and View alarms',1],['Open pad page',1],['Custom view',0]].map(function(p){return '<div class="kv" style="justify-content:flex-start;gap:8px"><span class="check'+(p[1]?' on':'')+'">'+(p[1]?ic('check',11):'')+'</span>'+p[0]+'</div>';}).join('')+'</div>';
+  h+='<div class="sect"><h4>Style rule</h4><div class="presets" style="margin-bottom:8px"><span class="on">States</span><span>Bands</span><span>Expression</span></div>';
+  h+='<div class="field"><label>Value</label><div class="input val small" style="font-family:ui-monospace,monospace">{asset.path}/Status</div></div>';
+  h+='<div class="tiny muted" style="display:grid;grid-template-columns:1fr 18px 1fr 64px;gap:8px"><span>When Status is</span><span></span><span>Use preset</span><span>Preview</span></div>';
+  [['Running','Normal','',''],['Shut in','Dimmed dashed','dim','Shut in'],['Testing','Attention','att','Testing']].forEach(function(r){
+    h+='<div class="rule"><span class="input val small" style="height:30px">'+r[0]+'</span><span class="muted">'+ic('chevr',14)+'</span><span class="sel-like">'+r[1]+ic('chev',14)+'</span>'+pvState(r[2],r[3])+'</div>';
+  });
+  h+='<button class="btn sm ghost" style="padding-left:0">'+ic('plus',14)+'Add a state</button><div class="note" style="margin-top:8px">Alarm wins over the rule. A stale value shows only as Stale. Attention has no hue: heavier outline plus the word.</div></div>';
+  return h;
+}
+function layersBody(){
+  return '<div class="sect"><h4>Basemap</h4><div class="presets"><span class="on">Blank</span><span>Satellite</span></div></div>'+
+   '<div class="sect"><h4>Show</h4>'+[['Lines',1],['Names',1],['Geofences',1],['Dots below zoom 14',1]].map(function(r){return '<div class="kv"><span>'+r[0]+'</span><span class="sw2'+(r[1]?' on':'')+'"></span></div>';}).join('')+'</div>'+
+   '<div class="sect"><h4>Reference layers <span class="tag">This session only</span></h4><div class="note">No reference layer loaded. Add a KML or GeoJSON file to trace over; it is never saved or edited.</div><button class="btn sm" style="margin-top:8px">'+ic('plus',14)+'Add reference layer</button></div>';
+}
+function importBody(){
+  return '<div class="sect"><h4>Import items</h4><div class="drop">'+ic('import',22)+'<div style="margin-top:6px;color:var(--label)">Drop a CSV, KML or GeoJSON file</div><div class="tiny">You see a preview first. Nothing changes until you add.</div></div></div>'+
+   '<div class="sect"><h4>CSV templates</h4>'+['Well pad','Tank battery','Pipeline'].map(function(k){return '<div class="kv"><span>'+k+'</span><button class="btn sm ghost">Download</button></div>';}).join('')+'</div>'+
+   '<div class="sect"><h4>Export</h4><div style="display:flex;gap:8px"><button class="btn sm">GeoJSON</button><button class="btn sm">CSV</button></div><div class="tiny muted" style="margin-top:6px">Whole map, 11 items</div></div>';
+}
+function railEl(slim){
+  var m=[['view','eye','View'],['items','list','Items'],['kinds','kinds','Kinds'],['layers','layers','Layers'],['import','import','Import']];
+  return '<div class="rail'+(slim?' slim':'')+'">'+m.map(function(x){return '<button class="'+(S.rail===x[0]?'on':'')+'" data-act="rail" data-v="'+x[0]+'">'+ic(x[1],20)+x[2]+'</button>';}).join('')+'</div>';
+}
+function titled(title,body,foot,extra){
+  return '<div class="ph"><div class="row"><h3 style="flex:1">'+title+'</h3>'+(extra||'')+'</div></div><div class="pbody">'+body+'</div>'+(foot||'');
+}
+
+/* ---------- directions ---------- */
+function dirA(){
+  var narrow=S.w<1400, lw=narrow?256:280, pw=narrow?320:340;
+  var h=railEl(false);
+  var list='', props='';
+  var head='<div class="ph"><div class="row"><h3 style="flex:1">Mesa map</h3>'+saveEl()+'</div></div>';
+  if(S.rail==='items'){list=head+'<div class="pbody">'+listBody()+'</div>'+listFoot();
+    var it=item(S.sel); if(it)props=detailsHead(it,false,true)+'<div class="pbody">'+detailsBody(it)+'</div>'+detailsFoot();}
+  else if(S.rail==='kinds'){list=head+'<div class="pbody">'+kindsList()+'</div>'; props=kindHead(false)+'<div class="pbody">'+kindBody()+'</div>';}
+  else if(S.rail==='layers'){list=head+'<div class="pbody">'+layersBody()+'</div>';}
+  else {list=head+'<div class="pbody">'+importBody()+'</div>';}
+  h+='<div class="panel" style="width:'+lw+'px">'+list+'</div>';
+  if(props)h+='<div class="panel" style="width:'+pw+'px">'+props+'</div>';
+  h+='<div class="map">'+mapWorld(props?-60:0)+toolbarTop()+topRight(false)+overlays()+conflictCard('top:60px;left:16px')+'</div>';
+  return h;
+}
+function dirB(){
+  var h='<div style="position:relative;display:flex;flex:1;min-width:0">'+railEl(true);
+  var open=S.panel&&S.rail!=='view', pane='';
+  if(S.rail==='items'){var it=S.sel&&item(S.sel); pane=it?detailsHead(it,true,true)+'<div class="pbody">'+detailsBody(it)+'</div>'+detailsFoot():titled('Items',listBody(),listFoot(),'<button class="ibtn" data-act="close" title="Close">'+ic('x',18)+'</button>');}
+  else if(S.rail==='kinds'){pane=S.kindSel?kindHead(true)+'<div class="pbody">'+kindBody()+'</div>':titled('Kinds',kindsList());}
+  else if(S.rail==='layers')pane=titled('Layers',layersBody(),'','<button class="ibtn" data-act="close">'+ic('x',18)+'</button>');
+  else pane=titled('Import and export',importBody(),'','<button class="ibtn" data-act="close">'+ic('x',18)+'</button>');
+  h+='<div class="map">'+mapWorld(open?160:0)+toolbarTop('<span class="div"></span>'+saveEl())+topRight(false)+overlays()+conflictCard('top:60px;left:50%;transform:translateX(-50%)')+
+     (open?'':'<button class="float btn" style="left:12px;bottom:12px" data-act="open">'+ic('list',16)+'Items 11</button>')+'</div>';
+  h+='<div class="slide'+(open?'':' closed')+'" style="left:56px">'+pane+'</div></div>';
+  return h;
+}
+function dirC(){
+  var narrow=S.w<1400, lw=narrow?240:264, pw=narrow?300:330;
+  var tabs=[['items','Items'],['kinds','Kinds'],['layers','Layers'],['import','Import']];
+  var left='<div class="ph"><div class="row"><h3 style="flex:1">Mesa map</h3>'+saveEl()+'</div><div class="tabs">'+tabs.map(function(t){return '<button class="'+(S.rail===t[0]?'on':'')+'" data-act="rail" data-v="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div></div>';
+  var body={items:listBody(),kinds:kindsList(),layers:layersBody(),import:importBody()}[S.rail]||listBody();
+  left+='<div class="pbody">'+body+'</div>'+(S.rail==='items'?listFoot():'');
+  var right;
+  if(S.rail==='kinds')right=kindHead(false)+'<div class="pbody">'+kindBody()+'</div>';
+  else {var it=item(S.sel); right=it?detailsHead(it,false,false)+'<div class="pbody">'+detailsBody(it)+'</div>'+detailsFoot():
+    '<div class="ph"><h3>Mesa</h3><div class="small muted">Nothing selected</div></div><div class="pbody"><div class="sect"><h4>Field</h4><div class="kv"><span class="k">Items</span><span>11</span></div><div class="kv"><span class="k">Unlinked</span><span>1 - P12 lateral</span></div><div class="kv"><span class="k">In alarm</span><span class="st a1">'+fi('a1u',14)+'1 - P14</span></div><div class="kv"><span class="k">Comms lost</span><span>1 - P21</span></div><div class="kv"><span class="k">Stale</span><span>1 - SWD1</span></div></div><div class="empty">Select an item on the map or in the list to edit it.</div></div>';}
+  return '<div class="panel" style="width:'+lw+'px">'+left+'</div><div class="map">'+mapWorld(0)+strip()+topRight(false)+overlays()+conflictCard('top:60px;left:70px')+'</div><div class="panel right" style="width:'+pw+'px">'+right+'</div>';
+}
+
+/* ---------- top-level render ---------- */
+function render(){
+  var sw='<b>Map Studio - layout directions</b>';
+  sw+='<span class="seg">'+['A','B','C'].map(function(d){return '<button class="'+(S.dir===d?'on':'')+'" data-act="dir" data-v="'+d+'">Direction '+d+'</button>';}).join('')+'</span>';
+  sw+='<span class="seg">'+[1440,1366].map(function(w){return '<button class="'+(S.w===w?'on':'')+'" data-act="w" data-v="'+w+'">'+w+'</button>';}).join('')+'</span>';
+  sw+='<span class="seg">'+[['0','View mode'],['1','Edit mode']].map(function(x){return '<button class="'+((S.edit?'1':'0')===x[0]?'on':'')+'" data-act="setedit" data-v="'+x[0]+'">'+x[1]+'</button>';}).join('')+'</span>';
+  sw+='<span class="lbl">Save status demo</span><span class="seg">'+[['saved','Saved'],['saving','Saving...'],['conflict','Conflict']].map(function(x){return '<button class="'+(S.save===x[0]?'on':'')+'" data-act="setsave" data-v="'+x[0]+'">'+x[1]+'</button>';}).join('')+'</span>';
+  document.getElementById('sw').innerHTML=sw;
+  var d=DIRS[S.dir];
+  document.getElementById('rat').innerHTML='<h2>'+d.name+'</h2><p>'+d.why+'</p><div class="hint">Try: the Edit switch on the map; a site or line on the map or in the list; the Details, Style and Link tabs; the line tool (snapping hint and Finish or Cancel); Kinds for the Well pad setup; zoom out below 14 for dots; the save status to cycle Saved, Saving... and the conflict.</div>';
+  var fr=document.getElementById('frame');
+  fr.style.width=S.w+'px'; fr.style.height=(S.w===1440?900:768)+'px';
+  var comp=S.edit?(S.dir==='A'?dirA():S.dir==='B'?dirB():dirC()):viewMap();
+  fr.innerHTML='<div class="host"><span class="crumb">Fields / <b>Mesa</b> / Map</span><span class="who">Jordan - map editor</span></div><div class="comp">'+comp+'</div><div class="appbar" title="Perspective App Bar toggle">'+ic('chev',12)+'App</div>';
+}
+var timer=null;
+document.addEventListener('click',function(e){
+  var t=e.target.closest('[data-act]');
+  if(!t){var m=e.target.closest('.map');if(m&&S.edit&&placing()){place(m,e);}return;}
+  var a=t.getAttribute('data-act'), v=t.getAttribute('data-v'), id=t.getAttribute('data-id');
+  switch(a){
+    case 'dir':S.dir=v;S.panel=true;break;
+    case 'w':S.w=+v;break;
+    case 'edit':S.edit=!S.edit;S.drawing=false;if(S.edit&&S.rail==='view')S.rail='items';break;
+    case 'setedit':S.edit=v==='1';if(S.edit&&S.rail==='view')S.rail='items';break;
+    case 'setsave':S.save=v;S.conflictOpen=v==='conflict';break;
+    case 'rail':if(v==='view'){S.edit=false;S.rail='items';}else{S.rail=v;S.panel=true;if(v==='kinds'&&S.dir==='B')S.kindSel=null;}S.drawing=false;break;
+    case 'sel':if(S.drawing)return; if(S.edit){S.sel=id;S.rail='items';S.panel=true;}else{S.popup=item(id)&&item(id).x?id:null;}break;
+    case 'close':if(S.dir==='B'&&S.rail==='items'&&!S.sel){S.panel=false;}else if(S.dir==='B'&&S.rail!=='items'){S.panel=false;}else S.sel=null;break;
+    case 'back':if(S.rail==='kinds')S.kindSel=null;else S.sel=null;break;
+    case 'open':S.panel=true;break;
+    case 'tab':S.tab=v;break;
+    case 'kind':S.kindSel=v;break;
+    case 'filter':S.filter=v;break;
+    case 'sortopen':S.sortOpen=!S.sortOpen;break;
+    case 'sort':S.sort=v;S.sortOpen=false;break;
+    case 'tool':S.tool=v;S.drawing=v==='line'||v==='pipe';S.toast=false;break;
+    case 'dcancel':S.drawing=false;S.tool='select';break;
+    case 'dfinish':S.toastMsg=S.tool==='pipe'?'Pipeline "L-3 (new)" added and saved':'Line added and saved - pick its kind in Details';S.drawing=false;S.tool='select';S.save='saving';S.toast=true;clearTimeout(timer);timer=setTimeout(function(){S.save='saved';render();},1200);break;
+    case 'toastx':S.toast=false;break;
+    case 'save':S.save=S.save==='saved'?'saving':'conflict';S.conflictOpen=S.save==='conflict';break;
+    case 'conflict':S.conflictOpen=!S.conflictOpen;break;
+    case 'resolve':S.save='saving';S.conflictOpen=false;clearTimeout(timer);timer=setTimeout(function(){S.save='saved';render();},1000);break;
+    case 'zin':S.zoom=Math.min(18,S.zoom+1);break;
+    case 'zout':S.zoom=Math.max(10,S.zoom-1);break;
+    case 'pclose':S.popup=null;break;
+    case 'legend':S.legend=!S.legend;break;
+    default:return;
+  }
+  render();
+});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&S.drawing){S.drawing=false;S.tool='select';render();}});
+function place(m,e){
+  var w=m.querySelector('.world').getBoundingClientRect();
+  var k=S.tool==='point'?'none':S.tool; S.newN++;
+  var nm=k==='pad'?'New well pad':k==='ctb'?'New tank battery':'New point';
+  var it={id:nm+(S.newN>1?' '+S.newN:''),kind:k,x:Math.round(e.clientX-w.left),y:Math.round(e.clientY-w.top)-10,ll:'32.2342, -103.8650',kvn:'',kv:'',status:'',comms:'',isNew:true};
+  ITEMS.push(it); S.sel=it.id; S.tab='details'; S.rail='items'; S.panel=true; S.tool='select'; S.save='saving';
+  clearTimeout(timer);timer=setTimeout(function(){S.save='saved';render();},900); render();
+}
+var drag=null;
+document.addEventListener('mousedown',function(e){var b=e.target.closest('.mk.new');if(!b||!S.edit)return;drag={it:item(b.getAttribute('data-id')),el:b,x:e.clientX,y:e.clientY,ox:0,oy:0};e.preventDefault();});
+document.addEventListener('mousemove',function(e){if(!drag)return;var dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.el.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';drag.dx=dx;drag.dy=dy;});
+document.addEventListener('mouseup',function(){if(!drag)return;if(drag.dx||drag.dy){drag.it.x+=drag.dx||0;drag.it.y+=drag.dy||0;S.save='saving';clearTimeout(timer);timer=setTimeout(function(){S.save='saved';render();},800);}drag=null;render();});
+window.ITEMS=ITEMS;window.place=place;
+window.S=S;window.render=render;
+render();
+</script>
+</body>
+</html>
