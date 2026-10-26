@@ -66,6 +66,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 /* ---------- shared bits ---------- */
 .ic{display:inline-block;vertical-align:middle;flex:none}
 .btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--neutral-40);background:var(--neutral-10)}
+.btn{white-space:nowrap}
 .btn:hover{background:var(--neutral-20)}
 .btn.pri{background:var(--callToAction);border-color:var(--callToAction);color:var(--neutral-10)}
 .btn.ghost{border-color:transparent;background:transparent}
@@ -108,6 +109,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 .ph h3{margin:0;font-size:16px;font-weight:600}
 .pbody{flex:1;overflow:auto;min-height:0}
 .pfoot{padding:10px 16px;border-top:1px solid var(--neutral-30);display:flex;gap:8px;align-items:center}
+.panel.right .pfoot{padding-right:76px} /* keep the App Bar toggle corner clear */
+.ph h3{white-space:nowrap}
+.ibtn{white-space:nowrap}
 .tabs{display:flex;gap:18px;margin-top:10px}
 .tabs button{border:0;background:none;padding:6px 0;color:var(--neutral-70);border-bottom:2px solid transparent}
 .tabs button.on{color:var(--label);font-weight:600;border-bottom-color:var(--neutral-90)}
@@ -150,6 +154,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .strip .div{height:1px;width:22px;background:var(--neutral-30);margin:4px auto}
 .tr{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;align-items:flex-end;gap:8px;z-index:6}
 .editsw{display:flex;align-items:center;gap:8px;height:36px;padding:0 10px 0 12px;font-weight:600;font-size:12px;border:0}
+.tr .float{position:relative}
 .zoom{display:flex;flex-direction:column;align-items:center;padding:2px;border-radius:8px}
 .zoom .zl{font-size:10px;color:var(--neutral-70);padding:2px 0}
 .search{top:12px;left:12px;width:300px;display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;color:var(--neutral-70)}
@@ -272,7 +277,7 @@ var ITEMS = [
 function item(id){for(var i=0;i<ITEMS.length;i++)if(ITEMS[i].id===id)return ITEMS[i];return null;}
 
 /* ---------- state ---------- */
-var S = {dir:'A',w:1440,edit:true,rail:'items',sel:'P14',tab:'details',tool:'select',drawing:false,save:'saved',filter:'all',zoom:15,popup:'P14',panel:true,kindSel:'pad',sort:'attention',sortOpen:false,drawKind:'pipe',newN:0,conflictOpen:false,toast:false,legend:true};
+var S = {dir:'A',w:1440,edit:true,rail:'items',sel:'P14',tab:'details',tool:'select',drawing:false,save:'saved',filter:'all',zoom:15,popup:'P14',panel:true,kindSel:'pad',snap:false,recent:false,sort:'attention',sortOpen:false,drawKind:'pipe',newN:0,conflictOpen:false,toast:false,legend:true};
 var DIRS = {
   A:{name:'Direction A - Docked studio',sum:'Atlist-like: a rail of modes, a docked list and a docked properties panel, the map on the right.',
      why:'Everything an editor needs stays on screen at once: modes on the rail, the field list, and the selected item. It reads as a finished studio rather than tools bolted onto a map, which answers the "cobbled together" complaint most directly. The cost is map width: at 1366 the map keeps about half the component.'},
@@ -291,9 +296,27 @@ function stBadge(it){
   return '';
 }
 function saveEl(){
-  if(S.save==='saving')return '<button class="save" data-act="save"><span class="spin"></span>Saving...</button>';
+  if(S.save==='saving')return '<button class="save" data-act="recent"><span class="spin"></span>Saving...</button>';
   if(S.save==='conflict')return '<button class="save conf" data-act="conflict">'+ic('warn',14)+'Not saved - conflict with Sam\'s change</button>';
-  return '<button class="save" data-act="save" title="Edits save as you go">'+ic('check',14)+'Saved</button>';
+  return '<button class="save" data-act="recent" title="Edits save as you go - open Recent changes">'+ic('check',14)+'Saved</button>';
+}
+function undoRedo(){
+  return '<button class="ibtn" style="width:28px;height:28px" title="Undo: edit 3 pads (Ctrl+Z)" data-act="nop">'+ic('undo',16)+'</button><button class="ibtn" style="width:28px;height:28px" title="Redo (Ctrl+Shift+Z)" data-act="nop">'+ic('redo',16)+'</button>';
+}
+function saveCluster(){return '<span style="display:inline-flex;align-items:center;gap:0">'+undoRedo()+saveEl()+'</span>';}
+var RECENT=[
+  ['You','Today 10:44','Edited 3 well pads in one change: Gas rate switched on',1],
+  ['Sam','Today 10:42','Moved P14 about 40 m north',0],
+  ['You','Today 10:31','Unlinked P12 lateral from Mesa/P12-LAT',0],
+  ['You','Today 08:05','Moved P21 12 m east',0],
+  ['Sam','Yesterday 16:20','Added P12 lateral, ends snapped to P12 and CTB1',0]
+];
+function recentPanel(pos){
+  if(!S.recent)return '';
+  var h='<div class="float" style="position:absolute;z-index:20;width:340px;'+pos+'"><div style="display:flex;align-items:center;padding:12px 12px 8px 16px"><b style="flex:1">Recent changes</b><button class="ibtn" data-act="recent" title="Close">'+ic('x',16)+'</button></div>';
+  h+='<div style="margin:0 12px 8px;padding:8px 10px;border-radius:6px;background:var(--neutral-20);display:flex;align-items:center;gap:8px"><span style="flex:1" class="small">Next undo is one step: <b>Undo: edit 3 pads</b></span><button class="btn sm">'+ic('undo',14)+'Undo</button></div>';
+  RECENT.forEach(function(r){h+='<div style="display:flex;gap:10px;padding:8px 16px;border-top:1px solid var(--neutral-30);align-items:flex-start"><span style="width:26px;height:26px;border-radius:50%;background:var(--neutral-30);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex:none">'+r[0].charAt(0)+'</span><div style="flex:1;min-width:0"><div class="small">'+r[2]+'</div><div class="tiny muted">'+r[0]+' - '+r[1]+'</div></div><button class="btn sm ghost">Revert</button></div>';});
+  return h+'<div class="tiny muted" style="padding:8px 16px 12px;border-top:1px solid var(--neutral-30)">Revert undoes that one change, including someone else\'s, and saves like any edit.</div></div>';
 }
 function editSwitch(){
   return '<button class="float editsw" style="position:relative" data-act="edit">'+ic(S.edit?'kinds':'eye',16)+(S.edit?'Editing':'Edit map')+'<span class="sw2'+(S.edit?' on':'')+'"></span></button>';
@@ -312,7 +335,7 @@ function toolBtns(vertical){
   KTOOLS.forEach(function(x){h+=tb(x);});
   h+='<span class="div"></span>';
   GTOOLS.forEach(function(x){h+=tb(x);});
-  h+='<span class="div"></span><button class="ibtn" title="Undo (Ctrl+Z)" data-act="nop">'+ic('undo',18)+'</button><button class="ibtn" title="Redo (Ctrl+Shift+Z)" data-act="nop">'+ic('redo',18)+'</button>';
+  h+='<span class="div"></span><button class="ibtn'+(S.snap?' on':'')+'" data-act="snap" title="Snapping '+(S.snap?'on':'off')+' - click to turn '+(S.snap?'off':'on')+'" style="width:auto;padding:0 8px;gap:4px;font-size:12px">'+ic('magnet',16)+'Snap'+(vertical?'':' '+(S.snap?'on':'off'))+'</button>';
   return h;
 }
 function placing(){return S.tool==='pad'||S.tool==='ctb'||S.tool==='point';}
@@ -322,8 +345,8 @@ function modeLabel(){
   if(nm)return ic(S.tool==='point'?'point':KINDS[S.tool].icon,16)+'Add a '+nm+' - click the map, then drag to fine-tune';
   return {select:ic('cursor',16)+'Select',area:ic('region',16)+'Draw an area - kind picked after'}[S.tool]||'';
 }
-function toolbarTop(extra){
-  return '<div class="float toolbar">'+toolBtns()+(extra||'')+'</div><div class="float modepill" style="position:absolute;top:60px;left:50%;transform:translateX(-50%);height:28px;padding:0 12px">'+modeLabel()+'</div>';
+function toolbarTop(extra,off){off=off||0;
+  return '<div class="float toolbar" style="left:calc(50% + '+off+'px)">'+toolBtns()+(extra||'')+'</div><div class="float modepill" style="position:absolute;top:60px;left:calc(50% + '+off+'px);transform:translateX(-50%);height:28px;padding:0 12px">'+modeLabel()+'</div>';
 }
 function strip(){
   return '<div class="float strip">'+toolBtns(true)+'</div><div class="float modepill" style="position:absolute;top:12px;left:64px;height:34px;padding:0 12px">'+modeLabel()+'</div>';
@@ -355,11 +378,11 @@ function mapWorld(dx){
   });
   /* draft line while drawing */
   if(S.drawing){
-    h+='<path d="M575 580 L650 512" stroke="var(--neutral-80)" stroke-width="3" fill="none" stroke-dasharray="7 5"/>';
-    h+='<path d="M650 512 L712 452" stroke="var(--neutral-60)" stroke-width="2" fill="none" stroke-dasharray="3 5"/>';
-    h+='<rect x="569" y="574" width="12" height="12" fill="var(--neutral-90)" stroke="var(--neutral-10)" stroke-width="2"/>';
-    h+='<circle cx="650" cy="512" r="5" fill="var(--neutral-10)" stroke="var(--neutral-90)" stroke-width="2"/>';
-    h+='<circle cx="720" cy="445" r="26" fill="var(--cta-tint)" stroke="var(--callToAction)" stroke-width="2" stroke-dasharray="4 3"/>';
+    h+='<path d="M935 535 L840 505" stroke="var(--neutral-80)" stroke-width="3" fill="none" stroke-dasharray="7 5"/>';
+    h+='<path d="M840 505 L748 458" stroke="var(--neutral-60)" stroke-width="2" fill="none" stroke-dasharray="3 5"/>';
+    h+=S.snap?'<rect x="929" y="529" width="12" height="12" fill="var(--neutral-90)" stroke="var(--neutral-10)" stroke-width="2"/>':'<circle cx="935" cy="535" r="6" fill="var(--neutral-10)" stroke="var(--neutral-90)" stroke-width="2"/>';
+    h+='<circle cx="840" cy="505" r="5" fill="var(--neutral-10)" stroke="var(--neutral-90)" stroke-width="2"/>';
+    if(S.snap)h+='<circle cx="720" cy="455" r="26" fill="var(--cta-tint)" stroke="var(--callToAction)" stroke-width="2" stroke-dasharray="4 3"/>';
   }
   h+='</svg>';
   /* sites */
@@ -379,7 +402,7 @@ function mapWorld(dx){
     }
   });
   var ni=S.edit&&item(S.sel);if(ni&&ni.isNew)h+='<div class="snaphint" style="left:'+ni.x+'px;top:'+(ni.y-4)+'px">'+ic('pin',12)+' Drag to fine-tune, or type latitude and longitude</div>';
-  if(S.drawing)h+='<div class="snaphint" style="left:720px;top:445px">'+ic('magnet',12)+' Snap to CTB1 - click to connect</div>';
+  if(S.drawing&&S.snap)h+='<div class="snaphint" style="left:735px;top:445px">'+ic('magnet',12)+' Snap to CTB1 - click to connect</div>';
   if(!S.edit&&S.popup)h+=popup(item(S.popup));
   return '<div class="world" style="transform:translate(calc(-50% + '+(dx||0)+'px),-50%)">'+h+'</div>';
 }
@@ -404,18 +427,18 @@ function legend(){
    '<div class="li"><svg width="16" height="8"><path d="M0 4h16" stroke="var(--neutral-60)" stroke-width="4"/></svg>Pipeline, weight by size</div>'+
    '<div class="tog"><span style="display:flex;gap:5px;align-items:center"><span class="check on">'+ic('check',11)+'</span>Lines</span><span style="display:flex;gap:5px;align-items:center"><span class="check on">'+ic('check',11)+'</span>Names</span></div><div class="tiny muted" style="margin-top:4px">Below zoom 14 sites show as dots</div></div>';
 }
-function drawBar(){
+function drawBar(off){
   var pk=S.tool==='pipe';
-  return '<div class="float drawbar"><span style="display:flex;gap:6px;align-items:center;font-weight:600">'+ic(pk?'pipeline':'line',16)+(pk?'New pipeline':'New line')+'</span>'+
+  return '<div class="float drawbar" style="left:calc(50% + '+off+'px)"><span style="display:flex;gap:6px;align-items:center;font-weight:600">'+ic(pk?'pipeline':'line',16)+(pk?'New pipeline':'New line')+'</span>'+
    (pk?'':'<span class="tag">Kind picked after Finish</span>')+
-   '<span class="muted small">2 points - 0.6 km - start snapped to P14</span>'+
-   '<span class="tag">'+ic('magnet',12)+'Snapping on</span>'+
+   '<span class="muted small">2 points - 0.7 km - start '+(S.snap?'snapped to CS01':'floating')+'</span>'+
+   '<span class="tag'+(S.snap?' ovr':'')+'">'+ic('magnet',12)+'Snapping '+(S.snap?'on':'off')+'</span>'+
    '<span class="muted tiny">Double-click or Enter to finish</span>'+
    '<button class="btn sm" data-act="dcancel">Cancel <span class="muted tiny">Esc</span></button><button class="btn sm pri" data-act="dfinish">Finish</button></div>';
 }
-function overlays(){
+function overlays(off){off=off||0;
   var h='';
-  if(S.drawing)h+=drawBar();
+  if(S.drawing)h+=drawBar(off);
   if(S.toast)h+='<div class="toast">'+ic('check',16)+''+S.toastMsg+'<button class="btn sm" data-act="toastx">Undo</button></div>';
   return h;
 }
@@ -531,7 +554,7 @@ function detailsBody(it){
   }
   return h;
 }
-function detailsFoot(){return '<div class="pfoot"><button class="btn sm">'+ic('copy',14)+'Add another like this</button><button class="btn sm ghost" style="margin-left:auto">'+ic('trash',14)+'Delete</button></div>';}
+function detailsFoot(){return '<div class="pfoot"><button class="btn sm">'+ic('copy',14)+'Add another like this</button><button class="ibtn" style="margin-left:auto" title="Delete (no confirmation, Ctrl+Z undoes)">'+ic('trash',16)+'</button></div>';}
 
 function kindsList(){
   var h='<div style="padding:12px 16px 4px" class="small muted">Setup applies to every item of a kind. Items can override.</div><div class="grp">';
@@ -548,12 +571,6 @@ function kindBody(){
   var h='<div class="sect"><h4>Icon</h4><div style="display:flex;gap:8px">';
   ['well-pad','wellhead','point'].forEach(function(n,i){h+='<span class="pv" style="width:auto"><span class="disc" style="'+(i===0?'box-shadow:0 0 0 2px var(--neutral-10),0 0 0 4px var(--neutral-90)':'')+'">'+ic(n,19)+'</span></span>';});
   h+='</div><div class="tiny muted" style="margin-top:6px">From zoom 14 the icon, below a neutral dot. Label rank 2 of 7.</div></div>';
-  h+='<div class="sect"><h4>Key values <span class="tag">Up to 4</span></h4>';
-  [['Comms','{asset.path}/Heartbeat',1,0],['Casing pressure','{asset.path}/CasingPressure',1,1],['Tubing pressure','{asset.path}/TubingPressure',1,0],['Gas rate','{asset.path}/GasRate',0,0]].forEach(function(r){
-    h+='<div class="kv"><div style="min-width:0"><div style="display:flex;gap:4px;align-items:center">'+r[0]+(r[3]?' <span class="tag">'+ic('star',10)+'Icon value</span>':'')+'</div><div class="tiny muted" style="font-family:ui-monospace,monospace">'+r[1]+'</div></div><span class="sw2'+(r[2]?' on':'')+'"></span></div>';
-  });
-  h+='<button class="btn sm" style="margin-top:6px">'+ic('tag',14)+'Browse tags</button><div class="tiny muted" style="margin-top:6px">Resolves for 3 of 3 items.</div></div>';
-  h+='<div class="sect"><h4>Popup parts</h4>'+[['Name and kind',1],['Comms',1],['Key values',1],['Alarm summary and View alarms',1],['Open pad page',1],['Custom view',0]].map(function(p){return '<div class="kv" style="justify-content:flex-start;gap:8px"><span class="check'+(p[1]?' on':'')+'">'+(p[1]?ic('check',11):'')+'</span>'+p[0]+'</div>';}).join('')+'</div>';
   h+='<div class="sect"><h4>Style rule</h4><div class="presets" style="margin-bottom:8px"><span class="on">States</span><span>Bands</span><span>Expression</span></div>';
   h+='<div class="field"><label>Value</label><div class="input val small" style="font-family:ui-monospace,monospace">{asset.path}/Status</div></div>';
   h+='<div class="tiny muted" style="display:grid;grid-template-columns:1fr 18px 1fr 64px;gap:8px"><span>When Status is</span><span></span><span>Use preset</span><span>Preview</span></div>';
@@ -561,6 +578,12 @@ function kindBody(){
     h+='<div class="rule"><span class="input val small" style="height:30px">'+r[0]+'</span><span class="muted">'+ic('chevr',14)+'</span><span class="sel-like">'+r[1]+ic('chev',14)+'</span>'+pvState(r[2],r[3])+'</div>';
   });
   h+='<button class="btn sm ghost" style="padding-left:0">'+ic('plus',14)+'Add a state</button><div class="note" style="margin-top:8px">Alarm wins over the rule. A stale value shows only as Stale. Attention has no hue: heavier outline plus the word.</div></div>';
+  h+='<div class="sect"><h4>Key values <span class="tag">Up to 4</span></h4>';
+  [['Comms','{asset.path}/Heartbeat',1,0],['Casing pressure','{asset.path}/CasingPressure',1,1],['Tubing pressure','{asset.path}/TubingPressure',1,0],['Gas rate','{asset.path}/GasRate',0,0]].forEach(function(r){
+    h+='<div class="kv"><div style="min-width:0"><div style="display:flex;gap:4px;align-items:center">'+r[0]+(r[3]?' <span class="tag">'+ic('star',10)+'Icon value</span>':'')+'</div><div class="tiny muted" style="font-family:ui-monospace,monospace">'+r[1]+'</div></div><span class="sw2'+(r[2]?' on':'')+'"></span></div>';
+  });
+  h+='<button class="btn sm" style="margin-top:6px">'+ic('tag',14)+'Browse tags</button><div class="tiny muted" style="margin-top:6px">Resolves for 3 of 3 items.</div></div>';
+  h+='<div class="sect"><h4>Popup parts</h4>'+[['Name and kind',1],['Comms',1],['Key values',1],['Alarm summary and View alarms',1],['Page link - pop-out icon in the header',1],['Custom view',0]].map(function(p){return '<div class="kv" style="justify-content:flex-start;gap:8px"><span class="check'+(p[1]?' on':'')+'">'+(p[1]?ic('check',11):'')+'</span>'+p[0]+'</div>';}).join('')+'</div>';
   return h;
 }
 function layersBody(){
@@ -586,7 +609,7 @@ function dirA(){
   var narrow=S.w<1400, lw=narrow?256:280, pw=narrow?320:340;
   var h=railEl(false);
   var list='', props='';
-  var head='<div class="ph"><div class="row"><h3 style="flex:1">Mesa map</h3>'+saveEl()+'</div></div>';
+  var head='<div class="ph"><div class="row"><h3 style="flex:1">Mesa map</h3>'+saveCluster()+'</div></div>';
   if(S.rail==='items'){list=head+'<div class="pbody">'+listBody()+'</div>'+listFoot();
     var it=item(S.sel); if(it)props=detailsHead(it,false,true)+'<div class="pbody">'+detailsBody(it)+'</div>'+detailsFoot();}
   else if(S.rail==='kinds'){list=head+'<div class="pbody">'+kindsList()+'</div>'; props=kindHead(false)+'<div class="pbody">'+kindBody()+'</div>';}
@@ -594,7 +617,7 @@ function dirA(){
   else {list=head+'<div class="pbody">'+importBody()+'</div>';}
   h+='<div class="panel" style="width:'+lw+'px">'+list+'</div>';
   if(props)h+='<div class="panel" style="width:'+pw+'px">'+props+'</div>';
-  h+='<div class="map">'+mapWorld(props?-60:0)+toolbarTop()+topRight(false)+overlays()+conflictCard('top:60px;left:16px')+'</div>';
+  h+='<div class="map">'+mapWorld(props?-60:0)+toolbarTop()+topRight(false)+overlays()+conflictCard('top:60px;left:16px')+recentPanel('top:8px;left:8px')+'</div>';
   return h;
 }
 function dirB(){
@@ -604,22 +627,22 @@ function dirB(){
   else if(S.rail==='kinds'){pane=S.kindSel?kindHead(true)+'<div class="pbody">'+kindBody()+'</div>':titled('Kinds',kindsList());}
   else if(S.rail==='layers')pane=titled('Layers',layersBody(),'','<button class="ibtn" data-act="close">'+ic('x',18)+'</button>');
   else pane=titled('Import and export',importBody(),'','<button class="ibtn" data-act="close">'+ic('x',18)+'</button>');
-  h+='<div class="map">'+mapWorld(open?160:0)+toolbarTop('<span class="div"></span>'+saveEl())+topRight(false)+overlays()+conflictCard('top:60px;left:50%;transform:translateX(-50%)')+
+  h+='<div class="map">'+mapWorld(open?160:0)+toolbarTop('<span class="div"></span>'+saveCluster(),open?180:0)+topRight(false)+overlays(open?180:0)+conflictCard('top:100px;left:calc(50% + 180px);transform:translateX(-50%)')+recentPanel('top:100px;left:calc(50% + 180px);transform:translateX(-50%)')+
      (open?'':'<button class="float btn" style="left:12px;bottom:12px" data-act="open">'+ic('list',16)+'Items 11</button>')+'</div>';
   h+='<div class="slide'+(open?'':' closed')+'" style="left:56px">'+pane+'</div></div>';
   return h;
 }
 function dirC(){
-  var narrow=S.w<1400, lw=narrow?240:264, pw=narrow?300:330;
+  var narrow=S.w<1400, lw=narrow?256:272, pw=narrow?300:330;
   var tabs=[['items','Items'],['kinds','Kinds'],['layers','Layers'],['import','Import']];
-  var left='<div class="ph"><div class="row"><h3 style="flex:1">Mesa map</h3>'+saveEl()+'</div><div class="tabs">'+tabs.map(function(t){return '<button class="'+(S.rail===t[0]?'on':'')+'" data-act="rail" data-v="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div></div>';
+  var left='<div class="ph"><div class="row"><h3 style="flex:1">Mesa map</h3>'+saveCluster()+'</div><div class="tabs">'+tabs.map(function(t){return '<button class="'+(S.rail===t[0]?'on':'')+'" data-act="rail" data-v="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div></div>';
   var body={items:listBody(),kinds:kindsList(),layers:layersBody(),import:importBody()}[S.rail]||listBody();
   left+='<div class="pbody">'+body+'</div>'+(S.rail==='items'?listFoot():'');
   var right;
   if(S.rail==='kinds')right=kindHead(false)+'<div class="pbody">'+kindBody()+'</div>';
   else {var it=item(S.sel); right=it?detailsHead(it,false,false)+'<div class="pbody">'+detailsBody(it)+'</div>'+detailsFoot():
     '<div class="ph"><h3>Mesa</h3><div class="small muted">Nothing selected</div></div><div class="pbody"><div class="sect"><h4>Field</h4><div class="kv"><span class="k">Items</span><span>11</span></div><div class="kv"><span class="k">Unlinked</span><span>1 - P12 lateral</span></div><div class="kv"><span class="k">In alarm</span><span class="st a1">'+fi('a1u',14)+'1 - P14</span></div><div class="kv"><span class="k">Comms lost</span><span>1 - P21</span></div><div class="kv"><span class="k">Stale</span><span>1 - SWD1</span></div></div><div class="empty">Select an item on the map or in the list to edit it.</div></div>';}
-  return '<div class="panel" style="width:'+lw+'px">'+left+'</div><div class="map">'+mapWorld(0)+strip()+topRight(false)+overlays()+conflictCard('top:60px;left:70px')+'</div><div class="panel right" style="width:'+pw+'px">'+right+'</div>';
+  return '<div class="panel" style="width:'+lw+'px">'+left+'</div><div class="map">'+mapWorld(0)+strip()+topRight(false)+overlays()+conflictCard('top:60px;left:70px')+recentPanel('top:8px;left:8px')+'</div><div class="panel right" style="width:'+pw+'px">'+right+'</div>';
 }
 
 /* ---------- top-level render ---------- */
@@ -631,7 +654,7 @@ function render(){
   sw+='<span class="lbl">Save status demo</span><span class="seg">'+[['saved','Saved'],['saving','Saving...'],['conflict','Conflict']].map(function(x){return '<button class="'+(S.save===x[0]?'on':'')+'" data-act="setsave" data-v="'+x[0]+'">'+x[1]+'</button>';}).join('')+'</span>';
   document.getElementById('sw').innerHTML=sw;
   var d=DIRS[S.dir];
-  document.getElementById('rat').innerHTML='<h2>'+d.name+'</h2><p>'+d.why+'</p><div class="hint">Try: the Edit switch on the map; a site or line on the map or in the list; the Details, Style and Link tabs; the line tool (snapping hint and Finish or Cancel); Kinds for the Well pad setup; zoom out below 14 for dots; the save status to cycle Saved, Saving... and the conflict.</div>';
+  document.getElementById('rat').innerHTML='<h2>'+d.name+'</h2><p>'+d.why+'</p><div class="hint">Try: the Edit switch on the map; Sort by in the list; a site or line on the map or in the list; the Details, Style and Link tabs; the Pipeline or Line tool (Snap is off by default, the demo turns it on; snapping hint and Finish or Cancel); a well pad tool then click the map and drag the new pin; Kinds for the Well pad setup; zoom out below 14 for dots; Saved to open Recent changes with Revert; the demo buttons above for Saving... and the conflict.</div>';
   var fr=document.getElementById('frame');
   fr.style.width=S.w+'px'; fr.style.height=(S.w===1440?900:768)+'px';
   var comp=S.edit?(S.dir==='A'?dirA():S.dir==='B'?dirB():dirC()):viewMap();
@@ -647,7 +670,7 @@ document.addEventListener('click',function(e){
     case 'w':S.w=+v;break;
     case 'edit':S.edit=!S.edit;S.drawing=false;if(S.edit&&S.rail==='view')S.rail='items';break;
     case 'setedit':S.edit=v==='1';if(S.edit&&S.rail==='view')S.rail='items';break;
-    case 'setsave':S.save=v;S.conflictOpen=v==='conflict';break;
+    case 'setsave':S.save=v;S.conflictOpen=v==='conflict';S.recent=false;break;
     case 'rail':if(v==='view'){S.edit=false;S.rail='items';}else{S.rail=v;S.panel=true;if(v==='kinds'&&S.dir==='B')S.kindSel=null;}S.drawing=false;break;
     case 'sel':if(S.drawing)return; if(S.edit){S.sel=id;S.rail='items';S.panel=true;}else{S.popup=item(id)&&item(id).x?id:null;}break;
     case 'close':if(S.dir==='B'&&S.rail==='items'&&!S.sel){S.panel=false;}else if(S.dir==='B'&&S.rail!=='items'){S.panel=false;}else S.sel=null;break;
@@ -658,12 +681,14 @@ document.addEventListener('click',function(e){
     case 'filter':S.filter=v;break;
     case 'sortopen':S.sortOpen=!S.sortOpen;break;
     case 'sort':S.sort=v;S.sortOpen=false;break;
-    case 'tool':S.tool=v;S.drawing=v==='line'||v==='pipe';S.toast=false;break;
+    case 'tool':S.tool=v;S.drawing=v==='line'||v==='pipe';if(S.drawing)S.snap=true;S.toast=false;break;
     case 'dcancel':S.drawing=false;S.tool='select';break;
     case 'dfinish':S.toastMsg=S.tool==='pipe'?'Pipeline "L-3 (new)" added and saved':'Line added and saved - pick its kind in Details';S.drawing=false;S.tool='select';S.save='saving';S.toast=true;clearTimeout(timer);timer=setTimeout(function(){S.save='saved';render();},1200);break;
     case 'toastx':S.toast=false;break;
     case 'save':S.save=S.save==='saved'?'saving':'conflict';S.conflictOpen=S.save==='conflict';break;
-    case 'conflict':S.conflictOpen=!S.conflictOpen;break;
+    case 'snap':S.snap=!S.snap;break;
+    case 'recent':S.recent=!S.recent;S.conflictOpen=false;break;
+    case 'conflict':S.recent=false;S.conflictOpen=!S.conflictOpen;break;
     case 'resolve':S.save='saving';S.conflictOpen=false;clearTimeout(timer);timer=setTimeout(function(){S.save='saved';render();},1000);break;
     case 'zin':S.zoom=Math.min(18,S.zoom+1);break;
     case 'zout':S.zoom=Math.max(10,S.zoom-1);break;
