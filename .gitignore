@@ -40,3 +40,6 @@ bin/
 
 # Agent worktrees (parallel stories), never committed
 .claude/worktrees/
+
+# Platform checks (story 3): generated PostgreSQL passwords
+ops/checks/secrets/
