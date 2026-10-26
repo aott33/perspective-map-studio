@@ -1,0 +1,7 @@
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-module-foundation/tickets/story-tracer-a-maplibre-map-on-a-perspective-view-with-one-round-t-plan.md`
+  summary: Remove the 15,704 `web/node_modules` files from the branch history by squashing the story 1 work-in-progress commits before the branch becomes a pull request.
+  evidence: An early WIP commit (13f7a34) swept `web/node_modules` in before it was ignored; `git ls-files` shows none now, but history carries them. Needs the owner's approval for a force-push on the session branch.
+  resolved: 2026-10-26 owner approved; the eleven WIP commits were squashed into one and force-pushed; no commit on the branch contains web/node_modules.
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-module-foundation/tickets/story-tracer-a-maplibre-map-on-a-perspective-view-with-one-round-t-plan.md`
+  summary: For the epic 1 refactor sweep (story 8) - clear the Gradle 10 deprecations in the build scripts, bump webpack to 5.112 or later to end the npm peer warnings, and fix the build-tool npm audit findings.
+  evidence: The owner's fresh-clone build on 2026-10-26 printed Gradle deprecation warnings (`by extra(...)`, `tasks.registering`, `moduleDependencies`) and npm peer warnings (webpack 5.101.3 pinned, plugins want ^5.112). `npm audit --omit=dev` findings (axios, lodash, moment, @babel/runtime) all come through `@inductiveautomation/perspective-client`, which webpack treats as an external the Gateway provides, so none of them ship in Map Studio's bundle; the rest are build tools only.

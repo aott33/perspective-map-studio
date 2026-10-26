@@ -1,0 +1,21 @@
+Map Studio for Ignition Perspective
+Copyright 2026 AO Industrial
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product bundles the following third-party software in its browser bundle:
+
+MapLibre GL JS (https://github.com/maplibre/maplibre-gl-js)
+    BSD 3-Clause License
+    Copyright (c) 2023 MapLibre contributors
+    Copyright (c) 2020 Mapbox
+    Contains code derived from Mapbox GL JS, licensed under the BSD 3-Clause
+    License (Copyright (c) 2020 Mapbox), and the packages it depends on under
+    their own licences (listed in web/node_modules after `npm install`).
+
+This product builds against, but does not redistribute, Inductive Automation's
+Ignition SDK and the @inductiveautomation/perspective-client package, which the
+Ignition platform provides at runtime.
+
+The icon in the Designer palette is drawn by the module itself; nothing in this
+product is derived from OpenBridge.
