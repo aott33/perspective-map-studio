@@ -22,3 +22,9 @@ Session: session_01DVAVWyHFvLKQeaRZ7Pw3zR · Timestamp: 2026-10-26T05:53:07Z
 Session: session_01DVAVWyHFvLKQeaRZ7Pw3zR · Timestamp: 2026-10-26T05:55:06Z
 
 - Result: owner accepted block 1. Owner noted map controls belong bottom-right like Google Maps; recorded as a UX direction in the initiative memlog with the reference image in ux-inputs/; not a story 1 change (tracer uses MapLibre's default top-right zoom).
+
+## 4 - block 2 - done
+
+Session: session_01DVAVWyHFvLKQeaRZ7Pw3zR · Timestamp: 2026-10-26T05:55:53Z
+
+- Result: owner accepted block 2; block 3 presented.
