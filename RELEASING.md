@@ -67,7 +67,7 @@ A host such as `ign-scada-template` pins the release in its lock file by SHA-256
 }
 ```
 
-Take `sha256` from the published release's `.sha256` file, `certSha256` from the README, and check both against the downloaded file with the host's own tool (`modl.py inspect`) and `scripts/ci/modl-verify.sh` before writing the entry. The rehearsal that proved this path is in [docs/template-install.md](docs/template-install.md).
+Take `sha256` from the published release's `.sha256` file, `certSha256` from the README, and check both against the downloaded file with the host's own tool (`modl.py inspect`) and `scripts/ci/modl-verify.sh` before writing the entry. The run that proved this path with the v0.1.0 release (and the earlier throwaway rehearsal) is in [docs/template-install.md](docs/template-install.md).
 
 ## Release approval
 

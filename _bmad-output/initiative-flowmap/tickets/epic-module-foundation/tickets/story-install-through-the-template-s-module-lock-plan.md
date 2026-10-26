@@ -3,7 +3,7 @@ title: "Install through the template's module lock"
 type: 'feature'
 ticket: '6'
 created: '2026-10-26'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '0c6a191c0550beaa9aff02c2610bc16b87ab6541'
 route: 'full'
 route_source: 'pinned'
@@ -76,9 +76,9 @@ Template repo (read for this plan, changed only in the later template pull reque
 - [x] In a template branch kept local (never pushed): lock entry with the throwaway sha256 and fingerprint, the `.modl` in `services/ignition/modules/`, commit, `scripts/test/stack.sh --keep`, scratch project, screenshots. Then delete the branch and `scripts/test/stack.sh --down`.
 
 **Execution (after P1 to P4; the template pull request waits for v0.1.0):**
-- [ ] Template `modules/modules.lock.json` -- add the Map Studio entry from the downloaded asset (`modl.py inspect`, `modl-verify.sh`, equal to the `.sha256` file and the README fingerprint); `upstream`: `{"type":"github","repo":"aott33/perspective-flowmap","asset":"Map-Studio-.*\\.modl","tag":"v0.1.0"}`.
+- [x] Template `modules/modules.lock.json` -- add the Map Studio entry from the downloaded asset (`modl.py inspect`, `modl-verify.sh`, equal to the `.sha256` file and the README fingerprint); `upstream`: `{"type":"github","repo":"aott33/perspective-flowmap","asset":"Map-Studio-.*\\.modl","tag":"v0.1.0"}`.
 - [x] `scripts/ci/build-signed.sh` (this repo) -- found by the rehearsal: wrap the exported certificate in a PKCS#7 DER bundle before the plugin copies it as `certificates.p7b`; without it the template's `modl.py` (openssl pkcs7) failed on the bare PEM certificate. Template `modl.py` is unchanged (decisions 1 and 2: no credential change, check like the others).
-- [ ] Template `docs/modules.md`, `THIRD_PARTY_NOTICES.md` -- fifth module, "three vendors" wording, Apache-2.0, history line. No workflow change.
+- [x] Template `docs/modules.md`, `THIRD_PARTY_NOTICES.md` -- fifth module, "three vendors" wording, Apache-2.0, history line. No workflow change.
 - [x] Template scratch project -- on the kept stack only: copy `ops/project/...` view and page config into `build/test-stack/projects/MapStudioScratch/` with its own `project.json`; `POST /data/api/v1/scan/projects`; open `/data/perspective/client/MapStudioScratch` at 1440 px and 390 px; screenshots. Done as a rehearsal on the throwaway build; repeat once against v0.1.0.
 - [x] This repo `docs/template-install.md`, `docs/screenshots/`, `RELEASING.md`, `README.md` -- the evidence (labels `[live 8.3.9]` only for what ran), the lock entry and the fetch path; feeds story 9. Written from the rehearsal; the real lock values are added after v0.1.0. `README.md` needed no change.
 
@@ -98,7 +98,9 @@ Rehearsal done 2026-10-26 (owner decisions 1 to 4 above); evidence in `docs/temp
 - The scratch project is a copy of `ops/project` (view, page config, popup view, `project.json`) copied into the kept test stack's `build/test-stack/projects/MapStudioScratch`, loaded by a project scan; it is never committed. `ops/screenshot.mjs` was run against it with the project name and output folder changed in a scratchpad copy.
 - One render failure in the first `stack.sh` run (`phone-native-night /well/Mesa/P12/P12-3H/trends`: `Cannot subscribe to "ProjectDefinition" state. "Parts/Asset/Trends/" does not exist`, an embed path whose type segment was still empty) looked like a template race, not Map Studio: the same page passed in `native-day`, and a re-run of the whole `phone-native-night` pass on the same stack had no failure. A full re-run on a fresh stack passed (`test stack: PASS`, exit 0). Not reproduced without the module: unverified whether the race predates Map Studio.
 
-- Status (bmad-build `in-progress`, because the story is not done): the rehearsal and the signing fix are built and reviewed (quick lens, four patches applied); the real template pull request, the real lock entry and the repeat against v0.1.0 wait for the signed release. This part merges first so v0.1.0 is built with the PKCS#7 fix. The repository is public now and CI on `main` is green (owner, 2026-10-26).
+- Status at the end of part 1 (`in-progress`; superseded by part 2 below): the rehearsal and the signing fix are built and reviewed (quick lens, four patches applied); the real template pull request, the real lock entry and the repeat against v0.1.0 wait for the signed release. This part merges first so v0.1.0 is built with the PKCS#7 fix. The repository is public now and CI on `main` is green (owner, 2026-10-26).
+
+- Part 2 (2026-10-26, after the owner published v0.1.0; the repository was renamed `aott33/perspective-map-studio`, so the lock entry, `upstream.repo` and `RELEASING.md` use that name where this plan says `perspective-flowmap`): in a fresh clone of `ign-scada-template` (scratchpad, origin the local path, branch `ccr-3c8b84b9-f1vbsm`, nothing pushed) one commit adds the lock entry (`sha256` from the published `.sha256`, `certSha256` the README fingerprint, Apache-2.0, `upstream` type `github`), `docs/modules.md` and `THIRD_PARTY_NOTICES.md`; `modl.py` and the workflows are unchanged. `modl.py fetch` downloaded the asset from the github.com URL (the template's `download()` sends no credential); `modl.py inspect`, `modl-verify.sh`, `verify-lock`, `check_repo.py`, `gen/check.py` passed; `scripts/test/stack.sh --keep` (CI render limits) printed `test stack: PASS`; the scratch project and screenshots at 1440 and 390 px were taken against the real release. Details in `docs/template-install.md`. Status is `built`: the template pull request itself (push, review, merge) is the owner's.
 
 ## Plan Change Log
 
