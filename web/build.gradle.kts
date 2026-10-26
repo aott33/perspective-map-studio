@@ -28,7 +28,7 @@ node {
 // Production build by default so every .modl is ship quality; -PwebDev gives
 // the unminified build with source maps for debugging.
 val webDev = project.hasProperty("webDev")
-val webpack by tasks.registering(NpmTask::class) {
+val webpack = tasks.register<NpmTask>("webpack") {
     group = "Ignition Module"
     description = "Builds the web bundle with webpack (-PwebDev for a development build)."
     args.set(listOf("run", if (webDev) "build:dev" else "build"))
@@ -39,7 +39,7 @@ val webpack by tasks.registering(NpmTask::class) {
     outputs.dir(projectOutput)
 }
 
-val jestTest by tasks.registering(NpmTask::class) {
+val jestTest = tasks.register<NpmTask>("jestTest") {
     group = "verification"
     description = "Runs the web unit tests with Jest."
     args.set(listOf("test"))

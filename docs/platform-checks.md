@@ -1,6 +1,6 @@
 # Platform checks
 
-The spike's platform questions (epic-module-foundation R3), each answered on a live Ignition 8.3.10 Gateway with its evidence and the fallback taken where it failed. One section per spike story; a story edits only its own section. Story 9 compiles these into the go or no-go report and carries the answers into claude-ignition-skills.
+The spike's platform questions (epic-module-foundation R3), each answered on a live Ignition 8.3.10 Gateway with its evidence and the fallback taken where it failed. One section per spike story; a story edits only its own section. Story 9 compiles these into the go or no-go report and carries the answers into claude-ignition-skills. The code and scripts that produced the Story 3 evidence were removed by Story 8 (see its section); they stay readable at commit `51104c8`.
 
 Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway (`inductiveautomation/ignition:8.3.10`); **[build]** seen in this repository's build or tests; **[npm metadata]** read from the package registry; **[client typings]** read from `@inductiveautomation/perspective-client` 2.3.10, the package matching 8.3.10; **[bundle]** read from Perspective's own `PerspectiveMap` browser bundle inside the 8.3.10 Perspective module; **[SDK 8.3.0 javap]** read from the SDK jars' signatures, not run; **[IA docs]** from the IA 8.3 manual; **[unverified]** or **[not verified]** not checked here.
 
@@ -227,3 +227,31 @@ Findings feed the phone epic and the viewing epic's bottom sheet (PRD: touch tar
 ### Not covered
 
 Hours to a green build (story 9 compiles it); the 60 fps NFR-1 verdict on a real GPU; a value batch from a real `values.batch`; real touch hardware.
+
+## Story 8 - Refactor sweep
+
+Cleanup only; no platform question here. Date: 2026-10-26.
+
+**Removed:** the Story 3 spike code (`gateway/.../spike/` and its three test classes, `MapStudioModule.SETUP_RESOURCE_TYPE`), the `mapstudio_checks` project script, the `setup` project resource, `ops/checks.sh`, `ops/checks/`, `ops/docker-compose.checks.yml` (the PostgreSQL 16 dev stack) and the checks hooks in `ops/lib.sh`. Nothing in `e2e/` used them. The module no longer logs `CHECK` lines. Kept: `MapStudioScriptModule` (`system.mapstudio.ping` and `echo`) and its registration in both hooks, because the Designer autocomplete check is still open (see below). Recovery: commit `51104c8` and the v0.1.0 release tag (not in the clone the sweep ran in, **[unverified]** here). The Story 3 section above remains the record of the answers.
+
+**Kept on purpose:** `popupView`, `testSet` (`scale30`), the dev views `MapStudioScale`, `MapStudioFallbackEmpty` and `MapStudioFallbackMissing` and their pages, so the popup, scale and measures specs keep their coverage. The owner's earlier decision to remove `testSet` in the sweep was superseded on 2026-10-26 (the 30-pad measure and the headed run need it; the component has no other way to receive data until the map store exists). They go with epic-map-store-and-data and epic-viewing.
+
+**Build tools** (Gradle 9.8.0, `./gradlew build --warning-mode all`, JDK 21 running Gradle with a JDK 17 toolchain) **[build]**:
+
+| Warning or finding | Before | After |
+| --- | --- | --- |
+| `val x by extra(...)` (`build.gradle.kts`) | deprecated, fails in Gradle 10 | `extra["sdk_version"] = ...` |
+| `val x by tasks.registering(...)` (`web/build.gradle.kts` twice) | deprecated | `tasks.register<NpmTask>(...)` |
+| `Task.project` at execution time from our `copy {}` in `doLast` and `layout` in `doFirst` | deprecated | a `Copy` task and values captured at configuration time; `module.xml` and the file list are unchanged |
+| `moduleDependencies` (owner's fresh clone) | not reproduced with `--warning-mode all` on the first run; appeared as a compile warning after the script changed | line removed; `moduleDependencySpecs` already declares the Perspective dependency |
+| `Project.getProperties` and `Task.project` in `:common:collectModlDependencies` | present | **left**: raised by the `io.ia.sdk.modl` 0.5.0 plugin as far as the build log shows (plugin source not read) |
+| npm peer warnings (webpack 5.101.3 against `^5.112`) | 4 `ERESOLVE` blocks | none; webpack 5.112.2 |
+| `npm audit` | 12 (1 low, 7 moderate, 4 high) | 8 (5 moderate, 3 high); `npm audit --omit=dev` reports 0 |
+
+The 8 remaining findings (`axios`, `lodash`, `moment`, `@babel/runtime` and the `react-swipeable-views` packages) all come through `@inductiveautomation/perspective-client`, which webpack treats as an external the Gateway provides, so none of them is in the bundle; npm's offered fix is a downgrade to 2.3.9, which does not match 8.3.10 and was not taken. The client moved to `devDependencies` (it is used at build time only) **[build]**; whether any other tool reads `dependencies` was not checked. The `serialize-javascript` findings went with `copy-webpack-plugin` 14.0.0 and `css-minimizer-webpack-plugin` 8.0.0 (both accept Node 20.9 or later and webpack 5 **[npm metadata]**).
+
+**Bundle** (production, served by the dev Gateway): `MapStudio.js` 1,179,848 to 1,179,814 bytes, `MapStudio.css` 72,208 to 72,518, worker unchanged at 517,065. The unsigned `.modl` went from 510,041 to 488,266 bytes: the only entries removed are the eight `gateway/.../spike` classes; `module.xml` is identical, including `<license>`. `docs/spike-measures.json` and the screenshots were not rewritten (Story 9 compiles them from the v0.1.0 run).
+
+**Verification:** `./gradlew build` green with Jest 32 and 6 Gateway tests (was 18); `npm test` in `e2e/` 10 of 10 on a fresh dev Gateway (`ms-s8`), no `CHECK` line and no Map Studio warning or error in the Gateway log; `scripts/ci/test-signing.sh` passes. A dev Gateway restarted with a leftover `setup` resource in the project started the project and the module, with no `CHECK` line and no Map Studio warning or error **[live 8.3.10]**.
+
+**Still with the owner (listed for Story 9):** the headed frame-rate run; the Designer checks for `system.mapstudio.` autocomplete and `CHECK setup-modified` (run the second on the v0.1.0 module or on `51104c8`: the code behind it is gone from the current tree).

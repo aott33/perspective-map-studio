@@ -57,7 +57,8 @@ export interface MapStudioProps {
     /**
      * Spike-only (story 7): which fixed test data the map draws, 'tracer' (three
      * points and a line) or 'scale30' (a seeded 30-pad stand-in for the
-     * template's scale set). Removed in the refactor sweep.
+     * template's scale set). Removed when the map store supplies the data
+     * (epic-map-store-and-data).
      */
     testSet: string;
 }
