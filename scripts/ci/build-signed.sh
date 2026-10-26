@@ -12,6 +12,13 @@ alias_name="${2:?key alias}"
 version="${3:?version}"
 : "${MODULE_SIGNING_KEYSTORE_PASSWORD:?set MODULE_SIGNING_KEYSTORE_PASSWORD}"
 
+# Gradle properties files cannot carry every character safely.
+case "$MODULE_SIGNING_KEYSTORE_PASSWORD" in
+  *\\*) echo "build-signed: the keystore password contains a backslash, which a properties file cannot hold. Choose another password." >&2; exit 1 ;;
+  *$'\n'*) echo "build-signed: the keystore password contains a newline. Choose another password." >&2; exit 1 ;;
+  " "*|*" "|$'\t'*|*$'\t') echo "build-signed: the keystore password has leading or trailing whitespace. Choose another password." >&2; exit 1 ;;
+esac
+
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -20,7 +27,7 @@ trap 'rm -rf "$work"' EXIT
 # exporting it here means it can never disagree with the key.
 keytool -exportcert -rfc -alias "$alias_name" -keystore "$keystore" \
   -storetype PKCS12 -storepass:env MODULE_SIGNING_KEYSTORE_PASSWORD \
-  -file "$work/cert.pem" 2>/dev/null
+  -file "$work/cert.pem"
 
 # The plugin reads project properties named ignition.signing.*. Gradle does not
 # honour dotted ORG_GRADLE_PROJECT_ environment names (tested), and a -P

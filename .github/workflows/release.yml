@@ -1,10 +1,13 @@
 name: Release
 
-# A release is a tag vX.Y.Z on main. The workflow builds, signs with the owner's
-# certificate (repository secrets), checks the signature and that the
-# certificate fingerprint is the one in the README, and attaches the signed
-# .modl and its SHA-256 to a DRAFT GitHub release. It never publishes: the
-# owner publishing the draft is the approval. See RELEASING.md.
+# A release is a tag vX.Y.Z on main. Two jobs:
+#   build-sign  reads the signing secrets, builds, signs, checks the signature
+#               structure, the certificate fingerprint against the README and the
+#               module version against the tag. It cannot write to the repository.
+#   draft       can write to the repository, sees no secret and builds nothing:
+#               it attaches the signed .modl and its SHA-256 to a DRAFT release.
+# The workflow never publishes: the owner publishing the draft is the approval.
+# See RELEASING.md.
 #
 # Secrets (Settings, Secrets and variables, Actions):
 #   MODULE_SIGNING_KEYSTORE_B64       base64 of the PKCS12 keystore (alias "mapstudio")
@@ -23,17 +26,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Build, sign and draft the release
+  build-sign:
+    name: Build and sign
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # environment: release   # uncomment when the plan allows environments (RELEASING.md)
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Check the tag
         id: tag
@@ -68,15 +74,6 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Cache Gradle
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties', 'web/package-lock.json') }}
-          restore-keys: gradle-${{ runner.os }}-
-
       - name: Decode the keystore
         env:
           KEYSTORE_B64: ${{ secrets.MODULE_SIGNING_KEYSTORE_B64 }}
@@ -93,24 +90,53 @@ jobs:
       - name: Build and sign
         env:
           MODULE_SIGNING_KEYSTORE_PASSWORD: ${{ secrets.MODULE_SIGNING_KEYSTORE_PASSWORD }}
-        run: scripts/ci/build-signed.sh "$RUNNER_TEMP/mapstudio-signing.p12" mapstudio "${{ steps.tag.outputs.version }}"
-
-      - name: Verify the signature and the fingerprint
-        run: |
-          cp build/Map-Studio.modl "$RUNNER_TEMP/Map-Studio-${{ steps.tag.outputs.version }}.modl"
-          scripts/ci/modl-verify.sh "$RUNNER_TEMP/Map-Studio-${{ steps.tag.outputs.version }}.modl" "${{ steps.readme.outputs.fingerprint }}"
-          (cd "$RUNNER_TEMP" && sha256sum "Map-Studio-${{ steps.tag.outputs.version }}.modl" > "Map-Studio-${{ steps.tag.outputs.version }}.modl.sha256")
-          cat "$RUNNER_TEMP/Map-Studio-${{ steps.tag.outputs.version }}.modl.sha256"
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: scripts/ci/build-signed.sh "$RUNNER_TEMP/mapstudio-signing.p12" mapstudio "$VERSION"
 
       - name: Remove the keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/mapstudio-signing.p12"
 
+      - name: Verify the signature structure, fingerprint and version
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+          FINGERPRINT: ${{ steps.readme.outputs.fingerprint }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          modl="$RUNNER_TEMP/out/Map-Studio-$VERSION.modl"
+          cp build/Map-Studio.modl "$modl"
+          scripts/ci/modl-verify.sh "$modl" "$FINGERPRINT" "$VERSION"
+          (cd "$RUNNER_TEMP/out" && sha256sum "Map-Studio-$VERSION.modl" > "Map-Studio-$VERSION.modl.sha256")
+          cat "$RUNNER_TEMP/out/Map-Studio-$VERSION.modl.sha256"
+
+      - name: Upload the signed module
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: signed-modl
+          path: ${{ runner.temp }}/out/*
+          if-no-files-found: error
+          retention-days: 3
+
+  draft:
+    name: Draft the release
+    needs: build-sign
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download the signed module
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: signed-modl
+          path: out
+
       - name: Create the draft release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.build-sign.outputs.version }}
         run: |
-          v="${{ steps.tag.outputs.version }}"
-          gh release create "$TAG" --draft --verify-tag --title "Map Studio $v" --generate-notes \
-            "$RUNNER_TEMP/Map-Studio-$v.modl" "$RUNNER_TEMP/Map-Studio-$v.modl.sha256"
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
+            --title "Map Studio $VERSION" --generate-notes \
+            "out/Map-Studio-$VERSION.modl" "out/Map-Studio-$VERSION.modl.sha256"

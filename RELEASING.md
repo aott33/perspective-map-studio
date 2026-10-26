@@ -6,7 +6,7 @@ Releases are signed `.modl` files on GitHub. Signing happens only in the release
 
 Do this on a trusted machine with a JDK 17 `keytool`.
 
-1. Generate the certificate. `keytool` asks for the password; choose a long one and do not type it on the command line.
+1. Generate the certificate. Use a password without a backslash, a newline, or leading or trailing whitespace: the build writes it to a temporary Gradle properties file and refuses such passwords with a clear message. `keytool` asks for the password; choose a long one and do not type it on the command line.
 
    ```bash
    keytool -genkeypair -alias mapstudio -keyalg RSA -keysize 3072 -sigalg SHA256withRSA \
@@ -41,10 +41,10 @@ Do this on a trusted machine with a JDK 17 `keytool`.
    git push origin v0.1.0
    ```
 
-3. The workflow checks the tag is on `main`, builds and signs, verifies the signature structure and that the certificate fingerprint equals the README line, and creates a DRAFT release with `Map-Studio-X.Y.Z.modl` and `Map-Studio-X.Y.Z.modl.sha256`.
+3. The `build-sign` job (read-only token, the only job that sees the secrets) checks the tag is on `main`, builds and signs, and checks the signature structure, that the certificate fingerprint equals the README line and that `module.xml`'s version equals the tag. The `draft` job (can write releases, sees no secret, builds nothing) then creates a DRAFT release with `Map-Studio-X.Y.Z.modl` and `Map-Studio-X.Y.Z.modl.sha256`.
 4. Review the draft. Download the `.modl`, run `scripts/ci/modl-verify.sh <file> "<README fingerprint>"`, then publish the draft. Publishing is the release approval; the workflow never publishes by itself.
 
-The workflow checks the structure of the signature. The Gateway checks the cryptography when it installs the module, so install the signed build once on a dev Gateway before you rely on a new certificate.
+`modl-verify.sh` is a structure and fingerprint check only: it does not verify the signatures cryptographically, so a forged module that carries the genuine certificate file would pass it. The cryptographic check happens when a Gateway installs the module, so install the signed build once on a dev Gateway before you rely on a new certificate. Real verification is a deferred item.
 
 Limit of this setup: the secrets are repository secrets, so anyone who can push a tag to the repository can start the release workflow (it still only creates a draft, and only for a tag on `main`).
 
@@ -54,7 +54,7 @@ Move the secrets behind an environment with a required reviewer:
 
 1. Settings, Environments: create `release`; set yourself as required reviewer; under deployment branches and tags choose "Selected" and add the tag rule `v*`.
 2. Move `MODULE_SIGNING_KEYSTORE_B64` and `MODULE_SIGNING_KEYSTORE_PASSWORD` into the `release` environment and delete the repository copies.
-3. In `release.yml` uncomment the one line `# environment: release` on the `release` job.
+3. In `release.yml` uncomment the one line `# environment: release` on the `build-sign` job.
 4. Settings, Rules, Rulesets: add a tag ruleset that restricts creation of `v*` tags to the owner.
 
 ## Rotation or lost key
@@ -63,4 +63,4 @@ A rotation is a release: generate a new certificate (setup steps 1 to 4), change
 
 ## Testing the signing path
 
-`scripts/ci/test-signing.sh` (also the `signing-check` CI job) generates a throwaway certificate in a temporary directory, signs with the same script the release uses, and checks that a wrong fingerprint, the unsigned build and a module with an unsigned file are all refused. It needs JDK 17 on `PATH`.
+`scripts/ci/test-signing.sh` (also the `signing-check` CI job) generates a throwaway certificate in a temporary directory, signs with the same script the release uses, and checks that a wrong fingerprint or version, empty arguments, the unsigned build, a module with an unsigned file and unsafe passwords are all refused. It needs JDK 17 on `PATH`.

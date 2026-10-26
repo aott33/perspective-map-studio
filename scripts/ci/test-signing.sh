@@ -25,8 +25,27 @@ fp="$(keytool -list -v -alias mapstudio -keystore "$work/throwaway.p12" \
 signed="$root/build/Map-Studio.modl"
 unsigned="$root/build/Map-Studio.unsigned.modl"
 
-echo "== positive: signed build verifies with its own fingerprint"
-"$here/modl-verify.sh" "$signed" "$fp"
+echo "== positive: signed build verifies with its own fingerprint and version"
+"$here/modl-verify.sh" "$signed" "$fp" 0.0.1
+
+echo "== negative: wrong version, empty fingerprint and empty version arguments are refused"
+if "$here/modl-verify.sh" "$signed" "$fp" 9.9.9; then
+  echo "test-signing: a wrong version was accepted" >&2; exit 1
+fi
+if "$here/modl-verify.sh" "$signed" ""; then
+  echo "test-signing: an empty fingerprint argument was accepted" >&2; exit 1
+fi
+if "$here/modl-verify.sh" "$signed" "$fp" ""; then
+  echo "test-signing: an empty version argument was accepted" >&2; exit 1
+fi
+
+echo "== negative: unsafe passwords are refused before any build"
+for bad in 'a\b' ' padded' 'padded '; do
+  if MODULE_SIGNING_KEYSTORE_PASSWORD="$bad" "$here/build-signed.sh" "$work/throwaway.p12" mapstudio 0.0.1 >/dev/null 2>&1; then
+    echo "test-signing: an unsafe password was accepted" >&2; exit 1
+  fi
+done
+test -f "$signed" || { echo "test-signing: the unsafe-password check touched the build" >&2; exit 1; }
 
 echo "== negative: wrong fingerprint is refused"
 if "$here/modl-verify.sh" "$signed" "00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF"; then

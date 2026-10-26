@@ -50,12 +50,12 @@ The dev Gateway loads the unsigned build (`-Dignition.allowunsignedmodules=true`
 
 ## Releases and signing
 
-Releases are signed `.modl` files attached to GitHub releases, built by CI from a `vX.Y.Z` tag on `main` ([RELEASING.md](RELEASING.md)). Every release is signed with one self-signed certificate held by the project owner. Check a download against this fingerprint before you install it:
+Releases are signed `.modl` files attached to GitHub releases, built by CI from a `vX.Y.Z` tag on `main` ([RELEASING.md](RELEASING.md)). Every release is signed with one self-signed certificate held by the project owner. Check a download against this fingerprint before you install it (the script checks structure and fingerprint only; the Gateway verifies the signatures cryptographically when you install the module):
 
 Signing certificate SHA-256: PENDING - the owner adds the fingerprint before the first release
 
 ```bash
-scripts/ci/modl-verify.sh Map-Studio-<version>.modl "<fingerprint above>"   # needs unzip and a JDK's keytool
+scripts/ci/modl-verify.sh Map-Studio-<version>.modl "<fingerprint above>"   # structure and fingerprint check; needs unzip and a JDK's keytool
 sha256sum -c Map-Studio-<version>.modl.sha256                               # the file's own SHA-256
 ```
 
