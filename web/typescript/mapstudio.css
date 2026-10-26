@@ -48,3 +48,94 @@
 .mapstudio .maplibregl-ctrl button .maplibregl-ctrl-icon {
     filter: none;
 }
+
+/* The line tool toggle: a glyph and the mode's name in words. */
+.mapstudio .mapstudio-draw-button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: auto;
+    height: 29px;
+    padding: 0 10px;
+    border: none;
+    background: var(--container);
+    color: var(--label);
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.mapstudio .mapstudio-draw-button:hover {
+    background: var(--neutral-30);
+}
+
+.mapstudio .mapstudio-draw-button--on {
+    background: var(--callToActionHighlight);
+    color: var(--callToAction);
+    box-shadow: inset 0 0 0 1px var(--callToAction);
+}
+
+.mapstudio .mapstudio-draw-glyph {
+    flex: 0 0 auto;
+}
+
+/* Point popup: a project view by path, or the text fallback. Token colours only.
+   The popup's own max-width is an inline style MapLibre writes from the Popup
+   option (MapStudio.tsx), so it is not set here. */
+.mapstudio .maplibregl-popup-content {
+    padding: 0;
+    background: var(--container);
+    color: var(--label);
+    border: 1px solid var(--border);
+    border-radius: var(--borderRadius);
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.mapstudio .maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.mapstudio .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.mapstudio .maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+    border-bottom-color: var(--border);
+}
+
+.mapstudio .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.mapstudio .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.mapstudio .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+    border-top-color: var(--border);
+}
+
+.mapstudio .maplibregl-popup-anchor-left .maplibregl-popup-tip {
+    border-right-color: var(--border);
+}
+
+.mapstudio .maplibregl-popup-anchor-right .maplibregl-popup-tip {
+    border-left-color: var(--border);
+}
+
+.mapstudio .maplibregl-popup-close-button {
+    color: var(--label);
+    font-size: 16px;
+    padding: 0 6px;
+    right: 2px;
+    top: 2px;
+}
+
+.mapstudio .maplibregl-popup-close-button:hover {
+    background: var(--containerRoot);
+}
+
+.mapstudio-popup {
+    min-width: 120px;
+    max-width: calc(100vw - 48px);
+    overflow: auto;
+}
+
+.mapstudio-popup--text {
+    padding: 8px 28px 8px 12px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.mapstudio-popup--view {
+    padding-top: 0;
+}

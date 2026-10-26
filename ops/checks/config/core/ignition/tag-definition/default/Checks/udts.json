@@ -1,0 +1,9 @@
+[
+  {
+    "enabled": true,
+    "name": "Pump1",
+    "tagType": "UdtInstance",
+    "typeId": "Checks/Pump",
+    "tags": []
+  }
+]

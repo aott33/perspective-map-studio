@@ -73,6 +73,8 @@ An open popup is the exception: its values are pushed as they change, and only w
 
 Map Studio draws a default popup from each kind's setup: details, comms, key values, an alarm summary with a "View alarms" button, and an optional link to the item's own page. A project can name its own Perspective view by its path instead, rendered the way the built-in Perspective Map renders a view from a path, and it receives a documented map item object as its parameter. Map Studio never acknowledges alarms; that happens in Ignition's alarm table (AD-7).
 
+How the custom view is rendered (checked live in story 4, see `docs/platform-checks.md`): the browser mounts Perspective's own `View` component from `@inductiveautomation/perspective-client` with the view path, a mount path below the component's own, and the parameters, the same element the built-in Map uses for its custom controls and view layer. The `View` starts and stops the Gateway view model itself, so no Map Studio Java is involved and bindings in the view work. The content sits in a MapLibre popup through a React portal, so the view stays in the component's React tree. Today the path comes from the spike-only `popupView` prop and the view receives one `mapItem` parameter (`{id, name}`) beside the author's params; a missing or failing view falls back to a text popup with the item id.
+
 ## The data
 
 The map store is PostgreSQL tables prefixed `mapstudio_`, created and upgraded by the module (AD-3). Every row belongs to one Ignition project, and shapes are stored as GeoJSON text.

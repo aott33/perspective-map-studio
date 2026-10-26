@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Pump",
+    "tagType": "UdtType",
+    "tags": [
+      {
+        "name": "Toggle",
+        "tagType": "AtomicTag",
+        "dataType": "Boolean",
+        "valueSource": "expr",
+        "expression": "getSecond(now(1000)) % 60 < 30",
+        "documentation": "True for the first half of every minute, so the alarm below goes active and clears every 30 s without any tag write.",
+        "alarms": [
+          {
+            "name": "Toggled",
+            "mode": "WhenTrue",
+            "priority": "High",
+            "label": "Toggle is true",
+            "ackMode": "Auto",
+            "shelvingAllowed": true,
+            "notes": "Test alarm for the Map Studio platform checks (story 3). Not rationalized; dev Gateway only."
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "scope": "A",
+  "description": "Docker secrets mounted into the dev Gateway for the platform checks",
+  "version": 1,
+  "restricted": false,
+  "overridable": true,
+  "files": [
+    "config.json"
+  ],
+  "attributes": {
+    "uuid": "2f96ffed-264a-48e0-8e29-d1bcb5768a52",
+    "enabled": true
+  }
+}

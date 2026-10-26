@@ -27,6 +27,9 @@ signing/
 *.p12
 *.jks
 *.keystore
+*.pem
+*.p7b
+*.modl
 
 # IDE
 .idea/
@@ -37,3 +40,6 @@ bin/
 
 # Agent worktrees (parallel stories), never committed
 .claude/worktrees/
+
+# Platform checks (story 3): generated PostgreSQL passwords
+ops/checks/secrets/
