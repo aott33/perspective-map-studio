@@ -93,7 +93,7 @@ Dependencies point inward to `common/`. `web/` never reaches the database, tags 
 
 - **Binds:** R6, R7, R8, R39
 - **Prevents:** popups that each project must build, two shapes for the same map item, and acknowledging outside Ignition's alarm table.
-- **Rule:** Map Studio draws the default popup from the kind setup; while it is open (`popup.open` to `popup.close`) the Gateway pushes that map item's LiveValues on change. A kind setup may name a custom popup view, which receives the map item object as its parameter: the AD-20 record plus `basePath`, `alarmsPath` and its LiveValues, kept live while the view is open. Placeholders in popup links are dotted paths into the map item object (`{asset.id}`, `{properties.route}`). A missing or failing custom view falls back to the default popup. Map Studio never acknowledges alarms.
+- **Rule:** Map Studio draws the default popup from the kind setup; while it is open (`popup.open` to `popup.close`) the Gateway pushes that map item's LiveValues on change. A kind setup may name a custom popup view by its project view path, rendered the way the built-in Perspective Map renders a view from a `path` (its custom controls and view layer); it receives the map item object as its parameter: the AD-20 record plus `basePath`, `alarmsPath` and its LiveValues, kept live while the view is open. Placeholders in popup links are dotted paths into the map item object (`{asset.id}`, `{properties.route}`). A missing or failing custom view falls back to the default popup. Map Studio never acknowledges alarms.
 
 ### AD-8 - The message contract [ADOPTED]
 

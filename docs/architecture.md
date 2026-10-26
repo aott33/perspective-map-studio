@@ -71,7 +71,7 @@ An open popup is the exception: its values are pushed as they change, and only w
 
 ## Popups
 
-Map Studio draws a default popup from each kind's setup: details, comms, key values, an alarm summary with a "View alarms" button, and an optional link to the item's own page. A project can name its own Perspective view instead, which receives a documented map item object as its parameter. Map Studio never acknowledges alarms; that happens in Ignition's alarm table (AD-7).
+Map Studio draws a default popup from each kind's setup: details, comms, key values, an alarm summary with a "View alarms" button, and an optional link to the item's own page. A project can name its own Perspective view by its path instead, rendered the way the built-in Perspective Map renders a view from a path, and it receives a documented map item object as its parameter. Map Studio never acknowledges alarms; that happens in Ignition's alarm table (AD-7).
 
 ## The data
 
