@@ -108,6 +108,6 @@ Map editors build and keep a field's map in the browser and everyone reads live 
 - Decision: 2026-10-26 The template cut-over is its own epic and owns the touch point on `ign-scada-template`; its work lands as template pull requests.
 - Decision: 2026-10-26 Alarm aggregation is answered from the IA 8.3 docs (an Alarm Metrics folder on tag folders and UDT instances since 8.3.0); it does not gate the spike.
 - Open question: Alarm Metrics can be bound or subscribed but not read directly, so the batched icon refresh (NFR-9) must subscribe on the Gateway; architecture decides how, and checks the reported nested-UDT and naming issues.
-- Open question: Satellite basemap provider (Mapbox Satellite on the template's existing token suggested; MapTiler or Esri World Imagery as alternatives); architecture checks the terms.
+- Decision: 2026-10-26 Satellite basemap: Mapbox Satellite on the template's existing Mapbox token and secret; architecture checks the terms (MapTiler or Esri World Imagery if they fail).
 - Open question: Where the Map Studio tools sit on the page; a UX workshop decides.
 - Open question: How the project supplies kinds and the asset list, and in what format; architecture decides.
