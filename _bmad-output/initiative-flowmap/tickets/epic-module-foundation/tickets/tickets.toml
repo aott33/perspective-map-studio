@@ -1,0 +1,100 @@
+# Epic 1 stories in build order. Table order is build order; ids are permanent.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Tracer: a MapLibre map on a Perspective view, with one round trip"
+description = "Scaffolds the module in Map Studio's own layout (modelled on Mustry's), builds it unsigned, installs it on the ops/ Docker dev Gateway, and shows an ao.mapstudio component drawing fixed test points and one line, with one envelope message to the delegate and back."
+verify = "On the dev Gateway a Perspective view shows the map with three points and a line, and clicking a point logs the delegate's reply in the browser."
+covers = ["R1", "R2"]
+after = []
+hitl = true
+risk = "high"
+
+[[entry]]
+id = 2
+type = "spike"
+title = "MapLibre 6 and Terra Draw on the Perspective toolchain"
+description = "Builds maplibre-gl 6.16.0 with terra-draw and its MapLibre adapter under React 16.14, TypeScript 4.9 and webpack 5 inside the component, and draws one line; if it fails, finds the newest MapLibre that works and pins it."
+verify = "A line is drawn with Terra Draw on the tracer view, and the pinned MapLibre version is recorded with the reason."
+covers = ["R3"]
+after = [1]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 3
+type = "spike"
+title = "Gateway platform checks"
+description = "Answers on a live 8.3 Gateway: a Java subscription to Alarm Metrics on a folder and a UDT instance, calling a project script function from module code, registering a system.mapstudio function, a custom project resource type for the setup, and PostgreSQL connect, create a mapstudio_ table and log an error on missing rights (with 8.3.10's connection defaults)."
+verify = "Each check has a recorded result, evidence and the fallback taken where it failed, entered in claude-ignition-skills."
+covers = ["R3"]
+after = [1]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 4
+type = "spike"
+title = "Render a project view by path as a popup"
+description = "Opens a project view named by path inside the component, the way the built-in Map renders a view from a path, passing a parameter object."
+verify = "Clicking a test point opens a project view that shows the point's id from its parameter."
+covers = ["R3"]
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 5
+type = "story"
+title = "CI builds, signs and releases the module"
+description = "GitHub Actions builds every push; a release job signs with the owner's self-signed certificate from an Actions secret and publishes the .modl as a GitHub release; the fingerprint goes in the README."
+verify = "Tagging a release produces a signed .modl on GitHub whose certificate fingerprint matches the README."
+covers = ["R4"]
+after = [1]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Install through the template's module lock"
+description = "Adds the released module to ign-scada-template's modules/modules.lock.json (a template pull request), rebuilds the Gateway image and places the component on a scratch view on the test stack."
+verify = "scripts/test/stack.sh passes in the template with the module installed, and the scratch view shows the map."
+covers = ["R5"]
+after = [5]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Playwright smoke suite and the spike's measures"
+description = "Adds the e2e Playwright suite that renders the tracer view at 1440 px and 390 px, saves screenshots for the docs, and records bundle size, frame rate on the 30-pad scale set, the size of a value batch and what broke on the phone."
+verify = "The suite passes in CI and writes both screenshots and a measures file."
+covers = ["R6"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 8
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up what the spike and the other stories deferred, scoped at its start from their plans and review findings; cleanup only."
+verify = "The build, the Playwright suite and the template stack run still pass after the sweep."
+covers = []
+after = [1, 2, 3, 4, 5, 6, 7]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 9
+type = "story"
+title = "Go or no-go"
+description = "Writes the spike report: the measures, every platform answer with its evidence and fallback, and the owner's go or no-go; a no-go names the built-in Map fallback."
+verify = "The report is in docs/ with the owner's dated decision, and every platform answer is recorded in claude-ignition-skills."
+covers = ["R7"]
+after = [2, 3, 4, 6, 7]
+hitl = true
+risk = "low"

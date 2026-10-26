@@ -2,13 +2,8 @@
 type: initiative
 title: "Map Studio for Ignition Perspective"
 parent: none
-sources:
-  - _bmad-output/initiative-flowmap/prd-map-studio/prd-map-studio.md
-companions:
-  - _bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md
-  - _bmad-output/initiative-flowmap/prd-map-studio/addendum.md
-  - _bmad-output/initiative-flowmap/brief-flowmap/brief-flowmap.md
-  - _bmad-output/initiative-flowmap/brief-flowmap/addendum.md
+sources: [_bmad-output/initiative-flowmap/prd-map-studio/prd-map-studio.md]
+companions: [_bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md, _bmad-output/initiative-flowmap/prd-map-studio/addendum.md, _bmad-output/initiative-flowmap/brief-flowmap/brief-flowmap.md, _bmad-output/initiative-flowmap/brief-flowmap/addendum.md]
 risk: high
 ---
 
