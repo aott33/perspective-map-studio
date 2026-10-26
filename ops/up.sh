@@ -59,5 +59,5 @@ echo
 ok "Map Studio dev Gateway is running."
 echo "    Gateway:  ${GATEWAY_URL}  (user ${ADMIN_USER}; password in .env)"
 echo "    Session:  ${SESSION_URL}"
-echo "    Logs:     ops/logs.sh        Screenshots: node ops/screenshot.mjs"
+echo "    Logs:     ops/logs.sh        Tests: cd e2e && npm test"
 echo "    Stop:     ops/down.sh        Wipe: ops/down.sh --purge"

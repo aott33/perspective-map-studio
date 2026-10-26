@@ -29,7 +29,7 @@ import {
 import { MESSAGE_EVENT, pointClick, readReply, replyText } from './messages';
 import { PointPopup } from './PointPopup';
 import { AuthorParams, PopupPoint, popupMountPath } from './popupParams';
-import { TEST_LINE, TEST_POINTS } from './testData';
+import { TestData, selectTestData } from './testSet';
 import { drawColor, themeColor } from './theme';
 
 /** Must match MapStudioComponent.COMPONENT_ID on the Java side. */
@@ -54,6 +54,12 @@ export interface MapStudioProps {
         path: string;
         params: AuthorParams;
     };
+    /**
+     * Spike-only (story 7): which fixed test data the map draws, 'tracer' (three
+     * points and a line) or 'scale30' (a seeded 30-pad stand-in for the
+     * template's scale set). Removed in the refactor sweep.
+     */
+    testSet: string;
 }
 
 /** The popup that is open: the clicked point with its map coordinates. */
@@ -129,6 +135,8 @@ const LAYER_POINTS = 'mapstudio-points';
 export class MapStudio extends Component<Props, MapStudioState> {
     state: MapStudioState = { ...DRAW_IDLE, popup: null };
 
+    /** Chosen once from the testSet prop; the map is built from it at mount. */
+    private testData: TestData = selectTestData(this.props.props.testSet);
     private mapContainer: HTMLDivElement | null = null;
     private map: MapLibreMap | null = null;
     private resizeObserver: ResizeObserver | null = null;
@@ -150,6 +158,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
             point: themeColor(root, '--label'),
             pointStroke: themeColor(root, '--containerRoot')
         };
+        const data = this.testData;
         const map = new MapLibreMap({
             container: this.mapContainer,
             style: {
@@ -161,14 +170,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     paint: { 'background-color': colors.background }
                 }]
             },
-            center: TEST_LINE.center,
-            zoom: TEST_LINE.zoom,
+            center: data.center,
+            zoom: data.zoom,
             attributionControl: false
         });
         map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
         map.on('load', () => {
-            map.addSource(SOURCE_LINE, { type: 'geojson', data: TEST_LINE.feature });
-            map.addSource(SOURCE_POINTS, { type: 'geojson', data: TEST_POINTS });
+            map.addSource(SOURCE_LINE, { type: 'geojson', data: data.lines });
+            map.addSource(SOURCE_POINTS, { type: 'geojson', data: data.points });
             map.addLayer({
                 id: LAYER_LINE,
                 type: 'line',
@@ -192,6 +201,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
             map.on('mouseenter', LAYER_POINTS, () => { map.getCanvas().style.cursor = 'pointer'; });
             map.on('mouseleave', LAYER_POINTS, () => { map.getCanvas().style.cursor = ''; });
             this.startTerraDraw(map, root);
+            // Readiness for the e2e suite: set once the map has gone idle with
+            // both sources and layers added, counted from MapLibre itself.
+            map.once('idle', () => this.publishReadiness(map));
         });
         this.drawControl = new DrawControl(this.toggleDrawing);
         map.addControl(this.drawControl, 'top-right');
@@ -262,6 +274,32 @@ export class MapStudio extends Component<Props, MapStudioState> {
             // cleaned up its provisional line.
             this.mapContainer.addEventListener('keydown', this.onKeyDown, true);
         }
+    }
+
+    /**
+     * Spike and e2e only: tell a test the map is drawn. The counts are read
+     * back from MapLibre's own sources (querySourceFeatures, unique by the
+     * feature's id property), so they prove the data reached the map, not only
+     * that the component was constructed with it.
+     */
+    private publishReadiness(map: MapLibreMap): void {
+        const el = this.mapContainer;
+        if (!el || this.map !== map) {
+            return;
+        }
+        const count = (source: string): number => {
+            const ids = new Set<string>();
+            for (const f of map.querySourceFeatures(source)) {
+                const id = f.properties ? f.properties.id : undefined;
+                if (typeof id === 'string') {
+                    ids.add(id);
+                }
+            }
+            return ids.size;
+        };
+        el.setAttribute('data-points-loaded', String(count(SOURCE_POINTS)));
+        el.setAttribute('data-lines-loaded', String(count(SOURCE_LINE)));
+        el.setAttribute('data-map-ready', 'true');
     }
 
     private toggleDrawing = (): void => {
@@ -418,7 +456,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const replyLine = delegate && delegate.lastReply ? delegate.lastReply : 'Click a point.';
         return (
             <div {...this.props.emit({ classes: ['mapstudio'] })}>
-                <div className="mapstudio-map" ref={this.setMapContainer} />
+                <div className="mapstudio-map" ref={this.setMapContainer}
+                     data-test-set={this.testData.name} />
                 <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '')}
                      data-pending={pending ? 'true' : 'false'}
                      data-drawing={this.state.drawing ? 'true' : 'false'}
@@ -451,6 +490,7 @@ export class MapStudioMeta implements ComponentMeta {
 
     getPropsReducer(tree: PropertyTree): MapStudioProps {
         return {
+            testSet: tree.readString('testSet', 'tracer'),
             popupView: {
                 path: tree.readString('popupView.path', ''),
                 params: tree.readObject<AuthorParams>('popupView.params', {})
