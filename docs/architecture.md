@@ -121,4 +121,4 @@ CI builds and signs the `.modl` and publishes it as a GitHub release. Projects i
 
 ## Still open
 
-The spike checks four platform questions before feature work starts: whether Java subscriptions reach Alarm Metrics, whether a component can open a project view as a popup, whether module code can call project scripts and add `system.mapstudio` functions, and whether MapLibre 6 builds with Perspective's toolchain. A fifth, whether Mapbox's terms allow satellite tiles in MapLibre (AD-12), is for the owner to settle. The spine lists each question with its fallback.
+The spike's four platform questions are answered, with evidence and fallbacks, in `docs/platform-checks.md`: whether Java subscriptions reach Alarm Metrics, whether a component can open a project view as a popup, whether module code can call project scripts and add `system.mapstudio` functions, and whether MapLibre 6 builds with Perspective's toolchain. The go or no-go report (story 9) judges them. Whether Mapbox's terms allow satellite tiles in MapLibre (AD-12) is for the owner to settle. The spine lists each question with its fallback.

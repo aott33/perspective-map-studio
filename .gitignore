@@ -44,5 +44,6 @@ bin/
 # Playwright suite output (story 7); docs/ gets screenshots and measures only with E2E_DOCS=1
 e2e/out/
 
-# Platform checks (story 3): generated PostgreSQL passwords
+# Removed platform checks (story 3, removed in story 8): a developer's old generated
+# PostgreSQL passwords must never be committed, so the folder stays ignored.
 ops/checks/secrets/

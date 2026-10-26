@@ -13,13 +13,13 @@ The tracer: a MapLibre map on a blank style with three fixed points and one line
 
 The platform checks the spike answered, with their evidence, are in [docs/platform-checks.md](docs/platform-checks.md) (toolchain pins: MapLibre GL JS 6.16.0, Terra Draw 1.38.0, adapter 1.5.0).
 
-Story 4 (spike): a point click also opens a popup that renders a project view by path, the way the built-in Perspective Map renders a view from a `path`. The spike-only prop `popupView` (`path`, `params`) names the view; it receives the point as its `mapItem` parameter (`{id, name}`) beside `params`, and an empty or failing path falls back to a text popup. Its evidence is in the same file.
+Story 4 (spike): a point click also opens a popup that renders a project view by path, the way the built-in Perspective Map renders a view from a `path`. The spike-only prop `popupView` (`path`, `params`) names the view; it receives the point as its `mapItem` parameter (`{id, name}`) beside `params`, and an empty or failing path falls back to a text popup. Its evidence is in the same file. Story 7 (spike): the spike-only prop `testSet` (`tracer` or `scale30`) picks the fixed data the map draws; `scale30` is the seeded 30-pad stand-in the frame-rate measure uses. Both props stay until the map store and the kind setup replace them.
 
 ![mapstudio-dev at 1440 px](docs/screenshots/mapstudio-dev-1440.png)
 
 ## Build
 
-Requirements: JDK 17 and Docker. Node 22 is downloaded by the build; nothing else needs installing.
+Requirements: JDK 17 and Docker. Node 22 is downloaded by the build; nothing else needs installing. Running `npm` in `web/` outside Gradle needs Node 20.9 or later (the webpack plugins' floor).
 
 ```bash
 ./gradlew build                      # produces build/Map-Studio.unsigned.modl
@@ -33,7 +33,7 @@ Layout:
 | Folder | What lives there |
 | --- | --- |
 | `common/` | component descriptor, props schema (`mapstudio.props.json`), the message contract (`Messages.java`) |
-| `gateway/` | gateway hook and the component model delegate (`MapStudioDelegate`) |
+| `gateway/` | gateway hook and the component model delegate (`MapStudioDelegate`); `system.mapstudio` script functions are in `common/` (`MapStudioScriptModule`: `ping`, `echo`) |
 | `designer/` | the Designer palette entry |
 | `web/` | the TypeScript and React component, MapLibre map, Terra Draw line tool (`DrawControl.tsx`, `draw.ts`), message client (`messages.ts`), the point popup (`PointPopup.tsx`, `popupParams.ts`) and their tests |
 | `e2e/` | the Playwright suite (pinned `@playwright/test`): smoke tests at 1440 and 390 px, the popup checks and the spike's measures |
@@ -54,7 +54,7 @@ The dev Gateway loads the unsigned build (`-Dignition.allowunsignedmodules=true`
 
 ### Platform checks
 
-`ops/checks.sh` answers the spike's Gateway questions on a live 8.3.10 Gateway: it adds PostgreSQL 16 beside the dev Gateway (`ops/docker-compose.checks.yml`), seeds the Gateway's core config collection from `ops/checks/config/core/` (a tag provider, a UDT whose alarm toggles every 30 s, a File secret provider and two database connections), and the module's `gateway/.../spike` package then logs one `CHECK <name> PASS|FAIL <evidence>` line per check for any project that holds a `com.aoindustrial.perspective.mapstudio/setup` resource (`ops/project/.../setup/setup.json`). The PostgreSQL passwords are generated into the git-ignored `ops/checks/secrets/` and reach the Gateway only through its File secret provider. While the checks stack exists, `ops/up.sh`, `down.sh` and `logs.sh` include it automatically and `ops/down.sh --purge` removes it, PostgreSQL volume included. The UDT's alarm is a dev-only test alarm, flagged for engineering review and never for a real Gateway. Results and evidence: [docs/platform-checks.md](docs/platform-checks.md). The spike package is removed by the refactor sweep.
+The spike's Gateway questions (Alarm Metrics subscription, a project script called from module code, `system.mapstudio` functions, a custom project resource, PostgreSQL rights) were answered by a spike package and `ops/checks.sh`, which the refactor sweep removed. Results and evidence are in [docs/platform-checks.md](docs/platform-checks.md); the harness itself is in the history at commit `51104c8`. If you ran it on your machine, its leftovers are yours to remove: the PostgreSQL volume (`docker volume ls`, then `docker volume rm <project>_postgres-data`) and the git-ignored `ops/checks/secrets/` folder. The checks also seeded config into the dev Gateway's own data volume (the Checks tag provider and UDT, with the dev-only test alarm `Checks/Pump Toggled` that toggles every 30 s, two database connections and a File secret provider); that config outlives the deleted files, so wipe it with `ops/down.sh --purge` or start once with `ops/up.sh --fresh`.
 
 ## Tests and proof
 

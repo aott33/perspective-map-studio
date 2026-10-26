@@ -53,43 +53,6 @@ if [[ -n "${MAPSTUDIO_CONTAINER:-}" ]]; then
   COMPOSE+=(-p "${MAPSTUDIO_CONTAINER}")
 fi
 COMPOSE+=(-f "${OPS_DIR}/docker-compose.yml")
-COMPOSE_PROJECT="${MAPSTUDIO_CONTAINER:-$(basename "${OPS_DIR}")}"
-
-# The platform checks' compose file (PostgreSQL and the checks' Gateway config on
-# the same compose project) is added with MAPSTUDIO_CHECKS=1 (ops/checks.sh), and
-# automatically while the checks stack exists for this project (its PostgreSQL
-# volume is there), so that up.sh, down.sh and logs.sh see the whole stack and
-# down.sh --purge removes it. The volume probe needs Docker; when Docker is down
-# it simply finds nothing.
-CHECKS_SECRETS_DIR="${OPS_DIR}/checks/secrets"
-checks_stack_exists() {
-  docker volume inspect "${COMPOSE_PROJECT}_postgres-data" >/dev/null 2>&1
-}
-if [[ "${MAPSTUDIO_CHECKS:-}" == "1" ]] || checks_stack_exists; then
-  COMPOSE+=(-f "${OPS_DIR}/docker-compose.checks.yml")
-  MAPSTUDIO_CHECKS=1
-fi
-
-# The PostgreSQL passwords of the platform checks: generated once into the
-# git-ignored ops/checks/secrets/ (letters and digits, no trailing newline
-# because the Gateway's File secret provider reads every byte) and handed to
-# the containers as Docker secrets. Never committed, never in a log.
-# Compose bind-mounts a file secret with its host mode, and the containers read
-# it as other users (postgres, ignition uid 2003), so the files are 0644 inside
-# a 0700 folder: hidden from other local users, readable inside the containers.
-ensure_checks_secrets() {
-  mkdir -p "${CHECKS_SECRETS_DIR}"
-  chmod 700 "${CHECKS_SECRETS_DIR}"
-  local name
-  for name in pg_password pg_ro_password; do
-    if [[ ! -s "${CHECKS_SECRETS_DIR}/${name}" ]]; then
-      # Letters and digits only, so the file is safe anywhere it is quoted.
-      ( umask 077; head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24 \
-          > "${CHECKS_SECRETS_DIR}/${name}" )
-    fi
-    chmod 644 "${CHECKS_SECRETS_DIR}/${name}"
-  done
-}
 
 # --- logging --------------------------------------------------------------
 if [[ -t 1 ]]; then

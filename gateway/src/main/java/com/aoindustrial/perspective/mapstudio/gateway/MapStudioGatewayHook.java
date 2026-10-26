@@ -15,7 +15,6 @@ import com.inductiveautomation.perspective.gateway.api.PerspectiveContext;
 import com.aoindustrial.perspective.mapstudio.common.MapStudioComponent;
 import com.aoindustrial.perspective.mapstudio.common.MapStudioModule;
 import com.aoindustrial.perspective.mapstudio.common.MapStudioScriptModule;
-import com.aoindustrial.perspective.mapstudio.gateway.spike.ChecksLifecycleFactory;
 
 /**
  * Gateway scope hook: registers the component and its model delegate on
@@ -28,14 +27,10 @@ public class MapStudioGatewayHook extends AbstractGatewayModuleHook {
     private GatewayContext gatewayContext;
     private ComponentRegistry componentRegistry;
     private ComponentModelDelegateRegistry delegateRegistry;
-    private ChecksLifecycleFactory checks;
 
     @Override
     public void setup(GatewayContext context) {
         this.gatewayContext = context;
-        // Spike (story 3): the platform checks run for any runnable project that
-        // holds a Map Studio setup resource. Removed by the refactor sweep.
-        this.checks = new ChecksLifecycleFactory(context);
     }
 
     /** Adds {@code system.mapstudio.*} to Gateway and project script scopes (AD-18). */
@@ -63,17 +58,10 @@ public class MapStudioGatewayHook extends AbstractGatewayModuleHook {
         } else {
             log.error("Perspective model delegate registry not found; the Map Studio delegate is not registered.");
         }
-
-        if (this.checks != null) {
-            this.checks.startup();
-        }
     }
 
     @Override
     public void shutdown() {
-        if (this.checks != null) {
-            this.checks.shutdown();
-        }
         if (this.componentRegistry != null) {
             this.componentRegistry.removeComponent(MapStudioComponent.COMPONENT_ID);
         }

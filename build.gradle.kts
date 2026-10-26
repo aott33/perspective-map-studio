@@ -12,7 +12,8 @@ plugins {
 
 // The lowest Ignition the module supports. Java compiles against this SDK so
 // that nothing newer than the minimum is used by accident.
-val sdk_version by extra("8.3.0")
+val sdk_version = "8.3.0"
+extra["sdk_version"] = sdk_version
 
 allprojects {
     // Release builds pass -PreleaseVersion=<tag>; local builds carry a SNAPSHOT.
@@ -46,8 +47,6 @@ ignitionModule {
         ":gateway" to "G"
     ))
 
-    moduleDependencies.set(mapOf<String, String>())
-
     moduleDependencySpecs {
         register("com.inductiveautomation.perspective") {
             scope = "GD"
@@ -70,19 +69,25 @@ ignitionModule {
 
 // The licence notice ships inside the .modl and is shown at install time. The
 // plugin has no property for it, so the file is staged into the module content
-// and referenced from module.xml.
+// and referenced from module.xml. Both steps use values captured here at
+// configuration time (no project access inside a task action, which Gradle 10
+// refuses).
+val moduleContentDir = layout.buildDirectory.dir("moduleContent")
+val moduleXmlFile = layout.buildDirectory.file("moduleContent/module.xml")
+
+val stageLicense = tasks.register<Copy>("stageLicense") {
+    from("license.html")
+    into(moduleContentDir)
+}
+
 tasks.named("assembleModlStructure") {
-    doLast {
-        copy {
-            from("license.html")
-            into(layout.buildDirectory.dir("moduleContent"))
-        }
-    }
+    finalizedBy(stageLicense)
 }
 
 tasks.named("zipModule") {
+    dependsOn(stageLicense)
     doFirst {
-        val moduleXml = layout.buildDirectory.file("moduleContent/module.xml").get().asFile
+        val moduleXml = moduleXmlFile.get().asFile
         val content = moduleXml.readText()
         if (!content.contains("<license>")) {
             moduleXml.writeText(

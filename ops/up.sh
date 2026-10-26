@@ -7,10 +7,6 @@
 #                       (ACCEPT_MODULE_* in docker-compose.yml); no browser wizard.
 #   ops/up.sh --fresh   Wipe the Gateway data first (fresh trial, fresh acceptance).
 #   ops/up.sh --no-build  Skip the Gradle build; stage nothing, just (re)start.
-#
-# While the platform checks stack exists (ops/checks.sh), its compose file is
-# included automatically, so the restart covers PostgreSQL too; --fresh then
-# wipes both volumes. Without it, this is the plain tracer Gateway.
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
