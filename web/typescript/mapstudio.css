@@ -48,3 +48,33 @@
 .mapstudio .maplibregl-ctrl button .maplibregl-ctrl-icon {
     filter: none;
 }
+
+/* The line tool toggle: a glyph and the mode's name in words. */
+.mapstudio .mapstudio-draw-button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: auto;
+    height: 29px;
+    padding: 0 10px;
+    border: none;
+    background: var(--container);
+    color: var(--label);
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.mapstudio .mapstudio-draw-button:hover {
+    background: var(--neutral-30);
+}
+
+.mapstudio .mapstudio-draw-button--on {
+    background: var(--callToActionHighlight);
+    color: var(--callToAction);
+    box-shadow: inset 0 0 0 1px var(--callToAction);
+}
+
+.mapstudio .mapstudio-draw-glyph {
+    flex: 0 0 auto;
+}
