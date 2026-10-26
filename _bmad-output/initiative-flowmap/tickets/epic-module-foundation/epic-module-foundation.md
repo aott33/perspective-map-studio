@@ -59,3 +59,7 @@ The owner knows within two days whether the toolchain and the Perspective client
 ## Notes
 
 - Decision: 2026-10-26 Names, licence (Apache-2.0) and the Alarm Metrics answer are recorded in the initiative's Notes and apply here.
+- Decision: 2026-10-26 Entry 1 is the tracer bullet: the thinnest path through build, install, browser, delegate and back.
+- Decision: 2026-10-26 Entry 2 (MapLibre 6 on the Perspective toolchain) goes next, as the least certain part; entries 2 to 5 can run in parallel after entry 1.
+- Decision: 2026-10-26 A refactor sweep (entry 8) closes the build work before the go or no-go report (entry 9).
+- Decision: 2026-10-26 Entry 6 changes `ign-scada-template` (its module lock) through a template pull request; the template is a touch point this epic consumes.
