@@ -4,6 +4,33 @@
   "required": [],
   "description": "Map Studio component properties. The list is closed: later versions add properties here and in docs/.",
   "properties": {
+    "popupView": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Spike-only (story 4): the project view opened as a popup when a point is clicked, rendered the way the built-in Map renders a view from a path. The view receives the point as its 'mapItem' parameter ({id, name}) beside the params given here. A later version names the view in the kind setup instead (AD-7).",
+      "default": {
+        "path": "",
+        "params": {}
+      },
+      "properties": {
+        "path": {
+          "type": "string",
+          "format": "view-path",
+          "description": "Path of the project view to show in the popup. Empty shows a text popup with the point id.",
+          "default": ""
+        },
+        "params": {
+          "type": "object",
+          "description": "Parameters passed to the view beside 'mapItem'. Names must match input parameters defined on the view.",
+          "extension": {
+            "view-params": {
+              "path": "../path"
+            }
+          },
+          "default": {}
+        }
+      }
+    },
     "style": {
       "$ref": "urn:ignition-schema:schemas/style-properties.schema.json",
       "default": {

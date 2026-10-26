@@ -3,7 +3,7 @@ title: 'Render a project view by path as a popup'
 type: 'feature'
 ticket: '4'
 created: '2026-10-26'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '0fba47cdb46cd4c75b7c24055d7b1489d41f834c'
 route: 'full'
 route_source: 'auto'
@@ -83,6 +83,14 @@ Evidence from the 8.3.10 runtime (`@inductiveautomation/perspective-client` 2.3.
 - Given `docs/platform-checks.md`, when read, then the open question is answered with its evidence and the answer is one a reader can check against the screenshots and log lines named.
 
 ## Implementation Notes
+
+- Implemented directly in this session (no implementation subagent available), 2026-10-26, on the `ms-s4` dev Gateway at port 9104 (worktree `.env`).
+- `web/typescript/popupParams.ts` (pure helpers), `PointPopup.tsx` (the `View` by path or the text fallback; `View` cast once to `React.ComponentClass<ViewProps>` because its typings target React 18), `MapStudio.tsx` (`popupView` prop, `OpenPopup` state, one MapLibre `Popup` created on first click and moved after, its DOM node filled through `ReactDOM.createPortal` in `render()`, `close` event clears the state, `componentWillUnmount` removes the popup before the map). `mapstudio.css` overrides MapLibre's popup content, tip and close button with tokens.
+- Surprise, found by the live probe: MapLibre's `closeOnClick` runs on the map click after the layer click handler, so a click on a second point moved the popup and then closed it. `closeOnClick` is now off and `onMapClick` closes the popup only when `queryRenderedFeatures` finds no point under the click. Recorded in `docs/platform-checks.md`.
+- A missing view reports `View` state `error` in 8.3.10, not `notFound`; `isFailedViewState` covers both and `access-denied`.
+- `ops/popup-check.mjs` was added (not in the plan's task list) so the matrix rows beyond the screenshot run (author params, another point, close, and with `--expect-fallback` the empty and missing path) are a committed check, not a one-off script.
+- The dev view title was shortened so it fits the 40 px label at 390 px.
+- `tsc --noEmit` clean; Jest 17 of 17 (8 message tests, 9 popup tests); `./gradlew build` success (Java 4 of 4); `ops/up.sh --fresh` RUNNING with no Map Studio error; `node ops/screenshot.mjs --url http://localhost:9104` wrote both screenshots with the view's `Id: p1`; `ops/popup-check.mjs` passed for the view, `Popups/Nope` (fallback, one warning, state `error`) and the empty path (fallback, no warning).
 
 ## Plan Change Log
 

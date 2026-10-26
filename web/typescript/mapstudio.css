@@ -48,3 +48,66 @@
 .mapstudio .maplibregl-ctrl button .maplibregl-ctrl-icon {
     filter: none;
 }
+
+/* Point popup: a project view by path, or the text fallback. Token colours only. */
+.mapstudio .maplibregl-popup {
+    max-width: calc(100vw - 32px);
+}
+
+.mapstudio .maplibregl-popup-content {
+    padding: 0;
+    background: var(--container);
+    color: var(--label);
+    border: 1px solid var(--border);
+    border-radius: var(--borderRadius);
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.mapstudio .maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.mapstudio .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.mapstudio .maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+    border-bottom-color: var(--border);
+}
+
+.mapstudio .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.mapstudio .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.mapstudio .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+    border-top-color: var(--border);
+}
+
+.mapstudio .maplibregl-popup-anchor-left .maplibregl-popup-tip {
+    border-right-color: var(--border);
+}
+
+.mapstudio .maplibregl-popup-anchor-right .maplibregl-popup-tip {
+    border-left-color: var(--border);
+}
+
+.mapstudio .maplibregl-popup-close-button {
+    color: var(--label);
+    font-size: 16px;
+    padding: 0 6px;
+    right: 2px;
+    top: 2px;
+}
+
+.mapstudio .maplibregl-popup-close-button:hover {
+    background: var(--containerRoot);
+}
+
+.mapstudio-popup {
+    min-width: 120px;
+    max-width: calc(100vw - 48px);
+    overflow: auto;
+}
+
+.mapstudio-popup--text {
+    padding: 8px 28px 8px 12px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.mapstudio-popup--view {
+    padding-top: 0;
+}

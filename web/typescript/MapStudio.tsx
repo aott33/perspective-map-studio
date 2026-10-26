@@ -1,4 +1,5 @@
 import * as React from 'react';
+import * as ReactDOM from 'react-dom';
 import {
     AbstractUIElementStore,
     Component,
@@ -10,8 +11,10 @@ import {
     PropertyTree,
     Size2d
 } from '@inductiveautomation/perspective-client';
-import { Map as MapLibreMap, MapLayerMouseEvent, NavigationControl, setWorkerUrl } from 'maplibre-gl';
+import { Map as MapLibreMap, MapLayerMouseEvent, NavigationControl, Popup, setWorkerUrl } from 'maplibre-gl';
 import { MESSAGE_EVENT, pointClick, readReply, replyText } from './messages';
+import { PointPopup } from './PointPopup';
+import { AuthorParams, PopupPoint, popupMountPath } from './popupParams';
 import { TEST_LINE, TEST_POINTS } from './testData';
 import { themeColor } from './theme';
 
@@ -26,8 +29,27 @@ export const COMPONENT_TYPE = 'ao.mapstudio';
 export const WORKER_URL = '/res/mapstudio/maplibre-gl-worker.js';
 setWorkerUrl(WORKER_URL);
 
-/** Component props read from the property tree. None yet beyond style. */
+/** Component props read from the property tree (mapstudio.props.json). */
 export interface MapStudioProps {
+    /**
+     * Spike-only (story 4): the project view opened as a popup on a point
+     * click, with the author's params. A later version names it in the kind
+     * setup (AD-7).
+     */
+    popupView: {
+        path: string;
+        params: AuthorParams;
+    };
+}
+
+/** The popup that is open: the clicked point with its map coordinates. */
+interface OpenPopup {
+    point: PopupPoint;
+    lngLat: [number, number];
+}
+
+interface MapStudioState {
+    popup: OpenPopup | null;
 }
 
 /** The delegate state the component renders. */
@@ -90,10 +112,16 @@ const LAYER_POINTS = 'mapstudio-points';
  * data (three points and one line). Clicking a point sends `point.click`
  * through the delegate; the reply is shown as text over the map.
  */
-export class MapStudio extends Component<Props, {}> {
+export class MapStudio extends Component<Props, MapStudioState> {
+    state: MapStudioState = { popup: null };
+
     private mapContainer: HTMLDivElement | null = null;
     private map: MapLibreMap | null = null;
     private resizeObserver: ResizeObserver | null = null;
+    /** The MapLibre popup, created once and moved between points; its content is a React portal. */
+    private popup: Popup | null = null;
+    /** The DOM node the popup shows; React renders PointPopup into it through a portal. */
+    private popupContent: HTMLDivElement | null = null;
 
     componentDidMount(): void {
         if (!this.mapContainer) {
@@ -144,6 +172,7 @@ export class MapStudio extends Component<Props, {}> {
                 }
             });
             map.on('click', LAYER_POINTS, this.onPointClick);
+            map.on('click', this.onMapClick);
             map.on('mouseenter', LAYER_POINTS, () => { map.getCanvas().style.cursor = 'pointer'; });
             map.on('mouseleave', LAYER_POINTS, () => { map.getCanvas().style.cursor = ''; });
         });
@@ -160,6 +189,11 @@ export class MapStudio extends Component<Props, {}> {
             this.resizeObserver.disconnect();
             this.resizeObserver = null;
         }
+        if (this.popup) {
+            this.popup.off('close', this.onPopupClosed);
+            this.popup.remove();
+            this.popup = null;
+        }
         if (this.map) {
             this.map.remove();
             this.map = null;
@@ -172,6 +206,14 @@ export class MapStudio extends Component<Props, {}> {
         if (typeof pointId !== 'string') {
             return;
         }
+        const name = feature && feature.properties && typeof feature.properties.name === 'string'
+            ? feature.properties.name : '';
+        const geometry = feature ? feature.geometry : undefined;
+        const lngLat: [number, number] = geometry && geometry.type === 'Point'
+            ? [geometry.coordinates[0], geometry.coordinates[1]]
+            : [ev.lngLat.lng, ev.lngLat.lat];
+        this.openPopup({ id: pointId, name }, lngLat);
+
         const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
         if (!delegate) {
             console.warn('[MapStudio] No delegate; the click on ' + pointId + ' was not sent.');
@@ -179,6 +221,82 @@ export class MapStudio extends Component<Props, {}> {
         }
         delegate.sendPointClick(pointId);
     };
+
+    /**
+     * A click on the map away from any point closes the popup. MapLibre's own
+     * closeOnClick is not used: it runs after the layer click handler and
+     * would close the popup that a click on another point has just moved.
+     */
+    private onMapClick = (ev: MapLayerMouseEvent): void => {
+        if (!this.map || !this.popup || !this.popup.isOpen()) {
+            return;
+        }
+        const onPoint = this.map.queryRenderedFeatures(ev.point, { layers: [LAYER_POINTS] });
+        if (onPoint.length === 0) {
+            this.popup.remove();
+        }
+    };
+
+    /**
+     * Open (or move) the MapLibre popup at a point. The popup's DOM node is
+     * filled by React through a portal in render(), so the embedded project
+     * view stays in this component's React tree.
+     */
+    private openPopup(point: PopupPoint, lngLat: [number, number]): void {
+        if (!this.map) {
+            return;
+        }
+        if (!this.popup) {
+            this.popupContent = document.createElement('div');
+            this.popupContent.className = 'mapstudio-popup-root';
+            this.popup = new Popup({
+                closeButton: true,
+                closeOnClick: false,
+                closeOnMove: false,
+                maxWidth: 'none',
+                offset: 12
+            });
+            this.popup.setDOMContent(this.popupContent);
+            this.popup.on('close', this.onPopupClosed);
+        }
+        this.setState({ popup: { point, lngLat } }, () => {
+            if (this.popup && this.map) {
+                this.popup.setLngLat(lngLat);
+                if (!this.popup.isOpen()) {
+                    this.popup.addTo(this.map);
+                }
+            }
+        });
+    }
+
+    /** MapLibre closed the popup (close button, map click): unmount the view. */
+    private onPopupClosed = (): void => {
+        if (this.state.popup !== null) {
+            this.setState({ popup: null });
+        }
+    };
+
+    private renderPopup(): React.ReactNode {
+        const open = this.state.popup;
+        if (!open || !this.popupContent) {
+            return null;
+        }
+        const store = this.props.store;
+        const { path, params } = this.props.props.popupView;
+        const mountPath = popupMountPath(store.viewMountPath, store.addressPathString);
+        return ReactDOM.createPortal(
+            <PointPopup
+                key={path + '|' + open.point.id}
+                clientStore={store.view.page.parent}
+                parent={store}
+                path={path}
+                params={params}
+                mountPath={mountPath}
+                point={open.point}
+            />,
+            this.popupContent
+        );
+    }
 
     private setMapContainer = (el: HTMLDivElement | null): void => {
         this.mapContainer = el;
@@ -195,6 +313,7 @@ export class MapStudio extends Component<Props, {}> {
                      data-pending={pending ? 'true' : 'false'}>
                     {pending ? 'Waiting for the Gateway ...' : text}
                 </div>
+                {this.renderPopup()}
             </div>
         );
     }
@@ -217,7 +336,12 @@ export class MapStudioMeta implements ComponentMeta {
         return new MapStudioStoreDelegate(component);
     }
 
-    getPropsReducer(_tree: PropertyTree): MapStudioProps {
-        return {};
+    getPropsReducer(tree: PropertyTree): MapStudioProps {
+        return {
+            popupView: {
+                path: tree.readString('popupView.path', ''),
+                params: tree.readObject<AuthorParams>('popupView.params', {})
+            }
+        };
     }
 }
