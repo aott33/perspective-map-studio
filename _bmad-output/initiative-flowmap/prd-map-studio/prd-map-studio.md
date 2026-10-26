@@ -531,11 +531,14 @@ The project offers none, OpenStreetMap, satellite and Mapbox basemaps; the user 
 Not a cut line: every item in 6.1 ships. The order makes Map Studio useful on the template early.
 
 1. The spike (6.4).
-2. Viewing: the map, icons, popups, search, basemaps (FR-1 to FR-6, FR-32 to FR-34).
-3. Data links: kinds, the asset contract, linking, kind setup, overrides (FR-9 to FR-13), and the map store and saving (FR-29 to FR-31).
-4. Drawing and editing, forms and location (FR-7, FR-8, FR-14 to FR-21, FR-36).
+2. The map store and data: kinds, the asset contract, roles, saving (FR-7, FR-9, FR-10, FR-29 to FR-31).
+3. Viewing: the map, icons, popups, search, basemaps (FR-1 to FR-6, FR-32 to FR-34).
+4. Drawing and editing, forms, location, linking and kind setup (FR-8, FR-11 to FR-21, FR-36).
 5. Import, bulk edit, reference layer and export (FR-22 to FR-26, FR-35).
 6. Phone editing (FR-27, FR-28).
+7. The template cut-over (SM-1).
+
+These match the initiative's seven epics (2026-10-26).
 
 ### 6.3 Out of scope for MVP
 

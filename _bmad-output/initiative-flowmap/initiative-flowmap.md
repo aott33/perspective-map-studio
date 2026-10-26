@@ -88,7 +88,7 @@ Map editors build and keep a field's map in the browser and everyone reads live 
 
 - Not a GIS, not an alarm system, no approval workflow or map version history; does not create assets or tags or write to devices; no Edge Gateways (prd section 5).
 - Out for the first version: flow animation (first to revisit), the full icon library and other industries' kinds, a time slider, clustering, offline tiles, a second renderer, the open-source release, scale beyond the 30-pad set (prd 6.3).
-- Touch point: `ign-scada-template` - `/map`, `/map/edit`, `ops.mapedit`, the `map_draft` tables and queries, `prov`'s map steps, the `_Model/Map` consumers, the view generators and byte gates, the Edge example and the PV-29 harness change or retire; owner: an epic to be named at slicing.
+- Touch point: `ign-scada-template` - `/map`, `/map/edit`, `ops.mapedit`, the `map_draft` tables and queries, `prov`'s map steps, the `_Model/Map` consumers, the view generators and byte gates, the Edge example and the PV-29 harness change or retire; owner: epic-template-cutover.
 - Tracer path: a project names its kinds, asset list and map store; a map editor draws a pad and links it; its kind setup binds comms, a KPI and alarms; a viewer sees the icon, opens the popup and follows its link.
 
 ## References
@@ -103,6 +103,9 @@ Map editors build and keep a field's map in the browser and everyone reads live 
 
 - Decision: 2026-10-26 Repository `perspective-map-studio`, module id `com.aoindustrial.perspective.mapstudio`, npm `@aoindustrial/perspective-map-studio`, component `ao.mapstudio`; the owner renames the GitHub repository.
 - Decision: 2026-10-26 Licence Apache-2.0 for the open-source release; MIT stays possible until the first outside contribution, after which a switch needs every contributor's consent.
+- Decision: 2026-10-26 Sliced into seven epics by source capability, in build order: module foundation and spike, map store and data, viewing, editing, import and export, phone, template cut-over. The map store comes before viewing (the PRD's build order had viewing first) because viewing reads map items and kind setups from it; kind setups can be seeded for viewing before the editing epic writes them.
+- Decision: 2026-10-26 R9 belongs to epic-map-store-and-data (the Gateway-side role check); epic-editing consumes it to show or hide the tools.
+- Decision: 2026-10-26 The template cut-over is its own epic and owns the touch point on `ign-scada-template`; its work lands as template pull requests.
 - Decision: 2026-10-26 Alarm aggregation is answered from the IA 8.3 docs (an Alarm Metrics folder on tag folders and UDT instances since 8.3.0); it does not gate the spike.
 - Open question: Alarm Metrics can be bound or subscribed but not read directly, so the batched icon refresh (NFR-9) must subscribe on the Gateway; architecture decides how, and checks the reported nested-UDT and naming issues.
 - Open question: Satellite basemap provider (Mapbox Satellite on the template's existing token suggested; MapTiler or Esri World Imagery as alternatives); architecture checks the terms.
