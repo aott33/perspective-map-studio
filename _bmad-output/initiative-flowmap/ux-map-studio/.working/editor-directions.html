@@ -118,6 +118,12 @@ button{font:inherit;color:inherit;cursor:pointer}
 .grp{padding:8px 8px 4px}
 .grp .gh{display:flex;justify-content:space-between;padding:4px 8px;font-size:11px;font-weight:600;color:var(--neutral-70);text-transform:uppercase;letter-spacing:.04em}
 .row-i{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;text-align:left;padding:7px 8px;border-radius:6px;color:var(--label)}
+.row-w{display:flex;align-items:center;gap:2px}
+.row-w .row-i{flex:1;min-width:0}
+.cb{width:22px;height:30px;display:flex;align-items:center;justify-content:center;flex:none;cursor:pointer}
+.cb .check{width:14px;height:14px;border-color:var(--neutral-50)}
+.mixed{font-style:italic;color:var(--neutral-70)}
+.boxsel{position:absolute;border:1.5px dashed var(--callToAction);background:var(--cta-tint);pointer-events:none;z-index:6}
 .row-i:hover{background:var(--neutral-20)}
 .row-i.sel{background:var(--cta-tint);box-shadow:inset 3px 0 0 var(--callToAction)}
 .row-i .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -194,7 +200,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .sel-like{display:flex;align-items:center;justify-content:space-between;gap:6px;height:30px;padding:0 8px;border:1px solid var(--neutral-40);border-radius:6px;background:var(--neutral-10);font-size:12px}
 .empty{padding:28px 20px;text-align:center;color:var(--neutral-70)}
 .drop{border:1.5px dashed var(--neutral-50);border-radius:8px;padding:22px;text-align:center;color:var(--neutral-70)}
-.scale{position:absolute;left:236px;bottom:14px;font-size:10px;color:var(--neutral-70);display:flex;flex-direction:column;gap:2px;z-index:4}
+.scale{position:absolute;left:120px;bottom:14px;font-size:10px;color:var(--neutral-70);display:flex;flex-direction:column;gap:2px;z-index:4}
 .scale i{display:block;width:80px;height:5px;border:1.5px solid var(--neutral-70);border-top:0}
 </style>
 </head>
@@ -242,6 +248,7 @@ var P = {
   'tag':'<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1"/>',
   'popout':'<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
   'sort':'<path d="M7 4v16M3 16l4 4 4-4"/><path d="M14 6h7M14 12h5M14 18h3"/>',
+  'box':'<rect x="3" y="3" width="15" height="15" rx="1" stroke-dasharray="3 3"/><path d="M14 14l7 7"/><path d="M21 15v6h-6"/>',
   'fit':'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'
 };
 var F = { /* filled alarm glyphs */
@@ -262,9 +269,9 @@ var KINDS = {
 };
 var KORDER = ['pad','ctb','cs','swd','pipe','lat','geo'];
 var ITEMS = [
-  {id:'P12',kind:'pad',x:520,y:335,asset:'Mesa/P12',ll:'32.2361, -103.8714',kvn:'Casing pressure',kv:'860 psi',kv2:[['Tubing pressure','385 psi'],['Gas rate','1.2 MMcf/d']],wells:'P12-3H',status:'Running',comms:'OK - 9 s ago',chg:'Yesterday 16:20'},
-  {id:'P14',kind:'pad',x:575,y:580,asset:'Mesa/P14',ll:'32.2297, -103.8689',kvn:'Casing pressure',kv:'1,240 psi',kv2:[['Tubing pressure','410 psi'],['Gas rate','1.8 MMcf/d']],wells:'P14-2H',status:'Running',comms:'OK - 12 s ago',alarm:{p:1,text:'Casing pressure high',src:'P14-2H',age:'4 min'}},
-  {id:'P21',kind:'pad',x:885,y:300,asset:'Mesa/P21',ll:'32.2378, -103.8562',kvn:'Casing pressure',kv:'910 psi (last)',kv2:[['Tubing pressure','352 psi (last)']],wells:'P21-1H',status:'Running',lost:true,comms:'Comms lost - last heard 14 min ago'},
+  {id:'P12',kind:'pad',x:520,y:335,asset:'Mesa/P12',ll:'32.2361, -103.8714',kvn:'Casing pressure',kv:'860 psi',kv2:[['Tubing pressure','385 psi'],['Gas rate','1.2 MMcf/d']],wells:'P12-3H',status:'Running',op:'Mesa Operating',comms:'OK - 9 s ago',chg:'Yesterday 16:20'},
+  {id:'P14',kind:'pad',x:575,y:580,asset:'Mesa/P14',ll:'32.2297, -103.8689',kvn:'Casing pressure',kv:'1,240 psi',kv2:[['Tubing pressure','410 psi'],['Gas rate','1.8 MMcf/d']],wells:'P14-2H',status:'Running',op:'Mesa Operating',comms:'OK - 12 s ago',alarm:{p:1,text:'Casing pressure high',src:'P14-2H',age:'4 min'}},
+  {id:'P21',kind:'pad',x:885,y:300,asset:'Mesa/P21',ll:'32.2378, -103.8562',kvn:'Casing pressure',kv:'910 psi (last)',kv2:[['Tubing pressure','352 psi (last)']],wells:'P21-1H',status:'Running',op:'Ridge Partners',lost:true,comms:'Comms lost - last heard 14 min ago'},
   {id:'CTB1',kind:'ctb',x:720,y:445,asset:'Mesa/CTB1',ll:'32.2331, -103.8621',kvn:'Oil tank level',kv:'11.2 ft',kv2:[['Water tank level','8.4 ft'],['Oil today','412 bbl']],status:'Running',comms:'OK - 6 s ago',chg:'Today 09:12'},
   {id:'CS01',kind:'cs',x:935,y:525,asset:'Mesa/CS01',ll:'32.2318, -103.8544',kvn:'Discharge pressure',kv:'1,050 psi',kv2:[['Suction pressure','62 psi'],['Units running','2 of 2']],status:'Running',comms:'OK - 4 s ago',chg:'Oct 22'},
   {id:'SWD1',kind:'swd',x:830,y:665,asset:'Mesa/SWD1',ll:'32.2276, -103.8583',kvn:'Injection rate',kv:'4,120 bbl/d (last)',kv2:[['Injection pressure','1,380 psi']],status:'Running',stale:true,comms:'OK - 7 s ago'},
@@ -277,7 +284,7 @@ var ITEMS = [
 function item(id){for(var i=0;i<ITEMS.length;i++)if(ITEMS[i].id===id)return ITEMS[i];return null;}
 
 /* ---------- state ---------- */
-var S = {dir:'A',w:1440,edit:true,rail:'items',sel:'P14',tab:'details',tool:'select',drawing:false,save:'saved',filter:'all',zoom:15,popup:'P14',panel:true,kindSel:'pad',snap:false,recent:false,sort:'attention',sortOpen:false,drawKind:'pipe',newN:0,conflictOpen:false,toast:false,legend:true};
+var S = {dir:'A',w:1440,edit:true,rail:'items',sel:'P14',tab:'details',tool:'select',drawing:false,save:'saved',filter:'all',zoom:15,popup:'P14',panel:true,kindSel:'pad',multi:[],lastChk:null,bulk20:false,bulkSet:false,snap:false,recent:false,sort:'attention',sortOpen:false,drawKind:'pipe',newN:0,conflictOpen:false,toast:false,legend:false,needs:false};
 var DIRS = {
   A:{name:'Direction A - Docked studio',sum:'Atlist-like: a rail of modes, a docked list and a docked properties panel, the map on the right.',
      why:'Everything an editor needs stays on screen at once: modes on the rail, the field list, and the selected item. It reads as a finished studio rather than tools bolted onto a map, which answers the "cobbled together" complaint most directly. The cost is map width: at 1366 the map keeps about half the component.'},
@@ -331,7 +338,7 @@ var KTOOLS=[['pad','well-pad','Add a well pad'],['ctb','tank-battery','Add a tan
 var GTOOLS=[['point','point','Point - pick the kind after'],['line','line','Line - pick the kind after'],['area','region','Area - pick the kind after']];
 function tb(x){return '<button class="ibtn'+(S.tool===x[0]?' on':'')+'" data-act="tool" data-v="'+x[0]+'" title="'+x[2]+'">'+ic(x[1],18)+'</button>';}
 function toolBtns(vertical){
-  var h=tb(['select','cursor','Select'])+'<span class="div"></span>';
+  var h=tb(['select','cursor','Select'])+tb(['box','box','Box select - hold Alt for a lasso'])+'<span class="div"></span>';
   KTOOLS.forEach(function(x){h+=tb(x);});
   h+='<span class="div"></span>';
   GTOOLS.forEach(function(x){h+=tb(x);});
@@ -343,7 +350,8 @@ function modeLabel(){
   if(S.drawing)return ic(S.tool==='pipe'?'pipeline':'line',16)+(S.tool==='pipe'?'Drawing a pipeline':'Drawing a line');
   var nm={pad:'well pad',ctb:'tank battery',point:'point'}[S.tool];
   if(nm)return ic(S.tool==='point'?'point':KINDS[S.tool].icon,16)+'Add a '+nm+' - click the map, then drag to fine-tune';
-  return {select:ic('cursor',16)+'Select',area:ic('region',16)+'Draw an area - kind picked after'}[S.tool]||'';
+  if(S.multi.length>1&&S.tool==='select')return ic('cursor',16)+(S.bulk20?20:S.multi.length)+' selected - Shift-click to add';
+  return {box:ic('box',16)+'Box select - drag on the map, hold Alt for a lasso',select:ic('cursor',16)+'Select',area:ic('region',16)+'Draw an area - kind picked after'}[S.tool]||'';
 }
 function toolbarTop(extra,off){off=off||0;
   return '<div class="float toolbar" style="left:calc(50% + '+off+'px)">'+toolBtns()+(extra||'')+'</div><div class="float modepill" style="position:absolute;top:60px;left:calc(50% + '+off+'px);transform:translateX(-50%);height:28px;padding:0 12px">'+modeLabel()+'</div>';
@@ -368,7 +376,7 @@ function mapWorld(dx){
   ITEMS.forEach(function(it){
     if(it.kind!=='pipe'&&it.kind!=='lat')return;
     var w=it.kind==='pipe'?(it.size==='6 in'?6:4):3, col=it.kind==='pipe'?'var(--neutral-60)':'var(--neutral-50)';
-    var sel=S.sel===it.id&&S.edit;
+    var sel=(S.sel===it.id||S.multi.indexOf(it.id)>=0)&&S.edit;
     if(sel)h+='<path d="'+it.d+'" stroke="var(--callToAction)" stroke-width="'+(w+6)+'" stroke-opacity=".35" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
     h+='<path d="'+it.d+'" stroke="'+col+'" stroke-width="'+w+'" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
     h+='<path d="'+it.d+'" stroke="transparent" stroke-width="16" fill="none" data-act="sel" data-id="'+it.id+'" style="cursor:pointer"/>';
@@ -388,7 +396,7 @@ function mapWorld(dx){
   /* sites */
   ITEMS.forEach(function(it){
     if(!it.x)return;
-    var k=KINDS[it.kind], sel=(S.edit?S.sel:S.popup)===it.id;
+    var k=KINDS[it.kind], sel=(S.edit?(S.sel===it.id||S.multi.indexOf(it.id)>=0):S.popup===it.id);
     var cls='mk'+(it.lost?' lost':'')+(sel?' sel':'')+(it.isNew?' new':'');
     var b='';
     if(it.alarm)b='<span class="badge a1">'+fi('a1u',18)+'1</span>';
@@ -420,11 +428,11 @@ function popup(it){
   return h+'</div>';
 }
 function legend(){
-  if(!S.legend)return '<button class="float btn" style="left:12px;bottom:12px" data-act="legend">'+ic('layers',16)+'Legend</button>';
-  return '<div class="float legend"><h5>Legend <button class="ibtn" style="width:20px;height:20px" data-act="legend" title="Collapse">'+ic('chev',14)+'</button></h5>'+
+  if(!S.legend)return '<button class="float btn" style="left:12px;bottom:12px;height:36px;border:0" data-act="legend">'+ic('layers',16)+'Legend</button>';
+  return '<div class="float legend" style="bottom:56px"><h5>Legend <button class="ibtn" style="width:20px;height:20px" data-act="legend" title="Collapse">'+ic('chev',14)+'</button></h5>'+
    '<div class="li">'+ic('well-pad',16)+'Well pad</div><div class="li">'+ic('tank-battery',16)+'Tank battery</div><div class="li">'+ic('compressor-station',16)+'Compressor station</div><div class="li">'+ic('swd',16)+'SWD</div>'+
-   '<div class="li"><span style="color:var(--error)">'+fi('a1u',16)+'</span>Priority 1 alarm, digit beside</div><div class="li">'+ic('comms-lost',16)+'Comms lost</div><div class="li">'+ic('stale',16)+'Stale value</div>'+
-   '<div class="li"><svg width="16" height="8"><path d="M0 4h16" stroke="var(--neutral-60)" stroke-width="4"/></svg>Pipeline, weight by size</div>'+
+   '<div class="li"><span style="color:var(--error)">'+fi('a1u',16)+'</span>Priority 1 alarm, digit beside</div><div class="li"><span style="color:var(--error)">'+fi('a1a',16)+'</span>Acknowledged</div><div class="li">'+ic('comms-lost',16)+'Comms lost</div><div class="li">'+ic('stale',16)+'Stale value</div>'+
+   '<div class="li"><svg width="16" height="8"><path d="M0 4h16" stroke="var(--neutral-60)" stroke-width="4"/></svg>Pipeline, weight by size</div><div class="li"><svg width="16" height="8"><path d="M0 4h16" stroke="var(--neutral-50)" stroke-width="3"/></svg>Lateral</div><div class="li"><svg width="16" height="8"><path d="M0 4h16" stroke="var(--neutral-60)" stroke-width="3" stroke-dasharray="5 3"/></svg>Dashed: no data or comms lost</div><div class="li"><svg width="16" height="10"><rect x="1" y="1" width="14" height="8" fill="none" stroke="var(--neutral-50)" stroke-dasharray="3 2"/></svg>Geofence</div>'+
    '<div class="tog"><span style="display:flex;gap:5px;align-items:center"><span class="check on">'+ic('check',11)+'</span>Lines</span><span style="display:flex;gap:5px;align-items:center"><span class="check on">'+ic('check',11)+'</span>Names</span></div><div class="tiny muted" style="margin-top:4px">Below zoom 14 sites show as dots</div></div>';
 }
 function drawBar(off){
@@ -439,15 +447,25 @@ function drawBar(off){
 function overlays(off){off=off||0;
   var h='';
   if(S.drawing)h+=drawBar(off);
-  if(S.toast)h+='<div class="toast">'+ic('check',16)+''+S.toastMsg+'<button class="btn sm" data-act="toastx">Undo</button></div>';
+  if(S.toast)h+='<div class="toast">'+ic('check',16)+''+S.toastMsg+'<button class="btn sm" data-act="toastx">'+(S.toastUndo||'Undo')+'</button></div>';
   return h;
 }
 function conflictCard(pos){
   if(S.save!=='conflict'||!S.conflictOpen)return '';
   return '<div class="float conflict" style="'+pos+'"><h4>'+ic('warn',16)+'Not saved - conflict with Sam\'s change</h4><p><b>Sam</b> moved P14 about 40 m north at 10:42, while you were editing it.</p><p>Your change, kept here and not saved: label position Right, Gas rate switched on.</p><div style="display:flex;gap:8px"><button class="btn sm" data-act="resolve">Use Sam\'s version</button><button class="btn sm pri" data-act="resolve">Apply mine on top</button></div></div>';
 }
+var NEEDS=[['P14','a1','Priority 1 alarm, unacknowledged','Casing pressure high - 4 min'],['P21','lost','Comms lost','Last heard 14 min ago'],['SWD1','stale','Stale value','Injection rate - last 22 min ago']];
+function needsYou(){
+  var h='<button class="float" data-act="needs" style="top:12px;left:324px;height:40px;display:flex;align-items:center;gap:8px;padding:0 12px;border:0;font-size:12px"><b>Needs you 3</b><span class="muted">:</span><span class="st a1">'+fi('a1u',14)+'1 alarm</span><span class="st">'+ic('comms-lost',13)+'1 comms lost</span><span class="st">'+ic('stale',13)+'1 stale</span>'+ic('chev',14)+'</button>';
+  if(!S.needs)return h;
+  h+='<div class="float" style="top:58px;left:324px;width:320px;padding:6px"><div class="tiny muted" style="padding:6px 8px">Ranked: alarms by priority, then comms lost, then stale</div>';
+  NEEDS.forEach(function(n,i){var it=item(n[0]);
+    var g=n[1]==='a1'?'<span style="color:var(--error)">'+fi('a1u',18)+'</span>':ic(n[1]==='lost'?'comms-lost':'stale',18);
+    h+='<button class="row-i" data-act="sel" data-id="'+n[0]+'" style="align-items:flex-start"><span style="width:16px;color:var(--neutral-70);font-size:12px">'+(i+1)+'</span>'+g+'<span style="flex:1"><b>'+n[0]+'</b> <span class="muted small">'+KINDS[it.kind].label+'</span><br><span class="small">'+n[2]+'</span><br><span class="tiny muted">'+n[3]+'</span></span></button>';});
+  return h+'</div>';
+}
 function viewMap(){
-  return '<div class="map">'+mapWorld(0)+'<div class="float search">'+ic('search',18)+'Search sites, wells or lines</div>'+legend()+topRight(false)+'<div class="scale"><span>500 m</span><i></i></div></div>';
+  return '<div class="map">'+mapWorld(0)+'<div class="float search">'+ic('search',18)+'Search sites, wells or lines</div>'+needsYou()+legend()+topRight(false)+'<div class="scale"><span>500 m</span><i></i></div></div>';
 }
 
 /* ---------- list, details, kinds, layers, import ---------- */
@@ -465,7 +483,8 @@ var SORTS=[['attention','Needs attention'],['place','Place'],['kind','Kind'],['n
 function needs(it){return !!(it.alarm||it.lost||it.stale||it.unlinked);}
 function rowI(it,indent,extra){
   var k=KINDS[it.kind];
-  return '<button class="row-i'+(S.sel===it.id?' sel':'')+'" style="padding-left:'+(8+indent)+'px" data-act="sel" data-id="'+it.id+'"><span class="ki">'+ic(k.icon,17)+'</span><span class="nm">'+it.id+(extra?' <span class="tiny muted">'+extra+'</span>':'')+'</span>'+stBadge(it)+'</button>';
+  var on=S.multi.indexOf(it.id)>=0;
+  return '<div class="row-w"><span class="cb" data-act="chk" data-id="'+it.id+'" title="Select (Shift-click for a range)" style="margin-left:'+indent+'px"><span class="check'+(on?' on':'')+'">'+(on?ic('check',10):'')+'</span></span><button class="row-i'+(S.sel===it.id||on?' sel':'')+'" style="padding-left:6px" data-act="sel" data-id="'+it.id+'"><span class="ki">'+ic(k.icon,17)+'</span><span class="nm">'+it.id+(extra?' <span class="tiny muted">'+extra+'</span>':'')+'</span>'+stBadge(it)+'</button></div>';
 }
 function pass(it){return S.filter==='all'||S.filter===it.kind;}
 function listBody(){
@@ -482,7 +501,7 @@ function listBody(){
   if(S.sort==='attention'||S.sort==='place'){
     var pl=PLACES.slice(); if(S.sort==='place')pl.sort(function(a,b){return a.site<b.site?-1:1;});
     var natt=ITEMS.filter(needs).length;
-    h+='<div class="grp"><div class="gh"><span>Mesa field</span><span>'+(S.sort==='attention'?natt+' need attention':'11 items')+'</span></div>';
+    h+='<div class="grp"><div class="gh"><span>Mesa field</span><span>'+(S.sort==='attention'?natt+' need attention':'11 items')+'</span></div><div style="padding:0 8px 4px"><button class="btn ghost sm" style="height:22px;padding:0 4px" data-act="selall" data-v="'+(S.filter==='all'?'visible':S.filter)+'">'+(S.filter==='all'?'Select all in Mesa field':'Select all in filter ('+KINDS[S.filter].label+')')+'</button></div>';
     pl.forEach(function(p){
       var site=item(p.site), ons=p.on.map(item);
       if(S.sort==='attention')ons.sort(function(a,b){return needs(b)-needs(a);});
@@ -497,7 +516,7 @@ function listBody(){
   }else if(S.sort==='kind'){
     KORDER.forEach(function(k){
       var rows=ITEMS.filter(function(i){return i.kind===k&&!i.isNew&&pass(i);}); if(!rows.length)return;
-      h+='<div class="grp"><div class="gh"><span>'+KINDS[k].label+'</span><span>'+rows.length+'</span></div>';
+      h+='<div class="grp"><div class="gh"><span>'+KINDS[k].label+' '+rows.length+'</span><button class="btn ghost sm" style="height:18px;padding:0 4px;text-transform:none;letter-spacing:0" data-act="selall" data-v="'+k+'">Select all in group</button></div>';
       rows.forEach(function(it){h+=rowI(it,0);});h+='</div>';
     });
   }else{
@@ -553,6 +572,46 @@ function detailsBody(it){
     h+='<div class="sect"><h4>Popup parts <span class="tag">From kind</span></h4>'+['Name and kind','Comms','Key values','Alarm summary','Buttons'].map(function(p){return '<div class="kv" style="justify-content:flex-start;gap:8px"><span class="check on">'+ic('check',11)+'</span>'+p+'</div>';}).join('')+'</div>';
   }
   return h;
+}
+function bulkActive(){return S.bulk20||S.multi.length>1;}
+function bulkHead(back){
+  var ids=S.multi, kinds={}; ids.forEach(function(i){kinds[item(i).kind]=1;});
+  var one=Object.keys(kinds).length===1?Object.keys(kinds)[0]:null; if(S.bulk20)one='pad';
+  var n=S.bulk20?20:ids.length;
+  var title=one?n+' '+KINDS[one].label.toLowerCase()+(one==='swd'?'s':'s')+' selected':n+' items selected';
+  return '<div class="ph">'+(back?'<button class="btn ghost sm" style="margin:-4px 0 6px -8px" data-act="back">'+ic('back',16)+'All items</button>':'')+'<div class="row"><span>'+ic(one?KINDS[one].icon:'box',22)+'</span><div style="flex:1;min-width:0"><h3>'+title+'</h3><div class="small muted">Shared fields only - a change applies to all '+n+'</div></div><button class="btn sm ghost" data-act="clearsel">Clear</button></div>'+
+   '<div class="tabs">'+['details','style','link'].map(function(t){return '<button class="'+(S.tab===t?'on':'')+'" data-act="tab" data-v="'+t+'">'+t.charAt(0).toUpperCase()+t.slice(1)+'</button>';}).join('')+'</div></div>';
+}
+function mixedOr(vals){var u=vals.filter(function(v,i){return vals.indexOf(v)===i;});return u.length===1?u[0]:null;}
+function bulkBody(){
+  var ids=S.multi, its=ids.map(item), n=S.bulk20?20:ids.length, h='';
+  var allPads=S.bulk20||its.every(function(i){return i.kind==='pad';});
+  if(S.bulk20)h+='<div class="sect"><div class="note">Example at scale: 20 well pads picked with the box tool on a larger field. The Mesa demo has 3.</div></div>';
+  if(S.tab==='details'){
+    h+='<div class="sect">';
+    if(allPads){
+      var op=S.bulkSet?'Mesa Operating':(S.bulk20?null:mixedOr(its.map(function(i){return i.op;})));
+      h+='<div class="field"><label>Kind</label><div class="sel-like">'+ic('well-pad',15)+'Well pad<span style="margin-left:auto">'+ic('chev',14)+'</span></div></div>';
+      h+='<div class="field"><label>Operator</label><button class="sel-like" style="width:100%" data-act="bulkset">'+(op?'<span>'+op+'</span>':'<span class="mixed">Mixed - '+(S.bulk20?'3 values':'2 values')+'</span>')+ic('chev',14)+'</button>'+(op&&S.bulkSet?'<div class="tiny muted" style="margin-top:4px">Set on all '+n+'</div>':'<div class="tiny muted" style="margin-top:4px">Pick a value to set it on all '+n+'</div>')+'</div>';
+      h+='<div class="field"><label>Route</label><div class="sel-like"><span>'+(S.bulk20?'Route 3':'Route 3')+'</span>'+ic('chev',14)+'</div></div>';
+      h+='<div class="field" style="margin:0"><label>Access road note</label><div class="input"><span class="mixed">Mixed</span></div></div>';
+    }else{
+      h+='<div class="field" style="margin:0"><label>Notes</label><div class="input"><span class="mixed">Mixed</span></div></div>';
+    }
+    h+='</div><div class="sect tiny muted">Name, location and asset link belong to one item and are not shown. Geometry is never bulk edited.</div>';
+  }else if(S.tab==='style'){
+    h+='<div class="sect"><h4>Size</h4><div class="presets"><span>Small</span><span class="on">Standard</span><span>Large</span></div></div>';
+    h+='<div class="sect"><h4>Label position <span class="tag">Mixed</span></h4><div class="presets"><span>Below</span><span>Right</span></div><div class="tiny muted" style="margin-top:6px">1 has an override. Pick one to set it on all, or Reset all to kind.</div></div>';
+  }else{
+    h+='<div class="sect"><h4>Page link <span class="tag">From kind</span></h4><div class="input val small">/pad/{asset.id}</div></div><div class="sect"><h4>Asset</h4><div class="note">Asset links are per item. Use Import to match many by name.</div></div>';
+  }
+  return h;
+}
+function bulkFoot(){var n=S.bulk20?20:S.multi.length;return '<div class="pfoot"><span class="small muted" style="flex:1">One change, one undo step</span><button class="ibtn" title="Delete '+n+' items">'+ic('trash',16)+'</button></div>';}
+function propsFor(back,close){
+  if(bulkActive())return bulkHead(back)+'<div class="pbody">'+bulkBody()+'</div>'+bulkFoot();
+  var it=item(S.sel); if(!it)return '';
+  return detailsHead(it,back,close)+'<div class="pbody">'+detailsBody(it)+'</div>'+detailsFoot();
 }
 function detailsFoot(){return '<div class="pfoot"><button class="btn sm">'+ic('copy',14)+'Add another like this</button><button class="ibtn" style="margin-left:auto" title="Delete (no confirmation, Ctrl+Z undoes)">'+ic('trash',16)+'</button></div>';}
 
@@ -611,7 +670,7 @@ function dirA(){
   var list='', props='';
   var head='<div class="ph"><div class="row"><h3 style="flex:1">Mesa map</h3>'+saveCluster()+'</div></div>';
   if(S.rail==='items'){list=head+'<div class="pbody">'+listBody()+'</div>'+listFoot();
-    var it=item(S.sel); if(it)props=detailsHead(it,false,true)+'<div class="pbody">'+detailsBody(it)+'</div>'+detailsFoot();}
+    props=propsFor(false,true);}
   else if(S.rail==='kinds'){list=head+'<div class="pbody">'+kindsList()+'</div>'; props=kindHead(false)+'<div class="pbody">'+kindBody()+'</div>';}
   else if(S.rail==='layers'){list=head+'<div class="pbody">'+layersBody()+'</div>';}
   else {list=head+'<div class="pbody">'+importBody()+'</div>';}
@@ -623,7 +682,7 @@ function dirA(){
 function dirB(){
   var h='<div style="position:relative;display:flex;flex:1;min-width:0">'+railEl(true);
   var open=S.panel&&S.rail!=='view', pane='';
-  if(S.rail==='items'){var it=S.sel&&item(S.sel); pane=it?detailsHead(it,true,true)+'<div class="pbody">'+detailsBody(it)+'</div>'+detailsFoot():titled('Items',listBody(),listFoot(),'<button class="ibtn" data-act="close" title="Close">'+ic('x',18)+'</button>');}
+  if(S.rail==='items'){var it=S.sel&&item(S.sel); pane=(S.bulkOpen&&bulkActive())||(it&&!bulkActive())?propsFor(true,true):titled('Items',listBody(),bulkActive()?'<div class="pfoot"><b style="flex:1">'+(S.bulk20?20:S.multi.length)+' selected</b><button class="btn sm ghost" data-act="clearsel">Clear</button><button class="btn sm pri" data-act="bulkopen">Edit together</button></div>':listFoot(),'<button class="ibtn" data-act="close" title="Close">'+ic('x',18)+'</button>');}
   else if(S.rail==='kinds'){pane=S.kindSel?kindHead(true)+'<div class="pbody">'+kindBody()+'</div>':titled('Kinds',kindsList());}
   else if(S.rail==='layers')pane=titled('Layers',layersBody(),'','<button class="ibtn" data-act="close">'+ic('x',18)+'</button>');
   else pane=titled('Import and export',importBody(),'','<button class="ibtn" data-act="close">'+ic('x',18)+'</button>');
@@ -640,7 +699,7 @@ function dirC(){
   left+='<div class="pbody">'+body+'</div>'+(S.rail==='items'?listFoot():'');
   var right;
   if(S.rail==='kinds')right=kindHead(false)+'<div class="pbody">'+kindBody()+'</div>';
-  else {var it=item(S.sel); right=it?detailsHead(it,false,false)+'<div class="pbody">'+detailsBody(it)+'</div>'+detailsFoot():
+  else {var it=item(S.sel); right=(it||bulkActive())?propsFor(false,false):
     '<div class="ph"><h3>Mesa</h3><div class="small muted">Nothing selected</div></div><div class="pbody"><div class="sect"><h4>Field</h4><div class="kv"><span class="k">Items</span><span>11</span></div><div class="kv"><span class="k">Unlinked</span><span>1 - P12 lateral</span></div><div class="kv"><span class="k">In alarm</span><span class="st a1">'+fi('a1u',14)+'1 - P14</span></div><div class="kv"><span class="k">Comms lost</span><span>1 - P21</span></div><div class="kv"><span class="k">Stale</span><span>1 - SWD1</span></div></div><div class="empty">Select an item on the map or in the list to edit it.</div></div>';}
   return '<div class="panel" style="width:'+lw+'px">'+left+'</div><div class="map">'+mapWorld(0)+strip()+topRight(false)+overlays()+conflictCard('top:60px;left:70px')+recentPanel('top:8px;left:8px')+'</div><div class="panel right" style="width:'+pw+'px">'+right+'</div>';
 }
@@ -652,9 +711,10 @@ function render(){
   sw+='<span class="seg">'+[1440,1366].map(function(w){return '<button class="'+(S.w===w?'on':'')+'" data-act="w" data-v="'+w+'">'+w+'</button>';}).join('')+'</span>';
   sw+='<span class="seg">'+[['0','View mode'],['1','Edit mode']].map(function(x){return '<button class="'+((S.edit?'1':'0')===x[0]?'on':'')+'" data-act="setedit" data-v="'+x[0]+'">'+x[1]+'</button>';}).join('')+'</span>';
   sw+='<span class="lbl">Save status demo</span><span class="seg">'+[['saved','Saved'],['saving','Saving...'],['conflict','Conflict']].map(function(x){return '<button class="'+(S.save===x[0]?'on':'')+'" data-act="setsave" data-v="'+x[0]+'">'+x[1]+'</button>';}).join('')+'</span>';
+  sw+='<span class="seg"><button class="'+(S.bulk20?'on':'')+'" data-act="bulk20">Bulk example: 20 pads</button></span>';
   document.getElementById('sw').innerHTML=sw;
   var d=DIRS[S.dir];
-  document.getElementById('rat').innerHTML='<h2>'+d.name+'</h2><p>'+d.why+'</p><div class="hint">Try: the Edit switch on the map; Sort by in the list; a site or line on the map or in the list; the Details, Style and Link tabs; the Pipeline or Line tool (Snap is off by default, the demo turns it on; snapping hint and Finish or Cancel); a well pad tool then click the map and drag the new pin; Kinds for the Well pad setup; zoom out below 14 for dots; Saved to open Recent changes with Revert; the demo buttons above for Saving... and the conflict.</div>';
+  document.getElementById('rat').innerHTML='<h2>'+d.name+'</h2><p>'+d.why+'</p><div class="hint">Try: the Edit switch on the map; Sort by in the list; list checkboxes (Shift-click for a range, Select all) or the box tool on the map for a bulk form; a site or line on the map or in the list; the Details, Style and Link tabs; the Pipeline or Line tool (Snap is off by default, the demo turns it on; snapping hint and Finish or Cancel); a well pad tool then click the map and drag the new pin; Kinds for the Well pad setup; zoom out below 14 for dots; Saved to open Recent changes with Revert; the demo buttons above for Saving... and the conflict.</div>';
   var fr=document.getElementById('frame');
   fr.style.width=S.w+'px'; fr.style.height=(S.w===1440?900:768)+'px';
   var comp=S.edit?(S.dir==='A'?dirA():S.dir==='B'?dirB():dirC()):viewMap();
@@ -672,18 +732,27 @@ document.addEventListener('click',function(e){
     case 'setedit':S.edit=v==='1';if(S.edit&&S.rail==='view')S.rail='items';break;
     case 'setsave':S.save=v;S.conflictOpen=v==='conflict';S.recent=false;break;
     case 'rail':if(v==='view'){S.edit=false;S.rail='items';}else{S.rail=v;S.panel=true;if(v==='kinds'&&S.dir==='B')S.kindSel=null;}S.drawing=false;break;
-    case 'sel':if(S.drawing)return; if(S.edit){S.sel=id;S.rail='items';S.panel=true;}else{S.popup=item(id)&&item(id).x?id:null;}break;
+    case 'sel':if(S.drawing)return; if(S.edit){if(e.shiftKey){if(S.multi.length===0&&S.sel)S.multi=[S.sel];if(S.multi.indexOf(id)<0)S.multi.push(id);S.bulkOpen=true;break;}S.multi=[];S.bulk20=false;S.bulkOpen=false;S.sel=id;S.rail='items';S.panel=true;}else{S.popup=item(id)&&item(id).x?id:null;S.needs=false;}break;
     case 'close':if(S.dir==='B'&&S.rail==='items'&&!S.sel){S.panel=false;}else if(S.dir==='B'&&S.rail!=='items'){S.panel=false;}else S.sel=null;break;
-    case 'back':if(S.rail==='kinds')S.kindSel=null;else S.sel=null;break;
+    case 'back':if(S.rail==='kinds')S.kindSel=null;else if(S.bulkOpen)S.bulkOpen=false;else S.sel=null;break;
     case 'open':S.panel=true;break;
     case 'tab':S.tab=v;break;
     case 'kind':S.kindSel=v;break;
     case 'filter':S.filter=v;break;
+    case 'chk':(function(){var ord=[].map.call(document.querySelectorAll('[data-act=chk]'),function(n){return n.getAttribute('data-id');});
+      if(e.shiftKey&&S.lastChk){var a=ord.indexOf(S.lastChk),b=ord.indexOf(id);ord.slice(Math.min(a,b),Math.max(a,b)+1).forEach(function(x){if(S.multi.indexOf(x)<0)S.multi.push(x);});}
+      else{var i=S.multi.indexOf(id);if(i>=0)S.multi.splice(i,1);else S.multi.push(id);}
+      S.lastChk=id;S.bulk20=false;S.bulkSet=false;S.bulkOpen=false;if(S.multi.length===1)S.sel=S.multi[0];})();break;
+    case 'selall':S.multi=v==='visible'?[].map.call(document.querySelectorAll('[data-act=chk]'),function(n){return n.getAttribute('data-id');}):ITEMS.filter(function(i){return i.kind===v&&!i.isNew;}).map(function(i){return i.id;});S.bulk20=false;S.bulkSet=false;break;
+    case 'clearsel':S.multi=[];S.bulk20=false;S.bulkSet=false;S.bulkOpen=false;break;
+    case 'bulkopen':S.bulkOpen=true;break;
+    case 'bulkset':S.bulkSet=true;S.toast=true;S.toastMsg='Operator set on '+(S.bulk20?20:S.multi.length)+' well pads';S.toastUndo='Undo: edit '+(S.bulk20?20:S.multi.length)+' pads';S.save='saving';clearTimeout(timer);timer=setTimeout(function(){S.save='saved';render();},900);break;
+    case 'bulk20':S.bulk20=!S.bulk20;S.multi=S.bulk20?['P12','P14','P21']:[];S.bulkSet=false;S.bulkOpen=true;S.rail='items';S.edit=true;S.panel=true;S.tab='details';break;
     case 'sortopen':S.sortOpen=!S.sortOpen;break;
     case 'sort':S.sort=v;S.sortOpen=false;break;
     case 'tool':S.tool=v;S.drawing=v==='line'||v==='pipe';if(S.drawing)S.snap=true;S.toast=false;break;
     case 'dcancel':S.drawing=false;S.tool='select';break;
-    case 'dfinish':S.toastMsg=S.tool==='pipe'?'Pipeline "L-3 (new)" added and saved':'Line added and saved - pick its kind in Details';S.drawing=false;S.tool='select';S.save='saving';S.toast=true;clearTimeout(timer);timer=setTimeout(function(){S.save='saved';render();},1200);break;
+    case 'dfinish':S.toastUndo='Undo';S.toastMsg=S.tool==='pipe'?'Pipeline "L-3 (new)" added and saved':'Line added and saved - pick its kind in Details';S.drawing=false;S.tool='select';S.save='saving';S.toast=true;clearTimeout(timer);timer=setTimeout(function(){S.save='saved';render();},1200);break;
     case 'toastx':S.toast=false;break;
     case 'save':S.save=S.save==='saved'?'saving':'conflict';S.conflictOpen=S.save==='conflict';break;
     case 'snap':S.snap=!S.snap;break;
@@ -694,6 +763,7 @@ document.addEventListener('click',function(e){
     case 'zout':S.zoom=Math.max(10,S.zoom-1);break;
     case 'pclose':S.popup=null;break;
     case 'legend':S.legend=!S.legend;break;
+    case 'needs':S.needs=!S.needs;break;
     default:return;
   }
   render();
@@ -707,6 +777,18 @@ function place(m,e){
   ITEMS.push(it); S.sel=it.id; S.tab='details'; S.rail='items'; S.panel=true; S.tool='select'; S.save='saving';
   clearTimeout(timer);timer=setTimeout(function(){S.save='saved';render();},900); render();
 }
+var box=null;
+document.addEventListener('mousedown',function(e){
+  if(!S.edit||S.tool!=='box')return; var m=e.target.closest('.map'); if(!m||e.target.closest('.float'))return;
+  var w=m.querySelector('.world'), r=w.getBoundingClientRect(); box={w:w,r:r,x:e.clientX-r.left,y:e.clientY-r.top,el:document.createElement('div')};
+  box.el.className='boxsel'; w.appendChild(box.el); e.preventDefault();
+});
+document.addEventListener('mousemove',function(e){if(!box)return;var x=e.clientX-box.r.left,y=e.clientY-box.r.top;
+  box.x2=x;box.y2=y;var st=box.el.style;st.left=Math.min(x,box.x)+'px';st.top=Math.min(y,box.y)+'px';st.width=Math.abs(x-box.x)+'px';st.height=Math.abs(y-box.y)+'px';});
+document.addEventListener('mouseup',function(){if(!box)return;var b=box;box=null;if(b.x2==null){b.el.remove();return;}
+  var x1=Math.min(b.x,b.x2),x2=Math.max(b.x,b.x2),y1=Math.min(b.y,b.y2),y2=Math.max(b.y,b.y2);
+  S.multi=ITEMS.filter(function(i){var px=i.x||i.mid[0],py=i.y||i.mid[1];return i.kind!=='geo'&&px>=x1&&px<=x2&&py>=y1&&py<=y2;}).map(function(i){return i.id;});
+  S.bulk20=false;S.bulkSet=false;S.bulkOpen=true;S.tool='select';if(S.multi.length===1){S.sel=S.multi[0];S.multi=[];}S.rail='items';S.panel=true;render();});
 var drag=null;
 document.addEventListener('mousedown',function(e){var b=e.target.closest('.mk.new');if(!b||!S.edit)return;drag={it:item(b.getAttribute('data-id')),el:b,x:e.clientX,y:e.clientY,ox:0,oy:0};e.preventDefault();});
 document.addEventListener('mousemove',function(e){if(!drag)return;var dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.el.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';drag.dx=dx;drag.dy=dy;});
