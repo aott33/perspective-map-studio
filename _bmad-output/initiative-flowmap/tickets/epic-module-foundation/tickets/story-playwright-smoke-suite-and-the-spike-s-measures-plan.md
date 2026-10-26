@@ -3,14 +3,14 @@ title: "Playwright smoke suite and the spike's measures"
 type: 'feature'
 ticket: '7'
 created: '2026-10-26'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '0c6a191c0550beaa9aff02c2610bc16b87ab6541'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md'
