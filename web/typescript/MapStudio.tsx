@@ -11,9 +11,22 @@ import {
     Size2d
 } from '@inductiveautomation/perspective-client';
 import { Map as MapLibreMap, MapLayerMouseEvent, NavigationControl, setWorkerUrl } from 'maplibre-gl';
+import { TerraDraw, TerraDrawLineStringMode } from 'terra-draw';
+import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
+import { DrawControl } from './DrawControl';
+import {
+    DRAW_IDLE,
+    DRAW_MODE_LINE,
+    DRAW_MODE_OFF,
+    DrawState,
+    cancelDrawing,
+    drawStatusText,
+    finishLine,
+    startDrawing
+} from './draw';
 import { MESSAGE_EVENT, pointClick, readReply, replyText } from './messages';
 import { TEST_LINE, TEST_POINTS } from './testData';
-import { themeColor } from './theme';
+import { drawColor, themeColor } from './theme';
 
 /** Must match MapStudioComponent.COMPONENT_ID on the Java side. */
 export const COMPONENT_TYPE = 'ao.mapstudio';
@@ -90,10 +103,14 @@ const LAYER_POINTS = 'mapstudio-points';
  * data (three points and one line). Clicking a point sends `point.click`
  * through the delegate; the reply is shown as text over the map.
  */
-export class MapStudio extends Component<Props, {}> {
+export class MapStudio extends Component<Props, DrawState> {
     private mapContainer: HTMLDivElement | null = null;
     private map: MapLibreMap | null = null;
     private resizeObserver: ResizeObserver | null = null;
+    private draw: TerraDraw | null = null;
+    private drawControl: DrawControl | null = null;
+
+    state: DrawState = DRAW_IDLE;
 
     componentDidMount(): void {
         if (!this.mapContainer) {
@@ -146,7 +163,10 @@ export class MapStudio extends Component<Props, {}> {
             map.on('click', LAYER_POINTS, this.onPointClick);
             map.on('mouseenter', LAYER_POINTS, () => { map.getCanvas().style.cursor = 'pointer'; });
             map.on('mouseleave', LAYER_POINTS, () => { map.getCanvas().style.cursor = ''; });
+            this.startTerraDraw(map, root);
         });
+        this.drawControl = new DrawControl(this.toggleDrawing);
+        map.addControl(this.drawControl, 'top-right');
         this.map = map;
 
         if (typeof ResizeObserver !== 'undefined') {
@@ -160,13 +180,101 @@ export class MapStudio extends Component<Props, {}> {
             this.resizeObserver.disconnect();
             this.resizeObserver = null;
         }
+        if (this.mapContainer) {
+            this.mapContainer.removeEventListener('keydown', this.onKeyDown, true);
+        }
+        if (this.draw) {
+            this.draw.stop();
+            this.draw = null;
+        }
         if (this.map) {
             this.map.remove();
             this.map = null;
         }
+        this.drawControl = null;
+    }
+
+    /**
+     * Terra Draw on the MapLibre adapter, started after the map's own layers so
+     * its `td-*` layers draw above them. It idles in the `static` mode and only
+     * the toggle enters `linestring`, so the point click round trip keeps the
+     * map's clicks while the tool is off. Styles come from theme tokens
+     * converted to hex (AD-11); a token that does not resolve leaves that key
+     * to the library default, with one warning from drawColor.
+     */
+    private startTerraDraw(map: MapLibreMap, root: HTMLElement | undefined): void {
+        const line = drawColor(root, ['--label', '--neutral-70']);
+        const outline = drawColor(root, ['--containerRoot', '--container']);
+        const styles: { [key: string]: string | number } = {
+            lineStringWidth: 4,
+            closingPointWidth: 6,
+            closingPointOutlineWidth: 2
+        };
+        if (line) {
+            styles.lineStringColor = line;
+            styles.closingPointColor = line;
+        }
+        if (outline) {
+            styles.closingPointOutlineColor = outline;
+        }
+        const draw = new TerraDraw({
+            adapter: new TerraDrawMapLibreGLAdapter({ map }),
+            modes: [new TerraDrawLineStringMode({ styles })]
+        });
+        draw.on('finish', this.onDrawFinish);
+        draw.start();
+        this.draw = draw;
+        if (this.mapContainer) {
+            // Capture phase, so Escape leaves the tool even after Terra Draw has
+            // cleaned up its provisional line.
+            this.mapContainer.addEventListener('keydown', this.onKeyDown, true);
+        }
+    }
+
+    private toggleDrawing = (): void => {
+        if (!this.draw) {
+            return;
+        }
+        if (this.state.drawing) {
+            this.draw.setMode(DRAW_MODE_OFF);
+            this.setDrawState(cancelDrawing());
+        } else {
+            this.draw.setMode(DRAW_MODE_LINE);
+            this.setDrawState(startDrawing());
+        }
+    };
+
+    private onDrawFinish = (id: string | number, context: { mode: string; action: string }): void => {
+        if (!this.draw || context.mode !== DRAW_MODE_LINE) {
+            return;
+        }
+        const feature = this.draw.getSnapshotFeature(id);
+        const geometry = feature ? feature.geometry : undefined;
+        const points = geometry && geometry.type === 'LineString' ? geometry.coordinates.length : 0;
+        this.draw.setMode(DRAW_MODE_OFF);
+        this.setDrawState(finishLine(points));
+        console.info('[MapStudio] Line drawn with Terra Draw: ' + points + ' points, id ' + id);
+    };
+
+    private onKeyDown = (ev: KeyboardEvent): void => {
+        if (ev.key === 'Escape' && this.state.drawing && this.draw) {
+            this.draw.setMode(DRAW_MODE_OFF);
+            this.setDrawState(cancelDrawing());
+        }
+    };
+
+    private setDrawState(state: DrawState): void {
+        this.setState(state);
+        if (this.drawControl) {
+            this.drawControl.setPressed(state.drawing);
+        }
     }
 
     private onPointClick = (ev: MapLayerMouseEvent): void => {
+        if (this.state.drawing) {
+            // The click belongs to the line being drawn.
+            return;
+        }
         const feature = ev.features && ev.features[0];
         const pointId = feature && feature.properties ? feature.properties.id : undefined;
         if (typeof pointId !== 'string') {
@@ -187,13 +295,17 @@ export class MapStudio extends Component<Props, {}> {
     render(): React.ReactNode {
         const delegate = this.props.delegate;
         const pending = !!(delegate && delegate.pendingId);
-        const text = delegate && delegate.lastReply ? delegate.lastReply : 'Click a point.';
+        const drawText = drawStatusText(this.state);
+        const replyLine = delegate && delegate.lastReply ? delegate.lastReply : 'Click a point.';
         return (
             <div {...this.props.emit({ classes: ['mapstudio'] })}>
                 <div className="mapstudio-map" ref={this.setMapContainer} />
                 <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '')}
-                     data-pending={pending ? 'true' : 'false'}>
-                    {pending ? 'Waiting for the Gateway ...' : text}
+                     data-pending={pending ? 'true' : 'false'}
+                     data-drawing={this.state.drawing ? 'true' : 'false'}
+                     data-line-points={this.state.linePoints === null ? '' : String(this.state.linePoints)}>
+                    <div>{pending ? 'Waiting for the Gateway ...' : replyLine}</div>
+                    {drawText !== '' ? <div className="mapstudio-draw-status">{drawText}</div> : null}
                 </div>
             </div>
         );

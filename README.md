@@ -9,7 +9,9 @@ An open-source Ignition 8.3 Perspective component module: the project's map, sho
 
 ## Status
 
-The tracer: a MapLibre map on a blank style with three fixed points and one line, and one round trip to the Gateway through the component model delegate. Clicking a point sends `{v, type: "point.click", id, body: {pointId}}`; the Gateway answers `point.click.reply` with the time it received the click, shown on the map.
+The tracer: a MapLibre map on a blank style with three fixed points and one line, and one round trip to the Gateway through the component model delegate. Clicking a point sends `{v, type: "point.click", id, body: {pointId}}`; the Gateway answers `point.click.reply` with the time it received the click, shown on the map. A "Draw a line" toggle (top right) starts Terra Draw's line tool: click to add points, Enter to finish, Escape to cancel; the status line reports the finished line. Nothing drawn is saved yet.
+
+The platform checks the spike answered, with their evidence, are in [docs/platform-checks.md](docs/platform-checks.md) (toolchain pins: MapLibre GL JS 6.16.0, Terra Draw 1.38.0, adapter 1.5.0).
 
 ![mapstudio-dev at 1440 px](docs/screenshots/mapstudio-dev-1440.png)
 
@@ -31,7 +33,7 @@ Layout:
 | `common/` | component descriptor, props schema (`mapstudio.props.json`), the message contract (`Messages.java`) |
 | `gateway/` | gateway hook and the component model delegate (`MapStudioDelegate`) |
 | `designer/` | the Designer palette entry |
-| `web/` | the TypeScript and React component, MapLibre map, message client (`messages.ts`) and its tests |
+| `web/` | the TypeScript and React component, MapLibre map, Terra Draw line tool (`DrawControl.tsx`, `draw.ts`), message client (`messages.ts`) and the tests |
 | `ops/` | the local development Gateway (Docker) and the screenshot script |
 | `docs/` | contributor architecture and screenshots |
 
@@ -39,7 +41,7 @@ Layout:
 
 ```bash
 ops/up.sh              # build, stage the .modl, start Ignition 8.3.10 in Docker, accept the module unattended
-node ops/screenshot.mjs   # click a point in headless Chromium at 1440 and 390 px, save docs/screenshots/*.png
+node ops/screenshot.mjs   # click a point and draw a line in headless Chromium at 1440 and 390 px, save docs/screenshots/*.png (--url for another port)
 ops/logs.sh -n 200     # Gateway log
 ops/down.sh [--purge]  # stop; --purge also wipes the Gateway data (trial, acceptance)
 ```
@@ -54,4 +56,4 @@ Every message between the browser and the Gateway is `{v, type, id, body}` under
 
 ## Attribution
 
-Map rendering by [MapLibre GL JS](https://maplibre.org/) (BSD-3-Clause). See [NOTICE](NOTICE).
+Map rendering by [MapLibre GL JS](https://maplibre.org/) (BSD-3-Clause); drawing by [Terra Draw](https://terradraw.io/) and its MapLibre adapter (MIT). See [NOTICE](NOTICE).

@@ -13,6 +13,12 @@ MapLibre GL JS (https://github.com/maplibre/maplibre-gl-js)
     License (Copyright (c) 2020 Mapbox), and the packages it depends on under
     their own licences (listed in web/node_modules after `npm install`).
 
+Terra Draw (https://github.com/JamesLMilner/terra-draw) and
+terra-draw-maplibre-gl-adapter
+    MIT License
+    Copyright (c) James Milner (the licence text is in the project's LICENSE
+    file on GitHub; the npm packages ship no copy)
+
 This product builds against, but does not redistribute, Inductive Automation's
 Ignition SDK and the @inductiveautomation/perspective-client package, which the
 Ignition platform provides at runtime.
