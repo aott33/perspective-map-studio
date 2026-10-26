@@ -2,7 +2,7 @@
 title: Map Studio for Ignition Perspective - PRD
 status: final
 created: 2026-10-25
-updated: 2026-10-25
+updated: 2026-10-26
 ---
 
 # PRD: Map Studio for Ignition Perspective
@@ -507,7 +507,7 @@ The project offers none, OpenStreetMap, satellite and Mapbox basemaps; the user 
 - **NFR-6 Platform and supply chain.** Ignition 8.3 full Gateways only; not Edge Gateways. Java 17 on the Gateway; the host's Jython is untouched. The module ships as a signed `.modl` from a GitHub release, pinned by SHA-256 and certificate fingerprint in the host's module lock and baked into its private Gateway image; never a `.modl` in git. The Perspective client package versions are pinned to the Gateway version, and every 8.3.x upgrade is checked on the test stack before release.
 - **NFR-7 Verified claims.** See section 10: claims tagged `[UNVERIFIED]` stay so until checked on a live 8.3 Gateway.
 - **NFR-8 Public contract.** The component's parameters and events, the asset contract, the kind list and the CSV template formats are documented and versioned; a breaking change needs a new major version. Versions follow semantic versioning.
-- **NFR-9 Live value load.** Icon live values arrive for the whole page in one batch every 10 seconds, never as a tag subscription per map item per session (the template's list rule). A popup's values are live while it is open. A live value the kind setup turns off is not read at all.
+- **NFR-9 Live value load.** Icon live values arrive for the whole page in one batch on a refresh interval the project sets (default 10 seconds; a project with less data can set it shorter, a large one longer), never as a tag subscription per map item per session (the template's list rule). A popup's values are live while it is open. A live value the kind setup turns off is not read at all.
 - **NFR-10 Licences.** No dependency that charges per deployment (the template's UX-36). Libraries, icon sets and place-check data use permissive licences, with their attributions shipped; no icon is derived from the template's AGPL-window OpenBridge set.
 - **NFR-11 Look.** Modern, minimal and clean: one minimalist icon style, neutral normal states, no decoration that carries no information.
 
@@ -601,7 +601,7 @@ Figures and limits chosen during discovery and confirmed by the owner (recorded 
 - Up to 4 KPIs per kind setup (FR-12).
 - 44 px touch targets, a 390 px phone, 768 px as the width below which drawing is not offered (FR-27, FR-28).
 - 30 minutes for SM-2; the 30-pad scale set, 60 frames per second and 100 ms for NFR-1.
-- 10 seconds between icon value batches (NFR-9); "a few seconds" for live updates across components (FR-29).
+- 10 seconds as the default icon refresh interval, adjustable by the project (NFR-9); "a few seconds" for live updates across components (FR-29).
 - 20 m for a shared marker (FR-34, from the template).
 - The offline place-check data adds a few megabytes to the module (addendum; an estimate).
 
