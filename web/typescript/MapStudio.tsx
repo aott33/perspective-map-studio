@@ -12,7 +12,7 @@ import {
     PropertyTree,
     Size2d
 } from '@inductiveautomation/perspective-client';
-import { Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent, NavigationControl, Popup, setWorkerUrl } from 'maplibre-gl';
+import { GeoJSONSource, Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent, NavigationControl, Popup, setWorkerUrl } from 'maplibre-gl';
 import { TerraDraw, TerraDrawLineStringMode } from 'terra-draw';
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import { DrawControl } from './DrawControl';
@@ -26,8 +26,10 @@ import {
     finishLine,
     startDrawing
 } from './draw';
-import { MESSAGE_EVENT, pointClick, readReply, replyText } from './messages';
+import { EditLevel, MapItemRecord } from './contract';
+import { MESSAGE_EVENT, Reply, editsApply, mapLoad, pointClick, readReply, replyText } from './messages';
 import { PointPopup } from './PointPopup';
+import { SAVE_IDLE, SaveState, itemsToGeoJson, lineCreateBatch, newId, refusedSave, saveStatusText, withItem } from './save';
 import { AuthorParams, PopupPoint, popupMountPath } from './popupParams';
 import { TestData, selectTestData } from './testSet';
 import { drawColor, themeColor } from './theme';
@@ -75,26 +77,54 @@ interface MapStudioState extends DrawState {
 
 /** The delegate state the component renders. */
 export interface MapStudioDelegateState {
-    /** The last reply from the Gateway as one line of text, or '' before the first. */
+    /** The last point-click reply from the Gateway as one line of text, or '' before the first. */
     lastReply: string;
-    /** Id of the message whose reply is awaited, or null. */
+    /** Id of the point.click message whose reply is awaited, or null. */
     pendingId: string | null;
+    /** The map store's items, as map.load sent them plus this session's saves. */
+    items: MapItemRecord[];
+    /** Bumped whenever items change, so the component knows to redraw them. */
+    itemsRevision: number;
+    /** The level map.load reported, or null before it answered. */
+    level: EditLevel | null;
+    /** 'loading', 'loaded', or the store-unreachable (or other) reason map.load answered. */
+    load: { state: 'loading' | 'loaded' | 'failed'; message: string };
+    /** The last save of a drawn line. */
+    save: SaveState;
 }
 
 /**
  * Browser side of the component delegate: sends envelopes to the Gateway
- * delegate and keeps the last reply for the component to show.
+ * delegate and keeps what the replies say. Point-click replies set the reply
+ * line; map.load and edits.apply replies are routed by message id and never
+ * change it, and they log to the console at info only.
  */
 export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private lastReply = '';
     private pendingId: string | null = null;
+    private items: MapItemRecord[] = [];
+    private itemsRevision = 0;
+    private level: EditLevel | null = null;
+    private load: MapStudioDelegateState['load'] = { state: 'loading', message: '' };
+    private save: SaveState = SAVE_IDLE;
+    private mapLoadId: string | null = null;
+    /** edits.apply message id -> the map item it creates and the record it would store. */
+    private pendingSaves = new Map<string, MapItemRecord>();
 
     constructor(componentStore: AbstractUIElementStore) {
         super(componentStore);
     }
 
     mapStateToProps(): MapStudioDelegateState {
-        return { lastReply: this.lastReply, pendingId: this.pendingId };
+        return {
+            lastReply: this.lastReply,
+            pendingId: this.pendingId,
+            items: this.items,
+            itemsRevision: this.itemsRevision,
+            level: this.level,
+            load: this.load,
+            save: this.save
+        };
     }
 
     /** Send `point.click` for one point; the reply arrives in handleEvent. */
@@ -105,18 +135,97 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject);
     }
 
+    /** Ask the Gateway for the map (map.load); the items and the level arrive in handleEvent. */
+    sendMapLoad(): void {
+        const message = mapLoad();
+        this.mapLoadId = message.id;
+        this.load = { state: 'loading', message: '' };
+        this.notify();
+        this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject);
+    }
+
+    /** Save a finished line as one new map item (edits.apply with one create op). */
+    sendLineCreate(coordinates: Array<[number, number]>): string {
+        const itemId = newId();
+        const batch = lineCreateBatch(itemId, newId(), coordinates, new Date());
+        const message = editsApply(batch);
+        const data = batch.ops[0].data;
+        this.pendingSaves.set(message.id, {
+            id: itemId,
+            kind: data.kind as string,
+            name: data.name as string,
+            geometry: data.geometry as MapItemRecord['geometry'],
+            properties: {},
+            assetId: null,
+            overrides: {},
+            ends: null,
+            version: 0,
+            deleted: false
+        });
+        this.save = { state: 'saving', itemId };
+        this.notify();
+        this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject);
+        return itemId;
+    }
+
     handleEvent(eventName: string, eventObject: JsObject): void {
         if (eventName !== MESSAGE_EVENT) {
             console.warn('[MapStudio] Ignoring unknown model event ' + eventName);
             return;
         }
         const reply = readReply(eventObject);
+        if (reply.kind === 'map.load.reply' || (reply.kind === 'error' && reply.id === this.mapLoadId)) {
+            this.onMapLoad(reply);
+            return;
+        }
+        if (reply.kind === 'edits.apply.reply' || (reply.kind === 'error' && this.pendingSaves.has(reply.id))) {
+            this.onSave(reply);
+            return;
+        }
         if (reply.kind !== 'invalid' && this.pendingId !== null && reply.id !== this.pendingId) {
             console.warn('[MapStudio] Reply ' + reply.id + ' does not match the pending message ' + this.pendingId);
         }
         this.lastReply = replyText(reply);
         this.pendingId = null;
         console.info('[MapStudio] ' + this.lastReply);
+        this.notify();
+    }
+
+    private onMapLoad(reply: Reply): void {
+        if (reply.kind === 'map.load.reply') {
+            this.items = reply.body.items;
+            this.itemsRevision++;
+            this.level = reply.body.level;
+            this.load = { state: 'loaded', message: '' };
+        } else if (reply.kind === 'error') {
+            this.level = null;
+            this.load = { state: 'failed', message: reply.body.code + ': ' + reply.body.message };
+        }
+        this.mapLoadId = null;
+        console.info('[MapStudio] ' + replyText(reply));
+        this.notify();
+    }
+
+    private onSave(reply: Reply): void {
+        if (reply.kind !== 'edits.apply.reply' && reply.kind !== 'error') {
+            return;
+        }
+        const pending = this.pendingSaves.get(reply.id);
+        this.pendingSaves.delete(reply.id);
+        if (!pending) {
+            console.info('[MapStudio] A save reply ' + reply.id + ' matches no pending save.');
+            return;
+        }
+        if (reply.kind === 'edits.apply.reply') {
+            const result = reply.body.results.find((r) => r.id === pending.id);
+            const version = result ? result.version : 1;
+            this.items = withItem(this.items, { ...pending, version });
+            this.itemsRevision++;
+            this.save = { state: 'saved', itemId: pending.id, version };
+        } else {
+            this.save = refusedSave(pending.id, reply.body);
+        }
+        console.info('[MapStudio] ' + replyText(reply));
         this.notify();
     }
 }
@@ -127,6 +236,11 @@ const SOURCE_POINTS = 'mapstudio-points';
 const SOURCE_LINE = 'mapstudio-line';
 const LAYER_LINE = 'mapstudio-line';
 const LAYER_POINTS = 'mapstudio-points';
+/** The map store's items (map.load and this session's saves); separate from the test data's sources. */
+const SOURCE_ITEM_LINES = 'mapstudio-items-line';
+const SOURCE_ITEM_POINTS = 'mapstudio-items-point';
+const LAYER_ITEM_LINES = 'mapstudio-items-line';
+const LAYER_ITEM_POINTS = 'mapstudio-items-point';
 
 /**
  * The Map Studio component: a MapLibre map on a blank style with fixed test
@@ -147,6 +261,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private popup: Popup | null = null;
     /** The DOM node the popup shows; React renders PointPopup into it through a portal. */
     private popupContent: HTMLDivElement | null = null;
+    /** Whether the items sources exist (after the map's load). */
+    private itemsReady = false;
+    /** The items revision last drawn. */
+    private drawnRevision = -1;
+    /** Map item id of a line being saved -> its Terra Draw feature id, removed once the store has it. */
+    private savingFeatures = new Map<string, string | number>();
 
     componentDidMount(): void {
         if (!this.mapContainer) {
@@ -197,6 +317,33 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     'circle-stroke-width': 2
                 }
             });
+            const empty = itemsToGeoJson([]);
+            map.addSource(SOURCE_ITEM_LINES, { type: 'geojson', data: empty.lines });
+            map.addSource(SOURCE_ITEM_POINTS, { type: 'geojson', data: empty.points });
+            map.addLayer({
+                id: LAYER_ITEM_LINES,
+                type: 'line',
+                source: SOURCE_ITEM_LINES,
+                layout: { 'line-cap': 'round', 'line-join': 'round' },
+                paint: { 'line-color': colors.point, 'line-width': 3 }
+            });
+            map.addLayer({
+                id: LAYER_ITEM_POINTS,
+                type: 'circle',
+                source: SOURCE_ITEM_POINTS,
+                paint: {
+                    'circle-radius': 7,
+                    'circle-color': colors.line,
+                    'circle-stroke-color': colors.pointStroke,
+                    'circle-stroke-width': 2
+                }
+            });
+            this.itemsReady = true;
+            this.drawItems();
+            const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+            if (delegate) {
+                delegate.sendMapLoad();
+            }
             map.on('click', LAYER_POINTS, this.onPointClick);
             map.on('click', this.onMapClick);
             map.on('mouseenter', LAYER_POINTS, () => { map.getCanvas().style.cursor = 'pointer'; });
@@ -213,6 +360,48 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (typeof ResizeObserver !== 'undefined') {
             this.resizeObserver = new ResizeObserver(() => { map.resize(); });
             this.resizeObserver.observe(this.mapContainer);
+        }
+    }
+
+    componentDidUpdate(): void {
+        this.drawItems();
+        this.dropSavedFeature();
+    }
+
+    /** Put the delegate's items into the items sources when they changed. */
+    private drawItems(): void {
+        const delegate = this.props.delegate;
+        if (!this.map || !this.itemsReady || !delegate || delegate.itemsRevision === this.drawnRevision) {
+            return;
+        }
+        const data = itemsToGeoJson(delegate.items);
+        const lines = this.map.getSource(SOURCE_ITEM_LINES) as GeoJSONSource | undefined;
+        const points = this.map.getSource(SOURCE_ITEM_POINTS) as GeoJSONSource | undefined;
+        if (lines && points) {
+            lines.setData(data.lines);
+            points.setData(data.points);
+            this.drawnRevision = delegate.itemsRevision;
+            if (this.mapContainer) {
+                this.mapContainer.setAttribute('data-items-loaded',
+                    String(data.lines.features.length + data.points.features.length));
+            }
+        }
+    }
+
+    /** A saved line is drawn from the items source: remove Terra Draw's copy of it. */
+    private dropSavedFeature(): void {
+        const delegate = this.props.delegate;
+        if (!delegate || delegate.save.state !== 'saved' || !this.draw) {
+            return;
+        }
+        const featureId = this.savingFeatures.get(delegate.save.itemId);
+        if (featureId !== undefined) {
+            this.savingFeatures.delete(delegate.save.itemId);
+            try {
+                this.draw.removeFeatures([featureId]);
+            } catch (err) {
+                console.info('[MapStudio] The drawn copy of a saved line was already gone.');
+            }
         }
     }
 
@@ -326,6 +515,13 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.draw.setMode(DRAW_MODE_OFF);
         this.setDrawState(finishLine(points));
         console.info('[MapStudio] Line drawn with Terra Draw: ' + points + ' points, id ' + id);
+        // Save the finished line through the write path (edits.apply); the Gateway checks the role.
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        if (delegate && geometry && geometry.type === 'LineString') {
+            const coordinates = geometry.coordinates.map((c) => [c[0], c[1]] as [number, number]);
+            const itemId = delegate.sendLineCreate(coordinates);
+            this.savingFeatures.set(itemId, id);
+        }
     };
 
     private onKeyDown = (ev: KeyboardEvent): void => {
@@ -455,16 +651,32 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const pending = !!(delegate && delegate.pendingId);
         const drawText = drawStatusText(this.state);
         const replyLine = delegate && delegate.lastReply ? delegate.lastReply : 'Click a point.';
+        const save = delegate ? delegate.save : SAVE_IDLE;
+        const saveText = saveStatusText(save);
+        const load = delegate ? delegate.load : { state: 'loading', message: '' };
         return (
             <div {...this.props.emit({ classes: ['mapstudio'] })}>
                 <div className="mapstudio-map" ref={this.setMapContainer}
-                     data-test-set={this.testData.name} />
+                     data-test-set={this.testData.name}
+                     data-edit-level={delegate && delegate.level ? delegate.level : ''}
+                     data-load-state={load.state} />
                 <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '')}
                      data-pending={pending ? 'true' : 'false'}
                      data-drawing={this.state.drawing ? 'true' : 'false'}
                      data-line-points={this.state.linePoints === null ? '' : String(this.state.linePoints)}>
                     <div>{pending ? 'Waiting for the Gateway ...' : replyLine}</div>
                     {drawText !== '' ? <div className="mapstudio-draw-status">{drawText}</div> : null}
+                    {saveText !== '' ? (
+                        <div className={'mapstudio-save-status mapstudio-save-status--' + save.state}
+                             data-save-state={save.state}
+                             data-item-id={save.state === 'idle' ? '' : save.itemId}
+                             data-version={save.state === 'saved' ? String(save.version) : ''}
+                             data-code={save.state === 'refused' ? save.code : ''}>
+                            {saveText}
+                        </div>
+                    ) : null}
+                    {load.state === 'failed'
+                        ? <div className="mapstudio-load-status">Map store: {load.message}</div> : null}
                 </div>
                 {this.renderPopup()}
             </div>

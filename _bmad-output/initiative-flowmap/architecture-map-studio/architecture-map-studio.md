@@ -115,9 +115,10 @@ Dependencies point inward to `common/`. `web/` never reaches the database, tags 
 
 ### AD-11 - Look and colour [ADOPTED]
 
-- **Binds:** R2, R5, R38
+- **Binds:** R2, R5, R38, R40
 - **Prevents:** colours or styles that ignore the host project's theme or read as alarms.
 - **Rule:** Every colour comes from the host project's theme tokens; the module ships no colour of its own. Normal state is neutral; hue appears only for abnormal state, always with a word or glyph. State on icons, lines and popups passes the template's engineering review (ER-27) before release.
+- **Rule, value-driven styles and area tints (owner, 2026-10-26; prd FR-38, FR-39, initiative R40):** a look bound to a value comes only from a closed list of style presets in `common/`: `normal` (neutral), `attention`, `warning`, `fault` (each a theme token plus its glyph or word, never colour alone), `dimmed` (out of service), and for lines `solid`, `dashed`, `dotted` and weight by pipe size. Areas may also take a category tint from a closed palette of low-saturation theme tokens that are distinct from every alarm and preset hue; points and lines never take one. No stored field holds a colour code. Alarm state draws over a value style, and both draw over an area tint. A stale source value draws only as stale: the map item drops its last value style until a fresh value arrives. The presets and the tints are documented in both themes and pass the same engineering review as the alarm glyphs (ER-27). This extends the rule above and relaxes none of it.
 
 ### AD-12 - Basemaps and tokens
 
@@ -145,9 +146,10 @@ Dependencies point inward to `common/`. `web/` never reaches the database, tags 
 
 ### AD-16 - Kind list and kind setup are separate [ADOPTED]
 
-- **Binds:** R12, R15, R16
+- **Binds:** R12, R15, R16, R40
 - **Prevents:** kind setups stored in three places, and overrides saved outside the item's version.
 - **Rule:** The kind list comes from the host adapter and is read only. The kind setup lives in the map store as one versioned row per project and kind id (no generated id), changed only through AD-2. Overrides are a field of the map item and save with it.
+- **Rule, style rule and area tints (owner, 2026-10-26; prd FR-38, FR-39, initiative R40):** the kind setup schema gains two optional parts. `styleRule {source, type, cases, expression}`: `source` is `{path}` relative to the base path or `{kpi}` naming one of the kind setup's KPIs; `type` is `states`, `bands` or `expression`; for `states`, `cases` is `[{value, preset}]`; for `bands`, `cases` is `[{min, max, preset}]` ordered by threshold, with a value in no band drawing `normal`; for `expression`, `expression` returns one preset name and anything else draws `normal` and is reported for that map item. For an area kind, `areaTints {property, tints: [{category, tint}]}` maps a category property of the area to a tint name from the closed palette. A map item's `overrides` may hold its own `styleRule`, which replaces the kind's whole rule and resets to it. The write service refuses a preset or tint name outside the closed lists, or a rule shape that does not match its type, with code `invalid` and the reason. The source tag is one more live value in AD-6's shared subscription and batch, subscribed only while a rule names it. Where the expression is evaluated, and in which expression language, is unverified and is settled when epic-viewing is refined.
 
 ### AD-17 - Saved changes reach every open map at once [ADOPTED]
 
@@ -282,6 +284,7 @@ erDiagram
 | --- | --- | --- |
 | R1, R3, R4, R5, R36, R37 map view, labels, search, parity, basemaps, speed | `web/` | AD-1, AD-6, AD-11, AD-12 |
 | R2, R6, R7, R8, R39 icons, popups, alarm summary, links, custom popup view | `web/`, `gateway/` live values | AD-6, AD-7, AD-11 |
+| R40 value-driven styles and area category tints | `common/` presets and palette, `gateway/` store and live values, `web/` drawing and preview | AD-6, AD-11, AD-16 |
 | R9, R32, R33, R34 roles, saving, map store, conflicts, live updates | `gateway/` write service, store, change events | AD-2, AD-3, AD-5, AD-10, AD-17, AD-18 |
 | R12, R13, R14, R15, R16, R27 kinds, assets, linking, kind setup, overrides, import matching | `gateway/` adapters and store, `web/` | AD-4, AD-5, AD-16, AD-20 |
 | R10, R11, R17 to R24, R38 tools, drawing, snapping, forms | `web/`, saved through `gateway/` | AD-2, AD-10, AD-11, AD-19 |
@@ -305,6 +308,7 @@ erDiagram
 Open questions, each with its revisit point:
 
 - Do Java tag subscriptions reach Alarm Metrics on folders and UDT instances? The spike checks it; if not, the fallback is a reference or expression tag per asset.
+- Where is a style rule's expression evaluated (Gateway or browser) and in which expression language? Unverified; settled when epic-viewing is refined, with a live 8.3 check if it is an Ignition expression.
 - Can a third-party component open a project view as a custom popup view in 8.3? The spike checks it (Embr Periscope embeds views, so it is likely).
 - Can module code call project script functions and register `system.mapstudio.*` functions? The spike checks it; the adapter fallback is a named query.
 - Does the Perspective toolchain (React 16.14, TypeScript 4.9) build MapLibre 6 and Terra Draw? The spike checks it; if not, pin an older MapLibre.

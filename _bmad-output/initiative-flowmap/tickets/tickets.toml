@@ -20,7 +20,7 @@ id = 3
 slug = "epic-viewing"
 title = "Everyone reads live state from the map"
 description = "Every user sees the one project map on a basemap, opened on its starting area: icons with comms, the icon KPI and alarms, lines with state, labels, search, popups with the alarm table and links, matching the template's current map."
-covers = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R36", "R37", "R39"]
+covers = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R36", "R37", "R39", "R40"]
 after = [{ epic = 2, needs = "map items, kinds and kind setups readable from the map store" }]
 
 [[epic]]
@@ -28,7 +28,7 @@ id = 4
 slug = "epic-editing"
 title = "Map editors build and keep the map in the browser"
 description = "Map editors draw and change points, lines and areas with snapping and undo, fill item forms with the place check, link map items to assets, and write kind setups and overrides, with one clear mode and a first-run path."
-covers = ["R10", "R11", "R14", "R15", "R16", "R17", "R18", "R19", "R20", "R21", "R22", "R23", "R24", "R38"]
+covers = ["R10", "R11", "R14", "R15", "R16", "R17", "R18", "R19", "R20", "R21", "R22", "R23", "R24", "R38", "R40"]
 after = [{ epic = 2, needs = "saving, roles and the asset list" }, { epic = 3, needs = "the map view to draw on" }]
 
 [[epic]]
