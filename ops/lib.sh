@@ -45,8 +45,9 @@ ADMIN_USER="admin"
 ADMIN_PASS="${GATEWAY_ADMIN_PASSWORD}"
 
 # docker compose, always pointed at this folder's compose file.
-# Project name follows the container, so parallel Gateways get separate volumes.
-COMPOSE=(docker compose -p "${MAPSTUDIO_CONTAINER:-mapstudio-ignition}" -f "${OPS_DIR}/docker-compose.yml")
+# With MAPSTUDIO_CONTAINER set, the compose project takes its name, so parallel
+# Gateways get separate volumes; unset, the default project is unchanged.
+COMPOSE=(docker compose ${MAPSTUDIO_CONTAINER:+-p "${MAPSTUDIO_CONTAINER}"} -f "${OPS_DIR}/docker-compose.yml")
 
 # --- logging --------------------------------------------------------------
 if [[ -t 1 ]]; then
