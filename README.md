@@ -67,7 +67,7 @@ npm run docs           # the same, rewriting docs/screenshots/*.png and docs/spi
 npm run test:unit      # the suite's own helper tests (no Gateway needed)
 ```
 
-The Gateway URL is `GATEWAY_URL`, else `http://localhost:` and `GATEWAY_HTTP_PORT` from `.env`, else 9088. The suite fails on any browser console or page error. It uses Playwright's own Chromium (`npx playwright install chromium`, run by CI); set `PW_CHROMIUM_PATH` to use a browser already on the machine, and `E2E_HEADED=1` to run with a visible browser (a real GPU gives a real frame rate). The measures it records, with their labels and limits, are in [docs/platform-checks.md](docs/platform-checks.md), section "Story 7".
+The Gateway URL is `GATEWAY_URL`, else `http://localhost:` and `GATEWAY_HTTP_PORT` from `.env`, else 9088. The suite fails on any browser console or page error. It uses Playwright's own Chromium: on a laptop run `npx playwright install chromium` once in `e2e/` before the first run (on Ubuntu possibly `sudo npx playwright install-deps chromium` as well; CI does both). Set `PW_CHROMIUM_PATH` to use a browser already on the machine, and `E2E_HEADED=1` to run with a visible browser. A headed run is not by itself a GPU run: Playwright's Chromium under WSL (WSLg) reported SwiftShader (software WebGL) with every frame at 33.3 ms (a 30 Hz-like cadence). A frame-rate reading needs a browser whose `chrome://gpu` shows hardware-accelerated WebGL; under WSL use the Windows browser (with graphics acceleration turned on) against the Gateway at `localhost` (`docs/spike-report.md`). The measures it records, with their labels and limits, are in [docs/platform-checks.md](docs/platform-checks.md), section "Story 7".
 
 ## Releases and signing
 
