@@ -78,4 +78,13 @@ class MapStudioDelegateTest {
         assertEquals("error", reply.get("type").getAsString());
         assertEquals("invalid", reply.getAsJsonObject("body").get("code").getAsString());
     }
+
+    @Test
+    void mapLoadAndEditsApplyPassTheEnvelopeCheck() {
+        // Epic 2 story 1: both go to the store work pool; the envelope check lets them through.
+        assertEquals(null, MapStudioDelegate.check(envelope(1, "map.load", "m", null)));
+        assertEquals(null, MapStudioDelegate.check(envelope(1, "edits.apply", "e", null)));
+        assertEquals("invalid", MapStudioDelegate.check(envelope(1, "map.changed", "c", null))
+            .getAsJsonObject("body").get("code").getAsString(), "map.changed is sent, never received");
+    }
 }

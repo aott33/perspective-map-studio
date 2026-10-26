@@ -45,6 +45,10 @@ jobs:
       - name: Build and test
         run: ./gradlew build --no-daemon --console plain -Dorg.gradle.java.installations.auto-download=false
 
+      # The dev stack's pure helpers (identity provider plan, security properties patch); no Gateway.
+      - name: Dev stack helper tests
+        run: python3 -I ops/tests/test_users.py
+
       - name: Upload the unsigned module
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -121,6 +125,9 @@ jobs:
         working-directory: e2e
         run: npm test
 
+      # e2e/out never holds the map editor's password: the sign-in runs in its own node
+      # process (e2e/lib/signInCli.mjs), outside the test runner, its traces and its report,
+      # and the global teardown scans e2e/out (traces unzipped) and deletes any file that holds it.
       - name: Upload screenshots, measures and the report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

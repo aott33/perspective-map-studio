@@ -1,0 +1,149 @@
+/**
+ * The shared contracts of Map Studio 0.2.0 (draft), browser side. Mirrors
+ * common/.../Messages.java and common/.../contract/*.java; docs/contract.md is
+ * the reference. Pure types and readers only, unit tested in node.
+ */
+
+/** Public contract version these shapes belong to (AD-9). */
+export const CONTRACT_VERSION = '0.2.0-draft';
+
+/** Error codes: stable kebab-case words. */
+export const ErrorCodes = {
+    CONFLICT: 'conflict',
+    ROLE: 'role',
+    INVALID: 'invalid',
+    STALE: 'stale',
+    STORE_UNREACHABLE: 'store-unreachable'
+} as const;
+
+/** Editing levels map.load reports (AD-2). */
+export type EditLevel = 'none' | 'phone' | 'full';
+
+export interface PointGeometry {
+    type: 'Point';
+    coordinates: [number, number];
+}
+
+export interface LineGeometry {
+    type: 'LineString';
+    coordinates: Array<[number, number]>;
+}
+
+export type ItemGeometry = PointGeometry | LineGeometry;
+
+/** The stored map item record (AD-20), closed and typed. */
+export interface MapItemRecord {
+    id: string;
+    kind: string;
+    name: string;
+    geometry: ItemGeometry;
+    properties: Record<string, unknown>;
+    assetId: string | null;
+    overrides: Record<string, unknown>;
+    ends: { start?: { itemId: string }; end?: { itemId: string } } | null;
+    version: number;
+    deleted: boolean;
+}
+
+/** The fields an op's data may carry: the record minus id, version and deleted. */
+export type MapItemData = Partial<Omit<MapItemRecord, 'id' | 'version' | 'deleted'>>;
+
+export interface EditOp {
+    op: 'create' | 'update' | 'delete';
+    entity: 'item' | 'kindSetup';
+    id: string;
+    /** 0 on create, the stored version otherwise. */
+    baseVersion: number;
+    data: MapItemData;
+}
+
+export interface EditBatch {
+    batchId: string;
+    ops: EditOp[];
+}
+
+export interface MapLoadReplyBody {
+    level: EditLevel;
+    seq: number;
+    items: MapItemRecord[];
+}
+
+export interface EditsApplyReplyBody {
+    batchId: string;
+    seq: number;
+    results: Array<{ entity: string; id: string; version: number }>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isPosition(value: unknown): value is [number, number] {
+    return Array.isArray(value) && value.length === 2 && value.every((n) => typeof n === 'number' && isFinite(n));
+}
+
+function isGeometry(value: unknown): value is ItemGeometry {
+    if (!isRecord(value)) {
+        return false;
+    }
+    if (value.type === 'Point') {
+        return isPosition(value.coordinates);
+    }
+    if (value.type === 'LineString') {
+        return Array.isArray(value.coordinates) && value.coordinates.length >= 2 && value.coordinates.every(isPosition);
+    }
+    return false;
+}
+
+/** A map item record from the Gateway, or null when it is not one. */
+export function readMapItem(value: unknown): MapItemRecord | null {
+    if (!isRecord(value) || typeof value.id !== 'string' || typeof value.kind !== 'string'
+        || typeof value.name !== 'string' || !isGeometry(value.geometry) || typeof value.version !== 'number'
+        || typeof value.deleted !== 'boolean') {
+        return null;
+    }
+    return {
+        id: value.id,
+        kind: value.kind,
+        name: value.name,
+        geometry: value.geometry,
+        properties: isRecord(value.properties) ? value.properties : {},
+        assetId: typeof value.assetId === 'string' ? value.assetId : null,
+        overrides: isRecord(value.overrides) ? value.overrides : {},
+        ends: isRecord(value.ends) ? value.ends as MapItemRecord['ends'] : null,
+        version: value.version,
+        deleted: value.deleted
+    };
+}
+
+/** The body of a map.load.reply, or null when it is malformed. Items that are not records are left out. */
+export function readMapLoadReply(body: Record<string, unknown>): MapLoadReplyBody | null {
+    const level = body.level;
+    if ((level !== 'none' && level !== 'phone' && level !== 'full') || typeof body.seq !== 'number'
+        || !Array.isArray(body.items)) {
+        return null;
+    }
+    const items: MapItemRecord[] = [];
+    for (const raw of body.items) {
+        const item = readMapItem(raw);
+        if (item) {
+            items.push(item);
+        }
+    }
+    return { level, seq: body.seq, items };
+}
+
+/** The body of an edits.apply.reply, or null when it is malformed. */
+export function readEditsApplyReply(body: Record<string, unknown>): EditsApplyReplyBody | null {
+    if (typeof body.batchId !== 'string' || typeof body.seq !== 'number' || !Array.isArray(body.results)) {
+        return null;
+    }
+    const results: EditsApplyReplyBody['results'] = [];
+    for (const r of body.results) {
+        if (!isRecord(r) || typeof r.entity !== 'string' || typeof r.id !== 'string' || typeof r.version !== 'number') {
+            return null;
+        }
+        results.push({ entity: r.entity, id: r.id, version: r.version });
+    }
+    return { batchId: body.batchId, seq: body.seq, results };
+}
