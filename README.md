@@ -45,8 +45,11 @@ Layout:
 ```bash
 ops/up.sh              # build, stage the .modl, start Ignition 8.3.10 in Docker, accept the module unattended
 ops/logs.sh -n 200     # Gateway log
-ops/down.sh [--purge]  # stop; --purge also wipes the Gateway data (trial, acceptance)
+ops/down.sh [--purge]  # stop; --purge also wipes the Gateway and PostgreSQL data
+ops/psql.sh            # psql on the dev map store (for example: ops/psql.sh -c "select * from mapstudio_edit")
 ```
+
+The dev stack also runs **PostgreSQL 16**, the map store: no host port, reached by the Gateway as `postgres`. Its password is generated into the git-ignored `ops/secrets/` (by `ops/gen_secrets.py`) and reaches the Gateway's `MapStudio` database connection only through the `MapStudioFiles` File secret provider (`ops/config/core`, copied into the Gateway's `core` collection on a fresh volume). `ops/up.sh` also makes a dev API key (git-ignored, allowed in the Gateway's security properties by `ops/dev_security.py`) and uses it to create the **map editor** user `mapeditor` with the role `MapEditor` and the role `MapOperator` (`ops/users.py`); the editor's password is `MAPSTUDIO_EDITOR_PASSWORD` in `.env`. The dev project's `/edit` page has a Log in button and a "Run script checks" button that calls `system.mapstudio`; the anonymous session is a viewer. If you delete `ops/secrets/` while the PostgreSQL volume still exists, `ops/up.sh` refuses and asks for `--fresh` (the volume keeps the old password). The contract the map store follows is in [docs/contract.md](docs/contract.md).
 
 To run several dev Gateways side by side, give each its own `MAPSTUDIO_CONTAINER` and `GATEWAY_HTTP_PORT` in its `.env`. The Gateway is at http://localhost:9088 (user `admin`, with a random password generated into the git-ignored `.env` on first start; development only, bound to localhost) and the session at http://localhost:9088/data/perspective/client/mapstudio-dev. The `mapstudio-dev` project is bind-mounted from `ops/project`, so Designer saves write back into the repository. The Gateway reads project files at start-up: restart it after editing them by hand.
 
