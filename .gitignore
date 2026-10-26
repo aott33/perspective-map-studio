@@ -34,3 +34,6 @@ signing/
 .vscode/
 bin/
 .DS_Store
+
+# Agent worktrees (parallel stories), never committed
+.claude/worktrees/
