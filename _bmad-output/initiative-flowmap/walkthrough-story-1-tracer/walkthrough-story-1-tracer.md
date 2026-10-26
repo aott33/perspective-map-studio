@@ -1,11 +1,11 @@
 # Walkthrough - story 1, the Map Studio tracer (commit c8d3ca4)
 
-A block is done only when the owner says so. Current block: 3.
+A block is done only when the owner says so. Current block: 4.
 
 - [x] Block 1 - Intent
 - [x] Block 2 - Broad strokes
-- [ ] Block 3 - The build and how the module is packaged (current)
-- [ ] Block 4 - The component's identity and registration
+- [x] Block 3 - The build and how the module is packaged
+- [ ] Block 4 - The component's identity and registration (current)
 - [ ] Block 5 - The round trip between browser and Gateway
 - [ ] Block 6 - Drawing the map
 - [ ] Block 7 - The dev Gateway

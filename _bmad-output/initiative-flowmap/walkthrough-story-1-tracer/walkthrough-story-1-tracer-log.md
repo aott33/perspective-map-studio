@@ -28,3 +28,9 @@ Session: session_01DVAVWyHFvLKQeaRZ7Pw3zR · Timestamp: 2026-10-26T05:55:06Z
 Session: session_01DVAVWyHFvLKQeaRZ7Pw3zR · Timestamp: 2026-10-26T05:55:53Z
 
 - Result: owner accepted block 2; block 3 presented.
+
+## 5 - block 3 - done
+
+Session: session_01DVAVWyHFvLKQeaRZ7Pw3zR · Timestamp: 2026-10-26T05:57:34Z
+
+- Result: owner accepted block 3. Owner revised the controls direction: keep top-right for now, since Perspective App Bar toggle is bottom-right; recorded in the initiative memlog with a screenshot.
