@@ -123,7 +123,7 @@ Dependencies point inward to `common/`. `web/` never reaches the database, tags 
 
 - **Binds:** R36
 - **Prevents:** tokens in views or git, and styles MapLibre cannot render.
-- **Rule:** Basemaps are none, OpenStreetMap, satellite and Mapbox. Satellite is the Mapbox raster tileset `mapbox.satellite` through the Raster Tiles API, conditional on the owner confirming Mapbox's Product Terms; otherwise a commercial MapTiler or Esri imagery plan. The Gateway reads the token from the project's secret store and sends it to the browser; only public, URL-restricted tokens are used. Every basemap shows its provider's attribution.
+- **Rule:** Basemaps are none, OpenStreetMap, satellite and Mapbox. Satellite imagery comes from a provider the project chooses, in this order (owner, 2026-10-26): 1. Esri World Imagery where the client already holds ArcGIS (Esri supports MapLibre through its ArcGIS plugin; "Powered by Esri" plus data attribution); 2. Mapbox `mapbox.satellite` through the Raster Tiles API, per site with its own account, once Mapbox confirms whether client sites need the additional Licensed Application licence; 3. MapTiler only after confirming that tracing imagery for a commercial product is allowed (its General Terms 4.3 and 4.4). The provider is a setting, never code. The Gateway reads the token from the project's secret store and sends it to the browser; only public, URL-restricted tokens are used. Every basemap shows its provider's attribution.
 
 ### AD-13 - Build, release and upgrade gate [ADOPTED]
 

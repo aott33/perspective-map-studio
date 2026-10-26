@@ -2,7 +2,7 @@
 
 Story 9 of epic-module-foundation (R7). This page compiles the spike's platform answers (stories 2, 3, 4 and 6) and its measures (story 7) into one table for the owner's decision, with the fallback each question had, and names the fallback a no-go takes. Every row links the section that carries its evidence; nothing here was measured again. The platform answers are recorded in claude-ignition-skills on the same day (its `docs/verification.md`, the "Map Studio spike" entry; branch `ccr-3c8b84b9-f1vbsm`, a pull request the owner opens).
 
-**Status: DRAFT. The decision is the owner's and is marked PENDING OWNER below. Nothing marked that way is guessed.**
+**Status: FINAL. Decision: go, 2026-10-26 (owner).**
 
 Labels: **measured** read from a running Gateway and browser; **stand-in** built from a contract or a synthetic data set because the real feature or data does not exist yet; **from commits** compiled from git timestamps, no clock was kept; **unverified** not checked; **PENDING OWNER** evidence only the owner can produce, not yet supplied. Gateway images: `[live 8.3.10]` the `ops/` dev Gateway, `[live 8.3.9]` the template's test stack.
 
@@ -76,13 +76,13 @@ None of these blocks the decision; each has an owner.
 
 | | |
 | --- | --- |
-| Go or no-go | **PENDING OWNER** |
-| Date | **PENDING OWNER** |
+| Go or no-go | **Go** |
+| Date | 2026-10-26 |
 | Headed run, software WebGL (2026-10-26) | Recorded: SwiftShader under WSL, scale30 pan 31.5 fps, zoom 29.6, 33.3 ms interval (a 30 Hz-like cadence) |
 | GPU run (2026-10-26, about 20:03 UTC) | Recorded: Windows Chrome 156.0.8078.47, Intel Arc Pro integrated GPU (ANGLE D3D11), 60 Hz display, 60.0 fps on `/scale` by DevTools Frame Rendering Stats; NFR-1 met for the stand-in |
 | Designer autocomplete of `system.mapstudio.` (2026-10-26) | Recorded: yes, `echo(text)` and `ping()` with signature, description and parameters in the Script Console (owner, seen in the Designer) |
 | `CHECK setup-modified` on v0.1.0 | Not checked: owner skipped, 2026-10-26 (see item 3) |
 | Mapbox terms (AD-12), date read | Allowed with conditions, to be confirmed with Mapbox; read 2026-10-26 (item 4) |
-| Owner's note | |
+| Owner's note | Go to epic-map-store-and-data. Satellite imagery provider order for epic-viewing (AD-12): 1. Esri World Imagery where the client already holds ArcGIS; 2. Mapbox per site, once Mapbox confirms the Licensed Application question; 3. MapTiler only after confirming that tracing imagery for a commercial product is allowed (its General Terms 4.3 and 4.4). |
 
-What the compiled record supports, for the owner to weigh: every platform question the spike set out to answer was answered yes on a live Gateway with no fallback taken; the module built, signed, released and installed through the template's lock within one day of session time; the one measure the PRD ties to a number (NFR-1, 60 fps) is met on the 30-pad stand-in by the owner's GPU reading on an integrated laptop GPU, with the limits stated (stand-in data, circles and lines only, one reading by eye). The report is final when the table above is filled and the date written.
+What the compiled record supports, for the owner to weigh: every platform question the spike set out to answer was answered yes on a live Gateway with no fallback taken; the module built, signed, released and installed through the template's lock within one day of session time; the one measure the PRD ties to a number (NFR-1, 60 fps) is met on the 30-pad stand-in by the owner's GPU reading on an integrated laptop GPU, with the limits stated (stand-in data, circles and lines only, one reading by eye). The owner decided go on 2026-10-26.
