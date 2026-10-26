@@ -3,14 +3,14 @@ title: 'MapLibre 6 and Terra Draw on the Perspective toolchain'
 type: 'feature'
 ticket: '2'
 created: '2026-10-26'
-status: 'in-review'
+status: 'built'
 baseline_revision: '0fba47cdb46cd4c75b7c24055d7b1489d41f834c'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md'
@@ -93,6 +93,8 @@ Evidence (2026-10-26): typescript 4.9.5 with the project's `tsconfig` options ty
 ## Plan Change Log
 
 ## Review Triage Log
+
+Pass 1 (quick lens, 2026-10-26, run context-free by the coordinator from the standalone prompt written beside this plan): high 0, medium 0, low 0, false 0, maybe-false 0. No findings: acceptance criteria met, boundaries followed, I/O matrix covered, no defects reported. Nothing patched, nothing deferred.
 
 ## Design Notes
 
