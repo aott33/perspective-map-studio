@@ -3,7 +3,7 @@ title: "Install through the template's module lock"
 type: 'feature'
 ticket: '6'
 created: '2026-10-26'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '0c6a191c0550beaa9aff02c2610bc16b87ab6541'
 route: 'full'
 route_source: 'pinned'
@@ -24,6 +24,8 @@ context:
 **Problem:** Nothing proves that a signed Map Studio release installs the way a real host installs third-party modules: through `ign-scada-template`'s `modules/modules.lock.json`, pinned by SHA-256 and certificate fingerprint (R5, AD-13). No release exists yet, the Map Studio repository is private, and the template's `modl.py fetch` downloads without any credential.
 
 **Approach:** One template pull request adds a lock entry for the released `.modl`, makes the fetch work for the chosen release source, and documents the module; it is proven on the template's test stack with a scratch Perspective project (placed only on the kept test stack, never committed) that shows the map. Until v0.1.0 exists the same change is rehearsed on a locally signed throwaway build that is never committed or pushed with its throwaway values.
+
+**Decisions (owner, 2026-10-26):** (1) The release source is a public repository: the owner makes `aott33/perspective-flowmap` public before the template pull request, so the lock entry's GitHub release URL is fetched without a credential and there is no token and no credential change in `modl.py`. (2) The template's weekly `modules.yml` opens update pull requests for Map Studio like the other modules (the certificate pin still stops a new key). (3) The throwaway-build rehearsal runs now. (4) v0.1.0 is tagged as is; the story 3 spike package is removed later by the refactor sweep (entry 8).
 
 ## Boundaries & Constraints
 
@@ -67,18 +69,18 @@ Template repo (read for this plan, changed only in the later template pull reque
 - P1 Signing setup per `RELEASING.md`: certificate `CN=Map Studio, O=AO Industrial`, secrets `MODULE_SIGNING_KEYSTORE_B64` and `MODULE_SIGNING_KEYSTORE_PASSWORD`, README `Signing certificate SHA-256:` line replacing `PENDING`.
 - P2 CI green on `main`: both jobs currently fail within 3 seconds with no logs (owner checking). Tagging needs it.
 - P3 Tag `v0.1.0` on `main`, review the draft release, publish it (draft releases are not downloadable without write access and are skipped by `check`).
-- P4 Q1 answered (release source) and, if Q1 is token, a read-only fine-grained token for `aott33/perspective-flowmap` stored as a template repository secret.
+- P4 The repository is public (decision 1), so the release asset URL needs no credential.
 
 **Before P1 to P3 (rehearsal, no commit of throwaway values):**
-- [ ] Locally sign a throwaway build (`scripts/ci/test-signing.sh` shows how; JDK 17, throwaway keystore under `mktemp`, deleted after) and run the template's `modl.py inspect` on it -- first check that the template's openssl signature check accepts this plugin's output (unverified).
-- [ ] In a template branch kept local (never pushed): lock entry with the throwaway sha256 and fingerprint, the `.modl` in `services/ignition/modules/`, commit, `scripts/test/stack.sh --keep`, scratch project, screenshots. Then delete the branch and `scripts/test/stack.sh --down`.
+- [x] Locally sign a throwaway build (`scripts/ci/test-signing.sh` shows how; JDK 17, throwaway keystore under `mktemp`, deleted after) and run the template's `modl.py inspect` on it -- first check that the template's openssl signature check accepts this plugin's output (unverified).
+- [x] In a template branch kept local (never pushed): lock entry with the throwaway sha256 and fingerprint, the `.modl` in `services/ignition/modules/`, commit, `scripts/test/stack.sh --keep`, scratch project, screenshots. Then delete the branch and `scripts/test/stack.sh --down`.
 
-**Execution (after P1 to P4):**
+**Execution (after P1 to P4; the template pull request waits for v0.1.0):**
 - [ ] Template `modules/modules.lock.json` -- add the Map Studio entry from the downloaded asset (`modl.py inspect`, `modl-verify.sh`, equal to the `.sha256` file and the README fingerprint); `upstream`: `{"type":"github","repo":"aott33/perspective-flowmap","asset":"Map-Studio-.*\\.modl","tag":"v0.1.0"}`.
-- [ ] Template `scripts/modules/modl.py` (+ test, `ci.yml` step) -- only for the Q1/Q2 answers that need it: token-based fetch of a private release asset (`GH_TOKEN` from the environment, redirect target fetched without the Authorization header, error names the variable, token never printed) and a skip for entries that `check` cannot reach. Unchanged when Q1 is public and Q2 is "check like the others".
-- [ ] Template `docs/modules.md`, `THIRD_PARTY_NOTICES.md` -- fifth module, "three vendors" wording, Apache-2.0, the fetch path, history line; `.github/workflows/stack.yml` and `modules.yml` pass the token secret only if Q1 is token.
-- [ ] Template scratch project -- on the kept stack only: copy `ops/project/...` view and page config into `build/test-stack/projects/MapStudioScratch/` with its own `project.json`; `POST /data/api/v1/scan/projects`; open `/data/perspective/client/MapStudioScratch` at 1440 px and 390 px; screenshots.
-- [ ] This repo `docs/template-install.md`, `docs/screenshots/`, `RELEASING.md`, `README.md` -- the evidence (labels `[live 8.3.9]` only for what ran), the lock entry and the fetch path; feeds story 9.
+- [x] `scripts/ci/build-signed.sh` (this repo) -- found by the rehearsal: wrap the exported certificate in a PKCS#7 DER bundle before the plugin copies it as `certificates.p7b`; without it the template's `modl.py` (openssl pkcs7) failed on the bare PEM certificate. Template `modl.py` is unchanged (decisions 1 and 2: no credential change, check like the others).
+- [ ] Template `docs/modules.md`, `THIRD_PARTY_NOTICES.md` -- fifth module, "three vendors" wording, Apache-2.0, history line. No workflow change.
+- [x] Template scratch project -- on the kept stack only: copy `ops/project/...` view and page config into `build/test-stack/projects/MapStudioScratch/` with its own `project.json`; `POST /data/api/v1/scan/projects`; open `/data/perspective/client/MapStudioScratch` at 1440 px and 390 px; screenshots. Done as a rehearsal on the throwaway build; repeat once against v0.1.0.
+- [x] This repo `docs/template-install.md`, `docs/screenshots/`, `RELEASING.md`, `README.md` -- the evidence (labels `[live 8.3.9]` only for what ran), the lock entry and the fetch path; feeds story 9. Written from the rehearsal; the real lock values are added after v0.1.0. `README.md` needed no change.
 
 **Acceptance Criteria:**
 - Given the published v0.1.0, when the template's `modl.py fetch` runs with the Q1 credential (or none if public), then it prints `ok` for Map Studio and the file's SHA-256 equals the release `.sha256`.
@@ -89,6 +91,13 @@ Template repo (read for this plan, changed only in the later template pull reque
 
 ## Implementation Notes
 
+Rehearsal done 2026-10-26 (owner decisions 1 to 4 above); evidence in `docs/template-install.md`, screenshots in `docs/screenshots/template-scratch-*.png`. Everything template-side ran in a throwaway local clone of `ign-scada-template` (scratchpad, branch never pushed, origin is the local path) because the planning agent may not run git in the shared template checkout; the template checkout itself was not touched. The throwaway keystore, sha256 and fingerprint exist only in the scratchpad and that clone.
+
+- Finding: the first throwaway build failed the template's `modl.py inspect` (`openssl pkcs7` on a bare PEM certificate in `certificates.p7b`). Fixed in this repository: `scripts/ci/build-signed.sh` wraps the certificate as PKCS#7 DER; `scripts/ci/modl-verify.sh` refuses a `certificates.p7b` that is not a PKCS#7 bundle (checked by hand with a module whose bundle was swapped for a bare certificate; no case in `test-signing.sh` yet). `test-signing.sh` passes. The template's `modl.py` needs no change.
+- The module loads and runs on the template's 8.3.9 image (ACTIVE, component registered, delegate round trip, no Map Studio warning or error): the image does not need a bump.
+- The scratch project is a copy of `ops/project` (view, page config, popup view, `project.json`) copied into the kept test stack's `build/test-stack/projects/MapStudioScratch`, loaded by a project scan; it is never committed. `ops/screenshot.mjs` was run against it with the project name and output folder changed in a scratchpad copy.
+- One render failure in the first `stack.sh` run (`phone-native-night /well/Mesa/P12/P12-3H/trends`: `Cannot subscribe to "ProjectDefinition" state. "Parts/Asset/Trends/" does not exist`, an embed path whose type segment was still empty) looked like a template race, not Map Studio: the same page passed in `native-day`, and a re-run of the whole `phone-native-night` pass on the same stack had no failure. A full re-run on a fresh stack passed (`test stack: PASS`, exit 0). Not reproduced without the module: unverified whether the race predates Map Studio.
+
 ## Plan Change Log
 
 ## Review Triage Log
@@ -97,7 +106,7 @@ Template repo (read for this plan, changed only in the later template pull reque
 
 Why a scratch project and not a view in `Upstream`: the writer empties the owned view folders and `check.py` fails on any view the generators did not produce, so a hand-placed view would be wiped or break CI. `build/` is ignored and `./projects` is a bind mount, so a project folder added to the kept test stack's worktree reaches the Gateway through a project scan (project scan picks up a new project folder without restart: unverified). A permanent Map Studio page waits for epic 7.
 
-Private release asset (all unverified until run): the browser URL needs a session; the API route is the asset endpoint with `Accept: application/octet-stream`, which answers a redirect to storage that must not receive the Authorization header. `gh release download <tag> -R aott33/perspective-flowmap -p '*.modl'` does this and uses `GH_TOKEN`. Local fetch needs no code: a downloaded file already in `services/ignition/modules/` whose sha256 matches is used as is, and `stack.sh` copies that folder into its worktree.
+Private release asset (not needed after decision 1; kept for the record, all unverified): the browser URL needs a session; the API route is the asset endpoint with `Accept: application/octet-stream`, which answers a redirect to storage that must not receive the Authorization header. `gh release download <tag> -R aott33/perspective-flowmap -p '*.modl'` does this and uses `GH_TOKEN`. Local fetch needs no code: a downloaded file already in `services/ignition/modules/` whose sha256 matches is used as is, and `stack.sh` copies that folder into its worktree.
 
 Checks from the template's "Before a pull request" that apply: `modl.py verify-lock`; `check_repo.py --jython tools/jython.jar` (JSON, `.modl` not tracked, em dashes); `gen/check.py` (proves no generated file moved); the new modl test with `python3 -I` plus its `ci.yml` step if `modl.py` changes; `docker compose config -q` and `bash -n`/`shellcheck -x` only if compose or shell files change (not planned); `scripts/test/stack.sh` (includes bootstrap, smoke and `render_all.mjs`) and a look at the screenshots. Not affected: theme and icons, `prov` (registry untouched), `tests/prov`, `tests/ui`, `tests/ops`, `tests/fieldsim`, plunger, lint baseline, feedback and db tests, `test_checks.mjs`. CI runs them all anyway.
 
@@ -112,10 +121,3 @@ Checks from the template's "Before a pull request" that apply: `modl.py verify-l
 
 **Manual checks:**
 - Screenshots of the scratch page at 1440 px and 390 px, and the Gateway log lines for the module, read by the owner.
-
-## Open Questions
-
-1. **Release source for a private repository (blocks the template pull request going green).** (a) Make `perspective-flowmap` public before the template PR: no credential, `fetch` and the weekly check work as for Embr and Mustry, no `modl.py` change; needs the licence, NOTICE and history to be ready to publish. (b) Stay private and add a read-only fine-grained token (this repo only, Contents read) as a template secret and local variable: `modl.py` gains a token fetch, CI works for same-repo pull requests only. (c) Stay private and download by hand into `services/ignition/modules/`: no code, works locally, but the template's `stack.yml` cannot pass. Recommended: (a) if the repository is meant to be open source anyway, otherwise (b).
-2. **Weekly module check.** Should `modules.yml` open update pull requests for new Map Studio releases like the other four (the certificate pin still stops a new key), or should the entry be excluded and updated by hand?
-3. **Rehearsal.** May the throwaway-build rehearsal (local-only template branch, deleted after) run before P1 to P3, or wait for the real release?
-4. **First release content.** v0.1.0 would ship the tracer and the story 3 spike package (inert without a `setup` resource; the refactor sweep, entry 8, removes it later, after this story). Tag v0.1.0 as is, or sweep first?

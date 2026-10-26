@@ -53,6 +53,14 @@ fi
 fp="$(keytool -printcert -file "$work/certificates.p7b" 2>/dev/null | sed -n 's/^[[:space:]]*SHA256: //p' | head -1)"
 [ -n "$fp" ] || fail "could not read the certificate fingerprint"
 
+# Hosts that pin the module (the template's modl.py) read certificates.p7b with
+# `openssl pkcs7`, so it must be a PKCS#7 bundle, not a bare certificate.
+if command -v openssl >/dev/null 2>&1; then
+  openssl pkcs7 -inform DER -in "$work/certificates.p7b" -noout >/dev/null 2>&1 ||
+    openssl pkcs7 -inform PEM -in "$work/certificates.p7b" -noout >/dev/null 2>&1 ||
+    fail "certificates.p7b is not a PKCS#7 bundle (a bare certificate fails host tools that use openssl pkcs7)"
+fi
+
 if [ "$#" -ge 2 ]; then
   norm() { printf '%s' "$1" | tr -d ': ' | tr 'a-f' 'A-F'; }
   [ "$(norm "$fp")" = "$(norm "$expected")" ] || fail "certificate fingerprint $fp does not match expected $expected"

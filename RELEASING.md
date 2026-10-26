@@ -48,6 +48,27 @@ Do this on a trusted machine with a JDK 17 `keytool`.
 
 Limit of this setup: the secrets are repository secrets, so anyone who can push a tag to the repository can start the release workflow (it still only creates a draft, and only for a tag on `main`).
 
+## Installing through a host's module lock
+
+A host such as `ign-scada-template` pins the release in its lock file by SHA-256 and certificate fingerprint and downloads it from the public release URL (no credential; the repository is public). The lock entry for release `X.Y.Z`:
+
+```json
+{
+  "id": "com.aoindustrial.perspective.mapstudio",
+  "name": "Map Studio",
+  "version": "X.Y.Z",
+  "requiredIgnitionVersion": "8.3.0",
+  "file": "Map-Studio-X.Y.Z.modl",
+  "url": "https://github.com/aott33/perspective-flowmap/releases/download/vX.Y.Z/Map-Studio-X.Y.Z.modl",
+  "sha256": "<the release's .sha256 file>",
+  "certSha256": "<the README's Signing certificate SHA-256 line>",
+  "licence": {"name": "Apache-2.0", "commercial": false},
+  "upstream": {"type": "github", "repo": "aott33/perspective-flowmap", "asset": "Map-Studio-.*\\.modl", "tag": "vX.Y.Z"}
+}
+```
+
+Take `sha256` from the published release's `.sha256` file, `certSha256` from the README, and check both against the downloaded file with the host's own tool (`modl.py inspect`) and `scripts/ci/modl-verify.sh` before writing the entry. The rehearsal that proved this path is in [docs/template-install.md](docs/template-install.md).
+
 ## When the repo goes public or the plan allows
 
 Move the secrets behind an environment with a required reviewer:
