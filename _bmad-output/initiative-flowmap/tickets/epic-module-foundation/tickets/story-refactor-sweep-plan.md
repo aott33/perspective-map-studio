@@ -3,7 +3,7 @@ title: 'Refactor sweep'
 type: 'refactor'
 ticket: '8'
 created: '2026-10-26'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '51104c889817dc9d01136807786963e58d8172b8'
 route: 'full'
 route_source: 'auto'
@@ -25,6 +25,8 @@ context:
 **Approach:** Sweep what is cleanup (the table in Design Notes decides every item), change no public prop, message or documented script function, and prove the build, the Playwright suite and the template stack still pass.
 
 ## Boundaries & Constraints
+
+**Decisions (owner, approved 2026-10-26):** (1) `testSet` and `popupView` stay until the map store seeds the 30 pads; this supersedes the owner's earlier 2026-10-26 decision (story 7, question 4) to remove `testSet` in the sweep, because `scale30` is the only source of the 30-pad frame-rate measure and the headed run needs it before story 9, and the component has no other way to receive data until `map.load` exists. (2) The PostgreSQL dev stack goes with the checks, recoverable at `51104c8`. (3) No release for the sweep; the next release is 0.1.1. (4) Signature verification stays deferred.
 
 **Always:** Cleanup only. Keep `popupView`, `testSet`, the four dev views and their e2e specs, `MapStudioScriptModule` (`system.mapstudio.ping` and `echo`). Compare the built `.modl` contents before and after. No em dashes, no secret in git. Every Ignition claim not seen live is marked unverified.
 
@@ -78,7 +80,7 @@ context:
 
 ## Design Notes
 
-Why `testSet` and `popupView` stay (the owner's 2026-10-26 decision asked to remove `testSet`; this contradicts it, see Open Questions 1): `scale30` is the only source of the 30-pad frame-rate measure and the owner's headed run (item 3) needs it before story 9; without a prop the component has no way to receive data until `map.load` exists (epic-map-store-and-data). `popupView` is the only way to name a popup view until the kind setup does (AD-7, epic-viewing); removing it orphans `PointPopup`, `popupParams`, 9 Jest tests and the popup spec. The four dev views each fix one prop combination; merging them needs view-param bindings whose timing is unverified (the component reads its props once at mount).
+Why `testSet` and `popupView` stay (the owner's 2026-10-26 decision asked to remove `testSet`; this superseded it, see Decisions): `scale30` is the only source of the 30-pad frame-rate measure and the owner's headed run (item 3) needs it before story 9; without a prop the component has no way to receive data until `map.load` exists (epic-map-store-and-data). `popupView` is the only way to name a popup view until the kind setup does (AD-7, epic-viewing); removing it orphans `PointPopup`, `popupParams`, 9 Jest tests and the popup spec. The four dev views each fix one prop combination; merging them needs view-param bindings whose timing is unverified (the component reads its props once at mount).
 
 `ops/checks.sh` is not kept as a harness: it only greps `CHECK` lines that the removed package writes, and keeping the package keeps spike code in every shipped `.modl`. The harness, PostgreSQL compose file and checks config stay readable at `51104c8` and in the v0.1.0 tag (not present in this clone, unverified here); the evidence stays in `docs/platform-checks.md`.
 
@@ -94,9 +96,9 @@ Disposition of every deferred item (G = this plan, O = owner, 9 = story 9):
 | 4 | webpack to 5.112 or later | In the sweep (5.112.2 exists, npm metadata) | G |
 | 5 | npm audit of build tools | In the sweep: fix or record; client findings stay | G |
 | 6 | Remove spike package, project script, `setup` resource | In the sweep (remove, no harness) | G |
-| 7 | Remove `testSet`, `Scale` and two fallback views | Not in the sweep: keep as e2e fixtures | epic-map-store-and-data (seed the 30 pads through `applyEdits`), Open Question 1 |
+| 7 | Remove `testSet`, `Scale` and two fallback views | Not in the sweep: keep as e2e fixtures | epic-map-store-and-data (seed the 30 pads through `applyEdits`), owner decision 1 |
 | 8 | Remove `popupView` | Not in the sweep | epic-viewing (kind setup, AD-7) |
-| 9 | Real signature verification in `modl-verify.sh` | Not in the sweep: a new verification feature; signed-bytes format unchecked against `io.ia.sdk.modl` 0.5.0 | Open Question 4; Gateway verifies at install |
+| 9 | Real signature verification in `modl-verify.sh` | Not in the sweep: a new verification feature; signed-bytes format unchecked against `io.ia.sdk.modl` 0.5.0 | owner decision 4; Gateway verifies at install |
 | 10 | Headed frame-rate run on a real GPU | Owner action | O, then 9 |
 | 11 | Designer: `system.mapstudio.` autocomplete; `CHECK setup-modified` | Owner action; run on the v0.1.0 module, since the sweep removes the second check's code | O, then 9 |
 | 12 | Gateway-side view stop on popup close (two entries: story 4 and story 7) | Not in the sweep: a live Gateway check, no code | 9 (an agent session can do it); the two entries are folded into one |
@@ -121,10 +123,3 @@ Version: no prop, message type or documented function changes, so the next relea
 
 **Manual checks (if no CLI):**
 - Install the sweep build on a dev Gateway whose project still holds a `setup` resource: expected, no error (unverified until done).
-
-## Open Questions
-
-1. **`testSet` and `popupView`.** The owner's 2026-10-26 decision removes `testSet` in the sweep; removal drops the 30-pad measure and the headed run unless the run happens first, and loses the scale spec. (a) Keep both, remove `testSet` when the map store seeds the 30 pads (recommended: patch release). (b) Remove `testSet` now, after the headed run, deleting `scaleData.ts`, the Scale view and `scale.spec`, and the measures spec's frame rate (0.2.0 or 1.0.0). (c) Remove it from the release bundle only with a build flag (e2e then tests a different bundle; rejected).
-2. **PostgreSQL dev stack.** (a) Remove the compose file, config and secret helper with the checks (recommended; recoverable at `51104c8`). (b) Keep them for epic-map-store-and-data's dev database, as dead files until then.
-3. **Release.** (a) No release for the sweep; the next one is 0.1.1 (recommended). (b) Cut 0.1.1 after the sweep so the template locks a build without the spike.
-4. **Signature verification.** (a) Leave deferred; the Gateway verifies at install (recommended until a release needs it). (b) The owner adds a ticket entry for a verification story that first reads the plugin's signing source.

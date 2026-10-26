@@ -3,7 +3,6 @@ package com.aoindustrial.perspective.mapstudio.common;
 import java.util.Set;
 
 import com.inductiveautomation.ignition.common.jsonschema.JsonSchema;
-import com.inductiveautomation.ignition.common.resourcecollection.ResourceType;
 import com.inductiveautomation.perspective.common.api.BrowserResource;
 
 /**
@@ -16,13 +15,6 @@ public final class MapStudioModule {
 
     /** Module id; must match {@code id} in the root build.gradle.kts. */
     public static final String MODULE_ID = "com.aoindustrial.perspective.mapstudio";
-
-    /**
-     * The project setup resource (AD-5): one per project, stored in the project
-     * folder as {@code com.aoindustrial.perspective.mapstudio/setup/setup.json}.
-     * Shared by the gateway (read) and, later, the designer (edit).
-     */
-    public static final ResourceType SETUP_RESOURCE_TYPE = new ResourceType(MODULE_ID, "setup");
 
     /** Mount alias: the web bundle is served at {@code /res/<URL_ALIAS>/}. */
     public static final String URL_ALIAS = "mapstudio";

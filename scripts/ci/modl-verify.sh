@@ -11,7 +11,7 @@
 # certificate in the archive has the expected fingerprint and that module.xml
 # has the expected version. A forged module that carries the genuine
 # certificates.p7b would pass. The cryptographic check is the Gateway's, when
-# the module is installed (see deferred-work.md: real signature verification
+# the module is installed (see _bmad-output/deferred-work.md: real signature verification
 # is a deferred item).
 #
 # certificates.p7b must be a PKCS#7 bundle (DER or PEM), not a bare certificate:
