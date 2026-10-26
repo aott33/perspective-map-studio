@@ -178,24 +178,24 @@ Production webpack build, unsigned, as the Gateway served it on a page load (byt
 
 | File | Bytes | gzip | Story 2 | Delta |
 | --- | --- | --- | --- | --- |
-| `MapStudio.js` | 1,179,583 | 315,995 | 1,167,572 | +12,011 |
+| `MapStudio.js` | 1,179,848 | 316,097 | 1,167,572 | +12,276 |
 | `MapStudio.css` | 72,208 | 10,591 | 70,976 | +1,232 |
 | `maplibre-gl-worker.js` | 517,065 | 147,896 | 517,065 | 0 |
 
-The staged `Map-Studio.unsigned.modl` is 509,949 bytes. The Gateway answered with `content-encoding: gzip` (transferred `MapStudio.js` body 314,937 bytes). No size budget exists, so none is asserted. Playwright reported 0 transferred body bytes for the worker request; why is **[unverified]**.
+The `.modl` in `ops/modules` (the file the Gateway was given) is `Map-Studio.unsigned.modl`, 510,041 bytes, SHA-256 `69e190fab36977db5808fc74f94ae1116f4ddc8c03c2e447f60c7ea733122f10`. The Gateway answered with `content-encoding: gzip` (transferred `MapStudio.js` body 315,033 bytes). No size budget exists, so none is asserted. Playwright reported 0 transferred body bytes for the worker request; why is **[unverified]**.
 
 ### Frame rate on the 30-pad scale set (measured, with limits)
 
-Method: requestAnimationFrame timestamps and long tasks sampled in the page while Playwright drives a 4 s circular drag and a 4 s wheel zoom, after a 2 s warm-up, three runs per view. This is the page's frame cadence during the gesture, not MapLibre's own render count.
+Method: requestAnimationFrame timestamps and long tasks sampled in the page while Playwright drives a 4 s circular drag (at most 60 mouse moves per second) and a 4 s wheel zoom (at most 25 wheel events per second: one call, then a 40 ms pause), after a 2 s warm-up, three runs per view. The driver's input events are handled on the page's main thread, so that load shares it with rendering; it is capped and the same in every run, but it is part of what is measured. The numbers are the page's frame cadence during the gesture, not MapLibre's own render count.
 
-| View | Pan median fps (runs) | Zoom median fps (runs) |
-| --- | --- | --- |
-| 30-pad stand-in (30 circles, 30 lines) | 5.8 (4.9, 5.8, 6.3) | 6.0 (6.0, 4.4, 14.3) |
-| Tracer (3 points, 1 line) | 15.2 (12.8, 17.7, 15.2) | 13.7 (15.9, 13.1, 13.7) |
+Two full suite runs on the same box (the one in `docs/spike-measures.json`, then a repeat), median fps with the three runs in brackets:
 
-An earlier complete run of the same suite on the same box gave 15.8 fps (pan) and 13.7 fps (zoom) for the 30-pad view and 16.7 and 11.6 for the tracer. That spread, from 5.8 to 15.8 fps for the same view, means no cost per pad can be read from these numbers: the box shares its 4 CPUs and renders WebGL on the CPU.
+| View | Pan, record | Pan, repeat | Zoom, record | Zoom, repeat |
+| --- | --- | --- | --- | --- |
+| 30-pad stand-in (30 circles, 30 lines) | 8.4 (8.4, 7.7, 8.5) | 7.5 (7.3, 7.5, 12.8) | 10.7 (9.3, 10.7, 10.7) | 13.1 (9.2, 13.1, 13.9) |
+| Tracer (3 points, 1 line) | 10.2 (10.2, 9.5, 10.5) | 9.9 (10.4, 9.1, 9.9) | 9.8 (9.8, 10.0, 9.2) | 10.8 (14.8, 10.8, 9.8) |
 
-Limits: (1) software WebGL, so a laptop GPU is expected to do better, **[unverified]**; (2) circle and line layers only, with no icons, labels, KPI values or alarm styling, so this is a floor on the finished map's cost; (3) the pads are a seeded stand-in (`web/typescript/scaleData.ts`) for the template's 30-pad set, which this repository cannot read; (4) no run reached 60 fps. NFR-1 (60 fps in a laptop browser) is therefore **not decided** by this measure. Running `E2E_HEADED=1 npm test` on a laptop records a real renderer string beside its numbers.
+The spread between runs of one view is as large as the difference between the views, on a box that shares its 4 CPUs and renders WebGL on the CPU. An earlier run with unthrottled input gave 15.8 and 5.8 fps for the 30-pad pan in two runs. Limits: (1) software WebGL, so a laptop GPU is expected to do better, **[unverified]**; (2) circle and line layers only, with no icons, labels, KPI values or alarm styling; (3) the pads are a seeded stand-in (`web/typescript/scaleData.ts`) for the template's 30-pad set, which this repository cannot read; (4) no run reached 60 fps. NFR-1 (60 fps in a laptop browser) is therefore **not decided** by this measure. Running `E2E_HEADED=1 npm test` on a laptop records a real renderer string beside its numbers.
 
 ### Size of one value batch (stand-in)
 
@@ -216,7 +216,7 @@ AD-6 fixes only the LiveValue fields `{value, quality, t, stale, reason}`; the i
 | --- | --- |
 | No horizontal page overflow; the map fills the width | pass (scrollWidth 390; map 390 x 804) |
 | Tap a point: reply text and popup view | pass |
-| Touch drag pans, pinch zooms (canvas pixels compared before and after; not a read of the map centre) | pass |
+| Touch drag pans, pinch zooms (read from where the open popup's tip moves, the popup being anchored to the point: -120 px for a 120 px drag, a 2.4 times larger distance after a pinch of scale 2) | pass |
 | Line tool finishes by touch alone (two vertex taps and a repeat tap on the last) | pass: 2 points |
 | No console or page errors | pass |
 | Touch targets of 44 px or more (PRD) | **fail**: zoom in and out 29 x 29, "Draw a line" 105 x 29 |

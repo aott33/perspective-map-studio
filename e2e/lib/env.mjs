@@ -31,9 +31,10 @@ export function gatewayUrl() {
 export const docsMode = process.env.E2E_DOCS === '1';
 export const outDir = path.join(e2eDir, 'out');
 export const screenshotDir = docsMode ? path.join(repoRoot, 'docs', 'screenshots') : path.join(outDir, 'screenshots');
-export const measuresFiles = docsMode
-    ? [path.join(outDir, 'measures.json'), path.join(repoRoot, 'docs', 'spike-measures.json')]
-    : [path.join(outDir, 'measures.json')];
+/** Always written. */
+export const measuresOutFile = path.join(outDir, 'measures.json');
+/** The committed copy: only with E2E_DOCS=1, and only when every measure test passed. */
+export const measuresDocsFile = docsMode ? path.join(repoRoot, 'docs', 'spike-measures.json') : null;
 
 /** The project's session URL for a page path such as '/' or '/scale'. */
 export function sessionUrl(pagePath = '/') {

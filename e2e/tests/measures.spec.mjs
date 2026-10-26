@@ -1,23 +1,25 @@
 // The spike's measures (epic-module-foundation R6): bundle size, frame rate on
 // the 30-pad scale set, the size of one value batch, and what breaks on a
-// phone. Writes measures.json (and docs/spike-measures.json with E2E_DOCS=1).
+// phone. Writes e2e/out/measures.json always, and docs/spike-measures.json only
+// with E2E_DOCS=1 and only when every measure test passed.
 //
-// Every number is labelled 'measured' or 'stand-in' with its method; a measure
-// that cannot run is {status: 'unavailable', reason}. Nothing here asserts a
-// performance limit: the story records, story 9 judges. Only a browser console
-// or page error fails a test.
+// Every number is labelled 'measured' or 'stand-in' with its method and the
+// environment it ran in; a measure that cannot run is {status: 'unavailable',
+// reason}. Nothing here asserts a performance limit: the story records, story 9
+// judges. Only a browser console or page error fails a test.
 
 import { createRequire } from 'node:module';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { measuresFiles, repoRoot } from '../lib/env.mjs';
+import { measuresDocsFile, measuresOutFile, repoRoot } from '../lib/env.mjs';
 import { TRACER, pagePixel } from '../lib/geo.mjs';
-import { unavailable, writeMeasures } from '../lib/measures.mjs';
+import { unavailable, validateMeasures, without, writeJson } from '../lib/measures.mjs';
 import { frameStats, median } from '../lib/stats.mjs';
 import { batchSize, buildValuesBatch } from '../lib/valueBatch.mjs';
-import { expect, openMap, test, watch } from './fixtures.mjs';
+import { expect, loadedCounts, nextFrames, openMap, test, watch } from './fixtures.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -27,7 +29,12 @@ test.use({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 // Story 2's recorded production bundle (docs/platform-checks.md), for the delta.
 const STORY_2_BUNDLE_BYTES = { 'MapStudio.js': 1167572, 'MapStudio.css': 70976, 'maplibre-gl-worker.js': 517065 };
 
+// The frame rate drive: input rate caps, so the driver's own load is bounded and the same in every run.
+const PAN_MOVES_PER_SECOND = 60;
+const ZOOM_EVENTS_PER_SECOND = 25;
+
 const m = {};
+let allPassed = true;
 
 function playwrightVersion() {
     try {
@@ -46,7 +53,12 @@ async function webglRenderer(page) {
     });
 }
 
-test.beforeAll(async ({ browser }) => {
+/** The environment for one section: the run's env plus the viewport it used. */
+function envFor(viewport) {
+    return { ...m.env, viewport, attempt: test.info().retry };
+}
+
+test.beforeAll(async ({ browser }, testInfo) => {
     const page = await browser.newPage();
     const renderer = await webglRenderer(page);
     await page.close();
@@ -60,16 +72,45 @@ test.beforeAll(async ({ browser }) => {
         cpus: os.cpus().length,
         platform: `${os.platform()} ${os.arch()}`,
         ci: !!process.env.CI,
-        headed: process.env.E2E_HEADED === '1'
+        headed: process.env.E2E_HEADED === '1',
+        retriesConfigured: testInfo.project.retries
     };
+});
+
+// The last attempt of each measure test decides, so a retry that passes counts as a pass.
+const lastAttemptOk = {};
+test.afterEach(({}, testInfo) => {
+    lastAttemptOk[testInfo.title] = testInfo.status === testInfo.expectedStatus;
+    allPassed = Object.keys(lastAttemptOk).length === 4 && Object.values(lastAttemptOk).every(Boolean);
 });
 
 test.afterAll(() => {
     for (const name of ['bundle', 'frameRate', 'valueBatch', 'phone']) {
         if (!m[name]) m[name] = unavailable('the measure did not run to completion; see the test output');
     }
-    writeMeasures(m, measuresFiles);
+    // A failed beforeAll leaves no env; keep the real failure visible instead of throwing here.
+    if (!m.env) m.env = { chromium: 'unknown', renderer: 'unknown' };
+    const problems = validateMeasures(m);
+    if (problems.length && allPassed) throw new Error('Invalid measures: ' + problems.join('; '));
+    // The run-local file always; with a failed measure it says so and may be incomplete.
+    writeJson(allPassed ? m : { ...m, incomplete: true, problems }, measuresOutFile);
+    // The committed copy only after a fully passing run, and without the timestamp so a re-run only
+    // changes it when a number changes.
+    if (measuresDocsFile && allPassed) writeJson(without(m, ['generatedAt']), measuresDocsFile);
 });
+
+// --- bundle size ------------------------------------------------------------
+
+/** The one .modl in ops/modules, the folder the dev Gateway reads (up.sh stages it; CI downloads it there). */
+function stagedModl() {
+    const dir = path.join(repoRoot, 'ops', 'modules');
+    const found = existsSync(dir) ? readdirSync(dir).filter((n) => n.endsWith('.modl')) : [];
+    if (found.length !== 1) {
+        return unavailable(`expected exactly one .modl in ops/modules, found ${found.length}${found.length ? ': ' + found.join(', ') : ''}`);
+    }
+    const bytes = readFileSync(path.join(dir, found[0]));
+    return { file: found[0], bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') };
+}
 
 test('bundle size', async ({ page }) => {
     const wire = new Map();
@@ -97,27 +138,18 @@ test('bundle size', async ({ page }) => {
         m.bundle = unavailable('the Gateway served no /res/mapstudio/MapStudio.js during the page load');
         return;
     }
-    const modlDirs = [path.join(repoRoot, 'ops', 'modules'), path.join(repoRoot, 'build')];
-    let modl = null;
-    for (const d of modlDirs) {
-        if (!existsSync(d)) continue;
-        const f = readdirSync(d).find((n) => n.endsWith('.modl'));
-        if (f) {
-            modl = { file: f, bytes: statSync(path.join(d, f)).size };
-            break;
-        }
-    }
     m.bundle = {
         label: 'measured',
-        method: 'Bytes of each /res/mapstudio/* file as the dev Gateway served it during a page load of the tracer view (response body decoded, gzip of that body, and the body bytes actually transferred), plus the staged .modl. Production webpack build, unsigned.',
+        method: 'Bytes of each /res/mapstudio/* file as the dev Gateway served it during a page load of the tracer view (response body decoded, gzip of that body, and the body bytes actually transferred), plus the .modl in ops/modules, the file the Gateway was given (name and SHA-256 recorded). Production webpack build, unsigned. File sizes do not depend on the viewport.',
+        env: envFor('1440x900'),
         files,
-        modl,
+        modl: stagedModl(),
         note: 'transferredBodyBytes 0 on maplibre-gl-worker.js: Playwright reported no body transfer for the worker request (Chromium fetches a worker script outside the page; why is unverified). Use bytes and gzipBytes for that file.',
         budget: 'none defined; recorded only'
     };
 });
 
-// --- frame rate -----------------------------------------------------------
+// --- frame rate -------------------------------------------------------------
 
 async function startSampler(page) {
     await page.evaluate(() => {
@@ -136,30 +168,43 @@ async function stopSampler(page) {
     return frameStats(r.t, r.long);
 }
 
-/** Drag the map round a circle for `ms`, as fast as input can be sent. */
+/**
+ * Call `fn(k, elapsedMs)` for `ms` at no more than `perSecond` calls per second: each call is due one
+ * step after the previous due time, and a call that is late runs at once but never makes up the missed
+ * slots (no burst of input after a slow frame). `minGapMs` is a pause after every call, however late.
+ */
+async function paced(page, ms, perSecond, fn, minGapMs = 0) {
+    const step = 1000 / perSecond;
+    const t0 = Date.now();
+    let due = t0;
+    for (let k = 0; due - t0 < ms; k++) {
+        const wait = due - Date.now();
+        if (wait > 0) await page.waitForTimeout(wait);
+        await fn(k, Date.now() - t0);
+        due = Math.max(due + step, Date.now() + minGapMs);
+    }
+}
+
+/** Drag the map round a circle for `ms`, at most PAN_MOVES_PER_SECOND mouse moves a second. */
 async function panGesture(page, box, ms) {
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
     const r = Math.min(box.width, box.height) * 0.2;
     await page.mouse.move(cx + r, cy);
     await page.mouse.down();
-    const t0 = Date.now();
-    while (Date.now() - t0 < ms) {
-        const a = ((Date.now() - t0) / ms) * 4 * Math.PI;
+    await paced(page, ms, PAN_MOVES_PER_SECOND, async (_k, elapsed) => {
+        const a = (elapsed / ms) * 4 * Math.PI;
         await page.mouse.move(cx + r * Math.cos(a), cy + r * Math.sin(a));
-    }
+    });
     await page.mouse.up();
 }
 
-/** Wheel zoom in for half of `ms`, then out for the other half. */
+/** Wheel zoom in for half of `ms`, then out for the other half, at a fixed nominal rate of wheel events. */
 async function zoomGesture(page, box, ms) {
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    const t0 = Date.now();
-    while (Date.now() - t0 < ms) {
-        const inward = Date.now() - t0 < ms / 2;
-        await page.mouse.wheel(0, inward ? -60 : 60);
-        await page.waitForTimeout(40);
-    }
+    await paced(page, ms, ZOOM_EVENTS_PER_SECOND, async (_k, elapsed) => {
+        await page.mouse.wheel(0, elapsed < ms / 2 ? -60 : 60);
+    }, 1000 / ZOOM_EVENTS_PER_SECOND);
 }
 
 async function measureView(page, pagePath) {
@@ -175,7 +220,7 @@ async function measureView(page, pagePath) {
         await zoomGesture(page, box, 4000);
         const zoom = await stopSampler(page);
         runs.push({ pan, zoom });
-        await page.waitForTimeout(1000);
+        await nextFrames(page); // the next run starts on a frame boundary, with no gesture in flight
     }
     const fps = (key) => runs.map((r) => r[key].fps).filter((v) => typeof v === 'number');
     return {
@@ -198,25 +243,25 @@ test('frame rate on the 30-pad scale set', async ({ page }) => {
     const tracer = await measureView(page, '/');
     m.frameRate = {
         label: 'measured',
-        method: 'requestAnimationFrame timestamps and long tasks sampled in the page while Playwright drives a 4 s circular drag and a 4 s wheel zoom (in, then out) on the map, after a 2 s warm-up; 3 runs per view. Frames are the page\'s frame cadence during the gesture, not MapLibre\'s own render count (the map object is not reachable by design).',
+        method: `requestAnimationFrame timestamps and long tasks sampled in the page while Playwright drives a 4 s circular drag (at most ${PAN_MOVES_PER_SECOND} mouse moves per second) and a 4 s wheel zoom (at most ${ZOOM_EVENTS_PER_SECOND} wheel events per second, so about 25 when the page keeps up and fewer when it does not; in for 2 s then out for 2 s) on the map, after a 2 s warm-up; 3 runs per view. The driver's input events are handled on the page's main thread, so that load shares it with rendering and is the same in every run. Frames are the page's frame cadence during the gesture, not MapLibre's own render count (the map object is not reachable by design).`,
+        env: envFor('1440x900'),
+        deviceScaleFactor: 1,
         views: {
             scale30: { stage: 'stand-in data: 30 seeded pads and 30 lines, circle and line layers only', ...scale },
             tracer: { stage: '3 points and 1 line, for contrast', ...tracer }
         },
-        env: { ...m.env, viewport: '1440x900', deviceScaleFactor: 1 },
         limits: [
             m.env.softwareWebGL
                 ? 'Software WebGL (CPU rendered): a laptop GPU is expected to do better, which is unverified here.'
                 : 'Hardware WebGL renderer as named in env.renderer.',
-            'Only circle and line layers: no icons, labels, KPI values or alarm styling, so this is a floor on rendering cost, not a measure of the finished map.',
+            'Only circle and line layers: no icons, labels, KPI values or alarm styling.',
             'The pads are a seeded stand-in for the template\'s 30-pad set, which this repository cannot read.'
         ],
-        comparison: 'Compare scale30 with tracer only through fpsRange: on software WebGL the run-to-run spread is as large as the difference between the views, so no cost per pad can be read from these numbers.',
-        nfr1: 'NFR-1 (60 frames per second in a laptop browser) is NOT decided by this measure; story 9 records it as unverified unless the suite is run headed on a laptop (E2E_HEADED=1).'
+        note: 'The run-to-run spread on software WebGL is recorded in docs/platform-checks.md, section "Story 7". NFR-1 asks for 60 frames per second in a laptop browser; the renderer this ran on is in env.renderer.'
     };
 });
 
-// --- value batch ----------------------------------------------------------
+// --- value batch ------------------------------------------------------------
 
 test('size of one value batch', async ({ page }) => {
     // Real wire sizes of the one round trip that exists: point.click and its reply.
@@ -226,9 +271,9 @@ test('size of one value batch', async ({ page }) => {
         ws.on('framereceived', (f) => frames.push({ dir: 'received', payload: f.payload }));
     });
     const map = await openMap(page, '/scale');
-    const count = Number(await map.getAttribute('data-feature-count'));
-    expect(count, 'the scale view reports its feature count').toBeGreaterThan(0);
-    const pads = count / 2; // one pad point and one line per pad
+    const counts = await loadedCounts(map);
+    expect(counts.points, 'pads the scale view loaded into MapLibre').toBeGreaterThan(0);
+    const pads = counts.points;
 
     const full = batchSize(buildValuesBatch({ pads, full: true }));
     const changes = batchSize(buildValuesBatch({ pads, full: false, every: 10 }));
@@ -240,18 +285,21 @@ test('size of one value batch', async ({ page }) => {
     const [x, y] = pagePixel(box, TRACER.points.p1.lngLat, TRACER.center, TRACER.zoom);
     await page.mouse.click(x, y);
     await expect(page.locator('.mapstudio-reply')).toContainText('Gateway received click on p1', { timeout: 15_000 });
-    await page.waitForTimeout(500);
-    const matching = frames
+    const readable = () => frames
         .map((f) => ({ dir: f.dir, buf: Buffer.isBuffer(f.payload) ? f.payload : Buffer.from(String(f.payload), 'utf8') }))
         .filter((f) => f.buf.includes('point.click'))
         .map((f) => ({ direction: f.dir, bytes: f.buf.length, type: f.buf.includes('point.click.reply') ? 'point.click.reply' : 'point.click' }));
+    // Both frames are in once the reply text shows, but the socket event can trail the DOM: poll for them.
+    await expect.poll(() => readable().length, { timeout: 5_000 }).toBeGreaterThanOrEqual(2).catch(() => {});
+    const matching = readable();
     const wire = matching.length
         ? { label: 'measured', method: 'Playwright websocket frame sizes of the Perspective session socket, frames whose bytes contain "point.click", from the click to the reply', frames: matching }
         : unavailable(`no websocket frame carried point.click in a readable form (${frames.length} frames seen since the click)`);
 
     m.valueBatch = {
         label: 'stand-in',
-        method: 'values.batch does not exist yet. The AD-6 envelope {v, type, id, body: {seq, full, items}} is built for the scale view\'s pads with three LiveValue slots per pad (comms, icon KPI, alarm count) and its JSON size is measured (UTF-8 bytes, and gzip of the same text).',
+        method: 'values.batch does not exist yet. The AD-6 envelope {v, type, id, body: {seq, full, items}} is built for the scale view\'s pads with three LiveValue slots per pad (comms, icon KPI, alarm count) and its JSON size is measured (UTF-8 bytes, and gzip of the same text). The pad count is the number MapLibre loaded on /scale.',
+        env: envFor('1440x900'),
         assumption: 'AD-6 fixes only the LiveValue fields {value, quality, t, stale, reason}; the item layout (pad id plus three named slots) is this story\'s guess, unverified. Whether Perspective compresses websocket frames is unverified, so gzip is an upper bound on the saving, not the wire size.',
         pads,
         slotsPerPad: 3,
@@ -261,7 +309,7 @@ test('size of one value batch', async ({ page }) => {
     };
 });
 
-// --- phone ----------------------------------------------------------------
+// --- phone ------------------------------------------------------------------
 
 test('what breaks on a 390 px phone', async ({ browser }) => {
     test.setTimeout(240_000);
@@ -282,12 +330,20 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
             findings.push({ check, ok: false, detail: 'probe threw: ' + String(err && err.message ? err.message : err).split('\n')[0] });
         }
     };
+    /** Re-read `read` on each frame until `done(value)` or the time is up; returns the last value. */
+    const until = async (read, done, ms = 5000) => {
+        const t0 = Date.now();
+        let v = await read();
+        while (!done(v) && Date.now() - t0 < ms) {
+            await nextFrames(page);
+            v = await read();
+        }
+        return v;
+    };
 
     const map = await openMap(page, '/');
     const box = await map.boundingBox();
     const reply = page.locator('.mapstudio-reply');
-    const mapShot = () => map.screenshot();
-    const differs = (a, b) => Buffer.compare(a, b) !== 0;
 
     await probe('page-has-no-horizontal-overflow', async () => {
         const d = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth }));
@@ -334,35 +390,48 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
         };
     });
 
+    // Pan and pinch are judged on where the open popup's tip moves: the popup is anchored to p1's
+    // map position, so its tip follows the map. The tip sits a fixed offset (about 12 px) from the point
+    // and may flip side near an edge, which is why the thresholds are generous.
+    const tip = () => page.evaluate(() => {
+        const t = document.querySelector('.maplibregl-popup-tip');
+        if (!t) return null;
+        const r = t.getBoundingClientRect();
+        return [r.x + r.width / 2, r.y + r.height / 2];
+    });
     const cdp = await context.newCDPSession(page);
+    // Gestures start above the popup (the popup spans y 450..548 on this view).
+    const gx = box.x + box.width / 2;
+    const gy = box.y + box.height * 0.2;
 
     await probe('touch-drag-pans-the-map', async () => {
-        const before = await mapShot();
-        const sx = box.x + box.width * 0.7;
-        const sy = box.y + box.height * 0.5;
-        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: sx, y: sy }] });
+        const before = await tip();
+        if (!before) return { ok: false, detail: 'no open popup to track' };
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: gx + 100, y: gy }] });
         for (let i = 1; i <= 12; i++) {
-            await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: sx - i * 12, y: sy }] });
-            await page.waitForTimeout(16);
+            await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: gx + 100 - i * 10, y: gy }] });
+            await nextFrames(page);
         }
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-        await page.waitForTimeout(1000);
-        const after = await mapShot();
-        return { ok: differs(before, after), detail: 'canvas pixels compared before and after a CDP touch drag of 144 px (a pixel comparison, not a read of the map centre)' };
+        const after = await until(tip, (t) => !!t && t[0] - before[0] < -72);
+        const dx = after ? Math.round(after[0] - before[0]) : null;
+        return { ok: dx !== null && dx < -72, detail: `popup tip moved ${dx} px horizontally for a 120 px leftward touch drag (needs under -72); the tip is the stand-in for the point's map position` };
     });
 
     await probe('pinch-zooms-the-map', async () => {
-        const before = await mapShot();
+        const before = await tip();
+        if (!before) return { ok: false, detail: 'no open popup to track' };
+        const dist = (t) => Math.hypot(t[0] - gx, t[1] - gy);
         await cdp.send('Input.synthesizePinchGesture', {
-            x: Math.round(box.x + box.width / 2),
-            y: Math.round(box.y + box.height / 2),
+            x: Math.round(gx),
+            y: Math.round(gy),
             scaleFactor: 2,
             relativeSpeed: 300,
             gestureSourceType: 'touch'
         });
-        await page.waitForTimeout(1000);
-        const after = await mapShot();
-        return { ok: differs(before, after), detail: 'canvas pixels compared before and after a CDP pinch of scale 2 (a pixel comparison)' };
+        const after = await until(tip, (t) => !!t && dist(t) > 1.5 * dist(before));
+        const ratio = after ? Math.round((dist(after) / dist(before)) * 100) / 100 : null;
+        return { ok: ratio !== null && ratio > 1.5, detail: `popup tip distance from the pinch centre grew by a factor of ${ratio} for a CDP pinch of scale 2 (needs over 1.5)` };
     });
 
     await probe('line-tool-finishes-by-touch-alone', async () => {
@@ -374,14 +443,14 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
             return [r.x + r.width / 2, r.y + r.height / 2];
         })));
         await expect(reply).toHaveAttribute('data-drawing', 'true', { timeout: 5_000 });
+        // Terra Draw shows no state between vertex taps; the pause only keeps two taps from reading as a double tap.
         await page.touchscreen.tap(a[0], a[1]);
         await page.waitForTimeout(300);
         await page.touchscreen.tap(b[0], b[1]);
         await page.waitForTimeout(300);
         // No Enter key on a phone: tapping the last vertex again is the touch way to finish.
         await page.touchscreen.tap(b[0], b[1]);
-        await page.waitForTimeout(800);
-        const points = await reply.getAttribute('data-line-points');
+        const points = await until(() => reply.getAttribute('data-line-points'), (p) => p === '2', 3000);
         return { ok: points === '2', detail: `data-line-points after two vertex taps and a repeat tap on the last: '${points}' (whether Terra Draw finishes this way on touch is the thing probed)` };
     });
 
@@ -393,8 +462,9 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
     await context.close();
     m.phone = {
         label: 'measured',
-        method: 'Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the tracer view; each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device\'s touch handling is unverified.',
-        viewport: '390x844',
+        method: 'Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the tracer view; each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device\'s touch handling is unverified. Pan and pinch are read from the open popup\'s tip position (a DOM stand-in for the point\'s map position), not from the map\'s centre or zoom, which the suite cannot reach by design.',
+        env: envFor('390x844'),
+        deviceScaleFactor: 2,
         findings,
         summary: { ok: findings.filter((f) => f.ok).length, failed: findings.filter((f) => !f.ok).length }
     };

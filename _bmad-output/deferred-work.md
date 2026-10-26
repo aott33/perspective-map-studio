@@ -1,6 +1,6 @@
 - source_plan: `_bmad-output/initiative-flowmap/tickets/epic-module-foundation/tickets/spike-render-a-project-view-by-path-as-a-popup-plan.md`
   summary: Confirm on the Gateway that the popup view's view model stops when the popup closes (and that a p1 to p2 switch, which reuses one mount path, stops the old one).
-  evidence: Review finding 2 (quick lens): only the browser side was seen; the Gateway logs nothing at info for a view stop. Settle it with the Perspective session page's view count or a debug logger on `perspective.ViewModel` during `ops/popup-check.mjs`, and record it under "Story 4" in `docs/platform-checks.md`.
+  evidence: Review finding 2 (quick lens): only the browser side was seen; the Gateway logs nothing at info for a view stop. Settle it with the Perspective session page's view count or a debug logger on `perspective.ViewModel` during `e2e/tests/popup.spec.mjs`, and record it under "Story 4" in `docs/platform-checks.md`.
 - source_plan: `_bmad-output/initiative-flowmap/tickets/epic-module-foundation/tickets/story-playwright-smoke-suite-and-the-spike-s-measures-plan.md`
   summary: For the epic 1 refactor sweep (story 8) - remove the spike-only `testSet` prop (`common/.../mapstudio.props.json`, `web/typescript/{testSet,scaleData}.ts`) and the dev views `MapStudioScale`, `MapStudioFallbackEmpty` and `MapStudioFallbackMissing`, or keep them as e2e fixtures once the map store supplies test data.
   evidence: Owner's decision 2026-10-26 (story 7, question 4): the 30 pads reach the component through a spike-only prop that is removed in the sweep. The e2e specs `scale.spec.mjs` and `popup.spec.mjs` and the frame rate measure depend on them.
@@ -11,5 +11,5 @@
   summary: Replace the `values.batch` stand-in (`e2e/lib/valueBatch.mjs`) with a measurement of the real message when epic-viewing builds it.
   evidence: The item layout and the websocket compression are unverified guesses; only the LiveValue fields are fixed by AD-6.
 - source_plan: `_bmad-output/initiative-flowmap/tickets/epic-module-foundation/tickets/story-playwright-smoke-suite-and-the-spike-s-measures-plan.md`
-  summary: Settle the story 4 deferred item (view model stops on popup close) in the e2e suite; `ops/popup-check.mjs`, which that entry names, is now `e2e/tests/popup.spec.mjs`.
+  summary: Settle the story 4 deferred item (view model stops on popup close) in the e2e suite; the popup check that entry names now lives in `e2e/tests/popup.spec.mjs`.
   evidence: The browser side of close and the p1 to p2 switch are tested; the Gateway side still needs a view count on the Perspective session page or a debug logger on `perspective.ViewModel`.

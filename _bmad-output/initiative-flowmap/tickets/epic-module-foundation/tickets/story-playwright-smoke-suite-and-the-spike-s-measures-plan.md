@@ -3,7 +3,7 @@ title: "Playwright smoke suite and the spike's measures"
 type: 'feature'
 ticket: '7'
 created: '2026-10-26'
-status: 'in-review'
+status: 'built'
 baseline_revision: '0c6a191c0550beaa9aff02c2610bc16b87ab6541'
 route: 'full'
 route_source: 'auto'
@@ -89,9 +89,26 @@ context:
 - Deleted `ops/screenshot.mjs` and `ops/popup-check.mjs`; README, `docs/architecture.md`, `docs/platform-checks.md` (section "Story 7"), the story 1 walkthrough link and `ops/up.sh` point at `e2e/`. Deferred entries appended for the sweep, a laptop headed run, the real `values.batch` and the Gateway-side popup stop.
 - CI: job `e2e` added (`needs: build`, every push to `main` and pull request); YAML parsed, every step's command run locally except `download-artifact`, `setup-node`, the browser cache and `playwright install --with-deps`, which are **[unverified]** until a runner executes them.
 
+- Review pass 1 patches (see the Review Triage Log), 2026-10-26: after them the suite passed three complete times on `ms-s7` (10 of 10 each, 1.8 to 2.1 min; the second with `E2E_DOCS=1`, which rewrote `docs/spike-measures.json` and the screenshots); Jest 32 of 32, `node --test` 9 of 9, `tsc` clean, Gradle build green. The Gateway log again shows no Map Studio warning or error. `docs/platform-checks.md` "Story 7" carries the new numbers: frame rates 7.5 to 13.1 fps for the 30-pad view and 9.8 to 10.8 for the tracer across the two recorded runs, the `.modl` SHA-256 and the new phone probe wording.
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+Pass 1 (quick lens, 2026-10-26, run context-free by the coordinator from the standalone prompt written beside this plan, against `dca34fc`): high 0, medium 7, low 3, false 0, maybe-false 0. All ten patched; none rejected or deferred. Verified by reading each cited location before patching.
+
+| # | Finding | Verdict | Route | Evidence |
+|---|---|---|---|---|
+| 1 | Two references to `ops/popup-check.mjs` remain in `_bmad-output/deferred-work.md` | low | patch | Real: lines 3 and 14 named a deleted script. Both now name `e2e/tests/popup.spec.mjs`; the plan's grep now excludes the ticket folder, whose plans name the old scripts by history. |
+| 2 | `playwright.config.mjs` says `playwright install` is never run, but CI runs it | low | patch | Real, the comment contradicted the workflow. Now: CI installs Chromium, the cloud box never does. |
+| 3 | `data-feature-count` comes from the constructor, so the counts prove nothing | medium | patch | Real: `featureCount` was computed from the input data. Removed. The component now sets `data-map-ready` and `data-points-loaded` and `data-lines-loaded` after MapLibre's first `idle`, counted with `querySourceFeatures`, unique by feature id; the tracer, scale and measures specs assert them (3 points and 1 line; 30 and 30). |
+| 4 | Fixed sleeps: 1500 ms first-frame wait and others; no retry policy | medium | patch | Real. `openMap` waits for `data-map-ready`; screenshots wait two animation frames (`nextFrames`); the phone pan and pinch and the touch-draw finish poll their state; the remaining pauses (between two vertex clicks; the "no warning" settle `WARNING_SETTLE_MS`, 500 ms) have no observable state and say so in comments. `retries: 1` in CI only, recorded as `env.retriesConfigured` and `env.attempt`. |
+| 5 | `afterAll` overwrote the docs measures after a failure and could throw on an undefined `m.env` | medium | patch | Real. The docs file is written only with `E2E_DOCS=1` and when the last attempt of all four measure tests passed; `e2e/out` always, marked `incomplete` after a failure; `m.env` is guarded; `generatedAt` is left out of the docs copy. |
+| 6 | `env` only on some sections; `validateMeasures` did not enforce it | medium | patch | Real. Every section carries `env` (with viewport and attempt); `validateMeasures` enforces label, method and env per section, with a unit test over every section and field. |
+| 7 | `frameRate.comparison` states a judgment as a result | medium | patch | Real. Replaced by a neutral `note` that points at `docs/platform-checks.md` for the run-to-run spread. |
+| 8 | Frame rate method omits the driver's input load and the unfixed zoom event rate | medium | patch | Real. Pan moves capped at 60 per second and wheel events at 25 per second (a pause after each call), both said in the method with the shared main thread. First attempt with a catch-up schedule made `mouse.wheel` hang for the 300 s timeout once; the schedule no longer makes up missed slots and the wheel keeps a 40 ms pause. |
+| 9 | Phone pan and pinch pass on any pixel change | medium | patch | Real. Both probes now read the open popup's tip (anchored to p1): pan needs under -72 px for a 120 px drag (saw -120), pinch needs a distance factor over 1.5 (saw 2.4); the detail says the tip stands in for the map position. |
+| 10 | `bundle.modl` is the first `.modl` found in `ops/modules` or `build` | low | patch | Real. Now exactly one `.modl` in `ops/modules` (the folder the Gateway reads), else `unavailable` naming what was found; name and SHA-256 recorded. |
 
 ## Design Notes
 
@@ -110,7 +127,7 @@ context:
 - `cd e2e && node --test lib/` and `cd web && npx tsc --noEmit && npm test` -- expected: pass
 - `./gradlew build` -- expected: success with the new prop in the schema
 - `E2E_DOCS=1 npx playwright test` -- expected: docs screenshots and `docs/spike-measures.json` updated
-- `python3 -c "import yaml,sys;yaml.safe_load(open('.github/workflows/ci.yml'))"` and `git grep -nE 'screenshot\.mjs|popup-check'` -- expected: valid; no hits
+- `python3 -c "import yaml,sys;yaml.safe_load(open('.github/workflows/ci.yml'))"` and `git grep -nE 'screenshot\.mjs|popup-check' -- . ':(exclude)_bmad-output/initiative-flowmap/tickets'` -- expected: valid; no hits
 - `git grep -I -nE 'BEGIN [A-Z ]*PRIVATE KEY|GATEWAY_ADMIN_PASSWORD=.+'` -- expected: no hits
 
 **Manual checks (if no CLI):**

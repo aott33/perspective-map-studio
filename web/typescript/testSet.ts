@@ -9,8 +9,6 @@ export interface TestData {
     lines: FeatureCollection | Feature;
     center: [number, number];
     zoom: number;
-    /** Points plus lines, written to data-feature-count for the e2e suite. */
-    featureCount: number;
 }
 
 /** 'scale30' gives the 30-pad stand-in; anything else gives the tracer's data. */
@@ -22,8 +20,7 @@ export function selectTestData(testSet: string): TestData {
             points: set.pads,
             lines: set.lines,
             center: SCALE_VIEW.center,
-            zoom: SCALE_VIEW.zoom,
-            featureCount: set.pads.features.length + set.lines.features.length
+            zoom: SCALE_VIEW.zoom
         };
     }
     return {
@@ -31,7 +28,6 @@ export function selectTestData(testSet: string): TestData {
         points: TEST_POINTS,
         lines: TEST_LINE.feature,
         center: TEST_LINE.center,
-        zoom: TEST_LINE.zoom,
-        featureCount: TEST_POINTS.features.length + 1
+        zoom: TEST_LINE.zoom
     };
 }

@@ -1,6 +1,5 @@
 {
   "schema": 1,
-  "generatedAt": "2026-10-26T13:46:04.165Z",
   "env": {
     "chromium": "153.0.8010.12",
     "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
@@ -9,11 +8,25 @@
     "cpus": 4,
     "platform": "linux x64",
     "ci": false,
-    "headed": false
+    "headed": false,
+    "retriesConfigured": 0
   },
   "bundle": {
     "label": "measured",
-    "method": "Bytes of each /res/mapstudio/* file as the dev Gateway served it during a page load of the tracer view (response body decoded, gzip of that body, and the body bytes actually transferred), plus the staged .modl. Production webpack build, unsigned.",
+    "method": "Bytes of each /res/mapstudio/* file as the dev Gateway served it during a page load of the tracer view (response body decoded, gzip of that body, and the body bytes actually transferred), plus the .modl in ops/modules, the file the Gateway was given (name and SHA-256 recorded). Production webpack build, unsigned. File sizes do not depend on the viewport.",
+    "env": {
+      "chromium": "153.0.8010.12",
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "softwareWebGL": true,
+      "playwright": "1.63.0",
+      "cpus": 4,
+      "platform": "linux x64",
+      "ci": false,
+      "headed": false,
+      "retriesConfigured": 0,
+      "viewport": "1440x900",
+      "attempt": 0
+    },
     "files": [
       {
         "file": "MapStudio.css",
@@ -26,12 +39,12 @@
       },
       {
         "file": "MapStudio.js",
-        "bytes": 1179583,
-        "gzipBytes": 315995,
-        "transferredBodyBytes": 314937,
+        "bytes": 1179848,
+        "gzipBytes": 316097,
+        "transferredBodyBytes": 315033,
         "contentEncoding": "gzip",
         "story2Bytes": 1167572,
-        "deltaBytes": 12011
+        "deltaBytes": 12276
       },
       {
         "file": "maplibre-gl-worker.js",
@@ -45,246 +58,15 @@
     ],
     "modl": {
       "file": "Map-Studio.unsigned.modl",
-      "bytes": 509949
+      "bytes": 510041,
+      "sha256": "69e190fab36977db5808fc74f94ae1116f4ddc8c03c2e447f60c7ea733122f10"
     },
     "note": "transferredBodyBytes 0 on maplibre-gl-worker.js: Playwright reported no body transfer for the worker request (Chromium fetches a worker script outside the page; why is unverified). Use bytes and gzipBytes for that file.",
     "budget": "none defined; recorded only"
   },
   "frameRate": {
     "label": "measured",
-    "method": "requestAnimationFrame timestamps and long tasks sampled in the page while Playwright drives a 4 s circular drag and a 4 s wheel zoom (in, then out) on the map, after a 2 s warm-up; 3 runs per view. Frames are the page's frame cadence during the gesture, not MapLibre's own render count (the map object is not reachable by design).",
-    "views": {
-      "scale30": {
-        "stage": "stand-in data: 30 seeded pads and 30 lines, circle and line layers only",
-        "runs": [
-          {
-            "pan": {
-              "frames": 20,
-              "spanMs": 3900,
-              "fps": 4.87,
-              "intervalMs": {
-                "p50": 183.4,
-                "p95": 416.6,
-                "max": 416.6
-              },
-              "shareOver20msPercent": 100,
-              "longTasks": {
-                "count": 1,
-                "totalMs": 143
-              }
-            },
-            "zoom": {
-              "frames": 24,
-              "spanMs": 3833,
-              "fps": 6,
-              "intervalMs": {
-                "p50": 183.4,
-                "p95": 283.3,
-                "max": 283.3
-              },
-              "shareOver20msPercent": 95.7,
-              "longTasks": {
-                "count": 2,
-                "totalMs": 202
-              }
-            }
-          },
-          {
-            "pan": {
-              "frames": 29,
-              "spanMs": 4817,
-              "fps": 5.81,
-              "intervalMs": {
-                "p50": 16.7,
-                "p95": 516.7,
-                "max": 566.6
-              },
-              "shareOver20msPercent": 50,
-              "longTasks": {
-                "count": 1,
-                "totalMs": 59
-              }
-            },
-            "zoom": {
-              "frames": 21,
-              "spanMs": 4550,
-              "fps": 4.4,
-              "intervalMs": {
-                "p50": 216.7,
-                "p95": 366.6,
-                "max": 416.7
-              },
-              "shareOver20msPercent": 95,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            }
-          },
-          {
-            "pan": {
-              "frames": 27,
-              "spanMs": 4150,
-              "fps": 6.27,
-              "intervalMs": {
-                "p50": 166.6,
-                "p95": 366.6,
-                "max": 516.6
-              },
-              "shareOver20msPercent": 73.1,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            },
-            "zoom": {
-              "frames": 61,
-              "spanMs": 4200,
-              "fps": 14.29,
-              "intervalMs": {
-                "p50": 66.6,
-                "p95": 133.4,
-                "max": 266.8
-              },
-              "shareOver20msPercent": 85,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            }
-          }
-        ],
-        "medianFps": {
-          "pan": 5.81,
-          "zoom": 6
-        },
-        "fpsRange": {
-          "pan": [
-            4.87,
-            6.27
-          ],
-          "zoom": [
-            4.4,
-            14.29
-          ]
-        }
-      },
-      "tracer": {
-        "stage": "3 points and 1 line, for contrast",
-        "runs": [
-          {
-            "pan": {
-              "frames": 54,
-              "spanMs": 4133,
-              "fps": 12.82,
-              "intervalMs": {
-                "p50": 83.3,
-                "p95": 133.4,
-                "max": 183.4
-              },
-              "shareOver20msPercent": 92.5,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            },
-            "zoom": {
-              "frames": 66,
-              "spanMs": 4083,
-              "fps": 15.92,
-              "intervalMs": {
-                "p50": 66.6,
-                "p95": 100,
-                "max": 166.6
-              },
-              "shareOver20msPercent": 86.2,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            }
-          },
-          {
-            "pan": {
-              "frames": 73,
-              "spanMs": 4066,
-              "fps": 17.71,
-              "intervalMs": {
-                "p50": 50.1,
-                "p95": 116.7,
-                "max": 216.6
-              },
-              "shareOver20msPercent": 72.2,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            },
-            "zoom": {
-              "frames": 53,
-              "spanMs": 3966,
-              "fps": 13.11,
-              "intervalMs": {
-                "p50": 66.7,
-                "p95": 133.4,
-                "max": 200
-              },
-              "shareOver20msPercent": 92.3,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            }
-          },
-          {
-            "pan": {
-              "frames": 63,
-              "spanMs": 4083,
-              "fps": 15.18,
-              "intervalMs": {
-                "p50": 66.6,
-                "p95": 150,
-                "max": 249.9
-              },
-              "shareOver20msPercent": 69.4,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            },
-            "zoom": {
-              "frames": 58,
-              "spanMs": 4166,
-              "fps": 13.68,
-              "intervalMs": {
-                "p50": 66.7,
-                "p95": 133.3,
-                "max": 166.7
-              },
-              "shareOver20msPercent": 96.5,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            }
-          }
-        ],
-        "medianFps": {
-          "pan": 15.18,
-          "zoom": 13.68
-        },
-        "fpsRange": {
-          "pan": [
-            12.82,
-            17.71
-          ],
-          "zoom": [
-            13.11,
-            15.92
-          ]
-        }
-      }
-    },
+    "method": "requestAnimationFrame timestamps and long tasks sampled in the page while Playwright drives a 4 s circular drag (at most 60 mouse moves per second) and a 4 s wheel zoom (at most 25 wheel events per second, so about 25 when the page keeps up and fewer when it does not; in for 2 s then out for 2 s) on the map, after a 2 s warm-up; 3 runs per view. The driver's input events are handled on the page's main thread, so that load shares it with rendering and is the same in every run. Frames are the page's frame cadence during the gesture, not MapLibre's own render count (the map object is not reachable by design).",
     "env": {
       "chromium": "153.0.8010.12",
       "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
@@ -294,20 +76,266 @@
       "platform": "linux x64",
       "ci": false,
       "headed": false,
+      "retriesConfigured": 0,
       "viewport": "1440x900",
-      "deviceScaleFactor": 1
+      "attempt": 0
+    },
+    "deviceScaleFactor": 1,
+    "views": {
+      "scale30": {
+        "stage": "stand-in data: 30 seeded pads and 30 lines, circle and line layers only",
+        "runs": [
+          {
+            "pan": {
+              "frames": 35,
+              "spanMs": 4067,
+              "fps": 8.36,
+              "intervalMs": {
+                "p50": 116.6,
+                "p95": 233.3,
+                "max": 250.1
+              },
+              "shareOver20msPercent": 100,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 41,
+              "spanMs": 4317,
+              "fps": 9.27,
+              "intervalMs": {
+                "p50": 116.6,
+                "p95": 200,
+                "max": 233.4
+              },
+              "shareOver20msPercent": 95,
+              "longTasks": {
+                "count": 1,
+                "totalMs": 52
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 32,
+              "spanMs": 4050,
+              "fps": 7.65,
+              "intervalMs": {
+                "p50": 133.3,
+                "p95": 216.74,
+                "max": 266.6
+              },
+              "shareOver20msPercent": 96.8,
+              "longTasks": {
+                "count": 1,
+                "totalMs": 92
+              }
+            },
+            "zoom": {
+              "frames": 47,
+              "spanMs": 4283,
+              "fps": 10.74,
+              "intervalMs": {
+                "p50": 66.7,
+                "p95": 216.5,
+                "max": 316.7
+              },
+              "shareOver20msPercent": 93.5,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 36,
+              "spanMs": 4100,
+              "fps": 8.54,
+              "intervalMs": {
+                "p50": 116.6,
+                "p95": 250.1,
+                "max": 366.6
+              },
+              "shareOver20msPercent": 94.3,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 46,
+              "spanMs": 4216,
+              "fps": 10.67,
+              "intervalMs": {
+                "p50": 83.3,
+                "p95": 200,
+                "max": 233.3
+              },
+              "shareOver20msPercent": 84.4,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          }
+        ],
+        "medianFps": {
+          "pan": 8.36,
+          "zoom": 10.67
+        },
+        "fpsRange": {
+          "pan": [
+            7.65,
+            8.54
+          ],
+          "zoom": [
+            9.27,
+            10.74
+          ]
+        }
+      },
+      "tracer": {
+        "stage": "3 points and 1 line, for contrast",
+        "runs": [
+          {
+            "pan": {
+              "frames": 43,
+              "spanMs": 4133,
+              "fps": 10.16,
+              "intervalMs": {
+                "p50": 83.3,
+                "p95": 183.4,
+                "max": 299.9
+              },
+              "shareOver20msPercent": 97.6,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 40,
+              "spanMs": 4000,
+              "fps": 9.75,
+              "intervalMs": {
+                "p50": 66.7,
+                "p95": 233.4,
+                "max": 283.3
+              },
+              "shareOver20msPercent": 92.3,
+              "longTasks": {
+                "count": 1,
+                "totalMs": 83
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 40,
+              "spanMs": 4100,
+              "fps": 9.51,
+              "intervalMs": {
+                "p50": 100,
+                "p95": 216.7,
+                "max": 216.7
+              },
+              "shareOver20msPercent": 100,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 43,
+              "spanMs": 4217,
+              "fps": 9.96,
+              "intervalMs": {
+                "p50": 83.5,
+                "p95": 183.4,
+                "max": 249.9
+              },
+              "shareOver20msPercent": 90.5,
+              "longTasks": {
+                "count": 1,
+                "totalMs": 65
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 43,
+              "spanMs": 4017,
+              "fps": 10.46,
+              "intervalMs": {
+                "p50": 83.3,
+                "p95": 200,
+                "max": 266.6
+              },
+              "shareOver20msPercent": 100,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 39,
+              "spanMs": 4117,
+              "fps": 9.23,
+              "intervalMs": {
+                "p50": 100,
+                "p95": 266.7,
+                "max": 416.6
+              },
+              "shareOver20msPercent": 92.1,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          }
+        ],
+        "medianFps": {
+          "pan": 10.16,
+          "zoom": 9.75
+        },
+        "fpsRange": {
+          "pan": [
+            9.51,
+            10.46
+          ],
+          "zoom": [
+            9.23,
+            9.96
+          ]
+        }
+      }
     },
     "limits": [
       "Software WebGL (CPU rendered): a laptop GPU is expected to do better, which is unverified here.",
-      "Only circle and line layers: no icons, labels, KPI values or alarm styling, so this is a floor on rendering cost, not a measure of the finished map.",
+      "Only circle and line layers: no icons, labels, KPI values or alarm styling.",
       "The pads are a seeded stand-in for the template's 30-pad set, which this repository cannot read."
     ],
-    "comparison": "Compare scale30 with tracer only through fpsRange: on software WebGL the run-to-run spread is as large as the difference between the views, so no cost per pad can be read from these numbers.",
-    "nfr1": "NFR-1 (60 frames per second in a laptop browser) is NOT decided by this measure; story 9 records it as unverified unless the suite is run headed on a laptop (E2E_HEADED=1)."
+    "note": "The run-to-run spread on software WebGL is recorded in docs/platform-checks.md, section \"Story 7\". NFR-1 asks for 60 frames per second in a laptop browser; the renderer this ran on is in env.renderer."
   },
   "valueBatch": {
     "label": "stand-in",
-    "method": "values.batch does not exist yet. The AD-6 envelope {v, type, id, body: {seq, full, items}} is built for the scale view's pads with three LiveValue slots per pad (comms, icon KPI, alarm count) and its JSON size is measured (UTF-8 bytes, and gzip of the same text).",
+    "method": "values.batch does not exist yet. The AD-6 envelope {v, type, id, body: {seq, full, items}} is built for the scale view's pads with three LiveValue slots per pad (comms, icon KPI, alarm count) and its JSON size is measured (UTF-8 bytes, and gzip of the same text). The pad count is the number MapLibre loaded on /scale.",
+    "env": {
+      "chromium": "153.0.8010.12",
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "softwareWebGL": true,
+      "playwright": "1.63.0",
+      "cpus": 4,
+      "platform": "linux x64",
+      "ci": false,
+      "headed": false,
+      "retriesConfigured": 0,
+      "viewport": "1440x900",
+      "attempt": 0
+    },
     "assumption": "AD-6 fixes only the LiveValue fields {value, quality, t, stale, reason}; the item layout (pad id plus three named slots) is this story's guess, unverified. Whether Perspective compresses websocket frames is unverified, so gzip is an upper bound on the saving, not the wire size.",
     "pads": 30,
     "slotsPerPad": 3,
@@ -341,8 +369,21 @@
   },
   "phone": {
     "label": "measured",
-    "method": "Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the tracer view; each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device's touch handling is unverified.",
-    "viewport": "390x844",
+    "method": "Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the tracer view; each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device's touch handling is unverified. Pan and pinch are read from the open popup's tip position (a DOM stand-in for the point's map position), not from the map's centre or zoom, which the suite cannot reach by design.",
+    "env": {
+      "chromium": "153.0.8010.12",
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "softwareWebGL": true,
+      "playwright": "1.63.0",
+      "cpus": 4,
+      "platform": "linux x64",
+      "ci": false,
+      "headed": false,
+      "retriesConfigured": 0,
+      "viewport": "390x844",
+      "attempt": 0
+    },
+    "deviceScaleFactor": 2,
     "findings": [
       {
         "check": "page-has-no-horizontal-overflow",
@@ -372,12 +413,12 @@
       {
         "check": "touch-drag-pans-the-map",
         "ok": true,
-        "detail": "canvas pixels compared before and after a CDP touch drag of 144 px (a pixel comparison, not a read of the map centre)"
+        "detail": "popup tip moved -120 px horizontally for a 120 px leftward touch drag (needs under -72); the tip is the stand-in for the point's map position"
       },
       {
         "check": "pinch-zooms-the-map",
         "ok": true,
-        "detail": "canvas pixels compared before and after a CDP pinch of scale 2 (a pixel comparison)"
+        "detail": "popup tip distance from the pinch centre grew by a factor of 2.43 for a CDP pinch of scale 2 (needs over 1.5)"
       },
       {
         "check": "line-tool-finishes-by-touch-alone",

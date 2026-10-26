@@ -3,7 +3,7 @@
 // missing view path (their own dev pages, so no Gateway restart is needed).
 
 import { TRACER, pagePixel } from '../lib/geo.mjs';
-import { expect, openMap, test } from './fixtures.mjs';
+import { WARNING_SETTLE_MS, expect, openMap, test } from './fixtures.mjs';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -27,7 +27,7 @@ test('custom view with author params, a second point, close', async ({ page, wat
     await page.locator('.maplibregl-popup-close-button').click();
     await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
     await expect(page.locator('.mapstudio-popup')).toHaveCount(0);
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(WARNING_SETTLE_MS);
     expect(watched.warnings, 'Map Studio warnings after close').toEqual([]);
 });
 
@@ -36,7 +36,7 @@ test('empty view path falls back to a text popup with no warning', async ({ page
     await clickPoint(page, map, 'p1');
     await expect(page.locator('.mapstudio-popup--text')).toContainText('p1', { timeout: 30_000 });
     await expect(page.locator('.mapstudio-popup--view')).toHaveCount(0);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(WARNING_SETTLE_MS);
     expect(watched.warnings, 'Map Studio warnings').toEqual([]);
 });
 
@@ -45,7 +45,7 @@ test('missing view falls back to text with exactly one warning naming the path',
     await clickPoint(page, map, 'p1');
     await expect(page.locator('.mapstudio-popup--text')).toContainText('p1', { timeout: 30_000 });
     await expect(page.locator('.mapstudio-popup--view')).toHaveCount(0);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(WARNING_SETTLE_MS);
     expect(watched.warnings).toHaveLength(1);
     expect(watched.warnings[0]).toContain('"Popups/Nope"');
 });

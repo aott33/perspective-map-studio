@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { project, pagePixel } from './geo.mjs';
-import { unavailable, validateMeasures } from './measures.mjs';
+import { unavailable, validateMeasures, without } from './measures.mjs';
 import { frameStats, median, percentile } from './stats.mjs';
 import { batchSize, buildValuesBatch } from './valueBatch.mjs';
 
@@ -59,17 +59,37 @@ test('project: the map centre lands on the middle of the map', () => {
 });
 
 const goodEnv = { chromium: '153', renderer: 'SwiftShader' };
-const section = { label: 'measured', method: 'm' };
+const section = { label: 'measured', method: 'm', env: goodEnv };
 
 test('validateMeasures accepts a complete file and an unavailable section', () => {
     const ok = {
         env: goodEnv,
         bundle: section,
         frameRate: unavailable('no WebGL'),
-        valueBatch: { label: 'stand-in', method: 'm' },
+        valueBatch: { label: 'stand-in', method: 'm', env: goodEnv },
         phone: section
     };
     assert.deepEqual(validateMeasures(ok), []);
+});
+
+test('validateMeasures requires label, method and env on every section', () => {
+    const base = { env: goodEnv, bundle: section, frameRate: section, valueBatch: { ...section, label: 'stand-in' }, phone: section };
+    for (const name of ['bundle', 'frameRate', 'valueBatch', 'phone']) {
+        for (const field of ['label', 'method', 'env']) {
+            const broken = { ...base, [name]: { ...base[name] } };
+            delete broken[name][field];
+            const problems = validateMeasures(broken).join('|');
+            assert.match(problems, new RegExp(`${name}: ${field === 'env' ? 'env needs' : field}`), `${name} without ${field}`);
+        }
+    }
+    const noRenderer = { ...base, phone: { ...section, env: { chromium: '153' } } };
+    assert.match(validateMeasures(noRenderer).join('|'), /phone: env needs/);
+});
+
+test('without drops the named fields and leaves the original alone', () => {
+    const m = { a: 1, generatedAt: 'x', b: 2 };
+    assert.deepEqual(without(m, ['generatedAt']), { a: 1, b: 2 });
+    assert.equal(m.generatedAt, 'x');
 });
 
 test('validateMeasures refuses an unlabelled number, a missing section and a measured values.batch', () => {

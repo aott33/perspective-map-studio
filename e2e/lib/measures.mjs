@@ -1,7 +1,7 @@
 // The measures file: shape, validation and writing. Every section is either
-// {status: 'unavailable', reason} or carries a label ('measured' or 'stand-in')
-// and the method that produced it, so nothing in the file can pass for more than
-// it is.
+// {status: 'unavailable', reason} or carries a label ('measured' or 'stand-in'),
+// the method that produced it and the environment it ran in, so nothing in the
+// file can pass for more than it is.
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -14,13 +14,13 @@ export function unavailable(reason) {
     return { status: 'unavailable', reason };
 }
 
+const hasEnv = (e) => !!e && typeof e === 'object' && typeof e.chromium === 'string' && typeof e.renderer === 'string';
+
 /** Problems with a measures object, as strings; an empty list means it is valid. */
 export function validateMeasures(m) {
     const problems = [];
     if (!m || typeof m !== 'object') return ['measures is not an object'];
-    if (!m.env || typeof m.env.renderer !== 'string' || typeof m.env.chromium !== 'string') {
-        problems.push('env needs chromium and renderer');
-    }
+    if (!hasEnv(m.env)) problems.push('env needs chromium and renderer');
     for (const name of SECTIONS) {
         const s = m[name];
         if (!s || typeof s !== 'object') {
@@ -30,6 +30,7 @@ export function validateMeasures(m) {
         } else {
             if (!LABELS.includes(s.label)) problems.push(`${name}: label must be one of ${LABELS.join(', ')}`);
             if (typeof s.method !== 'string' || s.method === '') problems.push(`${name}: method missing`);
+            if (!hasEnv(s.env)) problems.push(`${name}: env needs chromium and renderer`);
         }
     }
     if (m.valueBatch && m.valueBatch.status !== 'unavailable' && m.valueBatch.label !== 'stand-in') {
@@ -38,13 +39,15 @@ export function validateMeasures(m) {
     return problems;
 }
 
-/** Validate, then write the same JSON to every file; throws on an invalid object. */
-export function writeMeasures(m, files) {
-    const problems = validateMeasures(m);
-    if (problems.length) throw new Error('Invalid measures: ' + problems.join('; '));
-    const text = JSON.stringify(m, null, 2) + '\n';
-    for (const f of files) {
-        mkdirSync(path.dirname(f), { recursive: true });
-        writeFileSync(f, text);
-    }
+/** The measures without the named top-level fields (a copy). */
+export function without(m, fields) {
+    const copy = { ...m };
+    for (const f of fields) delete copy[f];
+    return copy;
+}
+
+/** Write the JSON to a file, creating its folder. */
+export function writeJson(m, file) {
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify(m, null, 2) + '\n');
 }

@@ -201,6 +201,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
             map.on('mouseenter', LAYER_POINTS, () => { map.getCanvas().style.cursor = 'pointer'; });
             map.on('mouseleave', LAYER_POINTS, () => { map.getCanvas().style.cursor = ''; });
             this.startTerraDraw(map, root);
+            // Readiness for the e2e suite: set once the map has gone idle with
+            // both sources and layers added, counted from MapLibre itself.
+            map.once('idle', () => this.publishReadiness(map));
         });
         this.drawControl = new DrawControl(this.toggleDrawing);
         map.addControl(this.drawControl, 'top-right');
@@ -271,6 +274,32 @@ export class MapStudio extends Component<Props, MapStudioState> {
             // cleaned up its provisional line.
             this.mapContainer.addEventListener('keydown', this.onKeyDown, true);
         }
+    }
+
+    /**
+     * Spike and e2e only: tell a test the map is drawn. The counts are read
+     * back from MapLibre's own sources (querySourceFeatures, unique by the
+     * feature's id property), so they prove the data reached the map, not only
+     * that the component was constructed with it.
+     */
+    private publishReadiness(map: MapLibreMap): void {
+        const el = this.mapContainer;
+        if (!el || this.map !== map) {
+            return;
+        }
+        const count = (source: string): number => {
+            const ids = new Set<string>();
+            for (const f of map.querySourceFeatures(source)) {
+                const id = f.properties ? f.properties.id : undefined;
+                if (typeof id === 'string') {
+                    ids.add(id);
+                }
+            }
+            return ids.size;
+        };
+        el.setAttribute('data-points-loaded', String(count(SOURCE_POINTS)));
+        el.setAttribute('data-lines-loaded', String(count(SOURCE_LINE)));
+        el.setAttribute('data-map-ready', 'true');
     }
 
     private toggleDrawing = (): void => {
@@ -428,8 +457,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         return (
             <div {...this.props.emit({ classes: ['mapstudio'] })}>
                 <div className="mapstudio-map" ref={this.setMapContainer}
-                     data-test-set={this.testData.name}
-                     data-feature-count={String(this.testData.featureCount)} />
+                     data-test-set={this.testData.name} />
                 <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '')}
                      data-pending={pending ? 'true' : 'false'}
                      data-drawing={this.state.drawing ? 'true' : 'false'}
