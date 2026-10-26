@@ -64,4 +64,13 @@ if "$here/modl-verify.sh" "$work/tampered.modl" "$fp"; then
   echo "test-signing: a module with an unsigned file was accepted" >&2; exit 1
 fi
 
+echo "== negative: a signed module whose certificates.p7b is a bare PEM certificate is refused"
+mkdir "$work/bare"
+(cd "$work/bare" && unzip -q "$signed" &&
+  openssl pkcs7 -inform DER -in certificates.p7b -print_certs -out cert.pem &&
+  mv cert.pem certificates.p7b && zip -q -r ../bare.modl .)
+if "$here/modl-verify.sh" "$work/bare.modl" "$fp"; then
+  echo "test-signing: a bare certificate in place of a PKCS#7 bundle was accepted" >&2; exit 1
+fi
+
 echo "test-signing: OK"

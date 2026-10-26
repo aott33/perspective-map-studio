@@ -29,6 +29,12 @@ keytool -exportcert -rfc -alias "$alias_name" -keystore "$keystore" \
   -storetype PKCS12 -storepass:env MODULE_SIGNING_KEYSTORE_PASSWORD \
   -file "$work/cert.pem"
 
+# The plugin copies this file into the module as certificates.p7b without
+# converting it, so it must already be a PKCS#7 bundle (DER, as other vendors'
+# modules ship it): a bare PEM certificate there made the template's
+# modl.py (openssl pkcs7) fail in the story 6 rehearsal.
+openssl crl2pkcs7 -nocrl -certfile "$work/cert.pem" -outform DER -out "$work/chain.p7b"
+
 # The plugin reads project properties named ignition.signing.*. Gradle does not
 # honour dotted ORG_GRADLE_PROJECT_ environment names (tested), and a -P
 # argument would put the password in the process list, so the properties go in
@@ -40,7 +46,7 @@ umask 077
 {
   echo "ignition.signing.keystoreFile=$keystore"
   echo "ignition.signing.keystorePassword=$MODULE_SIGNING_KEYSTORE_PASSWORD"
-  echo "ignition.signing.certFile=$work/cert.pem"
+  echo "ignition.signing.certFile=$work/chain.p7b"
   echo "ignition.signing.certAlias=$alias_name"
   echo "ignition.signing.certPassword=$MODULE_SIGNING_KEYSTORE_PASSWORD"
 } > gradle.properties

@@ -48,14 +48,37 @@ Do this on a trusted machine with a JDK 17 `keytool`.
 
 Limit of this setup: the secrets are repository secrets, so anyone who can push a tag to the repository can start the release workflow (it still only creates a draft, and only for a tag on `main`).
 
-## When the repo goes public or the plan allows
+## Installing through a host's module lock
 
-Move the secrets behind an environment with a required reviewer:
+A host such as `ign-scada-template` pins the release in its lock file by SHA-256 and certificate fingerprint and downloads it from the public release URL with no credential (the repository is public, so a host's `fetch` and its weekly update check work as for any public module). The lock entry for release `X.Y.Z`:
+
+```json
+{
+  "id": "com.aoindustrial.perspective.mapstudio",
+  "name": "Map Studio",
+  "version": "X.Y.Z",
+  "requiredIgnitionVersion": "8.3.0",
+  "file": "Map-Studio-X.Y.Z.modl",
+  "url": "https://github.com/aott33/perspective-flowmap/releases/download/vX.Y.Z/Map-Studio-X.Y.Z.modl",
+  "sha256": "<the release's .sha256 file>",
+  "certSha256": "<the README's Signing certificate SHA-256 line>",
+  "licence": {"name": "Apache-2.0", "commercial": false},
+  "upstream": {"type": "github", "repo": "aott33/perspective-flowmap", "asset": "Map-Studio-.*\\.modl", "tag": "vX.Y.Z"}
+}
+```
+
+Take `sha256` from the published release's `.sha256` file, `certSha256` from the README, and check both against the downloaded file with the host's own tool (`modl.py inspect`) and `scripts/ci/modl-verify.sh` before writing the entry. The rehearsal that proved this path is in [docs/template-install.md](docs/template-install.md).
+
+## Release approval (optional)
+
+The repository is public. The release workflow already never publishes by itself: the owner publishing the draft is the approval. To also gate the signing job itself, the owner may add a required reviewer:
 
 1. Settings, Environments: create `release`; set yourself as required reviewer; under deployment branches and tags choose "Selected" and add the tag rule `v*`.
 2. Move `MODULE_SIGNING_KEYSTORE_B64` and `MODULE_SIGNING_KEYSTORE_PASSWORD` into the `release` environment and delete the repository copies.
 3. In `release.yml` uncomment the one line `# environment: release` on the `build-sign` job.
 4. Settings, Rules, Rulesets: add a tag ruleset that restricts creation of `v*` tags to the owner.
+
+Until then the secrets are repository secrets, and anyone who can push a tag can start the release workflow (see "Cutting a release").
 
 ## Rotation or lost key
 
@@ -63,4 +86,4 @@ A rotation is a release: generate a new certificate (setup steps 1 to 4), change
 
 ## Testing the signing path
 
-`scripts/ci/test-signing.sh` (also the `signing-check` CI job) generates a throwaway certificate in a temporary directory, signs with the same script the release uses, and checks that a wrong fingerprint or version, empty arguments, the unsigned build, a module with an unsigned file and unsafe passwords are all refused. It needs JDK 17 on `PATH`.
+`scripts/ci/test-signing.sh` (also the `signing-check` CI job) generates a throwaway certificate in a temporary directory, signs with the same script the release uses, and checks that a wrong fingerprint or version, empty arguments, the unsigned build, a module with an unsigned file, a bare certificate in place of the PKCS#7 bundle and unsafe passwords are all refused. It needs JDK 17 and openssl on `PATH`.
