@@ -22,7 +22,9 @@ public final class PostgresCheck {
 
     static final String TABLE = "mapstudio_schema_version";
     static final String CREATE = "CREATE TABLE IF NOT EXISTS " + TABLE + " (version integer NOT NULL)";
-    static final String INSERT = "INSERT INTO " + TABLE + " (version) VALUES (?)";
+    /** Idempotent: a version row is written once, however many times the lifecycle starts. */
+    static final String INSERT = "INSERT INTO " + TABLE + " (version) SELECT ? WHERE NOT EXISTS (SELECT 1 FROM "
+        + TABLE + " WHERE version = ?)";
     static final String READ = "SELECT max(version) FROM " + TABLE;
 
     private final DatasourceManager datasources;
@@ -41,11 +43,13 @@ public final class PostgresCheck {
         try (SRConnection connection = datasource.getConnection()) {
             Object serverVersion = connection.runScalarQuery("SELECT version()");
             connection.runUpdateQuery(CREATE);
-            connection.runPrepUpdate(INSERT, 1);
+            int inserted = connection.runPrepUpdate(INSERT, 1, 1);
             Object version = connection.runScalarQuery(READ);
+            Object rows = connection.runScalarQuery("SELECT count(*) FROM " + TABLE);
             return CheckResult.pass(name, String.format(
-                "connection %s (status %s): created %s, inserted 1, read back max(version)=%s; server: %s",
-                connectionName, datasource.getStatus(), TABLE, version, serverVersion));
+                "connection %s (status %s): created %s, inserted %d row(s) for version 1 (%s row(s) in the table), "
+                    + "read back max(version)=%s; server: %s",
+                connectionName, datasource.getStatus(), TABLE, inserted, rows, version, serverVersion));
         } catch (SQLException ex) {
             return CheckResult.fail(name, String.format("connection %s: %s SQLState %s: %s",
                 connectionName, ex.getClass().getSimpleName(), ex.getSQLState(), ex.getMessage()));

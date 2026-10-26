@@ -35,8 +35,9 @@ class PostgresCheckTest {
     }
 
     @Test
-    void theTableIsAMapStudioTable() {
+    void theTableIsAMapStudioTableAndTheWritesAreIdempotent() {
         assertTrue(PostgresCheck.TABLE.startsWith("mapstudio_"));
         assertTrue(PostgresCheck.CREATE.contains("IF NOT EXISTS"));
+        assertTrue(PostgresCheck.INSERT.contains("WHERE NOT EXISTS"));
     }
 }

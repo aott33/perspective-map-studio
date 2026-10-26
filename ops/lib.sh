@@ -45,14 +45,30 @@ ADMIN_USER="admin"
 ADMIN_PASS="${GATEWAY_ADMIN_PASSWORD}"
 
 # docker compose, always pointed at this folder's compose file.
-# Project name follows the container, so parallel Gateways get separate volumes.
-# With MAPSTUDIO_CHECKS=1 (ops/checks.sh) the platform checks' compose file is
-# added: PostgreSQL and the checks' Gateway config on the same compose project.
-COMPOSE=(docker compose -p "${MAPSTUDIO_CONTAINER:-mapstudio-ignition}" -f "${OPS_DIR}/docker-compose.yml")
-if [[ "${MAPSTUDIO_CHECKS:-}" == "1" ]]; then
-  COMPOSE+=(-f "${OPS_DIR}/docker-compose.checks.yml")
+# The compose project follows MAPSTUDIO_CONTAINER when set, so parallel Gateways
+# get separate volumes and networks; otherwise compose's default (this folder's
+# name, "ops") applies.
+COMPOSE=(docker compose)
+if [[ -n "${MAPSTUDIO_CONTAINER:-}" ]]; then
+  COMPOSE+=(-p "${MAPSTUDIO_CONTAINER}")
 fi
+COMPOSE+=(-f "${OPS_DIR}/docker-compose.yml")
+COMPOSE_PROJECT="${MAPSTUDIO_CONTAINER:-$(basename "${OPS_DIR}")}"
+
+# The platform checks' compose file (PostgreSQL and the checks' Gateway config on
+# the same compose project) is added with MAPSTUDIO_CHECKS=1 (ops/checks.sh), and
+# automatically while the checks stack exists for this project (its PostgreSQL
+# volume is there), so that up.sh, down.sh and logs.sh see the whole stack and
+# down.sh --purge removes it. The volume probe needs Docker; when Docker is down
+# it simply finds nothing.
 CHECKS_SECRETS_DIR="${OPS_DIR}/checks/secrets"
+checks_stack_exists() {
+  docker volume inspect "${COMPOSE_PROJECT}_postgres-data" >/dev/null 2>&1
+}
+if [[ "${MAPSTUDIO_CHECKS:-}" == "1" ]] || checks_stack_exists; then
+  COMPOSE+=(-f "${OPS_DIR}/docker-compose.checks.yml")
+  MAPSTUDIO_CHECKS=1
+fi
 
 # The PostgreSQL passwords of the platform checks: generated once into the
 # git-ignored ops/checks/secrets/ (letters and digits, no trailing newline
@@ -67,6 +83,7 @@ ensure_checks_secrets() {
   local name
   for name in pg_password pg_ro_password; do
     if [[ ! -s "${CHECKS_SECRETS_DIR}/${name}" ]]; then
+      # Letters and digits only, so the file is safe anywhere it is quoted.
       ( umask 077; head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24 \
           > "${CHECKS_SECRETS_DIR}/${name}" )
     fi

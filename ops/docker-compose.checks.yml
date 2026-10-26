@@ -56,7 +56,10 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./checks/postgres-init.sh:/docker-entrypoint-initdb.d/10-mapstudio-ro.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mapstudio -d mapstudio"]
+      # Over TCP on purpose: the image's temporary init-time server listens on
+      # the unix socket only, so a socket probe says healthy before the init
+      # scripts (mapstudio_ro) have run and before the real server is up.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U mapstudio -d mapstudio"]
       interval: 5s
       timeout: 5s
       retries: 30

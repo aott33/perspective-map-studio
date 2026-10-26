@@ -7,8 +7,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import com.inductiveautomation.ignition.common.model.values.QualifiedValue;
+import com.inductiveautomation.ignition.common.model.values.QualityCode;
 import com.inductiveautomation.ignition.common.tags.model.TagManager;
 import com.inductiveautomation.ignition.common.tags.model.TagPath;
 import com.inductiveautomation.ignition.common.tags.model.event.TagChangeEvent;
@@ -19,20 +21,35 @@ import com.inductiveautomation.ignition.common.util.LoggerEx;
 /**
  * Spike check 1: a Java tag subscription to {@code <path>/Alarm Metrics.<prop>} on
  * a tag folder and on a UDT instance. The dev project's alarm toggles every 30 s
- * from an expression, so a working subscription sees true and false within 90 s.
- * The same paths are also read once with {@code readAsync}, for the record only
- * (IA: direct reads are not supported).
+ * from an expression, so a working subscription sees true and false, each with
+ * exactly Good quality, within 90 s. The same paths are also read once with
+ * {@code readAsync}, for the record only (IA: direct reads are not supported).
  */
 public final class AlarmMetricsCheck {
 
     private static final LoggerEx log = LoggerEx.newBuilder().build("MapStudio.check.alarm-metrics");
 
     static final long WAIT_SECONDS = 90;
-    static final int EVENTS_WANTED = 2;
+
+    /** One delivered event: the value, whether its quality is exactly Good, and the words for the log. */
+    record Seen(Object value, boolean good, boolean initial, String text) {
+        static Seen of(TagChangeEvent event) {
+            QualifiedValue qv = event.getValue();
+            Object value = qv == null ? null : qv.getValue();
+            QualityCode quality = qv == null ? null : qv.getQuality();
+            boolean good = quality != null && quality.isGood() && "Good".equals(quality.getName());
+            String text = String.format("%svalue %s quality %s", event.isInitial() ? "initial " : "", value, quality);
+            return new Seen(value, good, event.isInitial(), text);
+        }
+
+        boolean isGood(boolean expected) {
+            return good && Boolean.valueOf(expected).equals(value);
+        }
+    }
 
     private final TagManager tags;
     private final Map<TagPath, TagChangeListener> listeners = new ConcurrentHashMap<>();
-    private final Map<TagPath, List<String>> seen = new ConcurrentHashMap<>();
+    private final Map<TagPath, List<Seen>> seen = new ConcurrentHashMap<>();
 
     public AlarmMetricsCheck(TagManager tags) {
         this.tags = tags;
@@ -67,7 +84,7 @@ public final class AlarmMetricsCheck {
                     parsed.get(i), qv.getValue(), qv.getQuality()));
             }
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(WAIT_SECONDS);
-            while (System.nanoTime() < deadline && !enoughEvents()) {
+            while (System.nanoTime() < deadline && !allToggled()) {
                 Thread.sleep(1000);
             }
         } catch (InterruptedException ex) {
@@ -80,36 +97,33 @@ public final class AlarmMetricsCheck {
         }
         boolean ok = true;
         for (TagPath path : parsed) {
-            List<String> events = seen.get(path);
-            long good = events.stream().filter(e -> e.contains("quality Good")).count();
-            boolean sawTrue = events.stream().anyMatch(e -> e.contains("value true"));
-            boolean sawFalse = events.stream().anyMatch(e -> e.contains("value false"));
-            boolean pathOk = good >= EVENTS_WANTED && sawTrue && sawFalse;
+            List<Seen> events = seen.get(path);
+            boolean pathOk = toggled(events);
             ok &= pathOk;
             evidence.append(String.format("subscription %s: %d events in %ds (%s)%s; ",
-                path, events.size(), WAIT_SECONDS, String.join(", ", events),
-                pathOk ? "" : " - expected at least " + EVENTS_WANTED + " Good events with true and false"));
+                path, events.size(), WAIT_SECONDS,
+                events.stream().map(Seen::text).collect(Collectors.joining(", ")),
+                pathOk ? "" : " - expected a true and a false, each with quality exactly Good"));
         }
         return ok ? CheckResult.pass(name, evidence.toString()) : CheckResult.fail(name, evidence.toString());
     }
 
     private void record(TagPath path, TagChangeEvent event) {
-        QualifiedValue qv = event.getValue();
-        String entry = String.format("%svalue %s quality %s", event.isInitial() ? "initial " : "",
-            qv == null ? null : qv.getValue(), qv == null ? null : qv.getQuality());
-        List<String> events = seen.get(path);
+        Seen entry = Seen.of(event);
+        List<Seen> events = seen.get(path);
         if (events != null) {
             events.add(entry);
         }
-        log.infof("%s -> %s", path, entry);
+        log.infof("%s -> %s", path, entry.text());
     }
 
-    private boolean enoughEvents() {
-        return seen.values().stream().allMatch(events -> {
-            boolean sawTrue = events.stream().anyMatch(e -> e.contains("value true") && e.contains("quality Good"));
-            boolean sawFalse = events.stream().anyMatch(e -> e.contains("value false") && e.contains("quality Good"));
-            return sawTrue && sawFalse;
-        });
+    /** True once a path delivered both a Good true and a Good false. */
+    static boolean toggled(List<Seen> events) {
+        return events.stream().anyMatch(e -> e.isGood(true)) && events.stream().anyMatch(e -> e.isGood(false));
+    }
+
+    private boolean allToggled() {
+        return seen.values().stream().allMatch(AlarmMetricsCheck::toggled);
     }
 
     public void unsubscribe() {

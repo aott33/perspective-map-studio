@@ -7,13 +7,14 @@
 # the module's CREATE TABLE on this connection fails with SQLState 42501, which
 # is the "missing rights" case the platform checks record (AD-21).
 #
-# The password comes from the Docker secret; it is letters and digits only
-# (ops/lib.sh generates it), so quoting it in SQL is safe.
+# The password comes from the Docker secret and is passed to psql as a variable
+# (:'pw' quotes it as a literal), never interpolated into the SQL text.
 set -eu
 
 ro_password="$(cat /run/secrets/pg_ro_password)"
 
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<SQL
-CREATE ROLE mapstudio_ro LOGIN PASSWORD '${ro_password}';
-GRANT CONNECT ON DATABASE ${POSTGRES_DB} TO mapstudio_ro;
+psql -v ON_ERROR_STOP=1 -v pw="${ro_password}" -v db="${POSTGRES_DB}" \
+    --username "${POSTGRES_USER}" --dbname "${POSTGRES_DB}" <<'SQL'
+CREATE ROLE mapstudio_ro LOGIN PASSWORD :'pw';
+GRANT CONNECT ON DATABASE :"db" TO mapstudio_ro;
 SQL
