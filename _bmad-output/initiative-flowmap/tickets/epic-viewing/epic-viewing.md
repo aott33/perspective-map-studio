@@ -2,7 +2,7 @@
 type: epic
 title: "Everyone reads live state from the map"
 parent: initiative-flowmap
-covers: ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R36", "R37"]
+covers: ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R36", "R37", "R39"]
 sources: []
 companions: []
 after: []
@@ -14,7 +14,7 @@ risk: high
 
 ## Description
 
-The map everyone opens: the one project map on a basemap, opened on a starting area, icons with comms, the icon KPI and alarms from the Alarm Metrics folder, lines with state, labels that thin out, search, and popups with the built-in alarm table and links, matching what the template's current map shows.
+The map everyone opens: the one project map on a basemap, opened on a starting area, icons with comms, the icon KPI and alarms from the Alarm Metrics folder, lines with state, labels that thin out, search, and popups (a default popup with an alarm summary, or a project's custom popup view) with links, matching what the template's current map shows.
 
 ## Outcome
 
@@ -25,7 +25,7 @@ A viewer sees each site's state and reaches its page from an alarm in two clicks
 - Two components with different starting areas show the same map items.
 - Icons and lines show comms, the icon KPI and alarm state from Ignition's alarms, refreshed in one batch per page on the project's interval.
 - Every item in the template's `docs/map.md` section 5 is met or listed for engineering review.
-- Search, popups, the alarm table and popup links work on desktop and at 390 px.
+- Search, the default popup with its alarm summary, a custom popup view and popup links work on desktop and at 390 px.
 - Pan and zoom run at 60 frames per second on the 30-pad scale set.
 - Verified on the template's test stack with the field simulator's live tags.
 

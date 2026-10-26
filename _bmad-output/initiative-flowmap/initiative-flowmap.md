@@ -28,8 +28,8 @@ Map editors build and keep a field's map in the browser and everyone reads live 
 - R3 (prd FR-3): Map item labels give way to each other as the user zooms out, ranked by the kind list, and never overlap at the starting area's zoom.
 - R4 (prd FR-33): Any user finds a map item by name or asset in a search field; choosing a result zooms to it and selects it, on a 390 px phone and by keyboard.
 - R5 (prd FR-34): The map shows everything the template's current map shows (line state, flow arrow on the selected line, shared markers within 20 m, Fit and Return, line and name toggles), checked against the template's docs/map.md section 5.
-- R6 (prd FR-4): A click or tap on a map item opens its popup with the parts its kind setup turns on, values live while open and stale values marked; a bottom sheet on a 390 px phone.
-- R7 (prd FR-5): Where enabled, the popup embeds the built-in alarm table filtered to the map item's alarms path, with acknowledging under Ignition's own permissions.
+- R6 (prd FR-4): A click or tap on a map item opens its popup: Map Studio's default popup with the parts its kind setup turns on, values live while open and stale values marked; a bottom sheet on a 390 px phone.
+- R7 (prd FR-5): Where enabled, the default popup shows an alarm summary for the map item's alarms path (counts by priority, the most important alarms in words) with a View alarms button to the project's configured alarm page; Map Studio acknowledges nothing.
 - R8 (prd FR-6): Where configured, the popup link goes to a project page or URL with placeholders filled from the clicked map item; a placeholder with no value hides the button.
 - R9 (prd FR-7): The Map Studio tools show only for the project's editing roles (full editing and phone editing named separately), and every save is refused on the Gateway without the role.
 - R10 (prd FR-8): The tools name exactly one current mode in words and a glyph, and Esc cancels drawing and returns to Select.
@@ -37,7 +37,7 @@ Map editors build and keep a field's map in the browser and everyone reads live 
 - R12 (prd FR-9): The project supplies the kind list (geometry, icon, form fields, label rank); a new kind needs no module change; a core oil and gas icon set in one minimalist style ships with the module.
 - R13 (prd FR-10): The project supplies its asset list per a documented asset contract (at least id, name, kind, base path); the tools say where the list comes from and when it is empty or incomplete.
 - R14 (prd FR-11): A map editor links or unlinks a map item to an asset; unlinked map items are allowed and counted; duplicate names for different assets are flagged, not blocked; a vanished asset or kind shows its map items as unlinked or unknown kind with the reason.
-- R15 (prd FR-12): A map editor writes a kind setup once (comms path, up to 4 KPIs with one icon KPI, alarms path, popup parts, popup link) relative to each base path, with a tag browser and an on or off switch per live value; it applies to every map item of the kind without an override; unresolved paths are reported per map item.
+- R15 (prd FR-12): A map editor writes a kind setup once (comms path, up to 4 KPIs with one icon KPI, alarms path, popup parts, popup link, optional custom popup view) relative to each base path, with a tag browser and an on or off switch per live value; it applies to every map item of the kind without an override; unresolved paths are reported per map item.
 - R16 (prd FR-13): A map editor overrides any part of the kind setup on one map item, marked as an override and resettable.
 - R17 (prd FR-14): A map editor adds a point, line or area of any kind in any order, finishing by double-click, Enter or Finish, and can do it without dragging.
 - R18 (prd FR-15): A map editor moves points, drags, inserts and deletes vertices, and splits a line at a point into two lines that keep kind and properties; every drag has a non-drag alternative.
@@ -61,6 +61,7 @@ Map editors build and keep a field's map in the browser and everyone reads live 
 - R36 (prd FR-32): The project offers none, OpenStreetMap, satellite and Mapbox basemaps; with none, map items draw on a blank background; tokens come from the secret store and must be public, restricted tokens.
 - R37 (prd NFR-1): On the template's 30-pad scale set, pan, zoom and drag run at 60 frames per second in a laptop browser and an edit shows within 100 ms, before it is saved.
 - R38 (prd NFR-3): The map and tools meet WCAG 2.2 for dragging (2.5.7), target size (24 px, 44 px on touch; 2.5.8), non-text contrast 3:1 in both themes (1.4.11) and keyboard use.
+- R39 (prd FR-37): A kind setup may name a custom popup view that opens instead of the default popup and receives the documented map item object; an example view embeds the built-in alarm table, where acknowledging follows Ignition's permissions; a missing view falls back to the default popup.
 
 ## Constraints
 

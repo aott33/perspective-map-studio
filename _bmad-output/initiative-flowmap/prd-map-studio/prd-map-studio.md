@@ -90,9 +90,9 @@ Terms such as map item, kind setup and linked are defined in section 3.
   - **Entry state:** signed in, on the map page; no editing role, so no Map Studio tools.
   - **Path:**
     1. CTB1's icon shows a normal comms glyph, an alarm glyph and a count of 2.
-    2. Riley clicks CTB1: the popup shows its details, comms and KPIs, and the built-in alarm table filtered to CTB1.
-    3. Riley acknowledges one alarm in the table and clicks "Open CTB1", which goes to `/ctb/CTB1`.
-  - **Climax:** Riley is on CTB1's own page within two clicks of seeing the alarm (acknowledging is optional and not counted).
+    2. Riley clicks CTB1: the popup shows its details, comms, KPIs and an alarm summary (2 active, the highest in words).
+    3. Riley clicks "View alarms" and lands on the project's alarm page filtered to CTB1, acknowledges one alarm there, and then opens CTB1's own page at `/ctb/CTB1`.
+  - **Climax:** Riley sees CTB1's alarms in the alarm table, or CTB1's own page through the popup link, within two clicks of seeing the alarm (acknowledging is optional and not counted).
   - **Resolution:** the map shows the new count when Riley comes back.
   - **Edge case:** CTB1's comms are lost; the icon and the popup say "Comms lost" in words, and its values show as stale, not as current.
 
@@ -112,7 +112,7 @@ Every later section, and every document built from this PRD, uses these terms ex
 
 - **Map item** - one thing on a map: a point (a pad, a station, a valve), a line (a pipeline, a route) or an area (a geofence, a region). Has a kind, a name, properties and a location, and may be linked to an asset.
 - **Kind** - the type of a map item, such as well pad or compressor station. A kind sets the item's geometry (point, line or area), its icon and its form fields. The project supplies the list of kinds.
-- **Kind setup** - the configuration shared by every map item of a kind: its comms path, KPIs, alarms path, popup contents and popup link, written relative to each item's base path.
+- **Kind setup** - the configuration shared by every map item of a kind: its comms path, KPIs, alarms path, popup contents, popup link and optional custom popup view, written relative to each item's base path.
 - **Override** - a value set on one map item that replaces its kind setup for that item only.
 - **Property** - a named value on a map item, entered in its form or imported.
 - **Vertex** - a point on a line or an area. A **midpoint handle** sits between two vertices of the selected item and adds a vertex there.
@@ -127,7 +127,7 @@ Every later section, and every document built from this PRD, uses these terms ex
 - **Base path** - the tag path of an asset, from which the kind setup's relative paths are resolved.
 - **Comms path** - the tag whose value is a map item's communication state. The project decides how that tag is computed (in the template, from each source's `Heartbeat`).
 - **KPI** - a key value shown in a map item's popup, read from a tag path. A kind setup has up to 4; one of them may be marked as the **icon KPI**, shown on the icon.
-- **Alarms path** - the place in the tag hierarchy whose alarms belong to a map item. It drives the alarm count and the popup's alarm table.
+- **Alarms path** - the place in the tag hierarchy whose alarms belong to a map item. It drives the alarm count and the popup's alarm summary.
 - **Alarm count** - the number of active alarms under an alarms path, optionally shown on the icon.
 - **Live value** - any value Map Studio reads from a tag: comms state, a KPI, an alarm count. Each is optional in the kind setup.
 - **Stale** - a value whose tag quality is not good, or any value of a map item whose comms are lost. Shown as stale, never as current.
@@ -135,8 +135,11 @@ Every later section, and every document built from this PRD, uses these terms ex
 **Viewing**
 
 - **Icon** - how a point map item is drawn: its kind's glyph, with comms state, the icon KPI and the alarm state where configured.
-- **Popup** - the panel that opens when a map item is clicked or tapped: details, comms, KPIs, the alarm table and the popup link, each optional.
-- **Alarm table** - the built-in Perspective Alarm Status Table embedded in a popup, filtered to the map item's alarms path.
+- **Popup** - the panel that opens when a map item is clicked or tapped. By default Map Studio draws it: details, comms, KPIs, the alarm summary and the popup link, each optional.
+- **Custom popup view** - a project's own Perspective view that a kind setup names to open instead of the default popup, given the map item object as its parameter.
+- **Map item object** - the documented data a custom popup view receives: the map item's id, name, kind, properties, asset id, base path and live values with their quality.
+- **Alarm summary** - the alarm part of the default popup: active counts by priority and the most important active alarms in words, with a "View alarms" button.
+- **Alarm table** - the built-in Perspective Alarm Status Table, on the project's alarm page or inside a custom popup view; the authoritative place to acknowledge.
 - **Popup link** - an optional button in a popup that goes to a project page or a URL. It may contain placeholders.
 - **Placeholder** - a name in braces in a popup link, filled from the clicked map item, for example `{asset.id}` or `{name}`.
 - **Basemap** - the map imagery under the map items: none, OpenStreetMap, satellite or Mapbox.
@@ -157,7 +160,7 @@ Every later section, and every document built from this PRD, uses these terms ex
 
 **Description:** Every user sees the map, its icons and their state, and can search it.
 
-**Engineering review:** icons, lines and popups that show state are alarm presentation. The template's engineering review (ER-27, `docs/ux.md` section 11) applies to FR-2, FR-4 to FR-6 and FR-34 before release.
+**Engineering review:** icons, lines and popups that show state are alarm presentation. The template's engineering review (ER-27, `docs/ux.md` section 11) applies to FR-2, FR-4 to FR-6, FR-34 and FR-37 before release.
 
 #### FR-1: Show the map
 
@@ -220,13 +223,23 @@ A user opens a map item's popup by clicking or tapping it; the popup shows the p
 - Values update live while the popup is open; stale values are marked stale.
 - On a 390 px phone the popup opens as a bottom sheet with a visible close button.
 
-#### FR-5: Alarm table in the popup
+#### FR-37: Custom popup view
 
-Where enabled, the popup embeds the alarm table filtered to the map item's alarms path. Realizes UJ-5. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
+A kind setup may name a project view to open instead of the default popup, as a table's row subview does; the view receives the map item object as its parameter. Realizes UJ-5. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
 
 **Consequences (testable):**
-- The table lists only alarms under the map item's alarms path.
-- Acknowledging works as in the alarm table anywhere in the project and follows Ignition's acknowledge permissions; Map Studio adds no rules.
+- A kind setup with a custom popup view opens that view, with the map item object filled, instead of the default popup.
+- The map item object's fields are documented, with an example view that embeds the alarm table filtered to the alarms path; acknowledging there follows Ignition's acknowledge permissions.
+- A custom popup view that is missing or fails to load falls back to the default popup with a message.
+
+#### FR-5: Alarm summary in the popup
+
+Where enabled, the default popup shows the alarm summary for the map item's alarms path, with a "View alarms" button to the project's alarm page, which the project setup names and which may take placeholders. Acknowledging happens in the alarm table, never in Map Studio's own popup. Realizes UJ-5.
+
+**Consequences (testable):**
+- The summary counts only alarms under the map item's alarms path and names the most important active ones in words.
+- "View alarms" goes to the configured alarm page, filled from the map item (for example `/alarms?source={asset.id}`); with no page configured, the button is hidden.
+- Map Studio acknowledges nothing itself.
 
 #### FR-6: Popup link
 
@@ -299,11 +312,11 @@ A map editor links a map item to an asset from the asset list, and can unlink it
 
 #### FR-12: Write a kind setup
 
-A map editor writes a kind's setup once: comms path, up to 4 KPIs, alarms path, popup parts and popup link, as paths relative to each map item's base path. Realizes UJ-3.
+A map editor writes a kind's setup once: comms path, up to 4 KPIs, alarms path, popup parts, popup link and an optional custom popup view, as paths relative to each map item's base path. Realizes UJ-3.
 
 **Consequences (testable):**
 - Changing a kind setup changes every map item of that kind that has no override.
-- Each live value (comms, each KPI, the alarm count, the alarm table) has its own on and off switch.
+- Each live value (comms, each KPI, the alarm count, the alarm summary) has its own on and off switch.
 - A tag browser lets the editor pick a tag instead of typing a path.
 - A path that does not resolve for a map item is reported for that map item, not silently left blank.
 
@@ -503,7 +516,7 @@ The project offers none, OpenStreetMap, satellite and Mapbox basemaps; the user 
 - **NFR-2 No Gateway call per click.** Drawing and editing run in the browser; the Gateway is called when an edit is finished, not on every click or vertex.
 - **NFR-3 Accessibility.** WCAG 2.2: a non-drag alternative for every drag (2.5.7); targets at least 24 px, 44 px on touch (2.5.8); 3:1 non-text contrast in both themes (1.4.11); the tools usable by keyboard.
 - **NFR-4 Theme.** Colours come only from the host project's theme tokens, in both the light and the dark theme; the module carries no colour of its own. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
-- **NFR-5 Security.** Editing rights are checked on the Gateway on every save (FR-7); tokens and credentials come from the project's secret store (FR-32); Map Studio writes only to its map store (section 5), and acknowledging in the alarm table is Ignition's own write (FR-5).
+- **NFR-5 Security.** Editing rights are checked on the Gateway on every save (FR-7); tokens and credentials come from the project's secret store (FR-32); Map Studio writes only to its map store (section 5), and acknowledging happens only in the alarm table, as Ignition's own write (FR-5, FR-37).
 - **NFR-6 Platform and supply chain.** Ignition 8.3 full Gateways only; not Edge Gateways. Java 17 on the Gateway; the host's Jython is untouched. The module ships as a signed `.modl` from a GitHub release, pinned by SHA-256 and certificate fingerprint in the host's module lock and baked into its private Gateway image; never a `.modl` in git. The Perspective client package versions are pinned to the Gateway version, and every 8.3.x upgrade is checked on the test stack before release.
 - **NFR-7 Verified claims.** See section 10: claims tagged `[UNVERIFIED]` stay so until checked on a live 8.3 Gateway.
 - **NFR-8 Public contract.** The component's parameters and events, the asset contract, the kind list and the CSV template formats are documented and versioned; a breaking change needs a new major version. Versions follow semantic versioning.
@@ -532,7 +545,7 @@ Not a cut line: every item in 6.1 ships. The order makes Map Studio useful on th
 
 1. The spike (6.4).
 2. The map store and data: kinds, the asset contract, roles, saving (FR-7, FR-9, FR-10, FR-29 to FR-31).
-3. Viewing: the map, icons, popups, search, basemaps (FR-1 to FR-6, FR-32 to FR-34).
+3. Viewing: the map, icons, popups, search, basemaps (FR-1 to FR-6, FR-32 to FR-34, FR-37).
 4. Drawing and editing, forms, location, linking and kind setup (FR-8, FR-11 to FR-21, FR-36).
 5. Import, bulk edit, reference layer and export (FR-22 to FR-26, FR-35).
 6. Phone editing (FR-27, FR-28).
@@ -563,14 +576,14 @@ One to two days before any feature: a blank component module built from an open-
 
 **Primary**
 
-- **SM-1: It replaces the template's map pages.** The template's map and map editing run on Map Studio, the Leaflet map and drawing layer are retired, and the map lives in the map store. Validates FR-1 to FR-36.
+- **SM-1: It replaces the template's map pages.** The template's map and map editing run on Map Studio, the Leaflet map and drawing layer are retired, and the map lives in the map store. Validates FR-1 to FR-37.
 - **SM-2: A field from nothing in 30 minutes.** A map editor who has not seen the Mesa demo field (the template's sample field) lays it out (sites, pipelines split at taps, one geofence, every map item linked) with the tools alone, without help, in under 30 minutes. Validates FR-9 to FR-21.
 
 **Secondary**
 
 - **SM-3: Phone edits.** At 390 px, touch only, a pin is moved and a property edited, and both reach the map store. Validates FR-27, FR-28.
 - **SM-4: Nothing lost.** Closing the browser mid-layout and reopening on another computer loses no finished edit. Validates FR-29.
-- **SM-5: Alarm to page in two clicks.** From an icon with an alarm count, a viewer reaches the map item's own page in two clicks. Validates FR-2, FR-4 to FR-6, FR-33.
+- **SM-5: Alarm to page in two clicks.** From an icon with an alarm count, a viewer reaches the map item's own page in two clicks. Validates FR-2, FR-4 to FR-6, FR-33, FR-37.
 
 **Counter-metrics (do not optimize)**
 
@@ -608,4 +621,4 @@ Figures and limits chosen during discovery and confirmed by the owner (recorded 
 - 20 m for a shared marker (FR-34, from the template).
 - The offline place-check data adds a few megabytes to the module (addendum; an estimate).
 
-Unverified platform claims, tagged `[UNVERIFIED]` inline: FR-5, FR-6, FR-7, FR-27, FR-30, FR-32, NFR-4. Each stays unverified until checked on a live 8.3 Gateway and recorded in claude-ignition-skills (NFR-7).
+Unverified platform claims, tagged `[UNVERIFIED]` inline: FR-6, FR-7, FR-27, FR-30, FR-32, FR-37, NFR-4. Each stays unverified until checked on a live 8.3 Gateway and recorded in claude-ignition-skills (NFR-7).

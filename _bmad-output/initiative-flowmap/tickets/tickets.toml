@@ -20,7 +20,7 @@ id = 3
 slug = "epic-viewing"
 title = "Everyone reads live state from the map"
 description = "Every user sees the one project map on a basemap, opened on its starting area: icons with comms, the icon KPI and alarms, lines with state, labels, search, popups with the alarm table and links, matching the template's current map."
-covers = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R36", "R37"]
+covers = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R36", "R37", "R39"]
 after = [{ epic = 2, needs = "map items, kinds and kind setups readable from the map store" }]
 
 [[epic]]
