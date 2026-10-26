@@ -28,7 +28,7 @@ context:
 ## Boundaries & Constraints
 
 **Always:**
-- Icon ids, kebab-case, closed list. Kind icons (the sixteen FR-9 kinds plus `swd` and `separator`, and the fallback `point`): `well-pad`, `wellhead`, `tank-battery`, `compressor-station`, `booster-station`, `meter-station`, `pig-trap` (launcher or receiver), `line-valve`, `tap`, `rtu` (RTU or comms tower), `swd`, `separator`, `pipeline`, `lateral`, `lease-road`, `geofence`, `region`, `site-footprint`, `point`. State glyphs (coordinator correction 2026-10-26, owner to confirm): `comms-lost`, `stale`, `alarm-1-unacknowledged`, `alarm-1-acknowledged`, `alarm-1-rectified`, `alarm-2-unacknowledged`, `alarm-2-acknowledged`, `alarm-2-rectified`, `alarm-3` (triangle 1 for Critical and High, circle 2 for Medium, an outlined square 3 for Low in every state, the template's ER-27 set, drawn new). No kind icon's outline is a circle, square or triangle.
+- Icon ids, kebab-case, closed list. Kind icons (the sixteen FR-9 kinds plus `swd` and `separator`, and the fallback `point`): `well-pad`, `wellhead`, `tank-battery`, `compressor-station`, `booster-station`, `meter-station`, `pig-trap` (launcher or receiver), `line-valve`, `tap`, `rtu` (RTU or comms tower), `swd`, `separator`, `pipeline`, `lateral`, `lease-road`, `geofence`, `region`, `site-footprint`, `point`. State glyphs (coordinator correction 2026-10-26, confirmed by the owner the same day): `comms-lost`, `stale`, `alarm-1-unacknowledged`, `alarm-1-acknowledged`, `alarm-1-rectified`, `alarm-2-unacknowledged`, `alarm-2-acknowledged`, `alarm-2-rectified`, `alarm-3` (triangle 1 for Critical and High, circle 2 for Medium, an outlined square 3 for Low in every state, the template's ER-27 set, drawn new). No kind icon's outline is a circle, square or triangle.
 - Seeds (Tabler 3.49.0 outline, modified): `meter-station` from `gauge`, `rtu` from `building-broadcast-tower`, `lease-road` from `road`, `geofence` from `fence`, `region` from `polygon`, `site-footprint` from `square-dashed`. Every other icon is drawn new for this module. Each seed is re-checked against the owner's look at review; a seed that does not fit is drawn new instead.
 - Every glyph: `viewBox="0 0 24 24"`, `stroke="currentColor"` or `fill="currentColor"` only (kind glyphs are stroke only, `fill="none"`, `stroke-width="2"`, round caps and joins; a solid alarm shape fills with `currentColor`), paint values on an allow list (`none`, `currentColor`), no colour name, no `style`, no `url()`, no text, no external reference; legible at 16 px.
 - The alarm glyphs are alarm presentation: flagged for engineering review before release (CLAUDE.md alarm rule, ER-27) in this plan, `docs/icons.md` and the contact sheet.
@@ -49,7 +49,8 @@ context:
 - State glyphs (comms lost, stale, alarm shapes by priority) are drawn in this story's sprite; the alarm shapes are flagged for engineering review before release in this plan, `docs/icons.md` and the contact sheet.
 - `swd` and `separator` are added: 19 kind icons (with `point`) plus the state glyphs. Wells by type stay assets inside a pad.
 - Marker look, for epic-viewing (this story only provides the glyphs): a neutral dot when normal and the kind glyph from zoom 14 in, matching the template's reviewed map (FR-34, template docs/map.md section 5).
-- Coordinator correction, 2026-10-26, for the owner to confirm: the owner's intent was to follow the template's reviewed alarm set, so the alarm glyphs are ER-27's (per priority unacknowledged, acknowledged, cleared and not yet acknowledged; priority 3 one outlined square, faded once acknowledged), superseding the solid and hollow wording above; shapes the template never shows are dropped.
+- Coordinator correction, 2026-10-26, confirmed by the owner the same day: the owner's intent was to follow the template's reviewed alarm set, so the alarm glyphs are ER-27's (per priority unacknowledged, acknowledged, cleared and not yet acknowledged; priority 3 one outlined square, faded once acknowledged), superseding the solid and hollow wording above; shapes the template never shows are dropped.
+- Owner, 2026-10-26: the icon look is approved, including the `pipeline` redraw and the ER-27 alarm set. The Gateway content-type check (option b) runs on story 1's Gateway after story 1 merges.
 - The plan is kept whole (about 2,700 tokens, above the 1,600 target); phase B waits for story 3.
 - Phase A's Gateway checks run on the worktree's own dev Gateway (`MAPSTUDIO_CONTAINER=ms-e2s10`, `GATEWAY_HTTP_PORT=9130`); story 1 owns the other `common/` contracts, so this story adds only the icon catalogue files there.
 
@@ -138,7 +139,7 @@ Phase A, 2026-10-26, implemented directly (no implementation subagent available 
 - Screenshots `docs/screenshots/icons-contact-sheet-1440.png` and `-390.png` were taken by `icons.spec.mjs` (`E2E_DOCS=1`, `--grep "contact sheet|catalogue"`) against a stand-in Node static server serving the built `mounted/` folder at `/res/mapstudio/` (not the Gateway); docs/icons.md says so.
 - Verification run: `node scripts/icons.mjs --check` (27 icons, licences allowed); `npx tsc --noEmit` and `npm test` in `web/` (6 suites, 39 tests passed); `./gradlew build` (BUILD SUCCESSFUL; `IconCatalogueTest` 6 of 6, `MapStudioDelegateTest` 6 of 6; `mounted/icons/*` inside the web jar of the `.modl`); Playwright 3 of 6 icon tests against the stand-in, passed, no horizontal scroll at 390 px.
 - Matrix audit: sprite drift and forbidden source are covered by `icons.test.ts` (ran, passed). Known, unknown and no icon are covered at the catalogue level by `IconCatalogueTest` (`resolve`, `contains`); their `map.load` status entry and log line are phase B, waiting for story 3.
-- Owner review of the look (hitl): pending.
+- Owner review of the look (hitl): approved 2026-10-26 (relayed by the coordinator), including the `pipeline` redraw and the ER-27 alarm set.
 
 Quick review fixes, 2026-10-26 (findings in the Review Triage Log):
 
@@ -164,3 +165,12 @@ Pass 1, 2026-10-26: lens `quick`, run context-free by the coordinator on commit 
 | 4 | The `sources.json` comment names OpenBridge, so the plan's `grep -ri openbridge web/icons` check fails | low | patch | Confirmed. Comment reworded; the grep finds nothing and stays in Verification. |
 | 5 | `meter-station`, `compressor-station` and `booster-station` used a circular outline, the shape reserved for alarm priority 2 (template docs/ux.md, ER-27) | high | patch | Confirmed in the SVGs. Redrawn without circles; build check for circle and square outlines on kind icons, triangles listed in docs/icons.md as a review item. |
 | 6 | The alarm glyphs (solid and hollow, three shapes) did not match the template's reviewed ER-27 set (unacknowledged, acknowledged, rectified; priority 3 outlined in every state) | high | patch | Confirmed against template docs/ux.md (state table) and docs/map.md section 2. Redrawn to ER-27 with 7 alarm glyphs; differences listed in docs/icons.md; engineering review flag kept. |
+
+## Acceptance status (2026-10-26)
+
+- Criterion 1 (contact sheet served by the dev Gateway, all icons at 16, 24 and 44 px in both themes, screenshot in `docs/icons.md`): the contact sheet, its two themes and the screenshots are done (stand-in static server); the Gateway part (served from `/res/mapstudio/icons/` with usable content types) is pending, and runs on story 1's Gateway after story 1 merges (owner, option b). [UNVERIFIED] until then.
+- Criterion 2 (owner approves the look, recorded with its date): met, 2026-10-26.
+- Criterion 3 (NOTICE and `sources.json` agree, no excluded source): met; `icons.mjs` checks it on every build.
+- Criterion 4 (unknown icon reported in `map.load`): phase B, after story 3.
+- Engineering review (ER-27) of every alarm glyph: still required before release.
+- Status stays `in-review` until the Gateway check and phase B are done.
