@@ -30,7 +30,8 @@ jobs:
     name: Build and sign
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # environment: release   # uncomment when the plan allows environments (RELEASING.md)
+    # The signing secrets live only in this environment, which needs the owner's approval (RELEASING.md).
+    environment: release
     permissions:
       contents: read
     outputs:
