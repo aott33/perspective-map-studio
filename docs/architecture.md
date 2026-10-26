@@ -1,6 +1,6 @@
 # Map Studio architecture
 
-This page explains how Map Studio is built, for anyone who wants to contribute. The binding rules live in the architecture spine (`_bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md`); each section below names the rules it summarises (AD-n), so you can check the detail there. When this page and the spine disagree, the spine wins.
+This page explains how Map Studio is built, for anyone who wants to contribute. The binding rules live in the architecture spine (`_bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md`); most sections below name the rules they summarise (AD-n), so you can check the detail there. When this page and the spine disagree, the spine wins.
 
 ## What Map Studio is
 
@@ -11,7 +11,7 @@ Map Studio is an Ignition 8.3 Perspective component module. It is the map of a P
 Map Studio follows a pattern called ports and adapters. The core runs on the Gateway and owns everything that matters: the map's data, every save, every role check and every tag subscription. Around it sit adapters:
 
 - **The browser** draws the map and lets people edit it. It talks only to its Gateway side, through one message contract.
-- **The host project** tells Map Studio which kinds of map items exist and which assets can be linked, through script functions it writes. It changes the map only through Map Studio's scripting API.
+- **The host project** (the Ignition project that uses Map Studio) tells it which kinds of map items exist and which assets can be linked, through script functions it writes (AD-4). It changes the map only through Map Studio's scripting API.
 
 ```mermaid
 flowchart LR
@@ -22,7 +22,7 @@ flowchart LR
   G --> T[(Tags and Alarm Metrics)]
 ```
 
-So when you add a feature, ask: does the browser need to decide this, or the Gateway? If it changes stored data or checks who may do something, it belongs on the Gateway (AD-1).
+So when you add a feature, ask: does the browser need to decide this, or the Gateway? If it changes stored data or checks who may do something, it belongs on the Gateway (AD-1). Drawing, snapping and undo stay in the browser (AD-10).
 
 ## The repository
 
@@ -36,7 +36,7 @@ So when you add a feature, ask: does the browser need to decide this, or the Gat
 | `ops/` | A local development Gateway in Docker |
 | `docs/` | The contracts, example adapters, an example custom popup view, and screenshots |
 
-Code in every folder may depend on `common/`; nothing depends on `web/` or `gateway/` internals across that line.
+`web/`, `gateway/` and `designer/` may depend on `common/`. `web/` and `gateway/` never depend on each other's internals.
 
 ## How a save works
 
@@ -65,7 +65,7 @@ sequenceDiagram
 
 ## How live values work
 
-Map Studio never subscribes to tags per user or per map item (AD-6). The Gateway keeps **one subscription per project** to every value the kind setups turn on (comms, the icon's key value and Alarm Metrics) and holds the latest values in a cache. Each open map gets one batch of changes per refresh interval, which the project sets (10 seconds by default). Each value arrives in one shape: the value, its quality, its time, whether it is stale, and why.
+Map Studio never subscribes to tags per user or per map item (AD-6). The Gateway keeps **one subscription per project** to every value the kind setups turn on (comms, the icon's key value and Alarm Metrics) and holds the latest values in a cache. Each open map gets one batch per refresh interval, which the project sets (10 seconds by default): changes only, or the whole map on open and reconnect. Each value arrives in one shape: the value, its quality, its time, whether it is stale, and why.
 
 An open popup is the exception: its values are pushed as they change, and only while it is open (AD-7).
 
@@ -82,11 +82,12 @@ erDiagram
   PROJECT_MAP ||--o{ MAP_ITEM : holds
   PROJECT_MAP ||--o{ KIND_SETUP : configures
   MAP_ITEM ||--o{ EDIT_RECORD : "changed by"
+  KIND_SETUP ||--o{ MAP_ITEM : "applies to (by kind)"
   MAP_ITEM ||--o{ MAP_ITEM : "line end snaps to"
 ```
 
 - **Map item:** a closed, typed record: `{id, kind, name, geometry, properties, assetId, overrides, ends, version, deleted}`. Anything derived, such as the base path, is computed when read, never stored (AD-20).
-- **Kind setup:** one versioned row per kind, saved through the same write path. The list of kinds itself comes from the host project and is read only (AD-16).
+- **Kind setup:** one versioned row per project and kind, saved through the same write path. The list of kinds itself comes from the host project and is read only (AD-16).
 - **Snapping:** a line records what its ends snap to; moving the point moves the ends in the same batch (AD-19).
 
 ## Contracts you must not break
@@ -95,7 +96,7 @@ The component's props and events, the message contract, the map item record and 
 
 ## Conventions
 
-- Use the PRD's Glossary terms exactly ("map item", "kind setup", "base path") in code, messages and docs.
+- Use the Glossary terms of the PRD (`_bmad-output/initiative-flowmap/prd-map-studio/prd-map-studio.md`) exactly ("map item", "kind setup", "base path") in code, messages and docs.
 - Map item ids are UUID strings; coordinates are GeoJSON, longitude first; times are UTC.
 - Colours come only from the host project's theme tokens; normal state is neutral grey, and colour means a problem, always with a word or glyph (AD-11).
 - Log through `MapStudio.<area>` loggers, and never log a token, a password or a map item's properties.
@@ -104,7 +105,7 @@ The component's props and events, the message contract, the map item record and 
 
 ## Testing and proof
 
-Every documented behaviour has a Playwright test that records a screenshot, and the docs show it (AD-15). A behaviour without a passing test and screenshot is marked unverified. A release claims support for a new Ignition 8.3.x only after the template's test stack and the Playwright suite pass on it (AD-13).
+Every documented behaviour has a Playwright test that records a screenshot, and the docs show it (AD-15). A behaviour without a passing test and screenshot is marked unverified. A release claims support for a new Ignition 8.3.x only after the `ign-scada-template` test stack and the Playwright suite pass on it (AD-13).
 
 ## Releases
 
@@ -118,4 +119,4 @@ CI builds and signs the `.modl` and publishes it as a GitHub release. Projects i
 
 ## Still open
 
-The spike checks four platform questions before feature work starts: whether Java subscriptions reach Alarm Metrics, whether a component can open a project view as a popup, whether module code can call project scripts and add `system.mapstudio` functions, and whether MapLibre 6 builds with Perspective's toolchain. The spine lists each question with its fallback.
+The spike checks four platform questions before feature work starts: whether Java subscriptions reach Alarm Metrics, whether a component can open a project view as a popup, whether module code can call project scripts and add `system.mapstudio` functions, and whether MapLibre 6 builds with Perspective's toolchain. A fifth, whether Mapbox's terms allow satellite tiles in MapLibre (AD-12), is for the owner to settle. The spine lists each question with its fallback.

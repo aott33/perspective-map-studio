@@ -5,6 +5,7 @@ parent: none
 sources:
   - _bmad-output/initiative-flowmap/prd-map-studio/prd-map-studio.md
 companions:
+  - _bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md
   - _bmad-output/initiative-flowmap/prd-map-studio/addendum.md
   - _bmad-output/initiative-flowmap/brief-flowmap/brief-flowmap.md
   - _bmad-output/initiative-flowmap/brief-flowmap/addendum.md
@@ -99,6 +100,8 @@ Map editors build and keep a field's map in the browser and everyone reads live 
 - brief - _bmad-output/initiative-flowmap/brief-flowmap/brief-flowmap.md
 - research - _bmad-output/initiative-flowmap/brief-flowmap/addendum.md, current state, icons, editing libraries, map UI practices
 - glossary - _bmad-output/initiative-flowmap/prd-map-studio/prd-map-studio.md, section 3
+- architecture - _bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md, AD-1 to AD-22 (adopted companion; epics cite its AD ids)
+- contributor guide - docs/architecture.md
 
 ## Notes
 
@@ -108,7 +111,7 @@ Map editors build and keep a field's map in the browser and everyone reads live 
 - Decision: 2026-10-26 R9 belongs to epic-map-store-and-data (the Gateway-side role check); epic-editing consumes it to show or hide the tools.
 - Decision: 2026-10-26 The template cut-over is its own epic and owns the touch point on `ign-scada-template`; its work lands as template pull requests.
 - Decision: 2026-10-26 Alarm aggregation is answered from the IA 8.3 docs (an Alarm Metrics folder on tag folders and UDT instances since 8.3.0); it does not gate the spike.
-- Open question: Alarm Metrics can be bound or subscribed but not read directly, so the batched icon refresh (NFR-9) must subscribe on the Gateway; architecture decides how, and checks the reported nested-UDT and naming issues.
+- Decision: 2026-10-26 Alarm Metrics are subscribed by one shared Gateway subscription per project (architecture AD-6); the spike checks that Java subscriptions reach them.
 - Decision: 2026-10-26 Satellite basemap: Mapbox Satellite on the template's existing Mapbox token and secret; architecture checks the terms (MapTiler or Esri World Imagery if they fail).
 - Open question: Where the Map Studio tools sit on the page; a UX workshop decides.
-- Open question: How the project supplies kinds and the asset list, and in what format; architecture decides.
+- Decision: 2026-10-26 Kinds and assets come from project script functions in published shapes (architecture AD-4, AD-16).
