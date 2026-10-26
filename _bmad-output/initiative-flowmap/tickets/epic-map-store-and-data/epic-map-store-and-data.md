@@ -105,3 +105,4 @@ Every later epic reads and writes one map through one contract, and nothing is l
   - Inheritance: each project has its own map keyed by its own name, even when it inherits the setup.
   - Redundancy: proven with Gateway tests only (no redundant pair available).
 - Open question: How the delegate reads the Perspective session user's roles on the Gateway is unverified; entry 1 answers it live before the role check is built on it.
+- Proposed (pending owner approval, 2026-10-26): Entry 9 also stores and validates the kind setup's style rule and area tints (initiative R40, architecture AD-16 extension), not rendered; entry ids unchanged. If the owner has not approved it when entry 9 starts, entry 9 builds without them and a later entry adds them.

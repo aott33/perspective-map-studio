@@ -46,3 +46,5 @@ A viewer sees each site's state and reaches its page from an alarm in two clicks
 
 - Decision: 2026-10-26 Names, licence (Apache-2.0) and the Alarm Metrics answer are recorded in the initiative's Notes and apply here.
 - Waits on epic-map-store-and-data because: map items, kinds and kind setups readable from the map store.
+- Proposed (pending owner approval, 2026-10-26): Value-driven styles and area category tints (initiative R40; prd FR-38, FR-39; architecture AD-11, AD-16) are drawn here. Entry 1 in tickets/tickets.toml holds that work ahead of this epic's refinement and stays blocked by its unknown until the owner approves; refining the epic adds R40 to its covers and re-slices entry 1 with the rest, id kept.
+- Open question: Where a style rule's expression is evaluated and in which expression language (unverified); settled when this epic is refined.
