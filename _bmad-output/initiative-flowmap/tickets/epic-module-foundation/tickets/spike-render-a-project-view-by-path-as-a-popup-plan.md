@@ -3,14 +3,14 @@ title: 'Render a project view by path as a popup'
 type: 'feature'
 ticket: '4'
 created: '2026-10-26'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '0fba47cdb46cd4c75b7c24055d7b1489d41f834c'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md'
@@ -63,17 +63,17 @@ Evidence from the 8.3.10 runtime (`@inductiveautomation/perspective-client` 2.3.
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `common/src/main/resources/mapstudio.props.json` -- add `popupView: {path (format view-path, default ""), params (object, default {}, view-params extension)}` with `additionalProperties: false` -- the prop that names the view, shaped like the built-in Map's.
-- [ ] `web/typescript/popupParams.ts` -- pure helpers: `popupMountPath(viewMountPath, addressPathString)` returning `${viewMountPath}$${addressPathString}[popup]`, `popupViewParams(authorParams, point)` returning `{...authorParams, mapItem: {id, name}}`, `isFailedViewState(state)` for `notFound`, `error`, `access-denied` -- testable in node, no MapLibre or React import.
-- [ ] `web/typescript/__tests__/popupParams.test.ts` -- unit tests for the three helpers, including `mapItem` winning over an author key of the same name and an empty author object.
-- [ ] `web/typescript/PointPopup.tsx` -- React component given `store`, `path`, `params`, `point`, `onClose`: renders `View` (props as in the Code Map, `useDefaultWidth` and `useDefaultHeight` true, `onViewStateChange` to swap to the text fallback and `console.warn` with the path on a failed state) or the text fallback (`point.id`, `point.name`) when `path` is empty or the view failed.
-- [ ] `web/typescript/MapStudio.tsx` -- `MapStudioProps.popupView: {path: string; params: Record<string, unknown>}` read in `getPropsReducer` (`readString('popupView.path', '')`, `readObject('popupView.params', {})`); component state holds the open point; `onPointClick` keeps sending `point.click` and sets the open point; a `maplibregl.Popup({closeOnClick: true, closeButton: true, maxWidth: 'none'})` anchored at the point's coordinates takes an empty `div` through `setDOMContent`, and `render()` adds `ReactDOM.createPortal(<PointPopup .../>, div)` with `key` from `PageStore.instanceKeyFor(path, mountPath) + point.id`; the popup's `close` event clears the state (unmounting the View); `componentWillUnmount` removes the popup before the map.
-- [ ] `web/typescript/mapstudio.css` -- `.mapstudio .maplibregl-popup-content`, `.maplibregl-popup-tip`, `.maplibregl-popup-close-button` on `--container`, `--border`, `--label`, `--borderRadius`; `.mapstudio-popup` fallback text; a min size for the view box so a default-size view is not clipped on a 390 px phone (cap at `calc(100vw - 32px)`).
-- [ ] `ops/project/com.inductiveautomation.perspective/views/Popups/PointDetails/view.json` and `resource.json` -- a small flex view with input param `mapItem` (default `{"id": "", "name": ""}`) and labels bound to `{view.params.mapItem.id}` and `{view.params.mapItem.name}`, default size about 220 by 90.
-- [ ] `ops/project/com.inductiveautomation.perspective/views/MapStudioDev/view.json` -- set `popupView.path` to `Popups/PointDetails` and `popupView.params` to `{"source": "dev"}` on the `map` component; update the title label.
-- [ ] `ops/screenshot.mjs` -- after the click, wait for `.maplibregl-popup` containing text `p1` from the embedded view before the screenshot; keep the fail-on-console-error rule (the fallback warn must not fire on the happy path).
-- [ ] `docs/platform-checks.md` -- new: the question (architecture open question, AD-7), the method, the result on 8.3.10 with the Gateway log lines and screenshot names, the client API used, the fallback behaviour seen, and what story 9 should carry into claude-ignition-skills.
-- [ ] `docs/architecture.md`, `README.md` -- Popups section names the mechanism (`View` by path, `mapItem` parameter) and the spike-only `popupView` prop; README status and layout rows updated.
+- [x] `common/src/main/resources/mapstudio.props.json` -- add `popupView: {path (format view-path, default ""), params (object, default {}, view-params extension)}` with `additionalProperties: false` -- the prop that names the view, shaped like the built-in Map's.
+- [x] `web/typescript/popupParams.ts` -- pure helpers: `popupMountPath(viewMountPath, addressPathString)` returning `${viewMountPath}$${addressPathString}[popup]`, `popupViewParams(authorParams, point)` returning `{...authorParams, mapItem: {id, name}}`, `isFailedViewState(state)` for `notFound`, `error`, `access-denied` -- testable in node, no MapLibre or React import.
+- [x] `web/typescript/__tests__/popupParams.test.ts` -- unit tests for the three helpers, including `mapItem` winning over an author key of the same name and an empty author object.
+- [x] `web/typescript/PointPopup.tsx` -- React component given `store`, `path`, `params`, `point`, `onClose`: renders `View` (props as in the Code Map, `useDefaultWidth` and `useDefaultHeight` true, `onViewStateChange` to swap to the text fallback and `console.warn` with the path on a failed state) or the text fallback (`point.id`, `point.name`) when `path` is empty or the view failed.
+- [x] `web/typescript/MapStudio.tsx` -- `MapStudioProps.popupView: {path: string; params: Record<string, unknown>}` read in `getPropsReducer` (`readString('popupView.path', '')`, `readObject('popupView.params', {})`); component state holds the open point; `onPointClick` keeps sending `point.click` and sets the open point; a `maplibregl.Popup({closeOnClick: true, closeButton: true, maxWidth: 'none'})` anchored at the point's coordinates takes an empty `div` through `setDOMContent`, and `render()` adds `ReactDOM.createPortal(<PointPopup .../>, div)` with `key` from `PageStore.instanceKeyFor(path, mountPath) + point.id`; the popup's `close` event clears the state (unmounting the View); `componentWillUnmount` removes the popup before the map.
+- [x] `web/typescript/mapstudio.css` -- `.mapstudio .maplibregl-popup-content`, `.maplibregl-popup-tip`, `.maplibregl-popup-close-button` on `--container`, `--border`, `--label`, `--borderRadius`; `.mapstudio-popup` fallback text; a min size for the view box so a default-size view is not clipped on a 390 px phone (cap at `calc(100vw - 32px)`).
+- [x] `ops/project/com.inductiveautomation.perspective/views/Popups/PointDetails/view.json` and `resource.json` -- a small flex view with input param `mapItem` (default `{"id": "", "name": ""}`) and labels bound to `{view.params.mapItem.id}` and `{view.params.mapItem.name}`, default size about 220 by 90.
+- [x] `ops/project/com.inductiveautomation.perspective/views/MapStudioDev/view.json` -- set `popupView.path` to `Popups/PointDetails` and `popupView.params` to `{"source": "dev"}` on the `map` component; update the title label.
+- [x] `ops/screenshot.mjs` -- after the click, wait for `.maplibregl-popup` containing text `p1` from the embedded view before the screenshot; keep the fail-on-console-error rule (the fallback warn must not fire on the happy path).
+- [x] `docs/platform-checks.md` -- new: the question (architecture open question, AD-7), the method, the result on 8.3.10 with the Gateway log lines and screenshot names, the client API used, the fallback behaviour seen, and what story 9 should carry into claude-ignition-skills.
+- [x] `docs/architecture.md`, `README.md` -- Popups section names the mechanism (`View` by path, `mapItem` parameter) and the spike-only `popupView` prop; README status and layout rows updated.
 
 **Acceptance Criteria:**
 - Given a fresh `./gradlew build`, when it runs, then the `.modl` is produced, `npx tsc --noEmit` has no error and all Jest tests pass (8 existing plus the new ones).
@@ -95,6 +95,17 @@ Evidence from the 8.3.10 runtime (`@inductiveautomation/perspective-client` 2.3.
 ## Plan Change Log
 
 ## Review Triage Log
+
+Pass 1 (quick lens, 2026-10-26, a context-free sibling session `session_01AB1TSDhzVrGbfnAi8eXDYx` given the plan, the architecture rules and the diff inline): high 0, medium 1, low 4, false 0, maybe-false 1. Patched 5, deferred 1.
+
+| # | Finding | Verdict | Route | Evidence |
+|---|---|---|---|---|
+| 1 | `.maplibregl-popup { max-width }` in the stylesheet never applies: MapLibre writes `maxWidth` as an inline style, and `'none'` was passed | low | patch | Checked in MapLibre's `Popup` (inline `max-width` from the option); the popup option now carries `calc(100vw - 32px)` and the dead CSS rule is gone. The inner `.mapstudio-popup` cap stays. |
+| 2 | Acceptance criterion 3: the Gateway-side view stop on close was not read from a log line or the session page | maybe-false (would be medium if the view model leaked) | defer | The browser side is seen (view unmounted, `ViewStore.shutdown` sends `view-stop` per the typings); the Gateway logs nothing at info for a view stop and the session page needs a login the scripts do not do. Marked unverified in `docs/platform-checks.md`; entry in `deferred-work.md`. |
+| 3 | `popup-check.mjs --expect-fallback` did not assert the warning count or that it names the path | low | patch | True: it only printed the warnings. `--missing-view <path>` now requires exactly one warning naming the path; without it (empty path) no warning may appear. |
+| 4 | Portal child keyed `path + id`, not `PageStore.instanceKeyFor(path, mountPath) + id` as the plan said; every point's `View` shares one instance key and mount path | low | patch (key), rest noted | The key now follows the plan. The shared mount path is what the built-in Map does for one control slot; p1 to p2 remounted and rendered live. Whether the Gateway tells the back-to-back stop and start apart is part of finding 2. |
+| 5 | `onMapClick` typed `MapLayerMouseEvent` though registered without a layer | low | patch | Now `MapMouseEvent`; `ev.point` is all it reads. |
+| 6 | The React 18 typings cast was labelled `[live 8.3.10]` | low | patch | Split: the cast is `[client typings]`, the rendered result `[live 8.3.10]`. |
 
 ## Design Notes
 

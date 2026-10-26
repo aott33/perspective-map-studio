@@ -5,9 +5,11 @@
 // the popup; the close button removes the view. With --expect-fallback the
 // dev view must point at an empty or missing path and the text fallback is
 // checked instead (edit ops/project/.../MapStudioDev/view.json, restart with
-// ops/up.sh --no-build, run this, then restore the path and restart again).
+// ops/up.sh --no-build, run this, then restore the path and restart again):
+// with --missing-view <path> exactly one Map Studio warning naming that path
+// is required; without it (an empty path) no warning may appear.
 //
-// Usage: node ops/popup-check.mjs [--url http://localhost:9088] [--expect-fallback]
+// Usage: node ops/popup-check.mjs [--url http://localhost:9088] [--expect-fallback [--missing-view <path>]]
 //
 // Needs Playwright with its Chromium, like ops/screenshot.mjs. Exits 1 on any
 // console error or page error, and when a check fails.
@@ -20,6 +22,8 @@ const { chromium } = require('playwright');
 const argUrl = process.argv.indexOf('--url');
 const baseUrl = argUrl > -1 ? process.argv[argUrl + 1] : (process.env.GATEWAY_URL ?? 'http://localhost:9088');
 const expectFallback = process.argv.includes('--expect-fallback');
+const argMissing = process.argv.indexOf('--missing-view');
+const missingView = argMissing > -1 ? process.argv[argMissing + 1] : null;
 const session = `${baseUrl}/data/perspective/client/mapstudio-dev`;
 
 // The map's fixed view and test data (web/typescript/testData.ts), projected
@@ -77,6 +81,14 @@ async function main() {
             await page.locator('.mapstudio-popup--text').waitFor({ timeout: 30_000 });
             console.log(`fallback popup: ${await popupText()}`);
             if (await page.locator('.mapstudio-popup--view').count() !== 0) throw new Error('a view is mounted in the fallback popup');
+            await page.waitForTimeout(500);
+            if (missingView) {
+                if (warnings.length !== 1 || !warnings[0].includes(`"${missingView}"`)) {
+                    throw new Error(`expected one warning naming ${missingView}, got: ${JSON.stringify(warnings)}`);
+                }
+            } else if (warnings.length) {
+                throw new Error(`expected no warning for an empty path, got: ${warnings.join('; ')}`);
+            }
         } else {
             // The view's label shows the author param "dev" beside mapItem.
             await page.locator('.mapstudio-popup--view').filter({ hasText: 'Name: Point 1 (dev)' }).waitFor({ timeout: 30_000 });

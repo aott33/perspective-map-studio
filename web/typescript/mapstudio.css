@@ -49,11 +49,9 @@
     filter: none;
 }
 
-/* Point popup: a project view by path, or the text fallback. Token colours only. */
-.mapstudio .maplibregl-popup {
-    max-width: calc(100vw - 32px);
-}
-
+/* Point popup: a project view by path, or the text fallback. Token colours only.
+   The popup's own max-width is an inline style MapLibre writes from the Popup
+   option (MapStudio.tsx), so it is not set here. */
 .mapstudio .maplibregl-popup-content {
     padding: 0;
     background: var(--container);

@@ -7,11 +7,12 @@ import {
     ComponentProps,
     ComponentStoreDelegate,
     JsObject,
+    PageStore,
     PComponent,
     PropertyTree,
     Size2d
 } from '@inductiveautomation/perspective-client';
-import { Map as MapLibreMap, MapLayerMouseEvent, NavigationControl, Popup, setWorkerUrl } from 'maplibre-gl';
+import { Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent, NavigationControl, Popup, setWorkerUrl } from 'maplibre-gl';
 import { MESSAGE_EVENT, pointClick, readReply, replyText } from './messages';
 import { PointPopup } from './PointPopup';
 import { AuthorParams, PopupPoint, popupMountPath } from './popupParams';
@@ -227,7 +228,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * closeOnClick is not used: it runs after the layer click handler and
      * would close the popup that a click on another point has just moved.
      */
-    private onMapClick = (ev: MapLayerMouseEvent): void => {
+    private onMapClick = (ev: MapMouseEvent): void => {
         if (!this.map || !this.popup || !this.popup.isOpen()) {
             return;
         }
@@ -253,7 +254,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 closeButton: true,
                 closeOnClick: false,
                 closeOnMove: false,
-                maxWidth: 'none',
+                // MapLibre writes maxWidth as an inline style on the popup, so the
+                // phone cap lives here, not in the stylesheet.
+                maxWidth: 'calc(100vw - 32px)',
                 offset: 12
             });
             this.popup.setDOMContent(this.popupContent);
@@ -286,7 +289,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const mountPath = popupMountPath(store.viewMountPath, store.addressPathString);
         return ReactDOM.createPortal(
             <PointPopup
-                key={path + '|' + open.point.id}
+                key={PageStore.instanceKeyFor(path, mountPath) + '|' + open.point.id}
                 clientStore={store.view.page.parent}
                 parent={store}
                 path={path}
