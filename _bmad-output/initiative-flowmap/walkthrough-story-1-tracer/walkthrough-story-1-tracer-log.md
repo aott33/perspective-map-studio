@@ -34,3 +34,9 @@ Session: session_01DVAVWyHFvLKQeaRZ7Pw3zR · Timestamp: 2026-10-26T05:55:53Z
 Session: session_01DVAVWyHFvLKQeaRZ7Pw3zR · Timestamp: 2026-10-26T05:57:34Z
 
 - Result: owner accepted block 3. Owner revised the controls direction: keep top-right for now, since Perspective App Bar toggle is bottom-right; recorded in the initiative memlog with a screenshot.
+
+## 6 - review - wrap-up
+
+Session: session_01DVAVWyHFvLKQeaRZ7Pw3zR · Timestamp: 2026-10-26T05:58:53Z
+
+- Result: owner accepted block 4 and ended the walkthrough; blocks 5 to 8 not walked (owner had run and driven the build end to end). Next: commit, open the pull request, then stories 2 to 5 in parallel.

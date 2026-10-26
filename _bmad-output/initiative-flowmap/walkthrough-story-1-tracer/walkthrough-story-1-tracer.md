@@ -1,15 +1,15 @@
 # Walkthrough - story 1, the Map Studio tracer (commit c8d3ca4)
 
-A block is done only when the owner says so. Current block: 4.
+A block is done only when the owner says so. Review finished by the owner after block 4 (2026-10-26); blocks 5 to 8 were not walked.
 
 - [x] Block 1 - Intent
 - [x] Block 2 - Broad strokes
 - [x] Block 3 - The build and how the module is packaged
-- [ ] Block 4 - The component's identity and registration (current)
-- [ ] Block 5 - The round trip between browser and Gateway
-- [ ] Block 6 - Drawing the map
-- [ ] Block 7 - The dev Gateway
-- [ ] Block 8 - Periphery
+- [x] Block 4 - The component's identity and registration
+- [ ] Block 5 - The round trip between browser and Gateway (not walked)
+- [ ] Block 6 - Drawing the map (not walked)
+- [ ] Block 7 - The dev Gateway (not walked)
+- [ ] Block 8 - Periphery (not walked)
 
 ## Block 1 - Intent
 
