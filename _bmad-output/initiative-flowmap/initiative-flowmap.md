@@ -101,9 +101,10 @@ Map editors build and keep a field's map in the browser and everyone reads live 
 
 ## Notes
 
-- Open question: Which licence for the open-source release (O'Saasy considered); the owner decides before the open-source release.
-- Open question: Repository, module id and npm package names for Map Studio; the owner decides before the first signed release.
-- Open question: Which satellite basemap provider, on what terms; the architecture waits.
-- Open question: Where the Map Studio tools sit on the page; the UX specification waits.
-- Open question: How the project supplies kinds and the asset list, and in what format; the architecture waits.
-- Open question: Whether alarm counts aggregate on tag folders and UDT instances at every level in 8.3; the spike answers it; R2, R5 and R7 wait.
+- Decision: 2026-10-26 Repository `perspective-map-studio`, module id `com.aoindustrial.perspective.mapstudio`, npm `@aoindustrial/perspective-map-studio`, component `ao.mapstudio`; the owner renames the GitHub repository.
+- Decision: 2026-10-26 Licence Apache-2.0 for the open-source release; MIT stays possible until the first outside contribution, after which a switch needs every contributor's consent.
+- Decision: 2026-10-26 Alarm aggregation is answered from the IA 8.3 docs (an Alarm Metrics folder on tag folders and UDT instances since 8.3.0); it does not gate the spike.
+- Open question: Alarm Metrics can be bound or subscribed but not read directly, so the batched icon refresh (NFR-9) must subscribe on the Gateway; architecture decides how, and checks the reported nested-UDT and naming issues.
+- Open question: Satellite basemap provider (Mapbox Satellite on the template's existing token suggested; MapTiler or Esri World Imagery as alternatives); architecture checks the terms.
+- Open question: Where the Map Studio tools sit on the page; a UX workshop decides.
+- Open question: How the project supplies kinds and the asset list, and in what format; architecture decides.

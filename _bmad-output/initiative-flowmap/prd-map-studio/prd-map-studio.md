@@ -587,12 +587,12 @@ Target date for SM-1 to SM-5: end of January 2027, a target and not a deadline.
 
 ## 9. Open questions
 
-1. Which licence should the module use when it is open-sourced (MIT, as `docs/idea.md` proposed, or another)? Not blocking: decide before the open-source release.
-2. Should the repository be renamed from `perspective-flowmap` to match Map Studio, and the module id and npm package with it? Not blocking: decide before the first signed release.
+1. Licence: Apache-2.0 chosen 2026-10-26; MIT stays possible until the first outside contribution.
+2. Names chosen 2026-10-26: repository `perspective-map-studio`, module id `com.aoindustrial.perspective.mapstudio`, npm `@aoindustrial/perspective-map-studio`.
 3. Which satellite basemap provider, on what terms?
 4. Where do the Map Studio tools live on the page (a toolbar on the map, a side panel, a separate page in the same component)? For the UX specification.
 5. How does the project supply its kinds and asset list (a named query, a script, a file), and in which format? For the architecture.
-6. Do alarm counts aggregate on tag folders and UDT instances at every level in 8.3? To check in the spike.
+6. Answered 2026-10-26: Ignition 8.3 has an Alarm Metrics folder on tag folders and UDT instances (IA docs). Its values can be subscribed but not read directly, which the architecture must respect for NFR-9.
 
 ## 10. Assumptions index
 
