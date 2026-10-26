@@ -3,7 +3,7 @@ title: 'Tracer: a MapLibre map on a Perspective view, with one round trip'
 type: 'feature'
 ticket: '1'
 created: '2026-10-26'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '64d282043a05625e38871d0bfbcb31ac7fd17736'
 route: 'full'
 route_source: 'auto'
@@ -42,7 +42,7 @@ context:
 
 ## Code Map
 
-Reference repos (read only) are cloned in the session scratchpad: Mustry `refs/mustry`, IA example `refs/iaex/perspective-component`.
+Reference repos (read only, never build from inside them) are cloned at `/tmp/claude-0/-home-user/d8fcc768-17a3-54cb-a35d-639787b0aa6c/scratchpad/refs/mustry` and `/tmp/claude-0/-home-user/d8fcc768-17a3-54cb-a35d-639787b0aa6c/scratchpad/refs/iaex/perspective-component`. Environment: JDK 17 at `/usr/lib/jvm/java-17-openjdk-amd64` (default `java` is 21), the Docker daemon is running, image `inductiveautomation/ignition:8.3.10` is pulled, IA's Nexus registries are reachable, and Chromium with Playwright is pre-installed (`require('playwright')` works; do not install browsers).
 
 - Mustry `build.gradle.kts`, `settings.gradle.kts` -- root build to copy: plugin config, IA Nexus repos, numeric `moduleVersion`, `freeModule`, `skipModlSigning` unless signing properties, license file staging into module content.
 - Mustry `common/.../MustryPerspectiveComponentsModule.java`, `comp/Components.java`, `src/main/resources/*.props.json` -- descriptor builder, `BROWSER_RESOURCES` at `/res/<alias>/<Bundle>.js`, schema loading, one `Components.ALL` list.
