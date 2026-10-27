@@ -30,3 +30,9 @@ tasks.test {
     // SetupPanelTest builds the Swing form with no display.
     systemProperty("java.awt.headless", "true")
 }
+
+// Epic 2 story 16: SetupPanelRenderTest paints the form headless into PNGs when given a folder:
+// ./gradlew :designer:test --tests '*SetupPanelRenderTest' --rerun -PmapstudioScreenshots=<folder>
+tasks.test {
+    systemProperty("mapstudio.screenshots", (project.findProperty("mapstudioScreenshots") ?: "").toString())
+}

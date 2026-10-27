@@ -25,4 +25,25 @@ final class SetupCommit {
         }
         return form;
     }
+
+    /**
+     * What a project save does with a new setup (the workspace's own tab): the form to create
+     * the resource with, or a refusal when reasons are left (the save fails, no dialog).
+     */
+    static SetupForm newSetupToSave(SetupPanel draft) throws SetupRefusedException {
+        SetupForm form = draft.current();
+        Map<String, List<String>> reasons = form.reasons();
+        if (!reasons.isEmpty()) {
+            throw new SetupRefusedException(reasons);
+        }
+        return form;
+    }
+
+    /** The project browser node's words. */
+    static String nodeText(boolean hasSetup, boolean inherited, boolean newSetup) {
+        if (hasSetup) {
+            return SetupForm.msg(inherited ? "setup.node.inherited" : "setup.root");
+        }
+        return SetupForm.msg(newSetup ? "setup.node.new" : "setup.node.none");
+    }
 }

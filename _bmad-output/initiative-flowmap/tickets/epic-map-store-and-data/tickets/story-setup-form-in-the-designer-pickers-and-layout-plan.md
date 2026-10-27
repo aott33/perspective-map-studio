@@ -102,15 +102,15 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `docs/platform-checks.md` -- first, new section "Epic 2 story 16 - setup lists from the Gateway": the javap reading above, then a live probe on `ms-e2s16` (port 9138, `.env`): the Gateway half of each list (`getDatasources` names and vendors; the dev project's IdP and `getProfile(idp).getRoles()`; `getProviders()` names and `list()` of the built-in provider, names counted, never printed above debug; timings), the module RPC registered and its route; Designer lines [not verified] until the owner's session. Probe removed before commit.
-- [ ] `common/.../contract/SetupLookupRpc.java` (new) -- `@RpcInterface(packageId = "mapstudio-setup")`: `String lists(String identityProvider)` (the IdP name the Designer reads from the open project's Perspective general properties, `default` when unset) and `String secretNames(String provider)`, each a JSON reply (`SetupLists` record parsed in common, unit tested) so only `String` crosses the serializer.
-- [ ] `gateway/.../setuplookup/{SetupLookups, LookupSource, IgnitionLookupSource}.java` (new) and `MapStudioGatewayHook.getRpcImplementation` -- answers per list `ok`, `unavailable` with plain reason, or `not-listed` (roles); 5 s deadline each; no `@RunsOnClient`, and a caller whose `RpcDelegate.session()` is not a Designer is refused; never `read`.
-- [ ] `designer/.../setup/ProjectLists.java` (new, pure) -- functions from script resources (top-level `def name(` at column 0, path `a/b` to `a.b.name`, inherited included), page URLs, the project IdP name; tested on `ops/project` copies.
-- [ ] `designer/.../setup/GatewayLists.java` (new) -- the RPC client behind an interface; `SwingWorker` loading; states loading, ok, unavailable.
-- [ ] `designer/.../setup/{SetupPanel, ChipField, PickerCombo, StatusSlot}.java` -- layout and states per Decisions and EXPERIENCE.md; footer link scrolls to the first reason.
-- [ ] `SetupForm`, `SetupWorkspace`, `SetupEditor`, bundle -- as Code Map.
-- [ ] Tests: `SetupFormTest` (token split/join, warnings, every matrix row the form decides), `SetupPanelTest` headless (empty, new, discard, chips, unreachable banner, no dialog on refusal, width at most 760 at 2000 px and no horizontal scroll at 500 px), `ProjectListsTest`, `SetupLookupsTest` with a fake source (unavailable, timeout, not-listed, no value read), `SetupListsTest` in common.
-- [ ] `docs/setup.md` (`tokenSecret` as `<provider>/<name>`), `docs/setup-editor.md` (rewrite for the new form, screenshot `docs/screenshots/setup-editor.png` after the owner's check), `docs/contract.md` if it states the token form.
+- [x] `docs/platform-checks.md` -- first, new section "Epic 2 story 16 - setup lists from the Gateway": the javap reading above, then a live probe on `ms-e2s16` (port 9138, `.env`): the Gateway half of each list (`getDatasources` names and vendors; the dev project's IdP and `getProfile(idp).getRoles()`; `getProviders()` names and `list()` of the built-in provider, names counted, never printed above debug; timings), the module RPC registered and its route; Designer lines [not verified] until the owner's session. Probe removed before commit.
+- [x] `common/.../contract/SetupLookupRpc.java` (new) -- `@RpcInterface(packageId = "mapstudio-setup")`: `String lists(String identityProvider)` (the IdP name the Designer reads from the open project's Perspective general properties, `default` when unset) and `String secretNames(String provider)`, each a JSON reply (`SetupLists` record parsed in common, unit tested) so only `String` crosses the serializer.
+- [x] `gateway/.../setuplookup/{SetupLookups, LookupSource, IgnitionLookupSource}.java` (new) and `MapStudioGatewayHook.getRpcImplementation` -- answers per list `ok`, `unavailable` with plain reason, or `not-listed` (roles); 5 s deadline each; no `@RunsOnClient`, and a caller whose `RpcDelegate.session()` is not a Designer is refused; never `read`.
+- [x] `designer/.../setup/ProjectLists.java` (new, pure) -- functions from script resources (top-level `def name(` at column 0, path `a/b` to `a.b.name`, inherited included), page URLs, the project IdP name; tested on `ops/project` copies.
+- [x] `designer/.../setup/GatewayLists.java` (new) -- the RPC client behind an interface; `SwingWorker` loading; states loading, ok, unavailable.
+- [x] `designer/.../setup/{SetupPanel, ChipField, PickerCombo, StatusSlot}.java` -- layout and states per Decisions and EXPERIENCE.md; footer link scrolls to the first reason.
+- [x] `SetupForm`, `SetupWorkspace`, `SetupEditor`, bundle -- as Code Map.
+- [x] Tests: `SetupFormTest` (token split/join, warnings, every matrix row the form decides), `SetupPanelTest` headless (empty, new, discard, chips, unreachable banner, no dialog on refusal, width at most 760 at 2000 px and no horizontal scroll at 500 px), `ProjectListsTest`, `SetupLookupsTest` with a fake source (unavailable, timeout, not-listed, no value read), `SetupListsTest` in common.
+- [x] `docs/setup.md` (`tokenSecret` as `<provider>/<name>`), `docs/setup-editor.md` (rewrite for the new form, screenshot `docs/screenshots/setup-editor.png` after the owner's check), `docs/contract.md` if it states the token form.
 - [ ] (owner, hitl) Designer session below, recorded in `docs/platform-checks.md`.
 
 **Acceptance Criteria:**
@@ -121,6 +121,14 @@ context:
 ## Design Notes
 
 Why one module RPC for the Gateway lists: secrets have no platform RPC, so the module needs one anyway; putting connections and roles behind it too gives one security story, one round trip, and a Gateway half the implementer can check live with a probe, leaving the owner one Designer check. Fallback if the owner's check shows the RPC is not reachable from the Designer: platform RPCs for connections and IdPs (the Designer's own dropdowns use them), typing for secrets.
+
+## Implementation Notes
+
+- Names as built: the RPC client and loading are `SetupListSource` (interface, `Async.SWING` / `Async.DIRECT`) and `DesignerListSource`; the pickers are `PickerField` and `ChipField`; the status slot is the row's warning mark (`FormParts.Row`); colours and glyphs are `Theme`.
+- `lists(identityProvider)` takes the IdP name the Designer reads, not the project name, so the Gateway reads no project properties.
+- Live 8.3.10: `UserSourceManager.getProfile(name)` throws `IllegalArgumentException` for a missing name (not null); handled as not-listed.
+- The empty and new states are a plain tab of the workspace (the SDK's `ResourceEditor` throws for a missing resource); the workspace replaces the SDK close action, which casts the tab to `ResourceEditor`. Owner check.
+- Screenshots `docs/screenshots/setup-editor-{normal,reasons,empty,new,unreachable}.png` come from `SetupPanelRenderTest` (Swing's own look, DESIGN.md stand-in colours).
 
 ## Verification
 

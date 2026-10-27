@@ -3,9 +3,6 @@ package com.aoindustrial.perspective.mapstudio.designer.setup;
 import java.awt.BorderLayout;
 import java.nio.charset.StandardCharsets;
 
-import javax.swing.JOptionPane;
-import javax.swing.SwingUtilities;
-
 import com.inductiveautomation.ignition.common.resourcecollection.Resource;
 import com.inductiveautomation.ignition.common.resourcecollection.ResourceBuilder;
 import com.inductiveautomation.ignition.common.resourcecollection.ResourcePath;
@@ -17,17 +14,17 @@ import com.inductiveautomation.ignition.designer.tabbedworkspace.TabbedResourceW
 import com.aoindustrial.perspective.mapstudio.common.MapStudioModule;
 
 /**
- * The setup editor tab (epic 2 story 7): a {@link SetupPanel} on the project's one
- * setup resource. A save with reasons left is refused with them and writes
- * nothing; a read-only setup is never written.
+ * The setup editor tab (epic 2 stories 7 and 16): a {@link SetupPanel} on the project's one
+ * setup resource. A save with reasons left is refused and writes nothing; the refusal fails the
+ * project save with the Designer's own save failure and no Map Studio dialog (owner, 2026-10-27);
+ * a read-only setup is never written.
  *
  * <p>SDK behaviour read from the 8.3.0 jars with javap, not yet seen in a Designer
- * [not verified]: {@code ResourceEditor}'s constructor reads the resource and calls
- * {@link #init} before this class's fields are set, so the panel is made in
- * {@code init}; {@code commit()} calls {@link #getObjectForSave}, skips the write
- * when {@link #isOptimizeCommits} and the object equals the one read, modifies a
- * local resource or creates this project's own copy of an inherited one, and hands
- * any exception to {@link #onCommitFailed}.
+ * [unverified]: {@code ResourceEditor}'s constructor reads the resource and calls {@link #init}
+ * before this class's fields are set, so the panel is made in {@code init}; {@code commit()}
+ * calls {@link #getObjectForSave}, skips the write when {@link #isOptimizeCommits} and the object
+ * equals the one read, and hands any exception to {@link #onCommitFailed}, whose throw leaves
+ * {@code commit()}.
  */
 public final class SetupEditor extends ResourceEditor<SetupForm> {
 
@@ -63,7 +60,7 @@ public final class SetupEditor extends ResourceEditor<SetupForm> {
             // No edit callback: ResourceEditor has no dirty flag to raise. The project save
             // commits this tab (MapStudioDesignerHook.notifyProjectSaveStart) and commit()
             // compares the form with the one read [SDK 8.3.0 javap].
-            panel = new SetupPanel(null);
+            panel = new SetupPanel(null, null, new DesignerListSource(context), SetupListSource.Async.SWING);
             setLayout(new BorderLayout());
             add(panel, BorderLayout.CENTER);
         }
@@ -92,12 +89,12 @@ public final class SetupEditor extends ResourceEditor<SetupForm> {
     @Override
     protected void onCommitFailed(Exception ex) {
         if (ex instanceof SetupRefusedException) {
-            SetupRefusedException refused = (SetupRefusedException) ex;
-            LOG.warnf("Map Studio setup of project %s not saved: %s", context.getProject().getName(),
-                refused.getMessage());
-            SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, refused.describe(),
-                SetupForm.msg("setup.refused.title"), JOptionPane.ERROR_MESSAGE));
-            return;
+            SetupRefusedException.NotSaved notSaved =
+                new SetupRefusedException.NotSaved(context.getProject().getName(), (SetupRefusedException) ex);
+            LOG.warn(notSaved.getMessage());
+            // No dialog: the reasons are beside their fields and in the footer. The throw fails
+            // the project save, which the Designer reports in its own words [unverified].
+            throw notSaved;
         }
         super.onCommitFailed(ex);
     }

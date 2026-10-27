@@ -15,6 +15,7 @@ import com.inductiveautomation.perspective.designer.DesignerComponentRegistry;
 import com.inductiveautomation.perspective.designer.api.PerspectiveDesignerInterface;
 
 import com.aoindustrial.perspective.mapstudio.common.MapStudioComponent;
+import com.aoindustrial.perspective.mapstudio.designer.setup.SetupRefusedException;
 import com.aoindustrial.perspective.mapstudio.designer.setup.SetupWorkspace;
 
 /**
@@ -54,7 +55,8 @@ public class MapStudioDesignerHook extends AbstractDesignerModuleHook {
      * each module hook here [SDK 8.3.0 javap: {@code IgnitionDesigner.getCommitTasks}];
      * nothing commits a module's {@code TabbedResourceWorkspace} for it. The SDK has no
      * dirty flag on {@code ResourceEditor}: {@code commit()} compares the form with the
-     * one read, so every save is asked and an unchanged setup writes nothing.
+     * one read, so every save is asked and an unchanged setup writes nothing. A setup with
+     * reasons left (an open tab or a new setup) fails the save here, with no Map Studio dialog.
      */
     @Override
     public void notifyProjectSaveStart(SaveContext save) throws Exception {
@@ -69,6 +71,11 @@ public class MapStudioDesignerHook extends AbstractDesignerModuleHook {
             try {
                 EventQueue.invokeAndWait(workspace::commitAll);
             } catch (InvocationTargetException ex) {
+                if (ex.getCause() instanceof SetupRefusedException.NotSaved) {
+                    // Already logged; failing here fails the project save with the Designer's own
+                    // save failure and no Map Studio dialog (owner, 2026-10-27) [unverified wording].
+                    throw (SetupRefusedException.NotSaved) ex.getCause();
+                }
                 log.error("Map Studio setup could not be committed for the project save.", ex.getCause());
             }
         }

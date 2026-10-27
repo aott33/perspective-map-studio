@@ -1,17 +1,12 @@
 package com.aoindustrial.perspective.mapstudio.designer.setup;
 
-import java.awt.BorderLayout;
-import java.awt.FlowLayout;
+import java.awt.event.ActionEvent;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Map;
 
 import javax.swing.AbstractAction;
-import javax.swing.JButton;
-import javax.swing.JDialog;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.SwingUtilities;
 import javax.swing.tree.TreePath;
 
 import com.inductiveautomation.ignition.common.model.ApplicationScope;
@@ -27,17 +22,22 @@ import com.inductiveautomation.ignition.designer.tabbedworkspace.TabbedResourceW
 import com.aoindustrial.perspective.mapstudio.common.MapStudioModule;
 
 /**
- * The Designer workspace of the project's one Map Studio setup (epic 2 story 7):
- * a "Map Studio Setup" node in the project browser that opens the setup at the
- * type folder ({@code com.aoindustrial.perspective.mapstudio/setup/}, story 1's
- * layout) in a {@link SetupEditor} tab, or offers "Create setup" when the project
- * has none. Creating goes through a dialog with the same form, and writes the
- * resource only when the form has no reasons left.
+ * The Designer workspace of the project's one Map Studio setup (epic 2 stories 7 and 16): a
+ * "Map Studio Setup" node in the project browser; double-click is the only way in (no node menu).
+ * A project with a setup opens it in a {@link SetupEditor} tab. A project with none opens a
+ * "Map Studio Setup" tab of its own holding the same {@link SetupPanel} in the empty state;
+ * Create setup fills it with the defaults, marked new, and nothing is in the project until
+ * File > Save, which creates the resource when the form has no reasons left and otherwise fails
+ * the save. Discard new setup returns to the empty state. The node reads "(none)",
+ * "(new, unsaved)" or "(inherited)" after its name.
  *
- * <p>Built from the 8.3.0 SDK signatures (javap) and IA's project-resource example;
- * whether {@code TabbedResourceWorkspace} opens a resource at the type folder is
- * not seen in a Designer yet [not verified]; the plan's fallback is a plain node
- * opening the same panel in a dialog.
+ * <p>Built from the 8.3.0 SDK (javap) and not seen in a Designer [unverified]:
+ * {@code ResourceEditor} cannot open a resource that does not exist (its constructor throws), so
+ * the empty and new states are a plain tab added to this {@code JideTabbedPane}; the workspace's
+ * close action is replaced so it closes that tab too (the SDK's casts the selected tab to
+ * {@code ResourceEditor}); the tab popup ignores a tab that is not an editor (the SDK catches the
+ * cast). Whether a resource created during {@code notifyProjectSaveStart} goes up with that same
+ * save is part of the owner's check.
  */
 public final class SetupWorkspace extends TabbedResourceWorkspace {
 
@@ -48,6 +48,9 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
     /** The one setup per project, at the type folder. */
     public static final ResourcePath SETUP_PATH = MapStudioModule.SETUP_RESOURCE_TYPE.rootPath();
 
+    private SetupPanel draft;
+    private boolean draftNew;
+
     public SetupWorkspace(DesignerContext context) {
         super(context, ResourceDescriptor.builder()
             .resourceType(MapStudioModule.SETUP_RESOURCE_TYPE)
@@ -55,6 +58,13 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
             .rootFolderText(SetupForm.msg("setup.root"))
             .scope(ApplicationScope.GATEWAY)
             .build());
+        setCloseAction(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                closeSelected();
+            }
+        });
+        refreshNode();
     }
 
     @Override
@@ -77,66 +87,132 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
     public void addNewResourceActions(ResourceFolderNode folder, JPopupMenu menu) {
     }
 
+    @Override
+    protected JPopupMenu getTabPopupMenu(ResourceEditor editor) {
+        return editor == null ? null : super.getTabPopupMenu(editor);
+    }
+
     boolean hasSetup() {
         return context.getProject().getResource(SETUP_PATH).isPresent();
     }
 
-    /** Opens the setup, or asks to create it when the project has none. */
-    void openOrCreate() {
+    /** Double-click on the node: the setup's tab, or the empty (or new) setup tab. */
+    void openSetup() {
         if (hasSetup()) {
+            removeDraftTab();
             open(SETUP_PATH);
         } else {
-            create();
+            showDraftTab();
+        }
+        refreshNode();
+    }
+
+    private void showDraftTab() {
+        if (draft == null) {
+            draft = new SetupPanel(this::refreshNode, null, new DesignerListSource(context),
+                SetupListSource.Async.SWING);
+            draft.onCreate(() -> {
+                draftNew = true;
+                draft.showNew();
+                refreshNode();
+            });
+            draft.onDiscard(() -> {
+                draftNew = false;
+                draft.showEmpty();
+                refreshNode();
+            });
+        }
+        if (indexOfComponent(draft) < 0) {
+            if (draftNew) {
+                draft.repaint();
+            } else {
+                draft.showEmpty();
+            }
+            addTab(SetupForm.msg("setup.tab"), getDescriptor().getNavRootIcon(), draft, null);
+        }
+        setSelectedComponent(draft);
+    }
+
+    private void removeDraftTab() {
+        if (draft != null && indexOfComponent(draft) >= 0) {
+            remove(draft);
         }
     }
 
-    /** The "Create setup" dialog: the form with the defaults; the resource is written only when it may be saved. */
-    void create() {
-        JDialog dialog = new JDialog(context.getFrame(), SetupForm.msg("setup.create.title"), true);
-        SetupPanel panel = new SetupPanel(null);
-        JButton save = new JButton(SetupForm.msg("setup.create.save"));
-        JButton cancel = new JButton(SetupForm.msg("setup.create.cancel"));
-        save.addActionListener(e -> {
-            SetupForm form = panel.current();
-            Map<String, List<String>> reasons = form.reasons();
-            if (!reasons.isEmpty()) {
-                JOptionPane.showMessageDialog(dialog,
-                    new SetupRefusedException(reasons).describe(),
-                    SetupForm.msg("setup.refused.title"), JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            try {
-                context.getProject().createOrModify(SETUP_PATH, builder -> builder
-                    .putData(MapStudioModule.SETUP_FILE, form.toJson().getBytes(StandardCharsets.UTF_8))
-                    .setApplicationScope(ApplicationScope.GATEWAY));
-                LOG.infof("Map Studio setup created in project %s (saved to the Gateway at the next project save).",
-                    context.getProject().getName());
-                dialog.dispose();
-                open(SETUP_PATH);
-            } catch (RuntimeException ex) {
-                LOG.error("Map Studio setup could not be created.", ex);
-                JOptionPane.showMessageDialog(dialog, ex.getMessage(), SetupForm.msg("setup.refused.title"),
-                    JOptionPane.ERROR_MESSAGE);
-            }
-        });
-        cancel.addActionListener(e -> dialog.dispose());
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        buttons.add(cancel);
-        buttons.add(save);
-        dialog.getContentPane().add(panel, BorderLayout.CENTER);
-        dialog.getContentPane().add(buttons, BorderLayout.SOUTH);
-        dialog.setSize(720, 640);
-        dialog.setLocationRelativeTo(context.getFrame());
-        dialog.setVisible(true);
+    private void closeSelected() {
+        java.awt.Component selected = getSelectedComponent();
+        if (selected instanceof ResourceEditor) {
+            close(((ResourceEditor<?>) selected).getResourcePath());
+        } else if (selected != null && selected == draft) {
+            // A new setup stays in memory (the node says "(new, unsaved)"); Discard drops it.
+            remove(draft);
+        }
     }
 
-    /** The project browser node: double-click opens or creates; the menu says which. */
+    /**
+     * Commits the open editors (story 7), then a new setup: with reasons left the save is refused
+     * (no dialog); else the resource is created in the project for this save.
+     */
+    @Override
+    public void commitAll() {
+        super.commitAll();
+        if (!draftNew || draft == null) {
+            return;
+        }
+        SetupForm form;
+        try {
+            form = SetupCommit.newSetupToSave(draft);
+        } catch (SetupRefusedException refused) {
+            SetupRefusedException.NotSaved notSaved =
+                new SetupRefusedException.NotSaved(context.getProject().getName(), refused);
+            LOG.warn(notSaved.getMessage());
+            throw notSaved;
+        }
+        context.getProject().createOrModify(SETUP_PATH, builder -> builder
+            .putData(MapStudioModule.SETUP_FILE, form.toJson().getBytes(StandardCharsets.UTF_8))
+            .setApplicationScope(ApplicationScope.GATEWAY));
+        LOG.infof("Map Studio setup created in project %s with this project save.", context.getProject().getName());
+        draftNew = false;
+        SwingUtilities.invokeLater(() -> {
+            removeDraftTab();
+            open(SETUP_PATH);
+            refreshNode();
+        });
+    }
+
+    /** The node's words: the name, and "(none)", "(new, unsaved)" or "(inherited)". */
+    String nodeText() {
+        boolean has = hasSetup();
+        return SetupCommit.nodeText(has, has && context.getProject().isInherited(SETUP_PATH), draftNew);
+    }
+
+    void refreshNode() {
+        AbstractNavTreeNode node = getRootNode();
+        if (node instanceof SetupNode) {
+            ((SetupNode) node).update(nodeText());
+        }
+    }
+
+    @Override
+    public void onActivation() {
+        super.onActivation();
+        refreshNode();
+    }
+
+    /** The project browser node: double-click opens the setup tab; no menu. */
     static final class SetupNode extends AbstractNavTreeNode {
         private final SetupWorkspace workspace;
 
         SetupNode(SetupWorkspace workspace) {
             this.workspace = workspace;
             setText(SetupForm.msg("setup.root"));
+        }
+
+        void update(String text) {
+            if (!text.equals(getText())) {
+                setText(text);
+                refresh();
+            }
         }
 
         @Override
@@ -151,19 +227,13 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
 
         @Override
         public void onDoubleClick() {
-            workspace.openOrCreate();
+            workspace.openSetup();
         }
 
+        /** No Map Studio menu on the node (owner, 2026-10-27): double-click is the only way in. */
         @Override
         protected void initPopupMenu(JPopupMenu menu, TreePath[] paths, List<AbstractNavTreeNode> selection,
                                      int modifiers) {
-            boolean exists = workspace.hasSetup();
-            menu.add(new AbstractAction(SetupForm.msg(exists ? "setup.action.open" : "setup.action.create")) {
-                @Override
-                public void actionPerformed(java.awt.event.ActionEvent e) {
-                    workspace.openOrCreate();
-                }
-            });
         }
     }
 }
