@@ -123,8 +123,9 @@ test.describe('scripting API', () => {
         expect(byName.updateAtStoredVersion.value.seq).toBe(byName.create.value.seq + 1);
         expect(byName.updateAtOldVersion.ok).toBe(false);
         expect(byName.updateAtOldVersion.error).toMatch(/^conflict: /);
-        expect(byName.delete.ok).toBe(false);
-        expect(byName.delete.error).toMatch(/^invalid: .*not supported in this version/);
+        // Deletes are supported from epic 2 story 2: the check sends a stale one, refused with conflict.
+        expect(byName.staleDelete.ok).toBe(false);
+        expect(byName.staleDelete.error).toMatch(/^conflict: /);
         expect(byName.noActor.ok).toBe(false);
         expect(byName.noActor.error).toMatch(/^invalid: applyEdits needs an actor/);
         expect(byName.unknownProject.ok).toBe(false);

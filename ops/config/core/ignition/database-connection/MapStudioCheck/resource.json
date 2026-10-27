@@ -1,0 +1,14 @@
+{
+  "scope": "A",
+  "description": "Map Studio store checks (ops/store-checks.sh): role mapstudio_check on database mapstudio_check; only the store-check project names it",
+  "version": 1,
+  "restricted": false,
+  "overridable": true,
+  "files": [
+    "config.json"
+  ],
+  "attributes": {
+    "uuid": "4f7be53a-105d-426d-8914-47a92a77691b",
+    "enabled": true
+  }
+}

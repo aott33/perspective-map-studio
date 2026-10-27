@@ -4,6 +4,8 @@
  * the reference. Pure types and readers only, unit tested in node.
  */
 
+import { HostLists, readHostLists } from './adapters';
+
 /** Public contract version these shapes belong to (AD-9). */
 export const CONTRACT_VERSION = '0.2.0-draft';
 
@@ -13,7 +15,9 @@ export const ErrorCodes = {
     ROLE: 'role',
     INVALID: 'invalid',
     STALE: 'stale',
-    STORE_UNREACHABLE: 'store-unreachable'
+    STORE_UNREACHABLE: 'store-unreachable',
+    /** Readable but not saved here: a newer map store schema, or a standby Gateway (epic 2 story 5). */
+    READ_ONLY: 'read-only'
 } as const;
 
 /** Editing levels map.load reports (AD-2). */
@@ -62,16 +66,46 @@ export interface EditBatch {
     ops: EditOp[];
 }
 
+/** The part of the project setup map.load sends the browser (optional; docs/setup.md). */
+export interface MapSetup {
+    refreshIntervalSeconds: number;
+    basemaps: string[];
+    alarmPage: string;
+}
+
 export interface MapLoadReplyBody {
     level: EditLevel;
     seq: number;
     items: MapItemRecord[];
+    /** The project's kind list, asset list (editors only) and their statuses (adapters.ts). */
+    lists: HostLists;
+    /**
+     * Why the map cannot be saved on this Gateway (epic 2 story 5); left out when it
+     * can (the Gateway sends null then).
+     */
+    readOnly?: string;
+    /** Absent from a Gateway older than epic 2 entry 6, or when it is malformed. */
+    setup?: MapSetup;
 }
 
 export interface EditsApplyReplyBody {
     batchId: string;
     seq: number;
     results: Array<{ entity: string; id: string; version: number }>;
+}
+
+/**
+ * One stale op of a refused batch (epic 2 story 2), listed in a `conflict` error body:
+ * the stored record, and who changed it last and when (ISO 8601, UTC), null when unknown.
+ */
+export interface Conflict {
+    index: number;
+    entity: string;
+    id: string;
+    baseVersion: number;
+    current: MapItemRecord | null;
+    changedBy: string | null;
+    changedAt: string | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -130,7 +164,30 @@ export function readMapLoadReply(body: Record<string, unknown>): MapLoadReplyBod
             items.push(item);
         }
     }
-    return { level, seq: body.seq, items };
+    const reply: MapLoadReplyBody = { level, seq: body.seq, items, lists: readHostLists(body) };
+    if (typeof body.readOnly === 'string' && body.readOnly !== '') {
+        reply.readOnly = body.readOnly;
+    }
+    const setup = readMapSetup(body.setup);
+    if (setup) {
+        reply.setup = setup;
+    }
+    return reply;
+}
+
+/** map.load.reply's setup, or null when it is absent or malformed (the reply stays usable). */
+export function readMapSetup(value: unknown): MapSetup | null {
+    if (!isRecord(value) || typeof value.refreshIntervalSeconds !== 'number'
+        || !Number.isInteger(value.refreshIntervalSeconds) || value.refreshIntervalSeconds < 1
+        || !Array.isArray(value.basemaps) || !value.basemaps.every((b) => typeof b === 'string')
+        || typeof value.alarmPage !== 'string') {
+        return null;
+    }
+    return {
+        refreshIntervalSeconds: value.refreshIntervalSeconds,
+        basemaps: value.basemaps as string[],
+        alarmPage: value.alarmPage
+    };
 }
 
 /** The body of an edits.apply.reply, or null when it is malformed. */
@@ -146,4 +203,28 @@ export function readEditsApplyReply(body: Record<string, unknown>): EditsApplyRe
         results.push({ entity: r.entity, id: r.id, version: r.version });
     }
     return { batchId: body.batchId, seq: body.seq, results };
+}
+
+/** The conflicts of a `conflict` error body; entries that are not conflicts are left out. */
+export function readConflicts(value: unknown): Conflict[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+    const out: Conflict[] = [];
+    for (const c of value) {
+        if (!isRecord(c) || typeof c.index !== 'number' || typeof c.entity !== 'string' || typeof c.id !== 'string'
+            || typeof c.baseVersion !== 'number') {
+            continue;
+        }
+        out.push({
+            index: c.index,
+            entity: c.entity,
+            id: c.id,
+            baseVersion: c.baseVersion,
+            current: readMapItem(c.current),
+            changedBy: typeof c.changedBy === 'string' ? c.changedBy : null,
+            changedAt: typeof c.changedAt === 'string' ? c.changedAt : null
+        });
+    }
+    return out;
 }

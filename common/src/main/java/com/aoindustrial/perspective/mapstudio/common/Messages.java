@@ -39,13 +39,20 @@ public final class Messages {
     public static final String POINT_CLICK_REPLY = "point.click.reply";
     /** Browser asks for the map: body {}. */
     public static final String MAP_LOAD = "map.load";
-    /** Body {level, seq, items: [map item record]}. */
+    /**
+     * Body {level, seq, items: [map item record], kinds, assets, adapters, readOnly: reason or null,
+     * setup?: {refreshIntervalSeconds, basemaps, alarmPage}}; {@code setup} is optional (added in
+     * 0.2.0 draft by epic 2 entry 6).
+     */
     public static final String MAP_LOAD_REPLY = "map.load.reply";
     /** Body {batchId, ops: [{op, entity, id, baseVersion, data}]}. */
     public static final String EDITS_APPLY = "edits.apply";
     /** Body {batchId, seq, results: [{entity, id, version}]}. */
     public static final String EDITS_APPLY_REPLY = "edits.apply.reply";
-    /** Body {seq, ops}. Declared in 0.2.0; sent from epic-map-store-and-data entry 4. */
+    /**
+     * Body {seq, batchId, actor, ops: [{op, entity, id, version, record}]}, record the full stored
+     * record after the op; sent to every open map of the project after each committed batch (entry 4).
+     */
     public static final String MAP_CHANGED = "map.changed";
     public static final String ERROR = "error";
 
@@ -67,10 +74,15 @@ public final class Messages {
     public static final String CODE_STALE = "stale";
     /** The map store cannot be reached: no setup, no connection, or no schema. */
     public static final String CODE_STORE_UNREACHABLE = "store-unreachable";
+    /**
+     * The map can be read but not saved here: the map store's schema is newer than
+     * this module, or this Gateway is the standby of a redundant pair (epic 2 story 5).
+     */
+    public static final String CODE_READ_ONLY = "read-only";
 
     /** Every error code of this contract version. */
     public static final Set<String> CODES =
-        Set.of(CODE_CONFLICT, CODE_ROLE, CODE_INVALID, CODE_STALE, CODE_STORE_UNREACHABLE);
+        Set.of(CODE_CONFLICT, CODE_ROLE, CODE_INVALID, CODE_STALE, CODE_STORE_UNREACHABLE, CODE_READ_ONLY);
 
     // Editing levels reported by map.load (AD-2).
     public static final String LEVEL_NONE = "none";

@@ -1,0 +1,11 @@
+{
+ "pages": {
+  "/": {
+   "viewPath": "MapStudioCheck",
+   "viewParams": {}
+  }
+ },
+ "shared": {},
+ "defaultView": "MapStudioCheck",
+ "props": {}
+}

@@ -1,7 +1,9 @@
 package com.aoindustrial.perspective.mapstudio.common.contract;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.inductiveautomation.ignition.common.gson.JsonArray;
 import com.inductiveautomation.ignition.common.gson.JsonElement;
@@ -10,7 +12,8 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
 import com.aoindustrial.perspective.mapstudio.common.Messages;
 
 /**
- * An {@code edits.apply} batch (AD-2): {@code {batchId, ops}}. All ops or none.
+ * An {@code edits.apply} batch (AD-2): {@code {batchId, ops}}. All ops or none; at most
+ * one op per id.
  */
 public record EditBatch(String batchId, List<EditOp> ops) {
 
@@ -42,15 +45,21 @@ public record EditBatch(String batchId, List<EditOp> ops) {
                 "The batch has " + array.size() + " ops; at most " + MAX_OPS + " are accepted at once.");
         }
         List<EditOp> parsed = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
         for (int i = 0; i < array.size(); i++) {
-            parsed.add(EditOp.parse(array.get(i), i));
+            EditOp op = EditOp.parse(array.get(i), i);
+            if (!seen.add(op.entity() + "|" + op.id())) {
+                throw new MapStudioException(Messages.CODE_INVALID, "Op " + i + ": " + op.id()
+                    + " is already changed by an earlier op of this batch; send one op per id.", i, op.id());
+            }
+            parsed.add(op);
         }
         return new EditBatch(id.getAsString(), List.copyOf(parsed));
     }
 
     /**
      * Refuse, before anything is written, the ops this contract version does not carry
-     * out yet: deletes (entry 2) and any kind setup op (entry 3).
+     * out yet: any kind setup op (entry 3).
      *
      * @throws MapStudioException {@code invalid} naming the first such op
      */
@@ -59,11 +68,6 @@ public record EditBatch(String batchId, List<EditOp> ops) {
             if (EditOp.ENTITY_KIND_SETUP.equals(op.entity())) {
                 throw new MapStudioException(Messages.CODE_INVALID, "Op " + op.index()
                     + ": saving kind setups is not supported in this version (" + Messages.CONTRACT_VERSION + ").",
-                    op.index(), op.id());
-            }
-            if (EditOp.DELETE.equals(op.op())) {
-                throw new MapStudioException(Messages.CODE_INVALID, "Op " + op.index()
-                    + ": deleting map items is not supported in this version (" + Messages.CONTRACT_VERSION + ").",
                     op.index(), op.id());
             }
         }

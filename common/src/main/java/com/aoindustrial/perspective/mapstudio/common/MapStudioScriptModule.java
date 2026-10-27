@@ -55,7 +55,19 @@ public abstract class MapStudioScriptModule {
         return applyEditsImpl(project, batch, actor);
     }
 
+    /**
+     * Call the project's kind function and asset function now (instead of waiting
+     * for the refresh interval) and return both statuses, {kinds, assets}. Waits for
+     * the calls to answer or time out.
+     */
+    @JythonElement(docBundlePrefix = "MapStudioScriptModule")
+    public PyObject refreshAdapters(@ScriptArg("project") String project) {
+        return refreshAdaptersImpl(project);
+    }
+
     protected abstract PyObject getMapImpl(String project);
+
+    protected abstract PyObject refreshAdaptersImpl(String project);
 
     protected abstract PyObject applyEditsImpl(String project, PyObject batch, String actor);
 }

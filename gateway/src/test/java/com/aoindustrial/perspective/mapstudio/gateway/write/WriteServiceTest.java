@@ -23,61 +23,8 @@ import com.aoindustrial.perspective.mapstudio.gateway.setup.SetupRegistry;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreState;
 
-/** The write path against {@link FakeMapStore}: every row of the plan's I/O matrix that needs no Gateway. */
-class WriteServiceTest {
-
-    static final String PROJECT = "mapstudio-dev";
-    static final String LINE = "{\"type\":\"LineString\",\"coordinates\":[[-104.99,39.74],[-104.98,39.75]]}";
-
-    FakeMapStore store;
-    SetupRegistry setups;
-    StoreState state;
-    List<ChangeHook.CommittedBatch> hooked;
-    WriteService writes;
-
-    @BeforeEach
-    void setUp() throws Exception {
-        store = new FakeMapStore();
-        setups = new SetupRegistry(s -> { });
-        setups.put(PROJECT, Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\","
-            + "\"roles\":{\"full\":[\"MapEditor\"],\"phone\":[\"MapOperator\"]}}"));
-        state = StoreState.ready();
-        hooked = new ArrayList<>();
-        writes = new WriteService(new StoreGate(setups, c -> state), store, hooked::add);
-    }
-
-    static String uuid() {
-        return UUID.randomUUID().toString();
-    }
-
-    static JsonObject batch(String batchId, String... ops) {
-        return JsonParser.parseString("{\"batchId\":\"" + batchId + "\",\"ops\":[" + String.join(",", ops) + "]}")
-            .getAsJsonObject();
-    }
-
-    static String create(String id) {
-        return "{\"op\":\"create\",\"entity\":\"item\",\"id\":\"" + id + "\",\"baseVersion\":0,"
-            + "\"data\":{\"kind\":\"line\",\"name\":\"Line 1\",\"geometry\":" + LINE + "}}";
-    }
-
-    static String update(String id, int baseVersion, String data) {
-        return "{\"op\":\"update\",\"entity\":\"item\",\"id\":\"" + id + "\",\"baseVersion\":" + baseVersion
-            + ",\"data\":" + data + "}";
-    }
-
-    EditResult save(JsonObject batch) {
-        return writes.apply(PROJECT, batch, Actor.session("mapeditor"), Messages.LEVEL_FULL);
-    }
-
-    MapStudioException refused(JsonObject batch, String level) {
-        return assertThrows(MapStudioException.class,
-            () -> writes.apply(PROJECT, batch, Actor.session("someone"), level));
-    }
-
-    void assertNothingWritten(int edits, long seq) {
-        assertEquals(edits, store.committed.edits.size(), "edit rows");
-        assertEquals(seq, store.committed.seqs.getOrDefault(PROJECT, 0L), "seq");
-    }
+/** The write path against {@link FakeMapStore}: every row of entry 1's I/O matrix that needs no Gateway. */
+class WriteServiceTest extends WriteFixture {
 
     @Test
     void editorCreatesALineAtVersionOneAndItIsRecorded() {
@@ -167,17 +114,14 @@ class WriteServiceTest {
         assertTrue(viewer.plainMessage().contains("role"));
         assertEquals(Messages.CODE_ROLE, refused(batch(uuid(), create(uuid())), Messages.LEVEL_PHONE).code());
         assertNothingWritten(0, 0);
-        assertEquals(0, store.transactions, "no transaction is opened for a refused level");
+        // Story 2: the retry lookup (a read) runs before the role check; no write transaction follows it.
+        assertEquals(2, store.transactions, "only the two retry lookups ran");
     }
 
     @Test
-    void deleteAndKindSetupOpsAreRefusedAsNotSupported() {
+    void kindSetupOpsAreRefusedAsNotSupported() {
         String id = uuid();
         save(batch(uuid(), create(id)));
-        MapStudioException delete = refused(batch(uuid(),
-            "{\"op\":\"delete\",\"entity\":\"item\",\"id\":\"" + id + "\",\"baseVersion\":1}"), Messages.LEVEL_FULL);
-        assertEquals(Messages.CODE_INVALID, delete.code());
-        assertTrue(delete.plainMessage().contains("not supported in this version"));
         MapStudioException kind = refused(batch(uuid(),
             "{\"op\":\"create\",\"entity\":\"kindSetup\",\"id\":\"pad\",\"baseVersion\":0,\"data\":{}}"),
             Messages.LEVEL_FULL);
@@ -241,10 +185,11 @@ class WriteServiceTest {
     }
 
     @Test
-    void aBatchIdAlreadySavedIsRefusedAndNothingIsWritten() {
+    void aBatchIdAlreadySavedByTheSameActorReplaysAndWritesNothingMore() {
+        // Entry 1 refused this; epic 2 story 2 replays the stored reply (WriteServiceRetryTest has the rest).
         String batchId = uuid();
-        save(batch(batchId, create(uuid())));
-        assertEquals(Messages.CODE_INVALID, refused(batch(batchId, create(uuid())), Messages.LEVEL_FULL).code());
+        EditResult first = save(batch(batchId, create(uuid())));
+        assertEquals(first, save(batch(batchId, create(uuid()))));
         assertEquals(1, store.items(PROJECT).size());
         assertNothingWritten(1, 1);
     }

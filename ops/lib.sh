@@ -49,9 +49,12 @@ if [[ -z "${MAPSTUDIO_CONTAINER:-}" ]]; then
 fi
 export MAPSTUDIO_CONTAINER
 CONTAINER_NAME="${MAPSTUDIO_CONTAINER}"
-# The dev map editor's password (user mapeditor, role MapEditor; ops/users.py), generated the same way.
-if [[ -z "${MAPSTUDIO_EDITOR_PASSWORD:-}" ]]; then
-  MAPSTUDIO_EDITOR_PASSWORD="$(python3 -I -c 'import secrets, string
+# The dev users' passwords (ops/users.py), generated the same way: the map editor
+# (user mapeditor, role MapEditor) and the phone editor (user mapoperator, role MapOperator).
+ensure_dev_password() {
+  local name="$1"
+  if [[ -z "${!name:-}" ]]; then
+    printf -v "${name}" '%s' "$(python3 -I -c 'import secrets, string
 a = string.ascii_letters + string.digits
 while True:
     v = "".join(secrets.choice(a) for _ in range(20))
@@ -59,10 +62,13 @@ while True:
             and not any(v[i] == v[i + 1] == v[i + 2] for i in range(18)):
         print(v)
         break')"
-  ( umask 077; echo "MAPSTUDIO_EDITOR_PASSWORD=${MAPSTUDIO_EDITOR_PASSWORD}" >> "${PROJECT_ROOT}/.env" )
-  chmod 600 "${PROJECT_ROOT}/.env"
-fi
-export MAPSTUDIO_EDITOR_PASSWORD
+    ( umask 077; echo "${name}=${!name}" >> "${PROJECT_ROOT}/.env" )
+    chmod 600 "${PROJECT_ROOT}/.env"
+  fi
+  export "${name?}"
+}
+ensure_dev_password MAPSTUDIO_EDITOR_PASSWORD
+ensure_dev_password MAPSTUDIO_OPERATOR_PASSWORD
 SECRETS_DIR="${OPS_DIR}/secrets"
 GATEWAY_HTTP_PORT="${GATEWAY_HTTP_PORT:-9088}"
 GATEWAY_URL="http://localhost:${GATEWAY_HTTP_PORT}"
@@ -74,6 +80,11 @@ ADMIN_PASS="${GATEWAY_ADMIN_PASSWORD}"
 # checkout's own compose project (MAPSTUDIO_CONTAINER, above), so parallel
 # Gateways get separate containers, volumes and networks.
 COMPOSE=(docker compose -p "${MAPSTUDIO_CONTAINER}" -f "${OPS_DIR}/docker-compose.yml")
+# MAPSTUDIO_STORE_CHECKS=1 (set by ops/store-checks.sh) adds the store-check project
+# mapstudio-check to the Gateway (epic 2 story 5).
+if [[ "${MAPSTUDIO_STORE_CHECKS:-}" == "1" ]]; then
+  COMPOSE+=(-f "${OPS_DIR}/docker-compose.store-checks.yml")
+fi
 
 # --- logging --------------------------------------------------------------
 if [[ -t 1 ]]; then
@@ -135,10 +146,10 @@ ensure_dev_security() {
 }
 
 # --- dev users ------------------------------------------------------------
-# Create or update the dev map editor (mapeditor, role MapEditor) and the empty
-# role MapOperator through the Gateway's SCIM routes (ops/users.py).
+# Create or update the dev map editor (mapeditor, role MapEditor) and the dev phone
+# editor (mapoperator, role MapOperator) through the Gateway's SCIM routes (ops/users.py).
 ensure_dev_users() {
-  info "Creating the dev map editor user (mapeditor, role MapEditor) ..."
+  info "Creating the dev users (mapeditor in MapEditor, mapoperator in MapOperator) ..."
   GW_URL="${GATEWAY_URL}" python3 -I "${OPS_DIR}/users.py"
 }
 

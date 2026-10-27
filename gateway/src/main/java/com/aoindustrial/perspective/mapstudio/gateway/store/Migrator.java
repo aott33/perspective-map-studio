@@ -38,17 +38,23 @@ public final class Migrator {
     static final String VERSION_TABLE_EXISTS = "SELECT to_regclass('mapstudio_schema_version') IS NOT NULL";
     static final String RECORD_VERSION = "INSERT INTO mapstudio_schema_version (version, module_version) VALUES (?, ?)";
 
-    /** The schema is newer than this module knows (AD-21: the map is read only; entry 5 builds that). */
+    /** The schema is newer than this module knows (AD-21: the map is read only, epic 2 story 5). */
     public static final class SchemaNewerException extends Exception {
         private final int found;
+        private final int known;
 
         SchemaNewerException(int found, int known) {
             super("the map store's schema version " + found + " is newer than this module knows (" + known + ")");
             this.found = found;
+            this.known = known;
         }
 
         public int found() {
             return found;
+        }
+
+        public int known() {
+            return known;
         }
     }
 
@@ -56,17 +62,58 @@ public final class Migrator {
     public record Result(List<Integer> applied, int version) {
     }
 
-    /** A statement that failed, kept so the AD-21 error line can name it. */
+    /**
+     * A statement that failed, kept so the AD-21 error line can name it: the
+     * statement, the migration it belongs to (0 for the first version read) and
+     * its ordinal among the statements of that migration's transaction (1 is
+     * {@code CREATE TABLE IF NOT EXISTS mapstudio_schema_version}, then the file's
+     * statements, then the version record; 0 for the lock and the version read,
+     * which are named but not numbered). A runtime failure is wrapped too, with no
+     * SQLState (epic 2 story 5).
+     */
     public static final class MigrationFailure extends SQLException {
         private final String statement;
+        private final int migration;
+        private final int ordinal;
+        private final int count;
 
         MigrationFailure(String statement, SQLException cause) {
-            super(cause.getMessage(), cause.getSQLState(), cause.getErrorCode(), cause);
+            this(statement, 0, 0, 0, cause);
+        }
+
+        MigrationFailure(String statement, int migration, int ordinal, int count, Throwable cause) {
+            super(cause instanceof SQLException sql ? sql.getMessage()
+                    : cause.getClass().getSimpleName() + ": " + cause.getMessage(),
+                cause instanceof SQLException sql ? sql.getSQLState() : null,
+                cause instanceof SQLException sql ? sql.getErrorCode() : 0, cause);
             this.statement = statement;
+            this.migration = migration;
+            this.ordinal = ordinal;
+            this.count = count;
         }
 
         public String statement() {
             return statement;
+        }
+
+        /** The migration whose transaction failed; 0 when the first version read failed. */
+        public int migration() {
+            return migration;
+        }
+
+        /** 1-based ordinal of the statement in the migration's transaction; 0 for the lock or the version read. */
+        public int ordinal() {
+            return ordinal;
+        }
+
+        /** How many numbered statements the migration's transaction has. */
+        public int count() {
+            return count;
+        }
+
+        /** Whether the cause is not a database error (then {@link #getSQLState()} is null). */
+        public boolean runtime() {
+            return !(getCause() instanceof SQLException);
         }
     }
 
@@ -95,7 +142,8 @@ public final class Migrator {
                 return new Result(List.of(), version);
             }
             for (Migration migration : migrations) {
-                version = beginAndReadVersion(connection);
+                int count = migration.statements().size() + 2;
+                version = beginAndReadVersion(connection, migration.version(), count);
                 if (version > migrations.size()) {
                     connection.rollback();
                     throw new SchemaNewerException(version, migrations.size());
@@ -104,15 +152,16 @@ public final class Migrator {
                     connection.commit();
                     continue;
                 }
+                int ordinal = 1;
                 for (String statement : migration.statements()) {
-                    execute(connection, statement);
+                    execute(connection, statement, migration.version(), ++ordinal, count);
                 }
                 try (PreparedStatement ps = connection.prepareStatement(RECORD_VERSION)) {
                     ps.setInt(1, migration.version());
                     ps.setString(2, moduleVersion);
                     ps.executeUpdate();
-                } catch (SQLException ex) {
-                    throw new MigrationFailure(RECORD_VERSION, ex);
+                } catch (SQLException | RuntimeException ex) {
+                    throw new MigrationFailure(RECORD_VERSION, migration.version(), count, count, ex);
                 }
                 connection.commit();
                 applied.add(migration.version());
@@ -135,37 +184,52 @@ public final class Migrator {
         }
     }
 
+    /** The newest schema version this module knows. */
+    public int known() {
+        return migrations.size();
+    }
+
+    /**
+     * The recorded schema version, 0 when the version table does not exist; no
+     * lock, no DDL, nothing changed. A standby of a redundant pair only reads
+     * (owner decision, 2026-10-26).
+     */
+    public int recordedVersion(Connection connection) throws SQLException {
+        return readVersion(connection);
+    }
+
     /** The recorded schema version, 0 when the version table does not exist; no lock, no DDL. */
     private static int readVersion(Connection connection) throws SQLException {
         try (Statement s = connection.createStatement(); ResultSet rs = s.executeQuery(VERSION_TABLE_EXISTS)) {
             if (!rs.next() || !rs.getBoolean(1)) {
                 return 0;
             }
-        } catch (SQLException ex) {
-            throw new MigrationFailure(VERSION_TABLE_EXISTS, ex);
+        } catch (SQLException | RuntimeException ex) {
+            throw new MigrationFailure(VERSION_TABLE_EXISTS, 0, 0, 0, ex);
         }
         try (Statement s = connection.createStatement(); ResultSet rs = s.executeQuery(READ_VERSION)) {
             return rs.next() ? rs.getInt(1) : 0;
-        } catch (SQLException ex) {
-            throw new MigrationFailure(READ_VERSION, ex);
+        } catch (SQLException | RuntimeException ex) {
+            throw new MigrationFailure(READ_VERSION, 0, 0, 0, ex);
         }
     }
 
-    private static int beginAndReadVersion(Connection connection) throws SQLException {
-        execute(connection, LOCK);
-        execute(connection, CREATE_VERSION_TABLE);
+    private static int beginAndReadVersion(Connection connection, int migration, int count) throws SQLException {
+        execute(connection, LOCK, migration, 0, count);
+        execute(connection, CREATE_VERSION_TABLE, migration, 1, count);
         try (Statement s = connection.createStatement(); ResultSet rs = s.executeQuery(READ_VERSION)) {
             return rs.next() ? rs.getInt(1) : 0;
-        } catch (SQLException ex) {
-            throw new MigrationFailure(READ_VERSION, ex);
+        } catch (SQLException | RuntimeException ex) {
+            throw new MigrationFailure(READ_VERSION, migration, 0, count, ex);
         }
     }
 
-    private static void execute(Connection connection, String sql) throws SQLException {
+    private static void execute(Connection connection, String sql, int migration, int ordinal, int count)
+        throws SQLException {
         try (Statement s = connection.createStatement()) {
             s.execute(sql);
-        } catch (SQLException ex) {
-            throw new MigrationFailure(sql, ex);
+        } catch (SQLException | RuntimeException ex) {
+            throw new MigrationFailure(sql, migration, ordinal, count, ex);
         }
     }
 }

@@ -14,10 +14,13 @@ import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 
 /**
  * One per runnable project: reads the project's setup resource when the project
- * starts ({@code onStartup}, seen working in the spike, docs/platform-checks.md
- * check 4) and keeps the registry in step. Reading a changed setup without a
- * restart is entry 6's ({@code onResourcesModified} is [not verified]); this
- * lifecycle already re-reads it.
+ * starts ({@code onStartup}, seen in the spike, docs/platform-checks.md check 4)
+ * and again whenever it is created, modified or deleted, so a changed setup
+ * applies with no restart. After an edit of {@code setup.json} on disk, a project
+ * scan ({@code POST /data/api/v1/scan/projects}, {@code ops/scan.sh}) calls
+ * {@code onResourcesModified} within a second; the file edit alone calls nothing
+ * [live 8.3.10, docs/platform-checks.md "Epic 2 story 6"]. A Designer save is
+ * expected to call the same hook [not verified].
  */
 public final class SetupLifecycle extends ResourceCollectionLifecycle {
 
@@ -34,7 +37,7 @@ public final class SetupLifecycle extends ResourceCollectionLifecycle {
 
     @Override
     protected void onStartup(List<Resource> resources) {
-        read(resources);
+        read(registry, project(), resources, null);
     }
 
     @Override
@@ -44,36 +47,51 @@ public final class SetupLifecycle extends ResourceCollectionLifecycle {
 
     @Override
     protected void onResourcesCreated(List<Resource> resources) {
-        read(resources);
+        read(registry, project(), resources, "resource created");
     }
 
     @Override
     protected void onResourcesModified(List<Resource> resources) {
-        read(resources);
+        read(registry, project(), resources, "resource modified");
     }
 
     @Override
     protected void onResourcesDeleted(List<ResourceId> resources) {
-        registry.remove(project());
+        deleted(registry, project(), resources);
     }
 
-    private void read(List<Resource> resources) {
+    /**
+     * Read the project's setup resource, if {@code resources} holds one, and replace
+     * the project's state: valid, or invalid with every problem. {@code cause} names
+     * the hook for the log line (null at project start).
+     */
+    static void read(SetupRegistry registry, String project, List<Resource> resources, String cause) {
         for (Resource resource : resources) {
             if (!MapStudioModule.SETUP_RESOURCE_TYPE.equals(resource.getResourceType())) {
                 continue;
             }
             Optional<String> text = resource.getData(MapStudioModule.SETUP_FILE).map(ImmutableBytes::getBytesAsString);
             if (text.isEmpty()) {
-                registry.putProblem(project(), "the setup resource " + resource.getResourcePath() + " has no "
-                    + MapStudioModule.SETUP_FILE + ".");
+                registry.putProblem(project, MapStudioModule.SETUP_FILE + " is missing from the setup resource.", cause);
                 return;
             }
-            try {
-                registry.put(project(), Setup.parse(text.get()));
-            } catch (Setup.SetupException ex) {
-                registry.putProblem(project(), ex.getMessage());
+            Setup.Reading reading = Setup.read(text.get());
+            if (reading.ok()) {
+                registry.put(project, reading.setup(), cause);
+            } else {
+                registry.putProblem(project, reading.reason(), cause);
             }
             return;
+        }
+    }
+
+    /** The setup resource was deleted: the project's state becomes missing. */
+    static void deleted(SetupRegistry registry, String project, List<ResourceId> resources) {
+        for (ResourceId id : resources) {
+            if (MapStudioModule.SETUP_RESOURCE_TYPE.equals(id.getResourceType())) {
+                registry.deleted(project);
+                return;
+            }
         }
     }
 }

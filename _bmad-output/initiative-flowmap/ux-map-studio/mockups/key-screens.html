@@ -1,0 +1,1163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map Studio Key Screens</title>
+<style>
+/*
+  Map Studio - key screens (UX workshop, final mocks, 2026-10-27)
+  Direction A "Docked studio" (chosen 2026-10-26), its tokens, CSS and stand-in UI glyphs reused
+  from editor-directions.html. One file, screen picker on top; ?s=N&v=STATE&bare=1 renders one
+  screen alone (used for the screenshots).
+  Governing decisions (.memlog.md; DESIGN.md and EXPERIENCE.md are still empty drafts):
+    1 view mode: search top-left, Needs you, Legend button, popup order, header pop-out icon
+    2 phone: one top bar, bottom sheets (ER-27), Edit inside the sheet, crosshair move, App Bar corner clear
+    3 instruments on lines (owner, 2026-10-27): per segment, worst of its two end instruments
+    4 edit: rail, list, properties (Details / Style / Link), draw toolbar, Snap off, Undo / Redo, Recent changes
+    5 bulk: shared fields only, Mixed, one undo step
+    6 kinds: order Icon, Key values, Comms, Alarms, Popup, Style rule; preview item in the kind header;
+      tag browser (owner, 2026-10-27, refined): provider dropdown, tree opened at the preview item's
+      asset folder, inside pick saved as {asset.path}/..., outside pick saved full with "Same tag for
+      every <kind>", item override saved full; empty folder, loading, provider unreachable
+    7 import: four guided steps, one undo step
+    8 first run checklist
+    9 save states: Saved, Saving..., conflict, store unreachable, busy
+
+  Theme tokens (Perspective light theme stand-ins; the module ships no colour, AD-11):
+    --neutral-10  #ffffff  panels, cards
+    --neutral-20  #eef0f2  basemap (flat light grey, no tiles)
+    --neutral-30  #e2e5e8  lease roads, dividers, hover
+    --neutral-40  #ccd1d6  borders
+    --neutral-50  #a9afb6  geofence outline, laterals
+    --neutral-60  #858c94  pipelines, dots below zoom 14
+    --neutral-70  #5f666e  secondary text, normal glyphs
+    --neutral-80  #3c4249  kind glyphs, strong text
+    --neutral-90  #1e2227  attention outline
+    --label          #1e2227  text
+    --container      #ffffff  component background
+    --callToAction   #2f6fdc  selection ring, primary buttons, snap indicator
+    --warning        #a86200  save conflict (always with glyph and words)
+    --error          #c62828  alarm priority 1 (always with triangle glyph and digit)
+  Tints are derived with color-mix from these tokens only.
+  Rules applied: normal items neutral grey; hue only for problems and always with a glyph or word;
+  comms lost and stale are words and shapes, never colour; styles come from presets, no colour pickers;
+  below zoom 14 sites are neutral dots, from 14 the kind icon; zoom top-right; bottom-right corner
+  kept clear for the Perspective App Bar toggle.
+  Icons: kind and state glyphs inlined from web/icons/src (approved set). UI chrome glyphs
+  (eye, list, layers, upload, undo...) are stand-ins drawn on the same 24 px / 2 px grid.
+*/
+:root{
+  --neutral-10:#ffffff; --neutral-20:#eef0f2; --neutral-30:#e2e5e8; --neutral-40:#ccd1d6; --neutral-50:#a9afb6;
+  --neutral-60:#858c94; --neutral-70:#5f666e; --neutral-80:#3c4249; --neutral-90:#1e2227;
+  --label:#1e2227; --container:#ffffff; --callToAction:#2f6fdc; --warning:#a86200; --error:#c62828;
+  --cta-tint:color-mix(in srgb, var(--callToAction) 12%, transparent);
+  --warn-tint:color-mix(in srgb, var(--warning) 10%, var(--container));
+  --err-tint:color-mix(in srgb, var(--error) 8%, var(--container));
+  --shadow:0 1px 2px rgba(30,34,39,.10), 0 4px 14px rgba(30,34,39,.10);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--neutral-30);color:var(--label);font:13px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+/* ---------- workshop switcher (outside the product) ---------- */
+.sw{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 16px;background:var(--neutral-90);color:var(--neutral-10)}
+.sw b{font-weight:600;margin-right:8px}
+.seg{display:inline-flex;border:1px solid var(--neutral-70);border-radius:8px;overflow:hidden}
+.seg button{background:transparent;border:0;padding:6px 12px;color:var(--neutral-40)}
+.seg button.on{background:var(--neutral-10);color:var(--neutral-90);font-weight:600}
+.sw .lbl{color:var(--neutral-50);font-size:12px}
+.wrap{padding:20px 16px 40px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.rat{max-width:1440px;width:100%;background:var(--neutral-10);border-radius:8px;padding:14px 18px;display:grid;grid-template-columns:200px 1fr;gap:16px}
+.rat h2{margin:0;font-size:16px}
+.rat p{margin:0;color:var(--neutral-80)}
+.rat .hint{grid-column:1/-1;color:var(--neutral-70);font-size:12px;border-top:1px solid var(--neutral-30);padding-top:8px}
+/* ---------- device frame: a Perspective page ---------- */
+.frame{position:relative;background:var(--container);border-radius:6px;overflow:hidden;box-shadow:0 2px 30px rgba(0,0,0,.18);display:flex;flex-direction:column;flex:none}
+.host{height:40px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid var(--neutral-30);background:var(--container)}
+.host .crumb{color:var(--neutral-70)} .host .crumb b{color:var(--label);font-weight:600}
+.host .who{margin-left:auto;color:var(--neutral-70);font-size:12px}
+.appbar{position:absolute;right:0;bottom:0;width:58px;height:22px;background:var(--neutral-80);color:var(--neutral-10);border-top-left-radius:6px;display:flex;align-items:center;justify-content:center;gap:4px;font-size:10px;z-index:40}
+.comp{position:relative;flex:1;display:flex;min-height:0;background:var(--container)}
+/* ---------- shared bits ---------- */
+.ic{display:inline-block;vertical-align:middle;flex:none}
+.btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--neutral-40);background:var(--neutral-10)}
+.btn{white-space:nowrap}
+.btn:hover{background:var(--neutral-20)}
+.btn.pri{background:var(--callToAction);border-color:var(--callToAction);color:var(--neutral-10)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.sm{height:26px;padding:0 8px;font-size:12px}
+.ibtn{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:0;background:transparent;color:var(--neutral-80)}
+.ibtn:hover{background:var(--neutral-20)}
+.ibtn.on{background:var(--cta-tint);color:var(--callToAction)}
+.muted{color:var(--neutral-70)} .small{font-size:12px} .tiny{font-size:11px}
+.input{display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;border:1px solid var(--neutral-40);border-radius:6px;background:var(--neutral-10);color:var(--neutral-70)}
+.input.val{color:var(--label)}
+.field{margin-bottom:12px}
+.field>label{display:flex;justify-content:space-between;font-size:12px;color:var(--neutral-70);margin-bottom:4px}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:10px;background:var(--neutral-20);color:var(--neutral-80);font-size:11px;white-space:nowrap}
+.tag.ovr{background:var(--cta-tint);color:var(--callToAction)}
+.tag.err{background:var(--err-tint);color:var(--error)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:13px;border:1px solid var(--neutral-40);background:var(--neutral-10);font-size:12px;color:var(--neutral-80)}
+.chip.on{border-color:var(--neutral-90);background:var(--neutral-90);color:var(--neutral-10)}
+.chip .n{color:inherit;opacity:.7}
+.sect{padding:14px 16px;border-bottom:1px solid var(--neutral-30)}
+.sect h4{margin:0 0 10px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--neutral-70);display:flex;justify-content:space-between;align-items:center}
+.sect h4 .tag{text-transform:none;letter-spacing:0}
+.kv{display:flex;justify-content:space-between;align-items:center;padding:5px 0;gap:8px}
+.kv .k{color:var(--neutral-70)}
+.sw2{width:30px;height:18px;border-radius:9px;background:var(--neutral-40);position:relative;flex:none;border:0;padding:0}
+.sw2::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--neutral-10);transition:left .15s}
+.sw2.on{background:var(--neutral-90)} .sw2.on::after{left:14px}
+.check{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--neutral-60);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.check.on{background:var(--neutral-90);border-color:var(--neutral-90);color:var(--neutral-10)}
+.presets{display:inline-flex;border:1px solid var(--neutral-40);border-radius:6px;overflow:hidden}
+.presets span{padding:4px 9px;font-size:12px;color:var(--neutral-70);border-right:1px solid var(--neutral-40)}
+.presets span:last-child{border-right:0}
+.presets span.on{background:var(--neutral-90);color:var(--neutral-10)}
+.note{background:var(--neutral-20);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--neutral-80)}
+/* ---------- panels ---------- */
+.panel{background:var(--neutral-10);display:flex;flex-direction:column;min-height:0;flex:none;border-right:1px solid var(--neutral-30)}
+.panel.right{border-right:0;border-left:1px solid var(--neutral-30)}
+.ph{padding:12px 16px 10px;border-bottom:1px solid var(--neutral-30)}
+.ph .row{display:flex;align-items:center;gap:8px}
+.ph h3{margin:0;font-size:16px;font-weight:600}
+.pbody{flex:1;overflow:auto;min-height:0}
+.pfoot{padding:10px 16px;border-top:1px solid var(--neutral-30);display:flex;gap:8px;align-items:center}
+.panel.right .pfoot{padding-right:76px} /* keep the App Bar toggle corner clear */
+.ph h3{white-space:nowrap}
+.ibtn{white-space:nowrap}
+.tabs{display:flex;gap:18px;margin-top:10px}
+.tabs button{border:0;background:none;padding:6px 0;color:var(--neutral-70);border-bottom:2px solid transparent}
+.tabs button.on{color:var(--label);font-weight:600;border-bottom-color:var(--neutral-90)}
+.grp{padding:8px 8px 4px}
+.grp .gh{display:flex;justify-content:space-between;padding:4px 8px;font-size:11px;font-weight:600;color:var(--neutral-70);text-transform:uppercase;letter-spacing:.04em}
+.row-i{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;text-align:left;padding:7px 8px;border-radius:6px;color:var(--label)}
+.row-w{display:flex;align-items:center;gap:2px}
+.row-w .row-i{flex:1;min-width:0}
+.cb{width:22px;height:30px;display:flex;align-items:center;justify-content:center;flex:none;cursor:pointer}
+.cb .check{width:14px;height:14px;border-color:var(--neutral-50)}
+.mixed{font-style:italic;color:var(--neutral-70)}
+.boxsel{position:absolute;border:1.5px dashed var(--callToAction);background:var(--cta-tint);pointer-events:none;z-index:6}
+.row-i:hover{background:var(--neutral-20)}
+.row-i.sel{background:var(--cta-tint);box-shadow:inset 3px 0 0 var(--callToAction)}
+.row-i .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-i .ki{color:var(--neutral-70)}
+.st{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--neutral-70);white-space:nowrap}
+.st.a1{color:var(--error);font-weight:600}
+/* ---------- rail ---------- */
+.rail{width:72px;flex:none;background:var(--neutral-10);border-right:1px solid var(--neutral-30);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:4px}
+.rail button{width:60px;border:0;background:none;border-radius:10px;padding:8px 0 6px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--neutral-70)}
+.rail button:hover{background:var(--neutral-20)}
+.rail button.on{background:var(--neutral-20);color:var(--label);font-weight:600}
+.rail.slim{width:56px} .rail.slim button{width:44px;font-size:10px}
+/* ---------- map ---------- */
+.map{position:relative;flex:1;min-width:0;overflow:hidden;background:var(--neutral-20)}
+.world{position:absolute;left:50%;top:50%;width:1400px;height:900px;transition:transform .25s}
+.world svg.base{position:absolute;inset:0}
+.mk{position:absolute;transform:translate(-50%,-50%);border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;cursor:pointer}
+.mk .disc{width:34px;height:34px;border-radius:50%;background:var(--neutral-10);border:1.5px solid var(--neutral-50);color:var(--neutral-80);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--neutral-20),0 1px 3px rgba(30,34,39,.18);position:relative}
+.mk.lost .disc{border-style:dashed;border-color:var(--neutral-70);color:var(--neutral-60)}
+.mk.sel .disc{box-shadow:0 0 0 2px var(--neutral-10),0 0 0 4px var(--callToAction)}
+.mk .badge{position:absolute;top:-9px;right:-14px;display:flex;align-items:center;gap:1px;font-weight:700;font-size:11px}
+.mk .badge.a1{color:var(--error)}
+.mk .badge.g{color:var(--neutral-80);background:var(--neutral-10);border-radius:50%;padding:1px}
+.mk .lab{margin-top:3px;font-size:12px;font-weight:600;color:var(--neutral-90);text-shadow:0 0 3px var(--neutral-20),0 0 3px var(--neutral-20),0 0 2px var(--neutral-20);white-space:nowrap;display:flex;gap:4px;align-items:center}
+.mk .lab .w{font-weight:500;font-size:11px;color:var(--neutral-80);background:var(--neutral-10);border:1px solid var(--neutral-50);border-radius:3px;padding:0 4px;text-shadow:none}
+.mk .dot{width:11px;height:11px;border-radius:50%;background:var(--neutral-60);box-shadow:0 0 0 2px var(--neutral-20)}
+.mk.lost .dot{background:var(--neutral-20);border:2px dashed var(--neutral-70)}
+.mk.sel .dot{box-shadow:0 0 0 2px var(--neutral-10),0 0 0 4px var(--callToAction)}
+.float{position:absolute;background:var(--neutral-10);border-radius:10px;box-shadow:var(--shadow);z-index:5}
+.toolbar{top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:4px}
+.toolbar .div{width:1px;height:22px;background:var(--neutral-30);margin:0 4px}
+.modepill{display:inline-flex;align-items:center;gap:6px;padding:0 10px 0 6px;height:32px;font-size:12px;font-weight:600;color:var(--neutral-80);white-space:nowrap}
+.strip{top:12px;left:12px;display:flex;flex-direction:column;gap:2px;padding:4px}
+.strip .div{height:1px;width:22px;background:var(--neutral-30);margin:4px auto}
+.tr{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;align-items:flex-end;gap:8px;z-index:6}
+.editsw{display:flex;align-items:center;gap:8px;height:36px;padding:0 10px 0 12px;font-weight:600;font-size:12px;border:0}
+.tr .float{position:relative}
+.zoom{display:flex;flex-direction:column;align-items:center;padding:2px;border-radius:8px}
+.zoom .zl{font-size:10px;color:var(--neutral-70);padding:2px 0}
+.search{top:12px;left:12px;width:300px;display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;color:var(--neutral-70)}
+.legend{left:12px;bottom:12px;padding:10px 12px;width:208px;font-size:12px}
+.legend h5{margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--neutral-70);display:flex;justify-content:space-between}
+.legend .li{display:flex;align-items:center;gap:8px;padding:2px 0;color:var(--neutral-80)}
+.legend .tog{display:flex;gap:12px;border-top:1px solid var(--neutral-30);margin-top:6px;padding-top:6px}
+.popup{position:absolute;width:290px;transform:translate(-50%,calc(-100% - 30px));background:var(--neutral-10);border-radius:10px;box-shadow:var(--shadow);z-index:8;font-size:12px}
+.popup::after{content:"";position:absolute;left:50%;bottom:-7px;width:14px;height:14px;background:var(--neutral-10);transform:translateX(-50%) rotate(45deg);box-shadow:3px 3px 4px rgba(30,34,39,.06)}
+.popup .phd{display:flex;align-items:flex-start;gap:10px;padding:12px 12px 8px}
+.popup .phd h3{margin:0;font-size:16px}
+.popup .pb{padding:0 12px 8px}
+.popup .alm{margin:4px 12px 10px;padding:8px 10px;border-radius:6px;background:var(--err-tint);border-left:3px solid var(--error)}
+.popup .acts{display:flex;gap:8px;padding:0 12px 12px}
+.drawbar{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:8px 8px 8px 14px;white-space:nowrap;z-index:7}
+.snaphint{position:absolute;transform:translate(14px,-46px);background:var(--neutral-90);color:var(--neutral-10);font-size:11px;padding:4px 8px;border-radius:5px;white-space:nowrap;z-index:6}
+.save{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--neutral-70);border:0;background:none;padding:4px 6px;border-radius:6px;white-space:nowrap}
+.save:hover{background:var(--neutral-20)}
+.save.conf{color:var(--warning);background:var(--warn-tint);font-weight:600}
+.spin{width:12px;height:12px;border:2px solid var(--neutral-40);border-top-color:var(--neutral-80);border-radius:50%;animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.conflict{position:absolute;z-index:20;width:330px;padding:14px;border-left:3px solid var(--warning)}
+.conflict h4{margin:0 0 6px;font-size:13px;display:flex;gap:6px;align-items:center;color:var(--warning)}
+.conflict p{margin:0 0 8px;color:var(--neutral-80);font-size:12px}
+.toast{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:var(--neutral-90);color:var(--neutral-10);border-radius:8px;padding:8px 8px 8px 14px;display:flex;gap:12px;align-items:center;z-index:9}
+.toast .btn{background:transparent;color:var(--neutral-10);border-color:var(--neutral-70)}
+/* B slide panel */
+.slide{position:absolute;top:0;bottom:0;width:360px;background:var(--neutral-10);box-shadow:4px 0 18px rgba(30,34,39,.12);z-index:12;display:flex;flex-direction:column;transition:transform .25s}
+.slide.closed{transform:translateX(-110%)}
+/* kind preview */
+.pv{display:flex;flex-direction:column;align-items:center;gap:4px;width:64px}
+.pv .disc{width:34px;height:34px;border-radius:50%;background:var(--neutral-10);border:1.5px solid var(--neutral-50);color:var(--neutral-80);display:flex;align-items:center;justify-content:center}
+.pv.dim .disc{opacity:.5;border-style:dashed;border-color:var(--neutral-60)}
+.pv.att .disc{border:3px solid var(--neutral-90);color:var(--neutral-90)}
+.rule{display:grid;grid-template-columns:1fr 18px 1fr 64px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--neutral-30)}
+.rule:last-child{border-bottom:0}
+.sel-like{display:flex;align-items:center;justify-content:space-between;gap:6px;height:30px;padding:0 8px;border:1px solid var(--neutral-40);border-radius:6px;background:var(--neutral-10);font-size:12px}
+.empty{padding:28px 20px;text-align:center;color:var(--neutral-70)}
+.drop{border:1.5px dashed var(--neutral-50);border-radius:8px;padding:22px;text-align:center;color:var(--neutral-70)}
+.scale{position:absolute;left:120px;bottom:14px;font-size:10px;color:var(--neutral-70);display:flex;flex-direction:column;gap:2px;z-index:4}
+.scale i{display:block;width:80px;height:5px;border:1.5px solid var(--neutral-70);border-top:0}
+/* ---------- key screens additions ---------- */
+.sw .seg{flex-wrap:wrap}
+.rat .gov{grid-column:1/-1;color:var(--neutral-70);font-size:12px}
+body.bare{background:var(--container)}
+body.bare .sw, body.bare .rat{display:none}
+body.bare .wrap{padding:0;display:block}
+body.bare .frame{border-radius:0;box-shadow:none}
+.tb-off{opacity:.42;pointer-events:none}
+.banner{position:absolute;left:50%;transform:translateX(-50%);top:104px;width:430px;padding:12px 14px;border-left:3px solid var(--warning);z-index:9}
+.banner h4{margin:0 0 4px;font-size:13px;display:flex;gap:6px;align-items:center;color:var(--warning)}
+.banner p{margin:0 0 8px;font-size:12px;color:var(--neutral-80)}
+.save.warnst{color:var(--warning);background:var(--warn-tint);font-weight:600}
+/* line instruments */
+.ins{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;pointer-events:none}
+.ins .d{width:24px;height:24px;border-radius:50%;background:var(--neutral-10);border:1.5px solid var(--neutral-60);color:var(--neutral-80);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--neutral-20)}
+.ins.v .d{border-radius:5px}
+.ins.hl .d{box-shadow:0 0 0 2px var(--neutral-10),0 0 0 4px var(--callToAction)}
+.ins.lft .l{position:absolute;right:30px;top:3px;margin:0}
+.ins.stale .d{border-style:dashed;border-color:var(--neutral-70);color:var(--neutral-60)}
+.ins .l{margin-top:2px;font-size:11px;font-weight:600;color:var(--neutral-90);text-shadow:0 0 3px var(--neutral-20),0 0 3px var(--neutral-20);white-space:nowrap;display:flex;gap:3px;align-items:center}
+.ins .l .w{font-weight:500;color:var(--neutral-80);background:var(--neutral-10);border:1px solid var(--neutral-50);border-radius:3px;padding:0 4px;text-shadow:none}
+.irow{display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:center;padding:5px 6px;border-radius:5px}
+.irow.hl{background:var(--cta-tint);box-shadow:inset 3px 0 0 var(--callToAction)}
+.irow .pos{font-size:11px;color:var(--neutral-70)}
+.seg-box{margin:0 12px 8px;padding:8px 10px;border-radius:6px;border:1px solid var(--callToAction);background:var(--cta-tint)}
+/* phone */
+.frame.phone{border-radius:0}
+.phbar{position:absolute;left:8px;right:8px;top:8px;z-index:12;background:var(--neutral-10);border-radius:12px;box-shadow:var(--shadow)}
+.phbar .r{display:flex;align-items:center;height:48px;padding:0 4px 0 12px;gap:8px}
+.tap44{min-width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;border-radius:8px;color:var(--neutral-80)}
+.phzoom{position:absolute;right:8px;top:66px;z-index:6;display:flex;flex-direction:column;border-radius:10px}
+.sheet{position:absolute;left:8px;right:8px;bottom:40px;z-index:14;background:var(--neutral-10);border-radius:14px;box-shadow:0 -2px 24px rgba(30,34,39,.22);font-size:13px}
+.sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--neutral-40);margin:8px auto 2px}
+.sheet .btn{height:44px}
+.phapp{position:absolute;right:0;bottom:0;width:64px;height:30px;background:var(--neutral-80);color:var(--neutral-10);border-top-left-radius:8px;display:flex;align-items:center;justify-content:center;gap:4px;font-size:11px;z-index:40}
+.cross{position:absolute;left:50%;top:50%;width:64px;height:64px;transform:translate(-50%,-50%);z-index:8;pointer-events:none}
+/* kinds tag browser (refined 2026-10-27): provider dropdown, one provider's tree, asset folder marked */
+.tagpop{position:absolute;left:10px;top:104px;width:380px;z-index:20;padding:0 0 4px}
+.tagpop .tph{display:flex;align-items:center;padding:10px 8px 4px 14px}
+.tagpop .for{font-size:11px;color:var(--neutral-70);padding:0 14px 8px}
+.tree{margin:6px 8px 0;padding:4px 0;border:1px solid var(--neutral-30);border-radius:6px;font-size:12px;max-height:268px;overflow:hidden}
+.tree .tr2{display:grid;grid-template-columns:1fr 66px 50px;align-items:center;gap:6px;height:24px;padding-right:8px;border-radius:4px}
+.tree .tr2 .nm{display:flex;align-items:center;gap:5px;font-family:ui-monospace,monospace;white-space:nowrap;overflow:hidden}
+.tree .tr2 .ty,.tree .tr2 .dt{font-size:11px;color:var(--neutral-70);white-space:nowrap}
+.tree .tr2 .dt{text-align:right}
+.tree .tr2.fd .nm{color:var(--neutral-80)}
+.tree .tr2.in{box-shadow:inset 2px 0 0 var(--neutral-40)}
+.tree .tr2.on{background:var(--cta-tint);box-shadow:inset 3px 0 0 var(--callToAction)}
+.tree .tr2 .tag{font-family:system-ui,sans-serif;font-size:10px;padding:0 5px}
+.tree .msg{display:flex;align-items:center;gap:6px;height:24px;color:var(--neutral-70);font-size:11px;font-style:italic}
+.tree .fail{padding:18px 14px;text-align:left}
+.tree .fail h5{margin:0 0 4px;font-size:13px;color:var(--warning);display:flex;gap:6px;align-items:center}
+.tree .fail p{margin:0 0 8px;font-size:12px;color:var(--neutral-80)}
+.picked{margin:8px 14px 0;padding:8px 10px;border-radius:6px;background:var(--neutral-20);font-size:12px}
+.picked.warn{background:var(--warn-tint);border-left:3px solid var(--warning)}
+.picked .wt{display:flex;gap:6px;align-items:center;color:var(--warning);font-weight:600;margin-bottom:2px}
+.picked .mono{font-weight:600}
+.btn.off{opacity:.45;pointer-events:none}
+.kvp{display:flex;align-items:center;gap:2px}
+.kvp .ibtn{width:24px;height:24px}
+.kvrow.act{background:var(--cta-tint);box-shadow:inset 3px 0 0 var(--callToAction);margin:0 -16px;padding:5px 16px}
+/* import */
+.steps{display:flex;gap:4px;margin-top:10px}
+.steps span{flex:1;font-size:11px;color:var(--neutral-70);border-top:3px solid var(--neutral-30);padding-top:5px}
+.steps span.on{color:var(--label);font-weight:600;border-top-color:var(--neutral-90)}
+.steps span.done{color:var(--neutral-80);border-top-color:var(--neutral-60)}
+table.t{width:100%;border-collapse:collapse;font-size:12px}
+table.t th{text-align:left;font-weight:600;color:var(--neutral-70);font-size:11px;padding:6px 8px;border-bottom:1px solid var(--neutral-40);white-space:nowrap}
+table.t td{padding:6px 8px;border-bottom:1px solid var(--neutral-30);white-space:nowrap}
+table.t tr.flag td{background:var(--warn-tint)}
+.mono{font-family:ui-monospace,monospace;font-size:12px}
+.flagw{display:inline-flex;gap:4px;align-items:center;color:var(--warning);font-weight:600;font-size:11px}
+.sumn{font-size:28px;font-weight:700;line-height:1}
+/* first run */
+.check-card{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:400px;padding:18px 18px 12px;z-index:6}
+.ck{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--neutral-30);align-items:flex-start}
+.ck .num{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--neutral-60);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex:none}
+</style>
+</head>
+<body>
+<div class="sw" id="sw"></div>
+<div class="wrap">
+  <div class="rat" id="rat"></div>
+  <div class="frame" id="frame"></div>
+</div>
+<script>
+/* Interaction only: every click re-renders the mock from a small state object. No network. */
+var P = {
+  'well-pad':'<rect x="3" y="6" width="18" height="13" rx="2"/><circle cx="8.5" cy="12.5" r="1.5"/><circle cx="15.5" cy="12.5" r="1.5"/>',
+  'tank-battery':'<rect x="3" y="5" width="4" height="13" rx="1"/><rect x="10" y="5" width="4" height="13" rx="1"/><rect x="17" y="5" width="4" height="13" rx="1"/><path d="M2 21h20"/>',
+  'compressor-station':'<path d="M4 5l16 4.5v5l-16 4.5z"/><path d="M20 12h2"/><path d="M2 12h2"/>',
+  'swd':'<path d="M12 2.5c-2.2 2.8 -3.5 4.8 -3.5 6.3a3.5 3.5 0 0 0 7 0c0 -1.5 -1.3 -3.5 -3.5 -6.3z"/><path d="M3 15h6"/><path d="M15 15h6"/><path d="M12 14v7"/><path d="M9 18l3 3l3 -3"/>',
+  'pipeline':'<path d="M3 6v12"/><path d="M21 6v12"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M8.5 12h6"/><path d="M12.5 10l2 2l-2 2"/>',
+  'lateral':'<path d="M3 18h18"/><path d="M8 18l6 -9h7"/><circle cx="8" cy="18" r="1.5"/>',
+  'geofence':'<path d="M4 12v4h16v-4l-16 0"/><path d="M6 16v4h4v-4m0 -4v-6l-2 -2l-2 2v6"/><path d="M14 16v4h4v-4m0 -4v-6l-2 -2l-2 2v6"/>',
+  'wellhead':'<path d="M7 21h10"/><path d="M12 21v-17"/><path d="M10 4h4"/><rect x="9.5" y="14" width="5" height="3" rx="0.5"/><path d="M12 9h7"/><path d="M19 7v4"/>',
+  'comms-lost':'<path d="M12 11v10"/><path d="M9 21h6"/><path d="M8.5 5.5a5 5 0 0 0 0 7"/><path d="M15.5 5.5a5 5 0 0 1 0 7"/><circle cx="12" cy="9" r="1"/><path d="M3 3l18 18"/>',
+  'stale':'<path d="M7 3h10"/><path d="M7 21h10"/><path d="M8 3v2a4 4 0 0 0 2 3.5l2 3.5l2 -3.5a4 4 0 0 0 2 -3.5v-2"/><path d="M8 21v-2a4 4 0 0 1 2 -3.5l2 -3.5l2 3.5a4 4 0 0 1 2 3.5v2"/>',
+  'point':'<circle cx="12" cy="12" r="1.5"/>',
+  'tap':'<path d="M3 16h18"/><path d="M12 16v-9"/><path d="M9 7h6"/><path d="M9 4h6"/>',
+  'line-valve':'<path d="M2 12h3"/><path d="M19 12h3"/><path d="M5 8v8l14 -8v8z"/><path d="M12 12v-8"/><path d="M9 4h6"/>',
+  'region':'<path d="M10 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M3 11a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M13 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M6.5 9.5l3.5 -3"/><path d="M14 5.5l3 1.5"/><path d="M18.5 10l-2.5 7"/><path d="M13.5 17.5l-7 -5"/>',
+  /* UI chrome stand-ins, same grid */
+  'eye':'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  'list':'<path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
+  'kinds':'<rect x="3" y="3" width="7" height="7" rx="1.5"/><circle cx="17.5" cy="6.5" r="3.5"/><path d="M6.5 14l3.5 7h-7z"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  'layers':'<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
+  'import':'<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/>',
+  'search':'<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
+  'plus':'<path d="M12 5v14M5 12h14"/>', 'minus':'<path d="M5 12h14"/>',
+  'x':'<path d="M6 6l12 12M18 6L6 18"/>', 'back':'<path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/>',
+  'check':'<path d="M5 12.5l4.5 4.5L19 7.5"/>', 'cursor':'<path d="M5 3l14 8-6 2-2 6z"/>',
+  'undo':'<path d="M9 7L4 12l5 5"/><path d="M4 12h11a5 5 0 0 1 0 10h-2"/>', 'redo':'<path d="M15 7l5 5-5 5"/><path d="M20 12H9a5 5 0 0 0 0 10h2"/>',
+  'line':'<circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/><path d="M6.5 17.5l11-11"/>',
+  'chev':'<path d="M7 10l5 5 5-5"/>', 'chevr':'<path d="M10 7l5 5-5 5"/>', 'link':'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  'copy':'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
+  'trash':'<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
+  'pin':'<path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/>',
+  'magnet':'<path d="M5 4v8a7 7 0 0 0 14 0V4h-4v8a3 3 0 0 1-6 0V4z"/><path d="M5 8h4M15 8h4"/>',
+  'cloud':'<path d="M7 18h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.5 1.5A3.5 3.5 0 0 0 7 18z"/>',
+  'warn':'<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>',
+  'star':'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+  'tag':'<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1"/>',
+  'popout':'<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  'sort':'<path d="M7 4v16M3 16l4 4 4-4"/><path d="M14 6h7M14 12h5M14 18h3"/>',
+  'box':'<rect x="3" y="3" width="15" height="15" rx="1" stroke-dasharray="3 3"/><path d="M14 14l7 7"/><path d="M21 15v6h-6"/>',
+  'fit':'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  'folder':'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  'inst':'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16"/><path d="M9 9v11"/>',
+  'up':'<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>'
+};
+var F = { /* filled alarm glyphs */
+  'a1u':'<path fill-rule="evenodd" d="M12 2.5l10 18h-20z M7.5 12.5h2.5l3.5 -3v9.5l-3.5 -3h-2.5z M15 12.5h1.5v4h-1.5z"/>',
+  'a2u':'<path fill-rule="evenodd" d="M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0 -20z M7 10.5h2.5l3.5 -3v9l-3.5 -3h-2.5z M14.5 10h1.5v4h-1.5z"/>',
+  'a1a':'<path fill-rule="evenodd" d="M12 2.5l10 18h-20z M10.75 8.5h2.5v6h-2.5z M10.75 16h2.5v2.5h-2.5z"/>'
+};
+function ic(n,s){s=s||18;return '<svg class="ic" width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+P[n]+'</svg>';}
+function fi(n,s){s=s||16;return '<svg class="ic" width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="currentColor">'+F[n]+'</svg>';}
+
+/* ---------- real content: field Mesa ---------- */
+var KINDS = {
+  pad:{label:'Well pad',icon:'well-pad',geo:'Point',n:3}, ctb:{label:'Tank battery',icon:'tank-battery',geo:'Point',n:1},
+  cs:{label:'Compressor station',icon:'compressor-station',geo:'Point',n:1}, swd:{label:'SWD',icon:'swd',geo:'Point',n:1},
+  pipe:{label:'Pipeline',icon:'pipeline',geo:'Line',n:2}, lat:{label:'Lateral',icon:'lateral',geo:'Line',n:2},
+  geo:{label:'Geofence',icon:'geofence',geo:'Area',n:1},
+  none:{label:'Point - pick a kind',icon:'point',geo:'Point',n:0}
+};
+var KORDER = ['pad','ctb','cs','swd','pipe','lat','geo'];
+var ITEMS = [
+  {id:'P12',kind:'pad',x:520,y:335,asset:'Mesa/P12',ll:'32.2361, -103.8714',kvn:'Casing pressure',kv:'860 psi',kv2:[['Tubing pressure','385 psi'],['Gas rate','1.2 MMcf/d']],wells:'P12-3H',status:'Running',op:'Mesa Operating',comms:'OK - 9 s ago',chg:'Yesterday 16:20'},
+  {id:'P14',kind:'pad',x:575,y:580,asset:'Mesa/P14',ll:'32.2297, -103.8689',kvn:'Casing pressure',kv:'1,240 psi',kv2:[['Tubing pressure','410 psi'],['Gas rate','1.8 MMcf/d']],wells:'P14-2H',status:'Running',op:'Mesa Operating',comms:'OK - 12 s ago',alarm:{p:1,text:'Casing pressure high',src:'P14-2H',age:'4 min'}},
+  {id:'P21',kind:'pad',x:885,y:300,asset:'Mesa/P21',ll:'32.2378, -103.8562',kvn:'Casing pressure',kv:'910 psi (last)',kv2:[['Tubing pressure','352 psi (last)']],wells:'P21-1H',status:'Running',op:'Ridge Partners',lost:true,comms:'Comms lost - last heard 14 min ago'},
+  {id:'CTB1',kind:'ctb',x:720,y:445,asset:'Mesa/CTB1',ll:'32.2331, -103.8621',kvn:'Oil tank level',kv:'11.2 ft',kv2:[['Water tank level','8.4 ft'],['Oil today','412 bbl']],status:'Running',comms:'OK - 6 s ago',chg:'Today 09:12'},
+  {id:'CS01',kind:'cs',x:935,y:525,asset:'Mesa/CS01',ll:'32.2318, -103.8544',kvn:'Discharge pressure',kv:'1,050 psi',kv2:[['Suction pressure','62 psi'],['Units running','2 of 2']],status:'Running',comms:'OK - 4 s ago',chg:'Oct 22'},
+  {id:'SWD1',kind:'swd',x:830,y:665,asset:'Mesa/SWD1',ll:'32.2276, -103.8583',kvn:'Injection rate',kv:'4,120 bbl/d (last)',kv2:[['Injection pressure','1,380 psi']],status:'Running',stale:true,comms:'OK - 7 s ago'},
+  {id:'L-GL21',kind:'pipe',d:'M935 525 L965 410 L885 300',mid:[958,405],asset:'Mesa/L-GL21',svc:'Gas lift',size:'4 in',from:'CS01',to:'P21',len:'2.6 km'},
+  {id:'L-SWD',kind:'pipe',d:'M720 445 L760 560 L830 665',mid:[762,560],asset:'Mesa/L-SWD',svc:'Produced water',size:'6 in',from:'CTB1',to:'SWD1',len:'2.4 km'},
+  {id:'P12 lateral',kind:'lat',d:'M520 335 L640 360 L720 445',mid:[640,362],unlinked:true,svc:'Production',size:'3 in',from:'P12',to:'CTB1',len:'2.1 km'},
+  {id:'P14 lateral',kind:'lat',d:'M575 580 L650 520 L720 445',mid:[650,520],asset:'Mesa/P14-LAT',svc:'Production',size:'3 in',from:'P14',to:'CTB1',len:'1.9 km'},
+  {id:'Mesa lease',kind:'geo',d:'M455 255 L1010 240 L1035 520 L930 720 L470 700 Z',mid:[470,262],asset:'Mesa/Lease-North',area:'14.8 km2'}
+];
+function item(id){for(var i=0;i<ITEMS.length;i++)if(ITEMS[i].id===id)return ITEMS[i];return null;}
+
+/* ---------- state ---------- */
+var S = {}; /* set per screen by preset() below */
+/* ---------- small renderers ---------- */
+function stBadge(it){
+  if(it.alarm)return '<span class="st a1">'+fi('a1u',14)+'1</span>';
+  if(it.lost)return '<span class="st">'+ic('comms-lost',13)+'Comms lost</span>';
+  if(it.stale)return '<span class="st">'+ic('stale',13)+'Stale</span>';
+  if(it.unlinked)return '<span class="tag">Unlinked</span>';
+  return '';
+}
+function saveEl(){
+  if(S.save==='unreachable')return '<button class="save warnst" data-act="nop">'+ic('cloud',14)+'Store unreachable - 2 edits not saved</button>';
+  if(S.save==='busy')return '<button class="save warnst" data-act="nop">'+ic('warn',14)+'Not saved - Map Studio is busy</button>';
+  if(S.save==='saving')return '<button class="save" data-act="recent"><span class="spin"></span>Saving...</button>';
+  if(S.save==='conflict')return '<button class="save conf" data-act="conflict">'+ic('warn',14)+'Not saved - conflict with Sam\'s change</button>';
+  return '<button class="save" data-act="recent" title="Edits save as you go - open Recent changes">'+ic('check',14)+'Saved</button>';
+}
+function undoRedo(){
+  return '<button class="ibtn" style="width:28px;height:28px" title="'+(S.undoLbl||'Undo: edit 3 pads')+' (Ctrl+Z)" data-act="nop">'+ic('undo',16)+'</button><button class="ibtn" style="width:28px;height:28px" title="Redo (Ctrl+Shift+Z)" data-act="nop">'+ic('redo',16)+'</button>';
+}
+function saveCluster(){return '<span style="display:inline-flex;align-items:center;gap:0">'+undoRedo()+saveEl()+'</span>';}
+var RECENT=[
+  ['You','Today 10:44','Edited 3 well pads in one change: Gas rate switched on',1],
+  ['Sam','Today 10:42','Moved P14 about 40 m north',0],
+  ['You','Today 10:31','Unlinked P12 lateral from Mesa/P12-LAT',0],
+  ['Sam','Today 09:50','Deleted line L-TEST and its 2 instruments in one change',0],
+  ['You','Today 08:05','Moved P21 12 m east',0],
+  ['Sam','Yesterday 16:20','Added P12 lateral, ends snapped to P12 and CTB1',0]
+];
+function recentPanel(pos){
+  if(!S.recent)return '';
+  var h='<div class="float" style="position:absolute;z-index:20;width:340px;'+pos+'"><div style="display:flex;align-items:center;padding:12px 12px 8px 16px"><b style="flex:1">Recent changes</b><button class="ibtn" data-act="recent" title="Close">'+ic('x',16)+'</button></div>';
+  h+='<div style="margin:0 12px 8px;padding:8px 10px;border-radius:6px;background:var(--neutral-20);display:flex;align-items:center;gap:8px"><span style="flex:1" class="small">Next undo is one step: <b>'+(S.undoLbl||'Undo: edit 3 pads')+'</b></span><button class="btn sm">'+ic('undo',14)+'Undo</button></div>';
+  RECENT.forEach(function(r){h+='<div style="display:flex;gap:10px;padding:8px 16px;border-top:1px solid var(--neutral-30);align-items:flex-start"><span style="width:26px;height:26px;border-radius:50%;background:var(--neutral-30);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex:none">'+r[0].charAt(0)+'</span><div style="flex:1;min-width:0"><div class="small">'+r[2]+'</div><div class="tiny muted">'+r[0]+' - '+r[1]+'</div></div><button class="btn sm ghost">Revert</button></div>';});
+  return h+'<div class="tiny muted" style="padding:8px 16px 12px;border-top:1px solid var(--neutral-30)">Revert undoes that one change, including someone else\'s, and saves like any edit.</div></div>';
+}
+function editSwitch(){
+  return '<button class="float editsw" style="position:relative" data-act="edit">'+ic(S.edit?'kinds':'eye',16)+(S.edit?'Editing':'Edit map')+'<span class="sw2'+(S.edit?' on':'')+'"></span></button>';
+}
+function zoomCtl(){
+  return '<div class="float zoom"><button class="ibtn" data-act="zin" title="Zoom in">'+ic('plus',18)+'</button><span class="zl">z '+S.zoom+'</span><button class="ibtn" data-act="zout" title="Zoom out">'+ic('minus',18)+'</button><button class="ibtn" title="Fit field" data-act="nop">'+ic('fit',16)+'</button></div>';
+}
+function topRight(withSave){
+  return '<div class="tr">'+(withSave?'<div class="float" style="position:relative;padding:4px 4px">'+saveEl()+'</div>':'')+editSwitch()+zoomCtl()+'</div>';
+}
+var KTOOLS=[['pad','well-pad','Add a well pad'],['ctb','tank-battery','Add a tank battery'],['pipe','pipeline','Draw a pipeline']];
+var GTOOLS=[['point','point','Point - pick the kind after'],['line','line','Line - pick the kind after'],['area','region','Area - pick the kind after']];
+function tb(x){return '<button class="ibtn'+(S.tool===x[0]?' on':'')+'" data-act="tool" data-v="'+x[0]+'" title="'+x[2]+'">'+ic(x[1],18)+'</button>';}
+function toolBtns(vertical){
+  var h=tb(['select','cursor','Select'])+tb(['box','box','Box select - hold Alt for a lasso'])+'<span class="div"></span>';
+  KTOOLS.forEach(function(x){h+=tb(x);});
+  h+='<span class="div"></span>';
+  GTOOLS.forEach(function(x){h+=tb(x);});
+  h+='<span class="div"></span><button class="ibtn'+(S.snap?' on':'')+'" data-act="snap" title="Snapping '+(S.snap?'on':'off')+' - click to turn '+(S.snap?'off':'on')+'" style="width:auto;padding:0 8px;gap:4px;font-size:12px">'+ic('magnet',16)+'Snap'+(vertical?'':' '+(S.snap?'on':'off'))+'</button>';
+  return h;
+}
+function placing(){return S.tool==='pad'||S.tool==='ctb'||S.tool==='point';}
+function modeLabel(){
+  if(S.drawing)return ic(S.tool==='pipe'?'pipeline':'line',16)+(S.tool==='pipe'?'Drawing a pipeline':'Drawing a line');
+  var nm={pad:'well pad',ctb:'tank battery',point:'point'}[S.tool];
+  if(nm)return ic(S.tool==='point'?'point':KINDS[S.tool].icon,16)+'Add a '+nm+' - click the map, then drag to fine-tune';
+  if(S.multi.length>1&&S.tool==='select')return ic('cursor',16)+(S.bulk20?20:S.multi.length)+' selected - Shift-click to add';
+  return {box:ic('box',16)+'Box select - drag on the map, hold Alt for a lasso',select:ic('cursor',16)+'Select',area:ic('region',16)+'Draw an area - kind picked after'}[S.tool]||'';
+}
+function toolbarTop(extra,off){off=off||0;
+  return '<div class="float toolbar'+(S.save==='unreachable'?' tb-off':'')+'" style="left:calc(50% + '+off+'px)">'+toolBtns()+(extra||'')+'</div><div class="float modepill" style="position:absolute;top:60px;left:calc(50% + '+off+'px);transform:translateX(-50%);height:28px;padding:0 12px">'+modeLabel()+'</div>';
+}
+function strip(){
+  return '<div class="float strip">'+toolBtns(true)+'</div><div class="float modepill" style="position:absolute;top:12px;left:64px;height:34px;padding:0 12px">'+modeLabel()+'</div>';
+}
+
+/* ---------- map ---------- */
+function mapWorld(dx,dy){
+  var dots=S.zoom<14, h='', E=S.empty;
+  h+='<svg class="base" width="1400" height="900" viewBox="0 0 1400 900">';
+  /* faint lease roads */
+  h+='<g stroke="var(--neutral-30)" stroke-width="5" fill="none" stroke-linecap="round"><path d="M0 470 C300 450 500 480 700 470 S1100 420 1400 440"/><path d="M610 0 C600 200 640 330 700 470 S760 760 740 900"/><path d="M700 470 L900 300 L1080 120"/><path d="M520 335 L640 470"/><path d="M830 665 L1000 820"/></g>';
+  h+='<g fill="var(--neutral-50)" font-size="11" font-family="system-ui"><text x="1110" y="430">CR 748</text><text x="655" y="120" transform="rotate(-86 655 120)">Lease Rd 3</text></g>';
+  if(E){h+='</svg>';return '<div class="world" style="transform:translate(calc(-50% + '+(dx||0)+'px),calc(-50% + '+(dy||0)+'px))">'+h+'</div>';}
+  /* geofence */
+  var gsel=S.sel==='Mesa lease'&&S.edit;
+  h+='<path d="'+item('Mesa lease').d+'" fill="var(--neutral-50)" fill-opacity=".07" stroke="'+(gsel?'var(--callToAction)':'var(--neutral-50)')+'" stroke-width="'+(gsel?3:1.5)+'" stroke-dasharray="6 5"/>';
+  h+='<path d="'+item('Mesa lease').d+'" fill="none" stroke="transparent" stroke-width="14" data-act="sel" data-id="Mesa lease" style="cursor:pointer"/>';
+  h+='<text x="478" y="275" font-size="11" font-weight="600" fill="var(--neutral-70)" font-family="system-ui">Mesa lease</text>';
+  /* lines */
+  ITEMS.forEach(function(it){
+    if(it.kind!=='pipe'&&it.kind!=='lat')return;
+    var w=it.kind==='pipe'?(it.size==='6 in'?6:4):3, col=it.kind==='pipe'?'var(--neutral-60)':'var(--neutral-50)';
+    var sel=(S.sel===it.id||S.multi.indexOf(it.id)>=0)&&S.edit;
+    if(sel)h+='<path d="'+it.d+'" stroke="var(--callToAction)" stroke-width="'+(w+6)+'" stroke-opacity=".35" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
+    h+='<path d="'+it.d+'" stroke="'+col+'" stroke-width="'+w+'" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
+    h+='<path d="'+it.d+'" stroke="transparent" stroke-width="16" fill="none" data-act="sel" data-id="'+it.id+'" style="cursor:pointer"/>';
+    if(sel&&it.kind==='pipe'){h+='<path d="M'+(it.mid[0]-6)+' '+(it.mid[1]+8)+' l6 -10 l6 10" fill="none" stroke="var(--neutral-90)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';}
+    if(it.kind==='pipe'&&!dots)h+='<g font-family="system-ui" font-size="11" font-weight="600"><rect x="'+(it.mid[0]+10)+'" y="'+(it.mid[1]-9)+'" width="'+(it.id.length*7+10)+'" height="17" rx="3" fill="var(--neutral-10)" stroke="var(--neutral-40)"/><text x="'+(it.mid[0]+15)+'" y="'+(it.mid[1]+4)+'" fill="var(--neutral-80)">'+it.id+'</text></g>';
+    if(S.edit&&sel){/* vertex handles */ it.d.replace(/[ML]/g,'').trim().split(/ (?=\d+ \d+)/).forEach(function(){});}
+  });
+  /* draft line while drawing */
+  if(S.drawing){
+    h+='<path d="M935 535 L840 505" stroke="var(--neutral-80)" stroke-width="3" fill="none" stroke-dasharray="7 5"/>';
+    h+='<path d="M840 505 L748 458" stroke="var(--neutral-60)" stroke-width="2" fill="none" stroke-dasharray="3 5"/>';
+    h+=S.snap?'<rect x="929" y="529" width="12" height="12" fill="var(--neutral-90)" stroke="var(--neutral-10)" stroke-width="2"/>':'<circle cx="935" cy="535" r="6" fill="var(--neutral-10)" stroke="var(--neutral-90)" stroke-width="2"/>';
+    h+='<circle cx="840" cy="505" r="5" fill="var(--neutral-10)" stroke="var(--neutral-90)" stroke-width="2"/>';
+    if(S.snap)h+='<circle cx="720" cy="455" r="26" fill="var(--cta-tint)" stroke="var(--callToAction)" stroke-width="2" stroke-dasharray="4 3"/>';
+  }
+  if(S.importPrev)h+=importDots();
+  h+='</svg>';
+  /* sites */
+  ITEMS.forEach(function(it){
+    if(!it.x)return;
+    var k=KINDS[it.kind], sel=(S.edit?(S.sel===it.id||S.multi.indexOf(it.id)>=0):S.popup===it.id)||S.preview===it.id||(S.importPrev&&UPD.indexOf(it.id)>=0);
+    if(S.phoneMove&&it.id==='P14')return;
+    var cls='mk'+(it.lost?' lost':'')+(sel?' sel':'')+(it.isNew?' new':'');
+    var b='';
+    if(it.alarm)b='<span class="badge a1">'+fi('a1u',18)+'1</span>';
+    else if(it.lost&&!dots)b='<span class="badge g">'+ic('comms-lost',14)+'</span>';
+    else if(it.stale&&!dots)b='<span class="badge g">'+ic('stale',14)+'</span>';
+    var word=it.lost?'<span class="w">Comms lost</span>':(it.stale?'<span class="w">Stale</span>':'');
+    if(S.preview===it.id)word+='<span class="w">Preview</span>'; if(S.importPrev&&UPD.indexOf(it.id)>=0)word+='<span class="w">Updated</span>';
+    if(dots){
+      h+='<button class="'+cls+'" style="left:'+it.x+'px;top:'+it.y+'px" data-act="sel" data-id="'+it.id+'" title="'+it.id+'"><span style="position:relative"><span class="dot"></span>'+(it.alarm?'<span class="badge a1" style="top:-12px;right:-20px">'+fi('a1u',16)+'1</span>':'')+'</span></button>';
+    }else{
+      h+='<button class="'+cls+'" style="left:'+it.x+'px;top:'+(it.y+10)+'px" data-act="sel" data-id="'+it.id+'"><span class="disc">'+ic(k.icon,19)+b+'</span><span class="lab">'+it.id+word+'</span></button>';
+    }
+  });
+  var ni=S.edit&&item(S.sel);if(ni&&ni.isNew)h+='<div class="snaphint" style="left:'+ni.x+'px;top:'+(ni.y-4)+'px">'+ic('pin',12)+' Drag to fine-tune, or type latitude and longitude</div>';
+  if(S.drawing&&S.snap)h+='<div class="snaphint" style="left:735px;top:445px">'+ic('magnet',12)+' Snap to CTB1 - click to connect</div>';
+  if(!S.edit&&S.popup&&!S.phone)h+=popup(item(S.popup));
+  if(S.phoneMove)h+='<div class="mk" style="left:575px;top:590px;opacity:.45"><span class="disc" style="border-style:dashed">'+ic('well-pad',19)+'</span><span class="lab">Was here</span></div>';
+  return '<div class="world" style="transform:translate(calc(-50% + '+(dx||0)+'px),calc(-50% + '+(dy||0)+'px))">'+h+'</div>';
+}
+function popup(it){
+  if(!it||!it.x)return '';
+  var k=KINDS[it.kind], dim=it.lost||it.stale;
+  var h='<div class="popup" style="left:'+it.x+'px;top:'+(it.y-6)+'px">';
+  h+='<div class="phd"><span class="disc" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--neutral-50);display:flex;align-items:center;justify-content:center;color:var(--neutral-80)">'+ic(k.icon,17)+'</span><div style="flex:1"><h3>'+it.id+'</h3><div class="muted">'+k.label+(it.wells?' - '+it.wells:'')+'</div></div><button class="ibtn" title="Open the '+it.id+' page" data-act="nop">'+ic('popout',16)+'</button><button class="ibtn" data-act="pclose" title="Close">'+ic('x',16)+'</button></div>';
+  h+='<div class="pb"><div class="kv" style="border-bottom:1px solid var(--neutral-30);padding-bottom:7px;margin-bottom:3px"><span class="k">Comms</span><span style="display:flex;gap:4px;align-items:center;'+(it.lost?'font-weight:600':'')+'">'+(it.lost?ic('comms-lost',14):ic('check',14))+it.comms+'</span></div>';
+  var vals=[[it.kvn,it.kv]].concat(it.kv2||[]);
+  vals.forEach(function(v,i){h+='<div class="kv"><span class="k">'+v[0]+'</span><span style="font-weight:'+(i===0?600:500)+';display:flex;gap:4px;align-items:center'+(dim?';color:var(--neutral-70)':'')+'">'+(it.stale&&i===0?ic('stale',14)+'Stale - ':'')+v[1]+'</span></div>';});
+  h+='</div>';
+  if(it.alarm)h+='<div class="alm"><div style="display:flex;gap:6px;align-items:center;font-weight:600;color:var(--error)">'+fi('a1u',16)+'1 alarm - Priority 1, unacknowledged</div><div style="margin-top:3px">'+it.alarm.text+' - '+it.alarm.src+', '+it.alarm.age+' ago</div><button class="btn pri sm" style="margin-top:8px">View alarms</button></div>';
+  else h+='<div class="pb muted" style="padding-bottom:12px;display:flex;gap:6px;align-items:center">'+ic('check',14)+'No active alarms</div>';
+  return h+'</div>';
+}
+function legend(){
+  if(!S.legend)return '<button class="float btn" style="left:12px;bottom:12px;height:36px;border:0" data-act="legend">'+ic('layers',16)+'Legend</button>';
+  return '<div class="float legend" style="bottom:56px"><h5>Legend <button class="ibtn" style="width:20px;height:20px" data-act="legend" title="Collapse">'+ic('chev',14)+'</button></h5>'+
+   '<div class="li">'+ic('well-pad',16)+'Well pad</div><div class="li">'+ic('tank-battery',16)+'Tank battery</div><div class="li">'+ic('compressor-station',16)+'Compressor station</div><div class="li">'+ic('swd',16)+'SWD</div>'+
+   '<div class="li"><span style="color:var(--error)">'+fi('a1u',16)+'</span>Priority 1 alarm, digit beside</div><div class="li"><span style="color:var(--error)">'+fi('a1a',16)+'</span>Acknowledged</div><div class="li">'+ic('comms-lost',16)+'Comms lost</div><div class="li">'+ic('stale',16)+'Stale value</div>'+
+   '<div class="li"><svg width="16" height="8"><path d="M0 4h16" stroke="var(--neutral-60)" stroke-width="4"/></svg>Pipeline, weight by size</div><div class="li"><svg width="16" height="8"><path d="M0 4h16" stroke="var(--neutral-50)" stroke-width="3"/></svg>Lateral</div><div class="li"><svg width="16" height="8"><path d="M0 4h16" stroke="var(--neutral-60)" stroke-width="3" stroke-dasharray="5 3"/></svg>Dashed: no data or comms lost</div><div class="li"><svg width="16" height="10"><rect x="1" y="1" width="14" height="8" fill="none" stroke="var(--neutral-50)" stroke-dasharray="3 2"/></svg>Geofence</div>'+
+   '<div class="tog"><span style="display:flex;gap:5px;align-items:center"><span class="check on">'+ic('check',11)+'</span>Lines</span><span style="display:flex;gap:5px;align-items:center"><span class="check on">'+ic('check',11)+'</span>Names</span></div><div class="tiny muted" style="margin-top:4px">Below zoom 14 sites show as dots</div></div>';
+}
+function drawBar(off){
+  var pk=S.tool==='pipe';
+  return '<div class="float drawbar" style="left:calc(50% + '+off+'px)"><span style="display:flex;gap:6px;align-items:center;font-weight:600">'+ic(pk?'pipeline':'line',16)+(pk?'New pipeline':'New line')+'</span>'+
+   (pk?'':'<span class="tag">Kind picked after Finish</span>')+
+   '<span class="muted small">2 points - 0.7 km - start '+(S.snap?'snapped to CS01':'floating')+'</span>'+
+   '<span class="tag'+(S.snap?' ovr':'')+'">'+ic('magnet',12)+'Snapping '+(S.snap?'on':'off')+'</span>'+
+   '<span class="muted tiny">Double-click or Enter to finish</span>'+
+   '<button class="btn sm" data-act="dcancel">Cancel <span class="muted tiny">Esc</span></button><button class="btn sm pri" data-act="dfinish">Finish</button></div>';
+}
+function overlays(off){off=off||0;
+  var h='';
+  if(S.drawing)h+=drawBar(off);
+  if(S.toast)h+='<div class="toast">'+ic('check',16)+''+S.toastMsg+'<button class="btn sm" data-act="toastx">'+(S.toastUndo||'Undo')+'</button></div>';
+  return h;
+}
+function conflictCard(pos){
+  if(S.save!=='conflict'||!S.conflictOpen)return '';
+  return '<div class="float conflict" style="'+pos+'"><h4>'+ic('warn',16)+'Not saved - conflict with Sam\'s change</h4><p><b>Sam</b> moved P14 about 40 m north at 10:42, while you were editing it.</p><p>Your change, kept here and not saved: label position Right, Gas rate switched on.</p><div style="display:flex;gap:8px"><button class="btn sm" data-act="resolve">Use Sam\'s version</button><button class="btn sm pri" data-act="resolve">Apply mine on top</button></div></div>';
+}
+var NEEDS=[['P14','a1','Priority 1 alarm, unacknowledged','Casing pressure high - 4 min'],['P21','lost','Comms lost','Last heard 14 min ago'],['SWD1','stale','Stale value','Injection rate - last 22 min ago']];
+function needsYou(){
+  var h='<button class="float" data-act="needs" style="top:12px;left:324px;height:40px;display:flex;align-items:center;gap:8px;padding:0 12px;border:0;font-size:12px"><b>Needs you 3</b><span class="muted">:</span><span class="st a1">'+fi('a1u',14)+'1 alarm</span><span class="st">'+ic('comms-lost',13)+'1 comms lost</span><span class="st">'+ic('stale',13)+'1 stale</span>'+ic('chev',14)+'</button>';
+  if(!S.needs)return h;
+  h+='<div class="float" style="top:58px;left:324px;width:320px;padding:6px"><div class="tiny muted" style="padding:6px 8px">Ranked: alarms by priority, then comms lost, then stale</div>';
+  NEEDS.forEach(function(n,i){var it=item(n[0]);
+    var g=n[1]==='a1'?'<span style="color:var(--error)">'+fi('a1u',18)+'</span>':ic(n[1]==='lost'?'comms-lost':'stale',18);
+    h+='<button class="row-i" data-act="sel" data-id="'+n[0]+'" style="align-items:flex-start"><span style="width:16px;color:var(--neutral-70);font-size:12px">'+(i+1)+'</span>'+g+'<span style="flex:1"><b>'+n[0]+'</b> <span class="muted small">'+KINDS[it.kind].label+'</span><br><span class="small">'+n[2]+'</span><br><span class="tiny muted">'+n[3]+'</span></span></button>';});
+  return h+'</div>';
+}
+function viewMap(){
+  return '<div class="map">'+mapWorld(0)+'<div class="float search">'+ic('search',18)+'Search sites, wells or lines</div>'+needsYou()+legend()+topRight(false)+'<div class="scale"><span>500 m</span><i></i></div></div>';
+}
+
+/* ---------- list, details, kinds, layers, import ---------- */
+/* place tree: field, then site, then what is on it; attention first */
+var PLACES=[
+  {site:'P14',on:['P14 lateral'],wells:['P14-2H'],att:3},
+  {site:'P21',on:[],wells:['P21-1H'],att:2},
+  {site:'SWD1',on:[],att:1},
+  {site:'P12',on:['P12 lateral'],wells:['P12-3H'],att:1},
+  {site:'CTB1',on:['L-SWD'],att:0},
+  {site:'CS01',on:['L-GL21'],att:0}
+];
+var CHG={'P14':'Today 10:42 - Sam','P12 lateral':'Today 10:31 - you','P21':'Today 08:05 - you','SWD1':'Oct 24','L-SWD':'Oct 24','L-GL21':'Oct 23','P14 lateral':'Oct 23','Mesa lease':'Oct 20','P12':'Yesterday 16:20','CTB1':'Today 09:12','CS01':'Oct 22'};
+var SORTS=[['attention','Needs attention'],['place','Place'],['kind','Kind'],['name','Name'],['changed','Last changed']];
+function needs(it){return !!(it.alarm||it.lost||it.stale||it.unlinked);}
+function rowI(it,indent,extra){
+  var k=KINDS[it.kind];
+  var on=S.multi.indexOf(it.id)>=0;
+  return '<div class="row-w"><span class="cb" data-act="chk" data-id="'+it.id+'" title="Select (Shift-click for a range)" style="margin-left:'+indent+'px"><span class="check'+(on?' on':'')+'">'+(on?ic('check',10):'')+'</span></span><button class="row-i'+(S.sel===it.id||on?' sel':'')+'" style="padding-left:6px" data-act="sel" data-id="'+it.id+'"><span class="ki">'+ic(k.icon,17)+'</span><span class="nm">'+it.id+(extra?' <span class="tiny muted">'+extra+'</span>':'')+'</span>'+stBadge(it)+'</button></div>';
+}
+function pass(it){return S.filter==='all'||S.filter===it.kind;}
+function listBody(){
+  var lab=SORTS.filter(function(x){return x[0]===S.sort;})[0][1];
+  var h='<div style="padding:12px 16px 8px;display:flex;gap:8px"><div class="input" style="flex:1;min-width:0">'+ic('search',16)+'Search items</div></div>';
+  h+='<div style="padding:0 16px 8px;display:flex;align-items:center;gap:6px;position:relative"><span class="small muted">Sort by</span><button class="sel-like" style="flex:1" data-act="sortopen">'+ic('sort',14)+'<span style="flex:1;text-align:left">'+lab+'</span>'+ic('chev',14)+'</button>';
+  if(S.sortOpen){h+='<div class="float" style="top:34px;left:62px;right:16px;padding:4px">'+SORTS.map(function(x){return '<button class="row-i'+(S.sort===x[0]?' sel':'')+'" data-act="sort" data-v="'+x[0]+'">'+x[1]+'</button>';}).join('')+'</div>';}
+  h+='</div>';
+  h+='<div class="chips" style="padding:0 16px 10px"><button class="chip'+(S.filter==='all'?' on':'')+'" data-act="filter" data-v="all">All <span class="n">11</span></button>';
+  KORDER.forEach(function(k){h+='<button class="chip'+(S.filter===k?' on':'')+'" data-act="filter" data-v="'+k+'">'+KINDS[k].label+' <span class="n">'+KINDS[k].n+'</span></button>';});
+  h+='</div><div style="border-top:1px solid var(--neutral-30)"></div>';
+  var extra=ITEMS.filter(function(i){return i.isNew&&pass(i);});
+  if(extra.length){h+='<div class="grp"><div class="gh"><span>Just added</span></div>';extra.forEach(function(it){h+=rowI(it,0);});h+='</div>';}
+  if(S.sort==='attention'||S.sort==='place'){
+    var pl=PLACES.slice(); if(S.sort==='place')pl.sort(function(a,b){return a.site<b.site?-1:1;});
+    var natt=ITEMS.filter(needs).length;
+    h+='<div class="grp"><div class="gh"><span>Mesa field</span><span>'+(S.sort==='attention'?natt+' need attention':'11 items')+'</span></div><div style="padding:0 8px 4px"><button class="btn ghost sm" style="height:22px;padding:0 4px" data-act="selall" data-v="'+(S.filter==='all'?'visible':S.filter)+'">'+(S.filter==='all'?'Select all in Mesa field':'Select all in filter ('+KINDS[S.filter].label+')')+'</button></div>';
+    pl.forEach(function(p){
+      var site=item(p.site), ons=p.on.map(item);
+      if(S.sort==='attention')ons.sort(function(a,b){return needs(b)-needs(a);});
+      var rows=[site].concat(ons).filter(pass); if(!rows.length)return;
+      if(S.sort==='attention'&&p.att===0&&!h.match(/data-sep/)){h+='<div data-sep class="tiny muted" style="padding:8px 10px 2px;border-top:1px solid var(--neutral-30);margin-top:4px">All normal</div>';}
+      if(pass(site))h+=rowI(site,0);
+      (p.wells||[]).forEach(function(w){if(S.filter==='all')h+='<div class="row-i" style="padding-left:34px;color:var(--neutral-70);cursor:default"><span class="ki">'+ic('wellhead',15)+'</span><span class="nm small">'+w+' <span class="tiny">well, on '+p.site+'</span></span></div>';});
+      ons.filter(pass).forEach(function(it){h+=rowI(it,26);});
+    });
+    var g=item('Mesa lease'); if(pass(g))h+='<div class="tiny muted" style="padding:8px 10px 2px;border-top:1px solid var(--neutral-30);margin-top:4px">Field-wide</div>'+rowI(g,0);
+    h+='</div>';
+  }else if(S.sort==='kind'){
+    KORDER.forEach(function(k){
+      var rows=ITEMS.filter(function(i){return i.kind===k&&!i.isNew&&pass(i);}); if(!rows.length)return;
+      h+='<div class="grp"><div class="gh"><span>'+KINDS[k].label+' '+rows.length+'</span><button class="btn ghost sm" style="height:18px;padding:0 4px;text-transform:none;letter-spacing:0" data-act="selall" data-v="'+k+'">Select all in group</button></div>';
+      rows.forEach(function(it){h+=rowI(it,0);});h+='</div>';
+    });
+  }else{
+    var rows=ITEMS.filter(function(i){return !i.isNew&&pass(i);});
+    if(S.sort==='name')rows.sort(function(a,b){return a.id<b.id?-1:1;});
+    else {var ord=['P14','P12 lateral','CTB1','P21','P12','SWD1','L-SWD','CS01','L-GL21','P14 lateral','Mesa lease'];rows.sort(function(a,b){return ord.indexOf(a.id)-ord.indexOf(b.id);});}
+    h+='<div class="grp">';rows.forEach(function(it){h+=rowI(it,0,S.sort==='changed'?CHG[it.id]:'');});h+='</div>';
+  }
+  return h;
+}
+function listFoot(){return '<div class="pfoot"><button class="btn" style="flex:1;justify-content:center" data-act="tool" data-v="point">'+ic('plus',16)+'Add item</button>'+(S.empty?'':'<span class="small muted">1 unlinked</span>')+'</div>';}
+function detailsHead(it,back,close){
+  var k=KINDS[it.kind];
+  return '<div class="ph">'+(back?'<button class="btn ghost sm" style="margin:-4px 0 6px -8px" data-act="back">'+ic('back',16)+'All items</button>':'')+
+   '<div class="row"><span style="color:var(--neutral-80)">'+ic(k.icon,22)+'</span><div style="flex:1;min-width:0"><h3>'+it.id+'</h3><div class="small muted">'+k.label+(it.asset?' - linked to '+it.asset:' - not linked')+'</div></div>'+(close?'<button class="ibtn" data-act="close" title="Close">'+ic('x',18)+'</button>':'')+'</div>'+
+   '<div class="tabs">'+['details','style','link'].map(function(t){return '<button class="'+(S.tab===t?'on':'')+'" data-act="tab" data-v="'+t+'">'+t.charAt(0).toUpperCase()+t.slice(1)+'</button>';}).join('')+'</div></div>';
+}
+function detailsBody(it){
+  var k=KINDS[it.kind], h='';
+  if(S.tab==='details'){
+    h+='<div class="sect"><div class="field"><label>Name <span>Required</span></label><div class="input val">'+it.id+'</div></div>';
+    h+='<div class="field"><label>Kind <span>Required</span></label><div class="sel-like"'+(it.kind==='none'?' style="border-color:var(--neutral-90);border-width:2px"':'')+'>'+ic(k.icon,15)+(it.kind==='none'?'Pick a kind: Well pad, Tank battery, Compressor station, SWD':k.label)+'<span style="margin-left:auto">'+ic('chev',14)+'</span></div></div>';
+    if(it.x){
+      h+='<div class="field"><label>Location <span>Latitude, longitude</span></label><div class="input val">'+ic('pin',15)+it.ll+'</div><div class="tiny muted" style="margin-top:4px">Click the map, then drag the pin to fine-tune. Type here as a backup.</div><div class="tiny muted" style="margin-top:4px;display:flex;justify-content:space-between"><span>Lea County, New Mexico, US</span><button class="btn ghost sm" style="height:18px;padding:0">Zoom to location</button></div></div>';
+      if(it.isNew)h+='<div class="field"><label>Asset</label><div class="note">Not linked yet - pick the asset on the Link tab.</div></div>';
+      if(it.wells)h+='<div class="field"><label>Wells on pad</label><div class="chips"><span class="tag">'+ic('wellhead',12)+it.wells+'</span></div></div>';
+      if(!it.isNew)h+='<div class="field" style="margin:0"><label>Access road note</label><div class="input val small">'+(it.id==='P14'?'Gate code at CR 748 turn-off':'Lease Rd 3')+'</div></div>';
+      h+='</div>';
+      if(!it.isNew)h+='<div class="sect"><h4>Live now <span class="tag">From kind</span></h4><div class="kv"><span class="k">Comms</span><span style="display:flex;gap:4px;align-items:center">'+(it.lost?ic('comms-lost',14):'')+it.comms+'</span></div>'+(S.tagPop&&S.tagState==='override'&&it.id==='P14'?'<div class="kv kvrow act"><div style="min-width:0"><div style="display:flex;gap:4px;align-items:center">'+it.kvn+' '+ic('star',12)+'<span class="tag ovr">Override</span></div><div class="tiny muted mono" style="font-size:11px">[default]Mesa/P14/P14-2H/CasingPressure</div></div><span class="kvp"><b>'+it.kv+'</b><button class="ibtn" data-act="tagpop" title="Browse tags">'+ic('tag',14)+'</button></span></div>':'<div class="kv"><span class="k">'+it.kvn+' '+ic('star',12)+'</span><b style="display:flex;gap:4px;align-items:center">'+(it.stale?ic('stale',14)+'Stale - ':'')+it.kv+'</b></div>')+
+        (it.alarm?'<div class="kv"><span class="k">Alarms</span><span class="st a1">'+fi('a1u',14)+'1 - '+it.alarm.text+'</span></div>':'<div class="kv"><span class="k">Alarms</span><span class="muted">None</span></div>')+'</div>';
+    }else if(it.kind==='geo'){
+      h+='<div class="field" style="margin:0"><label>Area</label><div class="input val">'+it.area+' - 5 points</div></div></div>';
+    }else{
+      h+='<div class="field"><label>Service</label><div class="input val">'+it.svc+'</div></div><div class="field"><label>Pipe size</label><div class="presets"><span'+(it.size==='3 in'?' class="on"':'')+'>3 in</span><span'+(it.size==='4 in'?' class="on"':'')+'>4 in</span><span'+(it.size==='6 in'?' class="on"':'')+'>6 in</span></div></div>';
+      h+='<div class="field" style="margin:0"><label>Ends</label><div class="kv"><span class="k">From</span><span style="display:flex;gap:6px;align-items:center"><svg width="10" height="10"><rect width="10" height="10" fill="var(--neutral-90)"/></svg>'+it.from+' - snapped</span></div><div class="kv"><span class="k">To</span><span style="display:flex;gap:6px;align-items:center"><svg width="10" height="10"><rect width="10" height="10" fill="var(--neutral-90)"/></svg>'+it.to+' - snapped</span></div><div class="kv"><span class="k">Length</span><span>'+it.len+'</span></div></div></div>';
+    }
+  }else if(S.tab==='style'){
+    h+='<div class="sect"><div class="note">Style comes from the <b>'+k.label+'</b> kind and applies to all '+k.n+'. Changes here apply to '+it.id+' only and are marked <span class="tag ovr">Override</span>.</div></div>';
+    if(it.x){
+      h+='<div class="sect"><h4>Icon <span class="tag">From kind</span></h4><div style="display:flex;gap:10px;align-items:center"><span class="pv"><span class="disc">'+ic(k.icon,19)+'</span></span><span class="small muted">'+k.label+' icon from zoom 14, neutral dot below</span></div></div>';
+      h+='<div class="sect"><h4>Size <span class="tag">From kind</span></h4><div class="presets"><span>Small</span><span class="on">Standard</span><span>Large</span></div></div>';
+      h+='<div class="sect"><h4>Label <span class="tag ovr">Override <button class="btn ghost sm" style="height:16px;padding:0 0 0 4px;color:inherit">Reset</button></span></h4><div class="kv"><span class="k">Shows</span><div class="presets"><span class="on">Name</span><span>Name and key value</span></div></div><div class="kv"><span class="k">Position</span><div class="presets"><span>Below</span><span class="on">Right</span></div></div></div>';
+      h+='<div class="sect"><h4>Style rule <span class="tag">From kind</span></h4><div class="kv"><span class="k">States on Status</span><span>Now: <b>Running</b> - Normal</span></div><button class="btn sm" data-act="rail" data-v="kinds">Edit the kind\'s rule</button></div>';
+    }else{
+      h+='<div class="sect"><h4>Line <span class="tag">From kind</span></h4><div class="kv"><span class="k">Weight</span><div class="presets"><span>Thin</span><span'+(it.size!=='6 in'?' class="on"':'')+'>By pipe size</span><span>Heavy</span></div></div><div class="kv"><span class="k">Pattern</span><div class="presets"><span class="on">Solid</span><span>Dashed</span><span>Dotted</span></div></div></div>';
+      h+='<div class="sect"><h4>Label <span class="tag">From kind</span></h4><div class="presets"><span class="on">Name at midpoint</span><span>None</span></div></div>';
+    }
+    h+='<div class="sect tiny muted">Styles are presets from the project theme. Alarm always wins over style.</div>';
+  }else{
+    h+='<div class="sect"><h4>Asset</h4>'+(it.asset?'<div class="input val">'+ic('link',15)+it.asset+'</div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm">Change</button><button class="btn sm ghost">Unlink</button></div>':'<div class="note" style="display:flex;gap:6px;align-items:center">'+ic('link',14)+'Not linked. Pick an asset to show live values.</div><button class="btn sm pri" style="margin-top:8px">Link to an asset</button>')+'</div>';
+    h+='<div class="sect"><h4>Page link <span class="tag">From kind</span></h4><div class="input val small">/'+(it.kind==='pad'?'pad':'site')+'/{asset.id}</div><div class="tiny muted" style="margin-top:4px">Opens /'+(it.kind==='pad'?'pad':'site')+'/'+it.id+'</div></div>';
+    h+='<div class="sect"><h4>View alarms <span class="tag">From kind</span></h4><div class="input val small">/alarms?source={asset.path}</div><div class="tiny muted" style="margin-top:4px">Shown in the popup only while '+it.id+' has alarms</div></div>';
+    h+='<div class="sect"><h4>Popup parts <span class="tag">From kind</span></h4>'+['Name and kind','Comms','Key values','Alarm summary','Buttons'].map(function(p){return '<div class="kv" style="justify-content:flex-start;gap:8px"><span class="check on">'+ic('check',11)+'</span>'+p+'</div>';}).join('')+'</div>';
+  }
+  return h;
+}
+function bulkActive(){return S.bulk20||S.multi.length>1;}
+function bulkHead(back){
+  var ids=S.multi, kinds={}; ids.forEach(function(i){kinds[item(i).kind]=1;});
+  var one=Object.keys(kinds).length===1?Object.keys(kinds)[0]:null; if(S.bulk20)one='pad';
+  var n=S.bulk20?20:ids.length;
+  var title=one?n+' '+KINDS[one].label.toLowerCase()+(one==='swd'?'s':'s')+' selected':n+' items selected';
+  return '<div class="ph">'+(back?'<button class="btn ghost sm" style="margin:-4px 0 6px -8px" data-act="back">'+ic('back',16)+'All items</button>':'')+'<div class="row"><span>'+ic(one?KINDS[one].icon:'box',22)+'</span><div style="flex:1;min-width:0"><h3>'+title+'</h3><div class="small muted">Shared fields only - a change applies to all '+n+'</div></div><button class="btn sm ghost" data-act="clearsel">Clear</button></div>'+
+   '<div class="tabs">'+['details','style','link'].map(function(t){return '<button class="'+(S.tab===t?'on':'')+'" data-act="tab" data-v="'+t+'">'+t.charAt(0).toUpperCase()+t.slice(1)+'</button>';}).join('')+'</div></div>';
+}
+function mixedOr(vals){var u=vals.filter(function(v,i){return vals.indexOf(v)===i;});return u.length===1?u[0]:null;}
+function bulkBody(){
+  var ids=S.multi, its=ids.map(item), n=S.bulk20?20:ids.length, h='';
+  var allPads=S.bulk20||its.every(function(i){return i.kind==='pad';});
+  if(S.bulk20)h+='<div class="sect"><div class="note">Example at scale: 20 well pads picked with the box tool on a larger field. The Mesa demo has 3.</div></div>';
+  if(S.tab==='details'){
+    h+='<div class="sect">';
+    if(allPads){
+      var op=S.bulk20?null:mixedOr(its.map(function(i){return i.op;}));
+      h+='<div class="field"><label>Kind</label><div class="sel-like">'+ic('well-pad',15)+'Well pad<span style="margin-left:auto">'+ic('chev',14)+'</span></div></div>';
+      h+='<div class="field"><label>Operator</label><button class="sel-like" style="width:100%" data-act="bulkset">'+(op?'<span>'+op+'</span>':'<span class="mixed">Mixed - '+(S.bulk20?'3 values':'2 values')+'</span>')+ic('chev',14)+'</button>'+'<div class="tiny muted" style="margin-top:4px">Pick a value to set it on all '+n+'</div>'+'</div>';
+      h+='<div class="field"><label>Route <span>Just changed</span></label><div class="sel-like" style="border-color:var(--neutral-90)"><span>Route 3</span>'+ic('chev',14)+'</div><div class="tiny muted" style="margin-top:4px">'+(S.bulkSet?'Set on all '+n+' - was Mixed (Route 2, Route 3)':'Pick a value to set it on all '+n)+'</div></div>';
+      h+='<div class="field" style="margin:0"><label>Access road note</label><div class="input"><span class="mixed">Mixed</span></div></div>';
+    }else{
+      h+='<div class="field" style="margin:0"><label>Notes</label><div class="input"><span class="mixed">Mixed</span></div></div>';
+    }
+    h+='</div><div class="sect tiny muted">Name, location and asset link belong to one item and are not shown. Geometry is never bulk edited.</div>';
+  }else if(S.tab==='style'){
+    h+='<div class="sect"><h4>Size</h4><div class="presets"><span>Small</span><span class="on">Standard</span><span>Large</span></div></div>';
+    h+='<div class="sect"><h4>Label position <span class="tag">Mixed</span></h4><div class="presets"><span>Below</span><span>Right</span></div><div class="tiny muted" style="margin-top:6px">1 has an override. Pick one to set it on all, or Reset all to kind.</div></div>';
+  }else{
+    h+='<div class="sect"><h4>Page link <span class="tag">From kind</span></h4><div class="input val small">/pad/{asset.id}</div></div><div class="sect"><h4>Asset</h4><div class="note">Asset links are per item. Use Import to match many by name.</div></div>';
+  }
+  return h;
+}
+function bulkFoot(){var n=S.bulk20?20:S.multi.length;return '<div class="pfoot"><span class="small muted" style="flex:1">One change, one undo step</span><button class="ibtn" title="Delete '+n+' items">'+ic('trash',16)+'</button></div>';}
+function propsFor(back,close){
+  if(bulkActive())return bulkHead(back)+'<div class="pbody">'+bulkBody()+'</div>'+bulkFoot();
+  var it=item(S.sel); if(!it)return '';
+  return detailsHead(it,back,close)+'<div class="pbody">'+detailsBody(it)+'</div>'+detailsFoot();
+}
+function detailsFoot(){return '<div class="pfoot"><button class="btn sm">'+ic('copy',14)+'Add another like this</button><button class="ibtn" style="margin-left:auto" title="Delete (no confirmation, Ctrl+Z undoes)">'+ic('trash',16)+'</button></div>';}
+
+function kindsList(){
+  var h='<div style="padding:12px 16px 4px" class="small muted">Setup applies to every item of a kind. Items can override.</div><div class="grp">';
+  KORDER.forEach(function(k){h+='<button class="row-i'+(S.kindSel===k?' sel':'')+'" data-act="kind" data-v="'+k+'"><span class="ki">'+ic(KINDS[k].icon,17)+'</span><span class="nm">'+KINDS[k].label+'</span><span class="tiny muted">'+KINDS[k].geo+' - '+KINDS[k].n+'</span></button>';});
+  return h+'</div>';
+}
+function pvState(cls,word){
+  return '<span class="pv '+cls+'"><span class="disc">'+ic('well-pad',19)+'</span><span class="tiny" style="font-weight:600">P12'+(word?' <span class="tag" style="font-size:10px;padding:0 4px">'+word+'</span>':'')+'</span></span>';
+}
+function kindHead(back){
+  return '<div class="ph">'+(back?'<button class="btn ghost sm" style="margin:-4px 0 6px -8px" data-act="back">'+ic('back',16)+'All kinds</button>':'')+'<div class="row"><span>'+ic('well-pad',22)+'</span><div style="flex:1"><h3>Well pad</h3><div class="small muted">Point - applies to 3 items - 1 override (P14 label)</div></div></div>'+
+   '<div style="display:flex;align-items:center;gap:8px;margin-top:8px"><span class="small muted" style="white-space:nowrap">Preview item</span><span class="sel-like" style="flex:1">'+ic('well-pad',14)+'P14 <span class="muted mono" style="font-size:11px">[default]Mesa/P14</span><span style="margin-left:auto">'+ic('chev',14)+'</span></span></div>'+
+   '<div class="tiny muted" style="margin-top:4px">Tag browser opens at its asset folder; the style rule previews on it, on the map too.</div></div>';
+}
+function kindBody(){
+  var h='<div class="sect"><h4>Icon</h4><div style="display:flex;gap:8px">';
+  ['well-pad','wellhead','point'].forEach(function(n,i){h+='<span class="pv" style="width:auto"><span class="disc" style="'+(i===0?'box-shadow:0 0 0 2px var(--neutral-10),0 0 0 4px var(--neutral-90)':'')+'">'+ic(n,19)+'</span></span>';});
+  h+='</div><div class="tiny muted" style="margin-top:6px">From zoom 14 the icon, below a neutral dot. Label rank 2 of 7.</div></div>';
+  h+='<div class="sect"><h4>Style rule</h4><div class="presets" style="margin-bottom:8px"><span class="on">States</span><span>Bands</span><span>Expression</span></div>';
+  h+='<div class="field"><label>Value</label><div class="input val small" style="font-family:ui-monospace,monospace">{asset.path}/Status</div></div>';
+  h+='<div class="tiny muted" style="display:grid;grid-template-columns:1fr 18px 1fr 64px;gap:8px"><span>When Status is</span><span></span><span>Use preset</span><span>Preview</span></div>';
+  [['Running','Normal','',''],['Shut in','Dimmed dashed','dim','Shut in'],['Testing','Attention','att','Testing']].forEach(function(r){
+    h+='<div class="rule"><span class="input val small" style="height:30px">'+r[0]+'</span><span class="muted">'+ic('chevr',14)+'</span><span class="sel-like">'+r[1]+ic('chev',14)+'</span>'+pvState(r[2],r[3])+'</div>';
+  });
+  h+='<button class="btn sm ghost" style="padding-left:0">'+ic('plus',14)+'Add a state</button><div class="note" style="margin-top:8px">Alarm wins over the rule. A stale value shows only as Stale. Attention has no hue: heavier outline plus the word.</div></div>';
+  h+='<div class="sect"><h4>Key values <span class="tag">Up to 4</span></h4>';
+  [['Comms','{asset.path}/Heartbeat',1,0],['Casing pressure','{asset.path}/CasingPressure',1,1],['Tubing pressure','{asset.path}/TubingPressure',1,0],['Gas rate','{asset.path}/GasRate',0,0]].forEach(function(r){
+    h+='<div class="kv"><div style="min-width:0"><div style="display:flex;gap:4px;align-items:center">'+r[0]+(r[3]?' <span class="tag">'+ic('star',10)+'Icon value</span>':'')+'</div><div class="tiny muted" style="font-family:ui-monospace,monospace">'+r[1]+'</div></div><span class="sw2'+(r[2]?' on':'')+'"></span></div>';
+  });
+  h+='<button class="btn sm" style="margin-top:6px">'+ic('tag',14)+'Browse tags</button><div class="tiny muted" style="margin-top:6px">Resolves for 3 of 3 items.</div></div>';
+  h+='<div class="sect"><h4>Popup parts</h4>'+[['Name and kind',1],['Comms',1],['Key values',1],['Alarm summary and View alarms',1],['Page link - pop-out icon in the header',1],['Custom view',0]].map(function(p){return '<div class="kv" style="justify-content:flex-start;gap:8px"><span class="check'+(p[1]?' on':'')+'">'+(p[1]?ic('check',11):'')+'</span>'+p[0]+'</div>';}).join('')+'</div>';
+  return h;
+}
+function layersBody(){
+  return '<div class="sect"><h4>Basemap</h4><div class="presets"><span class="on">Blank</span><span>Satellite</span></div></div>'+
+   '<div class="sect"><h4>Show</h4>'+[['Lines',1],['Names',1],['Geofences',1],['Dots below zoom 14',1]].map(function(r){return '<div class="kv"><span>'+r[0]+'</span><span class="sw2'+(r[1]?' on':'')+'"></span></div>';}).join('')+'</div>'+
+   '<div class="sect"><h4>Reference layers <span class="tag">This session only</span></h4><div class="note">No reference layer loaded. Add a KML or GeoJSON file to trace over; it is never saved or edited.</div><button class="btn sm" style="margin-top:8px">'+ic('plus',14)+'Add reference layer</button></div>';
+}
+function importBody(){
+  return '<div class="sect"><h4>Import items</h4><div class="drop">'+ic('import',22)+'<div style="margin-top:6px;color:var(--label)">Drop a CSV, KML or GeoJSON file</div><div class="tiny">You see a preview first. Nothing changes until you add.</div></div></div>'+
+   '<div class="sect"><h4>CSV templates</h4>'+['Well pad','Tank battery','Pipeline'].map(function(k){return '<div class="kv"><span>'+k+'</span><button class="btn sm ghost">Download</button></div>';}).join('')+'</div>'+
+   '<div class="sect"><h4>Export</h4><div style="display:flex;gap:8px"><button class="btn sm">GeoJSON</button><button class="btn sm">CSV</button></div><div class="tiny muted" style="margin-top:6px">Whole map, 11 items</div></div>';
+}
+function railEl(slim){
+  var m=[['view','eye','View'],['items','list','Items'],['kinds','kinds','Kinds'],['layers','layers','Layers'],['import','import','Import']];
+  return '<div class="rail'+(slim?' slim':'')+'">'+m.map(function(x){return '<button class="'+(S.rail===x[0]?'on':'')+'" data-act="rail" data-v="'+x[0]+'">'+ic(x[1],20)+x[2]+'</button>';}).join('')+'</div>';
+}
+function titled(title,body,foot,extra){
+  return '<div class="ph"><div class="row"><h3 style="flex:1">'+title+'</h3>'+(extra||'')+'</div></div><div class="pbody">'+body+'</div>'+(foot||'');
+}
+
+
+/* =====================================================================
+   Key screens (2026-10-27). Everything below is new; everything above is
+   direction A's markup helpers and Mesa content, reused.
+   ===================================================================== */
+var Q={};location.search.replace(/^\?/,'').split('&').forEach(function(p){if(!p)return;var kv=p.split('=');Q[kv[0]]=decodeURIComponent(kv[1]||'');});
+var BARE=Q.bare==='1';
+var SCREENS=[
+  {n:1,key:'view-desktop',name:'View mode',dev:'desk',subs:[['popup','P14 popup'],['needs','Needs you open']],
+   cap:'Operator map at 1366: search top-left, "Needs you 3" beside it (opens a ranked list), Legend as a button bottom-left, Edit switch (editors only) and zoom top-right. The P14 popup reads comms with data age, then key values, then alarms with View alarms; the page link is the pop-out icon in the header.',
+   gov:'Memlog: view mode search top-left; Needs you summary and list; legend collapsed to a button; popup order and header icon; bottom-right clear for the App Bar toggle.'},
+  {n:2,key:'phone',name:'Phone',dev:'phone',subs:[['sheet','P14 sheet'],['needs','Top bar expanded'],['edit','Edit in sheet'],['move','Move point']],
+   cap:'390 x 844. One top bar holds search and Needs you and expands into the ranked list. A tap opens a bottom sheet in the popup order with a visible close and an Edit button for that one item. Move fixes a crosshair at the centre; the map moves under it; Done or Cancel. The bottom-right corner stays clear for the App Bar toggle.',
+   gov:'Memlog: phone popups are bottom sheets (ER-27); phone top bar; Edit inside the sheet, no map-wide switch; point move with a fixed centre crosshair. FR-4, FR-27, FR-28, 44 px targets.'},
+  {n:3,key:'line-instruments',name:'Instruments on lines',dev:'desk',subs:[['live','Segment PT-1 to PT-2'],['stale','PT-2 stale']],
+   cap:'L-SWD runs 2.9 km from CTB1 to SWD1 with taps PT-1 (1.1 km) and PT-2 (2.8 km) and line valve LV-1. A click on the line selects the segment between the nearest instruments (PT-1 to PT-2) and highlights them; the popup lists the instruments in order with live values. Each segment draws from the instruments at its two ends, so a stale PT-2 dashes only the two segments touching PT-2.',
+   gov:'Owner decision 2026-10-27: instruments on lines, per-segment worst of its two end instruments; popup order as for sites (comms, values, alarms).'},
+  {n:4,key:'edit-items',name:'Edit: Items',dev:'desk',subs:[['recent','Recent changes open']],
+   cap:'Direction A in edit mode with P14 selected (Details, Style, Link). Draw toolbar top-centre: Select, Box select (Alt for lasso), Well pad, Tank battery, Pipeline, generic Point, Line, Area, Snap off by default. Undo and Redo sit beside the save status, which opens Recent changes with Revert per change.',
+   gov:'Memlog: layout direction A; adding items (kind buttons plus generic tools); placing by click then drag; snapping off by default; undo both ways; one-step bulk and line deletes.'},
+  {n:5,key:'bulk-edit',name:'Bulk edit',dev:'desk',subs:[['20','20 pads']],
+   cap:'Example at scale: 20 well pads picked with the box tool. The form shows only the fields they share; values that differ read Mixed; Route was just set on all 20, and the toast offers "Undo: edit 20 pads" as one step.',
+   gov:'Memlog: bulk selection in list and on map; shared fields only, Mixed; a bulk change undoes as one step.'},
+  {n:6,key:'kinds',name:'Kinds',dev:'desk',subs:[['open','Tags: opens at asset folder'],['inside','Pick inside'],['outside','Pick outside'],['override','Item override'],['empty','Empty folder'],['loading','Loading'],['unreachable','Provider unreachable'],['style','Style rule and preview']],
+   cap:'Well pad setup in the decided order: Icon, Key values, Comms, Alarms, Popup, then Style rule last; the preview item (P14) sits in the kind header. Every tag pick opens one tag browser: a provider dropdown (the Gateway default marked and first) over that provider\'s tree, opened at the preview item\'s asset folder. A pick inside it is saved as {asset.path}/... with "Resolves for N of M"; a pick outside is saved as the full path with "Same tag for every well pad"; on one item\'s override every pick is saved as the full path. Typed paths work the same way.',
+   gov:'Owner decisions 2026-10-27 (initiative R15, PRD FR-12 and FR-37, architecture AD-8 tags.browse and tags.resolve): tag browser for every pick, full editing role only; Kinds sets up existing kinds only; preview item chosen by the editor; section order.'},
+  {n:7,key:'import',name:'Import',dev:'desk',subs:[['1','1 Preview'],['2','2 Columns'],['3','3 Match'],['4','4 Summary']],
+   cap:'Guided import of a 125-row CSV (example at scale): preview on the map plus a table, map columns to fields, match rows to assets (confident matches ticked, doubtful flagged), summary 120 new, 3 updated, 2 skipped, then Import. An import undoes as one step.',
+   gov:'Memlog: guided import steps; an import undoes as one step. FR-22 to FR-25.'},
+  {n:8,key:'first-run',name:'First run',dev:'desk',subs:[['empty','Empty map']],
+   cap:'An empty map in edit mode shows a short checklist: Set up your kinds, Add or import items, Check the operator view.',
+   gov:'Memlog: first run checklist. FR-36.'},
+  {n:9,key:'save-states',name:'Save states',dev:'desk',subs:[['saved','Saved'],['saving','Saving...'],['conflict','Conflict'],['unreachable','Store unreachable'],['busy','Busy']],
+   cap:'The save status beside Undo and Redo: Saved; Saving...; Not saved - conflict with Sam\'s change, with his change shown; Store unreachable, edits kept and tools paused; Busy, nothing saved, try again. Problems use the warning token with a glyph and words.',
+   gov:'Memlog: no Publish step, saves are live; undo. FR-29, FR-31, AD-10; busy reply text from the tracer story ("Map Studio is busy with other map requests; nothing was saved. Try again in a moment.").'}
+];
+function scr(){for(var i=0;i<SCREENS.length;i++)if(SCREENS[i].n===S.scr)return SCREENS[i];}
+function preset(n,v){
+  var sc=SCREENS[n-1]; v=v||sc.subs[0][0];
+  S={scr:n,sub:v,w:1366,edit:true,rail:'items',sel:'P14',tab:'details',tool:'select',drawing:false,save:'saved',filter:'all',zoom:15,popup:null,
+     multi:[],lastChk:null,bulk20:false,bulkSet:false,snap:false,recent:false,sort:'attention',sortOpen:false,newN:0,conflictOpen:false,toast:false,
+     legend:false,needs:false,kindSel:'pad',undoLbl:'Undo: edit 3 pads'};
+  if(n===1){S.edit=false;S.popup=v==='popup'?'P14':null;S.needs=v==='needs';}
+  if(n===2){S.edit=false;S.phone=true;S.popup='P14';S.phNeeds=v==='needs';if(v==='needs')S.popup=null;S.phEdit=v==='edit';S.phoneMove=v==='move';}
+  if(n===3){S.edit=false;S.lineStale=v==='stale';S.linePop=true;S.zoom=16;}
+  if(n===4){S.recent=true;}
+  if(n===5){S.bulk20=true;S.multi=['P12','P14','P21'];S.bulkSet=true;S.toast=true;S.toastMsg='Route set on 20 well pads';S.toastUndo='Undo: edit 20 pads';S.undoLbl='Undo: edit 20 pads';}
+  if(n===6){S.rail='kinds';S.preview='P14';S.tagPop=v!=='style';S.tagState=v;if(v==='override'){S.rail='items';S.sel='P14';S.tab='details';}}
+  if(n===7){S.rail='import';S.step=+v;S.importPrev=true;S.sel=null;}
+  if(n===8){S.empty=true;S.sel=null;}
+  if(n===9){S.save=v;S.conflictOpen=v==='conflict';}
+}
+
+/* ---------- 1 and 2 share the view map ---------- */
+function viewDesk(){return viewMap();}
+
+/* ---------- 2 phone ---------- */
+function phoneTop(){
+  var h='<div class="phbar"><div class="r">'+ic('search',18)+'<span class="muted" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Search sites, wells</span>'+
+   '<button class="tap44" data-act="phneeds" style="gap:6px;padding:0 8px;border-left:1px solid var(--neutral-30);border-radius:0;font-size:12px"><b>Needs you 3</b><span class="st a1">'+fi('a1u',14)+'1</span>'+ic('comms-lost',13)+ic('stale',13)+ic(S.phNeeds?'chev':'chevr',14)+'</button></div>';
+  if(S.phNeeds){
+    h+='<div style="border-top:1px solid var(--neutral-30);padding:4px 4px 6px"><div class="tiny muted" style="padding:6px 8px">Alarms by priority, then comms lost, then stale</div>';
+    NEEDS.forEach(function(n,i){var it=item(n[0]);
+      var g=n[1]==='a1'?'<span style="color:var(--error)">'+fi('a1u',18)+'</span>':ic(n[1]==='lost'?'comms-lost':'stale',18);
+      h+='<button class="row-i" data-act="phsel" data-id="'+n[0]+'" style="min-height:52px;align-items:flex-start">'+g+'<span style="flex:1"><b>'+n[0]+'</b> <span class="muted small">'+KINDS[it.kind].label+'</span><br><span class="small">'+n[2]+' - '+n[3]+'</span></span>'+ic('chevr',16)+'</button>';});
+    h+='</div>';
+  }
+  return h+'</div>';
+}
+function phoneSheet(){
+  var it=item('P14'), k=KINDS[it.kind];
+  var hd='<div class="grab"></div><div style="display:flex;align-items:center;gap:10px;padding:4px 4px 6px 14px"><span style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--neutral-50);display:flex;align-items:center;justify-content:center;color:var(--neutral-80)">'+ic(k.icon,18)+'</span><div style="flex:1"><div style="font-size:16px;font-weight:600">'+(S.phEdit?'Edit P14':'P14')+'</div><div class="small muted">'+(S.phEdit?'Saves as you go - '+ic('check',12)+' Saved':'Well pad - P14-2H')+'</div></div>'+
+    (S.phEdit?'':'<button class="tap44" title="Open the P14 page">'+ic('popout',18)+'</button>')+'<button class="tap44" data-act="phclose" title="Close">'+ic('x',20)+'</button></div>';
+  if(S.phEdit){
+    return '<div class="sheet">'+hd+'<div style="padding:4px 14px 6px"><div class="field"><label>Location <span>Latitude, longitude</span></label><div style="display:flex;gap:8px"><div class="input val" style="flex:1;height:44px">'+ic('pin',15)+it.ll+'</div><button class="btn" data-act="phmove" style="height:44px">Move</button></div></div>'+
+     '<div class="field"><label>Name</label><div class="input val" style="height:44px">P14</div></div><div class="field"><label>Access road note</label><div class="input val" style="height:44px">Gate code at CR 748 turn-off</div></div>'+
+     '<div class="tiny muted">On a phone you can move points and edit properties. Drawing and kinds need a wider screen.</div></div>'+
+     '<div style="display:flex;gap:8px;padding:8px 14px 14px;border-top:1px solid var(--neutral-30)"><button class="btn" style="height:44px">'+ic('undo',16)+'Undo</button><button class="btn pri" data-act="phdone" style="flex:1;justify-content:center;height:44px">Done</button></div></div>';
+  }
+  var h='<div class="sheet">'+hd+'<div style="padding:0 14px 4px"><div class="kv" style="border-bottom:1px solid var(--neutral-30);padding:8px 0"><span class="k">Comms</span><span style="display:flex;gap:4px;align-items:center">'+ic('check',14)+it.comms+'</span></div>';
+  [[it.kvn,it.kv],it.kv2[0],it.kv2[1]].forEach(function(v,i){h+='<div class="kv" style="padding:7px 0"><span class="k">'+v[0]+'</span><span style="font-weight:'+(i===0?600:500)+'">'+v[1]+'</span></div>';});
+  h+='</div><div class="alm" style="margin:6px 14px 10px;padding:10px 12px;border-radius:8px;background:var(--err-tint);border-left:3px solid var(--error)"><div style="display:flex;gap:6px;align-items:center;font-weight:600;color:var(--error)">'+fi('a1u',16)+'1 alarm - Priority 1, unacknowledged</div><div style="margin-top:3px">'+it.alarm.text+' - '+it.alarm.src+', '+it.alarm.age+' ago</div></div>';
+  h+='<div style="display:flex;gap:8px;padding:0 14px 14px"><button class="btn pri" style="flex:1;justify-content:center">View alarms</button><button class="btn" data-act="phedit" style="flex:1;justify-content:center">Edit</button></div></div>';
+  return h;
+}
+function phoneMoveUi(){
+  return '<div class="float" style="position:absolute;left:8px;right:8px;top:8px;z-index:12;padding:10px 14px;font-size:13px"><b>Moving P14</b><div class="small muted">Drag the map to put the crosshair on the pad. 38 m from where it was.</div></div>'+
+   '<svg class="cross" viewBox="0 0 64 64"><circle cx="32" cy="32" r="17" fill="var(--neutral-10)" stroke="var(--callToAction)" stroke-width="2.5"/><path d="M32 2v14M32 48v14M2 32h14M48 32h14" stroke="var(--neutral-90)" stroke-width="2.5" stroke-linecap="round"/><g transform="translate(22 22) scale(.8333)" fill="none" stroke="var(--neutral-80)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+P['well-pad']+'</g></svg>'+
+   '<div class="sheet" style="padding:12px 14px;display:flex;gap:8px;align-items:center"><span class="small" style="flex:1">'+ic('pin',15)+' 32.2300, -103.8686</span><button class="btn" data-act="phcancel" style="height:44px">Cancel</button><button class="btn pri" data-act="phdone" style="height:44px;padding:0 22px">Done</button></div>';
+}
+function phone(){
+  /* world centre placed so P14 sits above the sheet; in move mode the map has been dragged 30 px */
+  var dx=125, dy=S.phoneMove?-180:(S.popup?-322:-180), mx=S.phoneMove?-26:0, my=S.phoneMove?-22:0;
+  var h='<div class="map">'+mapWorld(dx+mx,dy+my);
+  if(S.phoneMove)h+=phoneMoveUi();
+  else{
+    h+=phoneTop()+'<div class="float phzoom"><button class="tap44">'+ic('plus',20)+'</button><button class="tap44">'+ic('minus',20)+'</button><button class="tap44">'+ic('fit',18)+'</button></div>';
+    if(S.popup)h+=phoneSheet(); else h+='<button class="float btn" style="left:8px;bottom:8px;height:44px;border:0">'+ic('layers',16)+'Legend</button>';
+    if(S.phToast)h+='<div class="toast" style="bottom:44px">'+ic('check',16)+'P14 moved 38 m. Saved<button class="btn sm" style="height:36px">Undo</button></div>';
+  }
+  return h+'</div>';
+}
+
+/* ---------- 3 instruments on lines ---------- */
+var LP={ctb:[170,170],bend:[260,430],swd:[1250,590],pt1:[467,463],lv:[859,527],pt2:[1207,583],click:[641,492]};
+function pt(p){return p[0]+' '+p[1];}
+function lineMap(){
+  var st=S.lineStale, h='<svg class="base" width="1366" height="728" viewBox="0 0 1366 728" style="position:absolute;inset:0">';
+  h+='<g stroke="var(--neutral-30)" stroke-width="7" fill="none" stroke-linecap="round"><path d="M0 330 C300 320 600 360 900 340 S1200 300 1366 310"/><path d="M90 0 C120 200 160 400 150 728"/><path d="M1180 560 L1366 690"/></g>';
+  h+='<g fill="var(--neutral-50)" font-size="11" font-family="system-ui"><text x="1240" y="300">CR 748</text><text x="104" y="640" transform="rotate(-86 104 640)">Lease Rd 3</text></g>';
+  h+='<path d="M0 640 L170 190" stroke="var(--neutral-50)" stroke-width="3" fill="none"/><text x="38" y="520" font-size="11" fill="var(--neutral-70)" font-family="system-ui">P14 lateral</text>';
+  /* segments: CTB1-PT1, PT1-PT2, PT2-SWD1 */
+  var segs=[['M'+pt(LP.ctb)+' L'+pt(LP.bend)+' L'+pt(LP.pt1),0],['M'+pt(LP.pt1)+' L'+pt(LP.pt2),st],['M'+pt(LP.pt2)+' L'+pt(LP.swd),st]];
+  if(S.linePop)h+='<path d="'+segs[1][0]+'" stroke="var(--callToAction)" stroke-width="14" stroke-opacity=".3" fill="none" stroke-linecap="round"/>';
+  segs.forEach(function(s){h+='<path d="'+s[0]+'" stroke="var(--neutral-60)" stroke-width="6" fill="none" stroke-linejoin="round"'+(s[1]?' stroke-dasharray="8 6"':' stroke-linecap="round"')+'/>';});
+  h+='<path d="M'+pt(LP.ctb)+' L'+pt(LP.bend)+' L'+pt(LP.swd)+'" stroke="transparent" stroke-width="18" fill="none" data-act="linepop" style="cursor:pointer"/>';
+  /* end instruments: CTB1 outlet, SWD1 inlet */
+  [[LP.ctb[0]+9,LP.ctb[1]+27],[LP.swd[0]-30,LP.swd[1]-3]].forEach(function(p){h+='<rect x="'+(p[0]-4)+'" y="'+(p[1]-4)+'" width="8" height="8" fill="var(--neutral-90)" stroke="var(--neutral-10)" stroke-width="1.5"/>';});
+  /* line label */
+  h+='<g font-family="system-ui" font-size="11" font-weight="600"><rect x="224" y="282" width="'+(st?96:50)+'" height="18" rx="3" fill="var(--neutral-10)" stroke="var(--neutral-40)"/><text x="230" y="295" fill="var(--neutral-80)">L-SWD</text>'+(st?'<g transform="translate(272 284) scale(.583)" fill="none" stroke="var(--neutral-80)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+P.stale+'</g><text x="288" y="295" fill="var(--neutral-80)" font-weight="500">Stale</text>':'')+'</g>';
+  if(S.linePop)h+='<circle cx="'+LP.click[0]+'" cy="'+LP.click[1]+'" r="4" fill="var(--neutral-10)" stroke="var(--callToAction)" stroke-width="2"/>';
+  h+='</svg>';
+  function ins(p,name,icon,cls,word){return '<div class="ins '+(cls||'')+'" style="left:'+p[0]+'px;top:'+(p[1]+8)+'px"><span class="d">'+ic(icon,14)+'</span><span class="l">'+name+(word||'')+'</span></div>';}
+  h+=ins(LP.pt1,'PT-1','tap',S.linePop?'hl':'');
+  h+=ins(LP.lv,'LV-1','line-valve','v');
+  h+=ins(LP.pt2,'PT-2','tap','lft '+(S.linePop?'hl ':'')+(st?'stale':''),st?'<span class="w">Stale</span>':'');
+  function site(id,p,icon,word){return '<button class="mk" style="left:'+p[0]+'px;top:'+(p[1]+10)+'px'+(id==='SWD1'?';flex-direction:row;gap:6px;transform:translate(-17px,-50%)':'')+'"><span class="disc">'+ic(icon,19)+(word?'<span class="badge g">'+ic('stale',14)+'</span>':'')+'</span><span class="lab">'+id+(word?'<span class="w">Stale</span>':'')+'</span></button>';}
+  h+=site('CTB1',LP.ctb,'tank-battery')+site('SWD1',LP.swd,'swd',true);
+  if(S.linePop)h+=linePopup();
+  return h;
+}
+function linePopup(){
+  var st=S.lineStale;
+  var h='<div class="popup" style="width:350px;left:'+LP.click[0]+'px;top:'+(LP.click[1]-4)+'px">';
+  h+='<div class="phd"><span style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--neutral-50);display:flex;align-items:center;justify-content:center;color:var(--neutral-80)">'+ic('pipeline',17)+'</span><div style="flex:1"><h3>L-SWD</h3><div class="muted">Pipeline - Produced water, 6 in, 2.9 km</div></div><button class="ibtn" title="Open the L-SWD page">'+ic('popout',16)+'</button><button class="ibtn" data-act="lineclose" title="Close">'+ic('x',16)+'</button></div>';
+  h+='<div class="seg-box"><div style="display:flex;justify-content:space-between;font-weight:600"><span>Segment PT-1 to PT-2</span><span class="muted" style="font-weight:500">1.1 to 2.8 km</span></div><div class="small" style="margin-top:2px">'+(st?ic('stale',13)+' Stale - drawn dashed until PT-2 updates':'398 to 371 psi - drop 27 psi over 1.7 km')+'</div></div>';
+  h+='<div class="pb"><div class="kv" style="border-bottom:1px solid var(--neutral-30);padding-bottom:7px;margin-bottom:3px"><span class="k">Comms</span><span style="display:flex;gap:4px;align-items:center">'+(st?ic('stale',14)+'PT-2 stale - last 18 min ago':ic('check',14)+'OK - 4 instruments, oldest 9 s ago')+'</span></div>';
+  h+='<div class="tiny muted" style="padding:4px 0 2px">Instruments, CTB1 to SWD1</div>';
+  var rows=[['CTB1 outlet','0 km','412 psi',0,'sq'],['PT-1','1.1 km','398 psi',1,'tap'],['LV-1 line valve','2.0 km','',0,'line-valve'],['PT-2','2.8 km',st?'371 psi (last)':'371 psi',1,'tap'],['SWD1 inlet','2.9 km','365 psi',0,'sq']];
+  rows.forEach(function(r){
+    var g=r[4]==='sq'?'<svg width="10" height="10"><rect width="10" height="10" fill="var(--neutral-90)"/></svg>':ic(r[4],15);
+    var val=r[2]?(st&&r[0]==='PT-2'?'<span style="display:flex;gap:4px;align-items:center;color:var(--neutral-70)">'+ic('stale',13)+'Stale - '+r[2]+'</span>':'<b>'+r[2]+'</b>'):'<span class="muted small">No value</span>';
+    h+='<div class="irow'+(r[3]?' hl':'')+'"><span style="color:var(--neutral-80);display:flex">'+g+'</span><span>'+r[0]+' <span class="pos">'+r[1]+'</span></span>'+val+'</div>';
+  });
+  h+='</div><div class="pb muted" style="padding-bottom:12px;display:flex;gap:6px;align-items:center;border-top:1px solid var(--neutral-30);padding-top:8px">'+ic('check',14)+'No active alarms</div>';
+  return h+'</div>';
+}
+function lineScreen(){
+  return '<div class="map">'+lineMap()+'<div class="float search">'+ic('search',18)+'Search sites, wells or lines</div>'+needsYou()+legend()+topRight(false)+'<div class="scale"><span>200 m</span><i></i></div></div>';
+}
+
+/* ---------- 4, 5, 9: direction A studio ---------- */
+function headA(){
+  if(S.save==='saved'||S.save==='saving')return '<div class="ph"><div class="row"><h3 style="flex:1">Mesa map</h3>'+saveCluster()+'</div></div>';
+  /* problem states need words: status gets its own row under the title */
+  return '<div class="ph"><div class="row"><h3 style="flex:1">Mesa map</h3>'+undoRedo()+'</div><div style="margin-top:6px">'+saveEl().replace('class="save','style="width:100%;white-space:normal;text-align:left" class="save')+'</div></div>';
+}
+function saveCards(){
+  if(S.save==='unreachable')return '<div class="float banner"><h4>'+ic('cloud',16)+'Store unreachable</h4><p>Map Studio cannot reach the map store. Your 2 edits are kept on this computer, not saved yet, and save when the store is back. Drawing and editing are paused; live values still update.</p><div style="display:flex;gap:8px"><button class="btn sm pri">Try again</button><button class="btn sm">Show my 2 edits</button></div></div>';
+  if(S.save==='busy')return '<div class="float banner"><h4>'+ic('warn',16)+'Not saved - Map Studio is busy</h4><p>Map Studio is busy with other map requests; nothing was saved. Try again in a moment.</p><p class="tiny muted" style="margin:0 0 8px">Your change, kept here: P14 label position Right.</p><div style="display:flex;gap:8px"><button class="btn sm pri">Try again</button><button class="btn sm">Discard my change</button></div></div>';
+  if(S.save==='saving')return '';
+  return '';
+}
+function studio(){
+  var lw=256,pw=320,h=railEl(false),list='',props='',extraMap='';
+  if(S.rail==='items'){list=headA()+'<div class="pbody">'+(S.empty?emptyList():listBody())+'</div>'+listFoot();props=S.empty?'':propsFor(false,true);if(S.tagPop&&S.tagState==='override')extraMap+=tagPop();}
+  else if(S.rail==='kinds'){list=headA()+'<div class="pbody">'+kindsList()+'</div>';props=kindHead(false)+'<div class="pbody" id="kbody">'+kindBody6()+'</div>';if(S.tagPop)extraMap+=tagPop();}
+  else if(S.rail==='import'){return h+'<div class="panel" style="width:'+(lw+pw)+'px">'+importPanel()+'</div><div class="map">'+mapWorld(0)+topRight(false)+importChip()+'</div>';}
+  h+='<div class="panel" style="width:'+lw+'px">'+list+'</div>';
+  if(props)h+='<div class="panel" style="width:'+pw+'px">'+props+'</div>';
+  h+='<div class="map">'+mapWorld(props?-60:0)+toolbarTop()+topRight(false)+overlays()+conflictCard('top:60px;left:16px')+recentPanel('top:8px;left:8px')+saveCards()+extraMap+(S.empty?firstRun():'')+'</div>';
+  return h;
+}
+
+/* ---------- 6 kinds ---------- */
+function kindBody6(){
+  var h='<div class="sect"><h4>1 Icon</h4><div style="display:flex;gap:8px">';
+  ['well-pad','wellhead','point'].forEach(function(n,i){h+='<span class="pv" style="width:auto"><span class="disc" style="'+(i===0?'box-shadow:0 0 0 2px var(--neutral-10),0 0 0 4px var(--neutral-90)':'')+'">'+ic(n,19)+'</span></span>';});
+  h+='</div><div class="tiny muted" style="margin-top:6px">From zoom 14 the icon, below a neutral dot.</div></div>';
+  h+='<div class="sect"><h4>2 Key values <span class="tag">Up to 4</span></h4>';
+  var ts=S.tagPop?S.tagState:'', k4=['Key value 4','Pick a tag',0,0];
+  if(ts==='inside')k4=['Gas rate','{asset.path}/GasRate',0,0];
+  if(ts==='outside')k4=['Ambient temperature','[default]Mesa/Weather/AmbientTemp',0,0];
+  [['Casing pressure','{asset.path}/CasingPressure',1,1],['Tubing pressure','{asset.path}/TubingPressure',1,0],['Status','{asset.path}/Status',0,0],k4].forEach(function(r,i){
+    var act=S.tagPop&&i===3;
+    h+='<div class="kv kvrow'+(act?' act':'')+'"><div style="min-width:0"><div style="display:flex;gap:4px;align-items:center">'+r[0]+(r[3]?' <span class="tag">'+ic('star',10)+'Icon value</span>':'')+(r[0]==='Status'?' <span class="tag">Used by style rule</span>':'')+(ts==='outside'&&i===3?' <span class="tag" style="color:var(--warning);background:var(--warn-tint)">'+ic('warn',10)+'Same tag for every well pad</span>':'')+'</div><div class="tiny mono muted" style="font-size:11px'+(i===3&&r[1]==='Pick a tag'?';font-style:italic':'')+'">'+r[1]+'</div></div><span class="kvp"><button class="ibtn" data-act="tagpop" title="Browse tags">'+ic('tag',14)+'</button><span class="sw2'+(r[2]?' on':'')+'"></span></span></div>';});
+  h+='<div class="tiny muted" style="margin-top:6px">On or off sets what the popup shows. Each path resolves for 3 of 3 well pads.</div></div>';
+  h+='<div class="sect"><h4>3 Comms</h4><div class="field"><label>Heartbeat path</label><div class="input val small mono">{asset.path}/Heartbeat<span style="margin-left:auto;color:var(--neutral-80)">'+ic('tag',14)+'</span></div></div><div class="tiny muted">Data age, Stale and Comms lost come from this one clock and the project\'s data age settings. Resolves for 3 of 3.</div></div>';
+  h+='<div class="sect"><h4>4 Alarms</h4><div class="field"><label>Alarm source</label><div class="input val small mono">{asset.path}<span style="margin-left:auto;color:var(--neutral-80)">'+ic('tag',14)+'</span></div></div><div class="field" style="margin:0"><label>View alarms link</label><div class="input val small mono">/alarms?source={asset.path}</div></div><div class="tiny muted" style="margin-top:4px">Count and highest priority show on the icon; the button shows only while there are alarms.</div></div>';
+  h+='<div class="sect"><h4>5 Popup</h4>'+[['Comms and data age',1],['Key values that are on (2 to 3)',1],['Alarms and View alarms',1],['Page link - pop-out icon in the header: /pad/{asset.id}',1],['Custom view',0]].map(function(p){return '<div class="kv" style="justify-content:flex-start;gap:8px"><span class="check'+(p[1]?' on':'')+'">'+(p[1]?ic('check',11):'')+'</span>'+p[0]+'</div>';}).join('')+'<div class="tiny muted" style="margin-top:4px">Order is fixed: comms, values, alarms.</div></div>';
+  h+='<div class="sect" id="rulesect"><h4>6 Style rule <span class="tag">Builds on key values</span></h4><div class="presets" style="margin-bottom:8px"><span class="on">States</span><span>Bands</span><span>Expression</span></div>';
+  h+='<div class="field"><label>Value</label><div class="sel-like">Status <span class="muted">key value</span><span style="margin-left:auto">'+ic('chev',14)+'</span></div></div>';
+  h+='<div class="tiny muted" style="margin:-4px 0 10px">Previews on P14, the preview item chosen in the header, on the map too.</div>';
+  h+='<div class="tiny muted" style="display:grid;grid-template-columns:1fr 18px 1fr 64px;gap:8px"><span>When Status is</span><span></span><span>Use preset</span><span>Preview</span></div>';
+  [['Running','Normal','',''],['Shut in','Dimmed dashed','dim','Shut in'],['Testing','Attention','att','Testing']].forEach(function(r){
+    h+='<div class="rule"><span class="input val small" style="height:30px">'+r[0]+'</span><span class="muted">'+ic('chevr',14)+'</span><span class="sel-like">'+r[1]+ic('chev',14)+'</span><span class="pv '+r[2]+'"><span class="disc">'+ic('well-pad',19)+'</span><span class="tiny" style="font-weight:600">P14'+(r[3]?' <span class="tag" style="font-size:10px;padding:0 4px">'+r[3]+'</span>':'')+'</span></span></div>';});
+  h+='<div class="note" style="margin-top:8px;display:flex;gap:22px;align-items:center;padding-top:14px"><span class="pv" style="width:auto"><span class="disc" style="position:relative">'+ic('well-pad',19)+'<span style="position:absolute;top:-9px;right:-14px;color:var(--error);font-weight:700;font-size:11px;display:flex">'+fi('a1u',16)+'1</span></span></span><span>Live now: P14 is <b>Running</b> (Normal), but its priority 1 alarm wins over the rule.</span></div></div>';
+  return h;
+}
+function tagPop(){
+  /* One browser for every tag pick. States: open, inside, outside, override, empty, loading, unreachable. */
+  var st=S.tagState, ov=st==='override', bad=st==='unreachable';
+  var forWhat=ov?'Casing pressure on P14 only - an override':'Key value 4 of the Well pad kind';
+  var h='<div class="float tagpop"><div class="tph"><b style="flex:1">Pick a tag</b><button class="ibtn" data-act="tagpop" title="Close">'+ic('x',16)+'</button></div><div class="for">For: '+forWhat+'</div>';
+  h+='<div style="display:flex;gap:8px;align-items:center;padding:0 14px"><span class="small muted">Provider</span><span class="sel-like" style="flex:1">'+ic('tag',13)+(bad?'<span class="mono">edge-p12</span>':'<span class="mono">default</span> <span class="tag">Default</span>')+'<span style="margin-left:auto">'+ic('chev',14)+'</span></span>'+
+     (st==='outside'?'<button class="btn sm ghost" title="Back to the preview item\'s asset folder">'+ic('up',13)+'P14 folder</button>':'')+'</div>';
+  function row(d,name,icon,ty,dt,cls,extra){
+    return '<div class="tr2 '+(cls||'')+'"><span class="nm" style="padding-left:'+(8+d*16)+'px">'+(icon==='chev'||icon==='chevr'?ic(icon,12):'<span style="width:12px"></span>')+ic(icon==='chev'||icon==='chevr'?(ty==='Folder'?'folder':'inst'):'tag',13)+name+(extra||'')+'</span><span class="ty">'+ty+'</span><span class="dt">'+(dt||'')+'</span></div>';
+  }
+  var AF=' <span class="tag">Asset folder</span>';
+  h+='<div class="tree">';
+  if(bad){
+    h+='<div class="fail"><h5>'+ic('cloud',15)+'Can\'t browse edge-p12</h5><p>The Gateway cannot reach this tag provider right now. Try again, pick another provider, or type the path below.</p><button class="btn sm pri">Try again</button></div>';
+  }else{
+    h+=row(0,'Mesa','chev','Folder','','fd');
+    h+=row(1,'CTB1','chevr','UDT instance','','fd');
+    h+=row(1,'P12','chevr','UDT instance','','fd');
+    if(st==='outside'){
+      h+=row(1,'P14','chevr','UDT instance','','fd',AF);
+      h+=row(1,'P21','chevr','UDT instance','','fd');
+      h+=row(1,'Weather','chev','Folder','','fd');
+      h+=row(2,'AmbientTemp','tag','Reference','Float8','on');
+      h+=row(2,'Rainfall','tag','Reference','Float8','');
+      h+=row(2,'WindSpeed','tag','Reference','Float8','');
+      h+=row(0,'Ridge','chevr','Folder','','fd');
+    }else{
+      var deep=st==='empty'||st==='loading'||ov;
+      h+=row(1,'P14','chev','UDT instance','','fd',AF);
+      var sel={open:'',inside:'GasRate',override:'',empty:'',loading:''}[st];
+      if(!deep){
+        [['CasingPressure','Float8'],['GasRate','Float8'],['Heartbeat','Int4'],['Status','String'],['TubingPressure','Float8']].forEach(function(t){h+=row(2,t[0],'tag','Reference',t[1],'in'+(sel===t[0]?' on':''));});
+        h+=row(2,'P14-2H','chevr','UDT instance','','fd in');
+      }else{
+        h+=row(2,'CasingPressure','tag','Reference','Float8','in');
+        h+=row(2,'Heartbeat','tag','Reference','Int4','in');
+        h+=row(2,'P14-2H','chev','UDT instance','','fd in');
+        if(ov){
+          h+=row(3,'CasingPressure','tag','Reference','Float8','in on');
+          h+=row(3,'Plunger','chevr','Folder','','fd in');
+          h+=row(3,'TubingPressure','tag','Reference','Float8','in');
+        }else{
+          h+=row(3,'Plunger','chev','Folder','','fd in'+(st==='empty'?' on':''));
+          h+='<div class="tr2 in"><span class="msg" style="padding-left:'+(8+4*16+18)+'px">'+(st==='empty'?'No tags in this folder':'<span class="spin"></span>Loading...')+'</span></div>';
+          h+=row(3,'TubingPressure','tag','Reference','Float8','in');
+        }
+      }
+      h+=row(1,'P21','chevr','UDT instance','','fd');
+      h+=row(1,'Weather','chevr','Folder','','fd');
+    }
+  }
+  h+='</div>';
+  var path={open:'',inside:'[default]Mesa/P14/GasRate',outside:'[default]Mesa/Weather/AmbientTemp',override:'[default]Mesa/P14/P14-2H/CasingPressure',empty:'[default]Mesa/P14/P14-2H/Plunger',loading:'',unreachable:''}[st];
+  h+='<div style="padding:8px 14px 0"><div class="tiny muted" style="margin-bottom:3px">Path - pick in the tree or type one</div><div class="input '+(path?'val ':'')+'small mono" style="height:30px">'+(path||'[default]Mesa/P14/...')+'</div></div>';
+  var note='', ok=false, btn='Use this tag';
+  if(st==='open'||st==='loading'){
+    note='<div class="picked">Opened at <b>P14\'s asset folder</b>, the preview item. A tag in it is saved for every well pad as <span class="mono" style="font-weight:600">{asset.path}/...</span>. Go up to pick a tag anywhere else.</div>';
+  }else if(st==='inside'){
+    ok=true;
+    note='<div class="picked"><div class="tiny muted">Inside P14\'s asset folder - saved for every well pad as</div><div class="mono">{asset.path}/GasRate</div><div class="tiny muted" style="margin-top:4px;display:flex;gap:4px;align-items:center">'+ic('check',12)+'Resolves for 3 of 3 well pads</div></div>';
+  }else if(st==='outside'){
+    ok=true;
+    note='<div class="picked warn"><div class="wt">'+ic('warn',14)+'Same tag for every well pad</div><div>AmbientTemp is outside P14\'s asset folder, so it is saved as the full path and all 3 well pads show this one tag.</div><div class="mono" style="margin-top:4px">[default]Mesa/Weather/AmbientTemp</div></div>';
+  }else if(ov){
+    ok=true; btn='Use for P14';
+    note='<div class="picked"><div class="tiny muted">Saved for P14 only, as the full path</div><div class="mono">[default]Mesa/P14/P14-2H/CasingPressure</div><div class="tiny muted" style="margin-top:4px">Marked <span class="tag ovr">Override</span> with Reset. The other 2 well pads keep {asset.path}/CasingPressure from the kind.</div></div>';
+  }else if(st==='empty'){
+    note='<div class="picked">Plunger is a folder with no tags. Pick a tag, not a folder.</div>';
+  }else if(bad){
+    note='<div class="picked">Typed paths still work: a path inside P14\'s asset folder is saved as {asset.path}/..., any other as the full path.</div>';
+  }
+  h+=note;
+  return h+'<div style="display:flex;gap:8px;justify-content:flex-end;padding:10px 14px 10px"><button class="btn sm" data-act="tagpop">Cancel</button><button class="btn sm pri'+(ok?'':' off')+'" data-act="tagpop">'+btn+'</button></div></div>';
+}
+
+/* ---------- 7 import ---------- */
+var UPD=['P12','P14','P21'];
+function rnd(seed){var x=seed;return function(){x=(x*1103515245+12345)%2147483648;return x/2147483648;};}
+function importDots(){
+  var r=rnd(7),h='<g>';
+  for(var i=0;i<120;i++){var x=380+r()*660,y=130+r()*660;
+    h+='<circle cx="'+x.toFixed(0)+'" cy="'+y.toFixed(0)+'" r="4.5" fill="var(--neutral-10)" stroke="var(--neutral-70)" stroke-width="1.5" stroke-dasharray="2.5 1.5"/>';}
+  return h+'</g>';
+}
+function importChip(){
+  return '<div class="float" style="left:12px;bottom:12px;padding:8px 12px;font-size:12px;display:flex;flex-direction:column;gap:4px"><b>Preview - not on the map yet</b><span style="display:flex;gap:6px;align-items:center"><svg width="12" height="12"><circle cx="6" cy="6" r="4.5" fill="var(--neutral-10)" stroke="var(--neutral-70)" stroke-width="1.5" stroke-dasharray="2.5 1.5"/></svg>120 new well pads</span><span style="display:flex;gap:6px;align-items:center"><span class="tag">Updated</span>3 existing pads, new location</span></div>';
+}
+var IROWS=[['2','P101','32.2412','-103.8790','Mesa Operating'],['3','P102','32.2405','-103.8755','Mesa Operating'],['4','P12','32.2363','-103.8712','Mesa Operating'],['5','P103','32.2398','-103.8731','Ridge Partners'],['6','P1O7','32.2391','-103.8702','Mesa Operating'],['7','P14','32.2299','-103.8687','Mesa Operating'],['8','Pad 115','32.2384','-103.8668','Ridge Partners'],['9','P130','','','Mesa Operating']];
+function importPanel(){
+  var st=S.step, names=['Preview','Map columns','Match to assets','Summary'];
+  var h='<div class="ph"><div class="row"><h3 style="flex:1">Import</h3><span class="tag">'+ic('import',12)+'mesa-north-pads.csv - 125 rows</span><button class="ibtn" title="Cancel import">'+ic('x',18)+'</button></div>';
+  h+='<div class="steps">'+names.map(function(n,i){return '<span class="'+(i+1===st?'on':(i+1<st?'done':''))+'">'+(i+1)+' '+n+'</span>';}).join('')+'</div></div><div class="pbody">';
+  if(st===1){
+    h+='<div class="sect"><div class="note">Example at scale: the Mesa demo has 3 pads; this file adds the north lease. Rows show on the map as dashed dots. Nothing changes until you import.</div></div>';
+    h+='<div style="padding:8px 8px 0"><table class="t"><tr><th>Row</th><th>Pad name</th><th>Lat</th><th>Long</th><th>Operator</th><th></th></tr>';
+    IROWS.forEach(function(r){var bad=!r[2];h+='<tr'+(bad?' class="flag"':'')+'><td class="muted">'+r[0]+'</td><td>'+r[1]+'</td><td class="mono">'+(r[2]||'-')+'</td><td class="mono">'+(r[3]||'-')+'</td><td>'+r[4]+'</td><td>'+(bad?'<span class="flagw">'+ic('warn',12)+'No location</span>':'')+'</td></tr>';});
+    h+='<tr><td colspan="6" class="muted small">117 more rows</td></tr></table></div><div class="sect small" style="border:0"><span class="flagw">'+ic('warn',12)+'2 rows have problems</span> <span class="muted">- row 9 has no location, row 41 repeats row 40. You decide in step 3.</span></div>';
+  }else if(st===2){
+    h+='<div class="sect"><div class="small muted" style="margin-bottom:8px">Every row becomes a <b>Well pad</b> (picked for the file; the file has no kind column).</div><div class="sel-like" style="width:220px">'+ic('well-pad',14)+'Well pad<span style="margin-left:auto">'+ic('chev',14)+'</span></div></div>';
+    h+='<div style="padding:8px"><table class="t"><tr><th>Column in the file</th><th>Example</th><th>Goes to</th></tr>';
+    [['Pad name','P101','Name',1],['Lat','32.2412','Latitude',1],['Long','-103.8790','Longitude',1],['Operator','Mesa Operating','Operator',1],['Lease','Mesa North','Do not import',0],['Spud date','2024-03-11','Do not import',0]].forEach(function(r){
+      h+='<tr><td><b>'+r[0]+'</b></td><td class="muted">'+r[1]+'</td><td><div class="sel-like" style="width:170px'+(r[3]?'':';color:var(--neutral-70)')+'">'+r[2]+ic('chev',14)+'</div></td></tr>';});
+    h+='</table></div><div class="sect small muted" style="border:0">Name and location are required. Columns were matched by their headings; change any that are wrong.</div>';
+  }else if(st===3){
+    h+='<div class="sect" style="padding-bottom:10px"><div class="chips"><span class="chip on">All 125</span><span class="chip">Confident 118</span><span class="chip">'+ic('warn',12)+'Check 2</span><span class="chip">Existing 3</span><span class="chip">Skip 2</span></div></div>';
+    h+='<div style="padding:0 8px"><table class="t"><tr><th></th><th>Row</th><th>Asset</th><th>Match</th></tr>';
+    [['on','P101','Mesa/P101','Same name'],['on','P102','Mesa/P102','Same name'],['on','P12','Mesa/P12','Existing item - update location'],['flag','P1O7','Mesa/P107?','Letter O, not zero'],['on','P14','Mesa/P14','Existing item - update location'],['flag','Pad 115','Mesa/P115?','Name differs'],['off','P130','-','Skip: no location'],['off','P140 (row 41)','-','Skip: repeats row 40']].forEach(function(r){
+      var flag=r[0]==='flag';
+      h+='<tr'+(flag?' class="flag"':'')+'><td><span class="check'+(r[0]==='on'?' on':'')+'">'+(r[0]==='on'?ic('check',10):'')+'</span></td><td>'+r[1]+'</td><td class="mono">'+r[2]+'</td><td class="small">'+(flag?'<span class="flagw">'+ic('warn',12)+'Check</span> ':'')+r[3]+'</td></tr>';});
+    h+='<tr><td colspan="4" class="muted small">117 more rows, all confident</td></tr></table></div><div class="sect small muted" style="border:0">Confident matches are ticked. Tick a flagged row to accept its match, or pick another asset. Unmatched rows import unlinked.</div>';
+  }else{
+    h+='<div class="sect"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'+[['120','new','Well pads added, linked to their assets'],['3','updated','P12, P14, P21: location from the file'],['2','skipped','Row 9 no location, row 41 repeated']].map(function(c){return '<div style="border:1px solid var(--neutral-30);border-radius:8px;padding:12px"><div class="sumn">'+c[0]+'</div><div style="font-weight:600;margin:2px 0 4px">'+c[1]+'</div><div class="tiny muted">'+c[2]+'</div></div>';}).join('')+'</div></div>';
+    h+='<div class="sect"><h4>Before you import</h4><div class="kv"><span class="k">Kind</span><span>Well pad</span></div><div class="kv"><span class="k">Matches you confirmed</span><span>2 (P1O7, Pad 115)</span></div><div class="kv"><span class="k">Unlinked after import</span><span>0</span></div></div>';
+    h+='<div class="sect" style="border:0"><div class="note" style="display:flex;gap:8px;align-items:center">'+ic('undo',16)+'<span>An import undoes as one step: <b>Undo: import 123 items</b>.</span></div></div>';
+  }
+  h+='</div><div class="pfoot">'+(st>1?'<button class="btn" data-act="step" data-v="'+(st-1)+'">'+ic('back',14)+'Back</button>':'<button class="btn">Choose another file</button>')+'<span style="flex:1"></span>'+(st<4?'<button class="btn pri" data-act="step" data-v="'+(st+1)+'">Next: '+names[st]+'</button>':'<button class="btn pri">Import 123 items</button>')+'</div>';
+  return h;
+}
+
+/* ---------- 8 first run ---------- */
+function emptyList(){return '<div class="empty">'+ic('list',22)+'<div style="margin-top:6px;color:var(--label)">No items yet</div><div class="tiny">Items you add or import are listed here, grouped by place.</div></div>';}
+function firstRun(){
+  var h='<div class="float check-card"><div style="font-size:16px;font-weight:600">Get Mesa on the map</div><div class="small muted" style="margin:2px 0 10px">Three steps. Edits save as you go.</div>';
+  [['Set up your kinds','Choose icons, key values, comms and alarms for the 7 kinds this project defines.','Open Kinds'],['Add or import items','Click a kind in the toolbar and click the map, or import a CSV, KML or GeoJSON file.','Import a file'],['Check the operator view','See the map the way operators will, with live values.','Open view mode']].forEach(function(c,i){
+    h+='<div class="ck"><span class="num">'+(i+1)+'</span><div style="flex:1"><b>'+c[0]+'</b><div class="small muted">'+c[1]+'</div></div><button class="btn sm'+(i===0?' pri':'')+'">'+c[2]+'</button></div>';});
+  return h+'<div style="display:flex;justify-content:space-between;border-top:1px solid var(--neutral-30);padding-top:10px"><span class="tiny muted">0 of 3 done</span><button class="btn ghost sm">Hide checklist</button></div></div>';
+}
+
+/* ---------- frame and picker ---------- */
+function render(){
+  var sc=scr();
+  var sw='<b>Map Studio - key screens</b><span class="seg">'+SCREENS.map(function(x){return '<button class="'+(x.n===S.scr?'on':'')+'" data-act="scr" data-v="'+x.n+'">'+x.n+' '+x.name+'</button>';}).join('')+'</span>';
+  if(sc.subs.length>1)sw+='<span class="seg">'+sc.subs.map(function(x){return '<button class="'+(x[0]===S.sub?'on':'')+'" data-act="sub" data-v="'+x[0]+'">'+x[1]+'</button>';}).join('')+'</span>';
+  document.getElementById('sw').innerHTML=sw;
+  document.getElementById('rat').innerHTML='<h2>'+sc.n+' '+sc.name+'</h2><p>'+sc.cap+'</p><div class="gov">Governed by: '+sc.gov+'</div>';
+  var fr=document.getElementById('frame');
+  if(sc.dev==='phone'){
+    fr.className='frame phone';fr.style.width='390px';fr.style.height='844px';
+    fr.innerHTML='<div class="host" style="padding:0 12px"><span class="crumb"><b>Mesa</b> / Map</span><span class="who">Alex</span></div><div class="comp">'+phone()+'</div><div class="phapp" title="Perspective App Bar toggle">'+ic('chev',12)+'App</div>';
+    return;
+  }
+  fr.className='frame';fr.style.width='1366px';fr.style.height='768px';
+  var comp=S.scr===3?lineScreen():(S.edit?studio():viewDesk());
+  fr.innerHTML='<div class="host"><span class="crumb">Fields / <b>Mesa</b> / Map</span><span class="who">Jordan - map editor</span></div><div class="comp">'+comp+'</div><div class="appbar" title="Perspective App Bar toggle">'+ic('chev',12)+'App</div>';
+  if(S.scr===6){var kb=document.getElementById('kbody');if(kb&&S.sub==='style')kb.scrollTop=kb.scrollHeight;}
+}
+var timer=null;
+function later(fn,ms){clearTimeout(timer);timer=setTimeout(function(){fn();render();},ms);}
+document.addEventListener('click',function(e){
+  var t=e.target.closest('[data-act]'); if(!t)return;
+  var a=t.getAttribute('data-act'), v=t.getAttribute('data-v'), id=t.getAttribute('data-id');
+  switch(a){
+    case 'scr':preset(+v);break;
+    case 'sub':preset(S.scr,v);break;
+    case 'edit':if(S.scr<=3){preset(4);}else{S.edit=!S.edit;}break;
+    case 'rail':if(v==='view'){preset(1);}else if(v==='kinds'){preset(6);}else if(v==='import'){preset(7,'1');}else if(v==='items'){preset(4);S.recent=false;}else return;break;
+    case 'sel':if(S.edit){S.multi=[];S.bulk20=false;S.sel=id;S.rail='items';S.toast=false;}else{S.popup=item(id)&&item(id).x?id:null;S.needs=false;}break;
+    case 'close':S.sel=null;break;
+    case 'tab':S.tab=v;break;
+    case 'filter':S.filter=v;break;
+    case 'chk':(function(){var i=S.multi.indexOf(id);if(i>=0)S.multi.splice(i,1);else S.multi.push(id);S.bulk20=false;if(S.multi.length===1)S.sel=S.multi[0];})();break;
+    case 'selall':S.multi=[].map.call(document.querySelectorAll('[data-act=chk]'),function(n){return n.getAttribute('data-id');});S.bulk20=false;break;
+    case 'clearsel':S.multi=[];S.bulk20=false;S.toast=false;break;
+    case 'bulkset':S.bulkSet=true;S.toast=true;S.save='saving';later(function(){S.save='saved';},900);break;
+    case 'sortopen':S.sortOpen=!S.sortOpen;break;
+    case 'sort':S.sort=v;S.sortOpen=false;break;
+    case 'tool':S.tool=v;S.drawing=v==='line'||v==='pipe';S.toast=false;break;
+    case 'dcancel':S.drawing=false;S.tool='select';break;
+    case 'dfinish':S.drawing=false;S.tool='select';S.toast=true;S.toastMsg='Pipeline added and saved';S.toastUndo='Undo';S.save='saving';later(function(){S.save='saved';},900);break;
+    case 'toastx':S.toast=false;break;
+    case 'snap':S.snap=!S.snap;break;
+    case 'recent':S.recent=!S.recent;S.conflictOpen=false;break;
+    case 'conflict':S.recent=false;S.conflictOpen=!S.conflictOpen;break;
+    case 'resolve':S.save='saving';S.conflictOpen=false;later(function(){S.save='saved';},900);break;
+    case 'zin':S.zoom=Math.min(18,S.zoom+1);break;
+    case 'zout':S.zoom=Math.max(10,S.zoom-1);break;
+    case 'pclose':S.popup=null;break;
+    case 'legend':S.legend=!S.legend;break;
+    case 'needs':S.needs=!S.needs;if(S.needs)S.popup=null;break;
+    case 'phneeds':S.phNeeds=!S.phNeeds;if(S.phNeeds)S.popup=null;break;
+    case 'phsel':S.phNeeds=false;S.popup='P14';S.phEdit=false;break;
+    case 'phclose':S.popup=null;S.phEdit=false;break;
+    case 'phedit':S.phEdit=true;break;
+    case 'phmove':S.phoneMove=true;S.phToast=false;break;
+    case 'phcancel':S.phoneMove=false;S.phEdit=true;break;
+    case 'phdone':if(S.phoneMove){S.phoneMove=false;S.phEdit=true;S.phToast=true;}else{S.phEdit=false;S.phToast=false;}break;
+    case 'linepop':S.linePop=true;break;
+    case 'lineclose':S.linePop=false;break;
+    case 'tagpop':S.tagPop=!S.tagPop;if(!S.tagState||S.tagState==='style')S.tagState='open';break;
+    case 'step':S.step=+v;S.sub=v;break;
+    case 'kind':S.kindSel=v;break;
+    default:return;
+  }
+  render();
+});
+if(BARE)document.body.className='bare';
+preset(+(Q.s||1),Q.v);
+render();
+</script>
+</body>
+</html>

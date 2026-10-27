@@ -30,6 +30,14 @@ public interface MapStore {
                    String actor, String source) {
     }
 
+    /** A committed batch as its row keeps it: who saved it and the reply it got. */
+    record StoredBatch(String actor, JsonObject result) {
+    }
+
+    /** Who made an entity's last change and when (ISO 8601, UTC, to the second). */
+    record LastEdit(String actor, String at) {
+    }
+
     /** What a transaction may do. Times are the database's {@code now()}: one time per transaction. */
     interface Tx {
 
@@ -50,6 +58,12 @@ public interface MapStore {
 
         /** The batch's result, kept so a retried batchId returns it (entry 2). */
         void insertBatch(String project, String batchId, long seq, String actor, JsonObject result) throws SQLException;
+
+        /** The committed batch of this id, or empty (epic 2 story 2: a retried batchId replays it). */
+        Optional<StoredBatch> findBatch(String project, String batchId) throws SQLException;
+
+        /** The last edit record of one entity, or empty when it has none. */
+        Optional<LastEdit> lastEdit(String project, String entity, String entityId) throws SQLException;
 
         /** Every map item of the project that is not deleted, ordered by id. */
         List<MapItemRecord> liveItems(String project) throws SQLException;
