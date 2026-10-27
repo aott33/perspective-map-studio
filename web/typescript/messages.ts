@@ -25,7 +25,12 @@ export const MessageTypes = {
     EDITS_APPLY: 'edits.apply',
     EDITS_APPLY_REPLY: 'edits.apply.reply',
     MAP_CHANGED: 'map.changed',
-    ERROR: 'error'
+    ERROR: 'error',
+    /** The tag browser's lookups (epic 2 story 15); their replies are read by epic-editing. */
+    TAGS_BROWSE: 'tags.browse',
+    TAGS_BROWSE_REPLY: 'tags.browse.reply',
+    TAGS_RESOLVE: 'tags.resolve',
+    TAGS_RESOLVE_REPLY: 'tags.resolve.reply'
 } as const;
 
 export interface Envelope<B = Record<string, unknown>> {

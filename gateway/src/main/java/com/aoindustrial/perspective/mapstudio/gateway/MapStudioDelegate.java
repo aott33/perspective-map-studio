@@ -8,8 +8,11 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import com.inductiveautomation.ignition.common.auth.web.WebAuthUser;
 import com.inductiveautomation.ignition.common.gson.JsonElement;
@@ -26,6 +29,7 @@ import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 import com.aoindustrial.perspective.mapstudio.gateway.change.ChangeBus;
 import com.aoindustrial.perspective.mapstudio.gateway.load.MapLoader;
 import com.aoindustrial.perspective.mapstudio.gateway.setup.SetupRegistry;
+import com.aoindustrial.perspective.mapstudio.gateway.tags.TagLookups;
 import com.aoindustrial.perspective.mapstudio.gateway.write.Actor;
 import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
 import com.aoindustrial.perspective.mapstudio.gateway.write.WriteService;
@@ -39,7 +43,8 @@ import com.aoindustrial.perspective.mapstudio.gateway.write.WriteService;
  * {@code edits.apply} read the session's project and user on the event thread
  * (roles from {@code Session.getWebAuthStatus().getUser().getRoles()}, read on
  * every message, docs/platform-checks.md, epic 2 story 1), then run on the
- * module's bounded work pool and answer from there.
+ * module's bounded work pool and answer from there; so do {@code tags.browse} and
+ * {@code tags.resolve} (entry 15).
  *
  * <p>From startup to shutdown the delegate is subscribed to the change bus for its
  * session's project and sends each committed batch to its browser as
@@ -216,11 +221,28 @@ public class MapStudioDelegate extends ComponentModelDelegate {
             send(error(id, Messages.CODE_INVALID, "The session could not be read."));
             return;
         }
+        submitWork(services.work, type, id, job(services.loader, services.writes, services.tags, view, type, id, body),
+            this::send);
+    }
+
+    /** The work for a message that runs on the pool: a tag lookup for {@code tags.*}, else a store call. */
+    static Supplier<JsonObject> job(MapLoader loader, WriteService writes, TagLookups tags, SessionView view, String type,
+            String id, JsonObject body) {
+        return isTagType(type)
+            ? () -> tagsReply(tags, view, type, id, body)
+            : () -> storeReply(loader, writes, view, type, id, body);
+    }
+
+    /**
+     * Run {@code job} on the work pool and send its reply; a full or stopping pool is answered at
+     * once with {@link #busyReply}, a store or a tag message alike.
+     */
+    static void submitWork(Executor work, String type, String id, Supplier<JsonObject> job, Consumer<JsonObject> send) {
         try {
-            services.work.execute(() -> send(storeReply(services.loader, services.writes, view, type, id, body)));
+            work.execute(() -> send.accept(job.get()));
         } catch (RejectedExecutionException ex) {
             log.debugf("%s %s refused: the work pool is full or stopping.", type, id);
-            send(busyReply(id));
+            send.accept(busyReply(id));
         }
     }
 
@@ -258,6 +280,27 @@ public class MapStudioDelegate extends ComponentModelDelegate {
     }
 
     /**
+     * The reply to {@code tags.browse} or {@code tags.resolve} for this session (entry 15), on the
+     * work pool like the store messages. Every refusal becomes an {@code error} envelope; anything
+     * else is logged and answered {@code tags-unavailable}.
+     */
+    static JsonObject tagsReply(TagLookups tags, SessionView view, String type, String id, JsonObject body) {
+        try {
+            if (Messages.TAGS_BROWSE.equals(type)) {
+                return envelope(Messages.TAGS_BROWSE_REPLY, id, tags.browseReply(view.project(), view.roles(), body));
+            }
+            return envelope(Messages.TAGS_RESOLVE_REPLY, id, tags.resolveReply(view.project(), view.roles(), body));
+        } catch (MapStudioException ex) {
+            log.debugf("%s %s refused for project %s: %s", type, id, view.project(), ex.getMessage());
+            return envelope(Messages.ERROR, id, ex.toErrorBody());
+        } catch (RuntimeException ex) {
+            log.error("Map Studio failed on " + type + " for project " + view.project() + ": "
+                + ex.getClass().getSimpleName(), ex);
+            return error(id, Messages.CODE_TAGS_UNAVAILABLE, "Map Studio could not look up tags; see the Gateway log.");
+        }
+    }
+
+    /**
      * The answer when the module's bounded work pool is full or stopping: {@code store-unreachable}
      * with the reason, so the browser shows it and nothing is saved (docs/contract.md).
      */
@@ -267,7 +310,11 @@ public class MapStudioDelegate extends ComponentModelDelegate {
     }
 
     private static boolean isStoreType(String type) {
-        return Messages.MAP_LOAD.equals(type) || Messages.EDITS_APPLY.equals(type);
+        return Messages.MAP_LOAD.equals(type) || Messages.EDITS_APPLY.equals(type) || isTagType(type);
+    }
+
+    static boolean isTagType(String type) {
+        return Messages.TAGS_BROWSE.equals(type) || Messages.TAGS_RESOLVE.equals(type);
     }
 
     /**

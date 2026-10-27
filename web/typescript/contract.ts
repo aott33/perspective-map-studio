@@ -17,7 +17,9 @@ export const ErrorCodes = {
     STALE: 'stale',
     STORE_UNREACHABLE: 'store-unreachable',
     /** Readable but not saved here: a newer map store schema, or a standby Gateway (epic 2 story 5). */
-    READ_ONLY: 'read-only'
+    READ_ONLY: 'read-only',
+    /** The tag system did not answer a tag lookup within 5 s, or failed (epic 2 story 15). */
+    TAGS_UNAVAILABLE: 'tags-unavailable'
 } as const;
 
 /** Editing levels map.load reports (AD-2). */

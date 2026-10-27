@@ -54,6 +54,8 @@ A list of dicts, one per asset a map item can be linked to:
 
 Assets are checked after kinds, against the last good kind list: an asset whose kind is not in it is left out.
 
+**Asset-relative tag paths (entry 15).** A kind's setup names tags once for every asset of that kind, below the asset's `basePath`: `{asset.path}/Pressure` reads `[default]Mesa/P12/Pressure` for P12 and `[default]Mesa/P14/Pressure` for P14. The tag browser picks a full path and asks the Gateway (`tags.resolve`) to turn it into this form: a pick inside the asset's `basePath` becomes `{asset.path}/<suffix>`, with how many of the kind's linked map items the tag exists for ("resolves for 2 of 3 items"); a pick outside stays a full path, the same tag for every item. So give assets of one kind the same tag layout below their `basePath` (one UDT per kind does that). The shapes and rules: [contract.md](contract.md), "tags.browse and tags.resolve".
+
 For both lists, keys Map Studio does not know are ignored, and the values must be plain JSON values (text, numbers, true or false, lists, dicts). Return a list (a tuple also works), not a Dataset: convert one with `system.dataset.toPyDataSet` and build the dicts.
 
 ## What Map Studio does with them
