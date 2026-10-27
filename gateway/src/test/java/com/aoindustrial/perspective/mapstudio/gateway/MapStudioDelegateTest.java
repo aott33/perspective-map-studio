@@ -1,10 +1,15 @@
 package com.aoindustrial.perspective.mapstudio.gateway;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.inductiveautomation.ignition.common.gson.JsonObject;
@@ -16,10 +21,16 @@ import com.inductiveautomation.perspective.gateway.api.Session;
 import org.junit.jupiter.api.Test;
 
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
+import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
+import com.aoindustrial.perspective.mapstudio.gateway.adapter.NoAdapters;
 import com.aoindustrial.perspective.mapstudio.gateway.change.ChangeBus;
 import com.aoindustrial.perspective.mapstudio.gateway.setup.SetupRegistry;
+import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
+import com.aoindustrial.perspective.mapstudio.gateway.store.StoreState;
+import com.aoindustrial.perspective.mapstudio.gateway.tags.TagLookups;
 import com.aoindustrial.perspective.mapstudio.gateway.write.Actor;
 import com.aoindustrial.perspective.mapstudio.gateway.write.ChangeHook;
+import com.aoindustrial.perspective.mapstudio.gateway.write.FakeMapStore;
 
 /** The I/O matrix of story 1's plan, one test per row. */
 class MapStudioDelegateTest {
@@ -102,6 +113,86 @@ class MapStudioDelegateTest {
         assertEquals(null, MapStudioDelegate.check(envelope(1, "edits.apply", "e", null)));
         assertEquals("invalid", MapStudioDelegate.check(envelope(1, "map.changed", "c", null))
             .getAsJsonObject("body").get("code").getAsString(), "map.changed is sent, never received");
+    }
+
+    @Test
+    void theTagLookupsPassTheEnvelopeCheckAndGoToTheWorkPool() {
+        // Epic 2 story 15: tags.browse and tags.resolve run on the work pool like the store messages.
+        assertEquals(null, MapStudioDelegate.check(envelope(1, "tags.browse", "b", null)));
+        assertEquals(null, MapStudioDelegate.check(envelope(1, "tags.resolve", "r", null)));
+        assertTrue(MapStudioDelegate.isTagType("tags.browse"));
+        assertTrue(MapStudioDelegate.isTagType("tags.resolve"));
+        assertEquals(false, MapStudioDelegate.isTagType("map.load"));
+        assertEquals("invalid", MapStudioDelegate.check(envelope(1, "tags.browse.reply", "c", null))
+            .getAsJsonObject("body").get("code").getAsString(), "a reply is sent, never received");
+    }
+
+    /** Tag lookups over a tag system that fails on any browse, for project {@code TagsReplyTest.P}. */
+    private static TagLookups brokenTags() throws Exception {
+        SetupRegistry setups = new SetupRegistry(s -> { });
+        setups.put(TagsReplyTest.P,
+            Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\",\"roles\":{\"full\":[\"MapEditor\"]}}"));
+        return new TagLookups(setups, new StoreGate(setups, c -> StoreState.ready()), new FakeMapStore(),
+            NoAdapters::snapshot, new TagsReplyTest.Broken());
+    }
+
+    @Test
+    void aTagMessageIsRoutedToTheTagLookupsAndAStoreMessageToTheStore() throws Exception {
+        MapStudioDelegate.SessionView view = new MapStudioDelegate.SessionView(TagsReplyTest.P, "u", List.of("MapEditor"));
+        TagLookups tags = brokenTags();
+        JsonObject browse = MapStudioDelegate.job(null, null, tags, view, "tags.browse", "b1", new JsonObject()).get();
+        assertEquals("b1", browse.get("id").getAsString());
+        assertEquals("tags-unavailable", browse.getAsJsonObject("body").get("code").getAsString(), "the tag system was asked");
+        JsonObject resolve = MapStudioDelegate.job(null, null, tags, view, "tags.resolve", "r1", new JsonObject()).get();
+        assertEquals("invalid", resolve.getAsJsonObject("body").get("code").getAsString());
+        // No loader: a map.load goes to the store side, whose failure is store-unreachable.
+        JsonObject load = MapStudioDelegate.job(null, null, tags, view, "map.load", "m1", new JsonObject()).get();
+        assertEquals("store-unreachable", load.getAsJsonObject("body").get("code").getAsString());
+    }
+
+    @Test
+    void aTagLookupOnAFullWorkPoolIsAnsweredBusyAtOnce() throws Exception {
+        ThreadPoolExecutor pool = MapStudioServices.newWorkPool(1, 1, Thread::new);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch started = new CountDownLatch(1);
+        List<JsonObject> sent = new CopyOnWriteArrayList<>();
+        try {
+            pool.execute(() -> {
+                started.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+            assertTrue(started.await(5, TimeUnit.SECONDS));
+            pool.execute(() -> { });
+            AtomicBoolean ran = new AtomicBoolean();
+            MapStudioDelegate.submitWork(pool, "tags.browse", "b2", () -> {
+                ran.set(true);
+                return new JsonObject();
+            }, sent::add);
+            assertEquals(1, sent.size());
+            assertEquals("b2", sent.get(0).get("id").getAsString());
+            assertEquals("store-unreachable", sent.get(0).getAsJsonObject("body").get("code").getAsString());
+            assertTrue(sent.get(0).getAsJsonObject("body").get("message").getAsString().contains("busy"));
+            assertEquals(false, ran.get());
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
+        ThreadPoolExecutor free = MapStudioServices.newWorkPool(1, 1, Thread::new);
+        try {
+            CountDownLatch replied = new CountDownLatch(1);
+            MapStudioDelegate.submitWork(free, "tags.resolve", "r2", () -> MapStudioDelegate.busyReply("never"), r -> {
+                sent.add(r);
+                replied.countDown();
+            });
+            assertTrue(replied.await(5, TimeUnit.SECONDS), "a free pool runs the job and sends its reply");
+            assertEquals("never", sent.get(1).get("id").getAsString());
+        } finally {
+            free.shutdownNow();
+        }
     }
 
     @Test
@@ -228,5 +319,34 @@ class MapStudioDelegateTest {
         assertEquals("", none.get("actor").getAsString());
         assertEquals(5, none.get("seq").getAsInt());
         assertEquals("mapeditor", body.get("actor").getAsString());
+    }
+
+    @Test
+    void aViewerGetsKindSetupRecordsWithoutTheirTagPaths() {
+        JsonObject body = com.inductiveautomation.ignition.common.gson.JsonParser.parseString("{\"seq\":6,"
+            + "\"actor\":\"mapeditor\",\"ops\":[{\"op\":\"create\",\"entity\":\"kindSetup\",\"id\":\"pad\","
+            + "\"version\":1,\"record\":{\"kindId\":\"pad\",\"setup\":{\"comms\":{\"path\":\"{asset.path}/C\"}},"
+            + "\"version\":1,\"deleted\":false}}]}").getAsJsonObject();
+        JsonObject none = MapStudioDelegate.bodyFor(body, "none");
+        assertEquals("{\"kindId\":\"pad\",\"version\":1,\"deleted\":false}",
+            none.getAsJsonArray("ops").get(0).getAsJsonObject().get("record").toString());
+        assertEquals(true, body.getAsJsonArray("ops").get(0).getAsJsonObject().getAsJsonObject("record").has("setup"));
+        assertEquals(body, MapStudioDelegate.bodyFor(body, "full"));
+    }
+
+    @Test
+    void aViewerGetsMapItemRecordsWithoutTheirOverrides() {
+        JsonObject body = com.inductiveautomation.ignition.common.gson.JsonParser.parseString("{\"seq\":7,"
+            + "\"actor\":\"mapeditor\",\"ops\":[{\"op\":\"update\",\"entity\":\"item\",\"id\":\"4f6c\","
+            + "\"version\":2,\"record\":{\"id\":\"4f6c\",\"kind\":\"pad\",\"name\":\"P12\",\"overrides\":"
+            + "{\"kpis\":[{\"key\":\"p\",\"path\":\"[default]Mesa/P12/Pressure\"}]},\"version\":2,"
+            + "\"deleted\":false}}]}").getAsJsonObject();
+        JsonObject record = MapStudioDelegate.bodyFor(body, "none").getAsJsonArray("ops").get(0).getAsJsonObject()
+            .getAsJsonObject("record");
+        assertEquals("{}", record.get("overrides").toString());
+        assertEquals("P12", record.get("name").getAsString());
+        assertEquals(true, body.getAsJsonArray("ops").get(0).getAsJsonObject().getAsJsonObject("record")
+            .getAsJsonObject("overrides").has("kpis"), "the shared body is never changed");
+        assertEquals(body, MapStudioDelegate.bodyFor(body, "phone"));
     }
 }

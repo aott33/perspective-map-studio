@@ -2,7 +2,7 @@ package com.aoindustrial.perspective.mapstudio.gateway.write;
 
 import java.util.List;
 
-import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
+import com.aoindustrial.perspective.mapstudio.common.contract.StoredRecord;
 
 /**
  * Called once after every committed batch (AD-17), outside the transaction, with
@@ -20,7 +20,10 @@ public interface ChangeHook {
     record CommittedBatch(String project, long seq, String batchId, Actor actor, List<CommittedOp> ops) {
     }
 
-    /** One saved op: {@code op} and {@code entity} as sent, and the record as stored after the op (new version). */
-    record CommittedOp(String op, String entity, String id, MapItemRecord record) {
+    /**
+     * One saved op: {@code op} and {@code entity} as sent, and the record as stored after the op
+     * (new version): a map item record, or a kind setup record for {@code kindSetup} (story 9).
+     */
+    record CommittedOp(String op, String entity, String id, StoredRecord record) {
     }
 }

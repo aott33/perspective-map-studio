@@ -55,13 +55,25 @@ public final class Messages {
      */
     public static final String MAP_CHANGED = "map.changed";
     public static final String ERROR = "error";
+    /** Browser lists tag providers and one folder's children: body {provider?, folder?} (entry 15). */
+    public static final String TAGS_BROWSE = "tags.browse";
+    /**
+     * Body {provider, folder, providers: [{name, isDefault}], children: [{name, path, type, dataType,
+     * hasChildren}], truncated}; at most 1000 children, ordered by name (entry 15).
+     */
+    public static final String TAGS_BROWSE_REPLY = "tags.browse.reply";
+    /** Browser turns a picked tag path asset-relative: body {kindId, assetId, path} (entry 15). */
+    public static final String TAGS_RESOLVE = "tags.resolve";
+    /** Body {path, relative, n?, m?}: {@code n} and {@code m} only when {@code relative} (entry 15). */
+    public static final String TAGS_RESOLVE_REPLY = "tags.resolve.reply";
 
     /** Every type the Gateway accepts from the browser. */
-    public static final Set<String> INBOUND_TYPES = Set.of(POINT_CLICK, MAP_LOAD, EDITS_APPLY);
+    public static final Set<String> INBOUND_TYPES = Set.of(POINT_CLICK, MAP_LOAD, EDITS_APPLY, TAGS_BROWSE, TAGS_RESOLVE);
 
     /** Every type the Gateway sends to the browser. */
     public static final Set<String> OUTBOUND_TYPES =
-        Set.of(POINT_CLICK_REPLY, MAP_LOAD_REPLY, EDITS_APPLY_REPLY, MAP_CHANGED, ERROR);
+        Set.of(POINT_CLICK_REPLY, MAP_LOAD_REPLY, EDITS_APPLY_REPLY, MAP_CHANGED, ERROR, TAGS_BROWSE_REPLY,
+            TAGS_RESOLVE_REPLY);
 
     // Error codes: stable kebab-case words.
     /** A batch's baseVersion is not the stored version. */
@@ -80,9 +92,12 @@ public final class Messages {
      */
     public static final String CODE_READ_ONLY = "read-only";
 
+    /** The tag system did not answer a tag lookup within 5 s, or failed (entry 15, draft addition). */
+    public static final String CODE_TAGS_UNAVAILABLE = "tags-unavailable";
+
     /** Every error code of this contract version. */
-    public static final Set<String> CODES =
-        Set.of(CODE_CONFLICT, CODE_ROLE, CODE_INVALID, CODE_STALE, CODE_STORE_UNREACHABLE, CODE_READ_ONLY);
+    public static final Set<String> CODES = Set.of(CODE_CONFLICT, CODE_ROLE, CODE_INVALID, CODE_STALE,
+        CODE_STORE_UNREACHABLE, CODE_READ_ONLY, CODE_TAGS_UNAVAILABLE);
 
     // Editing levels reported by map.load (AD-2).
     public static final String LEVEL_NONE = "none";

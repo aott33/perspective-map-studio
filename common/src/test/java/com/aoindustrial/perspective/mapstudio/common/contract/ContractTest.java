@@ -27,10 +27,13 @@ class ContractTest {
 
     @Test
     void theErrorCodesAndTypesAreTheContractsOnes() {
-        assertEquals(Set.of("conflict", "role", "invalid", "stale", "store-unreachable", "read-only"), Messages.CODES);
-        assertEquals(Set.of("point.click", "map.load", "edits.apply"), Messages.INBOUND_TYPES);
+        assertEquals(Set.of("conflict", "role", "invalid", "stale", "store-unreachable", "read-only",
+            "tags-unavailable"), Messages.CODES);
+        assertEquals(Set.of("point.click", "map.load", "edits.apply", "tags.browse", "tags.resolve"),
+            Messages.INBOUND_TYPES);
         assertTrue(Messages.OUTBOUND_TYPES.containsAll(
-            Set.of("map.load.reply", "edits.apply.reply", "map.changed", "error")));
+            Set.of("map.load.reply", "edits.apply.reply", "map.changed", "error", "tags.browse.reply",
+                "tags.resolve.reply")));
         assertEquals("0.2.0-draft", Messages.CONTRACT_VERSION);
         assertEquals(1, Messages.VERSION);
     }
@@ -47,7 +50,6 @@ class ContractTest {
         assertEquals(ID, op.id());
         assertEquals(0, op.baseVersion());
         assertEquals(0, op.index());
-        b.requireSupported();
     }
 
     @Test
@@ -67,15 +69,6 @@ class ContractTest {
             "{\"op\":\"update\",\"entity\":\"item\",\"id\":\"p1\",\"baseVersion\":1}"), 0));
         assertThrows(MapStudioException.class, () -> EditOp.parse(JsonParser.parseString("[]"), 0));
         assertThrows(MapStudioException.class, () -> EditBatch.parse(json("{\"batchId\":\"" + BATCH + "\",\"ops\":[]}")));
-    }
-
-    @Test
-    void kindSetupOpsAreRefusedAsNotSupportedInThisVersion() {
-        EditBatch kind = EditBatch.parse(json("{\"batchId\":\"" + BATCH + "\",\"ops\":[{\"op\":\"update\","
-            + "\"entity\":\"kindSetup\",\"id\":\"pad\",\"baseVersion\":1,\"data\":{}}]}"));
-        MapStudioException ex = assertThrows(MapStudioException.class, kind::requireSupported);
-        assertEquals(Messages.CODE_INVALID, ex.code());
-        assertTrue(ex.plainMessage().contains("not supported in this version"));
     }
 
     @Test

@@ -222,6 +222,19 @@ export class MapChanges {
     }
 
     /**
+     * The delegate's 15 s retry while the last map.load failed (a quiet project sends no
+     * map.changed to retry on): sends one map.load when none is pending; false otherwise.
+     * Not counted in `reloads` (that counts gap reloads).
+     */
+    retryFailedLoad(): boolean {
+        if (!this.loadFailedLast || this.loadPending) {
+            return false;
+        }
+        this.load();
+        return true;
+    }
+
+    /**
      * A map.changed. While not loaded after a failed map.load (nothing pending), it
      * starts one new reload, so a single refused load never leaves the map stale
      * until the page is reloaded; a load that fails again waits for the next change.

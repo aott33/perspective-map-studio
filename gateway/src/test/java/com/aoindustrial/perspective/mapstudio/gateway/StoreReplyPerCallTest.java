@@ -1,6 +1,7 @@
 package com.aoindustrial.perspective.mapstudio.gateway;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +21,7 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.StoreState;
 import com.aoindustrial.perspective.mapstudio.gateway.write.FakeMapStore;
 import com.aoindustrial.perspective.mapstudio.gateway.write.NoChangeHook;
 import com.aoindustrial.perspective.mapstudio.gateway.write.WriteService;
+import com.aoindustrial.perspective.mapstudio.gateway.adapter.TestKinds;
 
 /**
  * Epic 2 story 6: the delegate's {@code map.load} and {@code edits.apply} read the
@@ -57,7 +59,7 @@ class StoreReplyPerCallTest {
             return StoreState.ready();
         });
         loader = new MapLoader(gate, store, NoAdapters::snapshot);
-        writes = new WriteService(gate, store, new NoChangeHook());
+        writes = new WriteService(gate, store, new NoChangeHook(), TestKinds::snapshot);
     }
 
     private JsonObject load(List<String> roles) {
@@ -89,6 +91,18 @@ class StoreReplyPerCallTest {
         JsonObject refused = load(editor);
         assertEquals("error", refused.get("type").getAsString());
         assertEquals("store-unreachable", refused.getAsJsonObject("body").get("code").getAsString());
+    }
+
+    @Test
+    void mapLoadNamesTheSessionUserToEditorsOnly() throws Exception {
+        // Epic 2 story 8: the browser keys its unsaved edits by project and this user.
+        assertEquals("mapeditor", load(List.of("MapEditor")).getAsJsonObject("body").get("user").getAsString());
+        setups.put(P, setup("\"Nobody\"", "\"MapEditor\"", 10), "resource modified");
+        assertEquals("mapeditor", load(List.of("MapEditor")).getAsJsonObject("body").get("user").getAsString());
+        assertNull(load(List.of("Viewer")).getAsJsonObject("body").get("user"), "level none gets no user name");
+        JsonObject anonymous = MapStudioDelegate.storeReply(loader, writes, new MapStudioDelegate.SessionView(P, null,
+            List.of()), "map.load", "m-" + UUID.randomUUID(), new JsonObject()).getAsJsonObject("body");
+        assertNull(anonymous.get("user"));
     }
 
     @Test

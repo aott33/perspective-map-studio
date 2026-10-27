@@ -12,7 +12,9 @@ import { Envelope, MessageTypes, envelope } from './messages';
 export const TEST_REPLY_TIMEOUT_MS = 30_000;
 
 /** The message types the hook may send. */
-export const TEST_HOOK_TYPES: readonly string[] = [MessageTypes.MAP_LOAD, MessageTypes.EDITS_APPLY];
+export const TEST_HOOK_TYPES: readonly string[] = [
+    MessageTypes.MAP_LOAD, MessageTypes.EDITS_APPLY, MessageTypes.TAGS_BROWSE, MessageTypes.TAGS_RESOLVE
+];
 
 export interface MapStudioTestHook {
     send(type: string, body: Record<string, unknown>): Promise<Envelope>;

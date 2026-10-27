@@ -75,8 +75,9 @@ public final class GatewayScriptModule extends MapStudioScriptModule {
     protected PyObject getMapImpl(String project) {
         requireProject(project);
         MapLoader.Loaded loaded = loader.load(project);
-        // Still the list of records; it also answers .readOnly (epic 2 story 5).
-        return new MapList(TypeUtilities.gsonToPy(MapLoader.toJson(loaded.snapshot().items())), loaded.readOnly());
+        // Still the list of records; it also answers .readOnly (epic 2 story 5) and .kindSetups (story 9).
+        return new MapList(TypeUtilities.gsonToPy(MapLoader.toJson(loaded.snapshot().items())), loaded.readOnly(),
+            TypeUtilities.gsonToPy(MapLoader.kindSetupsJson(loaded.snapshot().kindSetups())));
     }
 
     @Override

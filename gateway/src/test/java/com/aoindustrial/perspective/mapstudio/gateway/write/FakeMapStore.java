@@ -11,6 +11,7 @@ import java.util.TreeMap;
 
 import com.inductiveautomation.ignition.common.gson.JsonObject;
 
+import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
 import com.aoindustrial.perspective.mapstudio.gateway.store.MapStore;
 
@@ -31,6 +32,7 @@ public class FakeMapStore implements MapStore {
     public static final class State {
         public final Map<String, Long> seqs = new HashMap<>();
         public final Map<String, TreeMap<String, MapItemRecord>> items = new HashMap<>();
+        public final Map<String, TreeMap<String, KindSetupRecord>> kindSetups = new HashMap<>();
         public final List<EditRow> edits = new ArrayList<>();
         public final List<String> editTimes = new ArrayList<>();
         public final Map<String, BatchRow> batches = new LinkedHashMap<>();
@@ -39,6 +41,7 @@ public class FakeMapStore implements MapStore {
             State s = new State();
             s.seqs.putAll(seqs);
             items.forEach((p, m) -> s.items.put(p, new TreeMap<>(m)));
+            kindSetups.forEach((p, m) -> s.kindSetups.put(p, new TreeMap<>(m)));
             s.edits.addAll(edits);
             s.editTimes.addAll(editTimes);
             s.batches.putAll(batches);
@@ -83,6 +86,10 @@ public class FakeMapStore implements MapStore {
 
     public List<MapItemRecord> items(String project) {
         return new ArrayList<>(committed.items.getOrDefault(project, new TreeMap<>()).values());
+    }
+
+    public List<KindSetupRecord> kindSetups(String project) {
+        return new ArrayList<>(committed.kindSetups.getOrDefault(project, new TreeMap<>()).values());
     }
 
     private final class FakeTx implements Tx {
@@ -191,6 +198,42 @@ public class FakeMapStore implements MapStore {
         public List<MapItemRecord> liveItems(String project) {
             List<MapItemRecord> out = new ArrayList<>();
             for (MapItemRecord r : s.items.getOrDefault(project, new TreeMap<>()).values()) {
+                if (!r.deleted()) {
+                    out.add(r);
+                }
+            }
+            return out;
+        }
+
+        @Override
+        public Optional<KindSetupRecord> lockKindSetup(String project, String kindId) {
+            return Optional.ofNullable(s.kindSetups.getOrDefault(project, new TreeMap<>()).get(kindId));
+        }
+
+        @Override
+        public void insertKindSetup(String project, KindSetupRecord setup) throws SQLException {
+            maybeFail();
+            TreeMap<String, KindSetupRecord> m = s.kindSetups.computeIfAbsent(project, p -> new TreeMap<>());
+            if (m.containsKey(setup.kindId())) {
+                throw new SQLException("duplicate key", "23505");
+            }
+            m.put(setup.kindId(), setup);
+        }
+
+        @Override
+        public void updateKindSetup(String project, KindSetupRecord setup) throws SQLException {
+            maybeFail();
+            TreeMap<String, KindSetupRecord> m = s.kindSetups.computeIfAbsent(project, p -> new TreeMap<>());
+            if (!m.containsKey(setup.kindId())) {
+                throw new SQLException("no row", "02000");
+            }
+            m.put(setup.kindId(), setup);
+        }
+
+        @Override
+        public List<KindSetupRecord> liveKindSetups(String project) {
+            List<KindSetupRecord> out = new ArrayList<>();
+            for (KindSetupRecord r : s.kindSetups.getOrDefault(project, new TreeMap<>()).values()) {
                 if (!r.deleted()) {
                     out.add(r);
                 }

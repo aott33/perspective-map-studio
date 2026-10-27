@@ -1,5 +1,6 @@
 import {
-    CONTRACT_VERSION, ErrorCodes, readConflicts, readEditsApplyReply, readMapItem, readMapLoadReply, readMapSetup
+    CONTRACT_VERSION, ErrorCodes, readConflicts, readEditsApplyReply, readKindSetup, readMapItem, readMapLoadReply,
+    readMapSetup
 } from '../contract';
 import { NO_HOST_LISTS } from '../adapters';
 import { MessageTypes, editsApply, mapLoad, readReply } from '../messages';
@@ -20,7 +21,7 @@ const ITEM = {
 describe('the 0.2.0 draft contract', () => {
     test('version, codes and types match common/', () => {
         expect(CONTRACT_VERSION).toBe('0.2.0-draft');
-        expect(Object.values(ErrorCodes).sort()).toEqual(['conflict', 'invalid', 'read-only', 'role', 'stale', 'store-unreachable']);
+        expect(Object.values(ErrorCodes).sort()).toEqual(['conflict', 'invalid', 'read-only', 'role', 'stale', 'store-unreachable', 'tags-unavailable']);
         expect(MessageTypes.MAP_LOAD).toBe('map.load');
         expect(MessageTypes.EDITS_APPLY).toBe('edits.apply');
         expect(MessageTypes.MAP_CHANGED).toBe('map.changed');
@@ -43,6 +44,10 @@ describe('the 0.2.0 draft contract', () => {
         const reply = readReply({ v: 1, type: 'map.load.reply', id: 'm1', body: { level: 'full', seq: 3, items: [ITEM, { bad: 1 }] } });
         expect(reply).toEqual({ kind: 'map.load.reply', id: 'm1', body: { level: 'full', seq: 3, items: [ITEM],
             lists: { kinds: [], assets: null, adapters: null } } });
+        // Epic 2 story 8: the session user, at phone and full; an empty or non-string one is left out.
+        expect(readMapLoadReply({ level: 'full', seq: 1, items: [], user: 'mapeditor' })!.user).toBe('mapeditor');
+        expect(readMapLoadReply({ level: 'full', seq: 1, items: [], user: '' })!.user).toBeUndefined();
+        expect(readMapLoadReply({ level: 'full', seq: 1, items: [], user: 7 })!.user).toBeUndefined();
         expect(readMapLoadReply({ level: 'admin', seq: 1, items: [] })).toBeNull();
         expect(readReply({ v: 1, type: 'map.load.reply', id: 'm1', body: {} }).kind).toBe('invalid');
     });
@@ -108,5 +113,22 @@ describe('conflicts (epic 2 story 2)', () => {
         const role = readReply({ v: 1, type: 'error', id: 'e', body: { code: 'role', message: 'no' } });
         expect(role.kind === 'error' && role.body.conflicts).toBe(undefined);
         expect(readConflicts('nope')).toEqual([]);
+    });
+});
+
+describe('kind setups (epic 2 story 9)', () => {
+    const pad = { kindId: 'pad', setup: { link: '/pad/{item.name}' }, version: 2, deleted: false };
+
+    test('map.load.reply carries them for editors and leaves malformed ones out', () => {
+        const reply = readMapLoadReply({ level: 'full', seq: 3, items: [], kindSetups: [pad, { kindId: 'x' }] });
+        expect(reply?.kindSetups).toEqual([pad]);
+        expect(readMapLoadReply({ level: 'none', seq: 3, items: [] })?.kindSetups).toBeUndefined();
+    });
+
+    test('a conflict on a kind setup reads its stored record', () => {
+        const [c] = readConflicts([{ index: 0, entity: 'kindSetup', id: 'pad', baseVersion: 1, current: pad,
+            changedBy: 'mapeditor', changedAt: '2026-10-27T10:00:00Z' }]);
+        expect(c.current).toEqual(pad);
+        expect(readKindSetup({ kindId: 'pad', setup: [], version: 1, deleted: false })).toBeNull();
     });
 });

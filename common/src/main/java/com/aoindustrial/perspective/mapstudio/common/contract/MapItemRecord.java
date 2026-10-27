@@ -19,8 +19,8 @@ import com.aoindustrial.perspective.mapstudio.common.Messages;
  * Derived fields (base path, unlinked reason, unknown kind) are never stored.
  *
  * <p>Geometry is GeoJSON (Point or LineString), longitude first, WGS 84, rounded
- * to 6 decimals when an op is read. Kind is checked against the kind list from
- * entry 9; this version only requires a non-empty string.
+ * to 6 decimals when an op is read. The write service checks and normalises every
+ * record it saves against the project's kind list ({@link ItemCheck}, epic 2 story 9).
  */
 public record MapItemRecord(
     String id,
@@ -32,12 +32,13 @@ public record MapItemRecord(
     JsonObject overrides,
     JsonElement ends,
     int version,
-    boolean deleted) {
+    boolean deleted) implements StoredRecord {
 
     /** The fields an op's {@code data} may carry (the record minus id, version and deleted). */
     public static final Set<String> DATA_FIELDS =
         Set.of("kind", "name", "geometry", "properties", "assetId", "overrides", "ends");
 
+    @Override
     public JsonObject toJson() {
         JsonObject o = new JsonObject();
         o.addProperty("id", id);

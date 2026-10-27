@@ -1,0 +1,13 @@
+{
+  "scope": "A",
+  "description": "Map Studio dev tag provider (test equipment for the tag browser, epic 2 story 15)",
+  "version": 1,
+  "restricted": false,
+  "overridable": true,
+  "files": [
+    "config.json"
+  ],
+  "attributes": {
+    "uuid": "5d0f7f1e-3b0a-4c55-9a43-6a1f2b8e7c15"
+  }
+}

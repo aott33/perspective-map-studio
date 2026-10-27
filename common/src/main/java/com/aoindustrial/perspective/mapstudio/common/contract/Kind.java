@@ -11,13 +11,21 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
 
 /**
  * One kind of the project's kind list (AD-4, docs/kinds-and-assets.md):
- * {@code {id, name, geometry, icon, labelRank, fields}}. {@code geometry} is
+ * {@code {id, name, geometry, icon, labelRank, fields, area}}. {@code geometry} is
  * {@code point} or {@code line}; a higher {@code labelRank} keeps its label
- * longer when labels collide (default 0). Unknown keys are ignored.
+ * longer when labels collide (default 0); {@code area: true} marks a line kind drawn
+ * as a closed area, the only kind whose setup may hold {@code areaTints} (owner,
+ * 2026-10-27, epic 2 story 9). Unknown keys are ignored.
  */
-public record Kind(String id, String name, String geometry, String icon, int labelRank, List<FormField> fields) {
+public record Kind(String id, String name, String geometry, String icon, int labelRank, List<FormField> fields,
+                   boolean area) {
 
     public static final Set<String> GEOMETRIES = Set.of("point", "line");
+
+    /** A kind that is not an area. */
+    public Kind(String id, String name, String geometry, String icon, int labelRank, List<FormField> fields) {
+        this(id, name, geometry, icon, labelRank, fields, false);
+    }
 
     static Kind parse(JsonObject o) throws Rows.RowException {
         String id = Rows.id(o, "id");
@@ -40,7 +48,12 @@ public record Kind(String id, String name, String geometry, String icon, int lab
                 fields.add(field);
             }
         }
-        return new Kind(id, name, geometry, icon == null ? "" : icon, rank == null ? 0 : rank, List.copyOf(fields));
+        Boolean area = Rows.bool(o, "area");
+        if (Boolean.TRUE.equals(area) && !"line".equals(geometry)) {
+            throw new Rows.RowException("area applies to line kinds only");
+        }
+        return new Kind(id, name, geometry, icon == null ? "" : icon, rank == null ? 0 : rank, List.copyOf(fields),
+            Boolean.TRUE.equals(area));
     }
 
     public JsonObject toJson() {
@@ -55,6 +68,9 @@ public record Kind(String id, String name, String geometry, String icon, int lab
             f.add(field.toJson());
         }
         o.add("fields", f);
+        if (area) {
+            o.addProperty("area", true);
+        }
         return o;
     }
 
@@ -80,6 +96,23 @@ public record Kind(String id, String name, String geometry, String icon, int lab
             }
         }
         return new Parsed<>(List.copyOf(kept), List.copyOf(reasons), rows.size());
+    }
+
+    /** The form field keys of this kind. */
+    public Set<String> fieldKeys() {
+        Set<String> keys = new HashSet<>();
+        fields.forEach(f -> keys.add(f.key()));
+        return keys;
+    }
+
+    /** The form field of this key, or null. */
+    public FormField field(String key) {
+        for (FormField f : fields) {
+            if (f.key().equals(key)) {
+                return f;
+            }
+        }
+        return null;
     }
 
     public static JsonArray toJson(List<Kind> kinds) {

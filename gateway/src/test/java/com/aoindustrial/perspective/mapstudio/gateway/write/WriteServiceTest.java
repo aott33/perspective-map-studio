@@ -22,6 +22,7 @@ import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 import com.aoindustrial.perspective.mapstudio.gateway.setup.SetupRegistry;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreState;
+import com.aoindustrial.perspective.mapstudio.gateway.adapter.TestKinds;
 
 /** The write path against {@link FakeMapStore}: every row of entry 1's I/O matrix that needs no Gateway. */
 class WriteServiceTest extends WriteFixture {
@@ -119,18 +120,6 @@ class WriteServiceTest extends WriteFixture {
     }
 
     @Test
-    void kindSetupOpsAreRefusedAsNotSupported() {
-        String id = uuid();
-        save(batch(uuid(), create(id)));
-        MapStudioException kind = refused(batch(uuid(),
-            "{\"op\":\"create\",\"entity\":\"kindSetup\",\"id\":\"pad\",\"baseVersion\":0,\"data\":{}}"),
-            Messages.LEVEL_FULL);
-        assertEquals(Messages.CODE_INVALID, kind.code());
-        assertTrue(kind.plainMessage().contains("not supported in this version"));
-        assertNothingWritten(1, 1);
-    }
-
-    @Test
     void aScriptSaveIsRecordedUnderItsActor() {
         writes.apply(PROJECT, batch(uuid(), create(uuid())), Actor.script("seed-script"), Messages.LEVEL_FULL);
         var row = store.committed.edits.get(0);
@@ -207,7 +196,7 @@ class WriteServiceTest extends WriteFixture {
     void aFailingHookDoesNotUndoTheSave() {
         writes = new WriteService(new StoreGate(setups, c -> state), store, b -> {
             throw new IllegalStateException("hook failed");
-        });
+        }, TestKinds::snapshot);
         EditResult result = save(batch(uuid(), create(uuid())));
         assertEquals(1, result.seq());
         assertEquals(1, store.items(PROJECT).size());

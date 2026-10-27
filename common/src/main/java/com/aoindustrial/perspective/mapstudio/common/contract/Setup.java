@@ -202,7 +202,13 @@ public record Setup(
                 problems.add(new SetupProblem("alarmPage",
                     "alarmPage must be empty or a page path starting with /, not " + shown(a)));
             } else {
-                alarmPage = a.getAsString();
+                try {
+                    // Text with any number of placeholders (owner, 2026-10-27; epic 2 story 9).
+                    Placeholders.checkTemplate(a.getAsString(), null);
+                    alarmPage = a.getAsString();
+                } catch (InvalidValue ex) {
+                    problems.add(new SetupProblem("alarmPage", "alarmPage: " + ex.getMessage()));
+                }
             }
         }
 

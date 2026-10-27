@@ -46,6 +46,10 @@ public record EditOp(String op, String entity, String id, int baseVersion, JsonO
         if (id == null || id.isBlank()) {
             throw invalid("Op " + index + ": id must be a non-empty string.", index, null);
         }
+        if (ENTITY_KIND_SETUP.equals(entity) && id.length() > Rows.MAX_ID) {
+            throw invalid("Op " + index + ": a kind setup id is a kind id, at most " + Rows.MAX_ID + " characters.",
+                index, id.substring(0, Rows.MAX_ID));
+        }
         if (ENTITY_ITEM.equals(entity) && !isUuid(id)) {
             throw invalid("Op " + index + ": a map item id must be a UUID string.", index, id);
         }

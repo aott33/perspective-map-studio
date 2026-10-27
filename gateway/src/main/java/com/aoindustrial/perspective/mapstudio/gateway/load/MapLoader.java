@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.function.Function;
 
 import com.inductiveautomation.ignition.common.gson.JsonArray;
+import com.inductiveautomation.ignition.common.gson.JsonElement;
 import com.inductiveautomation.ignition.common.gson.JsonNull;
 import com.inductiveautomation.ignition.common.gson.JsonObject;
 import com.inductiveautomation.ignition.common.util.LoggerEx;
@@ -12,6 +13,7 @@ import com.inductiveautomation.ignition.common.util.LoggerEx;
 import com.aoindustrial.perspective.mapstudio.common.Messages;
 import com.aoindustrial.perspective.mapstudio.common.contract.Asset;
 import com.aoindustrial.perspective.mapstudio.common.contract.Kind;
+import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
@@ -28,14 +30,21 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
  * messages, without host error text or row ids. A read-only store (newer schema, or
  * this Gateway a standby) is read as usual; {@code readOnly} carries the reason, null
  * when saving works (epic 2 story 5). {@code setup} is the part of the project setup
- * the browser needs (epic 2 story 6).
+ * the browser needs (epic 2 story 6). {@code kindSetups}, the project's live kind setups
+ * (they hold tag paths), go to {@code phone} and {@code full} only, like the assets (owner
+ * decision, 2026-10-27, epic 2 story 9).
  */
 public final class MapLoader {
 
     private static final LoggerEx log = LoggerEx.newBuilder().build("MapStudio.load");
 
-    /** A project's live map items and its last change sequence number, read in one transaction. */
-    public record Snapshot(long seq, List<MapItemRecord> items) {
+    /** A project's live map items, live kind setups and last change sequence number, read in one transaction. */
+    public record Snapshot(long seq, List<MapItemRecord> items, List<KindSetupRecord> kindSetups) {
+
+        /** A snapshot with no kind setups. */
+        public Snapshot(long seq, List<MapItemRecord> items) {
+            this(seq, items, List.of());
+        }
     }
 
     /** A snapshot and why the map cannot be saved here (null when it can). */
@@ -66,7 +75,8 @@ public final class MapLoader {
         Setup setup = readable.setup();
         try {
             return new Loaded(store.inTransaction(setup.connection(),
-                tx -> new Snapshot(tx.currentSeq(project), tx.liveItems(project))), readable.readOnly());
+                tx -> new Snapshot(tx.currentSeq(project), tx.liveItems(project), tx.liveKindSetups(project))),
+                readable.readOnly());
         } catch (SQLException ex) {
             log.errorf("Map Studio could not read the map of project %s on database connection %s (SQLState %s): %s",
                 project, setup.connection(), ex.getSQLState(), ex.getClass().getSimpleName());
@@ -94,12 +104,20 @@ public final class MapLoader {
         JsonObject body = new JsonObject();
         body.addProperty("level", level);
         body.addProperty("seq", snapshot.seq());
-        body.add("items", toJson(snapshot.items()));
+        boolean editor = Messages.LEVEL_PHONE.equals(level) || Messages.LEVEL_FULL.equals(level);
+        JsonArray items = toJson(snapshot.items());
+        if (!editor) {
+            // An item's overrides hold full tag paths, which viewers do not get (as kindSetups).
+            for (JsonElement item : items) {
+                item.getAsJsonObject().add("overrides", new JsonObject());
+            }
+        }
+        body.add("items", items);
         AdapterSnapshot lists = adapters.apply(project);
         body.add("kinds", Kind.toJson(lists.kinds()));
-        boolean editor = Messages.LEVEL_PHONE.equals(level) || Messages.LEVEL_FULL.equals(level);
         if (editor) {
             body.add("assets", Asset.toJson(lists.assets()));
+            body.add("kindSetups", kindSetupsJson(snapshot.kindSetups()));
         }
         body.add("adapters", lists.statusJson(editor));
         if (loaded.readOnly() == null) {
@@ -124,6 +142,14 @@ public final class MapLoader {
         o.add("basemaps", basemaps);
         o.addProperty("alarmPage", setup.alarmPage());
         return o;
+    }
+
+    public static JsonArray kindSetupsJson(List<KindSetupRecord> setups) {
+        JsonArray array = new JsonArray();
+        for (KindSetupRecord setup : setups) {
+            array.add(setup.toJson());
+        }
+        return array;
     }
 
     public static JsonArray toJson(List<MapItemRecord> items) {

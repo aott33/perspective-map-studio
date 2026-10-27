@@ -82,4 +82,17 @@ class KindListTest {
         assertTrue(!p.reasons().get(0).contains("hexagon") && !p.reasons().get(0).contains("Secret"),
             p.reasons().get(0));
     }
+
+    @Test
+    void areaIsALineKindFlagSentOnlyWhenTrue() {
+        Parsed<Kind> p = Kind.parseList(rows("[{\"id\":\"geofence\",\"name\":\"Geofence\",\"geometry\":\"line\","
+            + "\"area\":true},{\"id\":\"pad\",\"name\":\"Pad\",\"geometry\":\"point\",\"area\":true},"
+            + "{\"id\":\"line\",\"name\":\"Line\",\"geometry\":\"line\",\"area\":false}]"));
+        assertEquals(2, p.kept().size());
+        assertTrue(p.kept().get(0).area());
+        assertEquals(true, p.kept().get(0).toJson().get("area").getAsBoolean());
+        assertEquals(false, p.kept().get(1).area());
+        assertEquals(false, p.kept().get(1).toJson().has("area"));
+        assertEquals("row 2 (id pad): area applies to line kinds only", p.reasons().get(0));
+    }
 }

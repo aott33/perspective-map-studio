@@ -1,0 +1,29 @@
+[
+  {
+    "name": "Pad",
+    "tagType": "UdtType",
+    "tags": [
+      {
+        "name": "Pressure",
+        "tagType": "AtomicTag",
+        "valueSource": "memory",
+        "dataType": "Float8",
+        "value": 0.0
+      },
+      {
+        "name": "Flow",
+        "tagType": "AtomicTag",
+        "valueSource": "memory",
+        "dataType": "Float8",
+        "value": 0.0
+      },
+      {
+        "name": "Comms",
+        "tagType": "AtomicTag",
+        "valueSource": "memory",
+        "dataType": "Boolean",
+        "value": false
+      }
+    ]
+  }
+]

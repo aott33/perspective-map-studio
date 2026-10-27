@@ -26,6 +26,8 @@ export interface Kind {
     icon: string;
     labelRank: number;
     fields: FormField[];
+    /** A line kind drawn as a closed area (epic 2 story 9); sent only when true. */
+    area?: boolean;
 }
 
 export interface Asset {
@@ -92,7 +94,8 @@ export function readKind(value: unknown): Kind | null {
         geometry: value.geometry,
         icon: typeof value.icon === 'string' ? value.icon : '',
         labelRank: typeof value.labelRank === 'number' && isFinite(value.labelRank) ? value.labelRank : 0,
-        fields
+        fields,
+        ...(value.area === true ? { area: true } : {})
     };
 }
 

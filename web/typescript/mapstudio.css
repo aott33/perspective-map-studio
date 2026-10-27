@@ -150,3 +150,59 @@
 .mapstudio-store-status {
     font-weight: 600;
 }
+
+/* Unsaved edits (epic 2 story 8): said in words, styled from tokens only (AD-11). The reply
+   box ignores the pointer; the list takes it back for its buttons. */
+.mapstudio-unsaved {
+    margin-top: 4px;
+    max-height: 40vh;
+    overflow-y: auto;
+    pointer-events: auto;
+}
+
+.mapstudio-unsaved-summary,
+.mapstudio-unsaved-warning {
+    font-weight: 600;
+}
+
+.mapstudio-unsaved-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    padding: 2px 0;
+    border-top: 1px dashed var(--border);
+}
+
+.mapstudio-unsaved-text {
+    flex: 1 1 160px;
+}
+
+.mapstudio-unsaved-row--refused .mapstudio-unsaved-text {
+    font-weight: 600;
+}
+
+.mapstudio-unsaved-row button {
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--borderRadius);
+    background: var(--container);
+    color: var(--label);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.mapstudio-unsaved-row button:hover:not(:disabled) {
+    background: var(--neutral-30);
+}
+
+.mapstudio-unsaved-row button:disabled {
+    color: var(--label--disabled);
+    cursor: not-allowed;
+}
+
+.mapstudio .mapstudio-draw-button:disabled {
+    color: var(--label--disabled);
+    background: var(--container);
+    cursor: not-allowed;
+}

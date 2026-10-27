@@ -18,6 +18,7 @@ import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 import com.aoindustrial.perspective.mapstudio.gateway.setup.SetupRegistry;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreState;
+import com.aoindustrial.perspective.mapstudio.gateway.adapter.TestKinds;
 
 /**
  * The write service on a {@link FakeMapStore} with the dev setup, and the batch builders the
@@ -42,7 +43,7 @@ abstract class WriteFixture {
             + "\"roles\":{\"full\":[\"MapEditor\"],\"phone\":[\"MapOperator\"]}}"));
         state = StoreState.ready();
         hooked = new ArrayList<>();
-        writes = new WriteService(new StoreGate(setups, c -> state), store, hooked::add);
+        writes = new WriteService(new StoreGate(setups, c -> state), store, hooked::add, TestKinds::snapshot);
     }
 
     static String uuid() {
