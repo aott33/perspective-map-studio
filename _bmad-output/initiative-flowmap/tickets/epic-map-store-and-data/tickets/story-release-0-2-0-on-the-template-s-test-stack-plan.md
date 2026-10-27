@@ -3,13 +3,13 @@ title: "Release 0.2.0 on the template's test stack"
 type: 'chore'
 ticket: '13'
 created: '2026-10-27'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '3907248520a02e277c515715e8f82b754a8f8509'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'invocation'
 lenses_ran: []
 review_loop_iteration: 0
 context:
@@ -42,6 +42,18 @@ context:
 | Restart | `restart` of the test Gateway | after RUNNING, B reloads and draws the line; `mapstudio_items` row and edit record (actor `render-engineer`) present | missing: release check fails |
 | No editing role | `render-pumper` (role not in setup) | `map.load` level `none`, save refused `role`, nothing written | as contract |
 | Module on 8.3.9 | 0.2.0 on the template image | ACTIVE, migrations to schema 2 on the empty `mapstudio` database, no Map Studio error | fails: stop, report, no image bump |
+
+## Decisions
+
+Decision 2026-10-27 (owner: "agree with all recommendations, start"; all eight recommended answers):
+1. Rehearse before the tag: a throwaway-signed build of the version branch goes through a scratch template copy, `local.sh`, `stack.sh` and the scratch checks; repeated on the published release.
+2. The test stack's `MapStudio` connection uses its own role and database created inside the stack's PostgreSQL, password set inside the container (generated, passed by environment), connection file only in the stack's worktree, never committed.
+3. Scratch setup roles: full `engineer`, phone `operator`; `render-pumper` is the user without an editing role.
+4. Also close the extra live checks: a phone editor's line refused, a signed-in user without an editing role, a `storage` event between two tabs, a browser closed and reopened, a second project getting no `map.changed`.
+5. `CHANGELOG.md` plus `web`/`e2e` packages at 0.2.0 in the version pull request; Gradle default `0.3.0-SNAPSHOT` after the tag.
+6. ER-27: the owner reviews the alarm glyphs and state examples before the tag; the release waits for it.
+7. The template pull request is opened as a draft by Claude only on the owner's go; the owner merges.
+8. The owner's Designer session happens before the tag, on the dev Gateway of `main`.
 
 </frozen-after-approval>
 
@@ -116,13 +128,3 @@ What it proves: 0.2.0 installs by lock on 8.3.9, migrates an empty database, sav
 **Manual checks:**
 - Screenshots of both browsers before and after the restart, read by the owner.
 
-## Open Questions
-
-1. Rehearse before the tag? (a) yes: throwaway-signed build of the version branch through the template stack and the scratch checks, then repeat on the release; (b) no, only after the release. Recommended: a.
-2. The `MapStudio` connection on the test stack: (a) own role and database in the stack's PostgreSQL, password the existing `db_password` value set inside the container, connection file in the stack's worktree, never committed; (b) commit a `MapStudio` connection and secret to the template now. Recommended: a (b is epic-template-cutover's).
-3. Scratch setup roles: (a) full `engineer`, phone `operator`; `render-pumper` is the user without an editing role; (b) keep `MapEditor`/`MapOperator` and create those users on the stack. Recommended: a (the template maps its roles onto Map Studio's).
-4. Which deferred live checks to close on the stack: (a) also a phone editor's line refused, a signed-in user without an editing role, a `storage` event between two tabs, a browser closed and reopened with an unsaved edit, a second scratch project getting no `map.changed`; (b) only the ticket's two-browser edit and restart. Recommended: a; redundancy, slow tags, `onShutdown`, least-privilege kind setup save and the example adapters stay with the owner or later epics.
-5. Version records: (a) add `CHANGELOG.md`, bump `web`/`e2e` packages to 0.2.0, set the Gradle default to `0.3.0-SNAPSHOT` in the evidence PR after the tag; (b) draft release notes only, no file. Recommended: a.
-6. ER-27 scope and timing: (a) the owner reviews the alarm glyphs and state examples as the engineering reviewer and the tag waits for it; (b) release now, review before epic-viewing draws them. Recommended: a (CLAUDE.md and initiative R-constraint require it before release).
-7. Template pull request: (a) I push the clone's branch to `aott33/ign-scada-template` and open it as a draft on your go, with `local.sh` and `stack.sh` results in its body; you merge; (b) you push and open it. Recommended: a.
-8. Designer session timing: (a) before the tag, on the dev Gateway of `main` (a broken form would ship); (b) after, on the template stack. Recommended: a.
