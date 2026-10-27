@@ -56,15 +56,29 @@ done
 has_line CHANGELOG.md "## $contract"
 
 # No file calls a version a draft once it is released. Planning records keep their history.
+# The pattern catches the version and "draft" in either order, a few characters apart:
+# "0.2.0 draft", "0.2.0-draft", "0.2.0 (draft)", "**0.2.0** (draft", "0.2.0, draft",
+# "0.2.0 in draft", "Draft: contract 0.2.0".
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ "$(git rev-parse --show-toplevel)" = "$(pwd -P)" ]; then
   list() { git ls-files -co --exclude-standard; }
 else
   list() { find . -type f -not -path './.git/*' -not -path '*/node_modules/*' | sed 's|^\./||'; }
 fi
-self="scripts/ci/check-contract-versions.sh"
-drafts="$(list | grep -v -E '^(_bmad-output|_bmad|\.claude)/' | grep -v -x -F "$self" \
-  | grep -v -x -F scripts/ci/test-contract-versions.sh \
-  | tr '\n' '\0' | xargs -0 -r grep -I -n -E '[0-9]+\.[0-9]+\.[0-9]+([- ]draft| \(draft\))' -- 2>/dev/null || true)"
+files="$(list | grep -v -E '^(_bmad-output|_bmad|\.claude)/' \
+  | grep -v -x -F scripts/ci/check-contract-versions.sh \
+  | grep -v -x -F scripts/ci/test-contract-versions.sh || true)"
+# An empty list would make the search pass without looking at anything.
+printf '%s\n' "$files" | grep -q -x -F docs/contract.md \
+  || { echo "check-contract-versions: the file list for the draft search is empty or misses docs/contract.md" >&2; exit 1; }
+draft_re='([0-9]+\.[0-9]+\.[0-9]+[^a-z0-9]{0,6}(in )?\(?draft|draft[^.]{0,40}[0-9]+\.[0-9]+\.[0-9]+)'
+set +e
+# Files deleted in the work tree but still tracked are skipped; a grep error (exit 2) makes
+# xargs stop with 124, while "no match" (grep 1) shows as 123 and is a pass.
+drafts="$(printf '%s\n' "$files" | while IFS= read -r f; do [ -f "$f" ] && printf '%s\0' "$f"; done \
+  | xargs -0 -r sh -c 'grep -I -n -i -E "$0" -- "$@"; s=$?; [ "$s" -le 1 ] || exit 255' "$draft_re")"
+status=$?
+set -e
+case "$status" in 0|123) ;; *) echo "check-contract-versions: the draft search failed (exit $status)" >&2; exit 1 ;; esac
 if [ -n "$drafts" ]; then
   say "a released version is still called a draft:"
   echo "$drafts" >&2

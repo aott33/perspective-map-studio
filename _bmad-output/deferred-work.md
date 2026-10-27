@@ -95,4 +95,4 @@
 - source_plan: `_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-release-0-2-0-on-the-template-s-test-stack-plan.md`
   summary: `mapstudio_schema_version.module_version` is `dev` for every build, a signed release too: `MapStudioServices.moduleVersion()` reads the jar's `Implementation-Version`, which no module jar's manifest carries.
   evidence: Story 13 rehearsal, 2026-10-27: both migrations recorded `dev` from a 0.2.0 build; the manifests of `common-0.2.0.jar`, `gateway-0.2.0.jar`, `designer-0.2.0.jar` and `web-0.2.0.jar` hold only `Manifest-Version`.
-  goes_to: the owner's call before the tag (a small fix of its own: set the manifest attribute from the Gradle version), else a 0.2.1.
+  goes_to: blocks the v0.2.0 tag under the story 13 plan's rule (a defect found here stops the release and becomes its own fix): a small fix pull request of its own (set the manifest attribute from the Gradle version) before the tag, unless the owner waives it in the plan's Decisions. Default: block.

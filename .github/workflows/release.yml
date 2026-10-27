@@ -58,6 +58,13 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: Check the CHANGELOG and package versions name the tag
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          scripts/ci/check-release-version.sh "$VERSION"
+          scripts/ci/check-contract-versions.sh
+
       - name: Read the fingerprint from the README
         id: readme
         run: |

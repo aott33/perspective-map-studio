@@ -32,13 +32,13 @@ Do this on a trusted machine with a JDK 17 `keytool`.
 
 ## Cutting a release
 
-1. Merge to `main`; CI must be green. `CHANGELOG.md` has a section for the version, and every contract document names it (`scripts/ci/check-contract-versions.sh`, run by CI).
+1. Merge to `main`; CI must be green. Every contract document names the contract version and `CHANGELOG.md` has a section for it (`scripts/ci/check-contract-versions.sh`, run by CI). `CHANGELOG.md` also needs a `## X.Y.Z` section for the release itself and `web/package.json` and `e2e/package.json` must say `X.Y.Z` (they can differ from the contract version on a module-only release): the release workflow runs `scripts/ci/check-release-version.sh X.Y.Z` for the tag and stops before signing when they do not.
 2. Tag the merge commit with a plain `vX.Y.Z` (no `-rc` or other suffix: Ignition's module version is numeric) and push the tag:
 
    ```bash
    git switch main && git pull
-   git tag -a v0.1.0 -m "v0.1.0"
-   git push origin v0.1.0
+   git tag -a vX.Y.Z -m "vX.Y.Z"
+   git push origin vX.Y.Z
    ```
 
 3. The `build-sign` job (read-only token, the only job that sees the secrets) checks the tag is on `main`, builds and signs, and checks the signature structure, that the certificate fingerprint equals the README line and that `module.xml`'s version equals the tag. The `draft` job (can write releases, sees no secret, builds nothing) then creates a DRAFT release with `Map-Studio-X.Y.Z.modl` and `Map-Studio-X.Y.Z.modl.sha256`.

@@ -26,7 +26,7 @@ The `id` of a reply is the `id` of the message it answers.
 
 ## map.changed: saved edits reach every open map
 
-After every committed batch, from a browser or from `system.mapstudio.applyEdits`, the Gateway sends one `map.changed` to every open Map Studio component of that project, whatever its level, the saving session included: a `full` editor, a `phone` editor (since story 12, `changes.spec.mjs`) and a `none` viewer of one project **[live 8.3.10]**; another project's maps getting nothing is unit tested only (`ChangeBusTest`, `MapStudioDelegateTest`) **[unverified]** live. Its `id` is a new UUID (it answers nothing).
+After every committed batch, from a browser or from `system.mapstudio.applyEdits`, the Gateway sends one `map.changed` to every open Map Studio component of that project, whatever its level, the saving session included: a `full` editor, a `phone` editor (since story 12, `changes.spec.mjs`) and a `none` viewer of one project **[live 8.3.10]**; another project's maps getting nothing is unit tested (`ChangeBusTest`, `MapStudioDelegateTest`) and was seen on the template's test stack: a second project's open map got no `map.changed` **[live 8.3.9, rehearsal, throwaway-signed]** (see [platform-checks.md](platform-checks.md), "Epic 2 story 13"). Its `id` is a new UUID (it answers nothing).
 
 ```json
 {"v": 1, "type": "map.changed", "id": "<UUID>",

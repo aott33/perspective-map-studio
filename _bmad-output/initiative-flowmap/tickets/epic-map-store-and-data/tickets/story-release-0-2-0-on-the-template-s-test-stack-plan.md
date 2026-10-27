@@ -10,8 +10,8 @@ route_source: 'auto'
 risk: 'high'
 review: 'quick'
 review_source: 'invocation'
-lenses_ran: []
-review_loop_iteration: 0
+lenses_ran: ['quick']
+review_loop_iteration: 1
 context:
   - '{project-root}/RELEASING.md'
   - '{project-root}/docs/template-install.md'
@@ -81,21 +81,22 @@ Template (read only here; changed only in the scratch clone):
 - G1 Story 16 reviewed and merged to `main`; CI green on `main`.
 - G2 ER-27 engineering review of the alarm presentation 0.2.0 ships: the alarm glyphs and state examples on `/res/mapstudio/icons/contact-sheet.html` and the differences listed in `docs/icons.md` "Differences from the template's reviewed set". Recorded with reviewer and date in `docs/icons.md`. Changes asked for are fixed before the tag.
 - G3 Designer session on the dev Gateway of `main`: story 16 steps 1 to 8, story 7's open items, story 11's autocomplete text (`system.mapstudio.` shows `getMap`, `applyEdits`, `refreshAdapters`, `ping`). Results into `docs/platform-checks.md` as **[owner, seen in the Designer, date]**.
+- G4 The rehearsal's `module_version` `dev` finding (`docs/template-install.md`, "0.2.0 rehearsal", Findings): under the Never rule above it stops the release; its fix is its own pull request merged before the tag, unless the owner waives it in writing (a new Decisions line). Default: block.
 
 **Execution (me):**
 - [x] `common/.../Messages.java`, `web/typescript/contract.ts`, `ContractTest.java`, `contract.test.ts` -- `CONTRACT_VERSION` `"0.2.0"`.
 - [x] `docs/contract.md`, `docs/kind-setup.md`, `docs/kinds-and-assets.md`, `docs/setup.md`, `README.md`, `NOTICE`, javadoc and TS comments in the Code Map -- "0.2.0 draft" becomes "0.2.0"; contract title "version 0.2.0"; README status line says 0.2.0 is released through the template's lock.
 - [x] `web/package.json`, `e2e/package.json` and lock roots -- `0.2.0` (`npm version 0.2.0 --no-git-tag-version`); `build.gradle.kts:20` stays until after the tag (Decision 5: `0.3.0-SNAPSHOT` then).
-- [x] `CHANGELOG.md` (new, per Open Question 5) -- 0.1.0 (spike) and 0.2.0 (contract, map store schema 2, setup schema 1, scripting API, icons, Designer setup form), with the "Since" versions from `docs/contract.md`.
+- [x] `CHANGELOG.md` (new, per Decision 5) -- 0.1.0 (spike) and 0.2.0 (contract, map store schema 2, setup schema 1, scripting API, icons, Designer setup form), with the "Since" versions from `docs/contract.md`.
 - [x] `scripts/ci/check-contract-versions.sh` (new, run in CI `build` job) -- fails when a R14 doc lacks its version heading or any of the files above still says `0.2.0 draft`/`0.2.0-draft`.
 - [x] Rehearsal (Decision 1): throwaway-signed build of the version branch in a scratch template copy, local.sh, stack.sh and the kept-stack checks, nothing committed in the template (2026-10-27, `docs/template-install.md` "0.2.0 rehearsal"; also `license.html` carries Tabler Icons' MIT notice, `test-contract-versions.sh` proves the check).
 - [ ] After the release: scratch clone of the template (`git clone /home/user/ign-scada-template`, scratchpad, branch `map-studio-0.2.0`); `python3 -I scripts/modules/modl.py check --write` then `fetch`, `inspect`, `verify-lock`; `sha256` equals the release file, `certSha256` unchanged; `scripts/ci/modl-verify.sh` with the README fingerprint and `0.2.0`.
 - [ ] Template `docs/modules.md` (row 0.2.0, history line), `THIRD_PARTY_NOTICES.md` (adds Tabler Icons, MIT) -- one commit.
 - [ ] `scripts/ci/local.sh` in the clone, all steps (PG parts against a throwaway postgres:16), then `scripts/test/stack.sh --keep`: `test stack: PASS`.
-- [ ] Kept stack: in the db container create role `mapstudio` (LOGIN) with the `db_password` secret's value read inside the container and database `mapstudio` owned by it; `build/test-stack/config/resources/core/ignition/database-connection/MapStudio/{config.json,resource.json}` (copy of `upstream`, URL `.../mapstudio`, user `mapstudio`); `POST /data/api/v1/scan/config`; project `MapStudioScratch` from `ops/project` (setup roles per Open Question 3) in `build/test-stack/projects/`; `POST /data/api/v1/scan/projects`; set its IdP.
-- [ ] Scratch Playwright script (scratchpad, model `ops/screenshot.mjs`): two browsers as `render-engineer` on `/edit`, line drawn in A shows in B without reload; close both; `docker compose -p ign-og-test restart ignition` [unverified service name]; B reopens and draws it; `psql` shows the item and its edit record actor; extra checks per Open Question 4; screenshots at 1440 and 390 px. Then `stack.sh --down`.
+- [ ] Kept stack: in the db container create role `mapstudio` (LOGIN) with the `db_password` secret's value read inside the container and database `mapstudio` owned by it; `build/test-stack/config/resources/core/ignition/database-connection/MapStudio/{config.json,resource.json}` (copy of `upstream`, URL `.../mapstudio`, user `mapstudio`); `POST /data/api/v1/scan/config`; project `MapStudioScratch` from `ops/project` (setup roles per Decision 3) in `build/test-stack/projects/`; `POST /data/api/v1/scan/projects`; set its IdP.
+- [ ] Scratch Playwright script (scratchpad, model `ops/screenshot.mjs`): two browsers as `render-engineer` on `/edit`, line drawn in A shows in B without reload; close both; `docker compose -p ign-og-test restart ignition` [unverified service name]; B reopens and draws it; `psql` shows the item and its edit record actor; extra checks per Decision 4; screenshots at 1440 and 390 px. Then `stack.sh --down`.
 - [ ] `docs/template-install.md` (0.2.0 section), `docs/platform-checks.md`, `docs/screenshots/template-0.2.0-*.png`, `_bmad-output/deferred-work.md` (`resolved:` line on the sweep entry for what closed) -- evidence.
-- [ ] Template pull request (draft) from the clone's branch, per Open Question 7.
+- [ ] Template pull request (draft) from the clone's branch, per Decision 7.
 
 **Acceptance Criteria:**
 - Given the version pull request, when `./gradlew build`, `npm test` and `check-contract-versions.sh` run, then they pass and no file says `0.2.0 draft`.
@@ -105,7 +106,7 @@ Template (read only here; changed only in the scratch clone):
 
 ## Owner steps (hitl; Claude cannot do these)
 
-1. G1, G2 (ER-27), G3 above.
+1. G1, G2 (ER-27), G3 and G4 above; confirm the Decision 2 wording note in the Review Triage Log.
 2. Merge the version pull request; tag `v0.2.0` on `main` and push the tag.
 3. Approve the `build-sign` job under Review deployments (`release` environment); review the draft (`modl-verify.sh`), publish it.
 4. Review and merge the template pull request (after `local.sh` and `stack.sh` evidence in its body, since its Actions may not run).
@@ -127,4 +128,21 @@ What it proves: 0.2.0 installs by lock on 8.3.9, migrates an empty database, sav
 
 **Manual checks:**
 - Screenshots of both browsers before and after the restart, read by the owner.
+
+## Review Triage Log
+
+**2026-10-27, lens quick (context-free), review of `3907248..74428ee`, iteration 1.** Eight findings; seven patched, one partly rejected.
+
+| # | Finding | Triage | What changed |
+| --- | --- | --- | --- |
+| 1 | `docs/icons.md:3` still said "(draft"; the CI draft search missed bold, comma, "in draft" and "Draft: ... 0.2.0" forms | patch | icons.md line fixed; `check-contract-versions.sh` searches version-then-draft and draft-then-version (case-insensitive); `test-contract-versions.sh` refuses the comma, "in draft", bold and "Draft:" forms |
+| 2 | CHANGELOG check only compared with `CONTRACT_VERSION`, release.yml never ran it, RELEASING.md claimed more | patch | new `scripts/ci/check-release-version.sh X.Y.Z` (CHANGELOG `## X.Y.Z`, `web` and `e2e` package versions), run with `check-contract-versions.sh` in `release.yml` `build-sign` before signing; negative cases in `test-contract-versions.sh`; RELEASING.md says what each check does |
+| 3 | git-mode draft search never tested; errors hidden by `2>/dev/null \|\| true` | patch | negative and positive case in a `git init` copy; the script fails when the file list is empty or misses `docs/contract.md`, and on a grep error (only "no match" passes) |
+| 4 | CHANGELOG listed `invalid` as new (it is in v0.1.0) and left out `kindSetups` and `user` | patch | `invalid` dropped from "new"; `map.load.reply` names `kindSetups` (phone and full) and the optional `user` |
+| 5 | Old **[unverified]** lines left beside the new rehearsal section | patch | `docs/contract.md` (another project's maps) and `docs/platform-checks.md` (user without an editing role, real browser reopened, `storage` between tabs) now carry **[live 8.3.9, rehearsal, throwaway-signed]** with a pointer to "Epic 2 story 13"; the 8.3.10 labels stay |
+| 6 | Rehearsal evidence claimed more than was run | patch | template-install.md says "the same way as" CI's signing check (2 days and its own CN there); platform-checks row says the lock entry was hand-written from `inspect`, `fetch` downloaded nothing, `check --write` was not run |
+| 7 | `module_version` `dev` written as optional to fix, against the Never rule | patch | template-install.md and deferred-work.md say it blocks the tag unless the owner waives it in Decisions; new gate G4. No waiver was given: the relayed "agree with all recommendations, start" answered the eight decisions above, before this finding existed |
+| 8 | Plan record and stale version text | patch, part rejected | "Open Question N" now "Decision N"; RELEASING.md example uses `vX.Y.Z`; README says 0.2.0 is for a host to install through its lock once published and that the template still pins 0.1.0. Rejected: changing `build.gradle.kts:20` (`0.1.0-SNAPSHOT`), which follows owner Decision 5 (`0.3.0-SNAPSHOT` after the tag; the release takes its version from the tag). Not changed: Decision 2 says the password is "passed by environment"; the rehearsal handed it to `psql` on standard input with the shell's `printf` builtin, which keeps the decision's intent (never on a command line, in a log or a file). The block is frozen, so the owner confirms the wording (owner step 1) |
+
+Re-run after the patches (2026-10-27): `./gradlew clean build` (JDK 17) passed, 445 JUnit tests, 0 failures, 1 skipped; `web` `tsc --noEmit` clean and Jest 17 suites, 145 tests passed; `check-contract-versions.sh` OK (contract 0.2.0, setup schema 1, map store schema 2), `test-contract-versions.sh` OK (15 refusals plus the git work tree and five release-version cases), `check-release-version.sh 0.2.0` OK. The template rehearsal was not repeated: no finding showed its evidence wrong, only its wording (findings 5 and 6). Plan stays in-progress: gates G1 to G4, the tag and the published-release steps are ahead.
 

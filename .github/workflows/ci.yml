@@ -51,7 +51,9 @@ jobs:
 
       # Every public contract document names the version it describes, read from the
       # code, and no released version is still called a draft (epic 2 R14). The test
-      # proves the check refuses a document stripped of its version.
+      # proves the check refuses a document stripped of its version, every draft wording
+      # this release removed (also in a git work tree) and a release version the CHANGELOG
+      # or a package does not name (check-release-version.sh, which release.yml runs).
       - name: Contract documents name their versions
         run: |
           scripts/ci/check-contract-versions.sh
