@@ -11,7 +11,8 @@
    (designer-* tokens). The Swing form reads the keys; these hex values are only the
    mock's stand-ins for the Designer's light theme. Render one state with ?v=STATE:
    normal, reasons, unreachable, inherited, newer, picker, empty, new.
-   There is no create dialog: empty and new are the same tab. */
+   There is no create dialog: empty and new are the same tab.
+   No section list (owner, 2026-10-27): the tab body is the form alone, left aligned. */
 :root {
   --d-panel: #f2f3f5;          /* Panel.background */
   --d-surface: #ffffff;        /* TextField.background, Tree.background */
@@ -54,14 +55,8 @@ body { background: var(--d-panel); color: var(--d-text); font: 13px/1.35 var(--f
 .tabs { height: 30px; display: flex; align-items: flex-end; padding-left: 6px; border-bottom: 1px solid var(--d-divider); }
 .tab { height: 30px; padding: 0 12px; display: flex; align-items: center; gap: 8px; background: var(--d-surface); border: 1px solid var(--d-divider); border-bottom: 2px solid var(--d-accent); border-top-left-radius: 3px; border-top-right-radius: 3px; }
 .tab .x { color: var(--d-text-2); }
-.tabbody { flex: 1; display: grid; grid-template-columns: 196px 1fr; min-height: 0; background: var(--d-surface); }
-.cats { border-right: 1px solid var(--d-divider); padding: 10px 0; background: var(--d-surface); }
-.cats div { height: 26px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; }
-.cats .on { background: var(--d-accent-tint); }
-.cats .count { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; }
-.cats .count.err { color: var(--d-error); } .cats .count.warn { color: var(--d-warning); }
-.cats.off div { color: var(--d-text-2); }
-.formwrap { display: flex; flex-direction: column; min-height: 0; }
+.tabbody { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--d-surface); }
+.formwrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .scroll { flex: 1; overflow: hidden; position: relative; padding: 14px 24px 0 24px; }
 .scrollbar { position: absolute; right: 2px; top: 4px; width: 8px; height: 82%; border-radius: 4px; background: #cfd3d8; display: none; }
 .hdr { display: flex; align-items: baseline; justify-content: space-between; max-width: 760px; }
@@ -129,6 +124,7 @@ section h2::after { content: ''; flex: 1; height: 1px; background: var(--d-divid
 .newtag i { width: 7px; height: 7px; border-radius: 50%; background: var(--d-accent); display: inline-block; }
 .footer .link { margin-left: auto; color: var(--d-accent); white-space: nowrap; }
 .footer .note { color: var(--d-text-2); }
+.footer .jump { text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .footer span { white-space: nowrap; }
 .ctxmenu { position: absolute; background: var(--d-surface); border: 1px solid var(--d-border); border-radius: 4px; box-shadow: 0 4px 14px rgba(0,0,0,.16); padding: 4px 0; font-size: 12.5px; z-index: 5; width: 168px; }
 .ctxmenu div { height: 24px; padding: 0 12px; display: flex; align-items: center; }
@@ -172,7 +168,7 @@ const base = {
   basemaps: { none: true, osm: true, satellite: false, mapbox: false },
   alarm: { v: '/alarms/{item.name}', state: 'ok' },
   secretProvider: '', secretName: '',
-  msgs: {}, counts: {},
+  msgs: {},
 };
 const states = {
   normal: {},
@@ -189,7 +185,6 @@ const states = {
       phone: [['err', 'MapOperator is listed twice.']],
       refresh: [['err', 'refreshIntervalSeconds must be a whole number from 1 to 3600, not 0.']],
     },
-    counts: { store: ['warn', 1], who: ['err', 1, 1], kinds: ['err', 1] },
   },
   unreachable: { gwDown: true, connection: { v: 'MapStudio', state: 'down' } },
   newer: { readonly: true },
@@ -203,7 +198,6 @@ const states = {
     assets: { v: '', state: '' },
     alarm: { v: '', state: '' },
     msgs: { connection: [['err', 'Name the database connection Map Studio stores the map in.']] },
-    counts: { store: ['err', 1] },
   },
 };
 const v = new URLSearchParams(location.search).get('v') || 'normal';
@@ -234,13 +228,6 @@ function chips(list, key, opts = {}) {
 function row(label, ctl, help, key, top) {
   return `<div class="row"><label>${label}</label><div><div class="ctl">${ctl}</div>${msgs(key)}${help ? `<div class="help">${help}</div>` : ''}</div></div>`;
 }
-function catCount(k) {
-  const c = S.counts[k];
-  if (!c) return '';
-  if (c.length === 3) return `<span class="count err">${I.err}${c[1]}</span><span class="count warn" style="margin-left:6px">${I.warn}${c[2]}</span>`;
-  return `<span class="count ${c[0]}">${c[0] === 'err' ? I.err : I.warn}${c[1]}</span>`;
-}
-function wrapCount(k) { const h = catCount(k); return h ? `<span style="display:inline-flex">${h}</span>` : ''; }
 
 const reasonsLeft = Object.values(S.msgs).flat().filter(m => m[0] === 'err').length;
 const warningsLeft = Object.values(S.msgs).flat().filter(m => m[0] === 'warn').length;
@@ -304,15 +291,12 @@ if (S.none) {
 const footer = S.none
   ? `<div class="footer"><span class="note">No setup in this project.</span></div>`
   : S.isNew
-  ? `<div class="footer err">${I.err}<span>${reasonsLeft} reason left - this setup is not saved until it is fixed.</span><span class="note" style="margin-left:6px">File &gt; Save shows the Designer's standard save failure.</span><span class="link">Discard new setup</span></div>`
+  ? `<div class="footer err">${I.err}<span><span class="jump" title="Go to the first reason">${reasonsLeft} reason left</span> - this setup is not saved until it is fixed.</span><span class="note" style="margin-left:6px">File &gt; Save shows the Designer's standard save failure.</span><span class="link">Discard new setup</span></div>`
   : S.readonly
   ? `<div class="footer">${I.lock}<span>Read only - this Designer does not save this setup.</span></div>`
   : reasonsLeft
-    ? `<div class="footer err">${I.err}<span>${reasonsLeft} reasons left - this setup is not saved until they are fixed.</span><span style="color:var(--d-text-2);margin-left:6px">${warningsLeft} warnings do not stop a save.</span></div>`
+    ? `<div class="footer err">${I.err}<span><span class="jump" title="Go to the first reason">${reasonsLeft} reasons left</span> - this setup is not saved until they are fixed.</span><span style="color:var(--d-text-2);margin-left:6px">${warningsLeft} warnings do not stop a save.</span></div>`
     : `<div class="footer">${I.check}<span>Saves with the project (File &gt; Save).</span></div>`;
-
-const cats = (S.readonly || S.none) ? '' : [['store', 'Map store'], ['who', 'Who can edit'], ['kinds', 'Kinds and assets'], ['map', 'Map']]
-  .map(([k, l], i) => `<div class="${i === 0 ? 'on' : ''}"><span>${l}</span>${wrapCount(k)}</div>`).join('');
 
 document.getElementById('app').innerHTML = `
 <div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Tools</span><span>Window</span><span>Help</span></div>
@@ -335,8 +319,7 @@ document.getElementById('app').innerHTML = `
   </div>
   <div class="workspace">
     <div class="tabs"><div class="tab">${I.map}<span>Map Studio Setup</span><span class="x">${I.x}</span></div></div>
-    <div class="tabbody" style="${S.none ? 'grid-template-columns:1fr' : ''}">
-      <div class="cats ${S.readonly ? 'off' : ''}" style="${S.none ? 'display:none' : ''}">${cats}</div>
+    <div class="tabbody">
       <div class="formwrap">
         <div class="scroll" id="scroll">
           <div class="hdr"><div><h1>Map Studio Setup</h1><div class="sub">Project mapstudio-dev - how Map Studio stores, guards and draws this project's map.</div>${S.isNew ? '<div class="newtag"><i></i>New setup - saves with the project</div>' : ''}</div><span class="schema">${S.none ? '' : S.readonly ? 'Schema 2 - read only' : 'Schema version 1'}</span></div>
@@ -351,7 +334,9 @@ document.getElementById('app').innerHTML = `
 <div class="statusbar"><span>${S.readonly ? 'Read only' : S.isNew ? 'New Map Studio setup - not saved yet' : 'Ready'}</span><span class="gw ${S.gwDown ? 'down' : ''}">${I.gw}${S.gwDown ? 'Gateway localhost:8088 - not reachable' : 'Gateway localhost:8088 - connected'}</span></div>`;
 
 const sc = document.getElementById('scroll');
-if (sc.scrollHeight > sc.clientHeight + 4) document.getElementById('sb').style.display = 'block';
+function fitScrollbar() { document.getElementById('sb').style.display = sc.scrollHeight > sc.clientHeight + 4 ? 'block' : 'none'; }
+fitScrollbar();
+if (document.fonts) document.fonts.ready.then(fitScrollbar);
 
 if (S.picker) {
   const ch = document.getElementById('chips-full').getBoundingClientRect();
