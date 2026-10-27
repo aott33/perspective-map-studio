@@ -14,7 +14,6 @@ import com.inductiveautomation.perspective.gateway.api.PerspectiveContext;
 
 import com.aoindustrial.perspective.mapstudio.common.MapStudioComponent;
 import com.aoindustrial.perspective.mapstudio.common.MapStudioModule;
-import com.aoindustrial.perspective.mapstudio.common.MapStudioScriptModule;
 
 /**
  * Gateway scope hook: registers the component and its model delegate on
@@ -27,17 +26,22 @@ public class MapStudioGatewayHook extends AbstractGatewayModuleHook {
     private GatewayContext gatewayContext;
     private ComponentRegistry componentRegistry;
     private ComponentModelDelegateRegistry delegateRegistry;
+    private MapStudioServices services;
 
     @Override
     public void setup(GatewayContext context) {
         this.gatewayContext = context;
+        this.services = new MapStudioServices(context);
     }
 
-    /** Adds {@code system.mapstudio.*} to Gateway and project script scopes (AD-18). */
+    /**
+     * Adds {@code system.mapstudio.*} to Gateway and project script scopes (AD-18);
+     * the Gateway calls it for every script manager it creates (docs/platform-checks.md, check 3).
+     */
     @Override
     public void initializeScriptManager(ScriptManager manager) {
         super.initializeScriptManager(manager);
-        manager.addScriptModule("system.mapstudio", new MapStudioScriptModule(), new PropertiesFileDocProvider());
+        manager.addScriptModule("system.mapstudio", services.scriptModule, new PropertiesFileDocProvider());
     }
 
     @Override
@@ -54,14 +58,22 @@ public class MapStudioGatewayHook extends AbstractGatewayModuleHook {
         }
 
         if (this.delegateRegistry != null) {
-            this.delegateRegistry.register(MapStudioComponent.COMPONENT_ID, MapStudioDelegate::new);
+            MapStudioServices s = this.services;
+            this.delegateRegistry.register(MapStudioComponent.COMPONENT_ID,
+                component -> new MapStudioDelegate(component, s));
         } else {
             log.error("Perspective model delegate registry not found; the Map Studio delegate is not registered.");
         }
+
+        // Reads each runnable project's setup; each setup starts its connection's wait and migrations.
+        this.services.start();
     }
 
     @Override
     public void shutdown() {
+        if (this.services != null) {
+            this.services.stop();
+        }
         if (this.componentRegistry != null) {
             this.componentRegistry.removeComponent(MapStudioComponent.COMPONENT_ID);
         }

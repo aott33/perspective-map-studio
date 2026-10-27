@@ -2,6 +2,12 @@
 
 import { expect, test as base } from '@playwright/test';
 import { sessionUrl } from '../lib/env.mjs';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { EDITOR_USER, editorStateFile } from '../lib/editorAuth.mjs';
+
+const signInCli = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'lib', 'signInCli.mjs');
 
 /** Collect browser page errors and console errors, and Map Studio console warnings. */
 export function watch(page) {
@@ -68,4 +74,34 @@ export async function loadedCounts(map) {
  */
 export async function nextFrames(page) {
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+export { EDITOR_USER };
+
+/**
+ * `test` signed in as the dev map editor: right before the test, a separate node
+ * process (lib/signInCli.mjs) signs in with its own browser and saves the browser
+ * state, and the test's context starts from it. The sign-in runs outside this
+ * process, so no test step, trace or report ever sees the password. A sign-in saved
+ * once in the global setup was signed out by the time the full suite reached these
+ * tests (after the measures' two minutes; cause not established, [live 8.3.10]),
+ * hence one fresh sign-in per editor test.
+ */
+export const editorTest = test.extend({
+    // eslint-disable-next-line no-empty-pattern
+    storageState: async ({}, use) => {
+        const run = spawnSync(process.execPath, [signInCli], { encoding: 'utf8', env: process.env, timeout: 180_000 });
+        if (run.status !== 0) {
+            throw new Error((run.stderr || '').trim() || 'The map editor could not sign in (lib/signInCli.mjs).');
+        }
+        await use(editorStateFile);
+    }
+});
+
+/** Wait until map.load has answered (loaded or failed) after openMap. */
+export async function mapLoaded(map) {
+    await expect(map).not.toHaveAttribute('data-load-state', 'loading', { timeout: 60_000 });
+    await expect(map).toHaveAttribute('data-load-state', 'loaded');
+    await expect(map).toHaveAttribute('data-items-loaded', /^[0-9]+$/);
+    return Number(await map.getAttribute('data-items-loaded'));
 }
