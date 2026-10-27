@@ -3,7 +3,6 @@ package com.aoindustrial.perspective.mapstudio.designer.setup;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.Component;
@@ -15,7 +14,11 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import javax.swing.JComboBox;
+import javax.swing.JSpinner;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.UIManager;
+import javax.swing.plaf.UIResource;
 
 import org.junit.jupiter.api.Test;
 
@@ -164,28 +167,91 @@ class SetupPanelTest {
         SetupPanel panel = panel(null);
         SetupForm newer = SetupForm.fromJson("{\"schemaVersion\": 2, \"x\": 1}");
         panel.show(newer, false, "");
-        assertSame(newer, SetupCommit.formToSave(panel, newer));
+        assertSame(newer, SetupCommit.formToSave(panel, newer).form());
         SetupForm dev = SetupForm.fromJson(DEV);
         panel.show(dev, true, "");
         panel.type(SetupForm.CONNECTION, "");
-        assertSame(dev, SetupCommit.formToSave(panel, dev));
-        assertSame(dev, SetupCommit.formToSave(null, dev));
+        assertSame(dev, SetupCommit.formToSave(panel, dev).form());
+        assertFalse(SetupCommit.formToSave(panel, dev).isHeldBack());
+        assertSame(dev, SetupCommit.formToSave(null, dev).form());
     }
 
+    /**
+     * Fix 16 (owner, 2026-10-27): reasons hold back only the setup. The commit hands back the setup
+     * as read, which ResourceEditor.commit() does not write (it equals the one read), and the tab
+     * keeps the changes and reasons, reading "(unsaved)".
+     */
     @Test
-    void aSetupWithReasonsIsRefusedAndAValidOneIsSaved() throws Exception {
+    void aSetupWithReasonsIsHeldBackAndAValidOneIsSaved() {
         SetupPanel panel = panel(null);
         SetupForm dev = SetupForm.fromJson(VALID);
         panel.show(dev, false, "");
-        assertEquals(dev, SetupCommit.formToSave(panel, dev));
+        assertFalse(panel.hasUnsavedChanges());
+        assertEquals(dev, SetupCommit.formToSave(panel, dev).form());
         panel.type(SetupForm.REFRESH, "0");
-        SetupRefusedException refused =
-            assertThrows(SetupRefusedException.class, () -> SetupCommit.formToSave(panel, dev));
-        assertEquals(List.of(SetupForm.REFRESH), List.copyOf(refused.reasons().keySet()));
+        assertTrue(panel.hasUnsavedChanges());
+        SetupCommit.Decision held = SetupCommit.formToSave(panel, dev);
+        assertTrue(held.isHeldBack());
+        assertSame(dev, held.form(), "the setup as read: nothing of the setup is written");
+        assertEquals(List.of(SetupForm.REFRESH), List.copyOf(held.heldBack().keySet()));
+        // The tab keeps what was typed and its reason after the save.
+        assertEquals("0", panel.current().text(SetupForm.REFRESH));
+        assertTrue(panel.reasonText(SetupForm.REFRESH).contains("from 1 to 3600"));
+        assertTrue(panel.hasUnsavedChanges());
+        assertEquals("Map Studio Setup (unsaved)", SetupCommit.nodeText(true, false, false, true));
         panel.type(SetupForm.REFRESH, "20");
-        SetupForm saved = SetupCommit.formToSave(panel, dev);
-        assertEquals("20", saved.text(SetupForm.REFRESH));
-        assertFalse(saved.equals(dev));
+        SetupCommit.Decision saved = SetupCommit.formToSave(panel, dev);
+        assertFalse(saved.isHeldBack());
+        assertEquals("20", saved.form().text(SetupForm.REFRESH));
+        assertFalse(saved.form().equals(dev));
+    }
+
+    /**
+     * Fix 16 review: closing a tab with reasons left would drop its changes (the commit on close
+     * writes nothing), so the workspace asks first; a tab with changes and no reasons, or a
+     * read-only one, closes as before.
+     */
+    @Test
+    void closingATabWithReasonsLeftAsksFirst() {
+        SetupPanel panel = panel(null);
+        panel.show(SetupForm.fromJson(VALID), false, "");
+        assertFalse(SetupCommit.closeDropsChanges(panel));
+        panel.type(SetupForm.REFRESH, "0");
+        assertTrue(SetupCommit.closeDropsChanges(panel));
+        assertEquals(1, SetupCommit.reasonCount(panel));
+        panel.type(SetupForm.REFRESH, "20");
+        assertTrue(panel.hasUnsavedChanges());
+        assertFalse(SetupCommit.closeDropsChanges(panel), "no reasons: the close commits the changes");
+        panel.show(SetupForm.fromJson(VALID), true, "");
+        assertFalse(SetupCommit.closeDropsChanges(panel));
+        assertFalse(SetupCommit.closeDropsChanges(null));
+        assertEquals(0, SetupCommit.reasonCount(null));
+    }
+
+    /**
+     * Fix 16 review: after a save that wrote the setup, the form compares with what was written,
+     * so "(unsaved)" goes (ResourceEditor.commit() skips its own reload while it commits).
+     */
+    @Test
+    void unsavedGoesAfterASaveThatWroteTheSetup() {
+        SetupPanel panel = panel(null);
+        SetupForm dev = SetupForm.fromJson(VALID);
+        panel.show(dev, false, "");
+        panel.type(SetupForm.REFRESH, "20");
+        assertTrue(panel.hasUnsavedChanges());
+        SetupCommit.Decision saved = SetupCommit.formToSave(panel, dev);
+        assertFalse(saved.isHeldBack());
+        panel.markSaved(saved.form());
+        assertFalse(panel.hasUnsavedChanges());
+        assertEquals("Map Studio Setup", SetupCommit.nodeText(true, false, false, panel.hasUnsavedChanges()));
+        assertEquals("20", panel.current().text(SetupForm.REFRESH));
+        // Typing the old value back is a change now: the project holds 20.
+        panel.type(SetupForm.REFRESH, dev.text(SetupForm.REFRESH));
+        assertTrue(panel.hasUnsavedChanges());
+        // Only an editable setup moves its base.
+        panel.showEmpty();
+        panel.markSaved(dev);
+        assertFalse(panel.hasUnsavedChanges());
     }
 
     // Story 16: lists, warnings, footer, states, layout.
@@ -201,7 +267,7 @@ class SetupPanelTest {
         assertEquals(List.of("/", "/alarms/:name", "/edit", "Insert placeholder..."),
             panel.offered(SetupForm.ALARM_PAGE));
         assertEquals(List.of("Internal", "MapStudioFiles"), panel.offered("provider"));
-        assertEquals(List.of("Choose a secret provider first."), panel.offered("secretName"));
+        assertEquals(List.of(), panel.offered("secretName"));
         panel.pickProvider("Internal");
         assertEquals(List.of("api-key", "mapbox-token"), panel.offered("secretName"));
         assertEquals(List.of("lists default", "secretNames Internal"), source.asked);
@@ -241,8 +307,8 @@ class SetupPanelTest {
         assertEquals("MapOperator is listed twice.", panel.reasonText(SetupForm.PHONE_ROLES));
         assertEquals("2 reasons left - this setup is not saved until they are fixed. | 2 warnings do not stop a save.",
             panel.footerText());
-        panel.pressFooterLink();
-        assertEquals(SetupForm.PHONE_ROLES, panel.focusedReasonField());
+        // Plain text: no link, nothing to scroll to (owner, 2026-10-27).
+        assertEquals(List.of(), panel.footerButtons());
         // Warnings never stop the save.
         panel.type(SetupForm.PHONE_ROLES, "MapOperator");
         panel.type(SetupForm.REFRESH, "10");
@@ -251,41 +317,41 @@ class SetupPanelTest {
         assertTrue(panel.current().toJson().contains("\"connection\": \"MapStore\""));
     }
 
+    /** Fix 16: no Gateway-unreachable state; the Designer shows when it has no Gateway. */
     @Test
-    void anUnreachableGatewaySaysSoInTheFooterAndTypingStillWorks() {
-        source.reachable = false;
+    void aGatewayThatIsDownLeavesItsListsEmptyWithNoMessageAndTypingStillWorks() {
+        source.gatewayFails = true;
         SetupPanel panel = panel(null);
         panel.show(SetupForm.fromJson(VALID), false, "");
-        assertEquals("Gateway not reachable - lists unavailable, typing still works. | Connections, roles and secret"
-            + " providers come back with the Gateway; functions and pages are still listed. [Try again]",
-            panel.footerText());
-        assertEquals(List.of("List unavailable"), panel.offered(SetupForm.CONNECTION));
-        assertEquals(List.of("List unavailable"), panel.offered(SetupForm.FULL_ROLES));
+        assertEquals("", panel.footerText());
+        assertEquals(List.of(), panel.offered(SetupForm.CONNECTION));
+        assertEquals(List.of(), panel.offered(SetupForm.FULL_ROLES));
+        assertEquals(List.of(), panel.offered("provider"));
         assertEquals(List.of("mapstudio_dev.assets", "mapstudio_dev.kinds"), panel.offered(SetupForm.KINDS_FUNCTION));
         panel.type(SetupForm.CONNECTION, "MapStore");
         assertEquals("", panel.warningText(SetupForm.CONNECTION));
         assertFalse(panel.hasMark(SetupForm.CONNECTION));
         assertEquals("MapStore", panel.current().text(SetupForm.CONNECTION));
-        // Reasons win the footer: they are what stops the save.
         panel.type(SetupForm.REFRESH, "0");
-        assertTrue(panel.footerText().startsWith("1 reason left"));
+        assertEquals("1 reason left - this setup is not saved until it is fixed.", panel.footerText());
         panel.type(SetupForm.REFRESH, "10");
-        source.reachable = true;
-        panel.pressFooterAction();
         assertEquals("", panel.footerText());
+        // The Gateway is back: the header's Refresh lists asks again.
+        source.gatewayFails = false;
+        panel.pressRefreshLists();
+        assertEquals(List.of("MapStudio (PostgreSQL)", "MES (Microsoft SQL Server)"), panel.offered(SetupForm.CONNECTION));
         assertTrue(panel.warningText(SetupForm.CONNECTION).startsWith("MapStore is not"));
     }
 
     @Test
-    void anIdentityProviderThatCannotListRolesSaysSo() {
+    void anIdentityProviderThatCannotListRolesLeavesTheListEmpty() {
         source.gateway = new com.aoindustrial.perspective.mapstudio.common.contract.SetupLists(
             source.gateway.connections(),
             com.aoindustrial.perspective.mapstudio.common.contract.SetupLists.Part.notListed("x"),
             source.gateway.secretProviders());
         SetupPanel panel = panel(null);
         panel.show(SetupForm.fromJson(VALID), false, "");
-        assertEquals(List.of("This identity provider does not list its roles. Type them."),
-            panel.offered(SetupForm.FULL_ROLES));
+        assertEquals(List.of(), panel.offered(SetupForm.FULL_ROLES));
         panel.type(SetupForm.FULL_ROLES, "Anyone");
         assertEquals("", panel.warningText(SetupForm.FULL_ROLES));
     }
@@ -316,8 +382,9 @@ class SetupPanelTest {
         assertEquals(List.of("MapEditor"), panel.current().list(SetupForm.FULL_ROLES));
         assertEquals("Name the database connection Map Studio stores the map in.",
             panel.reasonText(SetupForm.CONNECTION));
-        assertEquals("1 reason left - this setup is not saved until it is fixed. | File > Save shows the Designer's"
-            + " standard save failure. [Discard new setup]", panel.footerText());
+        assertEquals("1 reason left - this setup is not saved until it is fixed. | File > Save saves the rest of"
+            + " the project without it. [Discard new setup]", panel.footerText());
+        assertTrue(panel.hasUnsavedChanges());
         panel.type(SetupForm.CONNECTION, "MapStudio");
         assertEquals("New setup - not saved yet. [Discard new setup]", panel.footerText());
         panel.pressFooterAction();
@@ -397,21 +464,24 @@ class SetupPanelTest {
     // Matrix: no setup and new setup - the node's words, and File > Save of a new setup.
     @Test
     void theNodeSaysWhetherThereIsASetup() {
-        assertEquals("Map Studio Setup (none)", SetupCommit.nodeText(false, false, false));
-        assertEquals("Map Studio Setup (new, unsaved)", SetupCommit.nodeText(false, false, true));
-        assertEquals("Map Studio Setup", SetupCommit.nodeText(true, false, false));
-        assertEquals("Map Studio Setup (inherited)", SetupCommit.nodeText(true, true, false));
+        assertEquals("Map Studio Setup (none)", SetupCommit.nodeText(false, false, false, false));
+        assertEquals("Map Studio Setup (new, unsaved)", SetupCommit.nodeText(false, false, true, false));
+        assertEquals("Map Studio Setup", SetupCommit.nodeText(true, false, false, false));
+        assertEquals("Map Studio Setup (inherited)", SetupCommit.nodeText(true, true, false, false));
+        assertEquals("Map Studio Setup (unsaved)", SetupCommit.nodeText(true, false, false, true));
+        assertEquals("Map Studio Setup (unsaved)", SetupCommit.nodeText(true, true, false, true));
     }
 
     @Test
-    void aNewSetupWithReasonsIsRefusedAtSaveAndOneWithoutIsCreated() throws Exception {
+    void aNewSetupWithReasonsIsHeldBackAtSaveAndOneWithoutIsCreated() {
         SetupPanel panel = panel(null);
         panel.showNew();
-        SetupRefusedException refused =
-            assertThrows(SetupRefusedException.class, () -> SetupCommit.newSetupToSave(panel));
-        assertEquals(List.of(SetupForm.CONNECTION), List.copyOf(refused.reasons().keySet()));
+        SetupCommit.Decision held = SetupCommit.newSetupToSave(panel);
+        assertTrue(held.isHeldBack());
+        assertEquals(null, held.form(), "nothing is created");
+        assertEquals(List.of(SetupForm.CONNECTION), List.copyOf(held.heldBack().keySet()));
         panel.type(SetupForm.CONNECTION, "MapStudio");
-        SetupForm created = SetupCommit.newSetupToSave(panel);
+        SetupForm created = SetupCommit.newSetupToSave(panel).form();
         assertTrue(created.toJson().startsWith("{\n  \"schemaVersion\": 1,\n  \"connection\": \"MapStudio\","),
             created.toJson());
     }
@@ -426,6 +496,7 @@ class SetupPanelTest {
         files.add(Path.of("src/main/java/com/aoindustrial/perspective/mapstudio/designer/MapStudioDesignerHook.java"));
         assertTrue(files.size() > 10, files.toString());
         int askFirst = 0;
+        int askClose = 0;
         for (Path file : files) {
             String code = Files.readString(file);
             assertFalse(code.contains("JDialog"), file.toString());
@@ -434,56 +505,53 @@ class SetupPanelTest {
             int shows = code.split("JOptionPane.show", -1).length - 1;
             if (file.getFileName().toString().equals("SetupPanel.java")) {
                 askFirst = shows;
+            } else if (file.getFileName().toString().equals("SetupWorkspace.java")) {
+                askClose = shows;
             } else {
                 assertEquals(0, shows, file.toString());
             }
         }
-        // The one dialog of the package is Start from defaults asking first.
+        // The dialogs of the package ask before something is lost: Start from defaults, and
+        // closing a setup tab whose changes cannot be kept (it names the count, not the reasons).
         assertEquals(1, askFirst);
+        assertEquals(1, askClose);
+        assertFalse(SetupForm.msg("setup.close.message.many", 2).contains("from 1 to 3600"));
     }
 
+    /** Fix 16: the footer's count is plain text, with no link and no scroll-to. */
     @Test
-    void theFooterLinkGoesToTheFirstReasonOnScreen() {
+    void theFooterCountsTheReasonsAsPlainText() {
         SetupPanel panel = panel(null);
-        // Basemaps is above Alarm page on screen, below it in setup.json.
         panel.show(SetupForm.fromJson(VALID.replace("}}", "}, \"basemaps\": [\"osm\", \"osm\"],"
             + " \"alarmPage\": \"alarms\"}")), false, "");
         assertFalse(panel.reasonText(SetupForm.ALARM_PAGE).isEmpty());
         assertFalse(panel.reasonText(SetupForm.BASEMAPS).isEmpty());
-        layout(panel, 900, 700);
-        assertTrue(panel.rowBounds(SetupForm.BASEMAPS).y < panel.rowBounds(SetupForm.ALARM_PAGE).y);
-        panel.pressFooterLink();
-        assertEquals(SetupForm.BASEMAPS, panel.focusedReasonField());
+        assertEquals("2 reasons left - this setup is not saved until they are fixed.", panel.footerText());
+        assertEquals(List.of(), panel.footerButtons());
     }
 
     @Test
-    void aNewSetupWithTheGatewayDownSaysSoBesideDiscard() {
-        source.reachable = false;
+    void aNewSetupWithTheGatewayDownSaysNothingAboutIt() {
+        source.gatewayFails = true;
         SetupPanel panel = panel(null);
         panel.showNew();
-        assertTrue(panel.footerText().contains("Gateway not reachable - lists unavailable, typing still works."),
-            panel.footerText());
-        assertTrue(panel.footerText().endsWith("[Discard new setup]"), panel.footerText());
+        assertEquals("1 reason left - this setup is not saved until it is fixed. | File > Save saves the rest of"
+            + " the project without it. [Discard new setup]", panel.footerText());
         panel.type(SetupForm.CONNECTION, "MapStudio");
-        assertEquals("New setup - not saved yet. | Gateway not reachable - lists unavailable, typing still works."
-            + " [Discard new setup]", panel.footerText());
+        assertEquals("New setup - not saved yet. [Discard new setup]", panel.footerText());
+        assertEquals(List.of("Discard new setup"), panel.footerButtons());
     }
 
     @Test
-    void aRefusedCallIsListUnavailableNotGatewayNotReachable() {
+    void aRefusedCallLeavesTheListsEmptyWithNoMessage() {
         source.failure = new SecurityException("Only a Designer may ask for the setup lists.");
         SetupPanel panel = panel(null);
         panel.show(SetupForm.fromJson(VALID), false, "");
         assertEquals("", panel.footerText());
-        assertEquals(List.of("List unavailable"), panel.offered(SetupForm.CONNECTION));
-        assertEquals(List.of("List unavailable"), panel.offered("provider"));
+        assertEquals(List.of(), panel.offered(SetupForm.CONNECTION));
+        assertEquals(List.of(), panel.offered("provider"));
         panel.type(SetupForm.CONNECTION, "MapStore");
         assertEquals("", panel.warningText(SetupForm.CONNECTION));
-        assertTrue(SetupPanel.isUnreachable(new java.net.ConnectException("refused")));
-        assertTrue(SetupPanel.isUnreachable(new RuntimeException(new java.net.SocketTimeoutException("slow"))));
-        assertTrue(SetupPanel.isUnreachable(new java.util.concurrent.TimeoutException()));
-        assertFalse(SetupPanel.isUnreachable(new SecurityException("no")));
-        assertFalse(SetupPanel.isUnreachable(new IllegalStateException("no such RPC")));
     }
 
     /** Gateway replies held back until the test hands them over, in any order. */
@@ -534,10 +602,114 @@ class SetupPanelTest {
         Runnable files = async.last();
         assertTrue(internal != files);
         files.run();
-        assertEquals(List.of("List unavailable"), panel.offered("secretName"));
+        assertEquals(List.of(), panel.offered("secretName"));
         internal.run();
-        assertEquals(List.of("List unavailable"), panel.offered("secretName"));
+        assertEquals(List.of(), panel.offered("secretName"));
         panel.typeSecretName("mapbox");
         assertEquals("", panel.warningText(SetupForm.TOKEN_SECRET));
+    }
+
+    // Fix 16: the Designer's own controls (owner, 2026-10-27, compared with Project Properties).
+
+    private static void assertPlainLook(javax.swing.JComponent c, String uiKey) {
+        assertEquals(UIManager.getDefaults().getUIClass(uiKey), c.getUI().getClass(), uiKey);
+        assertTrue(c.getBorder() == null || c.getBorder() instanceof UIResource, uiKey + " border " + c.getBorder());
+        assertTrue(c.getBackground() == null || c.getBackground() instanceof UIResource,
+            uiKey + " background " + c.getBackground());
+    }
+
+    @Test
+    void everyDropdownAndTheSpinnerAreTheLookAndFeelsOwn() {
+        SetupPanel panel = panel(null);
+        panel.show(SetupForm.fromJson(VALID), false, "");
+        for (String f : List.of(SetupForm.CONNECTION, SetupForm.KINDS_FUNCTION, SetupForm.ASSETS_FUNCTION,
+            SetupForm.ALARM_PAGE, "provider", "secretName")) {
+            JComboBox<Object> combo = panel.picker(f).combo();
+            assertSame(JComboBox.class, combo.getClass(), f);
+            assertTrue(combo.isEditable(), f);
+            assertPlainLook(combo, "ComboBoxUI");
+        }
+        for (String f : List.of(SetupForm.FULL_ROLES, SetupForm.PHONE_ROLES)) {
+            JComboBox<Object> combo = panel.chips(f).input().combo();
+            assertSame(JComboBox.class, combo.getClass(), f);
+            assertPlainLook(combo, "ComboBoxUI");
+        }
+        JSpinner spinner = panel.refreshSpinner();
+        assertSame(JSpinner.class, spinner.getClass());
+        assertPlainLook(spinner, "SpinnerUI");
+        // A reason or a warning never recolours a control: its glyph and line say it.
+        panel.type(SetupForm.CONNECTION, "");
+        panel.type(SetupForm.REFRESH, "0");
+        assertPlainLook(panel.picker(SetupForm.CONNECTION).combo(), "ComboBoxUI");
+        assertPlainLook(spinner, "SpinnerUI");
+    }
+
+    @Test
+    void noCodeOfOursChangesAControlsLook() throws IOException {
+        Path dir = Path.of("src/main/java/com/aoindustrial/perspective/mapstudio/designer/setup");
+        try (java.util.stream.Stream<Path> listed = Files.list(dir)) {
+            for (Path file : listed.filter(f -> f.toString().endsWith(".java")).toList()) {
+                String code = Files.readString(file);
+                for (String banned : List.of("setUI(", "BasicArrowButton", "BasicComboBoxUI", "ComboBoxUI",
+                    "BasicSpinnerUI", "MetalComboBoxUI", "createArrowButton")) {
+                    assertFalse(code.contains(banned), file + " uses " + banned);
+                }
+            }
+        }
+    }
+
+    @Test
+    void theSpinnersArrowsStepTheTypedNumberAndAnyTextCanBeTyped() throws Exception {
+        SetupPanel panel = panel(null);
+        panel.show(SetupForm.fromJson(VALID), false, "");
+        assertEquals("10", panel.current().text(SetupForm.REFRESH));
+        panel.type(SetupForm.REFRESH, "20");
+        // What the spinner's own arrow does: commit the typed text, then step.
+        JSpinner spinner = panel.refreshSpinner();
+        spinner.commitEdit();
+        spinner.setValue(spinner.getNextValue());
+        assertEquals("21", panel.current().text(SetupForm.REFRESH));
+        spinner.setValue(spinner.getPreviousValue());
+        spinner.setValue(spinner.getPreviousValue());
+        assertEquals("19", panel.current().text(SetupForm.REFRESH));
+        panel.type(SetupForm.REFRESH, "1000");
+        spinner.commitEdit();
+        spinner.setValue(spinner.getNextValue());
+        assertEquals("1001", panel.current().text(SetupForm.REFRESH), "no grouping comma");
+        panel.type(SetupForm.REFRESH, "abc");
+        assertEquals("abc", panel.current().text(SetupForm.REFRESH));
+        assertTrue(panel.reasonText(SetupForm.REFRESH).contains("whole number"));
+        panel.show(SetupForm.fromJson(VALID.replace("}}", "}, \"refreshIntervalSeconds\": 10.5}")), false, "");
+        assertEquals("10.5", panel.current().text(SetupForm.REFRESH));
+    }
+
+    @Test
+    void choosingInsertPlaceholderNeverBecomesTheValue() {
+        SetupPanel panel = panel(null);
+        panel.show(SetupForm.fromJson(VALID), false, "");
+        panel.type(SetupForm.ALARM_PAGE, "/alarms/");
+        JComboBox<Object> combo = panel.picker(SetupForm.ALARM_PAGE).combo();
+        Object action = combo.getItemAt(combo.getItemCount() - 1);
+        assertEquals("Insert placeholder...", action.toString());
+        combo.setSelectedItem(action);
+        assertEquals("/alarms/", panel.current().text(SetupForm.ALARM_PAGE));
+        // A page picked from the list is the value, with {item.name} for its :param.
+        combo.setSelectedItem(combo.getItemAt(1));
+        assertEquals("/alarms/{item.name}", panel.current().text(SetupForm.ALARM_PAGE));
+    }
+
+    @Test
+    void aRolePickedFromTheDropdownBecomesAChip() {
+        SetupPanel panel = panel(null);
+        panel.show(SetupForm.fromJson(VALID), false, "");
+        ChipField chips = panel.chips(SetupForm.FULL_ROLES);
+        JComboBox<Object> combo = chips.input().combo();
+        assertEquals(List.of("Administrator", "MapEditor  (added)", "MapOperator"), chips.offered());
+        combo.setSelectedItem(combo.getItemAt(0));
+        assertEquals(List.of("MapEditor", "Administrator"), panel.current().list(SetupForm.FULL_ROLES));
+        assertEquals("", chips.input().text());
+        // A role already added is not added twice.
+        combo.setSelectedItem(combo.getItemAt(1));
+        assertEquals(List.of("MapEditor", "Administrator"), panel.current().list(SetupForm.FULL_ROLES));
     }
 }

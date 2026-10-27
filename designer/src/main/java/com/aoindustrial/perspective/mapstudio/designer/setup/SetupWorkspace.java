@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import javax.swing.AbstractAction;
+import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
 import javax.swing.tree.TreePath;
@@ -27,9 +28,10 @@ import com.aoindustrial.perspective.mapstudio.common.MapStudioModule;
  * A project with a setup opens it in a {@link SetupEditor} tab. A project with none opens a
  * "Map Studio Setup" tab of its own holding the same {@link SetupPanel} in the empty state;
  * Create setup fills it with the defaults, marked new, and nothing is in the project until
- * File > Save, which creates the resource when the form has no reasons left and otherwise fails
- * the save. Discard new setup returns to the empty state. The node reads "(none)",
- * "(new, unsaved)" or "(inherited)" after its name.
+ * File > Save, which creates the resource when the form has no reasons left and otherwise holds
+ * it back while the rest of the project saves (fix 16). Discard new setup returns to the empty
+ * state. The node reads "(none)", "(new, unsaved)", "(unsaved)" or "(inherited)" after its name,
+ * and the tab says "(unsaved)" too while the form holds changes the project does not have.
  *
  * <p>Built from the 8.3.0 SDK (javap) and not seen in a Designer [unverified]:
  * {@code ResourceEditor} cannot open a resource that does not exist (its constructor throws), so
@@ -37,7 +39,9 @@ import com.aoindustrial.perspective.mapstudio.common.MapStudioModule;
  * close action is replaced so it closes that tab too (the SDK's casts the selected tab to
  * {@code ResourceEditor}); the tab popup ignores a tab that is not an editor (the SDK catches the
  * cast). Whether a resource created during {@code notifyProjectSaveStart} goes up with that same
- * save is part of the owner's check.
+ * save is part of the owner's check. Closing a setup tab whose changes cannot be written (reasons
+ * left) asks Discard or Cancel instead of dropping them; after a save that wrote the setup, the
+ * tab compares with what was written, so "(unsaved)" goes (fix 16 review).
  */
 public final class SetupWorkspace extends TabbedResourceWorkspace {
 
@@ -50,6 +54,8 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
 
     private SetupPanel draft;
     private boolean draftNew;
+    /** True while {@link #commitAll()} runs (a project save), so only a save logs a held-back setup. */
+    private boolean savingAll;
 
     public SetupWorkspace(DesignerContext context) {
         super(context, ResourceDescriptor.builder()
@@ -128,7 +134,8 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
             } else {
                 draft.showEmpty();
             }
-            addTab(SetupForm.msg("setup.tab"), getDescriptor().getNavRootIcon(), draft, null);
+            addTab(SetupForm.msg(draftNew ? "setup.node.new" : "setup.tab"), getDescriptor().getNavRootIcon(), draft,
+                null);
         }
         setSelectedComponent(draft);
     }
@@ -165,12 +172,57 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
     }
 
     /**
-     * Commits the open editors (story 7), then a new setup: with reasons left the save is refused
-     * (no dialog) and the setup's tab is brought forward on its first reason, reopened if it was
-     * closed; else the resource is created in the project for this save. A new setup is dropped
-     * first when the project has a setup by now. Reasons fail the whole project save (owner,
-     * 2026-10-27, "reasons block a save"); whether that should be only the setup's part is an
-     * owner question [unverified: what the rest of the save does].
+     * Closes a tab (its X, and the tab menu's Close, Close others and Close all, which call this
+     * [SDK 8.3.0 javap]). The SDK's close commits the editor first; a setup with reasons left
+     * cannot be written, so closing it would silently drop its changes (fix 16 review). Such a tab
+     * is brought forward and the user is asked: Discard closes it without a commit, Cancel keeps it
+     * open with its changes and reasons.
+     */
+    @Override
+    public void close(ResourcePath path) {
+        for (ResourceEditor<?> e : getEditors()) {
+            if (e instanceof SetupEditor editor && path.equals(editor.getResourcePath())
+                && editor.closeDropsChanges()) {
+                if (indexOfComponent(editor) >= 0) {
+                    setSelectedComponent(editor);
+                }
+                if (!confirmDiscard(editor.reasonCount())) {
+                    return;
+                }
+                LOG.info("Map Studio setup: tab closed and its unsaved changes discarded.");
+                super.close(path, false);
+                refreshNode();
+                return;
+            }
+        }
+        super.close(path);
+        refreshNode();
+    }
+
+    /** Discard / Cancel, Cancel the default. */
+    private boolean confirmDiscard(int reasons) {
+        String discard = SetupForm.msg("setup.close.discard");
+        String cancel = SetupForm.msg("setup.close.cancel");
+        int choice = JOptionPane.showOptionDialog(this,
+            reasons == 1 ? SetupForm.msg("setup.close.message.one") : SetupForm.msg("setup.close.message.many", reasons),
+            SetupForm.msg("setup.close.title"), JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE, null,
+            new Object[] {discard, cancel}, cancel);
+        return choice == 0;
+    }
+
+    /** True while a project save commits this workspace. */
+    boolean isSavingAll() {
+        return savingAll;
+    }
+
+    /**
+     * Commits the open editors (story 7), then a new setup. A setup with reasons left is held back
+     * from this save (owner, 2026-10-27, fix 16): the open tab's commit writes nothing (its
+     * {@code getObjectForSave} hands back the setup as read), a new setup is not created, the rest
+     * of the project saves, and the setup's tab is brought forward (reopened for a new setup whose
+     * tab was closed) with its changes and reasons, "(unsaved)" on its tab and node. No dialog and
+     * no throw: a throw here would fail the whole project save. A new setup is dropped first when
+     * the project has a setup by now.
      */
     @Override
     public void commitAll() {
@@ -179,37 +231,42 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
             dropDraft();
             refreshNode();
         }
+        savingAll = true;
         try {
             super.commitAll();
-        } catch (SetupRefusedException.NotSaved notSaved) {
-            // The open setup tab has reasons: bring it forward on its first reason (no dialog).
-            SwingUtilities.invokeLater(() -> {
-                open(SETUP_PATH);
-                if (getSelectedComponent() instanceof SetupEditor) {
-                    SetupEditor editor = (SetupEditor) getSelectedComponent();
-                    SwingUtilities.invokeLater(editor::goToFirstReason);
+        } finally {
+            savingAll = false;
+        }
+        for (ResourceEditor<?> e : getEditors()) {
+            if (e instanceof SetupEditor editor) {
+                if (editor.takeHeldBack()) {
+                    SwingUtilities.invokeLater(() -> {
+                        if (indexOfComponent(editor) >= 0) {
+                            setSelectedComponent(editor);
+                        }
+                        refreshNode();
+                    });
+                } else {
+                    // Written with this save: the form compares with it now, so "(unsaved)" goes.
+                    editor.markSaved();
+                    SwingUtilities.invokeLater(this::refreshNode);
                 }
-            });
-            throw notSaved;
+            }
         }
         if (!draftNew || draft == null) {
             return;
         }
-        SetupForm form;
-        try {
-            form = SetupCommit.newSetupToSave(draft);
-        } catch (SetupRefusedException refused) {
-            SetupRefusedException.NotSaved notSaved =
-                new SetupRefusedException.NotSaved(context.getProject().getName(), refused);
-            LOG.warn(notSaved.getMessage());
-            // A new setup's tab may have been closed: reopen it on its first reason, so the reason
-            // that fails the save is on screen (no dialog).
+        SetupCommit.Decision d = SetupCommit.newSetupToSave(draft);
+        if (d.isHeldBack()) {
+            LOG.warn(SetupForm.msg("setup.heldBack.log", context.getProject().getName(), d.summary()));
+            // A new setup's tab may have been closed: reopen it, so what was held back is on screen.
             SwingUtilities.invokeLater(() -> {
                 showDraftTab();
-                SwingUtilities.invokeLater(draft::goToFirstReason);
+                refreshNode();
             });
-            throw notSaved;
+            return;
         }
+        SetupForm form = d.form();
         context.getProject().createOrModify(SETUP_PATH, builder -> builder
             .putData(MapStudioModule.SETUP_FILE, form.toJson().getBytes(StandardCharsets.UTF_8))
             .setApplicationScope(ApplicationScope.GATEWAY));
@@ -222,16 +279,41 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
         });
     }
 
+    /** True when an open setup tab holds changes the project does not have. */
+    private boolean openSetupUnsaved() {
+        for (ResourceEditor<?> e : getEditors()) {
+            if (e instanceof SetupEditor editor && editor.hasUnsavedChanges()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** The node's words: the name, and "(none)", "(new, unsaved)" or "(inherited)". */
     String nodeText() {
         boolean has = hasSetup();
-        return SetupCommit.nodeText(has, has && context.getProject().isInherited(SETUP_PATH), draftNew);
+        return SetupCommit.nodeText(has, has && context.getProject().isInherited(SETUP_PATH), draftNew,
+            has && openSetupUnsaved());
     }
 
+    /** The node's words, and each setup tab's title ("(unsaved)" while it holds changes). */
     void refreshNode() {
         AbstractNavTreeNode node = getRootNode();
         if (node instanceof SetupNode) {
             ((SetupNode) node).update(nodeText());
+        }
+        for (ResourceEditor<?> e : getEditors()) {
+            int i = indexOfComponent(e);
+            if (i >= 0 && !e.getTabTitle().equals(getTitleAt(i))) {
+                setTitleAt(i, e.getTabTitle());
+            }
+        }
+        if (draft != null) {
+            int i = indexOfComponent(draft);
+            String title = SetupForm.msg(draftNew ? "setup.node.new" : "setup.tab");
+            if (i >= 0 && !title.equals(getTitleAt(i))) {
+                setTitleAt(i, title);
+            }
         }
     }
 

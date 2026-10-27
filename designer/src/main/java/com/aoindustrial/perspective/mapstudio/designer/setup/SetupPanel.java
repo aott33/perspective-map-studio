@@ -26,14 +26,16 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
+import javax.swing.JSpinner;
+import javax.swing.JFormattedTextField;
 import javax.swing.JTextArea;
-import javax.swing.JTextField;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.plaf.basic.BasicArrowButton;
+import javax.swing.text.JTextComponent;
 
 import com.inductiveautomation.ignition.common.util.LoggerEx;
 
@@ -53,8 +55,11 @@ import com.aoindustrial.perspective.mapstudio.common.contract.SetupLists;
  * <p>The form owns no setup rule: reasons are {@link SetupForm#reasons()}, warnings
  * {@link SetupForm#warnings(FormLists)} from the lists that loaded. Gateway lists load off the
  * Swing thread ({@link SetupListSource.Async}); every list is a suggestion and typing always
- * works. A reason is never repeated in a dialog. Swing look and behaviour in a Designer are
- * [unverified] until the owner's check.
+ * works. A reason is never repeated in a dialog. Fix 16 (owner, Designer 2026-10-27): the
+ * dropdowns and the refresh spinner are the Designer's own {@link javax.swing.JComboBox} and
+ * {@link JSpinner}, drawn by its look and feel with nothing of ours over their UI, border or
+ * background; a Gateway list that fails stays empty and typing still works, with no message (the
+ * Designer already shows when it has no Gateway); the footer's reason count is plain text.
  */
 public final class SetupPanel extends JPanel {
 
@@ -86,7 +91,6 @@ public final class SetupPanel extends JPanel {
     private SetupForm base = SetupForm.defaults();
     private Mode mode = Mode.EDIT;
     private FormLists lists = FormLists.none();
-    private boolean gatewayLoading;
     private int generation;
     private boolean filling;
     private Map<String, List<String>> shownReasons = Map.of();
@@ -117,12 +121,14 @@ public final class SetupPanel extends JPanel {
     // Fields
     private final Map<String, FormParts.Row> rows = new LinkedHashMap<>();
     private final PickerField connection = new PickerField(this::connectionItems, false);
-    private final ChipField fullRoles = new ChipField(this::roleItems, this::edited);
-    private final ChipField phoneRoles = new ChipField(this::roleItems, this::edited);
+    private final ChipField fullRoles = new ChipField(this::roleNames, this::edited);
+    private final ChipField phoneRoles = new ChipField(this::roleNames, this::edited);
     private final PickerField kindsFunction = new PickerField(this::functionItems, true);
     private final PickerField assetsFunction = new PickerField(this::functionItems, true);
-    private final JTextField refresh = new JTextField();
-    private final JPanel refreshControl = new JPanel(null);
+    /** The Designer's own number spinner; its text is the value, so any text can be typed. */
+    private final JSpinner refreshSpinner = new JSpinner(new SpinnerNumberModel(10, 1, 3600, 1));
+    private JFormattedTextField refresh;
+    private final JPanel refreshControl = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
     private final FormParts.Flow basemaps = new FormParts.Flow(16, 4);
     private final Map<String, JCheckBox> basemapBoxes = new LinkedHashMap<>();
     private final PickerField alarmPage = new PickerField(this::pageItems, true);
@@ -133,8 +139,6 @@ public final class SetupPanel extends JPanel {
 
     // Footer
     private final JPanel footer = new JPanel(new BorderLayout(12, 0));
-    private final JLabel footerGlyph = new JLabel();
-    private final JButton footerLink = FormParts.link("", Theme.error(), true);
     private final JLabel footerText = new JLabel();
     private final JLabel footerSecondary = new JLabel();
     private final JButton footerAction = FormParts.link("", Theme.accent(), false);
@@ -282,8 +286,8 @@ public final class SetupPanel extends JPanel {
         for (String b : BASEMAPS) {
             basemapBoxes.put(b, basemapBox(b, SetupForm.msg("setup.basemap." + b)));
         }
-        provider.setPreferredSize(new Dimension(170, Theme.CONTROL_HEIGHT));
-        secretName.setPreferredSize(new Dimension(202, Theme.CONTROL_HEIGHT));
+        provider.setFieldWidth(170);
+        secretName.setFieldWidth(202);
         token.add(provider);
         token.add(secretName);
 
@@ -310,66 +314,43 @@ public final class SetupPanel extends JPanel {
     }
 
     private void buildRefresh() {
+        // A plain JSpinner with the look and feel's own UI and arrows (owner, 2026-10-27: as Project
+        // Properties' Client Poll Rate). Its NumberEditor pattern "0" shows 1000, not 1,000; the
+        // text is the value, so a typed "abc" or "10.5" stays as typed (PERSIST on focus loss) and
+        // the form gives its reason. The arrows commit the typed number first, then step it.
+        refreshSpinner.setEditor(new JSpinner.NumberEditor(refreshSpinner, "0"));
+        refresh = ((JSpinner.DefaultEditor) refreshSpinner.getEditor()).getTextField();
+        refresh.setFocusLostBehavior(JFormattedTextField.PERSIST);
         refresh.setColumns(5);
         refresh.getDocument().addDocumentListener(new DocumentListener() {
             @Override public void insertUpdate(DocumentEvent e) { edited(); }
             @Override public void removeUpdate(DocumentEvent e) { edited(); }
             @Override public void changedUpdate(DocumentEvent e) { edited(); }
         });
-        BasicArrowButton up = new BasicArrowButton(BasicArrowButton.NORTH);
-        BasicArrowButton down = new BasicArrowButton(BasicArrowButton.SOUTH);
-        up.setFocusable(false);
-        down.setFocusable(false);
-        up.addActionListener(e -> step(1));
-        down.addActionListener(e -> step(-1));
+        Dimension d = refreshSpinner.getPreferredSize();
+        refreshSpinner.setPreferredSize(new Dimension(Theme.REFRESH_FIELD, d.height));
         JLabel seconds = new JLabel(SetupForm.msg("setup.seconds"));
         seconds.setForeground(Theme.secondary());
+        seconds.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 0));
         refreshControl.setOpaque(false);
-        refreshControl.add(refresh);
-        refreshControl.add(up);
-        refreshControl.add(down);
+        refreshControl.add(refreshSpinner);
         refreshControl.add(seconds);
-        refreshControl.setLayout(new java.awt.LayoutManager() {
-            @Override
-            public void layoutContainer(java.awt.Container c) {
-                int w = Theme.REFRESH_FIELD;
-                refresh.setBounds(0, 0, w - 18, Theme.CONTROL_HEIGHT);
-                up.setBounds(w - 18, 0, 18, Theme.CONTROL_HEIGHT / 2);
-                down.setBounds(w - 18, Theme.CONTROL_HEIGHT / 2, 18, Theme.CONTROL_HEIGHT - Theme.CONTROL_HEIGHT / 2);
-                seconds.setBounds(w + 8, 0, Math.max(0, c.getWidth() - w - 8), Theme.CONTROL_HEIGHT);
-            }
-
-            @Override
-            public Dimension preferredLayoutSize(java.awt.Container c) {
-                return new Dimension(Theme.REFRESH_FIELD + 70, Theme.CONTROL_HEIGHT);
-            }
-
-            @Override
-            public Dimension minimumLayoutSize(java.awt.Container c) {
-                return preferredLayoutSize(c);
-            }
-
-            @Override
-            public void addLayoutComponent(String n, java.awt.Component c) {
-            }
-
-            @Override
-            public void removeLayoutComponent(java.awt.Component c) {
-            }
-        });
     }
 
-    private void step(int by) {
-        if (!refresh.isEditable()) {
-            return;
-        }
-        int v;
+    /** Shows the refresh interval as written: a number in range goes through the spinner's model. */
+    private void fillRefresh(String text) {
+        String t = text == null ? "" : text;
         try {
-            v = Integer.parseInt(refresh.getText().trim());
+            int v = Integer.parseInt(t.trim());
+            if (v >= 1 && v <= 3600) {
+                refreshSpinner.setValue(v);
+            }
         } catch (NumberFormatException ex) {
-            v = by > 0 ? 0 : 2;
+            // Shown as written below; the form gives the reason.
         }
-        refresh.setText(String.valueOf(Math.max(1, Math.min(3600, v + by))));
+        if (!refresh.getText().equals(t)) {
+            refresh.setText(t);
+        }
     }
 
     private JCheckBox basemapBox(String value, String text) {
@@ -493,12 +474,10 @@ public final class SetupPanel extends JPanel {
         JPanel lead = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         lead.setOpaque(false);
         footerText.setFont(Theme.font());
+        footerText.setIconTextGap(6);
         footerSecondary.setFont(Theme.small());
         footerSecondary.setForeground(Theme.secondary());
         footerSecondary.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
-        footerLink.addActionListener(e -> goToFirstReason());
-        lead.add(footerGlyph);
-        lead.add(footerLink);
         lead.add(footerText);
         // The secondary words take what is left of the line and end in "..." on a narrow tab.
         JPanel left = new JPanel(new BorderLayout());
@@ -607,7 +586,7 @@ public final class SetupPanel extends JPanel {
             phoneRoles.fill(setup.list(SetupForm.PHONE_ROLES));
             kindsFunction.fill(setup.text(SetupForm.KINDS_FUNCTION));
             assetsFunction.fill(setup.text(SetupForm.ASSETS_FUNCTION));
-            refresh.setText(setup.text(SetupForm.REFRESH));
+            fillRefresh(setup.text(SetupForm.REFRESH));
             alarmPage.fill(setup.text(SetupForm.ALARM_PAGE));
             String[] t = SetupForm.splitToken(setup.text(SetupForm.TOKEN_SECRET));
             provider.fill(t[0]);
@@ -635,7 +614,7 @@ public final class SetupPanel extends JPanel {
         phoneRoles.setEditable(editable);
         kindsFunction.setEditable(editable);
         assetsFunction.setEditable(editable);
-        refresh.setEditable(editable);
+        refreshSpinner.setEnabled(editable);
         alarmPage.setEditable(editable);
         provider.setEditable(editable);
         secretName.setEditable(editable);
@@ -682,59 +661,26 @@ public final class SetupPanel extends JPanel {
     void refreshLists() {
         lists = lists.withProject(source.project());
         int gen = ++generation;
-        gatewayLoading = true;
         String idp = lists.project().identityProvider();
         relabelRoles();
         async.run(() -> source.gatewayLists(idp), json -> {
             if (gen != generation) {
                 return;
             }
-            gatewayLoading = false;
-            lists = lists.withGateway(SetupLists.fromJson(json), true);
+            lists = lists.withGateway(SetupLists.fromJson(json));
             loadSecretNames();
             recompute();
         }, ex -> {
             if (gen != generation) {
                 return;
             }
-            gatewayLoading = false;
-            boolean unreachable = isUnreachable(ex);
-            if (unreachable) {
-                LOG.debugf("Map Studio setup lists: the Gateway could not be asked (%s).",
-                    ex.getClass().getSimpleName());
-            } else {
-                // Asked and refused (not a Designer, an older module without the RPC): Try again
-                // cannot help, so the lists say unavailable and the footer says nothing.
-                LOG.warnf("Map Studio setup lists: the Gateway answered with a failure (%s).",
-                    ex.getClass().getSimpleName());
-            }
-            lists = lists.withGateway(SetupLists.unavailable(""), !unreachable);
+            // The lists stay empty and typing still works, with no message: the Designer itself
+            // shows when it has no Gateway connection (owner, 2026-10-27).
+            LOG.debugf("Map Studio setup lists: the Gateway call failed (%s).", ex.getClass().getSimpleName());
+            lists = lists.withGateway(SetupLists.unavailable(""));
             recompute();
         });
         recompute();
-    }
-
-    /**
-     * True when a failed Gateway call means the Gateway could not be reached in time (a connection
-     * or I/O failure, a timeout anywhere in the cause chain); false for a refusal or any other
-     * failure, which Try again cannot cure [unverified: the exception classes
-     * {@code GatewayConnection}'s RPC proxy throws in a Designer; the owner's check].
-     */
-    static boolean isUnreachable(Throwable ex) {
-        for (Throwable t = ex; t != null; t = t.getCause() == t ? null : t.getCause()) {
-            if (t instanceof SecurityException) {
-                return false;
-            }
-            if (t instanceof java.io.IOException || t instanceof java.util.concurrent.TimeoutException) {
-                return true;
-            }
-            String name = t.getClass().getSimpleName();
-            if (name.contains("Timeout") || name.contains("Connect") || name.contains("Communication")
-                || name.contains("Unreachable")) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void relabelRoles() {
@@ -751,7 +697,7 @@ public final class SetupPanel extends JPanel {
         secretNamesTimer.stop();
         String p = provider.text();
         SetupLists.Part providers = lists.secretProviders();
-        if (p.isEmpty() || providers == null || !providers.names().contains(p) || !lists.reachable()) {
+        if (p.isEmpty() || providers == null || !providers.names().contains(p)) {
             return;
         }
         if (p.equals(lists.secretNamesProvider()) && lists.secretNames() != null) {
@@ -771,24 +717,16 @@ public final class SetupPanel extends JPanel {
         });
     }
 
+    /** A Gateway list's names; empty while loading or when the list failed (no message). */
     private List<PickerField.Item> gatewayItems(java.util.function.Function<SetupLists, SetupLists.Part> part,
                                                 boolean withDetail) {
         List<PickerField.Item> out = new ArrayList<>();
-        if (gatewayLoading && lists.gateway() == null) {
-            out.add(PickerField.Item.note(SetupForm.msg("setup.list.loading")));
-            return out;
-        }
         SetupLists g = lists.gateway();
         SetupLists.Part p = g == null ? null : part.apply(g);
-        if (p == null || !p.isOk()) {
-            out.add(PickerField.Item.note(SetupForm.msg("setup.list.unavailable")));
-            return out;
-        }
-        for (SetupLists.Entry e : p.entries()) {
-            out.add(PickerField.Item.value(e.name(), withDetail ? FormLists.vendorWords(e.detail()) : ""));
-        }
-        if (out.isEmpty()) {
-            out.add(PickerField.Item.note(SetupForm.msg("setup.list.empty")));
+        if (p != null && p.isOk()) {
+            for (SetupLists.Entry e : p.entries()) {
+                out.add(PickerField.Item.value(e.name(), withDetail ? FormLists.vendorWords(e.detail()) : ""));
+            }
         }
         return out;
     }
@@ -801,63 +739,32 @@ public final class SetupPanel extends JPanel {
         return gatewayItems(SetupLists::secretProviders, false);
     }
 
+    /** The chosen provider's secret names, once they loaded. */
     private List<PickerField.Item> secretNameItems() {
         List<PickerField.Item> out = new ArrayList<>();
         String p = provider.text();
-        if (p.isEmpty()) {
-            out.add(PickerField.Item.note(SetupForm.msg("setup.list.chooseProvider")));
-            return out;
-        }
-        SetupLists.Part names = p.equals(lists.secretNamesProvider()) ? lists.secretNames() : null;
-        if (names == null && lists.reachable() && lists.secretProviders() != null
-            && lists.secretProviders().names().contains(p)) {
-            out.add(PickerField.Item.note(SetupForm.msg("setup.list.loading")));
-            return out;
-        }
-        if (names == null || !names.isOk()) {
-            out.add(PickerField.Item.note(SetupForm.msg("setup.list.unavailable")));
-            return out;
-        }
-        names.names().forEach(n -> out.add(PickerField.Item.value(n, "")));
-        if (out.isEmpty()) {
-            out.add(PickerField.Item.note(SetupForm.msg("setup.list.empty")));
+        SetupLists.Part names = p.isEmpty() || !p.equals(lists.secretNamesProvider()) ? null : lists.secretNames();
+        if (names != null && names.isOk()) {
+            names.names().forEach(n -> out.add(PickerField.Item.value(n, "")));
         }
         return out;
     }
 
-    private ChipField.Roles roleItems() {
-        String header = SetupForm.msg("setup.list.rolesHeader", lists.project().identityProvider());
-        if (gatewayLoading && lists.gateway() == null) {
-            return new ChipField.Roles(null, SetupForm.msg("setup.list.loading"), header);
-        }
+    /** The identity provider's roles; empty while loading, when not listed or when the list failed. */
+    private List<String> roleNames() {
         SetupLists g = lists.gateway();
-        if (g != null && g.roles().status() == SetupLists.Status.NOT_LISTED) {
-            return new ChipField.Roles(null, SetupForm.msg("setup.list.rolesNotListed"), header);
-        }
-        if (g == null || !g.roles().isOk()) {
-            return new ChipField.Roles(null, SetupForm.msg("setup.list.unavailable"), header);
-        }
-        return new ChipField.Roles(g.roles().names(), SetupForm.msg("setup.list.empty"), header);
+        return g != null && g.roles().isOk() ? g.roles().names() : List.of();
     }
 
     private List<PickerField.Item> functionItems() {
         List<PickerField.Item> out = new ArrayList<>();
-        if (lists.project().functions() == null) {
-            out.add(PickerField.Item.note(SetupForm.msg("setup.list.unavailable")));
-            return out;
-        }
         lists.project().offeredFunctions().forEach(f -> out.add(PickerField.Item.value(f, "")));
-        if (out.isEmpty()) {
-            out.add(PickerField.Item.note(SetupForm.msg("setup.list.empty")));
-        }
         return out;
     }
 
     private List<PickerField.Item> pageItems() {
         List<PickerField.Item> out = new ArrayList<>();
-        if (lists.project().pages() == null) {
-            out.add(PickerField.Item.note(SetupForm.msg("setup.list.unavailable")));
-        } else {
+        if (lists.project().pages() != null) {
             lists.project().pages().forEach(p -> out.add(PickerField.Item.value(p, "")));
         }
         out.add(PickerField.Item.action(SetupForm.msg("setup.list.insertPlaceholder"), this::showPlaceholders));
@@ -869,7 +776,7 @@ public final class SetupPanel extends JPanel {
         String value = ProjectLists.asAlarmPage(page);
         alarmPage.setText(value);
         int at = value.indexOf(Placeholders.ITEM_NAME);
-        JTextField f = alarmPage.textField();
+        JTextComponent f = alarmPage.textField();
         if (at >= 0 && page.contains(":")) {
             f.select(at, at + Placeholders.ITEM_NAME.length());
         } else {
@@ -885,7 +792,7 @@ public final class SetupPanel extends JPanel {
     }
 
     void insertPlaceholder(String placeholder) {
-        JTextField f = alarmPage.textField();
+        JTextComponent f = alarmPage.textField();
         f.replaceSelection(placeholder);
         if (placeholder.equals(Placeholders.PROPERTY_PREFIX + "}")) {
             f.setCaretPosition(f.getCaretPosition() - 1);
@@ -932,10 +839,8 @@ public final class SetupPanel extends JPanel {
                 Theme.font())));
             FormParts.Row row = e.getValue();
             row.setMessages(lines);
-            PickerField.Edge edge = !r.isEmpty() ? PickerField.Edge.REASON
-                : !w.isEmpty() ? PickerField.Edge.WARNING : PickerField.Edge.NONE;
-            setEdge(field, edge);
-            // A mark beside the field only for a warning (a reason has its edge and line).
+            // A mark beside the field only for a warning (a reason has its line under the field);
+            // the control itself keeps the Designer's look, with no coloured edge of ours.
             row.mark.setIcon(r.isEmpty() && !w.isEmpty() && field.equals(SetupForm.CONNECTION) || r.isEmpty()
                 && !w.isEmpty() && isPickerField(field) ? Theme.Glyph.WARNING : null);
             row.mark.setToolTipText(row.mark.getIcon() == null ? null : String.join(" ", w));
@@ -946,13 +851,17 @@ public final class SetupPanel extends JPanel {
         general.set(g == null ? null : Theme.Glyph.ERROR, g == null ? "" : String.join(" ", g), Theme.error(),
             Theme.font());
         general.setVisible(g != null);
-        provider.setPlaceholder(lists.gateway() != null && !lists.reachable()
-            ? SetupForm.msg("setup.placeholder.provider.unreachable") : SetupForm.msg("setup.placeholder.selectOne"));
+        provider.setPlaceholder(SetupForm.msg("setup.placeholder.selectOne"));
         connection.setPlaceholder(mode == Mode.NEW ? SetupForm.msg("setup.placeholder.connectionNew")
             : SetupForm.msg("setup.placeholder.selectOne"));
         kindsFunction.setPlaceholder(SetupForm.msg("setup.placeholder.selectOne"));
         assetsFunction.setPlaceholder(SetupForm.msg("setup.placeholder.selectOne"));
         alarmPage.setPlaceholder(SetupForm.msg("setup.placeholder.page"));
+        for (PickerField p : List.of(connection, kindsFunction, assetsFunction, alarmPage, provider, secretName)) {
+            p.refreshItems();
+        }
+        fullRoles.input().refreshItems();
+        phoneRoles.input().refreshItems();
         updateFooter(reasons, warnings);
         form.revalidate();
         form.repaint();
@@ -964,67 +873,33 @@ public final class SetupPanel extends JPanel {
             || field.equals(SetupForm.ALARM_PAGE) || field.equals(SetupForm.TOKEN_SECRET);
     }
 
-    private void setEdge(String field, PickerField.Edge edge) {
-        switch (field) {
-            case SetupForm.CONNECTION -> connection.setEdge(edge);
-            case SetupForm.FULL_ROLES -> fullRoles.setEdge(edge == PickerField.Edge.WARNING ? PickerField.Edge.NONE : edge);
-            case SetupForm.PHONE_ROLES -> phoneRoles.setEdge(edge == PickerField.Edge.WARNING ? PickerField.Edge.NONE : edge);
-            case SetupForm.KINDS_FUNCTION -> kindsFunction.setEdge(edge);
-            case SetupForm.ASSETS_FUNCTION -> assetsFunction.setEdge(edge);
-            case SetupForm.ALARM_PAGE -> alarmPage.setEdge(edge);
-            case SetupForm.TOKEN_SECRET -> {
-                provider.setEdge(edge);
-                secretName.setEdge(edge);
-            }
-            case SetupForm.REFRESH -> refresh.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(edge == PickerField.Edge.REASON ? Theme.error() : Theme.border()),
-                BorderFactory.createEmptyBorder(2, 6, 2, 4)));
-            default -> {
-            }
-        }
-    }
-
+    /**
+     * The footer, only when it has something to say: the reasons left as plain text (no link, the
+     * form is short: owner, 2026-10-27) with the warning count, or a new setup's state with
+     * Discard new setup.
+     */
     private void updateFooter(Map<String, List<String>> reasons, Map<String, List<String>> warnings) {
         int reasonCount = reasons.values().stream().mapToInt(List::size).sum();
         int warningCount = warnings.values().stream().mapToInt(List::size).sum();
         boolean editable = mode == Mode.EDIT || mode == Mode.NEW;
-        boolean unreachable = editable && lists.gateway() != null && !lists.reachable();
-        footerGlyph.setIcon(null);
-        footerLink.setVisible(false);
+        footerText.setIcon(null);
         footerText.setText("");
         footerText.setForeground(Theme.text());
-        footerText.setFont(Theme.font());
         footerSecondary.setText("");
         footerSecondary.setToolTipText(null);
         footerAction.setVisible(false);
         boolean shown = true;
         if (editable && reasonCount > 0) {
-            footerGlyph.setIcon(Theme.Glyph.ERROR);
-            footerLink.setText(reasonCount == 1 ? SetupForm.msg("setup.footer.reasons.one")
+            footerText.setIcon(Theme.Glyph.ERROR);
+            footerText.setText(reasonCount == 1 ? SetupForm.msg("setup.footer.reasons.one")
                 : SetupForm.msg("setup.footer.reasons.many", reasonCount));
-            footerLink.setVisible(true);
-            footerText.setText(SetupForm.msg(reasonCount == 1 ? "setup.footer.reasons.rest.one"
-                : "setup.footer.reasons.rest.many").strip());
             footerText.setForeground(Theme.error());
-            String secondary = mode == Mode.NEW ? SetupForm.msg("setup.footer.newSaveFailure")
+            footerSecondary.setText(mode == Mode.NEW ? SetupForm.msg("setup.footer.newHeldBack")
                 : warningCount == 0 ? "" : warningCount == 1 ? SetupForm.msg("setup.footer.warnings.one")
-                : SetupForm.msg("setup.footer.warnings.many", warningCount);
-            if (unreachable) {
-                // Said here too, so a Gateway that is down is never hidden behind the reasons.
-                String down = SetupForm.msg("setup.footer.unreachable");
-                secondary = mode == Mode.NEW ? secondary + " " + down : down;
-            }
-            footerSecondary.setText(secondary);
+                : SetupForm.msg("setup.footer.warnings.many", warningCount));
         } else if (mode == Mode.NEW) {
-            footerGlyph.setIcon(unreachable ? Theme.Glyph.CLOUD : Theme.Glyph.INFO);
+            footerText.setIcon(Theme.Glyph.INFO);
             footerText.setText(SetupForm.msg("setup.footer.new"));
-            // Discard stays the action; the header's Refresh lists asks the Gateway again.
-            footerSecondary.setText(unreachable ? SetupForm.msg("setup.footer.unreachable") : "");
-        } else if (unreachable) {
-            footerGlyph.setIcon(Theme.Glyph.CLOUD);
-            footerText.setText(SetupForm.msg("setup.footer.unreachable"));
-            footerText.setFont(Theme.bold(Theme.font().getSize2D()));
-            footerSecondary.setText(SetupForm.msg("setup.footer.unreachable.more"));
         } else {
             shown = false;
         }
@@ -1032,39 +907,33 @@ public final class SetupPanel extends JPanel {
             footerAction.setText(SetupForm.msg("setup.footer.discard"));
             footerAction.setVisible(true);
             footerActionRun = this::pressDiscard;
-        } else if (unreachable) {
-            footerAction.setText(SetupForm.msg("setup.footer.tryAgain"));
-            footerAction.setVisible(true);
-            footerActionRun = this::refreshLists;
         }
         footerSecondary.setToolTipText(footerSecondary.getText().isEmpty() ? null : footerSecondary.getText());
         footer.setVisible(shown);
         footer.revalidate();
     }
 
-    /** Scrolls to the first field with a reason and focuses it (the footer's "N reasons left"). */
-    void goToFirstReason() {
-        // The rows in the order they were added: the order on screen.
-        for (String field : rows.keySet()) {
-            if (shownReasons.containsKey(field)) {
-                FormParts.Row row = rows.get(field);
-                Rectangle r = row.getBounds();
-                form.scrollRectToVisible(new Rectangle(r.x, Math.max(0, r.y - 24), r.width, r.height + 48));
-                JComponent target = (JComponent) row.label.getLabelFor();
-                if (target != null) {
-                    target.requestFocusInWindow();
-                }
-                focusedForTests = field;
-                return;
-            }
+    /**
+     * True when the form holds changes the project does not have: an editable setup whose fields
+     * differ from the setup read, or a new setup. A refused save leaves them here (fix 16).
+     */
+    boolean hasUnsavedChanges() {
+        if (mode == Mode.NEW) {
+            return true;
         }
-        if (shownReasons.containsKey(SetupForm.GENERAL)) {
-            form.scrollRectToVisible(new Rectangle(0, 0, 1, 1));
-            focusedForTests = SetupForm.GENERAL;
-        }
+        return mode == Mode.EDIT && !current().equals(base);
     }
 
-    private String focusedForTests;
+    /**
+     * The project has this setup now (a project save wrote it): it becomes the setup the form
+     * compares with, so "(unsaved)" goes. The fields are left as they are. Only for an editable
+     * setup; any other state keeps what {@link #show} set.
+     */
+    void markSaved(SetupForm saved) {
+        if (mode == Mode.EDIT && saved != null) {
+            base = saved;
+        }
+    }
 
     private void askStartFromDefaults() {
         if (confirmStartFromDefaults.getAsBoolean()) {
@@ -1192,9 +1061,6 @@ public final class SetupPanel extends JPanel {
             return "";
         }
         StringBuilder sb = new StringBuilder();
-        if (footerLink.isVisible()) {
-            sb.append(footerLink.getText()).append(' ');
-        }
         sb.append(footerText.getText());
         if (!footerSecondary.getText().isEmpty()) {
             sb.append(" | ").append(footerSecondary.getText());
@@ -1205,8 +1071,24 @@ public final class SetupPanel extends JPanel {
         return sb.toString();
     }
 
-    void pressFooterLink() {
-        footerLink.doClick();
+    /** For tests: the footer's visible buttons, by their words. */
+    List<String> footerButtons() {
+        List<String> out = new ArrayList<>();
+        collectButtons(footer, out);
+        return out;
+    }
+
+    private static void collectButtons(java.awt.Container c, List<String> out) {
+        if (!c.isVisible()) {
+            return;
+        }
+        for (java.awt.Component k : c.getComponents()) {
+            if (k instanceof JButton b && b.isVisible()) {
+                out.add(b.getText());
+            } else if (k instanceof java.awt.Container sub) {
+                collectButtons(sub, out);
+            }
+        }
     }
 
     void pressFooterAction() {
@@ -1233,10 +1115,6 @@ public final class SetupPanel extends JPanel {
         return markerRow.isVisible();
     }
 
-    String focusedReasonField() {
-        return focusedForTests;
-    }
-
     void pressStartFromDefaults() {
         startFromDefaults.doClick();
     }
@@ -1250,7 +1128,25 @@ public final class SetupPanel extends JPanel {
     }
 
     boolean fieldsEditable() {
-        return refresh.isEditable();
+        return refreshSpinner.isEnabled();
+    }
+
+    /** For tests: the refresh spinner, to press its arrows as its own UI does. */
+    JSpinner refreshSpinner() {
+        return refreshSpinner;
+    }
+
+    /** For tests: a field's dropdown. */
+    PickerField picker(String field) {
+        return switch (field) {
+            case SetupForm.CONNECTION -> connection;
+            case SetupForm.KINDS_FUNCTION -> kindsFunction;
+            case SetupForm.ASSETS_FUNCTION -> assetsFunction;
+            case SetupForm.ALARM_PAGE -> alarmPage;
+            case "provider" -> provider;
+            case "secretName" -> secretName;
+            default -> throw new IllegalArgumentException(field);
+        };
     }
 
     /** For tests: the label of a field, with its tooltip. */

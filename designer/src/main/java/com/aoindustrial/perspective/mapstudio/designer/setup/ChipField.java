@@ -5,116 +5,88 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.Graphics;
 import java.awt.Insets;
 import java.awt.LayoutManager;
-import java.awt.event.FocusAdapter;
-import java.awt.event.FocusEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.function.Supplier;
 
 import javax.swing.BorderFactory;
-import javax.swing.DefaultListCellRenderer;
-import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
-import javax.swing.JList;
 import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
-import javax.swing.JScrollPane;
-import javax.swing.JTextField;
-import javax.swing.ListSelectionModel;
-import javax.swing.plaf.basic.BasicArrowButton;
 
 /**
- * A role picker (epic 2 story 16): one chip per role with a remove cross, an "Add a role..."
- * input and a chevron that opens the identity provider's roles. Enter adds the highlighted role or
- * the typed text; Backspace in the empty input removes the last chip. A role the provider does not
- * have takes the warning edge and glyph, a role listed twice the reason edge and glyph. The
- * chips wrap; the field grows in height, never in width.
+ * A role picker (epic 2 story 16, fix 16): one chip per role with a remove cross, and under the
+ * chips the Designer's own editable dropdown, a plain {@link PickerField}, whose list is the
+ * identity provider's roles (owner, 2026-10-27: its arrow matches the other dropdowns). Enter adds
+ * what is typed, picking a role adds it, and Backspace in the empty input removes the last chip.
+ * A role the provider does not have takes the warning glyph on its chip, a role listed twice the
+ * reason glyph. The chips wrap; the field grows in height, never in width.
  */
 final class ChipField extends JPanel implements HeightForWidth {
 
-    /** What the role list shows: the roles, or a note when it has none to show. */
-    record Roles(List<String> names, String note, String header) {
-    }
+    static final int GAP = 4;
 
     private final List<String> values = new ArrayList<>();
-    private final JTextField input = new JTextField(10);
-    private final JButton chevron = new BasicArrowButton(BasicArrowButton.SOUTH);
+    private final PickerField input;
     private final JPanel chips = new JPanel(new WrapLayout(4, 3));
-    private final Supplier<Roles> roles;
+    private final Supplier<List<String>> roles;
     private final Runnable onChange;
     private Set<String> unknown = Set.of();
     private boolean editable = true;
-    private PickerField.Edge edge = PickerField.Edge.NONE;
-    private String placeholder = "";
 
-    ChipField(Supplier<Roles> roles, Runnable onChange) {
-        super(new BorderLayout());
+    /**
+     * @param roles the identity provider's roles; empty while not loaded or when the list failed
+     *              (typing still works, no message, as any Ignition dropdown)
+     */
+    ChipField(Supplier<List<String>> roles, Runnable onChange) {
+        super(null);
         this.roles = roles;
         this.onChange = onChange == null ? () -> { } : onChange;
+        this.input = new PickerField(this::items, false);
         setOpaque(false);
         chips.setOpaque(false);
-        chips.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 2));
-        input.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
-        input.setOpaque(false);
-        input.addKeyListener(new KeyAdapter() {
+        input.onPick(item -> {
+            if (!values.contains(item.text())) {
+                add(item.text());
+            } else {
+                input.setText("");
+            }
+        });
+        input.onEnter(this::addTyped);
+        input.addEditorKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-                    addTyped();
-                    e.consume();
-                } else if (e.getKeyCode() == KeyEvent.VK_BACK_SPACE && input.getText().isEmpty() && !values.isEmpty()) {
+                if (e.getKeyCode() == KeyEvent.VK_BACK_SPACE && input.text().isEmpty() && !values.isEmpty()
+                    && editable) {
                     removeAt(values.size() - 1);
                     e.consume();
-                } else if (e.getKeyCode() == KeyEvent.VK_DOWN) {
-                    openList();
-                    e.consume();
                 }
             }
         });
-        input.addFocusListener(new FocusAdapter() {
-            @Override
-            public void focusLost(FocusEvent e) {
-                if (!e.isTemporary() && !input.getText().isBlank()) {
-                    addTyped();
-                }
-            }
-        });
-        chevron.setFocusable(false);
-        chevron.setPreferredSize(new Dimension(26, Theme.CONTROL_HEIGHT));
-        chevron.addActionListener(e -> openList());
-        JPanel box = new JPanel(new BorderLayout()) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                g.setColor(editable ? Theme.surface() : Theme.panel());
-                g.fillRect(0, 0, getWidth(), getHeight());
-            }
-        };
-        box.setOpaque(false);
-        box.add(chips, BorderLayout.CENTER);
-        JPanel east = new JPanel(new BorderLayout());
-        east.setOpaque(false);
-        east.add(chevron, BorderLayout.NORTH);
-        box.add(east, BorderLayout.EAST);
-        add(box, BorderLayout.CENTER);
-        updateBorder();
+        add(chips);
+        add(input);
         rebuild();
     }
 
+    private List<PickerField.Item> items() {
+        List<PickerField.Item> out = new ArrayList<>();
+        List<String> names = roles.get();
+        if (names != null) {
+            for (String n : names) {
+                out.add(PickerField.Item.value(n, values.contains(n) ? SetupForm.msg("setup.list.added") : ""));
+            }
+        }
+        return out;
+    }
+
     void setPlaceholder(String text) {
-        placeholder = text == null ? "" : text;
-        input.repaint();
+        input.setPlaceholder(text);
     }
 
     List<String> values() {
@@ -125,7 +97,7 @@ final class ChipField extends JPanel implements HeightForWidth {
     void fill(List<String> names) {
         values.clear();
         values.addAll(names);
-        input.setText("");
+        input.fill("");
         rebuild();
     }
 
@@ -134,7 +106,7 @@ final class ChipField extends JPanel implements HeightForWidth {
         String n = name == null ? "" : name.trim();
         if (!n.isEmpty()) {
             values.add(n);
-            input.setText("");
+            input.fill("");
             rebuild();
             onChange.run();
         }
@@ -144,7 +116,7 @@ final class ChipField extends JPanel implements HeightForWidth {
         values.remove(index);
         rebuild();
         onChange.run();
-        input.requestFocusInWindow();
+        input.labelTarget().requestFocusInWindow();
     }
 
     void setUnknown(Set<String> names) {
@@ -157,157 +129,32 @@ final class ChipField extends JPanel implements HeightForWidth {
     void setEditable(boolean editable) {
         this.editable = editable;
         input.setEditable(editable);
-        input.setFocusable(editable);
         input.setVisible(editable);
-        chevron.setEnabled(editable);
         rebuild();
     }
 
-    void setEdge(PickerField.Edge e) {
-        if (e != edge) {
-            edge = e;
-            updateBorder();
-        }
-    }
-
-    PickerField.Edge edge() {
-        return edge;
-    }
-
-    JTextField input() {
+    PickerField input() {
         return input;
     }
 
     JComponent labelTarget() {
-        return input;
-    }
-
-    private void updateBorder() {
-        Color c = switch (edge) {
-            case WARNING -> Theme.warning();
-            case REASON -> Theme.error();
-            default -> Theme.border();
-        };
-        setBorder(BorderFactory.createLineBorder(c));
+        return input.labelTarget();
     }
 
     private void addTyped() {
-        String typed = input.getText().trim();
-        if (typed.isEmpty()) {
-            return;
+        String typed = input.text();
+        if (!typed.isEmpty()) {
+            add(typed);
         }
-        // Enter in the input adds what is typed; the open list adds its highlighted role instead.
-        add(typed);
     }
 
-    private List<String> matches(String typed) {
-        List<String> out = new ArrayList<>();
-        Roles r = roles.get();
-        if (r.names() != null) {
-            for (String n : r.names()) {
-                if (n.toLowerCase(Locale.ROOT).contains(typed.toLowerCase(Locale.ROOT))) {
-                    out.add(n);
-                }
-            }
-        }
-        return out;
-    }
-
-    /** The lines the role list would show now (tests read it). */
+    /** The lines the role list shows now (tests read it). */
     List<String> offered() {
-        Roles r = roles.get();
         List<String> out = new ArrayList<>();
-        if (r.names() == null) {
-            out.add(r.note());
-            return out;
-        }
-        String typed = input.getText().trim();
-        for (String n : typed.isEmpty() ? r.names() : matches(typed)) {
-            out.add(values.contains(n) ? n + "  (" + SetupForm.msg("setup.list.added") + ")" : n);
-        }
-        if (out.isEmpty()) {
-            out.add(r.note() == null || r.note().isEmpty() ? SetupForm.msg("setup.list.empty") : r.note());
+        for (PickerField.Item i : items()) {
+            out.add(i.detail().isEmpty() ? i.text() : i.text() + "  (" + i.detail() + ")");
         }
         return out;
-    }
-
-    private void openList() {
-        if (!editable || !isShowing()) {
-            return;
-        }
-        Roles r = roles.get();
-        DefaultListModel<String> model = new DefaultListModel<>();
-        List<String> names = new ArrayList<>();
-        if (r.names() != null) {
-            String typed = input.getText().trim();
-            names.addAll(typed.isEmpty() ? r.names() : matches(typed));
-        }
-        names.forEach(model::addElement);
-        JList<String> view = new JList<>(model);
-        view.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        view.setCellRenderer(new DefaultListCellRenderer() {
-            @Override
-            public Component getListCellRendererComponent(JList<?> l, Object v, int i, boolean s, boolean f) {
-                boolean added = values.contains(v);
-                JLabel c = (JLabel) super.getListCellRendererComponent(l,
-                    added ? "\u2713 " + v + "   " + SetupForm.msg("setup.list.added") : "    " + v, i, s, f);
-                c.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
-                if (added && !s) {
-                    c.setForeground(Theme.secondary());
-                }
-                return c;
-            }
-        });
-        JPopupMenu popup = new JPopupMenu();
-        popup.setLayout(new BorderLayout());
-        if (r.header() != null && !r.header().isEmpty()) {
-            JLabel head = new JLabel(r.header());
-            head.setFont(Theme.small());
-            head.setForeground(Theme.secondary());
-            head.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
-            popup.add(head, BorderLayout.NORTH);
-        }
-        JScrollPane scroll = new JScrollPane(view);
-        scroll.setBorder(BorderFactory.createEmptyBorder());
-        scroll.setPreferredSize(new Dimension(getWidth(), Math.min(220, Math.max(28, names.size() * 24 + 6))));
-        if (!names.isEmpty()) {
-            popup.add(scroll, BorderLayout.CENTER);
-        }
-        JLabel foot = new JLabel(r.names() == null ? r.note() : SetupForm.msg("setup.list.typeNew"));
-        foot.setFont(Theme.small().deriveFont(Font.ITALIC));
-        foot.setForeground(Theme.secondary());
-        foot.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
-        popup.add(foot, BorderLayout.SOUTH);
-        Runnable choose = () -> {
-            String v = view.getSelectedValue();
-            if (v != null && !values.contains(v)) {
-                popup.setVisible(false);
-                add(v);
-                input.requestFocusInWindow();
-            }
-        };
-        view.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                choose.run();
-            }
-        });
-        view.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-                    choose.run();
-                }
-            }
-        });
-        popup.show(this, 0, getHeight());
-        for (int i = 0; i < names.size(); i++) {
-            if (!values.contains(names.get(i))) {
-                view.setSelectedIndex(i);
-                break;
-            }
-        }
-        view.requestFocusInWindow();
     }
 
     private void rebuild() {
@@ -321,8 +168,8 @@ final class ChipField extends JPanel implements HeightForWidth {
         for (int i = 0; i < values.size(); i++) {
             chips.add(chip(i, duplicates.contains(i)));
         }
-        chips.add(input);
-        input.setColumns(values.isEmpty() ? 14 : 8);
+        chips.setVisible(!values.isEmpty());
+        input.refreshItems();
         revalidate();
         repaint();
     }
@@ -368,32 +215,34 @@ final class ChipField extends JPanel implements HeightForWidth {
         return out;
     }
 
+    private int chipsHeight(int width) {
+        return chips.isVisible() ? ((WrapLayout) chips.getLayout()).heightFor(chips, Math.max(40, width)) : 0;
+    }
+
+    private int inputHeight() {
+        return input.isVisible() ? input.getPreferredSize().height : 0;
+    }
+
     @Override
     public int heightFor(int width) {
-        int inner = Math.max(40, width - 2 - 26);
-        return Math.max(Theme.CONTROL_HEIGHT, ((WrapLayout) chips.getLayout()).heightFor(chips, inner) + 2);
+        int c = chipsHeight(width);
+        int i = inputHeight();
+        return Math.max(Theme.CONTROL_HEIGHT / 2, c + (c > 0 && i > 0 ? GAP : 0) + i);
+    }
+
+    @Override
+    public void doLayout() {
+        int w = getWidth();
+        int c = chipsHeight(w);
+        chips.setBounds(0, 0, w, c);
+        int y = c > 0 ? c + GAP : 0;
+        input.setBounds(0, y, Math.min(w, Theme.FIELD), inputHeight());
     }
 
     @Override
     public Dimension getPreferredSize() {
-        int w = Theme.CHIP_FIELD;
+        int w = getWidth() > 0 ? getWidth() : Theme.CHIP_FIELD;
         return new Dimension(w, heightFor(w));
-    }
-
-    @Override
-    protected void paintChildren(Graphics g) {
-        super.paintChildren(g);
-        if (editable && input.getText().isEmpty() && !placeholder.isEmpty()) {
-            java.awt.Point p = javax.swing.SwingUtilities.convertPoint(input, 0, 0, this);
-            java.awt.Graphics2D g2 = (java.awt.Graphics2D) g.create();
-            g2.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING,
-                java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-            g2.setColor(Theme.secondary());
-            g2.setFont(Theme.font());
-            java.awt.FontMetrics fm = g2.getFontMetrics();
-            g2.drawString(placeholder, p.x + 4, p.y + (input.getHeight() - fm.getHeight()) / 2 + fm.getAscent());
-            g2.dispose();
-        }
     }
 
     /** A flow layout whose height follows the width it is given, so chips wrap inside a fixed width. */
@@ -448,10 +297,6 @@ final class ChipField extends JPanel implements HeightForWidth {
                     line.clear();
                 }
                 int w = Math.min(d.width, avail);
-                // The input takes the rest of its line.
-                if (k instanceof JTextField) {
-                    w = Math.max(w, avail - x);
-                }
                 k.setBounds(in.left + x, y, w, d.height);
                 x += w + hgap;
                 lineH = Math.max(lineH, d.height);
