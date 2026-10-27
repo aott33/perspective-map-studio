@@ -22,6 +22,7 @@ import com.aoindustrial.perspective.mapstudio.common.contract.KindSetup;
 import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
+import com.aoindustrial.perspective.mapstudio.common.contract.Rows;
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 import com.aoindustrial.perspective.mapstudio.common.contract.StoredRecord;
 import com.aoindustrial.perspective.mapstudio.gateway.adapter.AdapterSnapshot;
@@ -285,7 +286,7 @@ public final class WriteService {
         JsonObject data = op.data();
         for (String key : data.keySet()) {
             if (!KindSetupRecord.SETUP.equals(key)) {
-                throw invalid(op, "Unknown field " + key + " in the kind setup data; a kind setup op carries"
+                throw invalid(op, "Unknown field " + Rows.echo(key) + " in the kind setup data; a kind setup op carries"
                     + " {\"setup\": {...}}.");
             }
         }
@@ -294,7 +295,7 @@ public final class WriteService {
         }
         Kind kind = kinds.get(op.id());
         if (kind == null) {
-            throw invalid(op, "kind " + op.id() + " is not in the project's kind list, so it cannot have a kind setup.");
+            throw invalid(op, "kind " + Rows.echo(op.id()) + " is not in the project's kind list, so it cannot have a kind setup.");
         }
         JsonObject setup;
         try {
@@ -317,7 +318,7 @@ public final class WriteService {
     private static MapItemRecord checked(MapItemRecord item, Map<String, Kind> kinds, EditOp op) {
         Kind kind = kinds.get(item.kind());
         if (kind == null) {
-            throw invalid(op, "kind " + item.kind() + " is not in the project's kind list (" + String.join(", ",
+            throw invalid(op, "kind " + Rows.echo(item.kind()) + " is not in the project's kind list (" + String.join(", ",
                 kinds.keySet()) + ").");
         }
         try {
@@ -355,11 +356,11 @@ public final class WriteService {
 
     /** "map item <id>" or "the kind setup of <kind>", for a message. */
     private static String what(EditOp op) {
-        return isItem(op) ? "map item " + op.id() : "the kind setup of " + op.id();
+        return isItem(op) ? "map item " + op.id() : "the kind setup of " + Rows.echo(op.id());
     }
 
     private static MapStudioException invalid(EditOp op, String message) {
-        return new MapStudioException(Messages.CODE_INVALID, "Op " + op.index() + " (" + op.id() + "): " + message,
+        return new MapStudioException(Messages.CODE_INVALID, "Op " + op.index() + " (" + Rows.echo(op.id()) + "): " + message,
             op.index(), op.id());
     }
 }

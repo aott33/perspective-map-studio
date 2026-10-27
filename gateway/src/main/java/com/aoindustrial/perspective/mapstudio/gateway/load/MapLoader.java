@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.function.Function;
 
 import com.inductiveautomation.ignition.common.gson.JsonArray;
+import com.inductiveautomation.ignition.common.gson.JsonElement;
 import com.inductiveautomation.ignition.common.gson.JsonNull;
 import com.inductiveautomation.ignition.common.gson.JsonObject;
 import com.inductiveautomation.ignition.common.util.LoggerEx;
@@ -103,10 +104,17 @@ public final class MapLoader {
         JsonObject body = new JsonObject();
         body.addProperty("level", level);
         body.addProperty("seq", snapshot.seq());
-        body.add("items", toJson(snapshot.items()));
+        boolean editor = Messages.LEVEL_PHONE.equals(level) || Messages.LEVEL_FULL.equals(level);
+        JsonArray items = toJson(snapshot.items());
+        if (!editor) {
+            // An item's overrides hold full tag paths, which viewers do not get (as kindSetups).
+            for (JsonElement item : items) {
+                item.getAsJsonObject().add("overrides", new JsonObject());
+            }
+        }
+        body.add("items", items);
         AdapterSnapshot lists = adapters.apply(project);
         body.add("kinds", Kind.toJson(lists.kinds()));
-        boolean editor = Messages.LEVEL_PHONE.equals(level) || Messages.LEVEL_FULL.equals(level);
         if (editor) {
             body.add("assets", Asset.toJson(lists.assets()));
             body.add("kindSetups", kindSetupsJson(snapshot.kindSetups()));

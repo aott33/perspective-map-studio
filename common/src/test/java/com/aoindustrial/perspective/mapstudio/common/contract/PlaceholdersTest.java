@@ -35,6 +35,27 @@ class PlaceholdersTest {
     }
 
     @Test
+    void numbersFillAsTheBrowserShowsThem() {
+        // The same vectors as web/typescript/__tests__/placeholders.test.ts: JSON number text as String(n).
+        Placeholders.ItemView numbers = new Placeholders.ItemView("4f6c", "P12", null, null,
+            JsonParser.parseString("{\"n0\":12.0,\"n1\":4.50,\"n2\":1e3,\"n3\":1e21,\"n4\":1e-7,\"n5\":0.000001,"
+                + "\"n6\":-0.5,\"n7\":0.1,\"n8\":123456789012345680000,\"n9\":1.5e300,\"n10\":0.30000000000000004,\"n11\":-0,\"n12\":1e999}").getAsJsonObject());
+        assertEquals("12", Placeholders.fill("{item.properties.n0}", numbers));
+        assertEquals("4.5", Placeholders.fill("{item.properties.n1}", numbers));
+        assertEquals("1000", Placeholders.fill("{item.properties.n2}", numbers));
+        assertEquals("1e+21", Placeholders.fill("{item.properties.n3}", numbers));
+        assertEquals("1e-7", Placeholders.fill("{item.properties.n4}", numbers));
+        assertEquals("0.000001", Placeholders.fill("{item.properties.n5}", numbers));
+        assertEquals("-0.5", Placeholders.fill("{item.properties.n6}", numbers));
+        assertEquals("0.1", Placeholders.fill("{item.properties.n7}", numbers));
+        assertEquals("123456789012345680000", Placeholders.fill("{item.properties.n8}", numbers));
+        assertEquals("1.5e+300", Placeholders.fill("{item.properties.n9}", numbers));
+        assertEquals("0.30000000000000004", Placeholders.fill("{item.properties.n10}", numbers));
+        assertEquals("0", Placeholders.fill("{item.properties.n11}", numbers));
+        assertNull(Placeholders.fill("{item.properties.n12}", numbers));
+    }
+
+    @Test
     void aPlaceholderWithNoValueGivesNull() {
         assertNull(Placeholders.fill("{asset.path}/Pressure", NO_ASSET));
         assertNull(Placeholders.fill("{asset.id}", NO_ASSET));

@@ -71,6 +71,23 @@ class ItemCheckTest {
     }
 
     @Test
+    void hugeNumbersAreRefusedBeforeAnyConversion() {
+        long start = System.nanoTime();
+        for (String v : new String[] {"\"1e999999999\"", "1e999999999", "\"-1e999999999\"", "\"1e-999999999\""}) {
+            assertTrue(refused(item("pad", POINT, "{\"wells\":" + v + "}", "{}"), PAD).contains("out of range"), v);
+            assertTrue(refused(item("line", LINE_GEOMETRY, "{\"diameter\":" + v + "}", "{}"), LINE)
+                .contains("out of range"), v);
+        }
+        assertTrue(System.nanoTime() - start < 2_000_000_000L, "refusing huge numbers is cheap");
+        assertTrue(refused(item("pad", POINT, "{\"wells\":\"1e25\"}", "{}"), PAD).contains("out of range"));
+        assertTrue(refused(item("line", LINE_GEOMETRY, "{\"diameter\":\"1e309\"}", "{}"), LINE).contains("out of range"));
+        assertEquals("9223372036854775807", ItemCheck.check(item("pad", POINT, "{\"wells\":\"9223372036854775807\"}",
+            "{}"), PAD).properties().get("wells").toString());
+        assertEquals("1000", ItemCheck.check(item("pad", POINT, "{\"wells\":\"1e3\"}", "{}"), PAD).properties()
+            .get("wells").toString());
+    }
+
+    @Test
     void overridesAreAPartialKindSetupWithFullPaths() {
         String rule = "{\"styleRule\":{\"source\":{\"path\":\"[default]Mesa/P12/State\"},\"type\":\"states\","
             + "\"cases\":[{\"value\":\"stopped\",\"preset\":\"fault\"}]}}";

@@ -25,6 +25,12 @@ import com.inductiveautomation.ignition.common.gson.JsonPrimitive;
  */
 public final class ItemCheck {
 
+    /** At most this many digits before the decimal point (a double reaches about 1.8e308). */
+    static final int MAX_DIGITS = 309;
+
+    /** At most this many digits after the decimal point, or this negative scale (an exponent). */
+    static final int MAX_SCALE = 400;
+
     private ItemCheck() {
     }
 
@@ -107,14 +113,27 @@ public final class ItemCheck {
                 if (n == null) {
                     return JsonNull.INSTANCE;
                 }
-                if (integer && n.stripTrailingZeros().scale() > 0) {
-                    throw new InvalidValue(where + " is a whole number field, not " + shown(v) + ".");
+                // Bounded before any conversion: "1e999999999" is cheap to read but costs
+                // gigabytes as a whole number (Quick review, epic 2 story 9).
+                if (Math.abs((long) n.scale()) > MAX_SCALE || (long) n.precision() - n.scale() > MAX_DIGITS) {
+                    throw new InvalidValue(where + " is " + (integer ? "a whole number" : "a number")
+                        + " field; " + shown(v) + " is out of range.");
+                }
+                if (integer) {
+                    long whole;
+                    try {
+                        whole = n.longValueExact();
+                    } catch (ArithmeticException ex) {
+                        throw new InvalidValue(where + " is a whole number field, not " + shown(v)
+                            + (n.stripTrailingZeros().scale() > 0 ? "." : " (out of range)."));
+                    }
+                    return string ? new JsonPrimitive(whole) : v;
+                }
+                if (Double.isInfinite(n.doubleValue())) {
+                    throw new InvalidValue(where + " is a number field; " + shown(v) + " is out of range.");
                 }
                 if (!string) {
                     return v;
-                }
-                if (integer) {
-                    return new JsonPrimitive(n.toBigIntegerExact());
                 }
                 BigDecimal s = n.stripTrailingZeros();
                 return s.scale() <= 0 ? new JsonPrimitive(s.toBigIntegerExact()) : new JsonPrimitive(s);

@@ -127,4 +127,25 @@ class WriteServiceKindSetupTest extends WriteFixture {
             .contains("mixes text and placeholders"));
         assertNothingWritten(0, 0);
     }
+
+    @Test
+    void browserTextInARefusalIsEchoedOnOneShortLine() {
+        String key = "k\\nINFO fake log line" + "x".repeat(200);
+        String unknownKey = refused(batch(uuid(), "{\"op\":\"create\",\"entity\":\"kindSetup\",\"id\":\"pad\","
+            + "\"baseVersion\":0,\"data\":{\"" + key + "\":{}}}"), Messages.LEVEL_FULL).plainMessage();
+        assertTrue(unknownKey.contains("Unknown field k?INFO fake log line"), unknownKey);
+        String unknownKind = refused(batch(uuid(), kindSetup("create", "t\\nank", 0, "{}")), Messages.LEVEL_FULL)
+            .plainMessage();
+        assertEquals("Op 0 (t?ank): kind t?ank is not in the project's kind list, so it cannot have a kind setup.",
+            unknownKind);
+        String itemKind = refused(batch(uuid(), "{\"op\":\"create\",\"entity\":\"item\",\"id\":\"" + uuid()
+            + "\",\"baseVersion\":0,\"data\":{\"kind\":\"t\\nank" + "y".repeat(10_000) + "\",\"geometry\":"
+            + "{\"type\":\"Point\",\"coordinates\":[-104.97,39.74]}}}"), Messages.LEVEL_FULL).plainMessage();
+        assertTrue(itemKind.contains("kind t?ank"), itemKind);
+        assertTrue(itemKind.length() < 300, "a 10 kB kind is cut");
+        for (String m : new String[] {unknownKey, unknownKind, itemKind}) {
+            assertTrue(m.chars().noneMatch(Character::isISOControl), m);
+        }
+        assertNothingWritten(0, 0);
+    }
 }

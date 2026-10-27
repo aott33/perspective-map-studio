@@ -88,6 +88,11 @@ public final class KindSetup {
                 }
                 case "link" -> {
                     String link = text(v, "link", true);
+                    // A Perspective page path, as for Setup.alarmPage: never a scheme or another host.
+                    if (!link.startsWith("/") || link.startsWith("//") || link.startsWith("/\\")) {
+                        throw new InvalidValue("link is a Perspective page path starting with one /"
+                            + " (/pad/{item.name}), not " + Rows.echo(link) + ".");
+                    }
                     try {
                         Placeholders.checkTemplate(link, kind.fieldKeys());
                     } catch (InvalidValue ex) {

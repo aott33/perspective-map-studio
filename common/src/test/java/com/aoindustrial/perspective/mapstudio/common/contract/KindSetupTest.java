@@ -92,6 +92,11 @@ class KindSetupTest {
         assertTrue(refused("{\"kpis\":[{\"key\":\"a\",\"path\":\"Mesa/A\"}]}", PAD).startsWith("kpis[0].path: Mesa/A is"
             + " not a tag path"));
         assertTrue(refused("{\"link\":\"/pad/{item.foo}\"}", PAD).startsWith("link: {item.foo} is not a placeholder"));
+        for (String link : new String[] {"javascript:alert(1)", "https://evil.example/{item.name}", "//evil.example/x",
+            "/\\\\evil.example/x", "pad/{item.name}"}) {
+            assertTrue(refused("{\"link\":\"" + link + "\"}", PAD).startsWith("link is a Perspective page path"),
+                link);
+        }
         assertTrue(refused("{\"popupView\":{\"path\":\"Popups/P\",\"params\":{\"mapItem\":\"x\"}}}", PAD)
             .startsWith("popupView.params.mapItem: the popup view always receives"));
         assertTrue(refused("{\"popupView\":{\"path\":\"Popups/P\",\"params\":{\"p\":\"P-{item.name}\"}}}", PAD)

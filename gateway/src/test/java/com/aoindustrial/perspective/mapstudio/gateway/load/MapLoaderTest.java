@@ -181,4 +181,31 @@ class MapLoaderTest {
             Actor.script("t"), Messages.LEVEL_FULL);
         assertEquals(0, loader.mapLoadReply("mapstudio-dev", Messages.LEVEL_FULL).getAsJsonArray("kindSetups").size());
     }
+
+    @Test
+    void aViewerGetsMapItemsWithoutTheirOverrides() {
+        String id = UUID.randomUUID().toString();
+        String overrides = "{\"kpis\":[{\"key\":\"p\",\"path\":\"[default]Mesa/P12/Pressure\"}]}";
+        writes.apply("mapstudio-dev", JsonParser.parseString("{\"batchId\":\"" + UUID.randomUUID() + "\",\"ops\":["
+            + "{\"op\":\"create\",\"entity\":\"item\",\"id\":\"" + id + "\",\"baseVersion\":0,\"data\":{"
+            + "\"kind\":\"pad\",\"name\":\"P12\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[-104.97,39.74]},"
+            + "\"overrides\":" + overrides + "}}]}"), Actor.script("t"), Messages.LEVEL_FULL);
+        for (String level : List.of(Messages.LEVEL_PHONE, Messages.LEVEL_FULL)) {
+            assertEquals(JsonParser.parseString(overrides), item(loader.mapLoadReply("mapstudio-dev", level), id)
+                .get("overrides"), level);
+        }
+        JsonObject viewer = item(loader.mapLoadReply("mapstudio-dev", Messages.LEVEL_NONE), id);
+        assertEquals(new JsonObject(), viewer.get("overrides"), "a viewer gets no override tag paths");
+        assertEquals("P12", viewer.get("name").getAsString());
+        assertTrue(!loader.mapLoadReply("mapstudio-dev", Messages.LEVEL_NONE).toString().contains("Pressure"));
+    }
+
+    private static JsonObject item(JsonObject body, String id) {
+        for (var e : body.getAsJsonArray("items")) {
+            if (id.equals(e.getAsJsonObject().get("id").getAsString())) {
+                return e.getAsJsonObject();
+            }
+        }
+        throw new AssertionError("no item " + id);
+    }
 }

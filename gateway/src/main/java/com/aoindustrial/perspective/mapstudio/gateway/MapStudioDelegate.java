@@ -142,8 +142,9 @@ public class MapStudioDelegate extends ComponentModelDelegate {
     /**
      * The change bus's body as a map at {@code level} gets it: unchanged for
      * {@code phone} and {@code full}; for {@code none}, a copy with {@code actor}
-     * blank and each kind setup record without its {@code setup} (it holds tag paths,
-     * which viewers do not get; epic 2 story 9). The bus's body is shared, so it is
+     * blank, each kind setup record without its {@code setup} and each map item record
+     * with {@code overrides} {@code {}} (both hold tag paths, which viewers do not get;
+     * epic 2 story 9). The bus's body is shared, so it is
      * never changed. Pure.
      */
     static JsonObject bodyFor(JsonObject body, String level) {
@@ -154,9 +155,14 @@ public class MapStudioDelegate extends ComponentModelDelegate {
         copy.addProperty("actor", "");
         if (copy.has("ops") && copy.get("ops").isJsonArray()) {
             for (JsonElement op : copy.getAsJsonArray("ops")) {
-                if (op.isJsonObject() && "kindSetup".equals(stringOrNull(op.getAsJsonObject().get("entity")))
-                        && op.getAsJsonObject().get("record") instanceof JsonObject record) {
+                if (!op.isJsonObject() || !(op.getAsJsonObject().get("record") instanceof JsonObject record)) {
+                    continue;
+                }
+                String entity = stringOrNull(op.getAsJsonObject().get("entity"));
+                if ("kindSetup".equals(entity)) {
                     record.remove("setup");
+                } else if ("item".equals(entity) && record.has("overrides")) {
+                    record.add("overrides", new JsonObject());
                 }
             }
         }

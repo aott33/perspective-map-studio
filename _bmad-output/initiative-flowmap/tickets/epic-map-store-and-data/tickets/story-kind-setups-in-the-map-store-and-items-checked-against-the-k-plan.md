@@ -3,7 +3,7 @@ title: 'Kind setups in the map store, and items checked against the kind list'
 type: 'feature'
 ticket: '9'
 created: '2026-10-27'
-status: 'in-review'
+status: 'built'
 baseline_revision: '0759b1b47326e2a5140eaacf8be441bc8ee22171'
 route: 'full'
 route_source: 'auto'
@@ -140,6 +140,18 @@ Placeholder fill is published twice on purpose: Java in `common/` (the contract 
 - 2026-10-27: Open Questions resolved by the owner to every recommended option (Decisions block, frozen); status in-progress.
 
 ## Review Triage Log
+
+**2026-10-27, lens quick (context-free), iteration 0.** Five findings, all patched, none rejected.
+
+| # | Finding | Triage | Fix |
+| --- | --- | --- | --- |
+| 1 | `ItemCheck` converts `"1e999999999"` with `toBigIntegerExact()` inside the write transaction (CPU and memory denial of service) | Patched (real defect) | Numbers are bounded before any conversion: refused when the scale is beyond 400 either way or there are more than 309 digits before the point; `integer` fields fit a long (`longValueExact`), `number` fields a finite double. Test `hugeNumbersAreRefusedBeforeAnyConversion` (string and JSON number forms, both field types). Documented in docs/kind-setup.md. |
+| 2 | Item `overrides` hold full tag paths and reach level `none` in `map.load` and `map.changed` | Patched (real defect) | `MapLoader.mapLoadReply` and `MapStudioDelegate.bodyFor` send each item record with `overrides` `{}` at level `none`; tests in `MapLoaderTest` and `MapStudioDelegateTest`; docs/contract.md and docs/kind-setup.md say so. |
+| 3 | `link` is not bound to a Perspective page path (`javascript:`, `https://`, `//host` accepted) | Patched (real defect) | `link` must start with one `/` (not `//` or `/\`); refusal test in `KindSetupTest`; rule in docs/kind-setup.md, with a note that epic-viewing checks the filled link again (a property can still fill into it). |
+| 4 | Java `fill` keeps number text (`12.0`) where the browser gives `String(n)` (`12`) | Patched (real defect) | `Placeholders.jsNumber` formats as JavaScript's Number::toString (nearest double, shortest digits, plain from 1e-6 to below 1e21, `e+`/`e-` outside, null for a non-finite); 13 shared vectors (`12.0`, `4.50`, `1e21`, `1e-7`, `-0`, `1e999`, ...) in `PlaceholdersTest` and `placeholders.test.ts`. |
+| 5 | Unknown data key, `op.id()` and an item's `kind` reach refusal messages and the debug log unechoed | Patched (real defect) | `Rows` and `Rows.echo` are public; `WriteService` echoes the key, the kind setup id (also in the `Op n (id)` prefix and `what()`) and the item kind. Test `browserTextInARefusalIsEchoedOnOneShortLine` (newline, 10 kB kind). |
+
+Re-run after the patches: `./gradlew clean build` green (268 JUnit tests, 0 failures), Jest 81 of 81, e2e 30 passed and 5 skipped (the `store-ops` scenarios, run only by `ops/store-checks.sh`; no store path was touched, so it was not re-run).
 
 ## Verification
 

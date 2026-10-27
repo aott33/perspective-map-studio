@@ -1,5 +1,8 @@
 package com.aoindustrial.perspective.mapstudio.common.contract;
 
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -231,6 +234,60 @@ public final class Placeholders {
         if (v == null || !v.isJsonPrimitive()) {
             return null;
         }
+        if (v.getAsJsonPrimitive().isNumber()) {
+            return jsNumber(v.getAsString());
+        }
         return v.getAsString();
+    }
+
+    /**
+     * A JSON number as the browser shows it ({@code String(n)} in JavaScript): the nearest
+     * double, its shortest digits, plain from 1e-6 up to below 1e21 and in exponent form
+     * ({@code 1e+21}, {@code 1.5e-7}) outside that; {@code 12.0} is {@code "12"}, {@code 4.50}
+     * is {@code "4.5"}. Null for a number no double holds (as the browser's non-finite check).
+     */
+    static String jsNumber(String text) {
+        double d;
+        try {
+            d = Double.parseDouble(text);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+            return null;
+        }
+        if (d == 0) {
+            return "0";
+        }
+        // The fewest significant digits that read back as the same double (JavaScript's
+        // Number::toString; JDK 17's Double.toString is not always the shortest).
+        BigDecimal exact = new BigDecimal(Math.abs(d));
+        BigDecimal r = exact;
+        for (int p = 1; p <= 17; p++) {
+            r = exact.round(new MathContext(p, RoundingMode.HALF_EVEN));
+            if (r.doubleValue() == Math.abs(d)) {
+                break;
+            }
+        }
+        r = r.stripTrailingZeros();
+        String digits = r.unscaledValue().toString();
+        int k = digits.length();
+        int n = r.precision() - r.scale();
+        StringBuilder b = new StringBuilder(d < 0 ? "-" : "");
+        if (k <= n && n <= 21) {
+            b.append(digits).append("0".repeat(n - k));
+        } else if (0 < n && n <= 21) {
+            b.append(digits, 0, n).append('.').append(digits, n, k);
+        } else if (-6 < n && n <= 0) {
+            b.append("0.").append("0".repeat(-n)).append(digits);
+        } else {
+            int e = n - 1;
+            b.append(digits.charAt(0));
+            if (k > 1) {
+                b.append('.').append(digits, 1, k);
+            }
+            b.append('e').append(e < 0 ? '-' : '+').append(Math.abs(e));
+        }
+        return b.toString();
     }
 }
