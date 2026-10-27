@@ -81,7 +81,7 @@ Dependencies point inward to `common/`. `web/` never reaches the database, tags 
 
 - **Binds:** R9, R12, R13, R33, R36, the refresh interval of AD-6
 - **Prevents:** two pages disagreeing about the database, roles or adapters of the one map.
-- **Rule:** The database connection, adapter functions, full-editing and phone-editing roles, refresh interval (default 10 s), alarm page, basemaps and token secret name are set once per project in a setup with a versioned schema, as a project-level setup; if the spike shows a custom project resource type is too costly, the setup is a project script function returning the same schema. Components carry only per-page settings such as the starting area. Kind setups are never part of the project setup (AD-16).
+- **Rule:** The database connection, adapter functions, full-editing and phone-editing roles, refresh interval (default 10 s), alarm page, basemaps and token secret name are set once per project in a setup with a versioned schema, as a project-level setup. **Owner, 2026-10-27:** the setup is a custom project resource edited in the Designer, never a Gateway page, so it belongs to the project, moves with export and git and is inherited; the script-function fallback is retired. The Designer form offers lists from the Gateway and the project (database connections, the identity provider's roles, library functions, Perspective pages, basemaps, secret providers, names only) with typed values always allowed; how a Designer module asks the Gateway for them is unverified until checked live (epic-map-store-and-data entry 16). Components carry only per-page settings such as the starting area. Kind setups are never part of the project setup (AD-16).
 
 ### AD-6 - Live values: one shared subscription, batched out [ADOPTED]
 
@@ -313,7 +313,6 @@ erDiagram
 - **deck.gl and flow animation:** not in the first version; MapLibre layers draw lines and icons. Revisit with flow.
 - **Viewport-limited batches:** whole-map batches until the 300-site target needs less.
 - **Databases other than PostgreSQL:** after the first version.
-- **Setup as a custom project resource or a script:** the spike decides; AD-5 fixes the schema either way.
 - **Internal structure of `gateway/` and `web/`:** owned by the code once it exists.
 - **Parsers for CSV, KML and GeoJSON, and the place-check data package:** chosen in epic-import-export and epic-editing, within the licence convention.
 - **Reference layers and land grids (prd FR-26, initiative R29):** deferred, not dropped, by the owner in the UX workshop (ux-map-studio, 2026-10-27); when they return, a reference layer lasts for the session.
