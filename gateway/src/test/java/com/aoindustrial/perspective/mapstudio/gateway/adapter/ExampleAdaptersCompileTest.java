@@ -23,7 +23,8 @@ import org.python.util.PythonInterpreter;
 /**
  * The Jython 2.7 sources this story ships compile under the Gateway's Jython
  * (jython-ia 2.7.3, the SDK's; the 8.3.10 Gateway runs 2.7.4): both example
- * adapters in docs/examples/adapters and the dev adapter. Also checks the
+ * adapters in docs/examples/adapters, the dev adapter and the dev seed (epic 2
+ * story 11, whose planner runs in DevSeedTest). Also checks the
  * project function caller's reading of Python results and errors.
  */
 class ExampleAdaptersCompileTest {
@@ -32,7 +33,8 @@ class ExampleAdaptersCompileTest {
     static final List<String> SOURCES = List.of(
         "docs/examples/adapters/udt_instances.py",
         "docs/examples/adapters/named_query.py",
-        "ops/project/ignition/script-python/mapstudio_dev/code.py");
+        "ops/project/ignition/script-python/mapstudio_dev/code.py",
+        "ops/project/ignition/script-python/mapstudio_seed/code.py");
 
     static PythonInterpreter python;
 

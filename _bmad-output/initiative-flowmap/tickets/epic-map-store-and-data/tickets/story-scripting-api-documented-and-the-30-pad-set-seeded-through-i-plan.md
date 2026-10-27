@@ -3,14 +3,14 @@ title: 'Scripting API documented, and the 30-pad set seeded through it'
 type: 'feature'
 ticket: '11'
 created: '2026-10-27'
-status: 'draft'
-baseline_revision: ''
+status: 'built'
+baseline_revision: 'da7e3db88005000e763f56605156e597902944a3'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/docs/contract.md'
@@ -65,7 +65,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `ops/project/ignition/script-python/mapstudio_seed/{code.py,resource.json}` -- `SCALE` (30 pads `Pad 1`..`Pad 30`, 30 lines `Line to Pad N`) and `TRACER` (`Point 1`..`Point 3`, `Tracer line`) literals; pure `plan_ops(current, seed)`; `run(project, actor)` reads `getMap`, sends one batch, restores tombstones from the conflict, returns `{created, updated, restored, unchanged, seq, ids, scale: {pads, lines}, error?}` (`scale` counts live items named as seed items, by kind) -- the seed.
+- [ ] `ops/project/ignition/script-python/mapstudio_seed/{code.py,resource.json}` -- `SCALE` (30 pads `Pad 1`..`Pad 30`, 30 lines `Line to Pad N`) and `TRACER` (`Point 1`..`Point 3`, `Tracer line`) literals; pure `plan_ops(current, seed)`; `run(project, actor)` reads `getMap`, sends one batch, restores tombstones from the conflict, returns `{created, updated, restored, unchanged, seq, ids, scale: {pads, lines}, error?}` (`scale` counts live items whose ids are the scale set's seed ids, by kind) -- the seed.
 - [ ] `ops/project/.../views/MapStudioEdit/view.json` -- "Seed the dev map" button, MapEditor-gated, result JSON in a label (`#mapstudio-dev-seed-result`).
 - [ ] `web/typescript/MapStudio.tsx`, `common/src/main/resources/mapstudio.props.json`; delete `testSet.ts`, `scaleData.ts`, `testData.ts`, `__tests__/testSet.test.ts`, `__tests__/scaleData.test.ts` -- drop the prop and test layers; fixed start view (center -104.9725, 39.7445, zoom 12) until epic-viewing; click, hover and map-click popup close on `LAYER_ITEM_POINTS`; `data-points-loaded`/`data-lines-loaded` read back from the item sources after the items' first idle.
 - [ ] `ops/.../page-config/config.json`; delete `views/MapStudioScale/` -- no `/scale`.
@@ -88,21 +88,52 @@ Re-run, per seed id: absent from `getMap` gives `create` at 0; present and equal
 
 ```python
 except java.lang.Throwable as ex:
-    conflicts = system.util.jsonDecode(str(ex.conflicts())) if hasattr(ex, 'conflicts') and ex.conflicts() else []
+    # On the Gateway the conflicts iterate as dict-like elements (Implementation Notes).
+    found = ex.conflicts() if hasattr(ex, 'conflicts') else None
+    conflicts = list(found) if found is not None else []
 ```
+
+## Decisions
+
+**2026-10-27, owner ("agree with all recommendations, start building"):**
+1. A re-run reads a deleted seed item's version from the conflict the save returns (`ex.conflicts()`); no Java change.
+2. The tracer's points stay separate items at their old coordinates: the seed writes 33 pads and 31 lines; "30 pads and 30 lines" means the scale set.
+3. Other specs' items stay on the measured map; the measure records how many points and lines it drew.
+4. One story, as sliced.
+Also confirmed: pads carry `status: producing`; no instruments in the seed; `popupView` stays.
 
 ## Open Questions
 
-1. **How a re-run finds a deleted seed item's version.** (a) Catch the `conflict` and read `ex.conflicts()` (no Java change; documented as the way scripts read conflicts) [unverified that Jython reaches the method]. (b) Add `getMap(project, includeDeleted)` (store query, Gateway and Designer modules, tests; contract addition). (c) Leave deleted seed items deleted (then "exactly 30" fails after someone deletes a pad). Recommended: (a).
-2. **The tracer's points beside the 30 pads.** (a) Seed them as separate items at their old coordinates (3 pads `Point 1`..`3`, 1 line): the seed writes 33 pads and 31 lines, and the verify line is read as "30 pads and 30 lines of the scale set". (b) Make the tracer click three of the 30 pads: no extra items, the verify holds literally, spec coordinates and phone probes change. Recommended: (a).
-3. **Other specs' items on the measured map.** (a) Keep them; the measure records how many points and lines were drawn (CI starts empty, so only earlier specs' items). (b) The seed takes `prune=True` from the e2e and deletes every other live map item of `mapstudio-dev` before measuring (exact 64, but wipes a developer's dev items). Recommended: (a).
-4. **Plan size** is about 2,800 tokens, above the 1,600 guide. (a) Keep as one story, as sliced (docs and seed meet in the re-run rule). (b) Split the docs into their own entry. Recommended: (a).
+None (resolved by the Decisions above).
 
 ## Implementation Notes
 
+- Implemented directly (no subagent in this session), 2026-10-27.
+- Live finding: on the Gateway, `ex.conflicts()` reaches Jython through Ignition's JSON adapters, so the array iterates as dict-like objects (`'com.inductiveautomation.ignition.common.script.ada...' object has no attribute 'getAsJsonObject'` on the first try); the seed reads a conflict either way (`_conflict_row`), and DevSeedTest covers both forms.
+- The seed's re-send copies the ops list (the first batch's list was mutated in place, caught by DevSeedTest's restore row).
+- The seed result carries `ranAt` (added by the view), so `runSeed` tells two runs with an equal result apart without touching the label's DOM.
+- `data-points-loaded`/`data-lines-loaded` are set after the first loaded items are drawn and the map has gone idle; `data-map-ready` still after the first idle. Only features in loaded tiles count, so the phone checks use "at least the tracer's".
+- Review, 2026-10-27 (quick, context-free): `conflicts()` documented as read like dicts on the Gateway, `scale` counted by seed id, the role spec proves nothing was written, the re-run wording narrowed to the four seed fields, platform-checks dated; the popup spec moves to p3 and the draw vertices clear p1's popup at zoom 12. Status built. See the Review Triage Log.
+- Plan matrix row "Not a map editor" is covered by `e2e/tests/scale.spec.mjs` ("the seed needs the MapEditor role"); the other rows by `DevSeedTest` (Jython, stand-in store), and first run, re-run and deleted also live in `scale.spec.mjs`.
+
 ## Plan Change Log
 
+- 2026-10-27, review (quick): `scale` in the seed result counts the scale set's seed ids by kind, not names (was "live items named as seed items"); the Design Notes snippet reads the conflicts as dicts, as the Gateway hands them over, not through `jsonDecode(str(...))`. Intent unchanged.
+
 ## Review Triage Log
+
+Pass 1 (lens: quick, context-free, on the uncommitted working tree over `da7e3db`, 2026-10-27; each finding checked again here against the code and, where it could be, the dev stack): high 1 (rejected as stated, but the e2e run found a real neighbouring defect, patched), medium 1, low 4. Five patched, one rejected; no loopback (each fix is local and the plan's intent stands).
+
+| # | Finding | Verdict | Route | Evidence and action |
+|---|---|---|---|---|
+| 1 | Point 1 sits under seeded Pad 15 at zoom 12, so a click on Point 1 gets Pad 15 | high | reject (as stated); patch (what the e2e run found) | Not real as stated: the reviewer projected with 256 px tiles; MapLibre's zoom 12 is 512 px tiles (`e2e/lib/geo.mjs`), so Pad 15 is 12.7 px from Point 1, beyond its 9 px circle, and every p1 click in the run named Point 1's uuid (`tracer.spec` both widths, `popup.spec`, `measures.spec`). The tracer points keep their old coordinates (Decision 2). The full e2e run did show the real cost of the zoom change from 12.5 to 12: p1's open popup covers p2 at 1440 px (`popup.spec` clicked p2 and got p1's popup again) and the second draw vertex at 390 px (it sits right of p1 there; `tracer.spec` 390 drew 1 point). Patched: `popup.spec` moves the popup to p3 (205 px right of p1), and `TRACER.drawOffsets` are now `[-50, 150]` and `[100, 150]`, below the popup on both widths and at least 34 px from every seeded point. |
+| 2 | `conflicts()` docs say to walk it with Gson methods [live] and the Designer text recommends the unverified `jsonDecode(str(...))` | medium | patch | Real: the live finding (Implementation Notes) is that on the Gateway the elements arrive as dict-like objects and `getAsJsonObject` raised AttributeError. `docs/contract.md` now says they read as dicts (`c['current']['deleted']`, `c['current']['version']`) **[live 8.3.10]** and that Gson's methods are for plain Jython outside the Gateway only (`DevSeedTest`); its example and the `applyEdits.desc` text drop `jsonDecode(str(...))` and read the elements as dicts. |
+| 3 | `scale` counts names, not the seeded ids | low | patch | Real: a same-named stray counted. `_count_scale(records, seed)` counts live records whose id is one of the scale set's seed ids and whose kind matches; `DevSeedTest.theScaleCountReadsTheSeedIdsNotTheNames` (a stray "Pad 7" does not count, a renamed seed line does, a deleted seed pad is missing). contract.md and the plan say so. The repeated `pads == 30` in `measures.spec` is kept: it is cheap and names the set the frame rate was measured on. |
+| 4 | The "seed needs the MapEditor role" test cannot show that nothing was written | low | patch | Real: specs before it had seeded already, so an editor's seed would also leave the count unchanged. The test now deletes Pad 29 as an editor first, presses the button anonymously, asserts the refusal, no `seq`, and that Pad 29 is still deleted in `map.load`, then restores it with an editor's seed for the specs after it. |
+| 5 | A re-run does not fully restore an edited seed item (`assetId`, `overrides`, `ends`, `attachment` stay) | low | patch (docs) | Real as a wording overstatement. Sending those fields as None from a seed would clear an editor's binding on every re-run, which the seed has no reason to own, so the docs are narrowed instead: contract.md and the seed's header say an edited item is put back on the four fields it compares and sends (kind, name, geometry, properties), and other fields an editor added stay. |
+| 6 | `docs/platform-checks.md` still describes `testSet` and the Scale view as current | low | patch | Real: a dated 2026-10-27 note under story 8's "Kept on purpose" says story 11 removed `testSet`, `scaleData.ts`, `testData.ts`, `MapStudioScale` and `/scale`, and the set is now the seeded store items on `/`; the frame-rate limit (3) notes `scaleData.ts` was removed. |
+
+Re-run after the patches: `./gradlew clean build` green (Java common 86, gateway 267, designer 34; `DevSeedTest` 9 of 9), `cd web && npx tsc --noEmit && npx jest` 144 of 144 in 16 suites; `ops/up.sh --fresh` then `cd e2e && npm test` 55 passed, 7 skipped (the six `store-ops` cases `ops/store-checks.sh` runs, and the stopped-Gateway case), 0 failed on `ms-e2s11`; `ops/store-checks.sh` all five scenarios passed; the Verification `psql` query returns `line 30`, `pad 30`.
 
 ## Verification
 
