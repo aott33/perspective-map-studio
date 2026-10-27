@@ -131,6 +131,35 @@
         ]
        }
       }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Seed the dev map"
+      },
+      "meta": {
+       "name": "seed",
+       "domId": "mapstudio-dev-seed"
+      },
+      "position": {
+       "basis": "160px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 2 story 11): seed the mapstudio-dev map with the 30-pad scale set and the\n\t# tracer's points through system.mapstudio (project library mapstudio_seed). Safe to re-run.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.seed')\n\tout = self.view.rootContainer.getChild('seedResult')\n\n\t# The scripting API trusts its caller (docs/contract.md), so this view checks the role itself,\n\t# as the script checks do: only a signed-in session whose user holds MapEditor may seed.\n\troles = []\n\ttry:\n\t\tif self.session.props.auth.authenticated:\n\t\t\troles = [str(r) for r in (self.session.props.auth.user.roles or [])]\n\texcept java.lang.Throwable as ex:\n\t\troles = []\n\texcept Exception as ex:\n\t\troles = []\n\tif 'MapEditor' not in roles:\n\t\tout.props.text = system.util.jsonEncode({'refused': 'Seeding writes to the map store, so it needs the MapEditor role. Sign in as a map editor first.', 'ranAt': system.date.toMillis(system.date.now())})\n\t\tlogger.info('Dev seed refused: the session user does not hold MapEditor.')\n\t\treturn\n\n\ttry:\n\t\tresult = mapstudio_seed.run()\n\texcept java.lang.Throwable as ex:\n\t\tresult = {'error': ex.getMessage()}\n\t\tlogger.warn('Dev seed failed: %s' % ex.getMessage())\n\texcept Exception as ex:\n\t\tresult = {'error': str(ex)}\n\t\tlogger.warn('Dev seed failed: %s' % ex)\n\t# ranAt tells two runs with the same result apart.\n\tresult['ranAt'] = system.date.toMillis(system.date.now())\n\tout.props.text = system.util.jsonEncode(result)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
      }
     ]
    },
@@ -166,6 +195,25 @@
     "meta": {
      "name": "scriptResults",
      "domId": "mapstudio-dev-script-results"
+    },
+    "position": {
+     "basis": "24px",
+     "shrink": 0
+    },
+    "custom": {}
+   },
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {
+     "text": "",
+     "style": {
+      "padding": "4px 12px"
+     }
+    },
+    "meta": {
+     "name": "seedResult",
+     "domId": "mapstudio-dev-seed-result"
     },
     "position": {
      "basis": "24px",

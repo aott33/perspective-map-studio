@@ -16,16 +16,19 @@ export function pagePixel(box, lngLat, center, zoom) {
     return [box.x + box.width / 2 + (px - cx), box.y + box.height / 2 + (py - cy)];
 }
 
-// The tracer's fixed view and points (web/typescript/testData.ts).
+// The tracer's view and points: the dev map's start view (web/typescript/MapStudio.tsx START_VIEW)
+// and the seed's tracer set (ops/project/ignition/script-python/mapstudio_seed, epic 2 story 11),
+// whose map item ids are in the seed result's ids under tracer/p1 .. tracer/p3.
 export const TRACER = {
     center: [-104.9725, 39.7445],
-    zoom: 12.5,
+    zoom: 12,
     points: {
-        p1: { lngLat: [-104.9903, 39.7392], name: 'Point 1' },
-        p2: { lngLat: [-104.9750, 39.7500], name: 'Point 2' },
-        p3: { lngLat: [-104.9550, 39.7430], name: 'Point 3' }
+        p1: { lngLat: [-104.9903, 39.7392], name: 'Point 1', key: 'tracer/p1' },
+        p2: { lngLat: [-104.9750, 39.7500], name: 'Point 2', key: 'tracer/p2' },
+        p3: { lngLat: [-104.9550, 39.7430], name: 'Point 3', key: 'tracer/p3' }
     },
-    // Offsets from the map centre for a drawn line's two vertices, chosen to
-    // miss the three test points at this zoom on both viewports.
-    drawOffsets: [[-60, 120], [110, 40]]
+    // Offsets from the map centre for a drawn line's two vertices, chosen to miss the seeded
+    // points at this zoom (at least 34 px from any) and p1's open popup on both viewports (it
+    // sits above p1 at 1440 px and to its right, about 100 px tall, at 390 px).
+    drawOffsets: [[-50, 150], [100, 150]]
 };
