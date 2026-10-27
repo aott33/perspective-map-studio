@@ -109,6 +109,21 @@ export function latencyVerdict({ samples, outcomes, planned, limitMs, stat = 'p9
     return { stats: s, counts, verdict: reasons.length ? 'miss' : 'pass', reasons, limit: limitMs === null ? 'none' : `${stat} under ${limitMs} ms` };
 }
 
+/** The idle and total jiffies of the first (all CPUs) line of /proc/stat's text; null when unreadable. */
+export function procStatCpu(text) {
+    const line = String(text || '').split('\n')[0].trim();
+    if (!/^cpu\s/.test(line)) return null;
+    const f = line.split(/\s+/).slice(1).map(Number);
+    if (f.length < 4 || f.some((x) => !Number.isFinite(x))) return null;
+    return { idle: f[3] + (f[4] || 0), total: f.reduce((a, b) => a + b, 0) };
+}
+
+/** The whole box's CPU busy share between two procStatCpu readings, in percent of all CPUs (1 decimal). */
+export function hostBusyPct(a, b) {
+    if (!a || !b || b.total <= a.total) return null;
+    return round((1 - (b.idle - a.idle) / (b.total - a.total)) * 100, 1);
+}
+
 /** Samples of a sampler file (JSON lines) between t0 and t1 (ms since the epoch). */
 export function inWindow(samples, t0, t1) {
     return samples.filter((s) => s.t >= t0 && s.t <= t1);

@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CHANGED_PAD, createBatches, editorPads, itemData, itemId, uuid5 } from './items.mjs';
 import { LIMITS, anyCrashed, bundleVerdict, classifyReply, countOutcomes, deltaVerdict, exitCode, latencyVerdict,
-    merge, percentile, resourceStats, spikeVerdict, summarize, verdicts, withoutTimestamps } from './result.mjs';
+    hostBusyPct, merge, percentile, procStatCpu, resourceStats, spikeVerdict, summarize, verdicts, withoutTimestamps } from './result.mjs';
 import { compare, headlines } from './compare.mjs';
 import { isRepeat, parseSize, parseStatsLine } from './sampler.mjs';
 
@@ -156,4 +156,28 @@ test('sampler parses docker stats lines and skips redraws', () => {
     assert.equal(isRepeat({ t: 0, cpuPct: 1, memMiB: 2 }, { cpuPct: 1, memMiB: 2 }, 500), true);
     assert.equal(isRepeat({ t: 0, cpuPct: 1, memMiB: 2 }, { cpuPct: 1, memMiB: 2 }, 1000), false);
     assert.equal(isRepeat({ t: 0, cpuPct: 1, memMiB: 2 }, { cpuPct: 1.5, memMiB: 2 }, 500), false);
+});
+
+test('host CPU busy share from two /proc/stat readings', () => {
+    const a = procStatCpu('cpu  100 0 100 700 100 0 0 0 0 0\ncpu0 1 2 3 4\n');
+    assert.deepEqual(a, { idle: 800, total: 1000 });
+    const b = procStatCpu('cpu  400 0 200 900 100 0 0 0 0 0\n');
+    // 600 more jiffies, 200 of them idle: 66.7% busy.
+    assert.equal(hostBusyPct(a, b), 66.7);
+    assert.equal(procStatCpu('intr 1 2 3'), null);
+    assert.equal(procStatCpu(''), null);
+    assert.equal(hostBusyPct(null, b), null);
+    assert.equal(hostBusyPct(b, a), null);
+});
+
+test('compare lists the recorded one-page streams measure beside the judged editors measure', () => {
+    const r = { measures: { editsApply: {
+        '50op-10editors': { stats: { p95: 2108.8, median: 310.5 }, verdict: 'miss' },
+        '50op-10streams-1page': { stats: { p95: 320, median: 200 }, verdict: 'recorded' } } } };
+    const h = headlines(r).filter((x) => x.name.startsWith('edits.apply'));
+    assert.deepEqual(h.map((x) => [x.name, x.verdict]), [
+        ['edits.apply 50op-10editors p95', 'miss'], ['edits.apply 50op-10editors median', 'miss'],
+        ['edits.apply 50op-10streams-1page p95', 'recorded'], ['edits.apply 50op-10streams-1page median', 'recorded']]);
+    assert.equal(exitCode(r), 3);
+    assert.equal(exitCode({ measures: { editsApply: { x: { verdict: 'recorded' } } } }), 0);
 });

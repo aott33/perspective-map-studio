@@ -3,7 +3,8 @@
 //   nomodule  the Gateway without Map Studio: idle 3 min, then 20 sessions on /plain for 3 min
 //   main      bundle; idle 3 min; 30 items: map.load x10, frame rate; seed to 1,000: map.load x10,
 //             map.changed with 10 then 50 viewer sessions (5 saves each), 20 sessions open 3 min;
-//             seed to 5,000: map.load x10, edits.apply with 1 and 10 editors, frame rate; list refresh x10
+//             seed to 5,000: map.load x10, edits.apply with 1 and 10 editors (and the 10 editors' streams
+//             from one page, recorded), frame rate; list refresh x10
 // Each phase writes e2e/out/perf/phase-<phase>.json after every test; perf/result.mjs merges them.
 //
 // Every number carries its method and n; a measure that cannot run is {status: 'unavailable', reason}
@@ -21,8 +22,8 @@ import { gatewayUrl, perfOutDir, perfPhaseFile, sessionUrl } from '../lib/env.mj
 import { measureView, webglRenderer, PAN_MOVES_PER_SECOND, ZOOM_EVENTS_PER_SECOND } from '../lib/frameRate.mjs';
 import { EDITOR_USER, mapLoaded, signedInContext } from '../tests/fixtures.mjs';
 import { CHANGED_PAD, PROJECT, createBatches, editorPads, itemId } from './items.mjs';
-import { LIMITS, PERCENTILE_METHOD, PLANNED, bundleVerdict, classifyReply, countOutcomes, inWindow,
-    latencyVerdict, resourceStats, summarize } from './result.mjs';
+import { LIMITS, PERCENTILE_METHOD, PLANNED, bundleVerdict, classifyReply, countOutcomes, hostBusyPct, inWindow,
+    latencyVerdict, procStatCpu, resourceStats, summarize } from './result.mjs';
 
 const require = createRequire(import.meta.url);
 const PHASE = process.env.PERF_PHASE || 'main';
@@ -372,6 +373,15 @@ async function editsRun(page, ids, versions, size, count, warm = 1) {
     }, { ids, versions, size, count, warm });
 }
 
+/** Host CPU counters from /proc/stat (Linux), for the busy share of the whole box over a measure; null elsewhere. */
+function hostCpu() {
+    try {
+        return procStatCpu(readFileSync('/proc/stat', 'utf8'));
+    } catch {
+        return null;
+    }
+}
+
 function editsVerdict(runs, editors, size) {
     const samples = [];
     const outcomes = [];
@@ -619,6 +629,7 @@ test('main: 5,000 items, edits.apply and frame rate', async ({ browser }) => {
     R.measures.frameRate = R.measures.frameRate || {};
     R.measures.openToDrawn = R.measures.openToDrawn || {};
     const editors = [];
+    const state = [];
     try {
         if (!S.editor) S.editor = await openEditor(browser);
         await seed(S.editor.page, (await loadReply(S.editor.page)).items, 5000);
@@ -632,7 +643,6 @@ test('main: 5,000 items, edits.apply and frame rate', async ({ browser }) => {
         editors.push(S.editor);
         // One sign-in at a time, each page opened at once so its session stays signed in.
         for (let e = 1; e < EDITORS; e++) editors.push(await openEditor(browser));
-        const state = [];
         for (let e = 0; e < editors.length; e++) {
             const ids = editorPads(e).map(itemId);
             const { versions, items } = await loadReply(editors[e].page, ids);
@@ -641,12 +651,15 @@ test('main: 5,000 items, edits.apply and frame rate', async ({ browser }) => {
             state.push({ ids, versions });
         }
         for (const [n, size] of [[1, 1], [1, 50], [editors.length, 1], [editors.length, 50]]) {
+            const h0 = hostCpu();
+            const t0 = Date.now();
             const runs = await Promise.all(editors.slice(0, n).map(async (ed, e) => {
                 const r = await editsRun(ed.page, state[e].ids, state[e].versions, size, PLANNED.editsApplyPerEditor);
                 state[e].versions = r.versions;
                 return r;
             }));
-            R.measures.editsApply[`${size}op-${n}editor${n > 1 ? 's' : ''}`] = editsVerdict(runs, n, size);
+            R.measures.editsApply[`${size}op-${n}editor${n > 1 ? 's' : ''}`] = { ...editsVerdict(runs, n, size),
+                openEditorPages: editors.length, hostCpuBusyPct: hostBusyPct(h0, hostCpu()), gateway: windowResources(t0, Date.now()) };
             save();
         }
         if (editors.length < 10) R.measures.editsApply.note = `${editors.length} editors (PERF_EDITORS), not 10`;
@@ -654,6 +667,31 @@ test('main: 5,000 items, edits.apply and frame rate', async ({ browser }) => {
         R.measures.editsApply.crash = crashed(err);
     } finally {
         for (const ed of editors.slice(1)) await ed.context.close().catch(() => {});
+    }
+    save();
+    // Recorded, not judged (story 17 cause analysis): the 10 editors' 50-op streams sent at once from
+    // the one editor page left open, so 9 fewer browser renderers share the box. Set beside
+    // 50op-10editors it separates what the Gateway's write path costs (the project's batches are
+    // serialised by design) from what 10 browsers redrawing the 5,000-item map cost the box.
+    try {
+        if (state.length === EDITORS && S.editor) {
+            const h0 = hostCpu();
+            const t0 = Date.now();
+            const runs = await Promise.all(state.map(async (st) => {
+                const r = await editsRun(S.editor.page, st.ids, st.versions, 50, PLANNED.editsApplyPerEditor);
+                st.versions = r.versions;
+                return r;
+            }));
+            const v = editsVerdict(runs, EDITORS, 50);
+            // Not judged on p95; a busy refusal, a timeout, an error or a missing sample is still a miss.
+            const countReasons = v.reasons.filter((r) => !/^p95 /.test(r));
+            R.measures.editsApply[`50op-${EDITORS}streams-1page`] = { ...v, reasons: countReasons,
+                verdict: countReasons.length ? 'miss' : 'recorded',
+                method: `The ${EDITORS} editors' pads and batches of 50op-${EDITORS}editors, as ${EDITORS} concurrent streams from the one editor page left open (the other editor pages closed); per stream one discarded warm-up then ${PLANNED.editsApplyPerEditor} timed batches; recorded beside 50op-${EDITORS}editors to separate the box's browser load from the Gateway's write path, not judged.`,
+                limit: 'none (recorded)', openEditorPages: 1, hostCpuBusyPct: hostBusyPct(h0, hostCpu()), gateway: windowResources(t0, Date.now()) };
+        }
+    } catch (err) {
+        R.measures.editsApply[`50op-${EDITORS}streams-1page`] = crashed(err);
     }
     save();
     try {
