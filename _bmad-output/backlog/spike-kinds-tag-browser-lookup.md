@@ -31,3 +31,4 @@ The Kinds screen's tag browser shows one example asset's tags and saves the pick
 - Open question: Which Gateway API browses tags under an asset's base path, under whose permissions, and how deep and how fast on a UDT instance.
 - Open question: The message shape (for example a `tags.browse` request with base path and folder) and its role check (full editing only).
 - Open question: How "resolves for N items" is counted across every asset of the kind without a browse per asset.
+- Dropped: 2026-10-27 Moved into the plan by the owner's decision: the tag browser is in scope, built as Map Studio's own tree. The Gateway lookup is epic-map-store-and-data entry 15 ("Tag browse for the Kinds screen", 2.15), which checks the 8.3 browse API live first and answers the three questions above (`tags.browse`, full editing only, "resolves for N of M items"); the tree with the Kinds screen is epic-editing's (architecture AD-8).

@@ -144,12 +144,12 @@ Every later section, and every document built from this PRD, uses these terms ex
 
 - **Icon** - how a point map item is drawn: its kind's glyph, with comms state, the icon KPI and the alarm state where configured.
 - **Popup** - the panel that opens when a map item is clicked or tapped. By default Map Studio draws it: details, comms, KPIs, the alarm summary and the popup link, each optional.
-- **Custom popup view** - a project's own Perspective view that a kind setup names to open instead of the default popup, given the map item object as its parameter.
+- **Custom popup view** - a project's own Perspective view that a kind setup names to open instead of the default popup (`popupView {path, params}`), always given the map item object as its `mapItem` parameter, plus any extra named parameters the kind setup maps (FR-37).
 - **Map item object** - the documented data a custom popup view receives: the map item's id, name, kind, properties, asset id, base path and live values with their quality.
 - **Alarm summary** - the alarm part of the default popup: active counts by priority and the most important active alarms in words, with a "View alarms" button.
 - **Alarm table** - the built-in Perspective Alarm Status Table, on the project's alarm page or inside a custom popup view; the authoritative place to acknowledge.
 - **Popup link** - an optional link in a popup, shown as an open or pop-out icon in its header (FR-6), that goes to a project page or a URL. It may contain placeholders.
-- **Placeholder** - a name in braces in a popup link, filled from the clicked map item, for example `{asset.id}` or `{name}`.
+- **Placeholder** - a name in braces, filled from the clicked map item, from one closed list (owner, 2026-10-27): `{item.id}`, `{item.name}`, `{asset.id}`, `{asset.path}` and `{item.properties.X}` for the map item's property X. Used in popup links (FR-6), a custom popup view's params (FR-37) and the alarm page (FR-5).
 - **Basemap** - the map imagery under the map items: none, OpenStreetMap or satellite in the first version; a Mapbox vector style is deferred (FR-32).
 - **Reference layer** - an imported KML or GeoJSON file shown under the map items for comparison, not edited. Deferred (FR-26).
 - **Needs you** - (FR-42) the View mode summary of map items in alarm, with comms lost or stale, with a count per state, opening a ranked list.
@@ -289,16 +289,18 @@ A user opens a map item's popup by clicking or tapping it; the popup shows the p
 
 #### FR-37: Custom popup view
 
-A kind setup may name a project view to open instead of the default popup, as a table's row subview does; the view receives the map item object as its parameter. Realizes UJ-5. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
+A kind setup may name a project view to open instead of the default popup, as a table's row subview does, as `popupView {path, params}`. The view always receives the map item object as its `mapItem` parameter; `params` adds extra named parameters, each value either a literal or one placeholder from the closed list (FR-6). This lets a project reuse an existing view whose parameters have their own names (for example `padName`, `tagPath`) without a wrapper view or script (owner, 2026-10-27). Realizes UJ-5. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
 
 **Consequences (testable):**
 - A kind setup with a custom popup view opens that view, with the map item object filled, instead of the default popup.
+- A kind setup with `popupView {path: "Popups/PadDetails", params: {padName: "{item.name}", tagPath: "{asset.path}", area: "Mesa"}}` opens that view on pad P12 with `mapItem`, `padName` `P12`, `tagPath` the asset's base path and `area` `Mesa` (owner, 2026-10-27).
+- A kind setup whose params name a placeholder outside the closed list is refused when it is saved, with a plain-words reason (owner, 2026-10-27).
 - The map item object's fields are documented, with an example view that embeds the alarm table filtered to the alarms path; acknowledging there follows Ignition's acknowledge permissions.
 - A custom popup view that is missing or fails to load falls back to the default popup with a message.
 
 #### FR-5: Alarm summary in the popup
 
-Where enabled, the default popup shows the alarm summary for the map item's alarms path, with a "View alarms" button to the project's alarm page, which the project setup names and which may take placeholders. Acknowledging happens in the alarm table, never in Map Studio's own popup. Realizes UJ-5.
+Where enabled, the default popup shows the alarm summary for the map item's alarms path, with a "View alarms" button to the project's alarm page, which the project setup names and which may take placeholders from the closed list of FR-6 (owner, 2026-10-27). Acknowledging happens in the alarm table, never in Map Studio's own popup. Realizes UJ-5.
 
 **Consequences (testable):**
 - The summary counts only alarms under the map item's alarms path and names the most important active ones in words.
@@ -308,10 +310,12 @@ Where enabled, the default popup shows the alarm summary for the map item's alar
 
 #### FR-6: Popup link
 
-Where configured, the popup shows a link that goes to a project page or a URL, with placeholders filled from the clicked map item, using Perspective's navigation. The link is an open or pop-out icon in the popup header, not a button in its body (UX workshop, ux-map-studio, 2026-10-27). Realizes UJ-5. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
+Where configured, the popup shows a link that goes to a project page or a URL, with placeholders filled from the clicked map item, using Perspective's navigation. The link is an open or pop-out icon in the popup header, not a button in its body (UX workshop, ux-map-studio, 2026-10-27). Its placeholders come from one closed list, shared with a custom popup view's params (FR-37) and the alarm page (FR-5): `{item.id}`, `{item.name}`, `{asset.id}`, `{asset.path}` and `{item.properties.X}` for the map item's property X (owner, 2026-10-27). Realizes UJ-5. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
 
 **Consequences (testable):**
 - A link `/ctb/{asset.id}` on CTB1 goes to the project page `/ctb/CTB1`.
+- A link `/pad/{item.name}` on pad P12 goes to `/pad/P12`.
+- A link naming a placeholder outside the closed list is refused when the kind setup is saved, with a plain-words reason (owner, 2026-10-27).
 - A placeholder with no value (for example `{asset.id}` on an unlinked map item) hides the link icon rather than going to a broken page.
 - An outside URL opens as Perspective opens outside URLs.
 
@@ -409,7 +413,7 @@ A map editor links a map item to an asset from the asset list, and can unlink it
 
 #### FR-12: Write a kind setup
 
-A map editor writes a kind's setup once: comms path, up to 4 KPIs, alarms path, popup parts, popup link, an optional custom popup view, an optional style rule and, for areas, category tints (FR-38, FR-39), as paths relative to each map item's base path. Realizes UJ-3.
+A map editor writes a kind's setup once: comms path, up to 4 KPIs, alarms path, popup parts, popup link, an optional custom popup view with its params (FR-37), an optional style rule and, for areas, category tints (FR-38, FR-39), as paths relative to each map item's base path. Realizes UJ-3.
 
 **Consequences (testable):**
 - Changing a kind setup changes every map item of that kind that has no override.
@@ -418,6 +422,7 @@ A map editor writes a kind's setup once: comms path, up to 4 KPIs, alarms path, 
 - A path that does not resolve for a map item is reported for that map item, not silently left blank.
 - Amended in the UX workshop (ux-map-studio, 2026-10-27): the Kinds screen sets up only the kinds the project already defines (FR-9); it adds no kinds.
 - The tag browser shows one example asset's tags and turns the pick into a path relative to the asset's base path; typed paths still work. [UNVERIFIED: a Gateway tag-browse lookup for the module, to check on a live 8.3 Gateway]
+- In scope for the first version (owner, 2026-10-27): the tag browser is Map Studio's own tree, not Perspective's Tag Browse Tree component, so the Kinds screen keeps one consistent look. Each tag shows its name, type and data type, and a candidate path says for how many of the kind's map items it resolves ("resolves for N of M items"). Only map editors with full editing browse; the Gateway checks the role.
 - The live preview uses a map item the editor chooses.
 - The kind setup's sections come in this order: Icon, Key values, Comms, Alarms, Popup, Style rule (last, because it builds on the key values).
 
@@ -765,6 +770,8 @@ Target date for SM-1 to SM-5: end of January 2027, a target and not a deadline.
 12. Answered in the UX workshop (ux-map-studio, 2026-10-27): first run is the checklist only; the tour is dropped (FR-36).
 13. Answered in the UX workshop (ux-map-studio, 2026-10-27): reference layers (FR-26) and the Mapbox vector style option (FR-32) are deferred, not dropped.
 14. Answered in the UX workshop (ux-map-studio, 2026-10-27): there is no Publish step; live saves, Undo and Recent changes cover it (FR-17, FR-29, FR-44).
+15. Answered 2026-10-27 (owner): a custom popup view is `popupView {path, params}`, the view always receiving `mapItem`, with params mapped from a literal or one placeholder from a closed list that popup links and the alarm page share (FR-5, FR-6, FR-37). Still open, in the backlog: a per-item override of params, what an empty or missing placeholder value does in a param, and URL-encoding of link values.
+16. Answered 2026-10-27 (owner): the Kinds screen's tag browser is in the first version, built as Map Studio's own tree rather than Perspective's Tag Browse Tree component (FR-12).
 
 ## 10. Assumptions index
 

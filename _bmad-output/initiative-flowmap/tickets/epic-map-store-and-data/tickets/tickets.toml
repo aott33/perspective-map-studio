@@ -1,7 +1,7 @@
 # Epic 2 stories in build order. Table order is build order; ids are permanent.
 # Parallel groups (epic Notes, Decision 2026-10-26): 1 alone; group A = 2 to 7 after 1;
-# group B = 8, 9, 10; group C = 11 and 14 (added 2026-10-27, instruments on lines);
-# then 12 (sweep) and 13 (closing release check). Stories 2 to 7 are being built now: do not disturb them.
+# group B = 8, 9, 10 and 15 (added 2026-10-27, tag browse); group C = 11 and 14 (added 2026-10-27,
+# instruments on lines); then 12 (sweep) and 13 (closing release check). Stories 2 to 7 are being built now: do not disturb them.
 
 [[entry]]
 id = 1
@@ -34,6 +34,17 @@ description = "Calls the kind and asset functions the setup names on a bounded p
 verify = "map.load in the dev session carries the dev kinds and assets with status ok; emptying, breaking or slowing the dev adapter shows the matching plain-words status in map.load and one log line, without a Gateway restart."
 covers = ["R8", "R10", "R14"]
 after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 15
+type = "story"
+title = "Tag browse for the Kinds screen"
+description = "Owner-approved 2026-10-27 (initiative R15; prd FR-12; architecture AD-8): the Gateway side of the Kinds screen's tag browser, which is Map Studio's own tree (epic-editing), not Perspective's Tag Browse Tree component. First a short live check on the dev 8.3 Gateway of Ignition's tag browse API from the module's Gateway scope (which call, under whose permissions, how deep and how fast on a UDT instance), recorded in docs/platform-checks.md; the API is unverified until then. Then adds tags.browse {assetId, folder, candidate} and its reply to the message types in common/ and the delegate: the Gateway browses the tag provider under the example asset's base path (and the folder below it) and replies with its children, each with name, type and data type; with a candidate relative path it also replies how many of the kind's M map items with a base path it resolves for (N), from entry 3's cached asset list. Full editing only, checked on the Gateway (code role otherwise); reads tags, writes nothing; no migration. Docs for the message (R14). Gateway and common/ only; no tree or Kinds screen. Group B (after 3)."
+verify = "docs/platform-checks.md records the live 8.3 browse check; on the dev Gateway a full editor's tags.browse on a dev pad asset lists its tags with name, type and data type, a folder opens to its children, and a candidate path reports resolves for N of M across the dev pads, one pad with the tag missing; a viewer's or phone editor's tags.browse is refused with code role; Gateway tests cover the count and the refusal."
+covers = ["R17", "R14"]
+after = [3]
 hitl = false
 risk = "medium"
 
@@ -96,8 +107,8 @@ risk = "high"
 id = 9
 type = "story"
 title = "Kind setups in the map store, and items checked against the kind list"
-description = "Publishes the kind setup schema (comms path, up to 4 KPIs with one icon KPI, alarms path, popup parts, popup link, custom popup view, a switch per live value) in common/ and docs; kindSetup ops (one versioned row per project and kind id) go through the write service and come back in map.load and getMap; every map item op is validated and normalised against the cached kind list (known kind, geometry, form-field types) and refused with code invalid and the reason. Owner-approved 2026-10-26 (initiative R40, architecture AD-16): the schema also carries the optional styleRule {source, type, cases, expression} and, for area kinds, areaTints {property, tints}, and a map item's overrides may hold its own styleRule; the write service stores them and refuses a preset or tint name outside the closed lists in common/, or a rule that does not match its type, with code invalid; nothing renders them here (epic-viewing). Write service validation and kind setup storage. Group B (after 2 and 3)."
-verify = "Gateway tests and a live run: a kind setup saved by applyEdits returns in map.load; an item of an unknown kind, of the wrong geometry or with a mistyped property is refused with a plain-words reason; a CSV-style string number is stored as a number. A kind setup with a States rule, a Bands rule and areaTints, and an item override with its own styleRule, return unchanged in map.load and getMap, and a preset or tint name outside the closed lists, or a colour code, is refused with code invalid and a plain-words reason."
+description = "Publishes the kind setup schema (comms path, up to 4 KPIs with one icon KPI, alarms path, popup parts, popup link, custom popup view, a switch per live value) in common/ and docs; kindSetup ops (one versioned row per project and kind id) go through the write service and come back in map.load and getMap; every map item op is validated and normalised against the cached kind list (known kind, geometry, form-field types) and refused with code invalid and the reason. Owner-approved 2026-10-26 (initiative R40, architecture AD-16): the schema also carries the optional styleRule {source, type, cases, expression} and, for area kinds, areaTints {property, tints}, and a map item's overrides may hold its own styleRule; the write service stores them and refuses a preset or tint name outside the closed lists in common/, or a rule that does not match its type, with code invalid; nothing renders them here (epic-viewing). Owner-approved 2026-10-27 (initiative R8, R39; prd FR-5, FR-6, FR-37; architecture AD-7, AD-16): the custom popup view part is popupView {path, params}, each param a string literal or exactly one placeholder from the closed list published in common/ ({item.id}, {item.name}, {asset.id}, {asset.path}, {item.properties.X}), and the popup link uses the same placeholders; the view always receives mapItem, so no param may be named mapItem; the write service refuses an unknown placeholder in a param or the link, a malformed param or a param named mapItem with code invalid and the reason; stored and validated only, epic-viewing fills and renders them (per-item override, empty values and URL-encoding stay in the backlog). Write service validation and kind setup storage. Group B (after 2 and 3)."
+verify = "Gateway tests and a live run: a kind setup saved by applyEdits returns in map.load; an item of an unknown kind, of the wrong geometry or with a mistyped property is refused with a plain-words reason; a CSV-style string number is stored as a number. A kind setup with a States rule, a Bands rule and areaTints, and an item override with its own styleRule, return unchanged in map.load and getMap, and a preset or tint name outside the closed lists, or a colour code, is refused with code invalid and a plain-words reason. A kind setup with popupView {path: \"Popups/PadDetails\", params: {padName: \"{item.name}\", tagPath: \"{asset.path}\", area: \"Mesa\"}} and the link /pad/{item.name} returns unchanged in map.load and getMap; an unknown placeholder such as {item.foo} in a param or in the link, or a param named mapItem, is refused with code invalid and a plain-words reason."
 covers = ["R8", "R11", "R14"]
 after = [2, 3]
 hitl = false
@@ -143,7 +154,7 @@ title = "Refactor sweep"
 description = "Cleans up what the other stories deferred, scoped at its start from their plans and review findings; cleanup only."
 verify = "The build, the Gateway and Jest tests and the e2e suite still pass after the sweep."
 covers = []
-after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15]
 hitl = false
 risk = "low"
 
