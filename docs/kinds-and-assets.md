@@ -71,7 +71,8 @@ Each kind's `icon` is checked against the icon set the module ships ([icons.md](
 
 - A known icon, or no icon: nothing is reported; no icon means `point`.
 - An unknown icon (`wel-pad`): the kind stays in the list with the name it gave, the map draws it as `point`, and the status word does not change (`ok`, or `incomplete` for other left-out rows). The kind status message adds one sentence per kind, the first three named: "3 kinds from mapstudio_dev.kinds. Kind pad names icon wel-pad, which Map Studio does not have; it shows as a plain point." A session that cannot edit gets the count only ("1 kind names an icon Map Studio does not have and shows as a plain point.").
-- The Gateway log gets one warning on `MapStudio.adapters` when the set of kinds naming unknown icons changes, naming kind ids only ("Kind pad names an icon Map Studio does not have."), and one info line when it clears; the same set again logs nothing. When the status word changes at the same time, its one line carries that sentence instead.
+- The Gateway log gets one warning on `MapStudio.adapters` when the set of kinds naming unknown icons changes, naming kind ids only ("Kind pad names an icon Map Studio does not have."), and one info line when it clears ("No kind from mapstudio_dev.kinds names an icon Map Studio does not have any more."). The set is the kind ids: the same kinds again logs nothing, even when a kind's unknown icon name or the row order changed. When the status word changes at the same time, its one line carries the sentence instead ("No kind names an icon Map Studio does not have any more." when it clears).
+- If the module's icon catalogue cannot be read (a broken build), the Gateway logs one warning when it starts and checks no icons; the kind list still loads.
 - The dev adapter's mode `unknown-icon` (the `/adapters` page) gives the pad kind the icon `wel-pad`.
 
 ## Status

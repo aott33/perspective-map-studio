@@ -79,6 +79,8 @@ public final class AdapterService {
     static final Duration TICK = Duration.ofSeconds(1);
     static final int MAX_REASONS = 3;
     static final int MAX_ERROR = 200;
+    /** Added to a status-change line whose answer clears the unknown icons last logged. */
+    static final String ICONS_CLEAR = "No kind names an icon Map Studio does not have any more.";
 
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneOffset.UTC);
 
@@ -126,8 +128,8 @@ public final class AdapterService {
         Call call;
         /** An on-demand refresh asked for while a timed-out call still runs. */
         CompletableFuture<Void> pending;
-        /** The kinds naming unknown icons as last logged ({@link KindIcons#key()}); kinds only. */
-        String iconsLogged = "";
+        /** The sorted ids of the kinds naming unknown icons as last logged ({@link KindIcons#key()}); kinds only. */
+        List<String> iconsLogged = List.of();
     }
 
     private static final class ProjectState {
@@ -147,6 +149,8 @@ public final class AdapterService {
     private final Duration timeout;
     private final Log log;
     private final Map<String, ProjectState> states = new ConcurrentHashMap<>();
+    /** The shipped icon catalogue, read once here; null when it cannot be read (no icon check). */
+    private final IconCatalogue catalogue;
 
     public AdapterService(Function<String, Optional<Setup>> setups, Supplier<Set<String>> projects,
                           AdapterCaller caller, ExecutorService pool, ScheduledExecutorService ticker,
@@ -160,6 +164,18 @@ public final class AdapterService {
         this.clock = clock;
         this.timeout = timeout;
         this.log = log;
+        this.catalogue = shippedCatalogue(log);
+    }
+
+    /** The shipped catalogue, or null with one warning when the module lacks it (a broken build). */
+    private static IconCatalogue shippedCatalogue(Log log) {
+        try {
+            return IconCatalogue.shipped();
+        } catch (RuntimeException e) {
+            log.warn("The icon catalogue cannot be read (" + e.getClass().getSimpleName()
+                + "); kind icons are not checked.");
+            return null;
+        }
     }
 
     /** The Gateway's service: 2 daemon threads {@code MapStudio-adapter-N}, a queue of 8, 5 s timeout. */
@@ -368,26 +384,30 @@ public final class AdapterService {
         boolean answered = false;
         CompletableFuture<Void> pending;
         CompletableFuture<Void> next = null;
-        synchronized (ls) {
-            ls.running = false;
-            if (!call.done) {
-                call.done = true;
-                answered = true;
-                apply(project, list, ls, function, outcome, kindIds);
-            }
-            pending = ls.pending;
-            ls.pending = null;
-            if (pending != null) {
-                Optional<Setup> setup = setups.apply(project);
-                String now = setup.map(list.function).orElse("");
-                if (setup.isPresent() && !now.isBlank()) {
-                    next = startCall(project, ps, list, ls, now);
+        try {
+            synchronized (ls) {
+                ls.running = false;
+                if (!call.done) {
+                    call.done = true;
+                    answered = true;
+                    apply(project, list, ls, function, outcome, kindIds);
+                }
+                pending = ls.pending;
+                ls.pending = null;
+                if (pending != null) {
+                    Optional<Setup> setup = setups.apply(project);
+                    String now = setup.map(list.function).orElse("");
+                    if (setup.isPresent() && !now.isBlank()) {
+                        next = startCall(project, ps, list, ls, now);
+                    }
                 }
             }
-        }
-        // Complete outside the monitor: a dependent step may take another list's monitor.
-        if (answered) {
-            call.settled.complete(null);
+        } finally {
+            // Complete outside the monitor (a dependent step may take another list's monitor),
+            // and even when the step above threw, so no waiter hangs on this call.
+            if (answered) {
+                call.settled.complete(null);
+            }
         }
         if (pending != null) {
             if (next != null) {
@@ -418,8 +438,8 @@ public final class AdapterService {
                     : (Parsed<T>) Asset.parseList(returned.rows(), kindIds);
                 ls.good = parsed.kept();
                 ls.goodAt = now;
-                if (list == ListKind.KINDS) {
-                    icons = KindIcons.check((List<Kind>) parsed.kept(), IconCatalogue.shipped());
+                if (list == ListKind.KINDS && catalogue != null) {
+                    icons = KindIcons.check((List<Kind>) parsed.kept(), catalogue);
                 }
                 if (parsed.left() == 0) {
                     String head = parsed.kept().size() + " " + plural(list, parsed.kept().size()) + " from "
@@ -446,11 +466,16 @@ public final class AdapterService {
             status = failing(list, ls, function, "The " + list.one + " function " + function + " failed: "
                 + reason + (reason.endsWith(".") ? "" : "."), "The " + list.one + " function " + function + " failed.");
         }
+        boolean clears = list == ListKind.KINDS && icons != null && icons.isEmpty() && !ls.iconsLogged.isEmpty();
+        if (clears) {
+            logLine = (logLine != null ? logLine : status.message()) + " " + ICONS_CLEAR;
+        }
         boolean logged = setStatus(project, list, ls, status, logLine, icons != null && !icons.isEmpty());
         if (list == ListKind.KINDS && icons != null) {
             if (!logged && !icons.key().equals(ls.iconsLogged)) {
                 if (icons.isEmpty()) {
-                    log.info("Project " + project + ": every kind from " + function + " names an icon Map Studio has.");
+                    log.info("Project " + project + ": No kind from " + function
+                        + " names an icon Map Studio does not have any more.");
                 } else {
                     log.warn("Project " + project + ": " + icons.logNote());
                 }

@@ -61,6 +61,7 @@ test.describe('kind icon check', () => {
     const PAGE = '/adapters';
     const KINDS_FN = 'mapstudio_dev.kinds';
     const UNKNOWN = 'Kind pad names icon wel-pad, which Map Studio does not have; it shows as a plain point.';
+    const VIEWER_NOTE = '1 kind names an icon Map Studio does not have and shows as a plain point.';
 
     async function press(page, button, mode) {
         await page.locator('#mapstudio-dev-adapter-' + button).click();
@@ -80,23 +81,44 @@ test.describe('kind icon check', () => {
         };
     }
 
-    editorTest('a kind naming an unknown icon stays listed and its status names the kind and the icon', async ({ page }) => {
+    editorTest('a kind naming an unknown icon stays listed and its status names the kind and the icon', async ({ page, browser }) => {
         await mapLoaded(await openMap(page, PAGE));
         await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
 
-        // The dev kinds name real icons: ok with no icon note.
-        await press(page, 'ok', 'ok');
-        let k = await kindsAfterReload(page);
-        expect(k).toEqual({ status: 'ok', message: `3 kinds from ${KINDS_FN}.`, rows: '3' });
+        // The dev adapter mode is Gateway-wide: whatever fails below, put it back to ok
+        // so later specs see the dev kinds as they ship.
+        try {
+            // The dev kinds name real icons: ok with no icon note.
+            await press(page, 'ok', 'ok');
+            let k = await kindsAfterReload(page);
+            expect(k).toEqual({ status: 'ok', message: `3 kinds from ${KINDS_FN}.`, rows: '3' });
 
-        const r = await press(page, 'unknown-icon', 'unknown-icon');
-        expect(r.kinds.status).toBe('ok');
-        expect(r.kinds.message).toBe(`3 kinds from ${KINDS_FN}. ${UNKNOWN}`);
-        k = await kindsAfterReload(page);
-        expect(k).toEqual({ status: 'ok', message: `3 kinds from ${KINDS_FN}. ${UNKNOWN}`, rows: '3' });
+            const r = await press(page, 'unknown-icon', 'unknown-icon');
+            expect(r.kinds.status).toBe('ok');
+            expect(r.kinds.message).toBe(`3 kinds from ${KINDS_FN}. ${UNKNOWN}`);
+            k = await kindsAfterReload(page);
+            expect(k).toEqual({ status: 'ok', message: `3 kinds from ${KINDS_FN}. ${UNKNOWN}`, rows: '3' });
 
-        await press(page, 'ok', 'ok');
-        k = await kindsAfterReload(page);
+            // A session that cannot edit gets the count only, no kind id or icon name.
+            // An anonymous context: newContext would otherwise inherit the editor's sign-in.
+            const viewerContext = await browser.newContext({
+                viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, storageState: { cookies: [], origins: [] }
+            });
+            try {
+                const viewer = await viewerContext.newPage();
+                const viewerMap = await openMap(viewer, PAGE);
+                await mapLoaded(viewerMap);
+                await expect(viewerMap).toHaveAttribute('data-edit-level', 'none');
+                const el = viewer.locator('.mapstudio-adapter-status');
+                await expect(el).toHaveAttribute('data-kinds-status', 'ok');
+                await expect(el).toHaveAttribute('data-kinds-message', `3 kinds from ${KINDS_FN}. ${VIEWER_NOTE}`);
+            } finally {
+                await viewerContext.close();
+            }
+        } finally {
+            await press(page, 'ok', 'ok');
+        }
+        const k = await kindsAfterReload(page);
         expect(k.message).toBe(`3 kinds from ${KINDS_FN}.`);
     });
 });

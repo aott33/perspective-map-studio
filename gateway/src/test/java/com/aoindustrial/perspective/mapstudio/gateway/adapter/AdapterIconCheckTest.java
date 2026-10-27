@@ -18,6 +18,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.aoindustrial.perspective.mapstudio.common.IconCatalogue;
 import com.aoindustrial.perspective.mapstudio.common.contract.AdapterStatus;
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 
@@ -112,6 +113,8 @@ class AdapterIconCheckTest {
         assertEquals(AdapterStatus.OK, s.kindsStatus().status());
         assertEquals("2 kinds from mapstudio_dev.kinds.", s.kindsStatus().message());
         assertEquals("", s.kinds().get(0).icon());
+        assertEquals(IconCatalogue.FALLBACK, IconCatalogue.shipped().resolve(s.kinds().get(0).icon()),
+            "no icon is drawn as point");
         assertEquals(List.of(), log.about("WARN"));
     }
 
@@ -127,8 +130,39 @@ class AdapterIconCheckTest {
         assertEquals(List.of(
             "INFO Project mapstudio-dev: 2 kinds from mapstudio_dev.kinds.",
             "WARN Project mapstudio-dev: Kind pad names an icon Map Studio does not have.",
-            "INFO Project mapstudio-dev: every kind from mapstudio_dev.kinds names an icon Map Studio has."),
+            "INFO Project mapstudio-dev: No kind from mapstudio_dev.kinds names an icon Map Studio does not have"
+                + " any more."),
             kindLines());
+    }
+
+    @Test
+    void anotherUnknownIconNameOrRowOrderForTheSameKindsLogsNothing() throws Exception {
+        kinds("wel-pad");
+        refresh();
+        kinds("wel-pd");
+        AdapterSnapshot s = refresh();
+        assertEquals("wel-pd", s.kinds().get(0).icon());
+        caller.rows(KINDS, "[{\"id\":\"line\",\"name\":\"Line\",\"geometry\":\"line\",\"icon\":\"pipeline\"},"
+            + "{\"id\":\"pad\",\"name\":\"Pad\",\"geometry\":\"point\",\"icon\":\"wel-pd\"}]");
+        refresh();
+        assertEquals(1, log.about("Kind pad names an icon").size(), "the set of kinds did not change");
+    }
+
+    @Test
+    void aStatusChangeThatClearsTheIconsSaysSoOnItsLine() throws Exception {
+        kinds("wel-pad");
+        refresh();
+        caller.rows(KINDS, "[{\"id\":\"pad\",\"name\":\"Pad\",\"geometry\":\"point\",\"icon\":\"well-pad\"},"
+            + "{\"id\":\"tank\",\"name\":\"Tank\",\"geometry\":\"polygon\"}]");
+        AdapterSnapshot s = refresh();
+        assertEquals(AdapterStatus.INCOMPLETE, s.kindsStatus().status());
+        List<String> lines = kindLines();
+        assertEquals(2, lines.size(), String.join("\n", lines));
+        assertEquals("WARN Project mapstudio-dev: 1 of 2 kinds from mapstudio_dev.kinds left out: row 2 (id tank):"
+            + " geometry must be point or line. " + AdapterService.ICONS_CLEAR, lines.get(1));
+        kinds("wel-pad");
+        refresh();
+        assertEquals(2, log.about("Kind pad names an icon").size(), "the cleared set was remembered as cleared");
     }
 
     @Test

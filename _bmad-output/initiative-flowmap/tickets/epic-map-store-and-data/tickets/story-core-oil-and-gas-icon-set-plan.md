@@ -3,7 +3,7 @@ title: 'Core oil and gas icon set'
 type: 'feature'
 ticket: '10'
 created: '2026-10-26'
-status: 'in-review'
+status: 'built'
 baseline_revision: '7c119d866014add0df7ec988e47dd78b2662d068'
 route: 'full'
 route_source: 'auto'
@@ -176,6 +176,19 @@ Pass 1, 2026-10-26: lens `quick`, run context-free by the coordinator on commit 
 | 5 | `meter-station`, `compressor-station` and `booster-station` used a circular outline, the shape reserved for alarm priority 2 (template docs/ux.md, ER-27) | high | patch | Confirmed in the SVGs. Redrawn without circles; build check for circle and square outlines on kind icons, triangles listed in docs/icons.md as a review item. |
 | 6 | The alarm glyphs (solid and hollow, three shapes) did not match the template's reviewed ER-27 set (unacknowledged, acknowledged, rectified; priority 3 outlined in every state) | high | patch | Confirmed against template docs/ux.md (state table) and docs/map.md section 2. Redrawn to ER-27 with 7 alarm glyphs; differences listed in docs/icons.md; engineering review flag kept. |
 
+Pass 2, 2026-10-27: lens `quick`, run context-free by the coordinator on commit 0eb768f (phase B). Verdicts: high 0, medium 0, low 6, false 0, maybe-false 0. All six patched.
+
+| # | Finding | Verdict | Route | Evidence and action |
+|---|---------|---------|-------|---------------------|
+| 1 | `IconCatalogue.shipped()` ran inside `apply` under the list's monitor; a missing or unreadable catalogue threw out of the pool task, so `call.settled` never completed and every waiter (`refreshAdapters`) hung to its timeout | low | patch | Confirmed in `finish`/`apply`. The catalogue is read once in the `AdapterService` constructor; if it cannot be read, one warning ("The icon catalogue cannot be read (...); kind icons are not checked.") and no icon check. `finish` completes `call.settled` in a `finally`. |
+| 2 | The change key was the ordered `id=icon` pairs, so renaming an unknown icon or reordering rows logged a duplicate warning, against the docs' "set of kinds"; `=` or a newline made it ambiguous | low | patch | Confirmed. `KindIcons.key()` is now the sorted kind ids as a `List<String>` (no joining); `KindIconsTest` and `AdapterIconCheckTest.anotherUnknownIconNameOrRowOrderForTheSameKindsLogsNothing` pin it; `docs/kinds-and-assets.md` says so. |
+| 3 | A status-word change on the answer that cleared the unknown icons dropped the "clears" line | low | patch | Confirmed. That status line now ends "No kind names an icon Map Studio does not have any more." (`AdapterService.ICONS_CLEAR`); test `aStatusChangeThatClearsTheIconsSaysSoOnItsLine`; docs updated. |
+| 4 | The clear line "every kind ... names an icon Map Studio has" was false for kinds with no icon | low | patch | Confirmed. Reworded to "No kind from <fn> names an icon Map Studio does not have any more."; test and docs updated (seen live in the Gateway log). |
+| 5 | `icons.spec.mjs` (and `adapters.spec.mjs`) reset the Gateway-wide dev adapter mode to `ok` only on the last step; the viewer count-only message was not checked end to end | low | patch | Confirmed. The editor tests in both specs reset the mode in `try/finally`; the icon test adds an anonymous viewer context (empty `storageState`, since `browser.newContext` inherits the editor's sign-in) asserting edit level `none` and the count-only `data-kinds-message`. The first run of the new viewer step failed on that inherited sign-in and the `finally` reset held: every later spec passed. |
+| 6 | `aMissingIconMeansPointWithNoWarning` did not tie the empty icon to `point` | low | patch | Confirmed. It also asserts `IconCatalogue.shipped().resolve("")` is `point`. |
+
+Runs after the fixes: `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew clean build` BUILD SUCCESSFUL (common 39, gateway 178 tests, 0 failed); `cd web && npx jest` 12 suites, 91 tests passed; `ops/up.sh --fresh` on `ms-e2s10` (port 9132), `cd e2e && npm test` 32 passed, 5 skipped (the `store-ops` scenarios; store paths not touched, so `ops/store-checks.sh` not run). Gateway log: each unknown-icon warning followed by one "No kind from mapstudio_dev.kinds names an icon Map Studio does not have any more." info line; no line holds `wel-pad`.
+
 ## Acceptance status (2026-10-26, updated 2026-10-27)
 
 - Criterion 1 (contact sheet served by the dev Gateway, all icons at 16, 24 and 44 px in both themes, screenshot in `docs/icons.md`): met 2026-10-27 on the `ms-e2s10` dev Gateway; content types live-checked, screenshots from the Gateway.
@@ -183,4 +196,4 @@ Pass 1, 2026-10-26: lens `quick`, run context-free by the coordinator on commit 
 - Criterion 3 (NOTICE and `sources.json` agree, no excluded source): met; `icons.mjs` checks it on every build.
 - Criterion 4 (unknown icon reported in `map.load`): met 2026-10-27 (e2e on the dev Gateway).
 - Engineering review (ER-27) of every alarm glyph: still required before release.
-- Phase B built 2026-10-27; status `in-review` for its Quick lens review.
+- Phase B built 2026-10-27; Quick lens review pass 2 triaged and patched the same day; status `built`.

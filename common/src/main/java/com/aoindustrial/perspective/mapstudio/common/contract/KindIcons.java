@@ -16,27 +16,31 @@ import com.aoindustrial.perspective.mapstudio.common.IconCatalogue;
  * {@link #MAX_NAMED} kinds); {@link #viewerNote()} is the same without names,
  * for a session that cannot edit; {@link #logNote()} names the kind ids only
  * (no row values in a Gateway log line, docs/kinds-and-assets.md);
- * {@link #key()} identifies the set, so a caller logs one line when it changes.
+ * {@link #key()} is the sorted ids of those kinds (kind ids only, not icon
+ * names or row order), so a caller logs one line when the set of kinds changes
+ * and nothing when only a kind's unknown icon name or the row order changes.
  */
-public record KindIcons(List<String> unknown, String note, String viewerNote, String logNote, String key) {
+public record KindIcons(List<String> unknown, String note, String viewerNote, String logNote, List<String> key) {
 
     /** At most this many kinds are named in a note. */
     public static final int MAX_NAMED = 3;
 
     /** No kind names an unknown icon. */
-    public static final KindIcons NONE = new KindIcons(List.of(), "", "", "", "");
+    public static final KindIcons NONE = new KindIcons(List.of(), "", "", "", List.of());
 
     /** Check {@code kinds} against {@code catalogue}. */
     public static KindIcons check(List<Kind> kinds, IconCatalogue catalogue) {
         List<String> named = new ArrayList<>();
         List<String> ids = new ArrayList<>();
         List<String> keys = new ArrayList<>();
+        List<String> unknownIds = new ArrayList<>();
         for (Kind kind : kinds) {
             String icon = kind.icon();
             if (icon == null || icon.isEmpty() || catalogue.contains(icon)) {
                 continue;
             }
             keys.add(kind.id() + "=" + icon);
+            unknownIds.add(kind.id());
             if (named.size() < MAX_NAMED) {
                 ids.add(Rows.echo(kind.id()));
                 named.add("Kind " + Rows.echo(kind.id()) + " names icon " + Rows.echo(icon)
@@ -55,7 +59,8 @@ public record KindIcons(List<String> unknown, String note, String viewerNote, St
         String logNote = (n == 1 ? "Kind " : "Kinds ") + String.join(", ", ids)
             + (more > 0 ? " and " + more + " more" : "") + (n == 1 ? " names an icon" : " name icons")
             + " Map Studio does not have.";
-        return new KindIcons(List.copyOf(keys), note, viewerNote, logNote, String.join("\n", keys));
+        unknownIds.sort(null);
+        return new KindIcons(List.copyOf(keys), note, viewerNote, logNote, List.copyOf(unknownIds));
     }
 
     /** True when no kind names an unknown icon. */

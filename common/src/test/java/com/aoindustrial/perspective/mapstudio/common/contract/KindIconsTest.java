@@ -60,6 +60,10 @@ class KindIconsTest {
         assertEquals(k.key(), same.key());
         KindIcons other = KindIcons.check(kinds("[" + kind("a", "q9") + "]"), IconCatalogue.shipped());
         assertFalse(k.key().equals(other.key()));
+        KindIcons renamed = KindIcons.check(kinds("[" + kind("e", "x5") + "," + kind("d", "x4") + "," + kind("c", "x3")
+            + "," + kind("b", "x2") + "," + kind("a", "x1") + "]"), IconCatalogue.shipped());
+        assertEquals(k.key(), renamed.key(), "the key is the sorted kind ids, not the icon names or row order");
+        assertEquals(List.of("a", "b", "c", "d", "e"), k.key());
     }
 
     @Test
