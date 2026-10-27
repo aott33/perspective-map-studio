@@ -1,0 +1,39 @@
+# Epic 3 entries. Table order is build order; ids are permanent.
+# The epic is not refined yet (refined: false); its stories are planned when it is.
+# Entry 1 (owner-approved 2026-10-26, initiative R40) is held here ahead of refinement;
+# it cites initiative R40 until the epic has its own Requirements.
+# Entry 2 (owner-approved 2026-10-27, initiative R41) is held the same way and cites initiative R41.
+# Entry 3 (UX workshop, ux-map-studio, 2026-10-27, initiative R42 and R43) is held the same way and cites them.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Value-driven styles and area category tints drawn from live values"
+description = "Initiative R40 (owner, 2026-10-26; prd FR-38, FR-39; architecture AD-11, AD-16). Draws each map item's style rule from live values: the rule's source value arrives in the icon batch (AD-6), States, Bands or the expression pick a preset, and points, lines and areas draw it from the closed preset list in common/ (theme token plus glyph or word for attention, warning and fault; dimmed; solid, dashed, dotted and weight by pipe size for lines); alarm state draws over a value style, both over an area's category tint from the low-saturation palette; a stale source value draws only as stale, dropping the last value style until a fresh value arrives; per-item overrides apply. Ships the preview component the kind setup screen embeds, drawing every state or band in its preset before saving (the screen and its rule editing are epic-editing's, R15, R16), and the docs page of every preset and tint in both themes for the engineering review (ER-27), which is a hitl step."
+verify = "On the dev Gateway with seeded kind setups: a States rule and a Bands rule change an icon's and a line's look as the source tag changes, within one refresh interval; an active alarm draws over the value style; a stale source value drops the style and shows stale until a fresh value arrives; an area takes its category tint and a point never does; the preview shows every state in its preset; no colour literal is in the stored rules or the module's styles; the owner's engineering review of the presets and tints (ER-27) is recorded."
+covers = ["R40"]
+after = ["2.9"]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 2
+type = "story"
+title = "Instruments drawn on lines, the ordered line popup, segment click and the aggregate line style"
+description = "Initiative R41 (owner, 2026-10-27; prd FR-4, FR-5, FR-34, FR-38, FR-40; architecture AD-7, AD-11, AD-16, AD-19). Draws each instrument (tap, meter, line valve) as its kind's icon at its place on its line, from the stored attachment, and splits the line into line segments for display; a line's default popup lists its instruments in order along the line, between the map items its ends snap to, each with its live values and distance (for example CTB1 outlet, PT-1 at 1.1 km, PT-2 at 2.8 km, SWD1 inlet), plus the line's own KPIs and alarm summary, with the Gateway pushing every listed instrument's values while it is open; a click or tap on a line opens the popup at that segment (for example PT-1 to PT-2) with the instruments at its ends highlighted on the map and in the list, on desktop and as a bottom sheet at 390 px; an instrument's alarm glyph draws at its place on the line, the line's own alarms keeping the midpoint glyph; a line style rule with the instruments source draws each line segment from the worst of the instruments at the segment's ends (owner, 2026-10-27, as the template's map does): dashed when either end instrument is stale, otherwise the worse of their presets, alarm state still winning; the map item object of a line carries its ordered instruments and the open segment for custom popup views. The engineering review of instrument alarms and the aggregate look (ER-27) is a hitl step."
+verify = "On the dev Gateway with a seeded L-SWD-like line (PT-1 at 1,143 m, PT-2 at 2,841 m of 2,922 m, ends snapped to CTB1 and SWD1): the instruments draw at their places; the line popup lists CTB1 outlet, PT-1, PT-2, SWD1 inlet in order with live values that update while open; a click between PT-1 and PT-2 opens it at \"PT-1 to PT-2\" with both highlighted; an alarm on PT-2 draws at PT-2's place on the line; with the instruments style source, making PT-1 stale dashes the segments CTB1 to PT-1 and PT-1 to PT-2 only, and pushing PT-2 outside its band shows attention on PT-1 to PT-2 and PT-2 to SWD1 only, an active alarm drawing over both; the same at 390 px; the owner's engineering review (ER-27) is recorded."
+covers = ["R41"]
+after = ["2.14", 1]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Needs you summary and legend in View mode"
+description = "Initiative R42 and R43 (UX workshop, ux-map-studio, 2026-10-27; prd FR-41, FR-42; architecture AD-6, AD-11; EXPERIENCE.md Needs you bar, Legend, Responsive). View mode shows a Needs you summary counting map items in alarm, comms lost and stale, each with its glyph and word (for example Needs you 3: 1 alarm, 1 comms lost, 1 stale), from the same icon batch (AD-6, no extra subscription); a click or tap opens a list ranked alarms by priority, then comms lost, then stale, and choosing a row zooms to and selects the map item; with nothing to attend to it reads All OK in neutral and stays visible. A legend, collapsed to a button bottom-left and opened on request, names every glyph and line look the map draws in the map's own words and holds the Lines and Names toggles (FR-34). At 390 px Needs you and search share one top bar that expands on tap, and nothing sits in the bottom-right corner the App Bar toggle uses. The engineering review of the Needs you counts and the legend's glyph key (ER-27) is a hitl step."
+verify = "On the dev Gateway with seeded kind setups and the field simulator: one alarm, one comms-lost and one stale item read Needs you 3: 1 alarm, 1 comms lost, 1 stale within one refresh interval; the list ranks them in that order and a row zooms to and selects its item; clearing all three reads All OK in neutral; the legend opens and closes by click and keyboard and its Lines and Names toggles work; at 390 px the top bar holds search and Needs you and the bottom-right corner is clear; the owner's engineering review (ER-27) is recorded."
+covers = ["R42", "R43"]
+after = ["2.9"]
+hitl = true
+risk = "low"
