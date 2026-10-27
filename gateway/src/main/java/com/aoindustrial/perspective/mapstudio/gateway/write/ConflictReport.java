@@ -10,14 +10,15 @@ import com.inductiveautomation.ignition.common.gson.JsonArray;
 import com.aoindustrial.perspective.mapstudio.common.Messages;
 import com.aoindustrial.perspective.mapstudio.common.contract.Conflict;
 import com.aoindustrial.perspective.mapstudio.common.contract.EditOp;
-import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
+import com.aoindustrial.perspective.mapstudio.common.contract.StoredRecord;
 import com.aoindustrial.perspective.mapstudio.gateway.store.MapStore;
 
 /**
  * Collects every stale op of one batch (epic 2 story 2) and turns them into one
  * {@code conflict} refusal: the stored record of each, who changed it last and when,
- * and a plain-words message naming the map item, or the count when there are several.
+ * and a plain-words message naming the map item or kind setup, or the count when there
+ * are several.
  */
 final class ConflictReport {
 
@@ -25,7 +26,7 @@ final class ConflictReport {
     private final List<Boolean> exists = new ArrayList<>();
 
     /** Record a stale op; {@code current} is its stored record. */
-    void add(MapStore.Tx tx, String project, EditOp op, MapItemRecord current) throws SQLException {
+    void add(MapStore.Tx tx, String project, EditOp op, StoredRecord current) throws SQLException {
         Optional<MapStore.LastEdit> last = tx.lastEdit(project, op.entity(), op.id());
         conflicts.add(new Conflict(op.index(), op.entity(), op.id(), op.baseVersion(), current,
             last.map(MapStore.LastEdit::actor).orElse(null), last.map(MapStore.LastEdit::at).orElse(null)));
@@ -48,11 +49,15 @@ final class ConflictReport {
 
     String message() {
         if (conflicts.size() > 1) {
-            return conflicts.size() + " map items were changed by others since you loaded them."
+            long setups = conflicts.stream().filter(c -> EditOp.ENTITY_KIND_SETUP.equals(c.entity())).count();
+            String noun = setups == 0 ? "map items" : setups == conflicts.size() ? "kind setups"
+                : "map items and kind setups";
+            return conflicts.size() + " " + noun + " were changed by others since you loaded them."
                 + " Nothing in this save was written.";
         }
         Conflict c = conflicts.get(0);
-        String name = c.current() != null && !c.current().name().isBlank() ? c.current().name() : "Map item " + c.id();
+        String name = c.current() != null && !c.current().name().isBlank() ? c.current().name()
+            : EditOp.ENTITY_KIND_SETUP.equals(c.entity()) ? "The " + c.id() + " kind setup" : "Map item " + c.id();
         String who = c.changedBy() == null ? "" : " by " + c.changedBy()
             + (c.changedAt() == null ? "" : " at " + hhmm(c.changedAt()) + " UTC");
         if (exists.get(0)) {

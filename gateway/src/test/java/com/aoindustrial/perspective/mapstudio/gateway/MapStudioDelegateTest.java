@@ -229,4 +229,17 @@ class MapStudioDelegateTest {
         assertEquals(5, none.get("seq").getAsInt());
         assertEquals("mapeditor", body.get("actor").getAsString());
     }
+
+    @Test
+    void aViewerGetsKindSetupRecordsWithoutTheirTagPaths() {
+        JsonObject body = com.inductiveautomation.ignition.common.gson.JsonParser.parseString("{\"seq\":6,"
+            + "\"actor\":\"mapeditor\",\"ops\":[{\"op\":\"create\",\"entity\":\"kindSetup\",\"id\":\"pad\","
+            + "\"version\":1,\"record\":{\"kindId\":\"pad\",\"setup\":{\"comms\":{\"path\":\"{asset.path}/C\"}},"
+            + "\"version\":1,\"deleted\":false}}]}").getAsJsonObject();
+        JsonObject none = MapStudioDelegate.bodyFor(body, "none");
+        assertEquals("{\"kindId\":\"pad\",\"version\":1,\"deleted\":false}",
+            none.getAsJsonArray("ops").get(0).getAsJsonObject().get("record").toString());
+        assertEquals(true, body.getAsJsonArray("ops").get(0).getAsJsonObject().getAsJsonObject("record").has("setup"));
+        assertEquals(body, MapStudioDelegate.bodyFor(body, "full"));
+    }
 }

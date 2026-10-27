@@ -18,6 +18,7 @@ import com.inductiveautomation.ignition.common.gson.JsonNull;
 import com.inductiveautomation.ignition.common.gson.JsonObject;
 import com.inductiveautomation.ignition.common.gson.JsonParser;
 
+import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
 
 /**
@@ -29,6 +30,8 @@ public final class JdbcMapStore implements MapStore {
 
     static final String ITEM_COLUMNS =
         "id::text, kind, name, geometry, properties::text, asset_id, overrides::text, ends::text, version, deleted";
+
+    static final String KIND_SETUP_COLUMNS = "kind_id, setup::text, version, deleted";
 
     private final ConnectionSource connections;
 
@@ -237,6 +240,66 @@ public final class JdbcMapStore implements MapStore {
                 }
             }
             return items;
+        }
+
+        @Override
+        public Optional<KindSetupRecord> lockKindSetup(String project, String kindId) throws SQLException {
+            try (PreparedStatement ps = c.prepareStatement("SELECT " + KIND_SETUP_COLUMNS
+                    + " FROM mapstudio_kind_setup WHERE project = ? AND kind_id = ? FOR UPDATE")) {
+                ps.setString(1, project);
+                ps.setString(2, kindId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? Optional.of(kindSetup(rs)) : Optional.empty();
+                }
+            }
+        }
+
+        @Override
+        public void insertKindSetup(String project, KindSetupRecord setup) throws SQLException {
+            try (PreparedStatement ps = c.prepareStatement("INSERT INTO mapstudio_kind_setup (project, kind_id, setup, "
+                    + "version, deleted, updated_at) VALUES (?, ?, ?::jsonb, ?, ?, now())")) {
+                ps.setString(1, project);
+                ps.setString(2, setup.kindId());
+                ps.setString(3, setup.setup().toString());
+                ps.setInt(4, setup.version());
+                ps.setBoolean(5, setup.deleted());
+                ps.executeUpdate();
+            }
+        }
+
+        @Override
+        public void updateKindSetup(String project, KindSetupRecord setup) throws SQLException {
+            try (PreparedStatement ps = c.prepareStatement("UPDATE mapstudio_kind_setup SET setup = ?::jsonb, "
+                    + "version = ?, deleted = ?, updated_at = now() WHERE project = ? AND kind_id = ?")) {
+                ps.setString(1, setup.setup().toString());
+                ps.setInt(2, setup.version());
+                ps.setBoolean(3, setup.deleted());
+                ps.setString(4, project);
+                ps.setString(5, setup.kindId());
+                if (ps.executeUpdate() != 1) {
+                    throw new SQLException("mapstudio_kind_setup row " + setup.kindId() + " was not updated");
+                }
+            }
+        }
+
+        @Override
+        public List<KindSetupRecord> liveKindSetups(String project) throws SQLException {
+            List<KindSetupRecord> setups = new ArrayList<>();
+            try (PreparedStatement ps = c.prepareStatement("SELECT " + KIND_SETUP_COLUMNS
+                    + " FROM mapstudio_kind_setup WHERE project = ? AND NOT deleted ORDER BY kind_id")) {
+                ps.setString(1, project);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        setups.add(kindSetup(rs));
+                    }
+                }
+            }
+            return setups;
+        }
+
+        private static KindSetupRecord kindSetup(ResultSet rs) throws SQLException {
+            return new KindSetupRecord(rs.getString(1), JsonParser.parseString(rs.getString(2)).getAsJsonObject(),
+                rs.getInt(3), rs.getBoolean(4));
         }
 
         private static MapItemRecord item(ResultSet rs) throws SQLException {

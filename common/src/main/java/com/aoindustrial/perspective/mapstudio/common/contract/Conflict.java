@@ -6,11 +6,12 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
 /**
  * One stale op of a refused batch, as the {@code conflict} error body lists it
  * (epic 2 story 2): {@code {index, entity, id, baseVersion, current, changedBy, changedAt}}.
- * {@code current} is the stored record (a deleted one shows {@code deleted: true});
+ * {@code current} is the stored record, a map item or a kind setup (a deleted one shows
+ * {@code deleted: true});
  * {@code changedBy} and {@code changedAt} (ISO 8601, UTC) come from the item's last
  * edit record, null when it has none.
  */
-public record Conflict(int index, String entity, String id, int baseVersion, MapItemRecord current,
+public record Conflict(int index, String entity, String id, int baseVersion, StoredRecord current,
                        String changedBy, String changedAt) {
 
     public JsonObject toJson() {

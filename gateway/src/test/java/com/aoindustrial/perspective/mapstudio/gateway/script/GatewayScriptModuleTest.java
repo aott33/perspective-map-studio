@@ -25,6 +25,7 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.StoreState;
 import com.aoindustrial.perspective.mapstudio.gateway.write.FakeMapStore;
 import com.aoindustrial.perspective.mapstudio.gateway.write.NoChangeHook;
 import com.aoindustrial.perspective.mapstudio.gateway.write.WriteService;
+import com.aoindustrial.perspective.mapstudio.gateway.adapter.TestKinds;
 
 /** Epic 2 story 6: system.mapstudio reads the setup on every call, so a scanned change applies with no restart. */
 class GatewayScriptModuleTest {
@@ -45,7 +46,7 @@ class GatewayScriptModuleTest {
         setups = new SetupRegistry(s -> { });
         setups.put(P, setup("MapStudio"));
         StoreGate gate = new StoreGate(setups, c -> StoreState.ready());
-        module = new GatewayScriptModule(new WriteService(gate, store, new NoChangeHook()),
+        module = new GatewayScriptModule(new WriteService(gate, store, new NoChangeHook(), TestKinds::snapshot),
             new MapLoader(gate, store, NoAdapters::snapshot), NoAdapters.service(setups));
     }
 
@@ -77,5 +78,19 @@ class GatewayScriptModuleTest {
         setups.put(P, setup("MapStudio"), "resource modified");
         module.getMapImpl(P);
         assertEquals("MapStudio", store.lastConnection);
+    }
+
+    @Test
+    void getMapAnswersKindSetups() {
+        module.applyEditsImpl(P, TypeUtilities.gsonToPy(JsonParser.parseString("{\"batchId\":\"" + UUID.randomUUID()
+            + "\",\"ops\":[{\"op\":\"create\",\"entity\":\"kindSetup\",\"id\":\"pad\",\"baseVersion\":0,"
+            + "\"data\":{\"setup\":{\"comms\":{\"path\":\"{asset.path}/Comms\"}}}}]}")), "seed-script");
+        PyObject map = module.getMapImpl(P);
+        PyObject setups = map.__getattr__("kindSetups");
+        assertEquals(1, setups.__len__());
+        assertEquals(JsonParser.parseString("{\"kindId\":\"pad\",\"setup\":{\"comms\":{\"path\":"
+            + "\"{asset.path}/Comms\"}},\"version\":1,\"deleted\":false}"),
+            TypeUtilities.pyToGson(setups.__getitem__(0)));
+        assertEquals(0, map.__len__(), "still the list of map items");
     }
 }
