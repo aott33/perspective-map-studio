@@ -17,7 +17,7 @@ How Map Studio works: one Perspective component that is the operator's map in Vi
 
 ## Foundation
 
-- **Spines win.** `DESIGN.md` and this file win on any conflict with a mock, screenshot or import in `mockups/`, `.working/` or `imports/`. Known places where the mocks differ and the spines are right: the properties panel has two tabs, Details and Style (the mocks show a third, Link); the list's filter chips sit behind a Filter button (the mocks show them open); Layers offers None, OpenStreetMap and Satellite only (the mocks show Blank, Show toggles and reference layers); the Kinds section order puts Style rule last (the earlier Direction A mock puts it second).
+- **Spines win.** `DESIGN.md` and this file win on any conflict with a mock, screenshot or import in `mockups/`, `.working/` or `imports/`. Known places where the mocks differ and the spines are right: the properties panel has two tabs, Details and Style (the mocks show a third, Link); the list's filter chips sit behind a Filter button (the mocks show them open); Layers offers None, OpenStreetMap and Satellite only (the mocks show Blank, Show toggles and reference layers); the Kinds section order puts Style rule last (the earlier Direction A mock puts it second); the Kinds preview item sits in the kind's header and every tag path has its own tag button (the earlier Direction A mock shows a Browse tags button and the preview item in the style rule).
 - **Host.** A Map Studio component inside an Ignition 8.3 Perspective page, under the project's own header, with the Perspective App Bar. The **bottom-right corner is reserved** for the App Bar toggle at every width: no control, toast, sheet edge or footer button goes there (`{spacing.app-bar-clearance}`).
 - **UI system.** None of its own. Colours, font and light or dark come from the host project's Perspective theme; Map Studio ships no colour (AD-11). In the ign-scada-template host, state tokens resolve to its `--st-*` set.
 - **Form factors.**
@@ -46,7 +46,7 @@ Two modes on one component. **No Publish step** (owner, confirmed): every finish
 | Properties panel (Details, Style) | Edit | Select an item on the map or in the list | Edit one item |
 | Bulk form | Edit | Select several items | Shared fields, Mixed values |
 | Kinds | Edit | Rail, Kinds | Set up each kind the project defines |
-| Tag browser | Edit | Kinds, Browse tags | Pick a tag on an example asset; saved as a relative path |
+| Tag browser | Edit (full editing role) | The tag button on any tag path: Kinds (key values, comms, alarms, style rule value, popup params) and an item's override in Details | Pick a tag from one provider's tree; in a kind's setup it opens at the preview item's asset folder |
 | Layers | Edit | Rail, Layers | Basemap switch only: None, OpenStreetMap, Satellite |
 | Import | Edit | Rail, Import | Guided import, CSV templates, export [ASSUMPTION: export lives here, as in the mock] |
 | Recent changes | Edit | Save status | The edit record with Revert per change |
@@ -85,6 +85,9 @@ Plain words a pumper or an admin reads at a glance. States are nouns, actions ar
 | "Not linked. Pick an asset to show live values." | "No data" |
 | "PT-1 to PT-2" for a line segment | Internal ids |
 | "Preview - not on the map yet" / "Nothing changes until you import." | Changing the map before the user confirms |
+| "Same tag for every well pad" | "Absolute path" / "Not asset-relative" |
+| "Resolves for 3 of 3 well pads" | "Validation passed" |
+| "Can't browse edge-p12 - the Gateway cannot reach this tag provider right now." | "Browse failed" |
 
 No em dashes in any label or message: use " - ". Ellipsis only on progress ("Saving...").
 
@@ -118,8 +121,8 @@ Behavioural rules. Visual specs are in `DESIGN.md`, Components.
 | Needs you bar | View mode | Count of sites in alarm, comms lost or stale, with a glyph per state. Click lists them, ranked: alarms by priority, then comms lost, then stale; click a row zooms to and selects the site. With nothing to attend to it stays and reads **"All OK"** in neutral. |
 | Search | View mode top-left (always visible); Items list | Search by name or asset as you type, results with kind; choosing zooms and selects (lines and areas fitted). Works keyboard only and at 390 px (FR-33). |
 | Legend | View mode bottom-left | Collapsed to a button; opens on request. Holds the Lines and Names toggles and the zoom 14 note. |
-| Kind setup | Kinds | Lists only the kinds the project defines (read-only list from the host adapter, AD-4/AD-16); no adding kinds. Sections in order: **Icon, Key values, Comms, Alarms, Popup, Style rule** (last, it builds on the key values). Each key value has an on/off switch that sets what the popup shows; one key value is the icon value. Comms takes one heartbeat path, the clock for data age, Stale and Comms lost. Alarms takes the alarm source and the View alarms link. The popup order is fixed: comms, values, alarms. Each path reports how many items it resolves for. Style rule: States, Bands or Expression on a key value; each state maps to a preset with its preview tile. A **live preview** uses an item the editor chooses, shown on the map too with a "Preview" word; the note says what the preview item shows now and when its alarm wins over the rule. |
-| Tag browser | Kinds, Browse tags | Shows one example asset's tags (the asset is selectable); picking a tag shows the full path and the path relative to the asset that will be saved, and how many items it resolves for; "Use this path" or Cancel. Typed paths still work. |
+| Kind setup | Kinds | Lists only the kinds the project defines (read-only list from the host adapter, AD-4/AD-16); no adding kinds. Sections in order: **Icon, Key values, Comms, Alarms, Popup, Style rule** (last, it builds on the key values). Each key value has an on/off switch that sets what the popup shows; one key value is the icon value. Comms takes one heartbeat path, the clock for data age, Stale and Comms lost. Alarms takes the alarm source and the View alarms link. The popup order is fixed: comms, values, alarms. Each path reports how many items it resolves for. Style rule: States, Bands or Expression on a key value; each state maps to a preset with its preview tile. The **preview item** is chosen once, in the kind's header: the tag browser opens at its asset folder and the style rule previews on it, on the map too with a "Preview" word; the note says what the preview item shows now and when its alarm wins over the rule. Every tag path has a tag button that opens the tag browser. |
+| Tag browser | Every tag pick (owner, 2026-10-27) | One browser for every tag pick: key values, comms path, alarms path, a style rule's value, popup params, and a path on one item's override. Shown only to the full editing role; the Gateway refuses anyone else (`tags.browse`, AD-8). A **Provider** dropdown lists the Gateway's tag providers, the default marked "Default" and selected first; the tree shows that one provider, navigated by expanding folders and UDT instances, each row with name, type and data type. **In a kind's setup** it opens at the preview item's asset folder (for example `[default]Mesa/P14`), expanded, with the folder marked "Asset folder"; the editor can go up and out of it, into any folder or any provider, and a "P14 folder" button returns there. **A pick inside the asset folder** is saved as `{asset.path}/...` and shows "Resolves for N of M well pads" (M counts the kind's items with a base path; `tags.resolve`). **A pick outside it** is saved as the full path with the warning "Same tag for every well pad", which also stays on the key value row; it is allowed. **On one item's override** every pick is saved as the full path, with no conversion, marked Override with Reset [ASSUMPTION: it opens at that item's own asset folder]. **Popup params**: a tag picked inside the asset folder for a custom popup view's param gives `{asset.path}/<suffix>`, the one param form beside a literal and one placeholder (owner, 2026-10-27); outside it, the full path as a literal. **Typed paths** go in the Path field and are converted the same way. "Use this tag" (or "Use for P14") is inert until a tag is picked; Cancel or Esc changes nothing. A folder is not a pick. |
 | Import steps | Import | Drop CSV, KML or GeoJSON ("You see a preview first. Nothing changes until you add."); then guided steps. **1 Preview**: map plus table, rows drawn as preview rings on the map, rows with problems flagged with the reason ("No location", "repeats row 40") and left for step 3. **2 Map columns**: pick the kind for the file when it has no kind column; each column goes to a field or "Do not import"; columns are matched by heading first; name and location are required. **3 Match to assets**: confident matches ticked, doubtful flagged with the reason ("Letter O, not zero", "Name differs"), existing items update in place, rows that cannot import are skipped with the reason; tick a flagged row to accept it or pick another asset; unmatched rows import unlinked. **4 Summary**: new, updated, skipped, the matches you confirmed, how many stay unlinked, and the undo step; then **Import 123 items**. Back at any step; Cancel at any step changes nothing. An import undoes as one step. CSV template per kind downloads here. |
 | First-run checklist | Empty map, Edit mode | The only first-run aid (FR-36's tour is dropped). Card "Get Mesa on the map": "Set up your kinds" (Open Kinds), "Add or import items" (Import a file), "Check the operator view" (Open view mode); each opens its surface and ticks as done; the footer counts "0 of 3 done" and offers "Hide checklist". A viewer on an empty map sees the empty map and a short note. |
 | Phone crosshair | Phone Move | A card names the item and the distance from where it was; the old place stays as a faded "Was here" marker; the map moves under a fixed centre crosshair; Done saves the point there and returns to the edit sheet with an Undo toast; Cancel leaves it and returns to the edit sheet. |
@@ -162,6 +165,13 @@ See [key-screen-9-save-states-saved.png](mockups/key-screen-9-save-states-saved.
 | Empty map, viewer | View mode | Empty map and a short note. |
 | No asset list or incomplete | Item form, Kinds | Says where the asset list comes from and that it is empty or incomplete (FR-10). |
 | Path does not resolve | Kinds | Per path "Resolves for N of M items", listing the items it fails for. |
+| Tag browser: opened | Kinds, item override | Opens at the preview item's asset folder (on an override, at that item's) with its tags listed and a note: "Opened at P14's asset folder, the preview item. A tag in it is saved for every well pad as {asset.path}/.... Go up to pick a tag anywhere else." See [key-screen-6-kinds-tags-open.png](mockups/key-screen-6-kinds-tags-open.png). |
+| Tag browser: pick inside | Tag browser | `{asset.path}/GasRate` and "Resolves for 3 of 3 well pads" with a check. See [key-screen-6-kinds-tags-inside.png](mockups/key-screen-6-kinds-tags-inside.png). |
+| Tag browser: pick outside | Tag browser, key value row | The full path with the shared-tag note on `{colors.warning-tint}`: "Same tag for every well pad - AmbientTemp is outside P14's asset folder, so it is saved as the full path and all 3 well pads show this one tag." The key value row keeps the "Same tag for every well pad" tag. See [key-screen-6-kinds-tags-outside.png](mockups/key-screen-6-kinds-tags-outside.png). |
+| Tag browser: item override | Items, Details | "Saved for P14 only, as the full path"; the row in Live now shows the full path and Override with Reset; the other items keep the kind's path. See [key-screen-6-kinds-tags-override.png](mockups/key-screen-6-kinds-tags-override.png). |
+| Tag browser: empty folder | Tag browser | "No tags in this folder" under it; a folder picked shows "Pick a tag, not a folder." and "Use this tag" stays inert. See [key-screen-6-kinds-tags-empty.png](mockups/key-screen-6-kinds-tags-empty.png). |
+| Tag browser: loading | Tag browser | A "Loading..." row with the spinner under the folder being opened; the rest of the tree stays usable. See [key-screen-6-kinds-tags-loading.png](mockups/key-screen-6-kinds-tags-loading.png). |
+| Tag browser: provider unreachable | Tag browser | The tree is replaced by "Can't browse edge-p12" (cloud glyph, `{colors.warning}`), "The Gateway cannot reach this tag provider right now. Try again, pick another provider, or type the path below." and "Try again"; the Path field still works and typed paths are converted as usual. See [key-screen-6-kinds-tags-unreachable.png](mockups/key-screen-6-kinds-tags-unreachable.png). |
 | Busy (loading) | Map, list, import preview | [ASSUMPTION] the save-status spinner pattern on the busy surface; no skeletons specified yet. |
 | No search results | Search | "No matches" [ASSUMPTION: wording]. |
 | Nothing needs you | Needs you bar | "All OK" in neutral; the bar stays. |
@@ -197,6 +207,7 @@ Behavioural. Visual contrast lives in `DESIGN.md` (3:1 non-text in both themes).
 - The current mode is always named in words (FR-8).
 - Selection uses `{colors.selection}`, distinct from every state hue.
 - [ASSUMPTION] Glyphs carry text alternatives matching their legend words ("Priority 1 alarm, unacknowledged", "Comms lost").
+- [ASSUMPTION] The tag browser's tree works keyboard only, as a tree: Up and Down move, Right expands, Left collapses or goes to the parent, Enter picks a tag; the shared-tag warning and the resolve count are words, never colour alone.
 
 ## Responsive & Platform
 
@@ -271,13 +282,13 @@ Jordan, integrator, laptop, Map Studio opened straight into Edit mode on an empt
 1. In Import, Jordan downloads the meter CSV template and fills it.
 2. Jordan drops the GIS export: Preview shows the features on the map and in a table, with rows that have problems flagged and their reasons. Jordan maps columns to fields.
 3. Match to assets: most rows are ticked by name; doubtful ones are flagged; Jordan fixes those one by one. Summary: new, updated, skipped. Import. The same for the CSV.
-4. In Kinds, Jordan opens Well pad: picks the icon, sets key values from the tag browser on an example pad, sets the comms heartbeat, the alarms path, the popup parts and the link `/pad/{asset.id}`, and last a style rule; the preview pad shows each state.
+4. In Kinds, Jordan opens Well pad, leaves P14 as the preview item and picks the icon; each key value's tag button opens the tag browser at P14's asset folder, and a pick there is saved as `{asset.path}/...` with "Resolves for 3 of 3 well pads"; Jordan sets the comms heartbeat, the alarms path, the popup parts and the link `/pad/{asset.id}`, and last a style rule; the preview pad shows each state.
 5. Back in Items, Jordan box-selects twenty pads on one route; the bulk form shows shared fields, Operator reads "Mixed - 3 values"; Jordan picks one. The toast says "Undo: edit 20 pads".
 6. **Climax:** every pad on the map shows comms, pressure and its alarm count, all from one kind setup.
 
 Failure: rows with no matching asset stay on the map as Unlinked, and the list footer counts them until they are matched or deleted. The whole import undoes as one step.
 
-See [key-screen-7-import-1.png](mockups/key-screen-7-import-1.png) to [key-screen-7-import-4.png](mockups/key-screen-7-import-4.png), [key-screen-6-kinds-tags.png](mockups/key-screen-6-kinds-tags.png), [key-screen-5-bulk-edit.png](mockups/key-screen-5-bulk-edit.png).
+See [key-screen-7-import-1.png](mockups/key-screen-7-import-1.png) to [key-screen-7-import-4.png](mockups/key-screen-7-import-4.png), [key-screen-6-kinds-tags-inside.png](mockups/key-screen-6-kinds-tags-inside.png), [key-screen-5-bulk-edit.png](mockups/key-screen-5-bulk-edit.png).
 
 ### UJ-4. Alex fixes a pin from the field.
 
@@ -309,7 +320,7 @@ Failure: CTB1's comms are lost: the icon has a dashed ring and "Comms lost", the
 
 1. **Alarm hue tokens.** Which host Perspective theme variables carry priority 1, 2 and 3 (epic-viewing's call; the mocks used `--error` for priority 1)?
 2. **Area tint palette.** Which theme tokens make the FR-39 palette?
-3. **Kinds tag browser.** Needs a Gateway tag-browse lookup (new need, unverified).
+3. **Kinds tag browser.** The design is settled (owner, 2026-10-27); the Gateway's 8.3 tag browse of any provider (`tags.browse`, `tags.resolve`, AD-8) stays unverified until epic-map-store-and-data entry 15 checks it live. Open to the owner: where the browser opens on one item's override (assumed: that item's own asset folder), and whether the shared-tag note may use the `warning` token (assumed yes; DESIGN.md Colors).
 4. **Style rule Expression.** Where it is evaluated and in which language (PRD FR-38, AD-16).
 5. **Legend.** Resolved: Sofia added it as PRD FR-41 (initiative R42, epic-viewing entry 3.3) on 2026-10-27.
 6. **Instrument tool placement** on the draw toolbar and the instrument marker look (the key-screens mock frames the line valve in a rounded square, which the reserved-shapes rule does not allow).

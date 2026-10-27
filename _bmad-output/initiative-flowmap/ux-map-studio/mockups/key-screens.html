@@ -16,7 +16,10 @@
     3 instruments on lines (owner, 2026-10-27): per segment, worst of its two end instruments
     4 edit: rail, list, properties (Details / Style / Link), draw toolbar, Snap off, Undo / Redo, Recent changes
     5 bulk: shared fields only, Mixed, one undo step
-    6 kinds: order Icon, Key values, Comms, Alarms, Popup, Style rule; tag browser; preview item
+    6 kinds: order Icon, Key values, Comms, Alarms, Popup, Style rule; preview item in the kind header;
+      tag browser (owner, 2026-10-27, refined): provider dropdown, tree opened at the preview item's
+      asset folder, inside pick saved as {asset.path}/..., outside pick saved full with "Same tag for
+      every <kind>", item override saved full; empty folder, loading, provider unreachable
     7 import: four guided steps, one undo step
     8 first run checklist
     9 save states: Saved, Saving..., conflict, store unreachable, busy
@@ -250,11 +253,31 @@ body.bare .frame{border-radius:0;box-shadow:none}
 .sheet .btn{height:44px}
 .phapp{position:absolute;right:0;bottom:0;width:64px;height:30px;background:var(--neutral-80);color:var(--neutral-10);border-top-left-radius:8px;display:flex;align-items:center;justify-content:center;gap:4px;font-size:11px;z-index:40}
 .cross{position:absolute;left:50%;top:50%;width:64px;height:64px;transform:translate(-50%,-50%);z-index:8;pointer-events:none}
-/* kinds tag browser */
-.tagpop{position:absolute;left:10px;top:150px;width:330px;z-index:20;padding:0 0 4px}
-.tree{padding:4px 8px;font-family:ui-monospace,monospace;font-size:12px}
-.tree div{padding:4px 8px;border-radius:5px;display:flex;align-items:center;gap:6px}
-.tree .on{background:var(--cta-tint);box-shadow:inset 3px 0 0 var(--callToAction)}
+/* kinds tag browser (refined 2026-10-27): provider dropdown, one provider's tree, asset folder marked */
+.tagpop{position:absolute;left:10px;top:104px;width:380px;z-index:20;padding:0 0 4px}
+.tagpop .tph{display:flex;align-items:center;padding:10px 8px 4px 14px}
+.tagpop .for{font-size:11px;color:var(--neutral-70);padding:0 14px 8px}
+.tree{margin:6px 8px 0;padding:4px 0;border:1px solid var(--neutral-30);border-radius:6px;font-size:12px;max-height:268px;overflow:hidden}
+.tree .tr2{display:grid;grid-template-columns:1fr 66px 50px;align-items:center;gap:6px;height:24px;padding-right:8px;border-radius:4px}
+.tree .tr2 .nm{display:flex;align-items:center;gap:5px;font-family:ui-monospace,monospace;white-space:nowrap;overflow:hidden}
+.tree .tr2 .ty,.tree .tr2 .dt{font-size:11px;color:var(--neutral-70);white-space:nowrap}
+.tree .tr2 .dt{text-align:right}
+.tree .tr2.fd .nm{color:var(--neutral-80)}
+.tree .tr2.in{box-shadow:inset 2px 0 0 var(--neutral-40)}
+.tree .tr2.on{background:var(--cta-tint);box-shadow:inset 3px 0 0 var(--callToAction)}
+.tree .tr2 .tag{font-family:system-ui,sans-serif;font-size:10px;padding:0 5px}
+.tree .msg{display:flex;align-items:center;gap:6px;height:24px;color:var(--neutral-70);font-size:11px;font-style:italic}
+.tree .fail{padding:18px 14px;text-align:left}
+.tree .fail h5{margin:0 0 4px;font-size:13px;color:var(--warning);display:flex;gap:6px;align-items:center}
+.tree .fail p{margin:0 0 8px;font-size:12px;color:var(--neutral-80)}
+.picked{margin:8px 14px 0;padding:8px 10px;border-radius:6px;background:var(--neutral-20);font-size:12px}
+.picked.warn{background:var(--warn-tint);border-left:3px solid var(--warning)}
+.picked .wt{display:flex;gap:6px;align-items:center;color:var(--warning);font-weight:600;margin-bottom:2px}
+.picked .mono{font-weight:600}
+.btn.off{opacity:.45;pointer-events:none}
+.kvp{display:flex;align-items:center;gap:2px}
+.kvp .ibtn{width:24px;height:24px}
+.kvrow.act{background:var(--cta-tint);box-shadow:inset 3px 0 0 var(--callToAction);margin:0 -16px;padding:5px 16px}
 /* import */
 .steps{display:flex;gap:4px;margin-top:10px}
 .steps span{flex:1;font-size:11px;color:var(--neutral-70);border-top:3px solid var(--neutral-30);padding-top:5px}
@@ -320,7 +343,10 @@ var P = {
   'popout':'<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
   'sort':'<path d="M7 4v16M3 16l4 4 4-4"/><path d="M14 6h7M14 12h5M14 18h3"/>',
   'box':'<rect x="3" y="3" width="15" height="15" rx="1" stroke-dasharray="3 3"/><path d="M14 14l7 7"/><path d="M21 15v6h-6"/>',
-  'fit':'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'
+  'fit':'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  'folder':'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  'inst':'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16"/><path d="M9 9v11"/>',
+  'up':'<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>'
 };
 var F = { /* filled alarm glyphs */
   'a1u':'<path fill-rule="evenodd" d="M12 2.5l10 18h-20z M7.5 12.5h2.5l3.5 -3v9.5l-3.5 -3h-2.5z M15 12.5h1.5v4h-1.5z"/>',
@@ -615,7 +641,7 @@ function detailsBody(it){
       if(it.wells)h+='<div class="field"><label>Wells on pad</label><div class="chips"><span class="tag">'+ic('wellhead',12)+it.wells+'</span></div></div>';
       if(!it.isNew)h+='<div class="field" style="margin:0"><label>Access road note</label><div class="input val small">'+(it.id==='P14'?'Gate code at CR 748 turn-off':'Lease Rd 3')+'</div></div>';
       h+='</div>';
-      if(!it.isNew)h+='<div class="sect"><h4>Live now <span class="tag">From kind</span></h4><div class="kv"><span class="k">Comms</span><span style="display:flex;gap:4px;align-items:center">'+(it.lost?ic('comms-lost',14):'')+it.comms+'</span></div><div class="kv"><span class="k">'+it.kvn+' '+ic('star',12)+'</span><b style="display:flex;gap:4px;align-items:center">'+(it.stale?ic('stale',14)+'Stale - ':'')+it.kv+'</b></div>'+
+      if(!it.isNew)h+='<div class="sect"><h4>Live now <span class="tag">From kind</span></h4><div class="kv"><span class="k">Comms</span><span style="display:flex;gap:4px;align-items:center">'+(it.lost?ic('comms-lost',14):'')+it.comms+'</span></div>'+(S.tagPop&&S.tagState==='override'&&it.id==='P14'?'<div class="kv kvrow act"><div style="min-width:0"><div style="display:flex;gap:4px;align-items:center">'+it.kvn+' '+ic('star',12)+'<span class="tag ovr">Override</span></div><div class="tiny muted mono" style="font-size:11px">[default]Mesa/P14/P14-2H/CasingPressure</div></div><span class="kvp"><b>'+it.kv+'</b><button class="ibtn" data-act="tagpop" title="Browse tags">'+ic('tag',14)+'</button></span></div>':'<div class="kv"><span class="k">'+it.kvn+' '+ic('star',12)+'</span><b style="display:flex;gap:4px;align-items:center">'+(it.stale?ic('stale',14)+'Stale - ':'')+it.kv+'</b></div>')+
         (it.alarm?'<div class="kv"><span class="k">Alarms</span><span class="st a1">'+fi('a1u',14)+'1 - '+it.alarm.text+'</span></div>':'<div class="kv"><span class="k">Alarms</span><span class="muted">None</span></div>')+'</div>';
     }else if(it.kind==='geo'){
       h+='<div class="field" style="margin:0"><label>Area</label><div class="input val">'+it.area+' - 5 points</div></div></div>';
@@ -694,7 +720,9 @@ function pvState(cls,word){
   return '<span class="pv '+cls+'"><span class="disc">'+ic('well-pad',19)+'</span><span class="tiny" style="font-weight:600">P12'+(word?' <span class="tag" style="font-size:10px;padding:0 4px">'+word+'</span>':'')+'</span></span>';
 }
 function kindHead(back){
-  return '<div class="ph">'+(back?'<button class="btn ghost sm" style="margin:-4px 0 6px -8px" data-act="back">'+ic('back',16)+'All kinds</button>':'')+'<div class="row"><span>'+ic('well-pad',22)+'</span><div style="flex:1"><h3>Well pad</h3><div class="small muted">Point - applies to 3 items - 1 override (P14 label)</div></div></div></div>';
+  return '<div class="ph">'+(back?'<button class="btn ghost sm" style="margin:-4px 0 6px -8px" data-act="back">'+ic('back',16)+'All kinds</button>':'')+'<div class="row"><span>'+ic('well-pad',22)+'</span><div style="flex:1"><h3>Well pad</h3><div class="small muted">Point - applies to 3 items - 1 override (P14 label)</div></div></div>'+
+   '<div style="display:flex;align-items:center;gap:8px;margin-top:8px"><span class="small muted" style="white-space:nowrap">Preview item</span><span class="sel-like" style="flex:1">'+ic('well-pad',14)+'P14 <span class="muted mono" style="font-size:11px">[default]Mesa/P14</span><span style="margin-left:auto">'+ic('chev',14)+'</span></span></div>'+
+   '<div class="tiny muted" style="margin-top:4px">Tag browser opens at its asset folder; the style rule previews on it, on the map too.</div></div>';
 }
 function kindBody(){
   var h='<div class="sect"><h4>Icon</h4><div style="display:flex;gap:8px">';
@@ -756,9 +784,9 @@ var SCREENS=[
   {n:5,key:'bulk-edit',name:'Bulk edit',dev:'desk',subs:[['20','20 pads']],
    cap:'Example at scale: 20 well pads picked with the box tool. The form shows only the fields they share; values that differ read Mixed; Route was just set on all 20, and the toast offers "Undo: edit 20 pads" as one step.',
    gov:'Memlog: bulk selection in list and on map; shared fields only, Mixed; a bulk change undoes as one step.'},
-  {n:6,key:'kinds',name:'Kinds',dev:'desk',subs:[['tags','Key values and tag browser'],['style','Style rule and preview']],
-   cap:'Well pad setup in the decided order: Icon, Key values, Comms, Alarms, Popup, then Style rule last. The tag browser shows one example asset\'s tags and turns the pick into a path relative to the asset. The style rule previews on the item the editor picks (P14), on the map too.',
-   gov:'Memlog: Kinds screen sets up existing kinds only; tag browser with relative paths (needs a Gateway tag-browse lookup, unverified); preview item chosen by the editor; section order.'},
+  {n:6,key:'kinds',name:'Kinds',dev:'desk',subs:[['open','Tags: opens at asset folder'],['inside','Pick inside'],['outside','Pick outside'],['override','Item override'],['empty','Empty folder'],['loading','Loading'],['unreachable','Provider unreachable'],['style','Style rule and preview']],
+   cap:'Well pad setup in the decided order: Icon, Key values, Comms, Alarms, Popup, then Style rule last; the preview item (P14) sits in the kind header. Every tag pick opens one tag browser: a provider dropdown (the Gateway default marked and first) over that provider\'s tree, opened at the preview item\'s asset folder. A pick inside it is saved as {asset.path}/... with "Resolves for N of M"; a pick outside is saved as the full path with "Same tag for every well pad"; on one item\'s override every pick is saved as the full path. Typed paths work the same way.',
+   gov:'Owner decisions 2026-10-27 (initiative R15, PRD FR-12 and FR-37, architecture AD-8 tags.browse and tags.resolve): tag browser for every pick, full editing role only; Kinds sets up existing kinds only; preview item chosen by the editor; section order.'},
   {n:7,key:'import',name:'Import',dev:'desk',subs:[['1','1 Preview'],['2','2 Columns'],['3','3 Match'],['4','4 Summary']],
    cap:'Guided import of a 125-row CSV (example at scale): preview on the map plus a table, map columns to fields, match rows to assets (confident matches ticked, doubtful flagged), summary 120 new, 3 updated, 2 skipped, then Import. An import undoes as one step.',
    gov:'Memlog: guided import steps; an import undoes as one step. FR-22 to FR-25.'},
@@ -780,7 +808,7 @@ function preset(n,v){
   if(n===3){S.edit=false;S.lineStale=v==='stale';S.linePop=true;S.zoom=16;}
   if(n===4){S.recent=true;}
   if(n===5){S.bulk20=true;S.multi=['P12','P14','P21'];S.bulkSet=true;S.toast=true;S.toastMsg='Route set on 20 well pads';S.toastUndo='Undo: edit 20 pads';S.undoLbl='Undo: edit 20 pads';}
-  if(n===6){S.rail='kinds';S.preview='P14';S.tagPop=v==='tags';}
+  if(n===6){S.rail='kinds';S.preview='P14';S.tagPop=v!=='style';S.tagState=v;if(v==='override'){S.rail='items';S.sel='P14';S.tab='details';}}
   if(n===7){S.rail='import';S.step=+v;S.importPrev=true;S.sel=null;}
   if(n===8){S.empty=true;S.sel=null;}
   if(n===9){S.save=v;S.conflictOpen=v==='conflict';}
@@ -898,7 +926,7 @@ function saveCards(){
 }
 function studio(){
   var lw=256,pw=320,h=railEl(false),list='',props='',extraMap='';
-  if(S.rail==='items'){list=headA()+'<div class="pbody">'+(S.empty?emptyList():listBody())+'</div>'+listFoot();props=S.empty?'':propsFor(false,true);}
+  if(S.rail==='items'){list=headA()+'<div class="pbody">'+(S.empty?emptyList():listBody())+'</div>'+listFoot();props=S.empty?'':propsFor(false,true);if(S.tagPop&&S.tagState==='override')extraMap+=tagPop();}
   else if(S.rail==='kinds'){list=headA()+'<div class="pbody">'+kindsList()+'</div>';props=kindHead(false)+'<div class="pbody" id="kbody">'+kindBody6()+'</div>';if(S.tagPop)extraMap+=tagPop();}
   else if(S.rail==='import'){return h+'<div class="panel" style="width:'+(lw+pw)+'px">'+importPanel()+'</div><div class="map">'+mapWorld(0)+topRight(false)+importChip()+'</div>';}
   h+='<div class="panel" style="width:'+lw+'px">'+list+'</div>';
@@ -913,15 +941,19 @@ function kindBody6(){
   ['well-pad','wellhead','point'].forEach(function(n,i){h+='<span class="pv" style="width:auto"><span class="disc" style="'+(i===0?'box-shadow:0 0 0 2px var(--neutral-10),0 0 0 4px var(--neutral-90)':'')+'">'+ic(n,19)+'</span></span>';});
   h+='</div><div class="tiny muted" style="margin-top:6px">From zoom 14 the icon, below a neutral dot.</div></div>';
   h+='<div class="sect"><h4>2 Key values <span class="tag">Up to 4</span></h4>';
-  [['Casing pressure','{asset.path}/CasingPressure',1,1],['Tubing pressure','{asset.path}/TubingPressure',1,0],['Gas rate','{asset.path}/GasRate',0,0],['Status','{asset.path}/Status',0,0]].forEach(function(r){
-    h+='<div class="kv"><div style="min-width:0"><div style="display:flex;gap:4px;align-items:center">'+r[0]+(r[3]?' <span class="tag">'+ic('star',10)+'Icon value</span>':'')+(r[0]==='Status'?' <span class="tag">Used by style rule</span>':'')+'</div><div class="tiny muted mono" style="font-size:11px">'+r[1]+'</div></div><span class="sw2'+(r[2]?' on':'')+'"></span></div>';});
-  h+='<button class="btn sm'+(S.tagPop?' pri':'')+'" style="margin-top:6px" data-act="tagpop">'+ic('tag',14)+'Browse tags</button><div class="tiny muted" style="margin-top:6px">On or off sets what the popup shows. Resolves for 3 of 3 well pads.</div></div>';
-  h+='<div class="sect"><h4>3 Comms</h4><div class="field"><label>Heartbeat path</label><div class="input val small mono">{asset.path}/Heartbeat</div></div><div class="tiny muted">Data age, Stale and Comms lost come from this one clock and the project\'s data age settings. Resolves for 3 of 3.</div></div>';
-  h+='<div class="sect"><h4>4 Alarms</h4><div class="field"><label>Alarm source</label><div class="input val small mono">{asset.path}</div></div><div class="field" style="margin:0"><label>View alarms link</label><div class="input val small mono">/alarms?source={asset.path}</div></div><div class="tiny muted" style="margin-top:4px">Count and highest priority show on the icon; the button shows only while there are alarms.</div></div>';
+  var ts=S.tagPop?S.tagState:'', k4=['Key value 4','Pick a tag',0,0];
+  if(ts==='inside')k4=['Gas rate','{asset.path}/GasRate',0,0];
+  if(ts==='outside')k4=['Ambient temperature','[default]Mesa/Weather/AmbientTemp',0,0];
+  [['Casing pressure','{asset.path}/CasingPressure',1,1],['Tubing pressure','{asset.path}/TubingPressure',1,0],['Status','{asset.path}/Status',0,0],k4].forEach(function(r,i){
+    var act=S.tagPop&&i===3;
+    h+='<div class="kv kvrow'+(act?' act':'')+'"><div style="min-width:0"><div style="display:flex;gap:4px;align-items:center">'+r[0]+(r[3]?' <span class="tag">'+ic('star',10)+'Icon value</span>':'')+(r[0]==='Status'?' <span class="tag">Used by style rule</span>':'')+(ts==='outside'&&i===3?' <span class="tag" style="color:var(--warning);background:var(--warn-tint)">'+ic('warn',10)+'Same tag for every well pad</span>':'')+'</div><div class="tiny mono muted" style="font-size:11px'+(i===3&&r[1]==='Pick a tag'?';font-style:italic':'')+'">'+r[1]+'</div></div><span class="kvp"><button class="ibtn" data-act="tagpop" title="Browse tags">'+ic('tag',14)+'</button><span class="sw2'+(r[2]?' on':'')+'"></span></span></div>';});
+  h+='<div class="tiny muted" style="margin-top:6px">On or off sets what the popup shows. Each path resolves for 3 of 3 well pads.</div></div>';
+  h+='<div class="sect"><h4>3 Comms</h4><div class="field"><label>Heartbeat path</label><div class="input val small mono">{asset.path}/Heartbeat<span style="margin-left:auto;color:var(--neutral-80)">'+ic('tag',14)+'</span></div></div><div class="tiny muted">Data age, Stale and Comms lost come from this one clock and the project\'s data age settings. Resolves for 3 of 3.</div></div>';
+  h+='<div class="sect"><h4>4 Alarms</h4><div class="field"><label>Alarm source</label><div class="input val small mono">{asset.path}<span style="margin-left:auto;color:var(--neutral-80)">'+ic('tag',14)+'</span></div></div><div class="field" style="margin:0"><label>View alarms link</label><div class="input val small mono">/alarms?source={asset.path}</div></div><div class="tiny muted" style="margin-top:4px">Count and highest priority show on the icon; the button shows only while there are alarms.</div></div>';
   h+='<div class="sect"><h4>5 Popup</h4>'+[['Comms and data age',1],['Key values that are on (2 to 3)',1],['Alarms and View alarms',1],['Page link - pop-out icon in the header: /pad/{asset.id}',1],['Custom view',0]].map(function(p){return '<div class="kv" style="justify-content:flex-start;gap:8px"><span class="check'+(p[1]?' on':'')+'">'+(p[1]?ic('check',11):'')+'</span>'+p[0]+'</div>';}).join('')+'<div class="tiny muted" style="margin-top:4px">Order is fixed: comms, values, alarms.</div></div>';
   h+='<div class="sect" id="rulesect"><h4>6 Style rule <span class="tag">Builds on key values</span></h4><div class="presets" style="margin-bottom:8px"><span class="on">States</span><span>Bands</span><span>Expression</span></div>';
   h+='<div class="field"><label>Value</label><div class="sel-like">Status <span class="muted">key value</span><span style="margin-left:auto">'+ic('chev',14)+'</span></div></div>';
-  h+='<div class="field"><label>Preview item <span>Shown on the map too</span></label><div class="sel-like">'+ic('well-pad',14)+'P14 <span class="muted">Mesa/P14</span><span style="margin-left:auto">'+ic('chev',14)+'</span></div></div>';
+  h+='<div class="tiny muted" style="margin:-4px 0 10px">Previews on P14, the preview item chosen in the header, on the map too.</div>';
   h+='<div class="tiny muted" style="display:grid;grid-template-columns:1fr 18px 1fr 64px;gap:8px"><span>When Status is</span><span></span><span>Use preset</span><span>Preview</span></div>';
   [['Running','Normal','',''],['Shut in','Dimmed dashed','dim','Shut in'],['Testing','Attention','att','Testing']].forEach(function(r){
     h+='<div class="rule"><span class="input val small" style="height:30px">'+r[0]+'</span><span class="muted">'+ic('chevr',14)+'</span><span class="sel-like">'+r[1]+ic('chev',14)+'</span><span class="pv '+r[2]+'"><span class="disc">'+ic('well-pad',19)+'</span><span class="tiny" style="font-weight:600">P14'+(r[3]?' <span class="tag" style="font-size:10px;padding:0 4px">'+r[3]+'</span>':'')+'</span></span></div>';});
@@ -929,13 +961,78 @@ function kindBody6(){
   return h;
 }
 function tagPop(){
-  var h='<div class="float tagpop"><div style="display:flex;align-items:center;padding:10px 8px 6px 14px"><b style="flex:1">Browse tags</b><button class="ibtn" data-act="tagpop">'+ic('x',16)+'</button></div>';
-  h+='<div style="padding:0 14px 6px"><div class="tiny muted" style="margin-bottom:3px">Example asset</div><div class="sel-like">'+ic('well-pad',14)+'P14 <span class="muted">Mesa/P14</span><span style="margin-left:auto">'+ic('chev',14)+'</span></div></div>';
-  h+='<div class="tree"><div>'+ic('chev',12)+'Mesa/P14</div>';
-  [['Heartbeat',0],['Status',0],['CasingPressure',1],['TubingPressure',0],['GasRate',0]].forEach(function(t){h+='<div class="'+(t[1]?'on':'')+'" style="padding-left:28px">'+ic('tag',12)+t[0]+'</div>';});
-  h+='<div style="padding-left:28px;color:var(--neutral-70)">'+ic('chevr',12)+'P14-2H</div></div>';
-  h+='<div style="margin:6px 14px;padding:8px 10px;border-radius:6px;background:var(--neutral-20)"><div class="tiny muted">Picked</div><div class="mono">Mesa/P14/CasingPressure</div><div class="tiny muted" style="margin-top:4px">Saved as a path relative to each well pad\'s asset</div><div class="mono" style="font-weight:600">{asset.path}/CasingPressure</div><div class="tiny muted" style="margin-top:4px;display:flex;gap:4px;align-items:center">'+ic('check',12)+'Resolves for 3 of 3 well pads</div></div>';
-  return h+'<div style="display:flex;gap:8px;justify-content:flex-end;padding:4px 14px 10px"><button class="btn sm" data-act="tagpop">Cancel</button><button class="btn sm pri" data-act="tagpop">Use this path</button></div></div>';
+  /* One browser for every tag pick. States: open, inside, outside, override, empty, loading, unreachable. */
+  var st=S.tagState, ov=st==='override', bad=st==='unreachable';
+  var forWhat=ov?'Casing pressure on P14 only - an override':'Key value 4 of the Well pad kind';
+  var h='<div class="float tagpop"><div class="tph"><b style="flex:1">Pick a tag</b><button class="ibtn" data-act="tagpop" title="Close">'+ic('x',16)+'</button></div><div class="for">For: '+forWhat+'</div>';
+  h+='<div style="display:flex;gap:8px;align-items:center;padding:0 14px"><span class="small muted">Provider</span><span class="sel-like" style="flex:1">'+ic('tag',13)+(bad?'<span class="mono">edge-p12</span>':'<span class="mono">default</span> <span class="tag">Default</span>')+'<span style="margin-left:auto">'+ic('chev',14)+'</span></span>'+
+     (st==='outside'?'<button class="btn sm ghost" title="Back to the preview item\'s asset folder">'+ic('up',13)+'P14 folder</button>':'')+'</div>';
+  function row(d,name,icon,ty,dt,cls,extra){
+    return '<div class="tr2 '+(cls||'')+'"><span class="nm" style="padding-left:'+(8+d*16)+'px">'+(icon==='chev'||icon==='chevr'?ic(icon,12):'<span style="width:12px"></span>')+ic(icon==='chev'||icon==='chevr'?(ty==='Folder'?'folder':'inst'):'tag',13)+name+(extra||'')+'</span><span class="ty">'+ty+'</span><span class="dt">'+(dt||'')+'</span></div>';
+  }
+  var AF=' <span class="tag">Asset folder</span>';
+  h+='<div class="tree">';
+  if(bad){
+    h+='<div class="fail"><h5>'+ic('cloud',15)+'Can\'t browse edge-p12</h5><p>The Gateway cannot reach this tag provider right now. Try again, pick another provider, or type the path below.</p><button class="btn sm pri">Try again</button></div>';
+  }else{
+    h+=row(0,'Mesa','chev','Folder','','fd');
+    h+=row(1,'CTB1','chevr','UDT instance','','fd');
+    h+=row(1,'P12','chevr','UDT instance','','fd');
+    if(st==='outside'){
+      h+=row(1,'P14','chevr','UDT instance','','fd',AF);
+      h+=row(1,'P21','chevr','UDT instance','','fd');
+      h+=row(1,'Weather','chev','Folder','','fd');
+      h+=row(2,'AmbientTemp','tag','Reference','Float8','on');
+      h+=row(2,'Rainfall','tag','Reference','Float8','');
+      h+=row(2,'WindSpeed','tag','Reference','Float8','');
+      h+=row(0,'Ridge','chevr','Folder','','fd');
+    }else{
+      var deep=st==='empty'||st==='loading'||ov;
+      h+=row(1,'P14','chev','UDT instance','','fd',AF);
+      var sel={open:'',inside:'GasRate',override:'',empty:'',loading:''}[st];
+      if(!deep){
+        [['CasingPressure','Float8'],['GasRate','Float8'],['Heartbeat','Int4'],['Status','String'],['TubingPressure','Float8']].forEach(function(t){h+=row(2,t[0],'tag','Reference',t[1],'in'+(sel===t[0]?' on':''));});
+        h+=row(2,'P14-2H','chevr','UDT instance','','fd in');
+      }else{
+        h+=row(2,'CasingPressure','tag','Reference','Float8','in');
+        h+=row(2,'Heartbeat','tag','Reference','Int4','in');
+        h+=row(2,'P14-2H','chev','UDT instance','','fd in');
+        if(ov){
+          h+=row(3,'CasingPressure','tag','Reference','Float8','in on');
+          h+=row(3,'Plunger','chevr','Folder','','fd in');
+          h+=row(3,'TubingPressure','tag','Reference','Float8','in');
+        }else{
+          h+=row(3,'Plunger','chev','Folder','','fd in'+(st==='empty'?' on':''));
+          h+='<div class="tr2 in"><span class="msg" style="padding-left:'+(8+4*16+18)+'px">'+(st==='empty'?'No tags in this folder':'<span class="spin"></span>Loading...')+'</span></div>';
+          h+=row(3,'TubingPressure','tag','Reference','Float8','in');
+        }
+      }
+      h+=row(1,'P21','chevr','UDT instance','','fd');
+      h+=row(1,'Weather','chevr','Folder','','fd');
+    }
+  }
+  h+='</div>';
+  var path={open:'',inside:'[default]Mesa/P14/GasRate',outside:'[default]Mesa/Weather/AmbientTemp',override:'[default]Mesa/P14/P14-2H/CasingPressure',empty:'[default]Mesa/P14/P14-2H/Plunger',loading:'',unreachable:''}[st];
+  h+='<div style="padding:8px 14px 0"><div class="tiny muted" style="margin-bottom:3px">Path - pick in the tree or type one</div><div class="input '+(path?'val ':'')+'small mono" style="height:30px">'+(path||'[default]Mesa/P14/...')+'</div></div>';
+  var note='', ok=false, btn='Use this tag';
+  if(st==='open'||st==='loading'){
+    note='<div class="picked">Opened at <b>P14\'s asset folder</b>, the preview item. A tag in it is saved for every well pad as <span class="mono" style="font-weight:600">{asset.path}/...</span>. Go up to pick a tag anywhere else.</div>';
+  }else if(st==='inside'){
+    ok=true;
+    note='<div class="picked"><div class="tiny muted">Inside P14\'s asset folder - saved for every well pad as</div><div class="mono">{asset.path}/GasRate</div><div class="tiny muted" style="margin-top:4px;display:flex;gap:4px;align-items:center">'+ic('check',12)+'Resolves for 3 of 3 well pads</div></div>';
+  }else if(st==='outside'){
+    ok=true;
+    note='<div class="picked warn"><div class="wt">'+ic('warn',14)+'Same tag for every well pad</div><div>AmbientTemp is outside P14\'s asset folder, so it is saved as the full path and all 3 well pads show this one tag.</div><div class="mono" style="margin-top:4px">[default]Mesa/Weather/AmbientTemp</div></div>';
+  }else if(ov){
+    ok=true; btn='Use for P14';
+    note='<div class="picked"><div class="tiny muted">Saved for P14 only, as the full path</div><div class="mono">[default]Mesa/P14/P14-2H/CasingPressure</div><div class="tiny muted" style="margin-top:4px">Marked <span class="tag ovr">Override</span> with Reset. The other 2 well pads keep {asset.path}/CasingPressure from the kind.</div></div>';
+  }else if(st==='empty'){
+    note='<div class="picked">Plunger is a folder with no tags. Pick a tag, not a folder.</div>';
+  }else if(bad){
+    note='<div class="picked">Typed paths still work: a path inside P14\'s asset folder is saved as {asset.path}/..., any other as the full path.</div>';
+  }
+  h+=note;
+  return h+'<div style="display:flex;gap:8px;justify-content:flex-end;padding:10px 14px 10px"><button class="btn sm" data-act="tagpop">Cancel</button><button class="btn sm pri'+(ok?'':' off')+'" data-act="tagpop">'+btn+'</button></div></div>';
 }
 
 /* ---------- 7 import ---------- */
@@ -1051,7 +1148,7 @@ document.addEventListener('click',function(e){
     case 'phdone':if(S.phoneMove){S.phoneMove=false;S.phEdit=true;S.phToast=true;}else{S.phEdit=false;S.phToast=false;}break;
     case 'linepop':S.linePop=true;break;
     case 'lineclose':S.linePop=false;break;
-    case 'tagpop':S.tagPop=!S.tagPop;break;
+    case 'tagpop':S.tagPop=!S.tagPop;if(!S.tagState||S.tagState==='style')S.tagState='open';break;
     case 'step':S.step=+v;S.sub=v;break;
     case 'kind':S.kindSel=v;break;
     default:return;

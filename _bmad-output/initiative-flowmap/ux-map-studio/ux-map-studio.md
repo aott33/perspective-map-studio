@@ -18,7 +18,7 @@ Mockups (`mockups/`):
 - `key-screen-3-line-instruments-live.png`, `key-screen-3-line-instruments-stale.png` - instruments on lines.
 - `key-screen-4-edit-items.png` - Edit: Items with Recent changes.
 - `key-screen-5-bulk-edit.png` - bulk edit.
-- `key-screen-6-kinds-tags.png`, `key-screen-6-kinds-style.png` - Kinds.
+- `key-screen-6-kinds-tags-open.png`, `-inside.png`, `-outside.png`, `-override.png`, `-empty.png`, `-loading.png`, `-unreachable.png` - the tag browser (owner, 2026-10-27, refined); `key-screen-6-kinds-style.png` - Kinds style rule.
 - `key-screen-7-import-1.png` to `key-screen-7-import-4.png` - guided import.
 - `key-screen-8-first-run.png` - first-run checklist.
 - `key-screen-9-save-states-saved.png`, `-saving.png`, `-conflict.png`, `-unreachable.png`, `-busy.png` - save states.
