@@ -57,6 +57,11 @@ public final class SetupRegistry {
         warned.remove(project);
     }
 
+    /** The names of the projects that have a usable setup now (read by the adapter service's tick). */
+    public Set<String> projects() {
+        return Set.copyOf(setups.keySet());
+    }
+
     public Optional<Setup> find(String project) {
         return project == null ? Optional.empty() : Optional.ofNullable(setups.get(project));
     }

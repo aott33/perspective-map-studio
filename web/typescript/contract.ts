@@ -4,6 +4,8 @@
  * the reference. Pure types and readers only, unit tested in node.
  */
 
+import { HostLists, readHostLists } from './adapters';
+
 /** Public contract version these shapes belong to (AD-9). */
 export const CONTRACT_VERSION = '0.2.0-draft';
 
@@ -66,6 +68,8 @@ export interface MapLoadReplyBody {
     level: EditLevel;
     seq: number;
     items: MapItemRecord[];
+    /** The project's kind list, asset list (editors only) and their statuses (adapters.ts). */
+    lists: HostLists;
 }
 
 export interface EditsApplyReplyBody {
@@ -130,7 +134,7 @@ export function readMapLoadReply(body: Record<string, unknown>): MapLoadReplyBod
             items.push(item);
         }
     }
-    return { level, seq: body.seq, items };
+    return { level, seq: body.seq, items, lists: readHostLists(body) };
 }
 
 /** The body of an edits.apply.reply, or null when it is malformed. */

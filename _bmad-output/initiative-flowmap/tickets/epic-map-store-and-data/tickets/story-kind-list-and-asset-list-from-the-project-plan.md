@@ -3,18 +3,19 @@ title: 'Kind list and asset list from the project'
 type: 'feature'
 ticket: '3'
 created: '2026-10-26'
-status: 'draft'
-baseline_revision: ''
+status: 'in-review'
+baseline_revision: 'bf9737ec5f7bc182fc509c6490ba8a41f61e00ab'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: [quick]
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-tracer-one-edit-saved-through-the-write-path-and-read-back-plan.md'
   - '{project-root}/docs/platform-checks.md'
+  - '{project-root}/docs/contract.md'
 ---
 
 <frozen-after-approval reason="human-owned intent - do not modify unless human renegotiates">
@@ -34,6 +35,12 @@ context:
 - One Gateway log line per status change per project and list (warning into a bad status, info back to `ok`); a status that stays the same logs nothing. No asset or kind row content beyond ids in a log line; host exception text cut to its first line, 200 characters.
 - The setup is read from story 1's `SetupRegistry` at every tick, so a changed setup (story 6) applies without a hook into it.
 - Example and dev adapters follow Jython 2.7, catch `java.lang.Throwable` and `Exception`, and re-raise so a failure reports `failing`, never `empty`.
+
+**Decisions (owner, 2026-10-26, "approve 2 to 7, recommendations"):**
+- On-demand refresh is `system.mapstudio.refreshAdapters(project)` only (no new message type): host scripts refresh after their own data changes; it returns both statuses; in the Designer it raises "runs in Gateway scope only".
+- When a refresh fails or is slow, the last good list is kept and the message says so ("showing the list from 10:42 UTC"); an `empty` answer is a real answer and replaces the list.
+- `map.load` carries `assets` only to `phone` and `full` sessions; every level gets `kinds` and both statuses. The e2e page signs in as the dev editor.
+- The timeout is a fixed 5 s in the module, documented; setup v1 is unchanged.
 
 **Never:**
 - A database migration or a `mapstudio_` table change (caches live in memory); any write-path, role-matrix or `edits.apply` change; validating map item ops against the kind list (story 9); checking icon names (story 10); derived item fields (`basePath`, unlinked reason, unknown kind) in `map.load`; visible adapter UI (epic-editing); `map.changed` (story 4).
@@ -57,28 +64,36 @@ context:
 
 ## Code Map
 
-Story 1 (planned, not built) owns: `common/.../common/contract/*` (`Setup` with `kindsFunction()`, `assetsFunction()`, `refreshIntervalSeconds()`), `gateway/.../setup/SetupRegistry.java` (per-project setup lookup), `gateway/.../load/MapLoader.java` (`map.load` reply body), `MapStudioGatewayHook.java` (executors, start, shutdown), `MapStudioScriptModule` (abstract) with `gateway/.../script/GatewayScriptModule.java` and `designer/.../DesignerScriptModule.java`, `web/typescript/contract.ts`, `MapStudio.tsx` map.load handling, `docs/contract.md`, `ops/project/com.aoindustrial.perspective.mapstudio/setup/setup.json`, `ops/config/core/**`. Use the names story 1 actually lands; the ones here are from its plan.
+Story 1 is built and merged (its plan's Change Log has the final names). What this story touches or reuses:
 
-- Spike caller to reuse, `git show 51104c8:gateway/src/main/java/com/aoindustrial/perspective/mapstudio/gateway/spike/ProjectScriptCheck.java`: way 2 (`runCode("import <module>\n", locals, name)`, then `locals.__finditem__(<top module>)`, walk dotted attributes, `manager.runFunction(callable)`); `JythonExecException.getPyCause()` for the error text. Project modules are not in `getGlobals()` until imported **[live 8.3.10]**.
+- `common/.../common/contract/Setup.java` -- `kindsFunction()`, `assetsFunction()`, `refreshIntervalSeconds()`; unchanged. `MapStudioException(code, message)` is the one refusal type (`toErrorBody()`); the scripting API raises it.
+- `gateway/.../setup/SetupRegistry.java` -- per-project setups (`find`, `require`, `put`, `remove`); add a read-only `projects()` (names with a setup) for the tick. Nothing else changes there.
+- `gateway/.../MapStudioServices.java` -- wires every part once (`scheduler` for the store, bounded `work` pool 4/64 for delegates, `setups`, `gate`, `loader`, `scriptModule`, `start()`, `stop()`); add the `AdapterService` here (own pool and tick thread), start it in `start()`, stop it in `stop()`, pass it to `MapLoader` and `GatewayScriptModule`. `MapStudioGatewayHook` itself needs no change.
+- `gateway/.../load/MapLoader.java` -- `mapLoadReply(project, level)` builds `{level, seq, items}` after `gate.requireReady`; add `kinds`, `assets` (phone and full only) and `adapters` there. `MapLoaderTest` builds it with `new MapLoader(gate, store)`.
+- `gateway/.../MapStudioDelegate.java` -- unchanged: `map.load` already runs on the work pool and replies `map.load.reply`; refusals are `error {code, message}`.
+- `common/.../MapStudioScriptModule.java` (abstract, `getMapImpl`, `applyEditsImpl`), `gateway/.../script/GatewayScriptModule.java`, `designer/.../DesignerScriptModule.java`, `MapStudioScriptModule.properties` -- add `refreshAdapters` the same way.
+- Spike caller to reuse, `git show 51104c8:gateway/src/main/java/com/aoindustrial/perspective/mapstudio/gateway/spike/ProjectScriptCheck.java`: way 2 (`runCode("import <module>\n", locals, name)`, then `locals.__finditem__(<top module>)`, walk dotted attributes, `manager.runFunction(callable)`); `JythonExecException.getPyCause()` (`Optional<PyException>`) for the error text; `GatewayContext.getProjectManager().getProjectScriptManager(project)` **[SDK 8.3.0 javap]**. Project modules are not in `getGlobals()` until imported **[live 8.3.10]**. The function name goes into `runCode` text, so it must match a dotted identifier pattern first.
 - `git show 51104c8:ops/project/ignition/script-python/mapstudio_checks/{code.py,resource.json}` -- project library resource shape (`scope "A"`, `hintScope 2`).
-- `git show 51104c8:ops/checks/config/core/ignition/tag-definition/default/Checks/unary-resource.json` and `.../tag-provider/default/*` -- seeded tag shape for the dev memory tag.
 - `TypeUtilities.pyToGson(PyObject)` **[SDK 8.3.0 javap]** -- convert the result before parsing; parsers work on Gson only.
-- `org.python:jython-ia` is in the Gradle cache **[build]**; on the gateway test runtime classpath through `ignition-common` (unverified).
-- `MapStudio.tsx` root data attributes (`data-points-loaded`, `data-map-ready`) -- pattern for the new hidden status element; do not add to existing counts.
+- `web/typescript/contract.ts` (`readMapLoadReply` keeps only level, seq, items), `web/typescript/messages.ts` (`readReply`), `web/typescript/MapStudio.tsx` (`MapStudioStoreDelegate.onMapLoad`, root `.mapstudio-map` data attributes) -- pattern for the new hidden status element; do not add to existing counts.
+- `ops/project/com.inductiveautomation.perspective/views/MapStudioEdit/view.json` -- toolbar, sign-in label and button, the map component, the session-script role check (`MapEditor` from `session.props.auth.user.roles`) to copy for `/adapters`.
+- `e2e/tests/fixtures.mjs` -- `editorTest` (fresh sign-in per test, never `signInAsEditor`), `openMap`, `mapLoaded`, `nextFrames`; `e2e/tests/store.spec.mjs` for the screenshot helper. Existing specs unchanged.
+- Dev stack: each checkout has its own compose project from `MAPSTUDIO_CONTAINER` in `.env`; `ops/project` is bind-mounted; `ops/logs.sh` reads the Gateway log.
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `common/.../common/contract/{KindList,Kind,FormField,AssetList,Asset,AdapterStatus}.java` (new) -- parse and check rows from Gson into immutable records plus a list of reasons; asset kinds checked against a given kind id set -- shared by gateway, testable without Ignition.
-- [ ] `gateway/.../adapter/{AdapterCaller,ProjectFunctionCaller,AdapterService,AdapterSnapshot}.java` (new) -- `AdapterCaller` interface (project, dotted function, timeout) -> Gson or failure; `ProjectFunctionCaller` implements it with way 2 on the pool; `AdapterService` owns the pool and a 1 s scheduler tick that refreshes each project whose interval elapsed, keeps per project and list the snapshot and last status, logs transitions on `MapStudio.adapters`, offers `snapshot(project)` (for `MapLoader`, story 9, story 10) and `refreshNow(project)`.
-- [ ] `gateway/.../MapStudioGatewayHook.java` -- create `AdapterService` after `SetupRegistry`, start it, shut it down; pass it where story 1 builds `MapLoader`.
-- [ ] `gateway/.../load/MapLoader.java` -- add `kinds`, `assets` (per Open Question 3) and `adapters {kinds, assets}` from `AdapterSnapshot`; nothing else changes.
-- [ ] On-demand refresh per Open Question 1 (recommended: `MapStudioScriptModule`, `GatewayScriptModule`, `DesignerScriptModule`, `MapStudioScriptModule.properties` gain `refreshAdapters(project)` returning both statuses; Designer raises "runs in Gateway scope only").
-- [ ] `web/typescript/adapters.ts` (new, pure: read `kinds`, `assets`, `adapters` from a map.load body, tolerant of their absence), `web/typescript/MapStudio.tsx` -- keep them in state, render one hidden `.mapstudio-adapter-status` with `data-kinds-status`, `data-kinds-count`, `data-kinds-message` and the same for assets.
-- [ ] `ops/project/ignition/script-python/mapstudio_dev/{code.py,resource.json}` (new) -- `kinds()` (ids include `line` and the kind story 1's script point uses, plus `pad`, `geofence`), `assets()` (a few pads with `[default]` base paths), `set_mode(mode)`; mode read from memory tag `[default]MapStudioDev/AdapterMode` (`ok`, `empty`, `broken`, `slow` sleeps 8 s, `incomplete`); `ops/config/core/ignition/tag-definition/default/MapStudioDev/*` (new, plus `tag-provider/default` only if a fresh Gateway lacks it, unverified); `setup.json` -- set the two function names.
-- [ ] `ops/project/com.inductiveautomation.perspective/views/MapStudioAdapters/*` (new), `page-config/config.json` (add `/adapters`) -- the map plus one button per mode (session script: `set_mode`, then refresh) and a label with the refresh result.
-- [ ] `docs/kinds-and-assets.md` (new: kind list, form fields, label rank, asset contract, status words and messages, refresh and timeout, caller-side rules), `docs/examples/adapters/{udt_instances.py,named_query.py}` (new; `system.tag.browse` of UDT instances and `system.db.execQuery`, both unverified live), one link line in `docs/contract.md`.
-- [ ] Tests: `common/src/test/.../contract/{KindListTest,AssetListTest}.java` (every bad-row case), `gateway/src/test/.../adapter/{AdapterServiceTest,ExampleAdaptersCompileTest}.java` (fake caller and clock: each matrix row, one log per change, single flight, last good list per Open Question 2; Jython compiles both examples and the dev adapter), `web/typescript/__tests__/adapters.test.ts`, `e2e/tests/adapters.spec.mjs` (new: each mode then reload shows its status, count and message; ends in `ok`; screenshots `mapstudio-adapters-{ok,failing}-1440.png`).
+- [x] `common/.../common/contract/{KindList,Kind,FormField,AssetList,Asset,AdapterStatus}.java` (new) -- parse and check rows from Gson into immutable records plus a list of reasons; asset kinds checked against a given kind id set -- shared by gateway, testable without Ignition.
+- [x] `gateway/.../adapter/{AdapterCaller,ProjectFunctionCaller,AdapterService,AdapterSnapshot}.java` (new) -- `AdapterCaller` interface (project, dotted function) -> rows, not-a-list or failure; `ProjectFunctionCaller` implements it with way 2; `AdapterService` owns the adapter pool and a 1 s tick thread, refreshes each project of `SetupRegistry.projects()` whose interval elapsed (kinds first, then assets against the kind ids), keeps per project and list the snapshot and last status, logs transitions on `MapStudio.adapters`, offers `snapshot(project)` (for `MapLoader`, story 9, story 10) and `refreshNow(project)` (joins a call in flight; a refresh asked while a timed-out call still runs starts once that call ends).
+- [x] `gateway/.../setup/SetupRegistry.java` -- add `projects()`.
+- [x] `gateway/.../MapStudioServices.java` -- create `AdapterService` after `SetupRegistry` with `context.getProjectManager()`, start it in `start()`, stop it in `stop()`; pass it to `MapLoader` and `GatewayScriptModule`.
+- [x] `gateway/.../load/MapLoader.java` -- add `kinds`, `assets` (phone and full only) and `adapters {kinds, assets}` from `AdapterSnapshot`; nothing else changes.
+- [x] `MapStudioScriptModule`, `GatewayScriptModule`, `DesignerScriptModule`, `MapStudioScriptModule.properties` gain `refreshAdapters(project)` returning both statuses (waits for the calls to settle, at most the timeout plus a margin); Designer raises "runs in Gateway scope only".
+- [x] `web/typescript/adapters.ts` (new, pure: read `kinds`, `assets`, `adapters` from a map.load body, tolerant of their absence), `web/typescript/contract.ts` (`MapLoadReplyBody` gains them through that reader), `web/typescript/MapStudio.tsx` -- keep them in state, render one hidden `.mapstudio-adapter-status` with `data-kinds-status`, `data-kinds-count`, `data-kinds-message`, the same for assets, and `data-assets-rows` (rows received).
+- [x] `ops/project/ignition/script-python/mapstudio_dev/{code.py,resource.json}` (new) -- `kinds()` (ids include `line` and `pad`, which story 1's browser and script save, plus `geofence`), `assets()` (a few pads with `[default]` base paths), `set_mode(mode)`, `mode()`; mode `ok`, `empty`, `broken`, `slow` (sleeps 8 s), `incomplete`; `setup.json` -- set the two function names.
+- [x] `ops/project/com.inductiveautomation.perspective/views/MapStudioAdapters/*` (new), `page-config/config.json` (add `/adapters`) -- sign-in label and button, one button per mode (session script, `MapEditor` only: `set_mode`, then `refreshAdapters`), a label with the refresh result, and the map.
+- [x] `docs/kinds-and-assets.md` (new: kind list, form fields, label rank, asset contract, status words and messages, refresh and timeout, caller-side rules), `docs/examples/adapters/{udt_instances.py,named_query.py}` (new; `system.tag.browse` of UDT instances and `system.db.execQuery`, both unverified live), `docs/contract.md` (map.load body, `refreshAdapters`, link line).
+- [x] Tests: `common/src/test/.../contract/{KindListTest,AssetListTest}.java` (every bad-row case), `gateway/src/test/.../adapter/{AdapterServiceTest,ExampleAdaptersCompileTest}.java` (fake caller and clock: each matrix row, one log per change, single flight, last good list; Jython compiles both examples and the dev adapter), `MapLoaderTest` (kinds and statuses for every level, assets only for phone and full), `web/typescript/__tests__/adapters.test.ts`, `e2e/tests/adapters.spec.mjs` (new, `editorTest`: each mode then reload shows its status, count and message; ends in `ok`; a viewer gets the statuses and no asset rows; screenshots `mapstudio-adapters-{ok,failing}-1440.png`).
 
 **Acceptance Criteria:**
 - Given the dev stack, when `/adapters` opens, then the status element shows kinds and assets `ok` with the dev counts.
@@ -87,7 +102,34 @@ Story 1 (planned, not built) owns: `common/.../common/contract/*` (`Setup` with 
 
 ## Implementation Notes
 
+Implemented directly in the planning session (no implementation subagent was available), 2026-10-26 to 27, on the `ms-e2s3` dev Gateway (port 9123, `inductiveautomation/ignition:8.3.10`, `postgres:16-alpine`), on top of story 1 merged from `ccr-3c8b84b9-f1vbsm`.
+
+- **Live facts** (recorded in `docs/platform-checks.md`, "Epic 2 story 3"): way 2 runs on the adapter pool and a Python error comes back as `JythonExecException` with type and message; a function sleeping 8 s goes `slow` at 5 s and its thread ends later; two `refreshAdapters` from two sessions one second apart ran each dev function once; an edited `mapstudio_dev.kinds` plus a project scan (`POST /data/api/v1/scan/projects`) was `failing` at the next refresh and "recovered" after the revert and a second scan, with no restart (the manual check of the Verification section); `system.util.getGlobals()` is shared between a session script and the functions the module calls; a fresh 8.3.10 Gateway has only the `System` tag provider; the log shows `MapStudio.adapters` as `M.adapters`.
+- **Gateway log of one e2e run** (`ops/logs.sh | grep M.adapters`): one line per change and nothing else: info "3 kinds"/"4 assets" at start, warnings into incomplete, failing ("Showing the list from 00:11 UTC"), empty and slow, info "recovered" back to ok **[live 8.3.10]**.
+- **Runs and results:**
+  - `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew clean build`: green; Java 81 tests (common 14: contract 8, kind list 3, asset list 3; gateway 67: adapter service 18, example adapters and caller 5, map loader 4, story 1's 40 unchanged), Jest 47 (8 suites, `adapters.test.ts` 5 new).
+  - `ops/up.sh --fresh` then `cd e2e && npm test` (Playwright 1.63.0): 19 of 19, the 16 existing tests unchanged and passing, `adapters.spec.mjs` 3 new; the teardown found no password in `e2e/out`. The same spec alone passed 3 of 3 on the kept volume before.
+  - Gateway log of the fresh run: one `M.adapters` line per status change, as listed above; no Map Studio warning or error except story 1's expected "Project no-such-project has no Map Studio setup" from its script checks.
+  - No generated secret (admin and editor passwords, PostgreSQL password, API key) in either container's log or in any tracked or new file (a scratch script counted occurrences without printing them). `git grep` for an em dash over the changed files: none.
+  - Matrix audit: every row of the I/O matrix has a passing `AdapterServiceTest` case (good, empty, raises, slow, bad rows, not a list, not configured, loading, recovers), and the e2e test covers good, empty, raises, slow, bad rows and recovers live.
+- **Not run:** the two example adapters on a live Gateway (compiled under Jython 2.7 only; marked unverified in the docs); Designer autocomplete of `refreshAdapters` (owner, optional).
+
 ## Plan Change Log
+
+**Approval and story 1's final names, 2026-10-26 (not a review loopback).** The owner approved this plan with the recommended answer to every Open Question ("approve 2 to 7, recommendations"); the answers are the Decisions in the frozen block. Story 1 was merged into this branch (`ccr-3c8b84b9-f1vbsm`) and the Code Map and tasks now use its built names: `MapStudioServices` (not the hook) wires the parts, `SetupRegistry` gains `projects()`, `MapStudioException` is the refusal, replies are `map.load.reply`, editor e2e tests use `editorTest`. The kinds `pad` and `line` are the ones story 1 saves.
+
+**Implementation deviations, 2026-10-27 (not a review loopback).** Later entries read these:
+
+- *Parsers:* no `KindList` or `AssetList` classes: `Kind.parseList(JsonArray)` and `Asset.parseList(JsonArray, Set<String> kindIds)` return `Parsed<T>(kept, reasons, total)`; `Rows` (package-private) holds the readers. `AdapterStatus` is a record in `common/.../contract/` with the status word constants.
+- *Reasons carry ids only:* a reason names the row (`row 5 (id P99)`) and the key at fault, never a value ("geometry must be point or line", "basePath does not start with a [provider]"), so map.load messages and log lines hold no tag path or other row content, for viewers too.
+- *Adapter service API (for stories 9 and 10):* `AdapterService.snapshot(project)` gives `AdapterSnapshot(kinds, assets, kindsStatus, assetsStatus)`, never blocking; `refreshNow(project)` gives a future of it. `MapLoader` takes a `Function<String, AdapterSnapshot>` as its third constructor argument. `MapStudioServices.adapters` is the instance.
+- *A full adapter pool* reports `slow` with "Map Studio is busy calling other project functions ..." (no new status word).
+- *A refresh asked for while a timed-out call still runs* waits for that call to end and then makes one new call (never more than one waiting); a tick never waits.
+- *No kind function:* every asset is left out (its kind is not in an empty kind list), as for a kind list that never loaded.
+- *Dev adapter mode:* kept in `system.util.getGlobals()`, not a memory tag: a fresh 8.3.10 Gateway has no `default` tag provider, and seeding one was not needed. No `ops/config/core` change.
+- *Dev page:* besides one button per mode, a "Refresh lists" button (refresh only), and the result label carries the dev adapter's own call counts since the last mode change; the e2e test uses them for criterion 3 (single flight) instead of counting log lines. The dev setup's `refreshIntervalSeconds` is 30 (was 10), so a timed refresh does not cross that test's two overlapping refreshes.
+- *Browser:* `MapLoadReplyBody` gained `lists: HostLists` (`adapters.ts`); the hidden status element also carries `data-kinds-rows`.
+- *Story 1 files changed:* `SetupRegistry` (`projects()`), `MapStudioServices` (wiring), `MapLoader` (constructor and reply), `MapLoaderTest`, the scripting module trio and its `.properties`, `web/typescript/contract.ts`, `MapStudio.tsx`, `__tests__/contract.test.ts` (expected body), `setup.json` (function names, interval 30), `page-config/config.json`, `docs/contract.md`, `docs/platform-checks.md`.
 
 ## Review Triage Log
 
@@ -105,21 +147,14 @@ Contract additions (0.2.0 draft, in `docs/kinds-and-assets.md`):
               "refreshedAt": "2026-10-26T10:00:00Z"}, "assets": {"...": "..."}}}
 ```
 
-Field `type` is `text|number|integer|boolean|choice` (`choices` required for `choice`); `labelRank` an integer, higher keeps its label longer, default 0; ids at most 64 characters; unknown extra keys ignored. Assets are checked after kinds, so a kind failure makes every asset kind unknown only when no earlier good kind list exists. A timed-out Jython call cannot be killed; its result is discarded and single flight keeps the pool from filling.
-
-## Open Questions
-
-1. **On-demand refresh.** (a) `system.mapstudio.refreshAdapters(project)`: host scripts refresh after their own data changes; touches story 1's four scripting files (recommended). (b) A new `adapters.refresh` message for full editors: epic-editing's tools could use it; touches `Messages`, `contract.ts` and the delegate. (c) Both.
-2. **When a refresh fails or is slow.** (a) Keep the last good list and say so in the message ("showing the list from 10:42 UTC"): one bad call does not make every item an unknown kind (recommended). (b) Clear the list: map.load shows exactly what the function gives now.
-3. **Assets in `map.load`.** (a) To every level: simplest. (b) Only to `phone` and `full`; viewers get kinds and both statuses: smaller, and tag paths reach only editors, who link items (recommended). Under (b) the e2e page signs in as the dev editor.
-4. **Timeout.** (a) Fixed 5 s in the module, documented; setup v1 unchanged (recommended). (b) A setup field `adapterTimeoutSeconds`: a setup schema change that story 6 must also validate and document.
+Field `type` is `text|number|integer|boolean|choice` (`choices` required for `choice`); `labelRank` an integer, higher keeps its label longer, default 0; ids at most 64 characters; unknown extra keys ignored. Assets are checked after kinds, against the last good kind list, so a kind failure makes every asset kind unknown only when no earlier good kind list exists. A timed-out Jython call cannot be killed; its result is discarded and single flight keeps the pool from filling.
 
 ## Verification
 
 **Commands:**
 - `./gradlew build` -- expected: green with the new common, gateway and Jest tests.
 - `ops/up.sh --fresh`, then `cd e2e && npm test` -- expected: all pass, existing specs unchanged.
-- `ops/logs.sh -n 400 | grep MapStudio.adapters` -- expected: one line per status change of the e2e run.
+- `ops/logs.sh -n 400 | grep M.adapters` (the log abbreviates `MapStudio.adapters`) -- expected: one line per status change of the e2e run.
 - `git grep -nP '\x{2014}'` -- expected: no match.
 
 **Manual checks:**

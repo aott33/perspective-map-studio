@@ -11,7 +11,7 @@ Every message, both ways, is one JSON object `{v, type, id, body}` carried under
 | Type | Direction | Body |
 | --- | --- | --- |
 | `map.load` | browser to Gateway | `{}` |
-| `map.load.reply` | Gateway to browser | `{level, seq, items}`: `level` is `none`, `phone` or `full` for this session; `seq` is the project's last change sequence number; `items` are map item records, deleted ones left out **[live 8.3.10]** |
+| `map.load.reply` | Gateway to browser | `{level, seq, items, kinds, assets, adapters}`: `level` is `none`, `phone` or `full` for this session; `seq` is the project's last change sequence number; `items` are map item records, deleted ones left out; `kinds` the project's kind list; `assets` its asset list, sent only at level `phone` or `full`; `adapters` `{kinds: status, assets: status}` ([kinds-and-assets.md](kinds-and-assets.md)) **[live 8.3.10]** |
 | `edits.apply` | browser to Gateway | `{batchId, ops}` (below) |
 | `edits.apply.reply` | Gateway to browser | `{batchId, seq, results: [{entity, id, version}]}`: the batch's change sequence number and each op's new version **[live 8.3.10]** |
 | `map.changed` | Gateway to browser | `{seq, ops}`: declared; sent to every open map of the project from entry 4 **[unverified]** |
@@ -68,7 +68,7 @@ The project resource `com.aoindustrial.perspective.mapstudio/setup/` holding `se
  "alarmPage": "", "basemaps": ["none", "osm"], "tokenSecret": ""}
 ```
 
-`schemaVersion` and `connection` are required; the rest have the defaults shown. Role names are Ignition role names, compared exactly. The map is keyed by the project's own name, even when a child project inherits the setup. A project with no setup, or whose setup names a connection the Gateway does not have, logs one warning naming the project (and the connection) at its first `map.load` or `applyEdits` after a Gateway start, and answers `store-unreachable` **[live 8.3.10]**.
+`schemaVersion` and `connection` are required; the rest have the defaults shown. `kindsFunction` and `assetsFunction` name the project library functions that return the kind list and the asset list, and `refreshIntervalSeconds` how often they are called: see [kinds-and-assets.md](kinds-and-assets.md). Role names are Ignition role names, compared exactly. The map is keyed by the project's own name, even when a child project inherits the setup. A project with no setup, or whose setup names a connection the Gateway does not have, logs one warning naming the project (and the connection) at its first `map.load` or `applyEdits` after a Gateway start, and answers `store-unreachable` **[live 8.3.10]**.
 
 ## The map store, schema version 1 (AD-3, AD-21)
 
@@ -93,6 +93,7 @@ Gateway scope: Perspective session scripts **[live 8.3.10]**, and Gateway event 
 | --- | --- |
 | `system.mapstudio.getMap(project)` | a list of map item records (dicts), deleted ones left out |
 | `system.mapstudio.applyEdits(project, batch, actor)` | `{batchId, seq, results}`; `actor` is required and recorded in the edit record |
+| `system.mapstudio.refreshAdapters(project)` | `{kinds: status, assets: status}` after calling the project's kind and asset functions now; waits for both to answer or time out ([kinds-and-assets.md](kinds-and-assets.md)) **[live 8.3.10]** |
 | `system.mapstudio.ping()` | a short text with the Gateway time (a health check) |
 
 `applyEdits` trusts its caller, like `system.db` (owner decision, 2026-10-26): it saves with full editing under the actor it names. A Perspective session script runs on the Gateway, so a view author can expose saving to someone without an editing role; keep such scripts behind your own role checks. The dev project's `/edit` page does: its "Run script checks" button reads the session user's roles (`session.props.auth.user.roles`, set by the Gateway at sign-in) and writes nothing unless the user holds `MapEditor` **[live 8.3.10]**. A refusal raises a Java exception whose message starts with the code (`role: ...`, `conflict: ...`), and nothing is written. Jython 2.7, catching both kinds of exception:

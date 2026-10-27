@@ -1,0 +1,96 @@
+# Kinds and assets from the project, version 0.2.0 (draft)
+
+Map Studio learns what can be drawn (the **kind list**) and what a map item can be linked to (the **asset list**) from two project library functions the project's setup names (AD-4). The module knows nothing of the project's data model: the functions read it however the project likes and return rows in the shapes below. **Draft:** part of contract 0.2.0 in draft ([contract.md](contract.md)); it may still change until release 0.2.0.
+
+Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway by this repository's e2e suite (`e2e/tests/adapters.spec.mjs`); **[unverified]** written but not seen working.
+
+## Naming the functions
+
+In the setup (`com.aoindustrial.perspective.mapstudio/setup/setup.json`, [contract.md](contract.md)):
+
+```json
+{"kindsFunction": "my_map_adapters.kinds", "assetsFunction": "my_map_adapters.assets", "refreshIntervalSeconds": 10}
+```
+
+Each is a project library module path and a function in it, dotted identifiers only (`my_map_adapters.kinds`, `site.map.assets`); any other text is refused as `failing` without running anything. An empty string means "none": that list is `not-configured`. The functions take no arguments and run in the Gateway scope of the project, through the project's script manager **[live 8.3.10]**, so `system.tag`, `system.db` and the rest are there, and so is `system.mapstudio`.
+
+## The kind list
+
+A list of dicts, one per kind:
+
+```python
+[{'id': 'pad', 'name': 'Well pad', 'geometry': 'point', 'icon': 'well-pad', 'labelRank': 10,
+  'fields': [{'key': 'operator', 'label': 'Operator', 'type': 'text', 'required': False},
+             {'key': 'status', 'label': 'Status', 'type': 'choice', 'required': True,
+              'choices': ['producing', 'shut in', 'abandoned']}]},
+ {'id': 'line', 'name': 'Gathering line', 'geometry': 'line'}]
+```
+
+| Key | Required | Meaning |
+| --- | --- | --- |
+| `id` | yes | Text, at most 64 characters, unique in the list. A map item's `kind` names it. |
+| `name` | yes | Text people read. |
+| `geometry` | yes | `point` or `line`. |
+| `icon` | no | Icon name (checked against the icon set from entry 10); default `""`. |
+| `labelRank` | no | Whole number; when labels collide, the higher rank keeps its label longer. Default 0. |
+| `fields` | no | The form fields of the kind's map items (their `properties`), default none. |
+
+A form field is `{key, label, type, required, choices}`: `key` text, at most 64 characters, unique in the kind; `label` defaults to the key; `type` is `text`, `number`, `integer`, `boolean` or `choice`; `required` defaults to false; a `choice` field needs a non-empty `choices` list of text. Adding a kind needs no module change: return one more row.
+
+## The asset list
+
+A list of dicts, one per asset a map item can be linked to:
+
+```python
+[{'id': 'P12', 'name': 'Pad 12', 'kind': 'pad', 'basePath': '[default]Mesa/P12'}]
+```
+
+| Key | Required | Meaning |
+| --- | --- | --- |
+| `id` | yes | Text, at most 64 characters, unique in the list. A map item's `assetId` names it. |
+| `name` | yes | Text people read. |
+| `kind` | yes | A kind `id` from the kind list. |
+| `basePath` | yes | The asset's fully qualified tag path, provider included: `[default]Mesa/P12`. Live values and alarms are read below it. |
+
+Assets are checked after kinds, against the last good kind list: an asset whose kind is not in it is left out.
+
+For both lists, keys Map Studio does not know are ignored, and the values must be plain JSON values (text, numbers, true or false, lists, dicts). Return a list (a tuple also works), not a Dataset: convert one with `system.dataset.toPyDataSet` and build the dicts.
+
+## What Map Studio does with them
+
+- It calls each function on its own small pool (2 threads, 8 waiting calls) with a **fixed 5 s timeout**, never on a Perspective thread or per click **[live 8.3.10]**.
+- It keeps the result per project in memory and calls again every `refreshIntervalSeconds` of the setup (the setup is read afresh each time), kinds first, then assets. At most one call per project and list is in flight: a call still running at the next refresh is not started again.
+- `system.mapstudio.refreshAdapters(project)` calls both now and returns both statuses; it waits for the calls to answer or time out. Call it after your own kind or asset data changed. A refresh asked for while a call is in flight joins it **[live 8.3.10]**.
+- A timed-out call cannot be stopped (Jython has no safe way): it keeps its thread until it returns, and its answer is dropped.
+- `map.load` carries `kinds` to every session, `assets` only to sessions with phone or full editing (asset rows carry tag paths), and `adapters: {kinds: status, assets: status}` to every session ([contract.md](contract.md)).
+- Later entries read the same cache: map item validation against the kind list (entry 9) and the icon check (entry 10). Nothing is stored in the database.
+
+## Status
+
+Each list has a status: `{status, message, function, count, left, refreshedAt}`. `count` is the number of rows in use, `left` the rows the last call left out, `refreshedAt` when the list in use was read (ISO 8601 UTC, or null).
+
+| `status` | When | `message` (examples) | The list in use |
+| --- | --- | --- | --- |
+| `ok` | every row is good | "3 kinds from mapstudio_dev.kinds." | the new rows |
+| `empty` | the function returned `[]` | "The asset function mapstudio_dev.assets returned no assets." | none |
+| `failing` | the function raised, could not be found, or returned something other than a list | "The kind function mapstudio_dev.kinds failed: RuntimeError: ...", "... returned a dict, expected a list of dicts." | the last good list, if any ("Showing the list from 10:42 UTC.") |
+| `slow` | no answer within 5 s, or Map Studio's adapter pool was full | "The kind function mapstudio_dev.kinds did not answer within 5 s." | the last good list, if any |
+| `incomplete` | some rows were left out | "2 of 6 assets from mapstudio_dev.assets left out: row 5 (id P99): basePath does not start with a [provider]; ..." (the first three reasons) | the good rows |
+| `not-configured` | the setup names no function | "The setup names no kind function." | none |
+| `loading` | the first call has not answered yet | "Loading the kind list from mapstudio_dev.kinds." | none |
+
+All seven words are stable kebab-case; messages are plain words and may change. Reasons name rows by position and `id` only, never other row content.
+
+**Gateway log.** One line per status change per project and list, on the logger `MapStudio.adapters` (the Gateway log shows it as `M.adapters`): a warning into `empty`, `failing`, `slow` or `incomplete`, an info line into `ok` (on the first good list, and "recovered" after a bad one) and into `not-configured`. A status that stays the same logs nothing **[live 8.3.10]**. Exception text is cut to its first line, 200 characters.
+
+## Writing an adapter
+
+- Jython 2.7: no f-strings, no type hints (the Ignition Jython rules).
+- Catch both kinds of exception around `system.*` calls (`java.lang.Throwable` and `Exception`), log the class name, and **re-raise**: a failure must reach Map Studio as `failing`, never as `[]`, which reads as "no rows" and replaces the list.
+- Keep it fast: it runs every refresh interval, and past 5 s the list goes `slow`. Cache in the project if the source is expensive.
+- Return fully qualified base paths, provider included.
+- Two examples, both **[unverified]** on a live Gateway (they compile under Jython 2.7 in the unit tests): [examples/adapters/udt_instances.py](examples/adapters/udt_instances.py) (one asset per UDT instance in the tag tree, through `system.tag.browse`) and [examples/adapters/named_query.py](examples/adapters/named_query.py) (kinds and assets from named queries, through `system.db.execQuery`).
+
+## The dev adapter
+
+The dev project's library `mapstudio_dev` (`ops/project/ignition/script-python/mapstudio_dev/code.py`) is test equipment: three kinds (`pad`, `line`, `geofence`) and four assets, and a mode (`ok`, `empty`, `broken`, `slow`, `incomplete`) switched by the buttons of the `/adapters` page (map editors only) and kept in `system.util.getGlobals()`, which the page's session scripts and Map Studio's calls share **[live 8.3.10]**. Its setup refreshes every 30 s, so the e2e test's two overlapping refreshes are not crossed by a timed one.

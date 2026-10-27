@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -13,8 +14,12 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
 import com.inductiveautomation.ignition.common.gson.JsonParser;
 
 import com.aoindustrial.perspective.mapstudio.common.Messages;
+import com.aoindustrial.perspective.mapstudio.common.contract.AdapterStatus;
+import com.aoindustrial.perspective.mapstudio.common.contract.Asset;
+import com.aoindustrial.perspective.mapstudio.common.contract.Kind;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
+import com.aoindustrial.perspective.mapstudio.gateway.adapter.AdapterSnapshot;
 import com.aoindustrial.perspective.mapstudio.gateway.setup.SetupRegistry;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreState;
@@ -24,6 +29,14 @@ import com.aoindustrial.perspective.mapstudio.gateway.write.NoChangeHook;
 import com.aoindustrial.perspective.mapstudio.gateway.write.WriteService;
 
 class MapLoaderTest {
+
+    static final AdapterSnapshot LISTS = new AdapterSnapshot(
+        List.of(new Kind("pad", "Well pad", "point", "well-pad", 10, List.of())),
+        List.of(new Asset("P12", "Pad 12", "pad", "[default]Mesa/P12")),
+        new AdapterStatus(AdapterStatus.OK, "1 kind from mapstudio_dev.kinds.", "mapstudio_dev.kinds", 1, 0,
+            "2026-10-26T10:00:00Z"),
+        new AdapterStatus(AdapterStatus.OK, "1 asset from mapstudio_dev.assets.", "mapstudio_dev.assets", 1, 0,
+            "2026-10-26T10:00:00Z"));
 
     FakeMapStore store;
     SetupRegistry setups;
@@ -38,7 +51,7 @@ class MapLoaderTest {
         setups.put("mapstudio-dev", Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\"}"));
         state = StoreState.ready();
         StoreGate gate = new StoreGate(setups, c -> state);
-        loader = new MapLoader(gate, store);
+        loader = new MapLoader(gate, store, project -> LISTS);
         writes = new WriteService(gate, store, new NoChangeHook());
     }
 
@@ -74,5 +87,21 @@ class MapLoaderTest {
         assertEquals(Messages.CODE_STORE_UNREACHABLE, noConnection.code());
         assertTrue(noConnection.plainMessage().contains("MapStudio"));
         assertEquals(0, store.transactions, "nothing is read when the store is unreachable");
+    }
+
+    @Test
+    void everyLevelGetsKindsAndBothStatusesButOnlyEditorsGetAssets() {
+        for (String level : List.of(Messages.LEVEL_NONE, Messages.LEVEL_PHONE, Messages.LEVEL_FULL)) {
+            JsonObject body = loader.mapLoadReply("mapstudio-dev", level);
+            assertEquals("pad", body.getAsJsonArray("kinds").get(0).getAsJsonObject().get("id").getAsString());
+            assertEquals("ok", body.getAsJsonObject("adapters").getAsJsonObject("kinds").get("status").getAsString());
+            assertEquals(1, body.getAsJsonObject("adapters").getAsJsonObject("assets").get("count").getAsInt());
+            if (Messages.LEVEL_NONE.equals(level)) {
+                assertTrue(!body.has("assets"), "a viewer gets no asset rows (no tag paths)");
+            } else {
+                assertEquals("[default]Mesa/P12", body.getAsJsonArray("assets").get(0).getAsJsonObject()
+                    .get("basePath").getAsString(), level);
+            }
+        }
     }
 }

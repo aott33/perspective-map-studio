@@ -11,6 +11,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.inductiveautomation.ignition.gateway.model.GatewayContext;
 
+import com.aoindustrial.perspective.mapstudio.gateway.adapter.AdapterService;
+import com.aoindustrial.perspective.mapstudio.gateway.adapter.ProjectFunctionCaller;
 import com.aoindustrial.perspective.mapstudio.gateway.load.MapLoader;
 import com.aoindustrial.perspective.mapstudio.gateway.script.GatewayScriptModule;
 import com.aoindustrial.perspective.mapstudio.gateway.setup.SetupLifecycleFactory;
@@ -31,8 +33,9 @@ import com.aoindustrial.perspective.mapstudio.gateway.write.WriteService;
 /**
  * The Gateway core's parts, wired once per module start: the setup loader, the
  * store registry (connection wait and migrations), the map store repository, the
- * write service, the map loader, the scripting module and two small thread pools
- * (one for the connection wait, one bounded pool for the delegates' database work).
+ * write service, the host adapters (kind and asset lists, with their own small pool),
+ * the map loader, the scripting module and two small thread pools (one for the
+ * connection wait, one bounded pool for the delegates' database work).
  * Each part is its own class, so later entries change one without the others.
  */
 public final class MapStudioServices {
@@ -49,6 +52,7 @@ public final class MapStudioServices {
     final StoreGate gate;
     final MapStore store;
     final WriteService writes;
+    final AdapterService adapters;
     final MapLoader loader;
     final GatewayScriptModule scriptModule;
     private final SetupLifecycleFactory lifecycles;
@@ -64,16 +68,20 @@ public final class MapStudioServices {
         this.store = new JdbcMapStore(connections);
         ChangeHook hook = new NoChangeHook();
         this.writes = new WriteService(gate, store, hook);
-        this.loader = new MapLoader(gate, store);
-        this.scriptModule = new GatewayScriptModule(writes, loader);
+        this.adapters = AdapterService.create(setups::find, setups::projects,
+            new ProjectFunctionCaller(context.getProjectManager()));
+        this.loader = new MapLoader(gate, store, adapters::snapshot);
+        this.scriptModule = new GatewayScriptModule(writes, loader, adapters);
         this.lifecycles = new SetupLifecycleFactory(context, setups);
     }
 
     void start() {
         lifecycles.startup();
+        adapters.start();
     }
 
     void stop() {
+        adapters.stop();
         lifecycles.shutdown();
         scheduler.shutdownNow();
         work.shutdownNow();
