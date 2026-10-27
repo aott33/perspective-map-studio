@@ -29,4 +29,4 @@ A third small demo for a fleet of sites spread over a town: a water or wastewate
 
 - Decision (owner, 2026-10-27): water utility is the third demo.
 - Decision (owner, 2026-10-27): a small water icon set is needed (lift station, well, treatment plant, storage tank, flow meter, pressure meter, valve), drawn in the core set's style; built as an icon story before this demo.
-- Decision (owner, 2026-10-27): the demos live in a separate repository, working name `perspective-map-studio-demos` (owner open to other names), and are hosted on the owner's website, not shipped inside this repository. Waits for story 14 (instruments on lines) and epic-viewing.
+- Decision (owner, 2026-10-27): the demos live in a separate repository, named `map-studio-examples` (owner, 2026-10-27), and are hosted on the owner's website, not shipped inside this repository. Waits for story 14 (instruments on lines) and epic-viewing.

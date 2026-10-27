@@ -27,7 +27,7 @@ A small, self-contained Ignition project that shows Map Studio on an oil and gas
 
 ## Notes
 
-- Decision (owner, 2026-10-27): the demos live in a separate repository, working name `perspective-map-studio-demos` (owner open to other names), and are hosted on the owner's website, not shipped inside this repository.
+- Decision (owner, 2026-10-27): the demos live in a separate repository, named `map-studio-examples` (owner, 2026-10-27), and are hosted on the owner's website, not shipped inside this repository.
 - Open question: Hosting a live demo publicly needs an Ignition license for that Gateway (a trial Gateway stops every 2 hours) and a viewer-only public session (no editing role for anonymous visitors, or edits reset on a schedule); settle both before it goes on the website.
 - Decision (owner, 2026-10-27): waits for epic-viewing (drawing, popups); storing and validation (epic 2) alone is not enough.
 - Decision (owner, 2026-10-27): a smaller made-up field, so the demo stays independent of the template.

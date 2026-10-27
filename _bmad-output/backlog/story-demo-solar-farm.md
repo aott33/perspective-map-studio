@@ -28,4 +28,4 @@ A small, self-contained Ignition project that shows Map Studio outside oil and g
 ## Notes
 
 - Decision (owner, 2026-10-27): a small solar icon set is needed (inverter, combiner box, met station, substation, array block), drawn in the core set's style; built as an icon story before this demo.
-- Decision (owner, 2026-10-27): the demos live in a separate repository, working name `perspective-map-studio-demos` (owner open to other names), and are hosted on the owner's website, not shipped inside this repository. Waits for epic-viewing, as backlog 6.
+- Decision (owner, 2026-10-27): the demos live in a separate repository, named `map-studio-examples` (owner, 2026-10-27), and are hosted on the owner's website, not shipped inside this repository. Waits for epic-viewing, as backlog 6.
