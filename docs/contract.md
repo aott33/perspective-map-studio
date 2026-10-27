@@ -128,7 +128,7 @@ Stable kebab-case words; the message is plain words for the person.
 
 ### Conflicts
 
-A batch with stale ops is refused once, listing every one of them: the stored record (`current`, a deleted one with `deleted: true`), and the user or script actor of its last edit record with the time (`changedBy`, `changedAt`, ISO 8601 UTC to the second; null when there is no edit record). `op` names the first. The message names the map item, or the kind setup by its kind's display name from the kind list ("The Well pad kind setup"; by its kind id when the kind is not in the list; the name is shown on one line and cut after 64 characters; epic 2 story 12), or the count when there are several **[live 8.3.10]**:
+A batch with stale ops is refused once, listing every one of them: the stored record (`current`, a deleted one with `deleted: true`), and the user or script actor of its last edit record with the time (`changedBy`, `changedAt`, ISO 8601 UTC to the second; null when there is no edit record). `op` names the first. The message names the map item, or the kind setup by its kind's display name from the kind list ("The Well pad kind setup"; by its kind id when the kind is not in the list; the name is shown on one line and cut after 64 characters; epic 2 story 12; the id fallback and the cut are unit tested only, `WriteServiceKindSetupTest`), or the count when there are several **[live 8.3.10]**:
 
 ```json
 {"code": "conflict", "batchId": "<UUID>", "op": {"index": 0, "id": "<UUID>"},

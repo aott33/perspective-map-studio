@@ -37,7 +37,7 @@ Layout:
 | `designer/` | the Designer palette entry |
 | `web/` | the TypeScript and React component, MapLibre map, Terra Draw line tool (`DrawControl.tsx`, `draw.ts`), message client (`messages.ts`), the point popup (`PointPopup.tsx`, `popupParams.ts`) and their tests |
 | `e2e/` | the Playwright suite (pinned `@playwright/test`): smoke tests at 1440 and 390 px, the popup checks and the spike's measures |
-| `ops/` | the local development Gateway (Docker) and its `mapstudio-dev` project (`MapStudioDev` at `/`, `MapStudioEdit` at `/edit` with the script checks and the seed button, `MapStudioAdapters`, two popup fallback pages, `Popups/PointDetails`; project libraries `mapstudio_dev`, the dev kind and asset adapter, and `mapstudio_seed`, the dev seed) |
+| `ops/` | the local development Gateway (Docker) and its `mapstudio-dev` project (`MapStudioDev` at `/`, `MapStudioEdit` at `/edit` with the script checks and the seed button, `MapStudioAdapters`, two popup fallback pages, `Popups/PointDetails`; project libraries `mapstudio_dev`, the dev kind and asset adapter and the dev views' role check, and `mapstudio_seed`, the dev seed) |
 | `docs/` | contributor architecture, the platform checks and screenshots |
 
 ## Run the development Gateway

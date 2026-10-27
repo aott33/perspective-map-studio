@@ -104,6 +104,8 @@ test.describe('1440 px', () => {
                 message: `The asset function ${ASSETS_FN} returned no assets.` });
             expect(s.kindsRows).toBe('0');
             // With no kind list a save other than a delete is refused, and nothing is saved.
+            const before = await send(page, 'map.load', {});
+            expect(before.type, JSON.stringify(before.body)).toBe('map.load.reply');
             const refused = await send(page, 'edits.apply', { batchId: randomUUID(), ops: [{
                 op: 'create', entity: 'item', id: randomUUID(), baseVersion: 0,
                 data: { kind: 'pad', name: 'Kind list empty', properties: { status: 'producing' },
@@ -113,6 +115,10 @@ test.describe('1440 px', () => {
             expect(refused.body.code).toBe('invalid');
             expect(refused.body.message).toBe(`The kind list is not available (empty): The kind function ${KINDS_FN}`
                 + ' returned no kinds. Nothing was saved.');
+            const after = await send(page, 'map.load', {});
+            expect(after.type, JSON.stringify(after.body)).toBe('map.load.reply');
+            expect(after.body.seq).toBe(before.body.seq);
+            expect(after.body.items.length).toBe(before.body.items.length);
 
             // Slow: no answer within 5 s.
             r = await press(page, 'slow', 'slow');

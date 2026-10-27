@@ -277,9 +277,10 @@ class AdapterServiceTest {
         // chained and runs on the kind call's thread (epic 2 story 12: an instant answer could
         // settle first and leave the step to this thread, which failed 1 run in 20).
         CountDownLatch chained = new CountDownLatch(1);
+        AtomicBoolean latched = new AtomicBoolean();
         caller.answers.put(KINDS, () -> {
             try {
-                chained.await(10, TimeUnit.SECONDS);
+                latched.set(chained.await(10, TimeUnit.SECONDS));
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
             }
@@ -289,6 +290,7 @@ class AdapterServiceTest {
         chained.countDown();
         AdapterSnapshot s = second.get(5, TimeUnit.SECONDS);
         first.get(5, TimeUnit.SECONDS);
+        assertTrue(latched.get(), "refreshNow returned before the kind call answered");
         assertTrue(overlapped.get(), "the asset call answered while the kind call held the kind monitor");
         assertTrue(ordered.get(), "the asset call settled before the second refresh's asset step");
         assertEquals(AdapterStatus.FAILING, s.kindsStatus().status());
@@ -520,6 +522,7 @@ class AdapterServiceTest {
         // thread, so a call it started would already be a pool task when tick() returns.
         waitFor(() -> service.snapshot(P).kindsStatus().status().equals(AdapterStatus.SLOW)
             && service.snapshot(P).assetsStatus().status().equals(AdapterStatus.SLOW));
+        assertEquals(2, poolBusy(), "both workers held, so a new call would queue and be counted");
         long tasks = poolTasks();
         nanos.addAndGet(TimeUnit.SECONDS.toNanos(10));
         service.tick();
@@ -543,6 +546,7 @@ class AdapterServiceTest {
     void aRefreshAskedWhileATimedOutCallRunsStartsOneCallWhenItEnds() throws Exception {
         caller.hold = new CountDownLatch(1);
         refresh(); // both time out; both calls still run
+        assertEquals(2, poolBusy(), "both workers held, so a new call would queue and be counted");
         long tasks = poolTasks();
         var a = service.refreshNow(P);
         var b = service.refreshNow(P);
@@ -591,9 +595,19 @@ class AdapterServiceTest {
         assertEquals("", AdapterService.firstLine(null));
     }
 
-    /** Tasks ever handed to the test pool; counted when handed over, so no wait is needed to read it. */
+    /**
+     * Tasks ever handed to the test pool. Read with no wait only while every worker is held
+     * ({@link #poolBusy()} is the pool size, 2): a new task then sits in the queue, where
+     * {@code getTaskCount()} counts it at once. A task handed straight to a new or idle worker
+     * may not be counted yet, so with a free worker this count can miss one.
+     */
     long poolTasks() {
         return ((ThreadPoolExecutor) pool).getTaskCount();
+    }
+
+    /** Workers of the test pool running a task now; the precondition of {@link #poolTasks()}. */
+    int poolBusy() {
+        return ((ThreadPoolExecutor) pool).getActiveCount();
     }
 
     /** Tasks of the test pool that have finished (each call and the service's step after it). */

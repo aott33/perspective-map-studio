@@ -3,14 +3,14 @@ title: 'Refactor sweep'
 type: 'refactor'
 ticket: '12'
 created: '2026-10-27'
-status: 'in-review'
+status: 'built'
 baseline_revision: '40298071268fc360260fe568d66369ffb35d5694'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/docs/contract.md'
@@ -111,6 +111,22 @@ Implemented directly (no subagent tool in this session), 2026-10-27, on baseline
 ## Plan Change Log
 
 ## Review Triage Log
+
+Pass 1 (lens: quick, context-free, on commit 1ea830d against 4029807, 2026-10-27; the reviewer ran `AdapterServiceTest`, `WriteServiceKindSetupTest`, `FailureLineTest` and `TagPathsTest`, all passed, and the findings were checked again here against the code): high 0, medium 1, low 6, false 0, maybe-false 0. All seven patched; no loopback (each fix is a test, a javadoc or a doc line; no product behaviour, message shape or contract field changed).
+
+| # | Finding | Verdict | Route | Evidence and action |
+|---|---|---|---|---|
+| 1 | No live test covered the kind setup conflict wording, yet `docs/contract.md` labelled it live | medium | patch | Real: `kindsetup.spec.mjs` asserted the code and `conflicts[0]` only. It now asserts `message` matches `^The Well pad kind setup was changed` (passed on the fresh dev Gateway). `contract.md` keeps **[live 8.3.10]** for the display name and says the id fallback and the 64-character cut are unit tested only; `platform-checks.md` story 12 says the same. |
+| 2 | The deadlock test's latch ignored its own timeout | low | patch | Real: `chained.await` result was dropped. `AdapterServiceTest` records it in `latched` and asserts it after `second.get` ("refreshNow returned before the kind call answered"). |
+| 3 | `poolTasks()` javadoc overstated `getTaskCount()` | low | patch | Real: a task handed straight to a new or idle worker may not be counted yet. The javadoc states the precondition (every worker held, so a new task queues and is counted), and both tests that read `poolTasks()` with no wait first assert `poolBusy()` (`getActiveCount()`) is 2. |
+| 4 | `adapters.spec.mjs` said "nothing is saved" but checked only the error | low | patch | Real. The test reads `map.load` before and after the refused save and asserts `seq` and the item count are unchanged (workers 1, so no other test saves meanwhile). |
+| 5 | The gap reload line was labelled live though the Gateway's reply to it is faked | low | patch (doc) | Real. `platform-checks.md` now says the gap detection and the `map.load` it sends are **[live 8.3.10]**, the reply is faked `busy` by the test and the reload completes on the 15 s timed retry, so the Gateway's reply to a gap's `map.load` is **[unverified]** live. |
+| 6 | Docs did not match the dev library after `holdsMapEditor` | low | patch (doc) | Real. `platform-checks.md` says no `system.mapstudio` function changed and names the new dev library function; `kinds-and-assets.md` and the README say `mapstudio_dev` also holds the dev views' role check, used by `/adapters` and `/edit`, and that a library that fails to load makes those buttons raise and write nothing (fails closed, dev test equipment only, so no separate `mapstudio_devauth` library). |
+| 7 | `KindSetupRecord.name()` javadoc was stale | low | patch | Real. The javadoc says conflict messages name a kind setup through `ConflictReport.kindSetupName` and `name()` is the id-based fallback for other callers. |
+
+Outside the code: the owner's "add the setup form story" is recorded in `_bmad-output/deferred-work.md` for the coordinator; this story edits no ticket file (Never list), so the ticket is not created here.
+
+After the patches: Gradle `clean build` common 87, gateway 269, designer 34; Jest 145; e2e 55 passed, 7 skipped on a fresh `ms-e2s12` stack; `ops/store-checks.sh` rights, partial, healed, newer, upgrade pass.
 
 ## Design Notes
 

@@ -22,7 +22,11 @@ public record KindSetupRecord(String kindId, JsonObject setup, int version, bool
         return o;
     }
 
-    /** "The pad kind setup", for a conflict message. */
+    /**
+     * "The pad kind setup", by kind id. Conflict messages do not use it: they name a kind setup
+     * by its kind's display name through {@code ConflictReport.kindSetupName} (epic 2 story 12).
+     * This is the id-based fallback for other callers.
+     */
     @Override
     public String name() {
         return "The " + kindId + " kind setup";
