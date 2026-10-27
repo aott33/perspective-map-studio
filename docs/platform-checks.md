@@ -409,3 +409,10 @@ The owner's Designer session (the plan's manual check), to be recorded here:
 - [not verified] An invalid setup (refresh `0`) is refused at the project save with the dialog naming the field, and nothing is written; what the Designer does with the rest of that project save.
 - [not verified] With `MapEditor` removed from full editing, saved, and the dev Gateway restarted (story 6 not merged yet), `map.load` for `mapeditor` reports level `none`; restoring the role brings back `full`; `git diff ops/project` shows only the changed line.
 - [not verified] An inherited setup shows "Inherited from <project>" and a save makes this project's own copy.
+
+## Epic 2 story 10 - serving the icon set and checking kind icons
+
+**Question (epic-map-store-and-data, entry 10, phase B):** does the Gateway serve the module's icon files under `/res/mapstudio/icons/` with content types a browser can use, and does a kind naming an unknown icon reach `map.load` and the log as planned? **Answer:** yes **[live 8.3.10]**, on the `ms-e2s10` dev Gateway (port 9132, fresh volumes), 2026-10-27.
+
+- The module's mounted folder serves `mapstudio-icons.svg` as `Content-Type: image/svg+xml`, `icons.json` as `application/json` and `contact-sheet.html` as `text/html`, each `200` with `X-Content-Type-Options: nosniff`; a missing file is `404` **[live 8.3.10]** (curl and `e2e/tests/icons.spec.mjs`). So `<use href>` to the sprite, `fetch` of the catalogue and the contact sheet work as served; no content-type mapping is needed in the module. The contact sheet screenshots in `docs/icons.md` now come from the Gateway.
+- With the dev adapter in mode `unknown-icon` (pad kind naming `wel-pad`), `map.load` kept all 3 kinds at `ok` and the kind message ended "Kind pad names icon wel-pad, which Map Studio does not have; it shows as a plain point."; the Gateway log got one warning ("Kind pad names an icon Map Studio does not have.", as `M.adapters`), and one info line when mode `ok` cleared it; no log line held the icon name **[live 8.3.10]**.

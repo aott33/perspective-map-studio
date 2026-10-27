@@ -19,9 +19,46 @@ terra-draw-maplibre-gl-adapter
     Copyright (c) James Milner (the licence text is in the project's LICENSE
     file on GitHub; the npm packages ship no copy)
 
+This product's icon set (web/icons, served as /res/mapstudio/icons/) is drawn
+for Map Studio under the Apache License, Version 2.0, except the icons listed
+here, adapted from Tabler Icons 3.49.0 (https://github.com/tabler/tabler-icons)
+and modified (web/icons/sources.json says how; web/scripts/icons.mjs checks this
+list against it):
+
+    rtu from building-broadcast-tower
+    lease-road from road
+    geofence from fence
+    region from polygon
+    site-footprint from square-dashed
+
+Tabler Icons is licensed under the MIT License:
+
+    MIT License
+
+    Copyright (c) 2020-2026 Paweł Kuna
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
 This product builds against, but does not redistribute, Inductive Automation's
 Ignition SDK and the @inductiveautomation/perspective-client package, which the
 Ignition platform provides at runtime.
 
-The icon in the Designer palette is drawn by the module itself; nothing in this
-product is derived from OpenBridge.
+The icon in the Designer palette and the map icon set are drawn for the module
+itself or adapted from Tabler Icons as above; nothing in this product is
+derived from OpenBridge.

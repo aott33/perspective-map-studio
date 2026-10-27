@@ -1,0 +1,174 @@
+{
+    "version": "0.2.0",
+    "fallback": "point",
+    "icons": [
+        {
+            "id": "well-pad",
+            "label": "Well pad",
+            "group": "kind",
+            "geometry": "point"
+        },
+        {
+            "id": "wellhead",
+            "label": "Wellhead",
+            "group": "kind",
+            "geometry": "point"
+        },
+        {
+            "id": "tank-battery",
+            "label": "Tank battery",
+            "group": "kind",
+            "geometry": "point"
+        },
+        {
+            "id": "compressor-station",
+            "label": "Compressor station",
+            "group": "kind",
+            "geometry": "point"
+        },
+        {
+            "id": "booster-station",
+            "label": "Booster station",
+            "group": "kind",
+            "geometry": "point"
+        },
+        {
+            "id": "meter-station",
+            "label": "Meter station",
+            "group": "kind",
+            "geometry": "point"
+        },
+        {
+            "id": "pig-trap",
+            "label": "Pig launcher or receiver",
+            "group": "kind",
+            "geometry": "point"
+        },
+        {
+            "id": "line-valve",
+            "label": "Line valve",
+            "group": "kind",
+            "geometry": "point"
+        },
+        {
+            "id": "tap",
+            "label": "Tap",
+            "group": "kind",
+            "geometry": "point"
+        },
+        {
+            "id": "rtu",
+            "label": "RTU or comms tower",
+            "group": "kind",
+            "geometry": "point"
+        },
+        {
+            "id": "swd",
+            "label": "Salt water disposal",
+            "group": "kind",
+            "geometry": "point"
+        },
+        {
+            "id": "separator",
+            "label": "Separator",
+            "group": "kind",
+            "geometry": "point"
+        },
+        {
+            "id": "pipeline",
+            "label": "Pipeline",
+            "group": "kind",
+            "geometry": "line"
+        },
+        {
+            "id": "lateral",
+            "label": "Lateral",
+            "group": "kind",
+            "geometry": "line"
+        },
+        {
+            "id": "lease-road",
+            "label": "Lease road",
+            "group": "kind",
+            "geometry": "line"
+        },
+        {
+            "id": "geofence",
+            "label": "Geofence",
+            "group": "kind",
+            "geometry": "area"
+        },
+        {
+            "id": "region",
+            "label": "Region",
+            "group": "kind",
+            "geometry": "area"
+        },
+        {
+            "id": "site-footprint",
+            "label": "Site footprint",
+            "group": "kind",
+            "geometry": "area"
+        },
+        {
+            "id": "point",
+            "label": "Point (fallback)",
+            "group": "kind",
+            "geometry": "point"
+        },
+        {
+            "id": "comms-lost",
+            "label": "Comms lost",
+            "group": "state",
+            "geometry": null
+        },
+        {
+            "id": "stale",
+            "label": "Stale",
+            "group": "state",
+            "geometry": null
+        },
+        {
+            "id": "alarm-1-unacknowledged",
+            "label": "Alarm priority 1 (Critical, High), unacknowledged",
+            "group": "state",
+            "geometry": null
+        },
+        {
+            "id": "alarm-1-acknowledged",
+            "label": "Alarm priority 1 (Critical, High), acknowledged",
+            "group": "state",
+            "geometry": null
+        },
+        {
+            "id": "alarm-1-rectified",
+            "label": "Alarm priority 1 (Critical, High), cleared, not yet acknowledged",
+            "group": "state",
+            "geometry": null
+        },
+        {
+            "id": "alarm-2-unacknowledged",
+            "label": "Alarm priority 2 (Medium), unacknowledged",
+            "group": "state",
+            "geometry": null
+        },
+        {
+            "id": "alarm-2-acknowledged",
+            "label": "Alarm priority 2 (Medium), acknowledged",
+            "group": "state",
+            "geometry": null
+        },
+        {
+            "id": "alarm-2-rectified",
+            "label": "Alarm priority 2 (Medium), cleared, not yet acknowledged",
+            "group": "state",
+            "geometry": null
+        },
+        {
+            "id": "alarm-3",
+            "label": "Alarm priority 3 (Low), every state; faded once acknowledged",
+            "group": "state",
+            "geometry": null
+        }
+    ]
+}

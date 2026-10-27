@@ -4,7 +4,8 @@
 # page switches the mode to show each status Map Studio reports.
 #
 # Modes: ok (good lists), empty (no rows), broken (raises), slow (sleeps 8 s,
-# past Map Studio's 5 s timeout), incomplete (some bad rows).
+# past Map Studio's 5 s timeout), incomplete (some bad rows), unknown-icon (the
+# pad kind names an icon Map Studio does not have, story 2.10; assets as ok).
 #
 # The mode is kept in system.util.getGlobals(), shared by the Gateway's scripts,
 # so a Perspective session script's set_mode reaches the calls Map Studio makes
@@ -13,10 +14,12 @@
 import java.lang
 import time
 
-MODES = ('ok', 'empty', 'broken', 'slow', 'incomplete')
+MODES = ('ok', 'empty', 'broken', 'slow', 'incomplete', 'unknown-icon')
 MODE_KEY = 'mapstudio_dev.adapter_mode'
 CALLS_KEY = 'mapstudio_dev.adapter_calls'
 SLOW_SECONDS = 8
+# Not in Map Studio's icon set (docs/icons.md): mode unknown-icon gives it to the pad kind.
+UNKNOWN_ICON = 'wel-pad'
 
 logger = system.util.getLogger('MapStudio.devadapter')
 
@@ -31,7 +34,7 @@ KINDS = [
      'fields': [
          {'key': 'diameter', 'label': 'Diameter (in)', 'type': 'number', 'required': False},
          {'key': 'buried', 'label': 'Buried', 'type': 'boolean', 'required': False}]},
-    {'id': 'geofence', 'name': 'Geofence', 'geometry': 'line', 'icon': 'fence', 'labelRank': 0, 'fields': []},
+    {'id': 'geofence', 'name': 'Geofence', 'geometry': 'line', 'icon': 'geofence', 'labelRank': 0, 'fields': []},
 ]
 
 ASSETS = [
@@ -100,6 +103,10 @@ def _rows(what, good, incomplete):
         return [dict(row) for row in good]
     if current == 'incomplete':
         return [dict(row) for row in good] + incomplete
+    if current == 'unknown-icon' and what == 'kinds':
+        rows = [dict(row) for row in good]
+        rows[0]['icon'] = UNKNOWN_ICON
+        return rows
     return [dict(row) for row in good]
 
 

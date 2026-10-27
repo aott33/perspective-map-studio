@@ -5,9 +5,11 @@
     "private": true,
     "license": "Apache-2.0",
     "scripts": {
-        "build": "webpack --mode production",
-        "build:dev": "webpack --mode development",
-        "test": "jest",
+        "build": "webpack --mode production && node scripts/icons.mjs",
+        "build:dev": "webpack --mode development && node scripts/icons.mjs",
+        "test": "node scripts/icons.mjs --check && jest",
+        "icons": "node scripts/icons.mjs",
+        "icons:catalogue": "node scripts/icons.mjs --write-catalogue",
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
