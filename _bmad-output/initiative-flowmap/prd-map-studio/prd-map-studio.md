@@ -577,6 +577,8 @@ A map editor shows an imported KML or GeoJSON file as a reference layer under th
 
 Deferred, not dropped, in the UX workshop (ux-map-studio, 2026-10-27): the first version's Layers offers only the basemap switch (FR-32); reference layers and land grids come later (6.3).
 
+Parked in the backlog (owner, 2026-10-27): FR-26 is not covered by any epic; it is held as `_bmad-output/backlog/story-reference-layers.md` (initiative R29) until the owner brings it back.
+
 **Consequences (testable):**
 - A reference layer can be shown, hidden and removed, and is never edited or saved as map items.
 
@@ -708,7 +710,7 @@ These match the initiative's seven epics (2026-10-26).
 - A second renderer (MapWeave).
 - Open-source release (README, examples, Exchange listing): after the owner validates it in the template (open question 1).
 - Scale beyond the 30-pad scale set (NFR-1).
-- Deferred, not dropped, in the UX workshop (ux-map-studio, 2026-10-27): reference layers and land grids (FR-26), and the Mapbox vector style basemap option (FR-32). The first-run tour is dropped (FR-36).
+- Deferred, not dropped, in the UX workshop (ux-map-studio, 2026-10-27): reference layers and land grids (FR-26, parked in the backlog, initiative R29), and the Mapbox vector style basemap option (FR-32). The first-run tour is dropped (FR-36).
 
 ### 6.4 First step: the spike
 
