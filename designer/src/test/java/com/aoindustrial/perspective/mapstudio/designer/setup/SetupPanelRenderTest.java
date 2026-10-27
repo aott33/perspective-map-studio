@@ -19,10 +19,11 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Paints the setup form headless into PNGs (epic 2 story 16), for a look against the mockup
- * PNGs: normal, reasons, empty, new and unreachable. Runs only with
+ * PNGs: normal, reasons, empty and new. Runs only with
  * {@code -PmapstudioScreenshots=<folder>}. Swing's cross-platform look with the DESIGN.md
- * stand-in colours on the UIManager keys the form reads; the Designer's own look and feel is
- * not on the test class path, so a Designer shows its own controls.
+ * stand-in colours on the UIManager keys the form reads; the Designer's own look and feel
+ * (Synthetica, ignition-laf) is not on the test class path, so the dropdowns and the spinner
+ * here are Swing's Metal ones, and a Designer draws its own (fix 16).
  */
 class SetupPanelRenderTest {
 
@@ -48,7 +49,7 @@ class SetupPanelRenderTest {
         Font font = new Font("DejaVu Sans", Font.PLAIN, 13);
         UIManager.put("defaultFont", new FontUIResource(font));
         for (String k : new String[] {"Label.font", "TextField.font", "CheckBox.font", "Button.font", "TextArea.font",
-            "List.font", "ToolTip.font"}) {
+            "List.font", "ToolTip.font", "ComboBox.font", "Spinner.font", "FormattedTextField.font"}) {
             UIManager.put(k, new FontUIResource(font));
         }
         UIManager.put("Panel.background", new Color(0xF4, 0xF5, 0xF7));
@@ -88,8 +89,5 @@ class SetupPanelRenderTest {
         }, new FakeListSource());
         render(dir, "empty", SetupPanel::showEmpty, new FakeListSource());
         render(dir, "new", SetupPanel::showNew, new FakeListSource());
-        FakeListSource down = new FakeListSource();
-        down.reachable = false;
-        render(dir, "unreachable", p -> p.show(SetupForm.fromJson(SETUP), false, ""), down);
     }
 }

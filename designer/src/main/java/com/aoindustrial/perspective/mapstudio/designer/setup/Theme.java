@@ -9,7 +9,6 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Path2D;
-import java.awt.geom.RoundRectangle2D;
 
 import javax.swing.Icon;
 import javax.swing.UIManager;
@@ -109,7 +108,7 @@ final class Theme {
 
     /** A drawn glyph; its colour is read when painted. */
     enum Glyph implements Icon {
-        ERROR, WARNING, CLOUD, LOCK, INFO, MAP;
+        ERROR, WARNING, LOCK, INFO, MAP;
 
         @Override
         public void paintIcon(Component c, Graphics g0, int x, int y) {
@@ -136,13 +135,6 @@ final class Theme {
                     g.setColor(Color.WHITE);
                     g.fillRect(6, 5, 2, 4);
                     g.fillRect(6, 10, 2, 2);
-                }
-                case CLOUD -> {
-                    g.setColor(secondary());
-                    g.setStroke(new BasicStroke(1.3f));
-                    g.draw(new RoundRectangle2D.Double(1, 6, 12, 6, 6, 6));
-                    g.draw(new Ellipse2D.Double(4, 3, 6, 6));
-                    g.drawLine(1, 1, 13, 13);
                 }
                 case LOCK -> {
                     g.setColor(secondary());

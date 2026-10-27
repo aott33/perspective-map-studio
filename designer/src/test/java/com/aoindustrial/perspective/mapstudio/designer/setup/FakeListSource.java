@@ -8,7 +8,7 @@ import com.aoindustrial.perspective.mapstudio.common.contract.SetupLists;
 import com.aoindustrial.perspective.mapstudio.common.contract.SetupLists.Entry;
 import com.aoindustrial.perspective.mapstudio.common.contract.SetupLists.Part;
 
-/** The dev Gateway and project as the form's lists see them; switchable to unreachable. */
+/** The dev Gateway and project as the form's lists see them; switchable to a Gateway that is down. */
 final class FakeListSource implements SetupListSource {
 
     boolean reachable = true;

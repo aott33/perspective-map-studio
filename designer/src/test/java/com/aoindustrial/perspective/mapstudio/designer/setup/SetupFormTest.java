@@ -363,26 +363,25 @@ class SetupFormTest {
         throw new AssertionError("the Gateway reads " + json);
     }
 
-    // Row: invalid field, the refusal the save shows (the log line; never a dialog, owner 2026-10-27).
+    // Row: invalid field, the hold-back the save logs (never a dialog, owner 2026-10-27; fix 16).
 
     @Test
-    void aRefusalNamesEveryFieldForTheLog() {
+    void aHoldBackNamesEveryFieldForTheLog() {
         Map<String, List<String>> reasons = SetupForm.defaults()
             .setText(SetupForm.REFRESH, "0").setText(SetupForm.KINDS_FUNCTION, "kinds").reasons();
-        SetupRefusedException refused = new SetupRefusedException(reasons);
-        assertEquals(reasons, refused.reasons());
-        String log = refused.getMessage();
+        SetupCommit.Decision d = new SetupCommit.Decision(null, reasons);
+        assertTrue(d.isHeldBack());
+        String log = d.summary();
         assertTrue(log.startsWith("connection: Name the database connection"), log);
         assertTrue(log.contains("; kindsFunction: ") && log.contains("; refreshIntervalSeconds: "), log);
-        SetupRefusedException.NotSaved notSaved = new SetupRefusedException.NotSaved("mapstudio-dev", refused);
-        assertEquals("Map Studio setup of project mapstudio-dev not saved: " + log, notSaved.getMessage());
-        assertSame(refused, notSaved.getCause());
+        assertEquals("Map Studio setup of project mapstudio-dev held back from this save; the rest of the project"
+            + " is saved. Reasons: " + log, SetupForm.msg("setup.heldBack.log", "mapstudio-dev", log));
     }
 
     @Test
-    void aRefusalNamingNoFieldSaysSetup() {
+    void aHoldBackNamingNoFieldSaysSetup() {
         Map<String, List<String>> reasons = Map.of(SetupForm.GENERAL, List.of("Something."));
-        SetupRefusedException refused = new SetupRefusedException(reasons);
-        assertEquals("setup: Something.", refused.getMessage());
+        assertEquals("setup: Something.", new SetupCommit.Decision(null, reasons).summary());
+        assertFalse(new SetupCommit.Decision(SetupForm.defaults(), Map.of()).isHeldBack());
     }
 }

@@ -14,17 +14,19 @@ import com.inductiveautomation.ignition.designer.tabbedworkspace.TabbedResourceW
 import com.aoindustrial.perspective.mapstudio.common.MapStudioModule;
 
 /**
- * The setup editor tab (epic 2 stories 7 and 16): a {@link SetupPanel} on the project's one
- * setup resource. A save with reasons left is refused and writes nothing; the refusal fails the
- * project save with the Designer's own save failure and no Map Studio dialog (owner, 2026-10-27);
- * a read-only setup is never written.
+ * The setup editor tab (epic 2 stories 7 and 16, fix 16): a {@link SetupPanel} on the project's
+ * one setup resource. A setup with reasons left is held back from the project save: the rest of
+ * the project saves, nothing of the setup is written, and the tab keeps its changes and reasons,
+ * its tab and node reading "(unsaved)" (owner, 2026-10-27). A read-only setup is never written.
  *
  * <p>SDK behaviour read from the 8.3.0 jars with javap, not yet seen in a Designer
  * [unverified]: {@code ResourceEditor}'s constructor reads the resource and calls {@link #init}
  * before this class's fields are set, so the panel is made in {@code init}; {@code commit()}
- * calls {@link #getObjectForSave}, skips the write when {@link #isOptimizeCommits} and the object
- * equals the one read, and hands any exception to {@link #onCommitFailed}, whose throw leaves
- * {@code commit()}.
+ * calls {@link #getObjectForSave} and, with {@link #isOptimizeCommits}, writes nothing when that
+ * object equals the one read ("Avoiding commit - resource has not changed."), which is how the
+ * setup is held back; a throw from {@code commit()} would instead fail the whole project save
+ * (the Designer's module commit task returns false and shows "Error encountered in module ...
+ * while saving."), which is what story 16 did.
  */
 public final class SetupEditor extends ResourceEditor<SetupForm> {
 
@@ -32,6 +34,8 @@ public final class SetupEditor extends ResourceEditor<SetupForm> {
 
     /** Not final and not initialised here: the super constructor calls {@link #init} first. */
     private SetupPanel panel;
+    /** True when the last project save held this setup back. */
+    private boolean heldBack;
 
     public SetupEditor(TabbedResourceWorkspace workspace, ResourcePath path) {
         super(workspace, path);
@@ -44,7 +48,7 @@ public final class SetupEditor extends ResourceEditor<SetupForm> {
 
     @Override
     public String getTabTitle() {
-        return SetupForm.msg("setup.tab");
+        return SetupForm.msg(hasUnsavedChanges() ? "setup.node.unsaved" : "setup.tab");
     }
 
     @Override
@@ -57,10 +61,10 @@ public final class SetupEditor extends ResourceEditor<SetupForm> {
     @Override
     protected void init(SetupForm form) {
         if (panel == null) {
-            // No edit callback: ResourceEditor has no dirty flag to raise. The project save
-            // commits this tab (MapStudioDesignerHook.notifyProjectSaveStart) and commit()
-            // compares the form with the one read [SDK 8.3.0 javap].
-            panel = new SetupPanel(null, null, new DesignerListSource(context), SetupListSource.Async.SWING);
+            // ResourceEditor has no dirty flag to raise: the project save commits this tab
+            // (MapStudioDesignerHook.notifyProjectSaveStart) and commit() compares the form with
+            // the one read [SDK 8.3.0 javap]. An edit only updates the "(unsaved)" words.
+            panel = new SetupPanel(this::edited, null, new DesignerListSource(context), SetupListSource.Async.SWING);
             setLayout(new BorderLayout());
             add(panel, BorderLayout.CENTER);
         }
@@ -73,36 +77,41 @@ public final class SetupEditor extends ResourceEditor<SetupForm> {
             String from = project.getDefiningProject(path);
             note = SetupForm.msg(locked ? "setup.state.inheritedLocked" : "setup.state.inherited", from);
         }
+        heldBack = false;
         panel.show(form, locked, note);
+        edited();
+    }
+
+    /** The form holds changes the project does not have. */
+    boolean hasUnsavedChanges() {
+        return panel != null && panel.hasUnsavedChanges();
+    }
+
+    /** True when the last project save held this setup back; cleared when read. */
+    boolean takeHeldBack() {
+        boolean was = heldBack;
+        heldBack = false;
+        return was;
+    }
+
+    private void edited() {
+        if (workspace instanceof SetupWorkspace w) {
+            w.refreshNode();
+        }
     }
 
     @Override
-    protected SetupForm getObjectForSave() throws SetupRefusedException {
-        return SetupCommit.formToSave(panel, getResource());
+    protected SetupForm getObjectForSave() {
+        SetupCommit.Decision d = SetupCommit.formToSave(panel, getResource());
+        if (d.isHeldBack()) {
+            heldBack = true;
+            LOG.warn(SetupForm.msg("setup.heldBack.log", context.getProject().getName(), d.summary()));
+        }
+        return d.form();
     }
 
     @Override
     protected void serializeResource(ResourceBuilder builder, SetupForm form) {
         builder.putData(MapStudioModule.SETUP_FILE, form.toJson().getBytes(StandardCharsets.UTF_8));
-    }
-
-    /** Scrolls to and focuses the first reason (a refused save brings the tab forward on it). */
-    void goToFirstReason() {
-        if (panel != null) {
-            panel.goToFirstReason();
-        }
-    }
-
-    @Override
-    protected void onCommitFailed(Exception ex) {
-        if (ex instanceof SetupRefusedException) {
-            SetupRefusedException.NotSaved notSaved =
-                new SetupRefusedException.NotSaved(context.getProject().getName(), (SetupRefusedException) ex);
-            LOG.warn(notSaved.getMessage());
-            // No dialog: the reasons are beside their fields and in the footer. The throw fails
-            // the project save, which the Designer reports in its own words [unverified].
-            throw notSaved;
-        }
-        super.onCommitFailed(ex);
     }
 }

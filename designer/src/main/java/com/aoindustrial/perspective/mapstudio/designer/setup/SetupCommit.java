@@ -3,46 +3,65 @@ package com.aoindustrial.perspective.mapstudio.designer.setup;
 import java.util.List;
 import java.util.Map;
 
-/** The setup editor's commit step, with no SDK type, so it is unit tested. */
+/**
+ * The setup editor's commit step, with no SDK type, so it is unit tested. A setup with reasons
+ * left is held back from the project save: the rest of the project saves, nothing of the setup is
+ * written, and the tab keeps its changes and reasons (owner, 2026-10-27, fix 16).
+ */
 final class SetupCommit {
 
     private SetupCommit() {
     }
 
     /**
-     * What {@link SetupEditor#getObjectForSave()} hands the SDK: the setup as read when
-     * there is no panel or it is read only (equal to the one read, so nothing is
-     * written), else the panel's setup; a setup with reasons left is refused.
+     * What one project save does with the setup.
+     *
+     * @param form the setup to write; for an open tab held back, the setup as read (equal to it, so
+     *             {@code ResourceEditor.commit()} writes nothing); for a new setup held back, null
+     * @param heldBack the reasons that hold it back, empty when it saves
      */
-    static SetupForm formToSave(SetupPanel panel, SetupForm read) throws SetupRefusedException {
-        if (panel == null || panel.isLocked()) {
-            return read;
+    record Decision(SetupForm form, Map<String, List<String>> heldBack) {
+        Decision {
+            heldBack = heldBack == null ? Map.of() : heldBack;
         }
-        SetupForm form = panel.current();
-        Map<String, List<String>> reasons = form.reasons();
-        if (!reasons.isEmpty()) {
-            throw new SetupRefusedException(reasons);
+
+        boolean isHeldBack() {
+            return !heldBack.isEmpty();
         }
-        return form;
+
+        /** The reasons in one line, for the log. */
+        String summary() {
+            StringBuilder sb = new StringBuilder();
+            heldBack.forEach((field, list) -> sb.append(sb.length() == 0 ? "" : "; ")
+                .append(field.isEmpty() ? "setup" : field).append(": ").append(String.join(" ", list)));
+            return sb.toString();
+        }
     }
 
     /**
-     * What a project save does with a new setup (the workspace's own tab): the form to create
-     * the resource with, or a refusal when reasons are left (the save fails, no dialog).
+     * What {@link SetupEditor#getObjectForSave()} hands the SDK: the setup as read when there is
+     * no panel or it is read only, or when reasons are left (held back); else the panel's setup.
      */
-    static SetupForm newSetupToSave(SetupPanel draft) throws SetupRefusedException {
-        SetupForm form = draft.current();
-        Map<String, List<String>> reasons = form.reasons();
-        if (!reasons.isEmpty()) {
-            throw new SetupRefusedException(reasons);
+    static Decision formToSave(SetupPanel panel, SetupForm read) {
+        if (panel == null || panel.isLocked()) {
+            return new Decision(read, Map.of());
         }
-        return form;
+        SetupForm form = panel.current();
+        Map<String, List<String>> reasons = form.reasons();
+        return reasons.isEmpty() ? new Decision(form, Map.of()) : new Decision(read, reasons);
     }
 
-    /** The project browser node's words. */
-    static String nodeText(boolean hasSetup, boolean inherited, boolean newSetup) {
+    /** What a project save does with a new setup (the workspace's own tab). */
+    static Decision newSetupToSave(SetupPanel draft) {
+        SetupForm form = draft.current();
+        Map<String, List<String>> reasons = form.reasons();
+        return reasons.isEmpty() ? new Decision(form, Map.of()) : new Decision(null, reasons);
+    }
+
+    /** The project browser node's words (and the tab's). */
+    static String nodeText(boolean hasSetup, boolean inherited, boolean newSetup, boolean unsaved) {
         if (hasSetup) {
-            return SetupForm.msg(inherited ? "setup.node.inherited" : "setup.root");
+            return SetupForm.msg(unsaved ? "setup.node.unsaved" : inherited ? "setup.node.inherited" : "setup.root");
         }
         return SetupForm.msg(newSetup ? "setup.node.new" : "setup.node.none");
     }

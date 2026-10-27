@@ -23,7 +23,7 @@ class SetupFormListsTest {
 
     private FormLists loaded() throws Exception {
         return FormLists.none().withProject(source.project())
-            .withGateway(SetupLists.fromJson(source.gatewayLists("default")), true)
+            .withGateway(SetupLists.fromJson(source.gatewayLists("default")))
             .withSecretNames("Internal", Part.fromJson(source.secretNames("Internal")));
     }
 
@@ -58,11 +58,12 @@ class SetupFormListsTest {
         assertTrue(form.canSave());
     }
 
-    // Matrix: Gateway unreachable - no warnings from Gateway lists; functions and pages still checked.
+    // Matrix: a Gateway list that failed (no Gateway, a refusal) - no warnings from Gateway lists;
+    // functions and pages still checked.
     @Test
-    void anUnreachableGatewayGivesNoGatewayWarnings() {
+    void aFailedGatewayListGivesNoGatewayWarnings() {
         FormLists lists = FormLists.none().withProject(source.project())
-            .withGateway(SetupLists.unavailable(""), false);
+            .withGateway(SetupLists.unavailable(""));
         SetupForm form = SetupForm.fromJson(VALID).setText(SetupForm.CONNECTION, "MapStore")
             .setList(SetupForm.FULL_ROLES, List.of("MapEdtor")).setText(SetupForm.KINDS_FUNCTION, "mapstudio_dev.kind")
             .setText(SetupForm.TOKEN_SECRET, "Vault/x");
