@@ -133,6 +133,8 @@ Every later section, and every document built from this PRD, uses these terms ex
 - **Asset contract** - what the project must supply for each asset (at least an id, a name, a kind and a base path) and how.
 - **Linked** and **unlinked** - a map item is linked when it points to an asset, and unlinked otherwise. Unlinked items are allowed and counted.
 - **Base path** - the tag path of an asset, from which the kind setup's relative paths are resolved.
+- **Asset-relative path** - a tag path written from the base path as `{asset.path}/...`, resolved for each map item from its own asset (FR-12).
+- **Tag browser** - Map Studio's own tag tree with a tag provider dropdown, opened wherever a map editor picks a tag; a pick inside the preview asset's folder becomes an asset-relative path (FR-12).
 - **Comms path** - the tag whose value is a map item's communication state. The project decides how that tag is computed (in the template, from each source's `Heartbeat`).
 - **KPI** - a key value shown in a map item's popup, read from a tag path. A kind setup has up to 4; one of them may be marked as the **icon KPI**, shown on the icon.
 - **Alarms path** - the place in the tag hierarchy whose alarms belong to a map item. It drives the alarm count and the popup's alarm summary.
@@ -227,7 +229,7 @@ Map Studio shows everything the template's current map shows, as approved in its
 
 Approved by the owner 2026-10-26. It extends FR-2 and FR-34 and keeps their rule: normal is neutral, hue only for abnormal state, always with a word or glyph (NFR-4, NFR-11, SM-C2).
 
-A kind setup may bind a map item's look to one value through a style rule: the integrator picks the value (a tag relative to the item's base path, or one of the kind setup's KPIs), picks a rule type, and maps each state or band to a style preset. Realizes UJ-3, UJ-5.
+A kind setup may bind a map item's look to one value through a style rule: the integrator picks the value (a tag relative to the item's base path, a full tag path picked outside the asset's folder with FR-12's same-tag warning (owner, 2026-10-27), or one of the kind setup's KPIs), picks a rule type, and maps each state or band to a style preset. Realizes UJ-3, UJ-5.
 
 **Consequences (testable):**
 - Rule type States maps named or enumerated values (for example running, shut-in, testing, bypassed) to presets; rule type Bands maps numeric thresholds (for example pressure normal, above high, above high-high) to presets.
@@ -289,12 +291,12 @@ A user opens a map item's popup by clicking or tapping it; the popup shows the p
 
 #### FR-37: Custom popup view
 
-A kind setup may name a project view to open instead of the default popup, as a table's row subview does, as `popupView {path, params}`. The view always receives the map item object as its `mapItem` parameter; `params` adds extra named parameters, each value either a literal or one placeholder from the closed list (FR-6). This lets a project reuse an existing view whose parameters have their own names (for example `padName`, `tagPath`) without a wrapper view or script (owner, 2026-10-27). Realizes UJ-5. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
+A kind setup may name a project view to open instead of the default popup, as a table's row subview does, as `popupView {path, params}`. The view always receives the map item object as its `mapItem` parameter; `params` adds extra named parameters, each value either a string literal or exactly one placeholder from the closed list (FR-6), and no param may be named `mapItem` (owner, 2026-10-27). This lets a project reuse an existing view whose parameters have their own names (for example `padName`, `tagPath`) without a wrapper view or script (owner, 2026-10-27). Realizes UJ-5. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
 
 **Consequences (testable):**
 - A kind setup with a custom popup view opens that view, with the map item object filled, instead of the default popup.
 - A kind setup with `popupView {path: "Popups/PadDetails", params: {padName: "{item.name}", tagPath: "{asset.path}", area: "Mesa"}}` opens that view on pad P12 with `mapItem`, `padName` `P12`, `tagPath` the asset's base path and `area` `Mesa` (owner, 2026-10-27).
-- A kind setup whose params name a placeholder outside the closed list is refused when it is saved, with a plain-words reason (owner, 2026-10-27).
+- A kind setup whose params name a placeholder outside the closed list, mix text with a placeholder, or name a param `mapItem` is refused when it is saved, with a plain-words reason (owner, 2026-10-27).
 - The map item object's fields are documented, with an example view that embeds the alarm table filtered to the alarms path; acknowledging there follows Ignition's acknowledge permissions.
 - A custom popup view that is missing or fails to load falls back to the default popup with a message.
 
@@ -310,7 +312,7 @@ Where enabled, the default popup shows the alarm summary for the map item's alar
 
 #### FR-6: Popup link
 
-Where configured, the popup shows a link that goes to a project page or a URL, with placeholders filled from the clicked map item, using Perspective's navigation. The link is an open or pop-out icon in the popup header, not a button in its body (UX workshop, ux-map-studio, 2026-10-27). Its placeholders come from one closed list, shared with a custom popup view's params (FR-37) and the alarm page (FR-5): `{item.id}`, `{item.name}`, `{asset.id}`, `{asset.path}` and `{item.properties.X}` for the map item's property X (owner, 2026-10-27). Realizes UJ-5. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
+Where configured, the popup shows a link that goes to a project page or a URL, with placeholders filled from the clicked map item, using Perspective's navigation. The link is an open or pop-out icon in the popup header, not a button in its body (UX workshop, ux-map-studio, 2026-10-27). Its placeholders come from one closed list, shared with a custom popup view's params (FR-37) and the alarm page (FR-5): `{item.id}`, `{item.name}`, `{asset.id}`, `{asset.path}` and `{item.properties.X}` for the map item's property X (owner, 2026-10-27). Unlike a param, a link may mix text with any number of placeholders, and so may the alarm page (owner, 2026-10-27). Realizes UJ-5. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
 
 **Consequences (testable):**
 - A link `/ctb/{asset.id}` on CTB1 goes to the project page `/ctb/CTB1`.
@@ -421,8 +423,12 @@ A map editor writes a kind's setup once: comms path, up to 4 KPIs, alarms path, 
 - A tag browser lets the editor pick a tag instead of typing a path.
 - A path that does not resolve for a map item is reported for that map item, not silently left blank.
 - Amended in the UX workshop (ux-map-studio, 2026-10-27): the Kinds screen sets up only the kinds the project already defines (FR-9); it adds no kinds.
-- The tag browser shows one example asset's tags and turns the pick into a path relative to the asset's base path; typed paths still work. [UNVERIFIED: a Gateway tag-browse lookup for the module, to check on a live 8.3 Gateway]
-- In scope for the first version (owner, 2026-10-27): the tag browser is Map Studio's own tree, not Perspective's Tag Browse Tree component, so the Kinds screen keeps one consistent look. Each tag shows its name, type and data type, and a candidate path says for how many of the kind's map items it resolves ("resolves for N of M items"). Only map editors with full editing browse; the Gateway checks the role.
+- In scope for the first version (owner, 2026-10-27): the tag browser is Map Studio's own tree, not Perspective's Tag Browse Tree component, so the Kinds screen keeps one consistent look. Only map editors with the full editing role browse; the Gateway checks the role.
+- Refined by the owner, 2026-10-27: the tag browser is a regular tag tree with a tag provider dropdown, the Gateway's default provider selected first; each tag shows its name, type and data type. It opens wherever an editor picks a value: key values, comms path, alarms path, a style rule's value and popup params. Typed paths still work. [UNVERIFIED: a Gateway tag browse of any provider for the module, to check on a live 8.3 Gateway]
+- In a kind's setup the tag browser opens at the preview item's asset folder (for example `[default]Mesa/P12`); the editor can browse up and anywhere in any provider.
+- A pick inside the preview asset's folder is converted automatically to an asset-relative path, for example `{asset.path}/Pressure`, and shown with how many of the kind's map items it resolves for ("resolves for N of M items", M counting the kind's map items that have a base path).
+- A pick outside the preview asset's folder is stored as the full path, with the warning "Same tag for every <kind>" (for example "Same tag for every pad").
+- On a single map item's override (FR-13), a pick is stored as the full path.
 - The live preview uses a map item the editor chooses.
 - The kind setup's sections come in this order: Icon, Key values, Comms, Alarms, Popup, Style rule (last, because it builds on the key values).
 
@@ -771,7 +777,8 @@ Target date for SM-1 to SM-5: end of January 2027, a target and not a deadline.
 13. Answered in the UX workshop (ux-map-studio, 2026-10-27): reference layers (FR-26) and the Mapbox vector style option (FR-32) are deferred, not dropped.
 14. Answered in the UX workshop (ux-map-studio, 2026-10-27): there is no Publish step; live saves, Undo and Recent changes cover it (FR-17, FR-29, FR-44).
 15. Answered 2026-10-27 (owner): a custom popup view is `popupView {path, params}`, the view always receiving `mapItem`, with params mapped from a literal or one placeholder from a closed list that popup links and the alarm page share (FR-5, FR-6, FR-37). Still open, in the backlog: a per-item override of params, what an empty or missing placeholder value does in a param, and URL-encoding of link values.
-16. Answered 2026-10-27 (owner): the Kinds screen's tag browser is in the first version, built as Map Studio's own tree rather than Perspective's Tag Browse Tree component (FR-12).
+16. Answered 2026-10-27 (owner): the Kinds screen's tag browser is in the first version, built as Map Studio's own tree rather than Perspective's Tag Browse Tree component (FR-12). Refined the same day: a tag tree with a provider dropdown, opened for every tag pick, converting a pick inside the preview asset's folder to `{asset.path}/...` and storing any other pick, and every pick on an override, as the full path (FR-12).
+17. Open: a popup param picked with the tag browser inside the asset folder becomes `{asset.path}/...`, which is neither a literal nor exactly one placeholder, so FR-37 refuses it. Recommended: allow exactly one more param form, `{asset.path}/<path below it>` (FR-12, FR-37).
 
 ## 10. Assumptions index
 
@@ -786,4 +793,4 @@ Figures and limits chosen during discovery and confirmed by the owner (recorded 
 - 2 to 3 KPIs in the default popup (FR-4, UX workshop).
 - The offline place-check data adds a few megabytes to the module (addendum; an estimate).
 
-Unverified platform claims, tagged `[UNVERIFIED]` inline: FR-6, FR-7, FR-12 (the Gateway tag-browse lookup), FR-27, FR-30, FR-32, FR-37, FR-38, NFR-4. Each stays unverified until checked on a live 8.3 Gateway and recorded in claude-ignition-skills (NFR-7).
+Unverified platform claims, tagged `[UNVERIFIED]` inline: FR-6, FR-7, FR-12 (the Gateway tag browse of any provider), FR-27, FR-30, FR-32, FR-37, FR-38, NFR-4. Each stays unverified until checked on a live 8.3 Gateway and recorded in claude-ignition-skills (NFR-7).
