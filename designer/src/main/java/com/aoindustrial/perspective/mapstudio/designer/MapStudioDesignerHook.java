@@ -10,7 +10,6 @@ import com.inductiveautomation.perspective.designer.DesignerComponentRegistry;
 import com.inductiveautomation.perspective.designer.api.PerspectiveDesignerInterface;
 
 import com.aoindustrial.perspective.mapstudio.common.MapStudioComponent;
-import com.aoindustrial.perspective.mapstudio.common.MapStudioScriptModule;
 
 /**
  * Designer scope hook: puts the Map Studio component in the Perspective palette.
@@ -33,7 +32,7 @@ public class MapStudioDesignerHook extends AbstractDesignerModuleHook {
     @Override
     public void initializeScriptManager(ScriptManager manager) {
         super.initializeScriptManager(manager);
-        manager.addScriptModule("system.mapstudio", new MapStudioScriptModule(), new PropertiesFileDocProvider());
+        manager.addScriptModule("system.mapstudio", new DesignerScriptModule(), new PropertiesFileDocProvider());
     }
 
     @Override

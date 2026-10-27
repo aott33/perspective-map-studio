@@ -1,0 +1,51 @@
+package com.aoindustrial.perspective.mapstudio.gateway.store;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.junit.jupiter.api.Test;
+
+class MigrationsTest {
+
+    @Test
+    void migrationOneCreatesTheWholeFirstSchema() {
+        List<Migrations.Migration> all = Migrations.all();
+        assertEquals(1, all.size());
+        assertEquals(1, Migrations.latest());
+        Migrations.Migration first = all.get(0);
+        assertEquals(1, first.version());
+        String joined = String.join("\n", first.statements());
+        for (String table : List.of("mapstudio_project", "mapstudio_item", "mapstudio_kind_setup", "mapstudio_edit",
+                "mapstudio_batch")) {
+            assertTrue(joined.contains("CREATE TABLE " + table + " ("), table);
+        }
+        assertTrue(joined.contains("CREATE INDEX mapstudio_edit_project_seq"));
+        assertEquals(6, first.statements().size(), first.statements().stream().collect(Collectors.joining("\n---\n")));
+        for (String statement : first.statements()) {
+            assertFalse(statement.endsWith(";"), statement);
+            assertFalse(statement.contains("--"), "comments are dropped: " + statement);
+        }
+    }
+
+    @Test
+    void statementsSplitOnSemicolonsAtLineEnds() {
+        List<String> s = Migrations.statements("-- comment\nCREATE TABLE a (\n  x int\n);\n\nCREATE INDEX i ON a (x);\n");
+        assertEquals(List.of("CREATE TABLE a (\n  x int\n)", "CREATE INDEX i ON a (x)"), s);
+        assertThrows(IllegalStateException.class, () -> Migrations.statements("CREATE TABLE a (x int)"));
+    }
+
+    @Test
+    void theRightsLineNamesConnectionStatementAndSqlState() {
+        String line = StoreRegistry.rightsMessage("MapStudio", "CREATE TABLE IF NOT EXISTS mapstudio_schema_version (",
+            "42501", "ERROR: permission denied for schema public");
+        assertTrue(line.contains("database connection MapStudio"));
+        assertTrue(line.contains("lacks the right"));
+        assertTrue(line.contains("SQLState 42501"));
+        assertTrue(line.contains("CREATE TABLE IF NOT EXISTS mapstudio_schema_version"));
+    }
+}
