@@ -2,7 +2,7 @@
 # Parallel groups (epic Notes, Decision 2026-10-26): 1 alone; group A = 2 to 7 after 1;
 # group B = 8, 9, 10 and 15 (added 2026-10-27, tag browse); group C = 11 and 14 (added 2026-10-27,
 # instruments on lines); then 12 (sweep) with 16 beside it (added 2026-10-27, Designer setup form; the sweep does not wait on it),
-# and 13 (closing release check) after both. Stories 2 to 7 are being built now: do not disturb them.
+# then 17 (performance check, added 2026-10-27) after 12 and 16, and 13 (closing release check) after 17. Stories 2 to 7 are being built now: do not disturb them.
 
 [[entry]]
 id = 1
@@ -171,12 +171,23 @@ hitl = true
 risk = "medium"
 
 [[entry]]
+id = 17
+type = "story"
+title = "Performance check before 0.2.0"
+description = "Owner-approved 2026-10-27 (R19; prd NFR-1, FR-29; initiative R32, R37). Adds one repeatable script, run from one command, that measures the swept code on the dev stack and then on the template's test stack with its 300-pad scale setup (a pre-release build installed through a local, never-committed module lock change and a never-committed scratch project, as epic-module-foundation story 6 did), and records the results with their method in docs/platform-checks.md, in a form the next release's run is compared with. Measures and limits: map.load time and payload at 30, 1,000 and 5,000 map items, 5,000 under 1 s (the larger sets seeded through applyEdits with UUIDv5 ids in the scratch project, then removed); edits.apply median and p95 for 1-op and 50-op batches with 1 and 10 editors at once, p95 under 300 ms; a save reaching every other open map as map.changed with 10 and 50 open sessions, all within 1 s; a kind and asset list refresh with 300 assets (entry 3), under 1 s with no CPU spike; Gateway CPU and memory idle and with 20 sessions open, small next to the same Gateway without Map Studio (side-by-side numbers the owner judges); the browser bundle against 0.1.0 (MapStudio.js 1,179,848 bytes, docs/spike-report.md), grown less than 10%; and the frame-rate measure of epic-module-foundation story 7 repeated the same way, recorded but not pass or fail (software WebGL; the owner's laptop GPU reading stays the deciding one). Each miss is listed for the owner, who has it fixed before the release (the script then rerun) or accepts it in a dated Decision line in the epic's Notes. Measures only: no optimisation beyond a fixed miss, no NFR-9 live value load (epic-viewing). Group E: after the sweep (12) and 16, before release 0.2.0 (13)."
+verify = "One command runs the script on the dev stack and on the template's test stack; docs/platform-checks.md has a section with the method (stack, machine, data sizes, session counts, how each number is taken) and a results table for both stacks with every measure named here, each limit marked met or missed, the frame rate marked recorded only, and the bundle compared with 0.1.0's 1,179,848 bytes; every miss is either fixed and re-measured or accepted by the owner in a dated Decision line in the epic's Notes; a second run of the command gives results in the same form for comparison."
+covers = ["R19"]
+after = [3, 4, 8, 9, 11, 12, 14, 15, 16, "1.6", "1.7"]
+hitl = false
+risk = "medium"
+
+[[entry]]
 id = 13
 type = "story"
 title = "Release 0.2.0 on the template's test stack"
 description = "Tags and releases 0.2.0 (the public contract changed), checks the docs carry every contract with its version, updates the template's module lock (a template pull request the owner merges), and runs the template's test stack with a never-committed scratch project whose setup names a PostgreSQL connection: an edit saved in one browser shows in a second and survives a restart. Closing integrated check of the epic's Done when."
 verify = "scripts/test/stack.sh passes in the template with 0.2.0 installed, and on the scratch project an edit from one browser shows in another and is in the map store after a Gateway restart."
 covers = ["R14"]
-after = [12, 16, "1.5", "1.6"]
+after = [12, 16, 17, "1.5", "1.6"]
 hitl = true
 risk = "medium"
