@@ -57,7 +57,6 @@ class TagLookupsTest {
             + "\"roles\":{\"full\":[\"MapEditor\"],\"phone\":[\"MapOperator\"]}}"));
         state = StoreState.ready();
         StoreGate gate = new StoreGate(setups, c -> state);
-        writes = new WriteService(gate, store, new NoChangeHook());
         lists = new AdapterSnapshot(
             List.of(new Kind("pad", "Well pad", "point", "well-pad", 10, List.of()),
                 new Kind("line", "Line", "line", "pipeline", 5, List.of())),
@@ -69,6 +68,7 @@ class TagLookupsTest {
                 new Asset("PX", "Pad X", "pad", "[default]/Mesa/P12"),
                 new Asset("PR", "Pad R", "pad", "[~]Mesa/P12")),
             OK, OK);
+        writes = new WriteService(gate, store, new NoChangeHook(), project -> lists);
         tags = new FakeTagSource();
         for (String pad : List.of("P12", "P14")) {
             tags.instance("[default]Mesa/" + pad);
