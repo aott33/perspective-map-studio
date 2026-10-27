@@ -122,6 +122,27 @@ class SetupFormListsTest {
     }
 
     @Test
+    void aProviderWithNoSecretNameIsAWarningAndMapboxStillWantsAToken() throws Exception {
+        assertEquals("Internal/", SetupForm.joinToken("Internal", ""));
+        SetupForm form = SetupForm.fromJson(VALID).setText(SetupForm.TOKEN_SECRET, "Internal/")
+            .setList(SetupForm.BASEMAPS, List.of("osm", "mapbox"));
+        Map<String, List<String>> w = form.warnings(loaded());
+        assertEquals(List.of("Name the secret too."), w.get(SetupForm.TOKEN_SECRET));
+        assertEquals(List.of("Mapbox needs a map token. Name its secret below."), w.get(SetupForm.BASEMAPS));
+        assertTrue(form.canSave());
+    }
+
+    @Test
+    void aNameWithASlashAndNoProviderReadsBackAsThatName() throws Exception {
+        assertEquals("/team/map", SetupForm.joinToken("", "team/map"));
+        assertArrayEquals(new String[] {"", "team/map"}, SetupForm.splitToken(SetupForm.joinToken("", "team/map")));
+        SetupForm form = SetupForm.fromJson(VALID).setText(SetupForm.TOKEN_SECRET, "/team/map");
+        assertEquals(List.of("Name the secret provider too."), form.warnings(loaded()).get(SetupForm.TOKEN_SECRET));
+        // A story 7 name holding a "/" is read as <provider>/<name> (docs/setup.md says so).
+        assertArrayEquals(new String[] {"maps", "token"}, SetupForm.splitToken("maps/token"));
+    }
+
+    @Test
     void mapboxWithoutATokenIsAWarning() throws Exception {
         SetupForm form = SetupForm.fromJson(VALID).setList(SetupForm.BASEMAPS, List.of("osm", "mapbox"));
         assertEquals(List.of("Mapbox needs a map token. Name its secret below."),

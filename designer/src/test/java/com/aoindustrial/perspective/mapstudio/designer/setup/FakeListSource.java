@@ -12,6 +12,8 @@ import com.aoindustrial.perspective.mapstudio.common.contract.SetupLists.Part;
 final class FakeListSource implements SetupListSource {
 
     boolean reachable = true;
+    /** When set, the Gateway answers every call with this failure (a refusal, an older module). */
+    Exception failure;
     SetupLists gateway = new SetupLists(
         Part.ok(List.of(new Entry("MapStudio", "POSTGRES"), new Entry("MES", "MSSQL"))),
         Part.okNames(List.of("Administrator", "MapEditor", "MapOperator")),
@@ -30,6 +32,9 @@ final class FakeListSource implements SetupListSource {
     @Override
     public String gatewayLists(String identityProvider) throws Exception {
         asked.add("lists " + identityProvider);
+        if (failure != null) {
+            throw failure;
+        }
         if (!reachable) {
             throw new java.net.ConnectException("Gateway not reachable");
         }
@@ -39,6 +44,9 @@ final class FakeListSource implements SetupListSource {
     @Override
     public String secretNames(String provider) throws Exception {
         asked.add("secretNames " + provider);
+        if (failure != null) {
+            throw failure;
+        }
         if (!reachable) {
             throw new java.net.ConnectException("Gateway not reachable");
         }

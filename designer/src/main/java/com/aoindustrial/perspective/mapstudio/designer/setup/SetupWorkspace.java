@@ -99,7 +99,7 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
     /** Double-click on the node: the setup's tab, or the empty (or new) setup tab. */
     void openSetup() {
         if (hasSetup()) {
-            removeDraftTab();
+            dropDraft();
             open(SETUP_PATH);
         } else {
             showDraftTab();
@@ -133,6 +133,21 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
         setSelectedComponent(draft);
     }
 
+    /**
+     * The project has the setup now (saved here, or pulled in from another Designer's save): a new
+     * setup still in memory is dropped, so a later save never overwrites the project's setup with it.
+     */
+    private void dropDraft() {
+        if (draftNew) {
+            LOG.info("Map Studio setup: the project has a setup now, so the new unsaved one was dropped.");
+        }
+        draftNew = false;
+        removeDraftTab();
+        if (draft != null) {
+            draft.showEmpty();
+        }
+    }
+
     private void removeDraftTab() {
         if (draft != null && indexOfComponent(draft) >= 0) {
             remove(draft);
@@ -151,11 +166,32 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
 
     /**
      * Commits the open editors (story 7), then a new setup: with reasons left the save is refused
-     * (no dialog); else the resource is created in the project for this save.
+     * (no dialog) and the setup's tab is brought forward on its first reason, reopened if it was
+     * closed; else the resource is created in the project for this save. A new setup is dropped
+     * first when the project has a setup by now. Reasons fail the whole project save (owner,
+     * 2026-10-27, "reasons block a save"); whether that should be only the setup's part is an
+     * owner question [unverified: what the rest of the save does].
      */
     @Override
     public void commitAll() {
-        super.commitAll();
+        if (draftNew && hasSetup()) {
+            // Never overwrite a setup that reached the project since Create setup was pressed.
+            dropDraft();
+            refreshNode();
+        }
+        try {
+            super.commitAll();
+        } catch (SetupRefusedException.NotSaved notSaved) {
+            // The open setup tab has reasons: bring it forward on its first reason (no dialog).
+            SwingUtilities.invokeLater(() -> {
+                open(SETUP_PATH);
+                if (getSelectedComponent() instanceof SetupEditor) {
+                    SetupEditor editor = (SetupEditor) getSelectedComponent();
+                    SwingUtilities.invokeLater(editor::goToFirstReason);
+                }
+            });
+            throw notSaved;
+        }
         if (!draftNew || draft == null) {
             return;
         }
@@ -166,6 +202,12 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
             SetupRefusedException.NotSaved notSaved =
                 new SetupRefusedException.NotSaved(context.getProject().getName(), refused);
             LOG.warn(notSaved.getMessage());
+            // A new setup's tab may have been closed: reopen it on its first reason, so the reason
+            // that fails the save is on screen (no dialog).
+            SwingUtilities.invokeLater(() -> {
+                showDraftTab();
+                SwingUtilities.invokeLater(draft::goToFirstReason);
+            });
             throw notSaved;
         }
         context.getProject().createOrModify(SETUP_PATH, builder -> builder

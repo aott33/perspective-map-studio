@@ -36,22 +36,31 @@ public class MapStudioGatewayHook extends AbstractGatewayModuleHook {
     private ComponentRegistry componentRegistry;
     private ComponentModelDelegateRegistry delegateRegistry;
     private MapStudioServices services;
-    /** Threads of the setup form's lookups (epic 2 story 16); a few, so a slow provider cannot pile up calls. */
+    /** Threads of the setup form's lookups (epic 2 story 16): connections, roles, providers. */
     private ExecutorService lookupPool;
+    /** Threads of secret names, apart, so a hung secret provider never holds the other lists. */
+    private ExecutorService secretNamesPool;
     private GatewayRpcImplementation rpc;
 
     @Override
     public void setup(GatewayContext context) {
         this.gatewayContext = context;
         this.services = new MapStudioServices(context);
-        this.lookupPool = new ThreadPoolExecutor(0, 6, 30, TimeUnit.SECONDS, new SynchronousQueue<>(), r -> {
-            Thread t = new Thread(r, "MapStudio-setup-lookups");
+        this.lookupPool = lookupPool(6, "MapStudio-setup-lookups");
+        this.secretNamesPool = lookupPool(4, "MapStudio-setup-secret-names");
+        SetupLookups lookups = new SetupLookups(new IgnitionLookupSource(context.getDatasourceManager(),
+            context.getUserSourceManager(), context.getSecretProviderManager()), lookupPool, secretNamesPool,
+            new DesignerCaller());
+        this.rpc = GatewayRpcImplementation.of(ProtoRpcSerializer.DEFAULT_INSTANCE, lookups);
+    }
+
+    /** A few daemon threads and no queue: a call finds a thread or its list is unavailable now. */
+    private static ExecutorService lookupPool(int threads, String name) {
+        return new ThreadPoolExecutor(0, threads, 30, TimeUnit.SECONDS, new SynchronousQueue<>(), r -> {
+            Thread t = new Thread(r, name);
             t.setDaemon(true);
             return t;
         });
-        SetupLookups lookups = new SetupLookups(new IgnitionLookupSource(context.getDatasourceManager(),
-            context.getUserSourceManager(), context.getSecretProviderManager()), lookupPool, new DesignerCaller());
-        this.rpc = GatewayRpcImplementation.of(ProtoRpcSerializer.DEFAULT_INSTANCE, lookups);
     }
 
     /**
@@ -105,6 +114,9 @@ public class MapStudioGatewayHook extends AbstractGatewayModuleHook {
         }
         if (this.lookupPool != null) {
             this.lookupPool.shutdownNow();
+        }
+        if (this.secretNamesPool != null) {
+            this.secretNamesPool.shutdownNow();
         }
         if (this.componentRegistry != null) {
             this.componentRegistry.removeComponent(MapStudioComponent.COMPONENT_ID);

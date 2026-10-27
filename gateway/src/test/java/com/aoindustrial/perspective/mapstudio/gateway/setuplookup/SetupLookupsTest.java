@@ -36,6 +36,8 @@ class SetupLookupsTest {
         boolean connectionsHang;
         boolean providersHang;
         boolean namesFail;
+        String namesHang;
+        final java.util.concurrent.atomic.AtomicInteger namesAsked = new java.util.concurrent.atomic.AtomicInteger();
         String askedIdp;
 
         @Override
@@ -71,6 +73,15 @@ class SetupLookupsTest {
 
         @Override
         public Optional<List<String>> secretNames(String provider) {
+            namesAsked.incrementAndGet();
+            while (provider.equals(namesHang) && never.getCount() > 0) {
+                try {
+                    // A provider whose list() ignores the cancel and keeps its thread.
+                    never.await();
+                } catch (InterruptedException ignored) {
+                    // keep holding the thread
+                }
+            }
             if (namesFail) {
                 throw new UnsupportedOperationException("cannot list");
             }
@@ -79,7 +90,7 @@ class SetupLookupsTest {
     }
 
     private SetupLookups lookups(Fake fake, boolean designer, long timeoutMs) {
-        return new SetupLookups(fake, pool, () -> designer, timeoutMs);
+        return new SetupLookups(fake, pool, pool, () -> designer, timeoutMs);
     }
 
     @Test
@@ -164,12 +175,65 @@ class SetupLookupsTest {
             Fake fake = new Fake();
             fake.connectionsHang = true;
             // The first call's connection list holds the one thread past its deadline.
-            new SetupLookups(fake, full, () -> true, 100).lists("default");
-            SetupLists second = SetupLists.fromJson(new SetupLookups(new Fake(), full, () -> true, 100).lists("default"));
+            new SetupLookups(fake, full, full, () -> true, 100).lists("default");
+            SetupLists second = SetupLists.fromJson(
+                new SetupLookups(new Fake(), full, full, () -> true, 100).lists("default"));
             assertEquals(Status.UNAVAILABLE, second.connections().status());
         } finally {
             never.countDown();
             full.shutdownNow();
+        }
+    }
+
+    @Test
+    void aHungSecretProviderHoldsOneThreadAndNeverTheOtherLists() {
+        // The hook's shape: a small lists pool and a small secret names pool, no queue.
+        ThreadPoolExecutor lists = new ThreadPoolExecutor(0, 3, 1, TimeUnit.SECONDS, new SynchronousQueue<>());
+        ThreadPoolExecutor secrets = new ThreadPoolExecutor(0, 2, 1, TimeUnit.SECONDS, new SynchronousQueue<>());
+        try {
+            Fake fake = new Fake();
+            fake.namesHang = "Vault";
+            SetupLookups lookups = new SetupLookups(fake, lists, secrets, () -> true, 50);
+            for (int i = 0; i < 10; i++) {
+                SetupLists.Part hung = SetupLists.Part.fromJson(lookups.secretNames("Vault"));
+                assertEquals(Status.UNAVAILABLE, hung.status());
+                assertEquals(SetupLookups.UNAVAILABLE, hung.reason());
+            }
+            // Ten asks, one call: the later asks waited on the one in flight.
+            assertEquals(1, fake.namesAsked.get());
+            assertEquals(1, secrets.getActiveCount());
+            assertEquals(List.of("api-key", "mapbox-token"),
+                SetupLists.Part.fromJson(lookups.secretNames("Internal")).names());
+            for (int i = 0; i < 10; i++) {
+                SetupLists all = SetupLists.fromJson(lookups.lists("default"));
+                assertEquals(Status.OK, all.connections().status());
+                assertEquals(Status.OK, all.roles().status());
+                assertEquals(Status.OK, all.secretProviders().status());
+            }
+        } finally {
+            never.countDown();
+            lists.shutdownNow();
+            secrets.shutdownNow();
+        }
+    }
+
+    @Test
+    void aHungListIsAskedOnceWhileInFlight() {
+        ThreadPoolExecutor lists = new ThreadPoolExecutor(0, 3, 1, TimeUnit.SECONDS, new SynchronousQueue<>());
+        try {
+            Fake fake = new Fake();
+            fake.connectionsHang = true;
+            SetupLookups lookups = new SetupLookups(fake, lists, pool, () -> true, 50);
+            for (int i = 0; i < 6; i++) {
+                SetupLists all = SetupLists.fromJson(lookups.lists("default"));
+                assertEquals(Status.UNAVAILABLE, all.connections().status());
+                assertEquals(Status.OK, all.roles().status());
+                assertEquals(Status.OK, all.secretProviders().status());
+            }
+            assertEquals(1, lookups.inFlightForTests());
+        } finally {
+            never.countDown();
+            lists.shutdownNow();
         }
     }
 

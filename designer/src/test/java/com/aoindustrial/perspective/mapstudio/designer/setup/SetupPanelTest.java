@@ -2,7 +2,6 @@ package com.aoindustrial.perspective.mapstudio.designer.setup;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -420,14 +419,125 @@ class SetupPanelTest {
     @Test
     void noMapStudioDialogRepeatsAReason() throws IOException {
         Path dir = Path.of("src/main/java/com/aoindustrial/perspective/mapstudio/designer/setup");
-        for (String file : List.of("SetupEditor.java", "SetupWorkspace.java", "SetupCommit.java")) {
-            String code = Files.readString(dir.resolve(file));
-            assertFalse(code.contains("JOptionPane"), file);
-            assertFalse(code.contains("JDialog"), file);
+        List<Path> files = new java.util.ArrayList<>();
+        try (java.util.stream.Stream<Path> listed = Files.list(dir)) {
+            listed.filter(f -> f.toString().endsWith(".java")).forEach(files::add);
         }
-        // The panel's one dialog is Start from defaults asking first.
-        String panel = Files.readString(dir.resolve("SetupPanel.java"));
-        assertEquals(1, panel.split("JOptionPane.show", -1).length - 1);
-        assertNull(null);
+        files.add(Path.of("src/main/java/com/aoindustrial/perspective/mapstudio/designer/MapStudioDesignerHook.java"));
+        assertTrue(files.size() > 10, files.toString());
+        int askFirst = 0;
+        for (Path file : files) {
+            String code = Files.readString(file);
+            assertFalse(code.contains("JDialog"), file.toString());
+            assertFalse(code.contains("ErrorUtil"), file.toString());
+            assertFalse(code.contains("JOptionPane.showMessageDialog"), file.toString());
+            int shows = code.split("JOptionPane.show", -1).length - 1;
+            if (file.getFileName().toString().equals("SetupPanel.java")) {
+                askFirst = shows;
+            } else {
+                assertEquals(0, shows, file.toString());
+            }
+        }
+        // The one dialog of the package is Start from defaults asking first.
+        assertEquals(1, askFirst);
+    }
+
+    @Test
+    void theFooterLinkGoesToTheFirstReasonOnScreen() {
+        SetupPanel panel = panel(null);
+        // Basemaps is above Alarm page on screen, below it in setup.json.
+        panel.show(SetupForm.fromJson(VALID.replace("}}", "}, \"basemaps\": [\"osm\", \"osm\"],"
+            + " \"alarmPage\": \"alarms\"}")), false, "");
+        assertFalse(panel.reasonText(SetupForm.ALARM_PAGE).isEmpty());
+        assertFalse(panel.reasonText(SetupForm.BASEMAPS).isEmpty());
+        layout(panel, 900, 700);
+        assertTrue(panel.rowBounds(SetupForm.BASEMAPS).y < panel.rowBounds(SetupForm.ALARM_PAGE).y);
+        panel.pressFooterLink();
+        assertEquals(SetupForm.BASEMAPS, panel.focusedReasonField());
+    }
+
+    @Test
+    void aNewSetupWithTheGatewayDownSaysSoBesideDiscard() {
+        source.reachable = false;
+        SetupPanel panel = panel(null);
+        panel.showNew();
+        assertTrue(panel.footerText().contains("Gateway not reachable - lists unavailable, typing still works."),
+            panel.footerText());
+        assertTrue(panel.footerText().endsWith("[Discard new setup]"), panel.footerText());
+        panel.type(SetupForm.CONNECTION, "MapStudio");
+        assertEquals("New setup - not saved yet. | Gateway not reachable - lists unavailable, typing still works."
+            + " [Discard new setup]", panel.footerText());
+    }
+
+    @Test
+    void aRefusedCallIsListUnavailableNotGatewayNotReachable() {
+        source.failure = new SecurityException("Only a Designer may ask for the setup lists.");
+        SetupPanel panel = panel(null);
+        panel.show(SetupForm.fromJson(VALID), false, "");
+        assertEquals("", panel.footerText());
+        assertEquals(List.of("List unavailable"), panel.offered(SetupForm.CONNECTION));
+        assertEquals(List.of("List unavailable"), panel.offered("provider"));
+        panel.type(SetupForm.CONNECTION, "MapStore");
+        assertEquals("", panel.warningText(SetupForm.CONNECTION));
+        assertTrue(SetupPanel.isUnreachable(new java.net.ConnectException("refused")));
+        assertTrue(SetupPanel.isUnreachable(new RuntimeException(new java.net.SocketTimeoutException("slow"))));
+        assertTrue(SetupPanel.isUnreachable(new java.util.concurrent.TimeoutException()));
+        assertFalse(SetupPanel.isUnreachable(new SecurityException("no")));
+        assertFalse(SetupPanel.isUnreachable(new IllegalStateException("no such RPC")));
+    }
+
+    /** Gateway replies held back until the test hands them over, in any order. */
+    private static final class HeldAsync implements SetupListSource.Async {
+        final List<Runnable> held = new java.util.ArrayList<>();
+
+        @Override
+        public <T> void run(java.util.concurrent.Callable<T> work, java.util.function.Consumer<T> done,
+                            java.util.function.Consumer<Exception> failed) {
+            try {
+                T value = work.call();
+                held.add(() -> done.accept(value));
+            } catch (Exception ex) {
+                held.add(() -> failed.accept(ex));
+            }
+        }
+
+        Runnable last() {
+            return held.get(held.size() - 1);
+        }
+    }
+
+    @Test
+    void lateRepliesOutOfOrderNeverOverwriteNewerOnes() {
+        HeldAsync async = new HeldAsync();
+        SetupPanel panel = new SetupPanel(null, () -> true, source, async);
+        panel.show(SetupForm.fromJson(VALID), false, "");
+        Runnable first = async.last();
+        // The Gateway's connections change; Refresh lists asks again.
+        source.gateway = new com.aoindustrial.perspective.mapstudio.common.contract.SetupLists(
+            com.aoindustrial.perspective.mapstudio.common.contract.SetupLists.Part.ok(List.of(
+                new com.aoindustrial.perspective.mapstudio.common.contract.SetupLists.Entry("Other", "POSTGRES"))),
+            source.gateway.roles(), source.gateway.secretProviders());
+        panel.pressRefreshLists();
+        Runnable second = async.last();
+        second.run();
+        assertEquals(List.of("Other (PostgreSQL)"), panel.offered(SetupForm.CONNECTION));
+        assertTrue(panel.warningText(SetupForm.CONNECTION).startsWith("MapStudio is not"));
+        first.run();
+        // The older reply arrived last and is dropped.
+        assertEquals(List.of("Other (PostgreSQL)"), panel.offered(SetupForm.CONNECTION));
+        assertTrue(panel.warningText(SetupForm.CONNECTION).startsWith("MapStudio is not"));
+
+        // Secret names: the provider changes before the first provider's names arrive.
+        panel.pickProvider("Internal");
+        Runnable internal = async.last();
+        panel.pickProvider("MapStudioFiles");
+        Runnable files = async.last();
+        assertTrue(internal != files);
+        files.run();
+        assertEquals(List.of("List unavailable"), panel.offered("secretName"));
+        internal.run();
+        assertEquals(List.of("List unavailable"), panel.offered("secretName"));
+        panel.typeSecretName("mapbox");
+        assertEquals("", panel.warningText(SetupForm.TOKEN_SECRET));
     }
 }

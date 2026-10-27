@@ -445,14 +445,18 @@ public final class SetupForm {
             && !ProjectLists.isPage(alarmPage, pages)) {
             add(out, ALARM_PAGE, msg("setup.warning.page.missing", alarmPage));
         }
-        if (basemaps.contains("mapbox") && tokenSecret.isEmpty()) {
+        String[] token = splitToken(tokenSecret);
+        // A provider with no secret name names no token either.
+        if (basemaps.contains("mapbox") && token[1].isEmpty()) {
             add(out, BASEMAPS, msg("setup.warning.basemaps.mapboxToken"));
         }
         if (!tokenSecret.isEmpty()) {
-            String[] token = splitToken(tokenSecret);
             if (token[0].isEmpty()) {
                 add(out, TOKEN_SECRET, msg("setup.warning.token.noProvider"));
             } else {
+                if (token[1].isEmpty()) {
+                    add(out, TOKEN_SECRET, msg("setup.warning.token.noName"));
+                }
                 var providers = lists.secretProviders();
                 if (providers != null && !providers.names().contains(token[0])) {
                     add(out, TOKEN_SECRET, msg("setup.warning.token.provider", token[0]));
@@ -493,12 +497,16 @@ public final class SetupForm {
         return slash < 0 ? new String[] {"", t} : new String[] {t.substring(0, slash), t.substring(slash + 1)};
     }
 
-    /** The {@code tokenSecret} of a provider and a secret name: {@code <provider>/<name>}, or the name alone with no provider. */
+    /**
+     * The {@code tokenSecret} of a provider and a secret name: {@code <provider>/<name>}, or the
+     * name alone with no provider. A name with a {@code /} and no provider is written
+     * {@code /<name>}, so {@link #splitToken} reads it back as that name and not as a provider.
+     */
     public static String joinToken(String provider, String name) {
         String p = provider == null ? "" : provider.trim();
         String n = name == null ? "" : name.trim();
         if (p.isEmpty()) {
-            return n;
+            return n.indexOf('/') >= 0 ? "/" + n : n;
         }
         return p + "/" + n;
     }

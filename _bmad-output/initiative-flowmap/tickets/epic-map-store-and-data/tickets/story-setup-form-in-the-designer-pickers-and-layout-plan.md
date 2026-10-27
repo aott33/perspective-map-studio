@@ -10,7 +10,7 @@ route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md'
@@ -129,6 +129,7 @@ Why one module RPC for the Gateway lists: secrets have no platform RPC, so the m
 - Live 8.3.10: `UserSourceManager.getProfile(name)` throws `IllegalArgumentException` for a missing name (not null); handled as not-listed.
 - The empty and new states are a plain tab of the workspace (the SDK's `ResourceEditor` throws for a missing resource); the workspace replaces the SDK close action, which casts the tab to `ResourceEditor`. Owner check.
 - Screenshots `docs/screenshots/setup-editor-{normal,reasons,empty,new,unreachable}.png` come from `SetupPanelRenderTest` (Swing's own look, DESIGN.md stand-in colours).
+- Review pass 1 patches (see the Review Triage Log), 2026-10-27: a refused save brings the setup tab forward on its first reason (reopening a closed new setup's tab); a new setup is dropped when the project has a setup by then; `Name the secret too.` for a provider with no name, and Mapbox's warning on an empty secret name; a name with `/` and no provider is written `/<name>`; one call in flight per Gateway list and a separate secret names pool; only connection and timeout failures count as Gateway not reachable; "N reasons left" follows the screen order; a new setup says when the Gateway is not reachable; no page configuration gives no page list. After them: Gradle clean build green (common 89, designer 70 with the render test skipped, gateway 283), `tsc` clean, Jest 144 of 144, e2e 55 passed and 7 skipped on `ms-e2s16`, store checks all passed (rights, partial, healed, newer, upgrade). The five setup screenshots re-rendered byte-identical (the changed footers are not among the rendered states), so they are unchanged.
 
 ## Verification
 
@@ -142,7 +143,24 @@ Why one module RPC for the Gateway lists: secrets have no platform RPC, so the m
 2. The tab: four section headings, no section list, fields not wider than 760 px on a wide window; narrow the window: rows wrap, no horizontal scroll bar; "Schema version 1" is text.
 3. Open each list: connections with types, roles of `default`, functions `mapstudio_dev.kinds` and `.assets`, pages `/`, `/edit`, ... and last "Insert placeholder...", secret providers then names; no mark beside a found value; label tooltips hold the help.
 4. Pick `MapStudio`, keep `MapEditor`/`MapOperator`, pick the functions, an alarm page, tick Satellite, pick a provider and type a secret name; type role `MapEdtor`: warning, kept. File > Save; `git diff ops/project` shows the lines; a Perspective session's `map.load` reflects it; remove `MapEdtor`, save again.
-5. Set refresh `0`: reason beside it, footer "1 reason left" scrolls to it on click; File > Save: only the Designer's save failure, no Map Studio dialog; note what the rest of the save did.
+5. Set refresh `0`: reason beside it, footer "1 reason left" scrolls to it on click; File > Save: only the Designer's save failure, no Map Studio dialog, and the setup tab comes forward on the reason; note what the rest of the save did (views and scripts changed in the same save). Then decide what "reasons block a save" means: the whole project save (as built) or only the setup's part.
 6. Stop the Gateway briefly (or disconnect): banner, Try again, typing works, functions and pages still listed.
-7. Scratch project with no setup: node "(none)", empty state, Create setup, "(new, unsaved)", Discard returns to empty; Create again, fill connection, save: both files in `data/projects/<scratch>/com.aoindustrial.perspective.mapstudio/setup/`.
+7. Scratch project with no setup: node "(none)", empty state, Create setup, "(new, unsaved)", Discard returns to empty; Create again, close its tab with the connection empty, File > Save: the save fails and the tab reopens on the connection's reason; fill connection, save: both files in `data/projects/<scratch>/com.aoindustrial.perspective.mapstudio/setup/`.
 8. Search the Designer log (Help > Diagnostics) and `setup.json` for the secret's value: absent. Take `docs/screenshots/setup-editor.png`.
+
+## Review Triage Log
+
+Pass 1 (quick lens, 2026-10-27, run context-free from the standalone prompt written beside this plan, against `2043e34..284cbd8`): high 0, medium 2, low-medium 2, low 6, false 0. Nine patched, one patched in part (10, the parts that can be tested headless); none rejected or deferred. Each cited location read before patching.
+
+| # | Finding | Verdict | Route | Evidence |
+|---|---|---|---|---|
+| 1 | A forgotten new setup blocks every project save | medium | patch, owner question | Real: closing the new setup's tab kept it, and a save failed with nothing on screen. `SetupWorkspace.commitAll` now reopens the new setup's tab (or brings the setup editor forward) and goes to the first reason, still without a dialog. Failing the whole save stays, as the owner's "reasons block a save" reads; whether only the setup should be refused is added to manual checks 5 and 7 for the owner. |
+| 2 | A pending draft can overwrite a setup that appeared since | medium | patch | Real: `draftNew` stayed true after `openSetup` found a setup. `openSetup` and the top of `commitAll` now drop the new setup (`dropDraft`, logged at info) whenever the project has the resource. |
+| 3 | tokenSecret: a provider with no secret name is saved silently | low-medium | patch | Real. New warning "Name the secret too."; the Mapbox warning now looks at an empty secret name. `SetupFormListsTest` covers `Internal/` with Mapbox. Never blocks. |
+| 4 | tokenSecret: a `/` in a name with no provider changes meaning on re-read | low | patch | Real. `joinToken("", "team/map")` writes `/team/map`, which `splitToken` reads back as that name with no provider (tested). `docs/setup.md` says a story 7 name holding a `/` is read as `<provider>/<name>`. |
+| 5 | A hung secret provider can make every list unavailable | low-medium | patch | Real: `cancel(true)` does not free a thread that ignores interrupts. `SetupLookups` now keeps one call in flight per list (later asks wait on it again, it is not cancelled) and runs secret names on their own pool (`MapStudio-setup-secret-names`, 4 threads). Tests: ten asks of a hung provider run one call and one thread, and connections, roles and another provider still answer; a hung connections list is asked once. |
+| 6 | Any failed call is reported as "Gateway not reachable" | low | patch | Real. `SetupPanel.isUnreachable`: only an I/O, connection or timeout failure in the cause chain counts; a `SecurityException` or another failure leaves the lists "List unavailable" with no footer (logged at warn with the class only). The exception classes of the Designer's RPC proxy are [unverified], said in code and `docs/setup-editor.md`. |
+| 7 | "N reasons left" jumps to the wrong field when two have reasons | low | patch | Real: `FIELDS` has Alarm page before Basemaps. `goToFirstReason` walks the rows in the order added (screen order); a test with reasons on both lands on Basemaps. |
+| 8 | A new setup gets no unreachable footer or Try again | low | patch | Real. A new setup's footer now carries "Gateway not reachable - lists unavailable, typing still works." as its second line (with or without reasons), Discard stays the action and the header's Refresh lists asks again; an edited setup with reasons also shows it beside the reasons, with Try again. Rendered screenshots unchanged (states not among them). |
+| 9 | A missing or unreadable page configuration warns about every alarm page | low | patch | Real. `ProjectLists.pages` returns null (no list, "List unavailable", no warnings) for no or unreadable configuration; tested. |
+| 10 | Tests check less than they claim | low | patch in part | Real. The dialog scan now covers every file of the `setup` package and the hook, and `assertNull(null)` is gone; the banned list adds `::read`, `getValue`, `Secret` and `SecretValue` as patterns (string literals stripped) with a self-test that each pattern catches its case; a held-reply `Async` test delivers lists and secret names late and out of order and checks the `generation` and provider guards. Not done: real focus and scroll for `goToFirstReason` and the `SwingWorker` path need a shown window, which the headless build has not; they stay in the owner's Designer check (step 5). |

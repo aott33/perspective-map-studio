@@ -86,6 +86,13 @@ public final class SetupEditor extends ResourceEditor<SetupForm> {
         builder.putData(MapStudioModule.SETUP_FILE, form.toJson().getBytes(StandardCharsets.UTF_8));
     }
 
+    /** Scrolls to and focuses the first reason (a refused save brings the tab forward on it). */
+    void goToFirstReason() {
+        if (panel != null) {
+            panel.goToFirstReason();
+        }
+    }
+
     @Override
     protected void onCommitFailed(Exception ex) {
         if (ex instanceof SetupRefusedException) {

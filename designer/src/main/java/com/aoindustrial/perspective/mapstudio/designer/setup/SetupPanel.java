@@ -698,11 +698,43 @@ public final class SetupPanel extends JPanel {
                 return;
             }
             gatewayLoading = false;
-            LOG.debugf("Map Studio setup lists: the Gateway could not be asked (%s).", ex.getClass().getSimpleName());
-            lists = lists.withGateway(SetupLists.unavailable(""), false);
+            boolean unreachable = isUnreachable(ex);
+            if (unreachable) {
+                LOG.debugf("Map Studio setup lists: the Gateway could not be asked (%s).",
+                    ex.getClass().getSimpleName());
+            } else {
+                // Asked and refused (not a Designer, an older module without the RPC): Try again
+                // cannot help, so the lists say unavailable and the footer says nothing.
+                LOG.warnf("Map Studio setup lists: the Gateway answered with a failure (%s).",
+                    ex.getClass().getSimpleName());
+            }
+            lists = lists.withGateway(SetupLists.unavailable(""), !unreachable);
             recompute();
         });
         recompute();
+    }
+
+    /**
+     * True when a failed Gateway call means the Gateway could not be reached in time (a connection
+     * or I/O failure, a timeout anywhere in the cause chain); false for a refusal or any other
+     * failure, which Try again cannot cure [unverified: the exception classes
+     * {@code GatewayConnection}'s RPC proxy throws in a Designer; the owner's check].
+     */
+    static boolean isUnreachable(Throwable ex) {
+        for (Throwable t = ex; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            if (t instanceof SecurityException) {
+                return false;
+            }
+            if (t instanceof java.io.IOException || t instanceof java.util.concurrent.TimeoutException) {
+                return true;
+            }
+            String name = t.getClass().getSimpleName();
+            if (name.contains("Timeout") || name.contains("Connect") || name.contains("Communication")
+                || name.contains("Unreachable")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void relabelRoles() {
@@ -974,12 +1006,20 @@ public final class SetupPanel extends JPanel {
             footerText.setText(SetupForm.msg(reasonCount == 1 ? "setup.footer.reasons.rest.one"
                 : "setup.footer.reasons.rest.many").strip());
             footerText.setForeground(Theme.error());
-            footerSecondary.setText(mode == Mode.NEW ? SetupForm.msg("setup.footer.newSaveFailure")
+            String secondary = mode == Mode.NEW ? SetupForm.msg("setup.footer.newSaveFailure")
                 : warningCount == 0 ? "" : warningCount == 1 ? SetupForm.msg("setup.footer.warnings.one")
-                : SetupForm.msg("setup.footer.warnings.many", warningCount));
+                : SetupForm.msg("setup.footer.warnings.many", warningCount);
+            if (unreachable) {
+                // Said here too, so a Gateway that is down is never hidden behind the reasons.
+                String down = SetupForm.msg("setup.footer.unreachable");
+                secondary = mode == Mode.NEW ? secondary + " " + down : down;
+            }
+            footerSecondary.setText(secondary);
         } else if (mode == Mode.NEW) {
-            footerGlyph.setIcon(Theme.Glyph.INFO);
+            footerGlyph.setIcon(unreachable ? Theme.Glyph.CLOUD : Theme.Glyph.INFO);
             footerText.setText(SetupForm.msg("setup.footer.new"));
+            // Discard stays the action; the header's Refresh lists asks the Gateway again.
+            footerSecondary.setText(unreachable ? SetupForm.msg("setup.footer.unreachable") : "");
         } else if (unreachable) {
             footerGlyph.setIcon(Theme.Glyph.CLOUD);
             footerText.setText(SetupForm.msg("setup.footer.unreachable"));
@@ -1004,7 +1044,8 @@ public final class SetupPanel extends JPanel {
 
     /** Scrolls to the first field with a reason and focuses it (the footer's "N reasons left"). */
     void goToFirstReason() {
-        for (String field : SetupForm.FIELDS) {
+        // The rows in the order they were added: the order on screen.
+        for (String field : rows.keySet()) {
             if (shownReasons.containsKey(field)) {
                 FormParts.Row row = rows.get(field);
                 Rectangle r = row.getBounds();

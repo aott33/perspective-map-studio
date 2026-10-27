@@ -2,6 +2,7 @@ package com.aoindustrial.perspective.mapstudio.designer.setup;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -64,6 +65,11 @@ class ProjectListsTest {
         assertFalse(ProjectLists.isPage("/edit/x", pages));
         assertEquals("/alarms/{item.name}", ProjectLists.asAlarmPage("/alarms/:name"));
         assertEquals("/", ProjectLists.asAlarmPage("/"));
-        assertTrue(ProjectLists.pages("{\"pages\": 3}").isEmpty());
+        // No page configuration, or one that cannot be read: no list, so no page warnings.
+        assertNull(ProjectLists.pages("{\"pages\": 3}"));
+        assertNull(ProjectLists.pages(null));
+        assertNull(ProjectLists.pages("not json"));
+        assertNull(ProjectLists.of(Map.of(), null, null).pages());
+        assertEquals(List.of(), ProjectLists.pages("{\"pages\": {}}"));
     }
 }

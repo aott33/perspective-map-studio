@@ -95,8 +95,8 @@ class IgnitionLookupSourceTest {
         try (Stream<Path> files = Files.list(dir)) {
             for (Path f : (Iterable<Path>) files::iterator) {
                 String code = stripComments(Files.readString(f, StandardCharsets.UTF_8));
-                for (String banned : List.of(".read(", "Plaintext", "getSecret", "readSecret", "decrypt")) {
-                    if (code.contains(banned)) {
+                for (String banned : BANNED) {
+                    if (java.util.regex.Pattern.compile(banned).matcher(code).find()) {
                         found.add(f.getFileName() + ": " + banned);
                     }
                 }
@@ -105,7 +105,28 @@ class IgnitionLookupSourceTest {
         assertEquals(List.of(), found);
     }
 
+    /**
+     * A call or a method reference of read, a value getter, or the value types by name (Secret
+     * alone, not SecretProvider) [SDK 8.3.0 javap: ManagedSecretProvider.read returns a Plaintext].
+     */
+    private static final List<String> BANNED = List.of("\\.read\\s*\\(", "::\\s*read\\b", "Plaintext",
+        "getSecret", "readSecret", "decrypt", "getValue", "\\bSecret\\b", "SecretValue");
+
+    @Test
+    void theScanCatchesEachWayOfReadingAValue() {
+        for (String sample : List.of("p.read(name)", "p.read (name)", "names.map(p::read)", "Plaintext t",
+            "x.getValue()", "Secret s = null;", "import a.b.SecretValue;")) {
+            assertTrue(BANNED.stream().anyMatch(b -> java.util.regex.Pattern.compile(b).matcher(sample).find()),
+                sample);
+        }
+        for (String fine : List.of("SecretProviderManager m", "ManagedSecretProvider p", "p.list()", "readable")) {
+            assertTrue(BANNED.stream().noneMatch(b -> java.util.regex.Pattern.compile(b).matcher(fine).find()), fine);
+        }
+    }
+
+    /** The code without comments and string literals (a log text may say "Secret names"). */
     private static String stripComments(String code) {
-        return code.replaceAll("(?s)/\\*.*?\\*/", "").replaceAll("//[^\\n]*", "");
+        return code.replaceAll("(?s)/\\*.*?\\*/", "").replaceAll("//[^\\n]*", "")
+            .replaceAll("\"(?:\\\\.|[^\"\\\\\\n])*\"", "\"\"");
     }
 }

@@ -96,13 +96,17 @@ public final class ProjectLists {
         return out;
     }
 
-    /** The page URLs of a page configuration ({@code pages} keys), sorted; an unreadable one gives an empty list. */
+    /**
+     * The page URLs of a page configuration ({@code pages} keys), sorted; null (no list, so no
+     * warnings) when there is no page configuration or it cannot be read, for example an
+     * inherited one {@code getResourcesOfType} might leave out [unverified].
+     */
     public static List<String> pages(String configJson) {
-        List<String> out = new ArrayList<>();
         JsonObject o = object(configJson);
-        if (o != null && o.has("pages") && o.get("pages").isJsonObject()) {
-            out.addAll(o.getAsJsonObject("pages").keySet());
+        if (o == null || !o.has("pages") || !o.get("pages").isJsonObject()) {
+            return null;
         }
+        List<String> out = new ArrayList<>(o.getAsJsonObject("pages").keySet());
         out.sort(Comparator.naturalOrder());
         return out;
     }
