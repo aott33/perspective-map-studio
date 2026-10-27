@@ -10,7 +10,8 @@ import com.aoindustrial.perspective.mapstudio.common.Messages;
 
 /**
  * One op of an {@code edits.apply} batch (AD-2): {@code {op, entity, id, baseVersion, data}}.
- * {@code baseVersion} is 0 on create and the stored version otherwise.
+ * {@code baseVersion} is 0 on create and the stored version otherwise; a create at a
+ * deleted map item's version restores it. A delete carries no data.
  */
 public record EditOp(String op, String entity, String id, int baseVersion, JsonObject data, int index) {
 
@@ -48,6 +49,11 @@ public record EditOp(String op, String entity, String id, int baseVersion, JsonO
         if (ENTITY_ITEM.equals(entity) && !isUuid(id)) {
             throw invalid("Op " + index + ": a map item id must be a UUID string.", index, id);
         }
+        if (ENTITY_ITEM.equals(entity)) {
+            // The store keys map items by uuid, so ids differing only in letter case are one item:
+            // carry the canonical lower-case form so the one-op-per-id check and the edit log agree.
+            id = UUID.fromString(id).toString();
+        }
         JsonElement bv = o.get("baseVersion");
         if (bv == null || !bv.isJsonPrimitive() || !bv.getAsJsonPrimitive().isNumber()
                 || bv.getAsDouble() != Math.rint(bv.getAsDouble()) || bv.getAsDouble() < 0
@@ -55,9 +61,7 @@ public record EditOp(String op, String entity, String id, int baseVersion, JsonO
             throw invalid("Op " + index + ": baseVersion must be a whole number, 0 or more.", index, id);
         }
         int baseVersion = bv.getAsInt();
-        if (CREATE.equals(op) && baseVersion != 0) {
-            throw invalid("Op " + index + ": a create has baseVersion 0.", index, id);
-        }
+        // A create has baseVersion 0 (a new map item) or a deleted map item's version (a restore).
         if (!CREATE.equals(op) && baseVersion < 1) {
             throw invalid("Op " + index + ": an " + op + " has the stored version as baseVersion (1 or more).",
                 index, id);
@@ -67,6 +71,9 @@ public record EditOp(String op, String entity, String id, int baseVersion, JsonO
             throw invalid("Op " + index + ": data must be an object.", index, id);
         }
         JsonObject d = data == null || data.isJsonNull() ? new JsonObject() : data.getAsJsonObject();
+        if (DELETE.equals(op) && d.size() > 0) {
+            throw invalid("Op " + index + ": a delete carries no data.", index, id);
+        }
         return new EditOp(op, entity, id, baseVersion, d, index);
     }
 

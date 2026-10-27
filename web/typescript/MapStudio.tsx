@@ -32,6 +32,7 @@ import { PointPopup } from './PointPopup';
 import { SAVE_IDLE, SaveState, itemsToGeoJson, lineCreateBatch, newId, refusedSave, saveStatusText, withItem } from './save';
 import { AuthorParams, PopupPoint, popupMountPath } from './popupParams';
 import { TestData, selectTestData } from './testSet';
+import { registerTestHook, takeTestReply } from './testHook';
 import { drawColor, themeColor } from './theme';
 
 /** Must match MapStudioComponent.COMPONENT_ID on the Java side. */
@@ -113,6 +114,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
     constructor(componentStore: AbstractUIElementStore) {
         super(componentStore);
+        registerTestHook((message) => this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject));
     }
 
     mapStateToProps(): MapStudioDelegateState {
@@ -171,6 +173,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     handleEvent(eventName: string, eventObject: JsObject): void {
         if (eventName !== MESSAGE_EVENT) {
             console.warn('[MapStudio] Ignoring unknown model event ' + eventName);
+            return;
+        }
+        if (takeTestReply(eventObject)) {
             return;
         }
         const reply = readReply(eventObject);

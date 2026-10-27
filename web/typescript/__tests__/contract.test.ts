@@ -1,4 +1,4 @@
-import { CONTRACT_VERSION, ErrorCodes, readEditsApplyReply, readMapItem, readMapLoadReply } from '../contract';
+import { CONTRACT_VERSION, ErrorCodes, readConflicts, readEditsApplyReply, readMapItem, readMapLoadReply } from '../contract';
 import { MessageTypes, editsApply, mapLoad, readReply } from '../messages';
 
 const ITEM = {
@@ -58,5 +58,37 @@ describe('the 0.2.0 draft contract', () => {
             kind: 'error', id: 'e1',
             body: { code: 'conflict', message: 'changed', batchId: 'b1', op: { index: 1, id: ITEM.id } }
         });
+    });
+});
+
+describe('conflicts (epic 2 story 2)', () => {
+    test('a conflict error carries every stale op with the stored record and who changed it', () => {
+        const reply = readReply({
+            v: 1, type: 'error', id: 'e1', body: {
+                code: 'conflict', message: 'P12 was changed by alex at 14:02 UTC since you loaded it. Nothing in this save was written.',
+                batchId: 'b1', op: { index: 0, id: ITEM.id },
+                conflicts: [
+                    { index: 0, entity: 'item', id: ITEM.id, baseVersion: 1, current: { ...ITEM, version: 2 },
+                        changedBy: 'alex', changedAt: '2026-10-26T14:02:00Z' },
+                    { index: 2, entity: 'item', id: 'x', baseVersion: 3, current: { ...ITEM, id: 'x', deleted: true, version: 4 },
+                        changedBy: null, changedAt: null },
+                    { bad: true }
+                ]
+            }
+        });
+        expect(reply.kind).toBe('error');
+        if (reply.kind !== 'error') return;
+        const conflicts = reply.body.conflicts ?? [];
+        expect(conflicts).toHaveLength(2);
+        expect(conflicts[0]).toEqual({ index: 0, entity: 'item', id: ITEM.id, baseVersion: 1,
+            current: { ...ITEM, version: 2 }, changedBy: 'alex', changedAt: '2026-10-26T14:02:00Z' });
+        expect(conflicts[1].current?.deleted).toBe(true);
+        expect(conflicts[1].changedBy).toBeNull();
+    });
+
+    test('an error without conflicts has none, and malformed conflicts read as empty', () => {
+        const role = readReply({ v: 1, type: 'error', id: 'e', body: { code: 'role', message: 'no' } });
+        expect(role.kind === 'error' && role.body.conflicts).toBe(undefined);
+        expect(readConflicts('nope')).toEqual([]);
     });
 });

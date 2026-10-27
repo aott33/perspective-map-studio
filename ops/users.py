@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create or update the dev map editor on the local dev Gateway. Development only.
+"""Create or update the dev map editor and phone editor on the local dev Gateway. Development only.
 
 First makes sure the identity provider the dev project signs in with, `default` (pinned in the
 Gateway-written ops/project/ignition/global-props), exists: a fresh volume has once named its only provider
@@ -7,8 +7,9 @@ Gateway-written ops/project/ignition/global-props), exists: a fresh volume has o
 Gateway's system identity provider is an internal one, it is copied under the name `default` (same user
 source, same settings; the template's scripts/gw/ensure_identity.py). Then it makes the user `mapeditor` in
 the internal user source behind `default`, gives it the role `MapEditor` (full editing in the dev project's Map Studio setup) and sets its password
-from MAPSTUDIO_EDITOR_PASSWORD (generated into the git-ignored .env by ops/lib.sh). Also makes the role
-`MapOperator` (phone editing) with no members. The password is never printed.
+from MAPSTUDIO_EDITOR_PASSWORD (generated into the git-ignored .env by ops/lib.sh), and the user `mapoperator`
+in the role `MapOperator` (phone editing, epic 2 story 2) with MAPSTUDIO_OPERATOR_PASSWORD. Passwords are
+never printed.
 
 Routes (adapted from ign-scada-template scripts/gw/render_users.py, [live 8.3.9 there]):
 GET /data/api/v1/resources/singleton/ignition/security-properties (the system identity provider's name),
@@ -19,7 +20,7 @@ PUT .../Groups/<id>. Auth: the dev API key in ops/secrets/api-token (ops/gen_sec
 
 It writes users, so it refuses unless GW_URL names a Gateway on localhost (ops/lib.sh sets it).
 
-Usage: GW_URL=http://localhost:9121 MAPSTUDIO_EDITOR_PASSWORD=... python3 -I ops/users.py
+Usage: GW_URL=http://localhost:9121 MAPSTUDIO_EDITOR_PASSWORD=... MAPSTUDIO_OPERATOR_PASSWORD=... python3 -I ops/users.py
 """
 import json
 import os
@@ -35,7 +36,11 @@ USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User'
 GROUP_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Group'
 EDITOR = 'mapeditor'
 EDITOR_ROLE = 'MapEditor'
+OPERATOR = 'mapoperator'
 OPERATOR_ROLE = 'MapOperator'
+# Each dev user: (user name, role, the .env key of its password).
+DEV_USERS = ((EDITOR, EDITOR_ROLE, 'MAPSTUDIO_EDITOR_PASSWORD'),
+             (OPERATOR, OPERATOR_ROLE, 'MAPSTUDIO_OPERATOR_PASSWORD'))
 
 
 def api(method, path, body=None):
@@ -128,10 +133,10 @@ def run():
     if parsed.hostname not in ('localhost', '127.0.0.1'):
         print('users: refusing: GW_URL must name the local dev Gateway (localhost); got %r' % GW)
         return 2
-    password = os.environ.get('MAPSTUDIO_EDITOR_PASSWORD', '')
-    if not password:
-        print('users: MAPSTUDIO_EDITOR_PASSWORD is not set (ops/lib.sh generates it into .env)')
-        return 2
+    for _user, _role, key in DEV_USERS:
+        if not os.environ.get(key, ''):
+            print('users: %s is not set (ops/lib.sh generates it into .env)' % key)
+            return 2
     # The API key resource is read at Gateway start; allow the API a little time after RUNNING.
     last = None
     for _ in range(12):
@@ -145,16 +150,17 @@ def run():
         raise RuntimeError('could not read the system identity provider: %s' % last)
     scim = '/data/api/v1/scim/%s/v2' % urllib.parse.quote(source, safe='')
     users = {u['userName']: u['id'] for u in listing(scim + '/Users')}
-    body = {'schemas': [USER_SCHEMA], 'userName': EDITOR, 'password': password}
-    if EDITOR in users:
-        api('PUT', '%s/Users/%s' % (scim, users[EDITOR]), body)
-    else:
-        users[EDITOR] = api('POST', scim + '/Users', body)['id']
+    for user, _role, key in DEV_USERS:
+        body = {'schemas': [USER_SCHEMA], 'userName': user, 'password': os.environ[key]}
+        if user in users:
+            api('PUT', '%s/Users/%s' % (scim, users[user]), body)
+        else:
+            users[user] = api('POST', scim + '/Users', body)['id']
     groups = {g['displayName']: g for g in listing(scim + '/Groups')}
-    ensure_group(scim, groups, EDITOR_ROLE, [users[EDITOR]])
-    ensure_group(scim, groups, OPERATOR_ROLE, [])
-    print('ok   %s in role %s, role %s present (user source %s; password from .env, not printed)'
-          % (EDITOR, EDITOR_ROLE, OPERATOR_ROLE, source))
+    for user, role, _key in DEV_USERS:
+        ensure_group(scim, groups, role, [users[user]])
+    print('ok   %s (passwords from .env, not printed; user source %s)'
+          % (', '.join('%s in %s' % (u, r) for u, r, _k in DEV_USERS), source))
     return 0
 
 

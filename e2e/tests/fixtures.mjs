@@ -5,7 +5,7 @@ import { sessionUrl } from '../lib/env.mjs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EDITOR_USER, editorStateFile } from '../lib/editorAuth.mjs';
+import { EDITOR_USER, OPERATOR_USER, editorStateFile, stateFile } from '../lib/editorAuth.mjs';
 
 const signInCli = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'lib', 'signInCli.mjs');
 
@@ -76,7 +76,24 @@ export async function nextFrames(page) {
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
-export { EDITOR_USER };
+export { EDITOR_USER, OPERATOR_USER };
+
+/** Sign a dev user in, in its own node process (lib/signInCli.mjs); returns the state file. */
+function signInFresh(user) {
+    const run = spawnSync(process.execPath, [signInCli, user], { encoding: 'utf8', env: process.env, timeout: 180_000 });
+    if (run.status !== 0) {
+        throw new Error((run.stderr || '').trim() || 'The dev user ' + user + ' could not sign in (lib/signInCli.mjs).');
+    }
+    return stateFile(user);
+}
+
+/**
+ * A second browser context signed in as `user` (epic 2 story 2: the phone editor beside
+ * the map editor), signed in the same way as editorTest. The caller closes it.
+ */
+export async function signedInContext(browser, user, options = {}) {
+    return browser.newContext({ ...options, storageState: signInFresh(user) });
+}
 
 /**
  * `test` signed in as the dev map editor: right before the test, a separate node
@@ -90,10 +107,7 @@ export { EDITOR_USER };
 export const editorTest = test.extend({
     // eslint-disable-next-line no-empty-pattern
     storageState: async ({}, use) => {
-        const run = spawnSync(process.execPath, [signInCli], { encoding: 'utf8', env: process.env, timeout: 180_000 });
-        if (run.status !== 0) {
-            throw new Error((run.stderr || '').trim() || 'The map editor could not sign in (lib/signInCli.mjs).');
-        }
+        signInFresh(EDITOR_USER);
         await use(editorStateFile);
     }
 });

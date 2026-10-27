@@ -2,7 +2,7 @@
 
 The public contract between the browser, the Gateway, the host project and the map store, as epic-map-store-and-data builds it (AD-8, AD-9). **Draft:** everything here is version 0.2.0 in draft until release 0.2.0; it may still change, and each change is recorded in the plan of the entry that makes it. The code is the reference: `common/src/main/java/com/aoindustrial/perspective/mapstudio/common/Messages.java` and `common/.../common/contract/`, mirrored in `web/typescript/contract.ts` and `web/typescript/messages.ts`.
 
-Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway by this repository's e2e suite (`e2e/tests/store.spec.mjs`); **[unverified]** written but not seen working.
+Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway by this repository's e2e suite (`e2e/tests/store.spec.mjs`, and from entry 2 `e2e/tests/writepath.spec.mjs`); **[unverified]** written but not seen working.
 
 ## Messages
 
@@ -15,7 +15,7 @@ Every message, both ways, is one JSON object `{v, type, id, body}` carried under
 | `edits.apply` | browser to Gateway | `{batchId, ops}` (below) |
 | `edits.apply.reply` | Gateway to browser | `{batchId, seq, results: [{entity, id, version}]}`: the batch's change sequence number and each op's new version **[live 8.3.10]** |
 | `map.changed` | Gateway to browser | `{seq, ops}`: declared; sent to every open map of the project from entry 4 **[unverified]** |
-| `error` | Gateway to browser | `{code, message}`, plus `batchId` and `op: {index, id}` when an `edits.apply` op is at fault |
+| `error` | Gateway to browser | `{code, message}`, plus `batchId` and `op: {index, id}` when an `edits.apply` op is at fault, and `conflicts` on a `conflict` (below) |
 | `point.click`, `point.click.reply` | both | the spike's round trip, unchanged |
 
 The `id` of a reply is the `id` of the message it answers.
@@ -26,9 +26,9 @@ Stable kebab-case words; the message is plain words for the person.
 
 | Code | When |
 | --- | --- |
-| `conflict` | an op's `baseVersion` is not the stored version, or a create names an id that exists. Nothing in the batch is written |
-| `role` | the session has no role that allows the op (checked on the Gateway against the session user's roles, never anything the browser sends) |
-| `invalid` | the message, batch or op is malformed, an update names a map item that does not exist, a `batchId` was already saved, or the op is not supported in this version (deletes and any `kindSetup` op, until entries 2 and 3) |
+| `conflict` | an op's `baseVersion` is not the stored version, a create names an id that exists, or an update or delete names a deleted map item. Every such op of the batch is listed in `conflicts` with the stored record; nothing in the batch is written |
+| `role` | the session has no role that allows the op (checked on the Gateway against the session user's roles, never anything the browser sends; the role matrix below). A batch refused for role is never reported as a conflict |
+| `invalid` | the message, batch or op is malformed (two ops on one id included), an update, delete or restore names a map item that was never saved, a `batchId` was already saved by another actor, or the op is not supported in this version (any `kindSetup` op, until entry 3) |
 | `stale` | the browser's map is behind (a gap in `seq`); used from entry 4 |
 | `store-unreachable` | the project has no setup, its setup names a connection the Gateway does not have, the map store is starting or unavailable, or the Gateway is busy: when the module's bounded work pool (4 threads, 64 waiting messages) is full, a `map.load` or `edits.apply` is answered at once with this code and "Map Studio is busy with other map requests; nothing was saved. Try again in a moment." (no separate `busy` code in 0.2.0) |
 
@@ -41,11 +41,63 @@ Stable kebab-case words; the message is plain words for the person.
                    "geometry": {"type": "LineString", "coordinates": [[-104.99, 39.74], [-104.98, 39.75]]}}}]}
 ```
 
-- `op` is `create`, `update` or `delete`; `entity` is `item` (a map item) or `kindSetup`. A map item `id` is a UUID string made by the caller (the browser, or UUIDv5 from a stable name in a script).
-- `baseVersion` is 0 on create and the stored version otherwise.
+- `op` is `create`, `update` or `delete`; `entity` is `item` (a map item) or `kindSetup`. A map item `id` is a UUID string made by the caller (the browser, or UUIDv5 from a stable name in a script). Letter case does not matter: the Gateway turns a map item id into lower-case canonical form, and replies, conflicts and the edit log carry that form.
+- `baseVersion` is 0 on create and the stored version otherwise; a create at a deleted map item's version restores it (below). A delete carries no `data`. At most one op per id in a batch.
 - A create's `data` is the record's fields except `id`, `version` and `deleted`; `kind` and `geometry` are required. An update's `data` replaces only the top-level fields it carries (owner decision, 2026-10-26), so a moved point sends only `geometry`.
 - A batch is all or none: one transaction, every op's version checked, every saved op recorded. It takes the project's next change sequence number `seq`. At most 1000 ops per batch.
-- Supported in 0.2.0 draft as of entry 1: create and update of map items by a session with full editing, or a script. Deletes, kind setups, retried `batchId`s, the conflicting record in a `conflict` reply and the phone editing role follow in entries 2 and 3.
+- Supported in 0.2.0 draft as of entry 2: create, update, delete and restore of map items by a session with full editing or a script; a point's geometry and any map item's properties by a session with phone editing; retried `batchId`s; the conflicting records in a `conflict` reply. Kind setups follow in entry 3.
+- Checks, in order: the store is ready; the batch is well formed; a `batchId` already committed replays (below); the role matrix on each op's shape; the op is supported; there is an actor; then, in the transaction, the project's row is locked, the `batchId` looked up again, the map items locked, the role matrix checked on each stored geometry, and every op's version compared. A refusal writes nothing and takes no `seq` **[live 8.3.10]**.
+
+### Conflicts
+
+A batch with stale ops is refused once, listing every one of them: the stored record (`current`, a deleted one with `deleted: true`), and the user or script actor of its last edit record with the time (`changedBy`, `changedAt`, ISO 8601 UTC to the second; null when there is no edit record). `op` names the first. The message names the map item, or the count when there are several **[live 8.3.10]**:
+
+```json
+{"code": "conflict", "batchId": "<UUID>", "op": {"index": 0, "id": "<UUID>"},
+ "message": "Pad P12 was changed by mapoperator at 14:02 UTC since you loaded it. Nothing in this save was written.",
+ "conflicts": [{"index": 0, "entity": "item", "id": "<UUID>", "baseVersion": 1,
+                "current": {"id": "<UUID>", "kind": "pad", "name": "Pad P12", "version": 2, "deleted": false, "...": "..."},
+                "changedBy": "mapoperator", "changedAt": "2026-10-26T14:02:11Z"}]}
+```
+
+Several: "3 map items were changed by others since you loaded them. Nothing in this save was written." A create on an existing id: "<name> already exists (saved by ...), so it was not created again." A deleted one: "<name> was deleted by ... since you loaded it."
+
+### Retries
+
+A `batchId` is the batch's identity. Sent again after it was committed, by the same actor (the session's user name or the script's actor), it is answered with the first reply, the same `seq` and versions, and nothing is written again; the change hook is not called again. Two sends of one batch at the same time are serialised by the project's row lock, so one commits and the other replays it **[live 8.3.10]**. A batch that was refused left no record, so sending it again checks it afresh. A `batchId` committed by another actor is refused `invalid`, "This save id was already used for another change; send a new batchId." Example: the reply to both sends of
+
+```json
+{"batchId": "8d4f...", "ops": [{"op": "update", "entity": "item", "id": "<UUID>", "baseVersion": 2, "data": {"name": "P12"}}]}
+```
+
+is the same `{"batchId": "8d4f...", "seq": 41, "results": [{"entity": "item", "id": "<UUID>", "version": 3}]}`.
+
+### Delete and restore
+
+A delete keeps the record as a tombstone: `deleted` becomes true, the version goes up by one, the edit record says `delete`, and `map.load` and `getMap` leave it out. A `create` whose `baseVersion` is the tombstone's version restores it with the create's full `data` (as a new create: `kind` and `geometry` required), live again at the next version; its edit record says `create`. So one map item's edit records can read create v1, delete v2, create v3 **[live 8.3.10]**. An update or delete of a tombstone, a create at 0 of a tombstoned id, or a restore at another version is a `conflict`; a restore of an id never saved is `invalid`.
+
+```json
+{"batchId": "<UUID>", "ops": [{"op": "delete", "entity": "item", "id": "<UUID>", "baseVersion": 1}]}
+{"batchId": "<UUID>", "ops": [{"op": "create", "entity": "item", "id": "<UUID>", "baseVersion": 2,
+  "data": {"kind": "line", "name": "Line 21:05:09", "geometry": {"type": "LineString", "coordinates": [[-104.99, 39.74], [-104.98, 39.75]]}}}]}
+```
+
+### The role matrix
+
+The level comes from the session user's roles as the Gateway sees them against the setup's `roles` lists (`full` first, then `phone`); a script runs as `full` under its actor.
+
+| Level | May |
+| --- | --- |
+| `full` | create, update, delete and restore any map item |
+| `phone` | `update` of a map item whose `data` carries only `properties`, or `geometry` of a map item stored as a `Point` (moved to another `Point`), or both. Anything else, a create, delete, restore, a line's geometry, `name`, `kind`, `assetId`, `overrides`, `ends` or a kind setup, is refused `role`: "Phone editing may move a point and change a map item's properties; this change needs a full editing role. Nothing in this save was written." **[live 8.3.10]** |
+| `none` | nothing: `role`, "You do not have a role that lets you change the map. Ask for a Map Studio editing role." |
+
+```json
+{"batchId": "<UUID>", "ops": [{"op": "update", "entity": "item", "id": "<UUID>", "baseVersion": 3,
+  "data": {"geometry": {"type": "Point", "coordinates": [-104.9745, 39.7442]}}}]}
+```
+
+saved for a phone editor; the same op with a `LineString` on a line is refused `role`. Known gap (epic-editing, AD-19): a phone move of a point that lines snap to cannot carry the line ends a phone editor may not change.
 
 ## The map item record (AD-20)
 
@@ -81,7 +133,7 @@ PostgreSQL only. On start, for each connection a setup names, Map Studio waits f
 | `mapstudio_item` | `(project, id uuid)` | `kind`, `name`, `geometry text` (GeoJSON), `properties jsonb`, `asset_id`, `overrides jsonb`, `ends jsonb`, `version`, `deleted`, `updated_at` |
 | `mapstudio_kind_setup` | `(project, kind_id)` | `setup jsonb`, `version`, `deleted`, `updated_at` (written from entry 3) |
 | `mapstudio_edit` | `edit_id bigserial` | `project`, `batch_id uuid`, `seq`, `entity`, `entity_id`, `op`, `version` (after the op), `actor`, `source` (`session` or `script`), `at timestamptz` (UTC); index `(project, seq)` |
-| `mapstudio_batch` | `(project, batch_id)` | `seq`, `actor`, `result jsonb`, `committed_at` (read by entry 2 for retries) |
+| `mapstudio_batch` | `(project, batch_id)` | `seq`, `actor`, `result jsonb`, `committed_at` (the reply a retried `batchId` gets, from entry 2) |
 
 The edit record answers "who changed what, when": the Ignition user name of the session, or the actor a script names.
 
