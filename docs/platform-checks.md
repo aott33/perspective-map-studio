@@ -544,3 +544,25 @@ The Designer half, for the owner's session (plan, manual checks), each **[not ve
 - [not verified] `DesignableProject.getResourcesOfType(ScriptLibrary.RESOURCE_TYPE)` includes inherited scripts.
 - [not verified] With no setup, double-click opens a "Map Studio Setup" tab that is not a resource editor (the SDK's `ResourceEditor` cannot open a missing resource); its close button closes it; File > Save with a new setup without reasons creates `com.aoindustrial.perspective.mapstudio/setup/` in that same save.
 - [not verified] A refused save (a reason left) shows the Designer's standard save failure and no Map Studio dialog; what the Designer does with the rest of that save.
+
+## Epic 2 story 13 - release 0.2.0 rehearsal on the template stack
+
+**Question (story 13, owner decisions 1 and 4, 2026-10-27):** does a 0.2.0 build, installed through `ign-scada-template`'s module lock on its 8.3.9 test stack, migrate an empty database, save through the browser write path with role checks, push `map.changed` across browsers and keep the edit over a Gateway restart; and do the live checks the refactor sweep could not make hold there? **Answer:** yes for every check below; two findings. Date: 2026-10-27 (UTC). Steps, commands and screenshots: [template-install.md](template-install.md), "0.2.0 rehearsal".
+
+Labels: **[live 8.3.9, rehearsal, throwaway-signed]** seen on the template's test stack (`ign-og/ignition:8.3.9-modules`, compose project `ign-og-test`) with this branch's 0.2.0 build signed by a throwaway certificate, before the tag. The real release repeats them; until then nothing here is **[live]** for the published asset.
+
+| Check | Result |
+| --- | --- |
+| Module on 8.3.9 by the lock | `modl.py fetch` and the template's bootstrap installed it; `smoke.sh` `ok module`; log `Starting up module ... v0.2.0` **[live 8.3.9, rehearsal, throwaway-signed]** |
+| Migration on an empty database | schema 1 and 2 recorded on the first `map.load` after the connection appeared, six `mapstudio_` tables owned by the connection's role **[live 8.3.9, rehearsal, throwaway-signed]**; `module_version` recorded `dev` (finding) |
+| `map.changed` across browsers | a line saved in one browser was drawn in a second browser of the same user without a reload, within 0.12 s **[live 8.3.9, rehearsal, throwaway-signed]** |
+| Over a Gateway restart | after `docker compose restart`, the line is in `map.load` and drawn; its `mapstudio_edit` row names `render-engineer`, source `session` **[live 8.3.9, rehearsal, throwaway-signed]** |
+| A signed-in user without an editing role (closes the sweep's item) | `render-pumper`: level `none`, save refused `role`, nothing written **[live 8.3.9, rehearsal, throwaway-signed]** |
+| A phone editor's line | `render-operator`: level `phone`, the line refused `role`, nothing written **[live 8.3.9, rehearsal, throwaway-signed]** |
+| A `storage` event between two real tabs (closes the sweep's item) | the second tab listed the first tab's queued batch at once and saved it once after its next `map.load`; it does not replay on its own timer (finding) **[live 8.3.9, rehearsal, throwaway-signed]** |
+| A real browser closed and reopened with an unsaved edit (closes the sweep's item) | the queued line was replayed under its own id after the browser profile was opened again and signed in **[live 8.3.9, rehearsal, throwaway-signed]** |
+| Another project's maps get no `map.changed` (closes the sweep's item) | an open map of a second project on the same connection got no `map.changed` frame and kept its `seq` **[live 8.3.9, rehearsal, throwaway-signed]** |
+
+Still open after this rehearsal: `onShutdown` on page or session close, a redundant pair, a slow tag system, a kind setup saved by the least-privilege runtime role, the example adapters run live (the owner or later epics), and the owner's Designer session (gate G3).
+
+Facts learned on 8.3.9, for claude-ignition-skills: a project copied in without `global-props/data.bin` but with its `resource.json` fails to start in Perspective (`NullPointerException`, `existingGlobalProps` is null) and needs a remove and rescan after the Gateway writes `data.bin`; a hand-written database connection resource without `attributes.uuid` is listed by `resources/list` but not loaded ("does not have required UUID attribute"); `GET /data/api/v1/projects/find/<name>` reads the project record whose `identityProvider` `PUT /data/api/v1/projects/<name>` sets (a `GET` of `/projects/<name>` itself answers 404) **[live 8.3.9]**.

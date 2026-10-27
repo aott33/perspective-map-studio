@@ -79,9 +79,20 @@
   summary: Live checks the sweep could not make with the dev stack and e2e harness: `onShutdown` on page or session close, a redundant pair (standby refusal, migration on becoming active), a `storage` event between two real tabs, a real browser closed and reopened with unsaved edits, a slow tag system (`tags-unavailable`), a kind setup saved by the least-privilege runtime role, the example adapters run live, another project's maps getting no `map.changed`, and a signed-in user without an editing role (no such dev user).
   evidence: Each is unit tested and marked **[unverified]** live in `docs/platform-checks.md` or `docs/contract.md`; each needs new harness, a second Gateway or new dev users, which is not cleanup.
   goes_to: the release check of epic-map-store-and-data (entry 13) or the owner; the redundant pair with the template test stack.
+  resolved: 2026-10-27 (partly) epic 2 story 13's rehearsal on the template test stack, throwaway-signed 0.2.0 on 8.3.9 (`docs/platform-checks.md`, "Epic 2 story 13"; `docs/template-install.md`, "0.2.0 rehearsal"): closed a `storage` event between two real tabs, a real browser closed and reopened with unsaved edits, another project's maps getting no `map.changed`, and a signed-in user without an editing role. Still open: `onShutdown`, the redundant pair, a slow tag system, the least-privilege kind setup save and the example adapters live.
 
 - source_plan: `_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-refactor-sweep-plan.md`
   summary: The Designer setup form (epic 2 story 7) gets its own redesign story; the sweep leaves `designer/.../setup/` unchanged.
   evidence: Owner, 2026-10-27: "add the setup form story". The owner opened the Map Studio Setup tab on 8.3.10 and it showed the dev setup's values correctly; the save failed on a dev-stack file permission, fixed in a separate change. The form already reads `"basemaps": null` as the default list, as the Gateway does (`SetupForm.names`), so only the docs were wrong (fixed by the sweep).
   goes_to: a new story in epic-map-store-and-data for the setup form redesign (the coordinator adds the ticket; the sweep edits no ticket file), with the remaining story 7 Designer checks in `docs/platform-checks.md`.
   resolved: 2026-10-27 entry 16 "Setup form in the Designer: pickers and layout" added to epic-map-store-and-data (commit f28129e) and being built; the dev-stack save permission is fixed (PR #14).
+
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-release-0-2-0-on-the-template-s-test-stack-plan.md`
+  summary: A tab that learns another tab's unsent batch from a `storage` event arms no replay timer (`UnsavedSender.storage()` refreshes the list only), so it replays the batch only on its next `map.load`, `map.changed` or Try again.
+  evidence: Story 13 rehearsal on the template stack, 2026-10-27 (`docs/platform-checks.md`, "Epic 2 story 13"): the second tab showed the batch at once but saved it only after a reload. The contract promises only the refresh; a module change is out of scope for the version pull request.
+  goes_to: epic-editing (the save banner and the unsaved list), or a 0.2.x fix if the owner wants it sooner.
+
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-release-0-2-0-on-the-template-s-test-stack-plan.md`
+  summary: `mapstudio_schema_version.module_version` is `dev` for every build, a signed release too: `MapStudioServices.moduleVersion()` reads the jar's `Implementation-Version`, which no module jar's manifest carries.
+  evidence: Story 13 rehearsal, 2026-10-27: both migrations recorded `dev` from a 0.2.0 build; the manifests of `common-0.2.0.jar`, `gateway-0.2.0.jar`, `designer-0.2.0.jar` and `web-0.2.0.jar` hold only `Manifest-Version`.
+  goes_to: the owner's call before the tag (a small fix of its own: set the manifest attribute from the Gradle version), else a 0.2.1.

@@ -47,7 +47,7 @@ context:
 
 Decision 2026-10-27 (owner: "agree with all recommendations, start"; all eight recommended answers):
 1. Rehearse before the tag: a throwaway-signed build of the version branch goes through a scratch template copy, `local.sh`, `stack.sh` and the scratch checks; repeated on the published release.
-2. The test stack's `MapStudio` connection uses its own role and database created inside the stack's PostgreSQL, password set inside the container (generated, passed by environment), connection file only in the stack's worktree, never committed.
+2. The test stack's `MapStudio` connection uses its own role and database created inside the stack's PostgreSQL, its password the stack's generated `db_password` value, read and set inside the container (passed by environment, never on a command line or in a file), so the connection references the existing `UpstreamFiles/db_password` secret; connection file only in the stack's worktree, never committed.
 3. Scratch setup roles: full `engineer`, phone `operator`; `render-pumper` is the user without an editing role.
 4. Also close the extra live checks: a phone editor's line refused, a signed-in user without an editing role, a `storage` event between two tabs, a browser closed and reopened, a second project getting no `map.changed`.
 5. `CHANGELOG.md` plus `web`/`e2e` packages at 0.2.0 in the version pull request; Gradle default `0.3.0-SNAPSHOT` after the tag.
@@ -83,12 +83,12 @@ Template (read only here; changed only in the scratch clone):
 - G3 Designer session on the dev Gateway of `main`: story 16 steps 1 to 8, story 7's open items, story 11's autocomplete text (`system.mapstudio.` shows `getMap`, `applyEdits`, `refreshAdapters`, `ping`). Results into `docs/platform-checks.md` as **[owner, seen in the Designer, date]**.
 
 **Execution (me):**
-- [ ] `common/.../Messages.java`, `web/typescript/contract.ts`, `ContractTest.java`, `contract.test.ts` -- `CONTRACT_VERSION` `"0.2.0"`.
-- [ ] `docs/contract.md`, `docs/kind-setup.md`, `docs/kinds-and-assets.md`, `docs/setup.md`, `README.md`, `NOTICE`, javadoc and TS comments in the Code Map -- "0.2.0 draft" becomes "0.2.0"; contract title "version 0.2.0"; README status line says 0.2.0 is released through the template's lock.
-- [ ] `web/package.json`, `e2e/package.json` and lock roots -- `0.2.0` (`npm version 0.2.0 --no-git-tag-version`); `build.gradle.kts:20` per Open Question 5.
-- [ ] `CHANGELOG.md` (new, per Open Question 5) -- 0.1.0 (spike) and 0.2.0 (contract, map store schema 2, setup schema 1, scripting API, icons, Designer setup form), with the "Since" versions from `docs/contract.md`.
-- [ ] `scripts/ci/check-contract-versions.sh` (new, run in CI `build` job) -- fails when a R14 doc lacks its version heading or any of the files above still says `0.2.0 draft`/`0.2.0-draft`.
-- [ ] Rehearsal (Open Question 1): throwaway-signed build of the version branch in a scratch template clone, steps below, nothing committed.
+- [x] `common/.../Messages.java`, `web/typescript/contract.ts`, `ContractTest.java`, `contract.test.ts` -- `CONTRACT_VERSION` `"0.2.0"`.
+- [x] `docs/contract.md`, `docs/kind-setup.md`, `docs/kinds-and-assets.md`, `docs/setup.md`, `README.md`, `NOTICE`, javadoc and TS comments in the Code Map -- "0.2.0 draft" becomes "0.2.0"; contract title "version 0.2.0"; README status line says 0.2.0 is released through the template's lock.
+- [x] `web/package.json`, `e2e/package.json` and lock roots -- `0.2.0` (`npm version 0.2.0 --no-git-tag-version`); `build.gradle.kts:20` stays until after the tag (Decision 5: `0.3.0-SNAPSHOT` then).
+- [x] `CHANGELOG.md` (new, per Open Question 5) -- 0.1.0 (spike) and 0.2.0 (contract, map store schema 2, setup schema 1, scripting API, icons, Designer setup form), with the "Since" versions from `docs/contract.md`.
+- [x] `scripts/ci/check-contract-versions.sh` (new, run in CI `build` job) -- fails when a R14 doc lacks its version heading or any of the files above still says `0.2.0 draft`/`0.2.0-draft`.
+- [x] Rehearsal (Decision 1): throwaway-signed build of the version branch in a scratch template copy, local.sh, stack.sh and the kept-stack checks, nothing committed in the template (2026-10-27, `docs/template-install.md` "0.2.0 rehearsal"; also `license.html` carries Tabler Icons' MIT notice, `test-contract-versions.sh` proves the check).
 - [ ] After the release: scratch clone of the template (`git clone /home/user/ign-scada-template`, scratchpad, branch `map-studio-0.2.0`); `python3 -I scripts/modules/modl.py check --write` then `fetch`, `inspect`, `verify-lock`; `sha256` equals the release file, `certSha256` unchanged; `scripts/ci/modl-verify.sh` with the README fingerprint and `0.2.0`.
 - [ ] Template `docs/modules.md` (row 0.2.0, history line), `THIRD_PARTY_NOTICES.md` (adds Tabler Icons, MIT) -- one commit.
 - [ ] `scripts/ci/local.sh` in the clone, all steps (PG parts against a throwaway postgres:16), then `scripts/test/stack.sh --keep`: `test stack: PASS`.
