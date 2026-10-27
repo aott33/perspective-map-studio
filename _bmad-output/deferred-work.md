@@ -84,3 +84,4 @@
   summary: The Designer setup form (epic 2 story 7) gets its own redesign story; the sweep leaves `designer/.../setup/` unchanged.
   evidence: Owner, 2026-10-27: "add the setup form story". The owner opened the Map Studio Setup tab on 8.3.10 and it showed the dev setup's values correctly; the save failed on a dev-stack file permission, fixed in a separate change. The form already reads `"basemaps": null` as the default list, as the Gateway does (`SetupForm.names`), so only the docs were wrong (fixed by the sweep).
   goes_to: a new story in epic-map-store-and-data for the setup form redesign (the coordinator adds the ticket; the sweep edits no ticket file), with the remaining story 7 Designer checks in `docs/platform-checks.md`.
+  resolved: 2026-10-27 entry 16 "Setup form in the Designer: pickers and layout" added to epic-map-store-and-data (commit f28129e) and being built; the dev-stack save permission is fixed (PR #14).
