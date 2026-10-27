@@ -123,6 +123,8 @@ editorTest.describe('kind setups and item checks', () => {
             const stale = await send(page, 'edits.apply', batch({ op: 'update', entity: 'kindSetup', id: 'pad',
                 baseVersion: byKind.pad.version - 1 || 99, data: { setup: PAD_SETUP } }));
             expect(stale.body.code).toBe('conflict');
+            // The message names the kind setup by its kind's display name (epic 2 story 12).
+            expect(stale.body.message).toMatch(/^The Well pad kind setup was changed/);
             expect(stale.body.conflicts[0]).toMatchObject({ entity: 'kindSetup', id: 'pad',
                 current: { kindId: 'pad', setup: PAD_SETUP, version: byKind.pad.version, deleted: false } });
         });

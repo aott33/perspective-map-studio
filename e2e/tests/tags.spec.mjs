@@ -113,6 +113,10 @@ editorTest.describe('tag browse and resolve', () => {
             const map = await openMap(page, '/edit');
             await mapLoaded(map);
             await expect(map).toHaveAttribute('data-edit-level', 'phone');
+            // map.load.reply names the phone editor (epic 2 story 12: was unit tested only).
+            const loaded = expectReply(await send(page, 'map.load', {}), 'map.load.reply');
+            expect(loaded.level).toBe('phone');
+            expect(loaded.user).toBe(OPERATOR_USER);
             expectRefused(await send(page, 'tags.browse', {}), 'role');
             expectRefused(await send(page, 'tags.resolve', { kindId: 'pad', assetId: 'P12', path: '{asset.path}' }), 'role');
             expect(watched.errors).toEqual([]);
@@ -126,6 +130,10 @@ test.describe('tag browse for a viewer', () => {
     test('an anonymous viewer is refused role and learns nothing about tags', async ({ page }) => {
         const map = await openMap(page, '/');
         await mapLoaded(map);
+        // A viewer's map.load.reply carries no user (epic 2 story 12: was unit tested only).
+        const loaded = expectReply(await send(page, 'map.load', {}), 'map.load.reply');
+        expect(loaded.level).toBe('none');
+        expect(loaded).not.toHaveProperty('user');
         const browse = expectRefused(await send(page, 'tags.browse', { provider: 'nope' }), 'role');
         expect(browse.message).not.toContain('nope');
         expectRefused(await send(page, 'tags.resolve', { kindId: 'pad', assetId: 'P12', path: '{asset.path}' }), 'role');

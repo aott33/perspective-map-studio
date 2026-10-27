@@ -225,8 +225,9 @@ class AdapterServiceTest {
         assertEquals(1, log.about("kind function").size());
         int logged = log.lines.size();
         caller.hold.countDown();
-        // The late answers arrive; the status stays slow and nothing more is logged.
-        Thread.sleep(200);
+        // The late answers arrive (both pool tasks have finished); the status stays slow and nothing more is logged.
+        waitFor(() -> poolTasksDone() == caller.calls(KINDS) + caller.calls(ASSETS));
+        assertEquals(2, poolTasksDone());
         assertEquals(AdapterStatus.SLOW, service.snapshot(P).kindsStatus().status());
         assertEquals(0, service.snapshot(P).kinds().size());
         assertEquals(logged, log.lines.size(), "a dropped late answer logs nothing");
@@ -272,9 +273,24 @@ class AdapterServiceTest {
                 ordered.set(within(() -> AdapterStatus.OK.equals(service.snapshot(P).assetsStatus().status())));
             }
         };
-        caller.answers.put(KINDS, () -> new AdapterCaller.Failed("ValueError: down"));
-        AdapterSnapshot s = service.refreshNow(P).get(5, TimeUnit.SECONDS);
+        // The kind call answers only once refreshNow has returned, so its asset step is already
+        // chained and runs on the kind call's thread (epic 2 story 12: an instant answer could
+        // settle first and leave the step to this thread, which failed 1 run in 20).
+        CountDownLatch chained = new CountDownLatch(1);
+        AtomicBoolean latched = new AtomicBoolean();
+        caller.answers.put(KINDS, () -> {
+            try {
+                latched.set(chained.await(10, TimeUnit.SECONDS));
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+            return new AdapterCaller.Failed("ValueError: down");
+        });
+        var second = service.refreshNow(P);
+        chained.countDown();
+        AdapterSnapshot s = second.get(5, TimeUnit.SECONDS);
         first.get(5, TimeUnit.SECONDS);
+        assertTrue(latched.get(), "refreshNow returned before the kind call answered");
         assertTrue(overlapped.get(), "the asset call answered while the kind call held the kind monitor");
         assertTrue(ordered.get(), "the asset call settled before the second refresh's asset step");
         assertEquals(AdapterStatus.FAILING, s.kindsStatus().status());
@@ -502,13 +518,17 @@ class AdapterServiceTest {
         caller.hold = new CountDownLatch(1);
         service.tick();
         waitFor(() -> caller.calls(KINDS) == 2);
-        // Past the timeout the call still runs: the next ticks skip it.
-        waitFor(() -> service.snapshot(P).kindsStatus().status().equals(AdapterStatus.SLOW));
+        // Past the timeout both calls still run: the next ticks skip them. A tick decides on its own
+        // thread, so a call it started would already be a pool task when tick() returns.
+        waitFor(() -> service.snapshot(P).kindsStatus().status().equals(AdapterStatus.SLOW)
+            && service.snapshot(P).assetsStatus().status().equals(AdapterStatus.SLOW));
+        assertEquals(2, poolBusy(), "both workers held, so a new call would queue and be counted");
+        long tasks = poolTasks();
         nanos.addAndGet(TimeUnit.SECONDS.toNanos(10));
         service.tick();
         nanos.addAndGet(TimeUnit.SECONDS.toNanos(10));
         service.tick();
-        Thread.sleep(100);
+        assertEquals(tasks, poolTasks(), "no call was handed to the pool");
         assertEquals(2, caller.calls(KINDS), "a call still running is never queued twice");
     }
 
@@ -526,9 +546,12 @@ class AdapterServiceTest {
     void aRefreshAskedWhileATimedOutCallRunsStartsOneCallWhenItEnds() throws Exception {
         caller.hold = new CountDownLatch(1);
         refresh(); // both time out; both calls still run
+        assertEquals(2, poolBusy(), "both workers held, so a new call would queue and be counted");
+        long tasks = poolTasks();
         var a = service.refreshNow(P);
         var b = service.refreshNow(P);
-        Thread.sleep(100);
+        // refreshNow decides on this thread: a call it started would already be a pool task here.
+        assertEquals(tasks, poolTasks(), "both refreshes wait for the running call");
         assertEquals(1, caller.calls(KINDS));
         caller.hold.countDown();
         caller.hold = null;
@@ -570,6 +593,26 @@ class AdapterServiceTest {
         assertEquals("a", AdapterService.firstLine(" a \n b"));
         assertEquals("y".repeat(200) + "...", AdapterService.firstLine("y".repeat(250)));
         assertEquals("", AdapterService.firstLine(null));
+    }
+
+    /**
+     * Tasks ever handed to the test pool. Read with no wait only while every worker is held
+     * ({@link #poolBusy()} is the pool size, 2): a new task then sits in the queue, where
+     * {@code getTaskCount()} counts it at once. A task handed straight to a new or idle worker
+     * may not be counted yet, so with a free worker this count can miss one.
+     */
+    long poolTasks() {
+        return ((ThreadPoolExecutor) pool).getTaskCount();
+    }
+
+    /** Workers of the test pool running a task now; the precondition of {@link #poolTasks()}. */
+    int poolBusy() {
+        return ((ThreadPoolExecutor) pool).getActiveCount();
+    }
+
+    /** Tasks of the test pool that have finished (each call and the service's step after it). */
+    long poolTasksDone() {
+        return ((ThreadPoolExecutor) pool).getCompletedTaskCount();
     }
 
     static void sleepQuietly(long ms) {

@@ -3,6 +3,7 @@ package com.aoindustrial.perspective.mapstudio.gateway.write;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.inductiveautomation.ignition.common.gson.JsonArray;
@@ -10,7 +11,9 @@ import com.inductiveautomation.ignition.common.gson.JsonArray;
 import com.aoindustrial.perspective.mapstudio.common.Messages;
 import com.aoindustrial.perspective.mapstudio.common.contract.Conflict;
 import com.aoindustrial.perspective.mapstudio.common.contract.EditOp;
+import com.aoindustrial.perspective.mapstudio.common.contract.Kind;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
+import com.aoindustrial.perspective.mapstudio.common.contract.Rows;
 import com.aoindustrial.perspective.mapstudio.common.contract.StoredRecord;
 import com.aoindustrial.perspective.mapstudio.gateway.store.MapStore;
 
@@ -18,12 +21,19 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.MapStore;
  * Collects every stale op of one batch (epic 2 story 2) and turns them into one
  * {@code conflict} refusal: the stored record of each, who changed it last and when,
  * and a plain-words message naming the map item or kind setup, or the count when there
- * are several.
+ * are several. A kind setup is named by its kind's display name from the batch's kind
+ * list (epic 2 story 12), or by its kind id when the kind is not in the list.
  */
 final class ConflictReport {
 
+    private final Map<String, Kind> kinds;
     private final List<Conflict> conflicts = new ArrayList<>();
     private final List<Boolean> exists = new ArrayList<>();
+
+    /** {@code kinds}: the batch's kind list by id (empty for a delete-only batch). */
+    ConflictReport(Map<String, Kind> kinds) {
+        this.kinds = kinds;
+    }
 
     /** Record a stale op; {@code current} is its stored record. */
     void add(MapStore.Tx tx, String project, EditOp op, StoredRecord current) throws SQLException {
@@ -56,8 +66,8 @@ final class ConflictReport {
                 + " Nothing in this save was written.";
         }
         Conflict c = conflicts.get(0);
-        String name = c.current() != null && !c.current().name().isBlank() ? c.current().name()
-            : EditOp.ENTITY_KIND_SETUP.equals(c.entity()) ? "The " + c.id() + " kind setup" : "Map item " + c.id();
+        String name = EditOp.ENTITY_KIND_SETUP.equals(c.entity()) ? kindSetupName(c.id())
+            : c.current() != null && !c.current().name().isBlank() ? c.current().name() : "Map item " + c.id();
         String who = c.changedBy() == null ? "" : " by " + c.changedBy()
             + (c.changedAt() == null ? "" : " at " + hhmm(c.changedAt()) + " UTC");
         if (exists.get(0)) {
@@ -68,6 +78,13 @@ final class ConflictReport {
             return name + " was deleted" + who + " since you loaded it. Nothing in this save was written.";
         }
         return name + " was changed" + who + " since you loaded it. Nothing in this save was written.";
+    }
+
+    /** "The Well pad kind setup": the kind's display name, its id when it has none here. */
+    private String kindSetupName(String kindId) {
+        Kind kind = kinds.get(kindId);
+        String shown = kind != null && !kind.name().isBlank() ? kind.name() : kindId;
+        return "The " + Rows.echo(shown) + " kind setup";
     }
 
     /** "14:02" from "2026-10-26T14:02:00Z". */

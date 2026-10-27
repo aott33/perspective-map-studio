@@ -22,6 +22,7 @@ import com.aoindustrial.perspective.mapstudio.common.contract.Asset;
 import com.aoindustrial.perspective.mapstudio.common.contract.Kind;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
+import com.aoindustrial.perspective.mapstudio.common.contract.Rows;
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 import com.aoindustrial.perspective.mapstudio.common.contract.TagChild;
 import com.aoindustrial.perspective.mapstudio.common.contract.TagPaths;
@@ -83,13 +84,13 @@ public final class TagLookups {
             provider = named(providers, askedProvider);
             if (provider == null) {
                 throw new MapStudioException(Messages.CODE_INVALID,
-                    "There is no tag provider named " + echo(askedProvider) + " on this Gateway.");
+                    "There is no tag provider named " + Rows.echo(askedProvider) + " on this Gateway.");
             }
         }
         TagSource.Browse browse = source.browse(provider, folder, roles, MAX_CHILDREN);
         if (!browse.found()) {
             throw new MapStudioException(Messages.CODE_INVALID,
-                "The folder " + echo(folder) + " was not found in tag provider " + provider + ".");
+                "The folder " + Rows.echo(folder) + " was not found in tag provider " + provider + ".");
         }
         List<TagChild> children = new ArrayList<>(browse.children());
         children.sort(TagChild.BY_NAME);
@@ -123,24 +124,26 @@ public final class TagLookups {
             kindKnown |= kind.id().equals(kindId);
         }
         if (!kindKnown) {
-            throw new MapStudioException(Messages.CODE_INVALID, "The kind " + echo(kindId) + " is not in the kind list.");
+            throw new MapStudioException(Messages.CODE_INVALID,
+                "The kind " + Rows.echo(kindId) + " is not in the kind list.");
         }
         Map<String, Asset> assets = new LinkedHashMap<>();
         lists.assets().forEach(a -> assets.put(a.id(), a));
         Asset asset = assets.get(assetId);
         if (asset == null) {
-            throw new MapStudioException(Messages.CODE_INVALID, "The asset " + echo(assetId) + " is not in the asset list.");
+            throw new MapStudioException(Messages.CODE_INVALID,
+                "The asset " + Rows.echo(assetId) + " is not in the asset list.");
         }
         if (!asset.kind().equals(kindId)) {
             throw new MapStudioException(Messages.CODE_INVALID,
-                "The asset " + echo(assetId) + " is a " + asset.kind() + ", not a " + kindId + ".");
+                "The asset " + Rows.echo(assetId) + " is a " + asset.kind() + ", not a " + kindId + ".");
         }
         if (!path.startsWith("{")) {
             TagPaths.parseFull(path);
             if (!usable(asset.basePath())) {
-                throw new MapStudioException(Messages.CODE_INVALID, "The asset " + echo(assetId) + "'s basePath "
-                    + echo(asset.basePath()) + " cannot be used for tag paths; the host adapter must give a full path"
-                    + " such as [default]Mesa/P12.");
+                throw new MapStudioException(Messages.CODE_INVALID, "The asset " + Rows.echo(assetId)
+                    + "'s basePath " + Rows.echo(asset.basePath())
+                    + " cannot be used for tag paths; the host adapter must give a full path such as [default]Mesa/P12.");
             }
         }
         TagPaths.Resolved resolved = TagPaths.resolve(path, asset.basePath());
@@ -270,9 +273,5 @@ public final class TagLookups {
             throw new MapStudioException(Messages.CODE_INVALID, "tags.resolve needs " + key + ".");
         }
         return s;
-    }
-
-    private static String echo(String s) {
-        return s.length() <= 80 ? s : s.substring(0, 77) + "...";
     }
 }

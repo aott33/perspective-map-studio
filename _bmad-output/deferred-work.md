@@ -69,3 +69,18 @@
   summary: Phone editing may move an instrument along its own line by sending `attachment` with the new point (Open Question 5, option b).
   evidence: Owner decision 2026-10-27 took option a for now: a phone editor's geometry or attachment change of an instrument is refused `role` ("An instrument moves along its line; only full editing can move it"); option b was recommended as a backlog entry.
   goes_to: epic-phone
+
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-refactor-sweep-plan.md`
+  summary: Two tag path rules disagree: a kind setup save checks tag paths with `Placeholders.checkTagPath` (`isAssetSuffix`), which accepts `{asset.path}/a//b` and a `[` in the suffix, while the tag browser's `tags.resolve` (`TagPaths.resolve`) refuses both.
+  evidence: Owner decision 2026-10-27 (sweep Open Question 3, option a): the sweep must not tighten validation, so both rules stay. Today the tag browser stores only what `tags.resolve` returns, so the looser rule is reached only by a hand-written or scripted kind setup. Aligning the save rule to `TagPaths` refuses kind setups that save today, so it needs a decision on existing rows.
+  goes_to: epic-editing (the kind setup editor and tag browser), with a check of stored kind setups before tightening.
+
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-refactor-sweep-plan.md`
+  summary: Live checks the sweep could not make with the dev stack and e2e harness: `onShutdown` on page or session close, a redundant pair (standby refusal, migration on becoming active), a `storage` event between two real tabs, a real browser closed and reopened with unsaved edits, a slow tag system (`tags-unavailable`), a kind setup saved by the least-privilege runtime role, the example adapters run live, another project's maps getting no `map.changed`, and a signed-in user without an editing role (no such dev user).
+  evidence: Each is unit tested and marked **[unverified]** live in `docs/platform-checks.md` or `docs/contract.md`; each needs new harness, a second Gateway or new dev users, which is not cleanup.
+  goes_to: the release check of epic-map-store-and-data (entry 13) or the owner; the redundant pair with the template test stack.
+
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-refactor-sweep-plan.md`
+  summary: The Designer setup form (epic 2 story 7) gets its own redesign story; the sweep leaves `designer/.../setup/` unchanged.
+  evidence: Owner, 2026-10-27: "add the setup form story". The owner opened the Map Studio Setup tab on 8.3.10 and it showed the dev setup's values correctly; the save failed on a dev-stack file permission, fixed in a separate change. The form already reads `"basemaps": null` as the default list, as the Gateway does (`SetupForm.names`), so only the docs were wrong (fixed by the sweep).
+  goes_to: a new story in epic-map-store-and-data for the setup form redesign (the coordinator adds the ticket; the sweep edits no ticket file), with the remaining story 7 Designer checks in `docs/platform-checks.md`.

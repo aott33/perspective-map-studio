@@ -64,7 +64,7 @@ The map shows "Map store: read only. The map store was upgraded by a newer Map S
 - An independent Gateway (redundancy off) reads, saves and migrates.
 - Of a redundant pair only the active node saves and migrates. A standby reads the map and the schema version only (no lock, no DDL); every save there is refused `read-only` with "This Gateway is the standby of a redundant pair; saving is off here. Open the map on the active Gateway to save." If the standby finds the schema not yet created, its map store is unavailable until the active node has created it (the next try a minute later finds it) or until it becomes active itself, when it runs the migrator at once.
 - Map Studio reads the redundancy state on every save, so a missed change event cannot leave a standby saving. A state it cannot read counts as standby, with one warning from `MapStudio.store` per change (not one per save).
-- Both nodes of a pair should name the same database connection and run the same module version. Reloading maps that are open during a failover comes with live updates (epic 2, entry 4).
+- Both nodes of a pair should name the same database connection and run the same module version. A map open during a failover catches up at its next gap in `map.changed` or its next page open; reloading on a Perspective reconnect is epic-viewing's (AD-6; [contract.md](contract.md), "map.changed").
 
 ## Proof
 

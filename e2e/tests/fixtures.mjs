@@ -2,6 +2,7 @@
 
 import { expect, test as base } from '@playwright/test';
 import { sessionUrl } from '../lib/env.mjs';
+import { TRACER } from '../lib/geo.mjs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,6 +42,33 @@ export { expect };
  * settle time, not a synchronisation.
  */
 export const WARNING_SETTLE_MS = 500;
+
+/**
+ * Terra Draw shows no state between two vertex clicks, so there is nothing to
+ * await; this pause only keeps two clicks from reading as a double click.
+ */
+export const VERTEX_PAUSE_MS = 300;
+
+/**
+ * Draw the tracer's two-point line with the spike "Draw a line" tool, `dy`
+ * pixels below the map's centre offsets (unsaved.spec draws 200 px above, dy -200,
+ * so its dashed line is not hidden under a saved one), and wait for the reply.
+ */
+export async function drawLine(page, map, { dy = 0 } = {}) {
+    const box = await map.boundingBox();
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const [a, b] = TRACER.drawOffsets.map(([ox, oy]) => [cx + ox, cy + oy + dy]);
+    const reply = page.locator('.mapstudio-reply');
+    await page.locator('.mapstudio-draw-button').click();
+    await expect(reply).toHaveAttribute('data-drawing', 'true');
+    await page.mouse.click(a[0], a[1]);
+    await page.waitForTimeout(VERTEX_PAUSE_MS);
+    await page.mouse.click(b[0], b[1]);
+    await page.waitForTimeout(VERTEX_PAUSE_MS);
+    await page.keyboard.press('Enter');
+    await expect(reply).toHaveAttribute('data-line-points', '2');
+}
 
 /**
  * Open a dev project page and wait until the map reports itself ready: the

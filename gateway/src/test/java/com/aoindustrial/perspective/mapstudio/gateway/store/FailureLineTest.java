@@ -84,4 +84,15 @@ class FailureLineTest {
         String warn = FailureLine.newerLine("C", 999, 1);
         assertTrue(warn.contains("connection C") && warn.contains("999") && warn.contains("(1)"), warn);
     }
+
+    @Test
+    void aStatementAndADetailAreShownOnOneLine() {
+        // Moved from story 1's StoreRegistry.rightsMessage test (epic 2 story 12): one line each.
+        assertEquals("CREATE TABLE IF NOT EXISTS mapstudio_schema_version ...",
+            FailureLine.firstLine("CREATE TABLE IF NOT EXISTS mapstudio_schema_version (\n  version int\n)"));
+        assertEquals("ALTER TABLE a ADD COLUMN b int ...", FailureLine.firstLine("ALTER TABLE a ADD COLUMN b int\nWHERE x"));
+        assertEquals("", FailureLine.firstLine(null));
+        assertEquals("ERROR: permission denied   Position: 28", FailureLine.oneLine(" ERROR: permission denied\n  Position: 28 "));
+        assertEquals("", FailureLine.oneLine(null));
+    }
 }

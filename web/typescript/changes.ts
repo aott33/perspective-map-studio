@@ -11,6 +11,7 @@
  * `map.load.reply` and `map.changed`, never through `edits.apply.reply`.
  */
 
+import { isRecord } from './json';
 import { MapItemRecord, MapLoadReplyBody, readMapItem } from './contract';
 
 /** One op of a `map.changed`: the op as saved, the new version, and the stored record after it. */
@@ -56,10 +57,6 @@ export interface ChangeStep {
 export const MAX_BUFFER = 500;
 
 export const CHANGES_INITIAL: ChangeState = { seq: 0, loaded: false, buffer: [], stale: false, items: [] };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 /** The body of a map.changed, or null when it is unreadable (missing seq or ops, or a bad item record). */
 export function readMapChanged(body: unknown): MapChangedBody | null {
