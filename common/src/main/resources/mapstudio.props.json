@@ -31,12 +31,6 @@
         }
       }
     },
-    "testSet": {
-      "type": "string",
-      "enum": ["tracer", "scale30"],
-      "description": "Spike-only (story 7): the fixed test data the map draws. 'tracer' is three points and a line; 'scale30' is a seeded 30-pad stand-in for the template's scale set, used to measure frame rate. Removed when the map store supplies the data (epic-map-store-and-data).",
-      "default": "tracer"
-    },
     "style": {
       "$ref": "urn:ignition-schema:schemas/style-properties.schema.json",
       "default": {

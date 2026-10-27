@@ -9,6 +9,9 @@ sources:
   - .memlog.md
   - .working/sources-digest.md
   - mockups/key-screens.html
+  - ../../../docs/setup.md
+  - ../../../docs/setup-editor.md
+  - mockups/designer-setup-form.html
 ---
 
 # Map Studio - Experience Spine
@@ -29,6 +32,7 @@ How Map Studio works: one Perspective component that is the operator's map in Vi
 | Phone (390) | Operators with phone editing, viewers | View mode; one-item editing from the item's bottom sheet (move a point, edit properties); no drawing |
 
 - **Roles** (PRD 2.1): map editor (admin or integrator), operator (phone editing), viewer. The tools appear only for editing roles and every save is checked on the Gateway (FR-7).
+- **Designer.** The project's Map Studio setup is edited in the Ignition 8.3 Designer as a project resource tab (owner, 2026-10-27), in the Designer's own Swing look, not the component's. It has its own section below, Designer Setup Form.
 - **Layout direction.** Direction A, Docked studio, simplified at the owner's request: the filter chips go behind a Filter button and the properties tabs fold to Details and Style.
 
 ## Information Architecture
@@ -56,6 +60,7 @@ Two modes on one component. **No Publish step** (owner, confirmed): every finish
 | Phone top bar | View (phone) | Always shown | Search and Needs you; expands into the ranked list |
 | Phone bottom sheet | View and Edit (phone) | Tap an item | Popup; Edit opens the item's edit sheet |
 | Phone move | Edit (phone) | Edit sheet, Move | Fixed centre crosshair; Done or Cancel |
+| Map Studio Setup tab | Ignition 8.3 Designer (not the component) | Project Browser, Map Studio Setup node (double-click opens the tab; a project has exactly one setup, so the node has no menu of its own; a project with none opens the tab's empty state, with Create setup there) | The project's setup: map store, who can edit, kinds and assets, map. See Designer Setup Form below |
 
 **Entering Edit mode** - two ways (owner): the Edit switch on the map, shown only to users with an editing role, or the integrator opens the component straight into Edit mode with a prop. View on the rail returns to View mode. On the phone there is no map-wide Edit switch.
 
@@ -232,6 +237,71 @@ Atlist (`imports/atlist-1.webp` to `imports/atlist-4.webp`) is a reference and a
 - **Not taken - address search as a main way to place** (`imports/atlist-3.webp`): click then drag, typed coordinates as backup.
 - **Rejected from the template's map and editor** (the owner's pain: "cobbled together, not connected"): chip-row actions with Save draft and Discard, one Gateway call per vertex, "Open the editor on a laptop" below 768 px, popup forms on the map.
 
+## Designer Setup Form
+
+The Map Studio Setup tab in the Ignition 8.3 Designer (owner, 2026-10-27, after testing epic 2 story 7's editor live: it worked but looked unfinished, with a plain label column, full-width text fields across a 2000 px tab, everything typed by hand and the schema version in an editable-looking field). The setup stays a project resource tab. The look is the Designer's own, matched to Ignition's Project Properties dialog (DESIGN.md, Designer setup form). Field meanings and the Gateway's messages are `docs/setup.md` and `docs/setup-editor.md`; this section adds the form's behaviour. Mock: [designer-setup-form.html](mockups/designer-setup-form.html) with [-normal](mockups/designer-setup-form-normal.png), [-reasons](mockups/designer-setup-form-reasons.png), [-unreachable](mockups/designer-setup-form-unreachable.png), [-inherited](mockups/designer-setup-form-inherited.png), [-newer](mockups/designer-setup-form-newer.png), [-picker](mockups/designer-setup-form-picker.png), [-empty](mockups/designer-setup-form-empty.png), [-new](mockups/designer-setup-form-new.png).
+
+**One form, one place** (owner, 2026-10-27, after testing story 7's Create setup dialog live: a modal holding the old full-width form in a scroll pane with both scroll bars, Create enabled with the connection empty, and a second error dialog repeating the reason shown under the field). Creating and editing a setup are the same tab and the same form. There is **no create dialog**.
+
+### Layout
+
+- **Header**: "Map Studio Setup", a subline naming the project, and the schema version as small read-only text on the right ("Schema version 1"). It is never a field.
+- **Section list** on the left, as Project Properties' category list: Map store, Who can edit, Kinds and assets, Map. Unlike Project Properties it does not switch pages: the four sections are one short scrolling form, and a click scrolls to its section. Each entry shows its count of reasons (error glyph) and warnings (warning glyph), so a reason below the fold is never hidden.
+- **Form**: the four sections in that order, left aligned, at most 760 px wide; fields keep their width on any tab width.
+- **Footer** across the tab: "Saves with the project (File > Save)."; with reasons, "N reasons left - this setup is not saved until they are fixed." and "N warnings do not stop a save."; read only, "Read only - this Designer does not save this setup."; a new setup, see New setup under States. The tab has no OK, Apply, Create or Cancel: it saves with the project, as now.
+- **No horizontal scroll bar, ever.** The form is at most 760 px wide and wraps: help, reasons and warnings wrap at 560 px, and on a tab narrower than the form a field pair (Map token) and a row's label and control stack instead of overflowing. Only the form scrolls, vertically, when the window is short; the section list, the header's new-setup marker and the footer stay in view.
+
+### Fields
+
+Every list is a suggestion: **typing is always allowed**, and what is typed is saved as typed. A list from the Gateway loads when the tab opens and again with the field's refresh button; a list from the project (functions, pages) is read from the open project, so it works without the Gateway.
+
+| Section | Field | Control | List from | Help under the field | Reasons (stop the save; wording from `docs/setup.md`) | Warnings (never stop the save) |
+|---|---|---|---|---|---|---|
+| Map store | Database connection | Editable combo, "Select one...", refresh button, status slot | The Gateway's database connections, each with its type | "The Gateway database connection (PostgreSQL) the map is stored in. Pick one or type a name." | "Name the database connection Map Studio stores the map in." | "MapStore is not a database connection of this Gateway yet. Map Studio waits for it; add it on the Gateway under Connections > Databases." [ASSUMPTION] "MES is a Microsoft SQL Server connection; Map Studio stores maps in PostgreSQL." |
+| Who can edit | Full-editing roles | Chip field: a chip per role with a remove cross, "Add a role...", a chevron for the role list, refresh button | The project's identity provider (Perspective project properties) | "Edit everything: drawing, kinds, import. Roles of the identity provider default, compared exactly." | "MapEditor is listed twice." | "MapEdtor is not a role of the identity provider default. It is saved as typed; nobody holds it until the provider has it." |
+| Who can edit | Phone-editing roles | As full-editing roles | As above | "Move points and edit properties from a phone. A role in both lists gets full editing." | "MapOperator is listed twice." | As above |
+| Kinds and assets | Kinds function | Editable combo, monospace, status slot | The project library's functions (inherited ones too), as `package.function` | "The project library function that returns the kind list, as package.function." | "Name a project library function as package.function, for example mapstudio_adapter.kinds." and the Gateway's `kindsFunction must be empty or a project script function name ...` | "mapstudio_adapter.kind is not a function in this project's library. It is saved as typed." |
+| Kinds and assets | Assets function | As kinds function | As above | "The project library function that returns the asset list, as package.function." | As kinds function, for `assetsFunction` | As kinds function |
+| Kinds and assets | Refresh interval | Spinner 1 to 3600 with "seconds"; typing allowed | none | "How often kinds and assets are read again. 1 to 3600." | "Refresh interval must be a whole number of seconds, for example 10." (not a whole number); the Gateway's "refreshIntervalSeconds must be a whole number from 1 to 3600, not 0." (out of range) | none |
+| Map | Basemaps | Four checkboxes: None, OpenStreetMap, Satellite, Mapbox (`none`, `osm`, `satellite`, `mapbox`) | fixed | "The basemaps the map offers. At least one. Mapbox needs the map token below." | "basemaps must name at least one of none, osm, satellite, mapbox." | [ASSUMPTION] "Mapbox needs a map token. Name its secret below." while Mapbox is ticked and the token is empty |
+| Map | Alarm page | Editable combo, monospace, a "{ }" button that inserts a placeholder, status slot | The project's Perspective pages (page configuration URLs) | "The Perspective page View alarms opens. Add a placeholder such as {item.name} to filter it to the item." | The Gateway's `alarmPage must be empty or a page path starting with /, not "alarms"` and the placeholder message | "/alarm is not a page of this project. It is saved as typed." |
+| Map | Map token | Secret provider combo ("Select one...") and secret name combo side by side, one refresh button | The Gateway's secret providers, then the chosen provider's secret names [unverified: whether the Designer can list names] | "The secret that holds the basemap token: a provider and a secret name. Names only - the Designer never reads, shows or logs the token." | The Gateway's `tokenSecret must be the name of a secret as text (its value is not shown)` | "No secret named mapbox-token in Internal. It is saved as typed." |
+
+Rules:
+
+- **Dialogs only for what is not on screen.** A reason or warning lives beside its field, in the section list count and in the footer; it is **never repeated in a dialog**. A Map Studio dialog appears only for something the tab cannot show: a write that failed on disk, Start from defaults asking first. A refused save is the footer line plus the Designer's own standard save failure, which names the Map Studio Setup tab and not the reasons [ASSUMPTION: the wording of the Designer's save failure is the Designer's; the module only refuses the commit].
+- **Reasons and warnings.** A reason stops the save and keeps the Gateway's wording (the input checks and `Setup.read`'s messages, unchanged, beside the field they name; a message naming no field shows under the header). A warning says something the Gateway would accept but that will not work yet; it never stops a save. Warnings are the form's only new words; they come from the lists, so they show only when the list loaded.
+- **Status slot** after each list field: a green check when the value is found in its list ("Found on the Gateway" or "Found in this project" as the tooltip), the warning glyph when not, a grey cloud when the list is unavailable, nothing when the field is empty.
+- **Reasons update as you type**, as now; the section list counts and the footer follow.
+- **Role picker.** Typing filters the provider's roles; roles already in the field show with a check and "added"; Enter adds the highlighted role, or the typed text when nothing matches; Backspace in the empty input removes the last chip; each chip's cross removes it. A role listed twice in the file shows both chips, the second with the reason edge, until one is removed. An identity provider that cannot list its roles (an OIDC or SAML provider gives roles in its claims) shows "This identity provider does not list its roles. Type them." in the list and no unknown-role warnings [ASSUMPTION: which 8.3 providers can list roles].
+- **Connection list** shows each connection with its type; a connection that does not exist yet can be typed and is kept with the warning, since Map Studio waits for it (`docs/contract.md`, the map store).
+- **Function list** shows every function of the project library, inherited scripts included, as its full dotted path (`mapstudio.kinds.get`); picking one fills the field.
+- **Alarm page list** shows the page URLs from the project's page configuration. Picking a URL with a `:param` puts it in with each `:param` turned into `{item.name}`, selected so the next pick from "{ }" or typing replaces it [ASSUMPTION]. "{ }" lists `{item.id}`, `{item.name}`, `{asset.id}`, `{asset.path}` and `{item.properties.<field key>}`.
+- **Map token**: the form shows and saves names only. No control reads a secret's value, and no warning or log line holds one.
+- **A setup file with a basemap listed twice** shows the box ticked and the reason "osm is listed twice."; unticking and ticking it writes it once.
+
+### States
+
+| State | Treatment |
+|---|---|
+| Normal | Values with their found checks; footer "Saves with the project (File > Save)." See [designer-setup-form-normal.png](mockups/designer-setup-form-normal.png). |
+| Reasons and warnings | Each beside its field (reason in `{colors.designer-error}`, warning in `{colors.designer-warning}`, each with its glyph); the field takes the matching edge; the section list counts them; the footer counts the reasons. A project save with reasons left does not save this setup: the footer says so and the Designer shows its standard save failure; no Map Studio dialog repeats the reasons (what the Designer does with the rest of that save is still the owner's check in `docs/setup-editor.md`). See [designer-setup-form-reasons.png](mockups/designer-setup-form-reasons.png) (refresh 0, a role listed twice, a connection the Gateway does not have, a role the provider does not have). |
+| Gateway not reachable | A warning banner under the header: "Gateway not reachable - lists unavailable, typing still works." with "Try again". Database connections, roles and secret providers show "List unavailable" when opened and a grey cloud in the status slot; their warnings are not shown (nothing to compare with). Functions and pages still list and check. Reasons still show: they need no Gateway. Saving is unchanged. See [designer-setup-form-unreachable.png](mockups/designer-setup-form-unreachable.png). |
+| List loading | The opened list shows "Loading..." with a spinner; the field stays editable. |
+| Inherited | An info banner: "Inherited from template-base. Saving makes this project's own copy." (existing wording); the Project Browser node reads "(inherited)"; the form is editable. See [designer-setup-form-inherited.png](mockups/designer-setup-form-inherited.png). |
+| Inherited, not overridable | A lock banner: "Inherited from template-base, and that project does not allow overriding it. Read only." Fields show their values, disabled; refresh buttons and the section list stay; footer read only. |
+| Newer schema | A lock banner: "Read only. This setup was written by a newer Map Studio (schema 2). This Designer edits schema 1. It is shown as written and never rewritten here."; the header reads "Schema 2 - read only"; the form is replaced by "setup.json as written" in a read-only monospace box, since this Designer cannot be sure what a newer field means; the section list is empty. See [designer-setup-form-newer.png](mockups/designer-setup-form-newer.png). |
+| Unreadable file | As newer schema, with "This setup cannot be read: <reason>" and the **Start from defaults** button, which asks first (existing wording). |
+| No setup (empty) | Opening Map Studio Setup opens the tab in an empty state: no section list, "No Map Studio setup", "This project has no Map Studio setup yet. The map store is unavailable until it has one.", one primary button **Create setup**, and the help "Create setup fills this tab with the defaults. Nothing is written until File > Save."; the node reads "(none)"; footer "No setup in this project." See [designer-setup-form-empty.png](mockups/designer-setup-form-empty.png). |
+| New setup | Create setup fills the same tab with the defaults (full-editing role MapEditor, phone-editing role MapOperator, refresh 10 seconds, basemaps None and OpenStreetMap, everything else empty) and focuses Database connection. The header carries the marker "New setup - saves with the project"; the node reads "(new, unsaved)". Reasons show beside their fields as in any edit (an empty connection: "Name the database connection Map Studio stores the map in."). Nothing is written until File > Save. With reasons left the footer reads "1 reason left - this setup is not saved until it is fixed." with "File > Save shows the Designer's standard save failure." and the save is refused that way only. The footer's **Discard new setup** link returns the tab to the empty state (nothing was written, so it asks nothing). After a successful save the marker goes and the tab is the normal state. See [designer-setup-form-new.png](mockups/designer-setup-form-new.png). |
+
+### Accessibility
+
+- Every control has its label bound to it (Swing `setLabelFor`), so a screen reader names it; the help text is its description.
+- Tab order follows the form top to bottom; refresh buttons and the "{ }" button are in it; the section list is reached with Ctrl+Tab or a click [ASSUMPTION].
+- Reasons, warnings and found checks are a glyph and words, never colour alone; the check's meaning is in its tooltip and accessible name.
+- Everything is doable by keyboard: combos open with Alt+Down, chips add with Enter and remove with Backspace.
+
 ## Engineering Review Items
 
 Alarm presentation changes go to the template's engineering review (ER-27, template `docs/ux.md` section 11) before release. Each is a deliberate change or addition:
@@ -325,5 +395,8 @@ Failure: CTB1's comms are lost: the icon has a dashed ring and "Comms lost", the
 5. **Legend.** Resolved: Sofia added it as PRD FR-41 (initiative R42, epic-viewing entry 3.3) on 2026-10-27.
 6. **Instrument tool placement** on the draw toolbar and the instrument marker look (the key-screens mock frames the line valve in a rounded square, which the reserved-shapes rule does not allow).
 7. **Toast timing** and Undo bar lifetime.
+8. **Map token storage (Designer setup form).** Schema 1 has one text field, `tokenSecret`, but the owner's form picks a secret provider and a secret name. Recommended: keep schema 1 and store `"<provider>/<name>"` in `tokenSecret` (the Gateway's rule, text, already accepts it; nothing reads the token yet since Mapbox is deferred), documented in `docs/setup.md`; the alternative, a `tokenSecretProvider` key, is refused by schema 1 and needs schema 2. Owner and architecture to decide.
+9. **Designer lists from the Gateway.** Whether the Designer can list database connections with their type, an identity provider's roles, and a secret provider's secret names (names only) is unverified; until it is, those fields fall back to typing with no warnings, as in the Gateway not reachable state.
+10. **Section list.** One scrolling form with a section list that scrolls and counts (recommended, so a reason is never on a hidden page), or Project Properties' page switching. Owner to confirm.
 
 **Resolved by the owner on 2026-10-27:** phone move is the crosshair (PRD UJ-4 and FR-27 updated to match); first run is the checklist only, FR-36's tour dropped; Mapbox (FR-32) and reference layers (FR-26) deferred; no Publish step confirmed; Needs you shows "All OK" in neutral; Direction A collapses the list panel below about 1280 px; Direction A simplified first by the Filter button and the Details and Style tabs; line look per segment, deleting a line deletes its instruments with one undo, and a segment with no instruments draws normal (PRD section 9 questions 9 and 10).

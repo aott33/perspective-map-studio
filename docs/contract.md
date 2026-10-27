@@ -262,36 +262,61 @@ The edit record answers "who changed what, when": the Ignition user name of the 
 
 ## The scripting API (AD-18)
 
-Gateway scope: Perspective session scripts **[live 8.3.10]**, and Gateway event scripts and project library functions called from either **[unverified]** (the module registers the functions on every script manager the Gateway creates, docs/platform-checks.md check 3). In the Designer the functions autocomplete with their docs and raise "runs in Gateway scope only" when called.
+Gateway scope: Perspective session scripts **[live 8.3.10]**, and Gateway event scripts and project library functions called from either **[unverified]** (the module registers the functions on every script manager the Gateway creates, docs/platform-checks.md check 3); the dev seed is a project library function called from a Perspective session script **[live 8.3.10]**. In the Designer the functions autocomplete with their docs (the text below, from `MapStudioScriptModule.properties`; every function, argument and result is documented there, `ScriptDocsTest`) **[unverified until an owner Designer session]**, and raise "runs in Gateway scope only" when called.
 
-| Function | Returns |
-| --- | --- |
-| `system.mapstudio.getMap(project)` | a list of map item records (dicts, with `attachment` a dict or None, epic 2 story 14 **[live 8.3.10]**), deleted ones left out; the list's attribute `readOnly` is None, or the reason the map cannot be saved here (entry 5) **[live 8.3.10]**; its attribute `kindSetups` is the list of live kind setup records (entry 9) **[live 8.3.10]** |
-| `system.mapstudio.applyEdits(project, batch, actor)` | `{batchId, seq, results}`; `actor` is required and recorded in the edit record |
-| `system.mapstudio.refreshAdapters(project)` | `{kinds: status, assets: status}` after calling the project's kind and asset functions now; waits for both to answer or time out, at most 21 s ([kinds-and-assets.md](kinds-and-assets.md)) **[live 8.3.10]** |
-| `system.mapstudio.ping()` | a short text with the Gateway time (a health check) |
+| Function | Arguments | Returns |
+| --- | --- | --- |
+| `system.mapstudio.getMap(project)` | the Ignition project's name; it needs a Map Studio setup | a list of the live map item records (dicts: the map item record below, with `attachment` a dict or None, epic 2 story 14 **[live 8.3.10]**); deleted ones (tombstones) are left out. The list has two attributes: `readOnly` is None, or the reason the map cannot be saved here (entry 5) **[live 8.3.10]**; `kindSetups` is the list of live kind setup records `{kindId, setup, version, deleted}` (entry 9) **[live 8.3.10]** |
+| `system.mapstudio.applyEdits(project, batch, actor)` | the project; one batch `{batchId, ops}` ([Batches and ops](#batches-and-ops)); the actor, who makes the change | `{batchId, seq, results: [{entity, id, version}]}`: `seq` is the project's change number the batch took, one result per op with its new version **[live 8.3.10]** |
+| `system.mapstudio.refreshAdapters(project)` | the project | `{kinds: status, assets: status}` after calling the project's kind and asset functions now; waits for both to answer or time out, at most 21 s ([kinds-and-assets.md](kinds-and-assets.md)) **[live 8.3.10]** |
+| `system.mapstudio.ping()` | none | a short text with the Gateway time (a health check) |
 
-`applyEdits` trusts its caller, like `system.db` (owner decision, 2026-10-26): it saves with full editing under the actor it names. A Perspective session script runs on the Gateway, so a view author can expose saving to someone without an editing role; keep such scripts behind your own role checks. The dev project's `/edit` page does: its "Run script checks" button reads the session user's roles (`session.props.auth.user.roles`, set by the Gateway at sign-in) and writes nothing unless the user holds `MapEditor` **[live 8.3.10]**. A refusal raises a Java exception whose message starts with the code (`role: ...`, `conflict: ...`, `read-only: ...`), and nothing is written. Jython 2.7, catching both kinds of exception:
+**Ops.** Everything in [Batches and ops](#batches-and-ops) holds for a script: `create`, `update` and `delete` of an `item` or a `kindSetup` (its `id` the kind id, its `data` `{"setup": {...}}`), restore as a `create` at a deleted map item's version, an update's `data` replacing only the top-level fields it carries, an instrument's `attachment` `{lineId, distanceM}`, every record checked against the project's kind list, at most 1000 ops and one op per id, all or none.
+
+**Actor and trust.** `actor` is required: blank or None is refused `invalid`, "applyEdits needs an actor: who makes the change, for example "seed-script"." **[live 8.3.10]**. It is recorded in the edit record as a script actor, and a `batchId` sent again by the same actor after it was saved is answered with the first reply ([Retries](#retries)). `applyEdits` trusts its caller, like `system.db` (owner decision, 2026-10-26): it saves with full editing under the actor it names. A Perspective session script runs on the Gateway, so a view author can expose saving to someone without an editing role; keep such scripts behind your own role checks. The dev project's `/edit` page does: its "Run script checks" and "Seed the dev map" buttons read the session user's roles (`session.props.auth.user.roles`, set by the Gateway at sign-in) and write nothing unless the user holds `MapEditor` **[live 8.3.10]**.
+
+**Errors.** A refusal raises a Java exception (`MapStudioException`; catch `java.lang.Throwable`), and nothing is written. Its message starts with the code: `conflict: ...`, `role: ...`, `invalid: ...`, `read-only: ...` or `store-unreachable: ...` ([Error codes](#error-codes)); a missing project name is `invalid`, a project without a setup `store-unreachable` **[live 8.3.10]**. A `conflict`'s exception also answers `conflicts()`: the same list as the `conflicts` of the error body ([Conflicts](#conflicts)), `[{index, entity, id, baseVersion, current, changedBy, changedAt}]` with `current.deleted` true for a deleted map item, returned as Gson's `JsonArray`. In a Gateway script Ignition hands it to Jython through its JSON adapters, so it iterates as dict-like elements: read `c['index']`, `c['current']['deleted']`, `c['current']['version']` **[live 8.3.10]** (the dev seed does, below; Gson's own methods such as `getAsJsonObject()` raise AttributeError there). Only outside the Gateway, in plain Jython with the raw `JsonArray` (as in `DevSeedTest`), walk it with Gson's methods (`get(i).getAsJsonObject()`). Other refusals answer None.
+
+**Ids and re-runs.** A map item id is a UUID the script makes. Make it a UUIDv5 of a stable name (`uuid.uuid5(uuid.NAMESPACE_URL, '<project>/<your key>')`), so a re-run names the same map items. A re-run must not send `create` at 0 again: an id already stored is refused `conflict` ("<name> already exists ..."), not saved twice. Read the stored records with `getMap` first and, per id: absent, `create` at 0; present and as wanted, nothing; present and different, `update` at its stored `version`. A deleted map item is not in `getMap`, so its `create` at 0 is refused `conflict` too; that conflict's `current` is the tombstone, and a `create` at `current.version` restores it ([Delete and restore](#delete-and-restore)).
+
+Jython 2.7, catching both kinds of exception:
 
 ```python
 import java.lang
 import uuid
 
-logger = system.util.getLogger('MapStudio.seed')
+logger = system.util.getLogger('MapStudio.example')
+project = 'my-project'
 pad_id = str(uuid.uuid5(uuid.NAMESPACE_URL, 'my-project/pads/P12'))
-batch = {'batchId': str(uuid.uuid4()), 'ops': [
-    {'op': 'create', 'entity': 'item', 'id': pad_id, 'baseVersion': 0,
-     'data': {'kind': 'pad', 'name': 'P12', 'geometry': {'type': 'Point', 'coordinates': [-104.9650, 39.7360]}}}]}
+data = {'kind': 'pad', 'name': 'P12', 'properties': {'status': 'producing'},
+        'geometry': {'type': 'Point', 'coordinates': [-104.9650, 39.7360]}}
+
+stored = None
+for item in system.mapstudio.getMap(project):
+    if item['id'] == pad_id:
+        stored = item
+if stored is None:
+    op = {'op': 'create', 'entity': 'item', 'id': pad_id, 'baseVersion': 0, 'data': data}
+else:
+    op = {'op': 'update', 'entity': 'item', 'id': pad_id, 'baseVersion': stored['version'], 'data': data}
 try:
-    result = system.mapstudio.applyEdits('my-project', batch, 'seed-script')
+    result = system.mapstudio.applyEdits(project, {'batchId': str(uuid.uuid4()), 'ops': [op]}, 'pad-import')
     logger.info('Saved as seq %s' % result['seq'])
 except java.lang.Throwable as ex:
-    logger.warn('Not saved: %s' % ex.getMessage())
+    found = ex.conflicts() if hasattr(ex, 'conflicts') else None
+    conflicts = list(found) if found is not None else []
+    deleted = [c for c in conflicts if c['current'] is not None and c['current']['deleted']]
+    if deleted:
+        logger.info('P12 was deleted; send create at version %s to restore it' % deleted[0]['current']['version'])
+    else:
+        logger.warn('Not saved: %s' % ex.getMessage())
 except Exception as ex:
     logger.warn('Not saved: %s' % ex)
 ```
 
-A re-run of this script finds `pad_id` already stored and is refused with `conflict`; to update instead, read the stored version with `getMap` and send an `update` with it as `baseVersion`.
+### The dev seed (epic 2 story 11)
+
+The dev project's `mapstudio_seed` library (`ops/project/ignition/script-python/mapstudio_seed/code.py`) seeds `mapstudio-dev` through this API and is the worked example of the rules above. Its "Seed the dev map" button on `/edit` (MapEditor only) runs `mapstudio_seed.run()`, and the e2e suite presses it before the specs that draw or click map items. It writes 64 map items under the actor `seed-script`: the 30-pad scale set (`Pad 1` to `Pad 30`, kind `pad`, `status: producing`, and `Line to Pad 1` to `Line to Pad 30`, kind `line`; the coordinates of the spike's seeded stand-in, frozen as 6-decimal literals) and the tracer's set (`Point 1` to `Point 3` and `Tracer line`). Ids are UUIDv5 of `mapstudio-dev/seed/<set>/<key>` (`scale/pad-7`, `tracer/p1`). One batch per run, all or none: a re-run sends nothing when every item is as seeded **[live 8.3.10]**, puts an edited one back with an `update` at its stored version (on the four fields it compares and sends: kind, name, geometry and properties; an `assetId`, `overrides`, `ends` or `attachment` an editor added stays, since an update replaces only the fields it carries), and restores a deleted one with a second batch whose `create` is at the version the first batch's conflict reported **[live 8.3.10]**. Any other conflict is reported, not retried. It returns `{created, updated, restored, unchanged, seq, ids, scale: {pads, lines}}` (`scale` counts the live map items whose ids are the scale set's seed ids, by kind, read back with `getMap`), or with `error` when nothing was written. It adds no instruments.
 
 ## Change hook (Gateway, for contributors)
 
