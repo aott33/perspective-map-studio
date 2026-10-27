@@ -8,6 +8,10 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
+import com.aoindustrial.perspective.mapstudio.gateway.LogCapture;
+
+import ch.qos.logback.classic.Level;
+
 /** The redundancy gate over a fake node (the SDK manager is unverified live, epic 2 story 5). */
 class RedundancyGateTest {
 
@@ -72,5 +76,24 @@ class RedundancyGateTest {
         Node node = new Node();
         node.broken = true;
         assertFalse(new RedundancyGate(node, () -> { }).mayWrite());
+    }
+
+    @Test
+    void anUnreadableStateWarnsOncePerChange() {
+        Node node = new Node();
+        node.broken = true;
+        RedundancyGate gate = new RedundancyGate(node, () -> { });
+        try (LogCapture log = new LogCapture("MapStudio.store")) {
+            for (int i = 0; i < 5; i++) {
+                assertFalse(gate.mayWrite());
+                gate.standbyReason();
+            }
+            assertEquals(1, log.exactly(Level.WARN).size(), "every save and load asks; one line");
+            node.broken = false;
+            assertTrue(gate.mayWrite());
+            node.broken = true;
+            assertFalse(gate.mayWrite());
+            assertEquals(2, log.exactly(Level.WARN).size(), "logged again after a good read");
+        }
     }
 }

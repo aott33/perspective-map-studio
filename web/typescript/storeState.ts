@@ -24,14 +24,23 @@ export function storeStateFromLoad(body: MapLoadReplyBody): StoreState {
 }
 
 /**
- * The state after an error reply to map.load or edits.apply: store-unreachable
- * makes it unavailable, read-only makes it read only (a Gateway that became a
- * standby after the map loaded); any other code leaves it as it was.
+ * The state after an error reply to map.load: store-unreachable makes it
+ * unavailable, read-only makes it read only; any other code leaves it as it was.
  */
 export function storeStateFromError(current: StoreState, error: ErrorBody): StoreState {
     if (error.code === ErrorCodes.STORE_UNREACHABLE) {
         return { status: 'unavailable', reason: error.message };
     }
+    return storeStateFromSaveError(current, error);
+}
+
+/**
+ * The state after an error reply to edits.apply: read-only makes it read only (a
+ * Gateway that became a standby after the map loaded). A store-unreachable save
+ * refusal (busy, or one failed write) stays on the save status and leaves the
+ * store state alone: only map.load says the store is unavailable (docs/operations.md).
+ */
+export function storeStateFromSaveError(current: StoreState, error: ErrorBody): StoreState {
     if (error.code === ErrorCodes.READ_ONLY) {
         return { status: 'read-only', reason: error.message };
     }

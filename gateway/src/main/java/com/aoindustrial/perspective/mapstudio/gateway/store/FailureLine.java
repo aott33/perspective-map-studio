@@ -45,14 +45,49 @@ public final class FailureLine {
             + ": " + oneLine(detail);
     }
 
-    /** The plain reason a person sees for an unavailable map store (story 1's words, plus where to look). */
+    /**
+     * The plain reason a person sees for a failed migrator run (story 1's words,
+     * plus where to look). On a 42501 it follows the same right as the log line:
+     * CREATE for a CREATE statement, ownership for ALTER or DROP, and a generic
+     * "a right it needs" for any other statement (the version read, the version record).
+     */
+    public static String userReason(String connection, Migrator.MigrationFailure failure) {
+        String sqlState = failure.getSQLState();
+        if (SQLSTATE_INSUFFICIENT_PRIVILEGE.equals(sqlState)) {
+            String right = right(failure.statement(), sqlState, failure.getMessage());
+            if (right != null && right.startsWith("CREATE")) {
+                return createReason(connection);
+            }
+            if (right != null) {
+                return "The map store is unavailable: the database role of connection " + connection
+                    + " does not own Map Studio's tables. Ask an administrator (see the Gateway log).";
+            }
+            return rightReason(connection);
+        }
+        return userReason(connection, sqlState);
+    }
+
+    /**
+     * The plain reason a person sees for an unavailable map store that is not a
+     * statement's failure (opening or committing on the connection): a 42501 there
+     * names no particular right.
+     */
     public static String userReason(String connection, String sqlState) {
         if (SQLSTATE_INSUFFICIENT_PRIVILEGE.equals(sqlState)) {
-            return "The map store is unavailable: the database role of connection " + connection
-                + " lacks the right to create Map Studio's tables. Ask an administrator (see the Gateway log).";
+            return rightReason(connection);
         }
         return "The map store is unavailable: Map Studio could not create its tables on connection " + connection
             + " (SQLState " + (sqlState == null ? "none" : sqlState) + "). Ask an administrator (see the Gateway log).";
+    }
+
+    private static String createReason(String connection) {
+        return "The map store is unavailable: the database role of connection " + connection
+            + " lacks the right to create Map Studio's tables. Ask an administrator (see the Gateway log).";
+    }
+
+    private static String rightReason(String connection) {
+        return "The map store is unavailable: the database role of connection " + connection
+            + " lacks a right Map Studio needs. Ask an administrator (see the Gateway log).";
     }
 
     /** The read-only reason for a schema newer than the module. */

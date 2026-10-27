@@ -59,10 +59,26 @@ class FailureLineTest {
     }
 
     @Test
+    void theReasonFollowsTheSameRightAsTheLine() {
+        assertTrue(FailureLine.userReason("C", failure("ALTER TABLE t ADD c int", 2, 1, 1, "42501", "must be owner"))
+            .contains("does not own Map Studio's tables"));
+        String read = FailureLine.userReason("C", failure(Migrator.VERSION_TABLE_EXISTS, 0, 0, 0, "42501", "denied"));
+        assertTrue(read.contains("lacks a right Map Studio needs") && !read.contains("create"), read);
+        String insert = FailureLine.userReason("C", failure("INSERT INTO mapstudio_schema_version VALUES (?)", 1, 8, 8,
+            "42501", "denied"));
+        assertTrue(insert.contains("lacks a right Map Studio needs"), insert);
+        assertTrue(FailureLine.userReason("C", "42501").contains("lacks a right Map Studio needs"),
+            "a 42501 opening the connection names no right");
+        assertTrue(FailureLine.userReason("C", failure("CREATE TABLE t (x int)", 1, 2, 8, "42P07", "exists"))
+            .contains("SQLState 42P07"));
+    }
+
+    @Test
     void reasonsInPlainWords() {
         assertEquals("The map store is unavailable: the database role of connection C lacks the right to create "
-            + "Map Studio's tables. Ask an administrator (see the Gateway log).", FailureLine.userReason("C", "42501"));
-        assertTrue(FailureLine.userReason("C", null).contains("SQLState none"));
+            + "Map Studio's tables. Ask an administrator (see the Gateway log).",
+            FailureLine.userReason("C", failure(Migrator.CREATE_VERSION_TABLE, 1, 1, 8, "42501", "denied")));
+        assertTrue(FailureLine.userReason("C", (String) null).contains("SQLState none"));
         assertEquals("The map store was upgraded by a newer Map Studio (schema 3, this module knows 1); saving is off "
             + "until the module is upgraded.", FailureLine.newerReason(3, 1));
         String warn = FailureLine.newerLine("C", 999, 1);

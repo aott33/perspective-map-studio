@@ -34,7 +34,7 @@ It names the connection, the migration, the statement (its number in the migrati
 
 While the map store is unavailable a map shows "Map store: store-unreachable: The map store is unavailable: ... Ask an administrator (see the Gateway log)." and nothing can be saved (`map.load` and `applyEdits` answer `store-unreachable`).
 
-**Recovery:** fix the right (`GRANT CREATE ON SCHEMA public TO <role>`, or the table in the way). No restart is needed: Map Studio tries again at most once a minute, the next time a map of a project naming that connection is opened or saved, and logs the error line again only when it changes **[live 8.3.10]**. A Gateway or module restart also tries again at once.
+**Recovery:** fix the right (`GRANT CREATE ON SCHEMA public TO <role>`, or the table in the way). No restart is needed: Map Studio tries again at most once a minute, the next time a map of a project naming that connection is opened or saved **[live 8.3.10]**, and logs the error line again only when it changes (unit tested; **[unverified]** live). A Gateway or module restart also tries again at once.
 
 ## The map store's states
 
@@ -62,7 +62,7 @@ The map shows "Map store: read only. The map store was upgraded by a newer Map S
 
 - An independent Gateway (redundancy off) reads, saves and migrates.
 - Of a redundant pair only the active node saves and migrates. A standby reads the map and the schema version only (no lock, no DDL); every save there is refused `read-only` with "This Gateway is the standby of a redundant pair; saving is off here. Open the map on the active Gateway to save." If the standby finds the schema not yet created, its map store is unavailable until the active node has created it (the next try a minute later finds it) or until it becomes active itself, when it runs the migrator at once.
-- Map Studio reads the redundancy state on every save, so a missed change event cannot leave a standby saving. A state it cannot read counts as standby.
+- Map Studio reads the redundancy state on every save, so a missed change event cannot leave a standby saving. A state it cannot read counts as standby, with one warning from `MapStudio.store` per change (not one per save).
 - Both nodes of a pair should name the same database connection and run the same module version. Reloading maps that are open during a failover comes with live updates (epic 2, entry 4).
 
 ## Proof

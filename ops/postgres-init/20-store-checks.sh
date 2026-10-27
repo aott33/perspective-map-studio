@@ -7,8 +7,8 @@
 # every role (CONNECT and TEMP on the database, USAGE on schema public; no CREATE on it), so
 # Map Studio's first start on connection MapStudioCheck fails with 42501 until a check grants
 # CREATE. The password is the stack's pg_password Docker secret (the connection reads it through
-# the MapStudioFiles secret provider); it goes to psql as a variable, never on a command line or
-# into a log.
+# the MapStudioFiles secret provider); psql reads the file itself (a backtick \set inside the
+# script on stdin), so the password is never on a command line (argv, ps) or in a log.
 set -euo pipefail
 
 secret=/run/secrets/pg_password
@@ -17,8 +17,8 @@ if [[ ! -r "${secret}" ]]; then
   exit 1
 fi
 
-psql -v ON_ERROR_STOP=1 -q --username "${POSTGRES_USER}" --dbname "${POSTGRES_DB}" \
-  -v pw="$(cat "${secret}")" <<'SQL'
+psql -v ON_ERROR_STOP=1 -q --username "${POSTGRES_USER}" --dbname "${POSTGRES_DB}" <<'SQL'
+\set pw `cat /run/secrets/pg_password`
 SELECT 'CREATE ROLE mapstudio_check LOGIN'
  WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mapstudio_check')\gexec
 ALTER ROLE mapstudio_check WITH LOGIN PASSWORD :'pw';

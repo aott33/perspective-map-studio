@@ -10,9 +10,9 @@
 # PostgreSQL volume; on older volumes run ops/up.sh --fresh once). It adds the project
 # mapstudio-check (ops/docker-compose.store-checks.yml), which names MapStudioCheck, then per
 # scenario sets the check database with psql, restarts the Gateway where the scenario needs a
-# fresh start, checks the Gateway log and runs e2e/tests/store-ops.spec.mjs. At the end it
-# empties the check database and recreates the Gateway without the check project, so the plain
-# stack is back. Only this checkout's containers are touched.
+# fresh start, checks the Gateway log and runs e2e/tests/store-ops.spec.mjs. On every exit, an
+# early one included (an EXIT trap), it empties the check database and recreates the Gateway
+# without the check project, so the plain stack is back. Only this checkout's containers are touched.
 
 export MAPSTUDIO_STORE_CHECKS=1
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
@@ -99,6 +99,26 @@ if ! "${COMPOSE[@]}" exec -T gateway test -f "${CHECK_CONN}"; then
   err "The Gateway has no MapStudioCheck connection (an older volume): run ops/up.sh --fresh once."
   exit 1
 fi
+
+# The restore runs on every exit (lib.sh sets -euo pipefail, so a failed command ends the script
+# early): an empty check database and the Gateway recreated without the check project, so the plain
+# stack logs no Map Studio error and keeps no schema 999 or CREATE grant.
+restored=0
+restore() {
+  local status=$?
+  (( restored )) && return 0
+  restored=1
+  set +e
+  echo
+  info "Restoring: empty check database, Gateway without the check project ..."
+  reset_check_db || err "could not empty the check database; run ops/store-checks.sh again or ops/up.sh --fresh"
+  MAPSTUDIO_STORE_CHECKS="" docker compose -p "${MAPSTUDIO_CONTAINER}" -f "${OPS_DIR}/docker-compose.yml" up -d gateway \
+    || err "could not recreate the Gateway without the check project; run ops/up.sh"
+  wait_for_commissioned 60 || err "the Gateway did not come back commissioned after the restore"
+  wait_for_bundle 24 || err "the Gateway did not serve the bundle after the restore"
+  return "${status}"
+}
+trap restore EXIT
 
 info "Making sure the check database and role exist ..."
 "${COMPOSE[@]}" exec -T postgres bash /docker-entrypoint-initdb.d/20-store-checks.sh
@@ -194,12 +214,7 @@ for scenario in "${SCENARIOS[@]}"; do
   esac
 done
 
-echo
-info "Restoring: empty check database, Gateway without the check project ..."
-reset_check_db
-MAPSTUDIO_STORE_CHECKS="" docker compose -p "${MAPSTUDIO_CONTAINER}" -f "${OPS_DIR}/docker-compose.yml" up -d gateway
-wait_for_commissioned 60
-wait_for_bundle 24
+restore
 
 if (( failures > 0 )); then
   err "${failures} store check(s) failed."

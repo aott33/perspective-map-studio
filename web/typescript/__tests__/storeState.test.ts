@@ -1,6 +1,6 @@
 import { readMapLoadReply } from '../contract';
 import {
-    STORE_UNKNOWN, storeStateAttribute, storeStateFromError, storeStateFromLoad, storeStatusText
+    STORE_UNKNOWN, storeStateAttribute, storeStateFromError, storeStateFromLoad, storeStateFromSaveError, storeStatusText
 } from '../storeState';
 
 describe('the map store state (epic 2 story 5)', () => {
@@ -29,6 +29,16 @@ describe('the map store state (epic 2 story 5)', () => {
         expect(storeStateFromError(ready, { code: 'read-only', message: 'saving is off' }))
             .toEqual({ status: 'read-only', reason: 'saving is off' });
         expect(storeStateFromError(ready, { code: 'role', message: 'no role' })).toBe(ready);
+    });
+
+    test('a save refusal never marks a loaded store unavailable; read-only still does', () => {
+        const ready = { status: 'ready' as const, reason: '' };
+        expect(storeStateFromSaveError(ready, { code: 'store-unreachable', message: 'Map Studio is busy.' })).toBe(ready);
+        expect(storeStateFromSaveError(ready, { code: 'store-unreachable', message: 'The map store failed; nothing was saved.' }))
+            .toBe(ready);
+        expect(storeStateFromSaveError(ready, { code: 'read-only', message: 'saving is off' }))
+            .toEqual({ status: 'read-only', reason: 'saving is off' });
+        expect(storeStateFromSaveError(ready, { code: 'conflict', message: 'newer' })).toBe(ready);
     });
 
     test('nothing is said before map.load answers or when ready', () => {

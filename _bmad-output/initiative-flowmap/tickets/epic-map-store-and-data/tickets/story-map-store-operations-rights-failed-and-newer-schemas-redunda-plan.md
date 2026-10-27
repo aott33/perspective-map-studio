@@ -3,14 +3,14 @@ title: 'Map store operations: rights, failed and newer schemas, redundancy'
 type: 'feature'
 ticket: '5'
 created: '2026-10-26'
-status: 'in-review'
+status: 'built'
 baseline_revision: 'f3a63a29cb7c8c5ed80bef5acbeaf29fe341fb63'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-tracer-one-edit-saved-through-the-write-path-and-read-back-plan.md'
@@ -120,6 +120,18 @@ Baseline is the merge of story 1 (`f3a63a2`). No migration. Redundancy is unit t
 - Story 1's two code lists (`ContractTest`, `contract.test.ts`) gain `read-only`: decision 2 adds a code, and those assertions mirror the code list.
 
 ## Review Triage Log
+
+**Lens quick (context-free), 2026-10-27.** Eight findings; seven patched, one patched in part.
+- 1 (check role's password on psql's argv) - patched: `ops/postgres-init/20-store-checks.sh` reads the secret inside psql (`\set pw` with a backtick `cat`), so it is never on a command line; the header comment now says so. Checked live: the script ran on the `ms-e2s5` stack and the role logs in with the password. Rejected in part: a separate secret for the check role. The role exists only on the dev stack, holds no right beyond PostgreSQL's defaults, and the `MapStudioCheck` connection reads the same `pg_password` through the `MapStudioFiles` provider; a second secret means changes to `gen_secrets.py`, the compose file, the provider and `lib.sh` for no gain in a dev-only harness.
+- 2 (standby-to-active race leaves the store unavailable for up to 60 s) - patched: `StoreRegistry.retryNow()` also marks a `STARTING` or in-flight connection to run again; `migrate()` clears the mark before it reads `mayMigrate`, and a run that ends unavailable with the mark set queues one more run at once (`afterRun`). Unit test `becomingActiveDuringAStandbyRunRunsAgainAtOnce` covers both paths (first run and lazy retry) and fails without the fix.
+- 3 (any `store-unreachable` save reply marks a loaded store unavailable) - patched: `storeStateFromSaveError` takes only `read-only` from an `edits.apply` error; a busy or failed save stays on the save status. `map.load` errors keep `storeStateFromError`. Jest test added.
+- 4 (log dedup claimed live with no evidence or test) - patched: `LogCapture` (logback on the test classpath) and `theSameFailureIsLoggedOnceAndAChangedOneAgain` (three runs, one line; a changed failure, a second line) and `aNewerSchemaWarnsOnceOverRuns`. `docs/contract.md` and `docs/operations.md` keep **[live 8.3.10]** for the retry and mark the dedup unit tested, **[unverified]** live; `docs/platform-checks.md` notes the `rights` count was within the retry interval.
+- 5 (`applyEdits.desc` omits `read-only`) - patched.
+- 6 (every 42501 reported to the person as the CREATE right) - patched: `FailureLine.userReason(connection, MigrationFailure)` follows the same `right(...)` as the log line (CREATE, ownership, else "lacks a right Map Studio needs"); a 42501 opening or committing the connection names no right. Unit test added.
+- 7 (unreadable redundancy state warns on every call) - patched: `RedundancyGate.mayWrite()` warns once per change and again after a good read. Unit test added; `docs/operations.md` says so.
+- 8 (store-checks restore only on the normal path) - patched: the restore is a function run from `trap ... EXIT` (and once at the normal end), with `set +e` inside so one failed step does not skip the rest.
+
+Re-run after the patches: `./gradlew clean build` green (JUnit 83, Jest 47); plain e2e on `ms-e2s5` 16 passed, 5 skipped (`store-ops`); no Map Studio error in the plain stack's log. `ops/store-checks.sh` was not re-run (not part of this loop).
 
 ## Design Notes
 

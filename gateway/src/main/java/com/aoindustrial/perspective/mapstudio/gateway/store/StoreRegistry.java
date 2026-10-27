@@ -55,6 +55,12 @@ public final class StoreRegistry {
     private final ConcurrentHashMap<String, Long> lastAttempt = new ConcurrentHashMap<>();
     /** Connections whose retry is queued or running. */
     private final Set<String> retrying = ConcurrentHashMap.newKeySet();
+    /**
+     * Connections {@link #retryNow()} asked to run again while a run of theirs was
+     * starting or in flight: that run may have read "standby" before the node
+     * became active, so it is followed by one more run if it left the store unavailable.
+     */
+    private final Set<String> rerun = ConcurrentHashMap.newKeySet();
     /** The last failure or warning line logged per connection, so it is logged again only when it changes. */
     private final ConcurrentHashMap<String, String> lastLine = new ConcurrentHashMap<>();
 
@@ -115,14 +121,30 @@ public final class StoreRegistry {
 
     /**
      * Run the migrator again now on every unavailable store (this node became the
-     * active one of a redundant pair).
+     * active one of a redundant pair). A store still starting, or whose run is in
+     * flight, runs again after that run when it leaves the store unavailable, so a
+     * run that read "standby" just before the switch does not hold the store for
+     * {@link #RETRY}.
      */
     public void retryNow() {
         for (var entry : states.entrySet()) {
-            if (entry.getValue().status() == StoreState.Status.UNAVAILABLE) {
+            StoreState.Status status = entry.getValue().status();
+            if (status == StoreState.Status.UNAVAILABLE || status == StoreState.Status.STARTING) {
+                rerun.add(entry.getKey());
                 lastAttempt.remove(entry.getKey());
-                retryIfDue(entry.getKey());
+                if (status == StoreState.Status.UNAVAILABLE) {
+                    retryIfDue(entry.getKey());
+                }
             }
+        }
+    }
+
+    /** After a run: honour a {@link #retryNow()} that came while it was in flight. */
+    private void afterRun(String connection) {
+        StoreState state = states.get(connection);
+        if (rerun.remove(connection) && state != null && state.status() == StoreState.Status.UNAVAILABLE) {
+            lastAttempt.remove(connection);
+            retryIfDue(connection);
         }
     }
 
@@ -142,6 +164,7 @@ public final class StoreRegistry {
                 } finally {
                     retrying.remove(connection);
                 }
+                afterRun(connection);
             });
         } catch (RuntimeException ex) {
             // A stopping module refuses new work; the next call tries again.
@@ -162,7 +185,10 @@ public final class StoreRegistry {
             return;
         }
         switch (step) {
-            case USABLE -> migrate(connection);
+            case USABLE -> {
+                migrate(connection);
+                afterRun(connection);
+            }
             case RETRY -> {
                 if (wait.attempts() == 1) {
                     log.infof("Map Studio is waiting for database connection %s to be usable (%s); it tries every %d s "
@@ -198,6 +224,8 @@ public final class StoreRegistry {
     }
 
     private void migrate(String connection) {
+        // A retryNow() from before this point is answered by this run (it reads mayMigrate below).
+        rerun.remove(connection);
         lastAttempt.put(connection, nanoClock.getAsLong());
         try (Connection c = connections.open(connection)) {
             if (!mayMigrate.getAsBoolean()) {
@@ -216,7 +244,7 @@ public final class StoreRegistry {
             states.put(connection, StoreState.ready());
         } catch (Migrator.MigrationFailure ex) {
             errorOnce(connection, FailureLine.line(connection, ex));
-            states.put(connection, StoreState.unavailable(FailureLine.userReason(connection, ex.getSQLState())));
+            states.put(connection, StoreState.unavailable(FailureLine.userReason(connection, ex)));
         } catch (SQLException ex) {
             errorOnce(connection, FailureLine.connectLine(connection, ex.getSQLState(), ex.getMessage()));
             states.put(connection, StoreState.unavailable(FailureLine.userReason(connection, ex.getSQLState())));
@@ -225,7 +253,7 @@ public final class StoreRegistry {
         } catch (RuntimeException ex) {
             errorOnce(connection, FailureLine.connectLine(connection, null,
                 ex.getClass().getSimpleName() + ": " + ex.getMessage()));
-            states.put(connection, StoreState.unavailable(FailureLine.userReason(connection, null)));
+            states.put(connection, StoreState.unavailable(FailureLine.userReason(connection, (String) null)));
         }
     }
 

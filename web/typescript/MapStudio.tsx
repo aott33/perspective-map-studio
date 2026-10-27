@@ -29,7 +29,8 @@ import {
 import { EditLevel, MapItemRecord } from './contract';
 import { MESSAGE_EVENT, Reply, editsApply, mapLoad, pointClick, readReply, replyText } from './messages';
 import {
-    STORE_UNKNOWN, StoreState, storeStateAttribute, storeStateFromError, storeStateFromLoad, storeStatusText
+    STORE_UNKNOWN, StoreState, storeStateAttribute, storeStateFromError, storeStateFromLoad, storeStateFromSaveError,
+    storeStatusText
 } from './storeState';
 import { PointPopup } from './PointPopup';
 import { SAVE_IDLE, SaveState, itemsToGeoJson, lineCreateBatch, newId, refusedSave, saveStatusText, withItem } from './save';
@@ -233,7 +234,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.save = { state: 'saved', itemId: pending.id, version };
         } else {
             this.save = refusedSave(pending.id, reply.body);
-            this.store = storeStateFromError(this.store, reply.body);
+            this.store = storeStateFromSaveError(this.store, reply.body);
         }
         console.info('[MapStudio] ' + replyText(reply));
         this.notify();

@@ -1,6 +1,7 @@
 package com.aoindustrial.perspective.mapstudio.gateway.redundancy;
 
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.inductiveautomation.ignition.common.util.LoggerEx;
 import com.inductiveautomation.ignition.gateway.redundancy.RedundancyManager;
@@ -64,6 +65,8 @@ public final class RedundancyGate {
     private final ActiveNode node;
     private final Runnable onActive;
     private Boolean last;
+    /** The last unreadable-state warning, so it is logged once per change and again after a good read. */
+    private final AtomicReference<String> lastFailure = new AtomicReference<>();
 
     /** {@code onActive} runs when this node changes from standby to writable ({@code StoreRegistry::retryNow}). */
     public RedundancyGate(ActiveNode node, Runnable onActive) {
@@ -74,10 +77,17 @@ public final class RedundancyGate {
     /** Whether this node may write and migrate: redundancy off, or this node active. */
     public boolean mayWrite() {
         try {
-            return !node.redundancyEnabled() || node.active();
+            boolean may = !node.redundancyEnabled() || node.active();
+            lastFailure.set(null);
+            return may;
         } catch (RuntimeException ex) {
-            // Unknown redundancy state: refuse writes rather than risk two writers.
-            log.warn("Map Studio could not read this Gateway's redundancy state: " + ex.getClass().getSimpleName());
+            // Unknown redundancy state: refuse writes rather than risk two writers. Called on every
+            // save, map.load and migrator run, so the warning is logged once per change only.
+            String line = "Map Studio could not read this Gateway's redundancy state: " + ex.getClass().getSimpleName()
+                + "; saving is off here until it can be read.";
+            if (!line.equals(lastFailure.getAndSet(line))) {
+                log.warn(line);
+            }
             return false;
         }
     }
