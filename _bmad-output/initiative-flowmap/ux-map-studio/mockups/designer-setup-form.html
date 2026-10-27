@@ -247,7 +247,7 @@ const warningsLeft = Object.values(S.msgs).flat().filter(m => m[0] === 'warn').l
 
 let form;
 if (S.none) {
-  form = `<div class="empty"><div class="glyph">${I.map}</div><h2>No Map Studio setup</h2><p>This project has no Map Studio setup yet. The map store is unavailable until it has one.</p><span class="btn primary">Create setup</span><div class="help">Create setup fills this tab with the defaults. Nothing is written until File &gt; Save. Also on the Map Studio Setup node's right-click menu.</div></div>`;
+  form = `<div class="empty"><div class="glyph">${I.map}</div><h2>No Map Studio setup</h2><p>This project has no Map Studio setup yet. The map store is unavailable until it has one.</p><span class="btn primary">Create setup</span><div class="help">Create setup fills this tab with the defaults. Nothing is written until File &gt; Save.</div></div>`;
 } else if (S.readonly) {
   form = `
   <div class="banner warn">${I.lock}<div><b>Read only.</b> This setup was written by a newer Map Studio (schema 2). This Designer edits schema 1. It is shown as written and never rewritten here.</div></div>
@@ -353,14 +353,6 @@ document.getElementById('app').innerHTML = `
 const sc = document.getElementById('scroll');
 if (sc.scrollHeight > sc.clientHeight + 4) document.getElementById('sb').style.display = 'block';
 
-if (S.none) {
-  const n = document.getElementById('node').getBoundingClientRect();
-  const m = document.createElement('div');
-  m.className = 'ctxmenu';
-  m.style.left = (n.left + 40) + 'px'; m.style.top = (n.bottom + 2) + 'px';
-  m.innerHTML = '<div class="hi">Create setup</div><div class="dim">Open setup</div>';
-  document.body.appendChild(m);
-}
 if (S.picker) {
   const ch = document.getElementById('chips-full').getBoundingClientRect();
   const p = document.createElement('div');
