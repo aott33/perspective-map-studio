@@ -81,6 +81,36 @@ class GatewayScriptModuleTest {
     }
 
     @Test
+    void applyEditsSavesAnInstrumentOnItsLineAndGetMapAnswersTheAttachment() {
+        // Epic 2 story 14: the attachment goes in and comes back as a dict, unchanged.
+        String line = UUID.randomUUID().toString();
+        String tap = UUID.randomUUID().toString();
+        module.applyEditsImpl(P, TypeUtilities.gsonToPy(JsonParser.parseString("{\"batchId\":\"" + UUID.randomUUID()
+            + "\",\"ops\":[{\"op\":\"create\",\"entity\":\"item\",\"id\":\"" + line + "\",\"baseVersion\":0,"
+            + "\"data\":{\"kind\":\"line\",\"name\":\"L-SWD\",\"geometry\":{\"type\":\"LineString\","
+            + "\"coordinates\":[[-103.52,31.92],[-103.505,31.9205]]}}},"
+            + "{\"op\":\"create\",\"entity\":\"item\",\"id\":\"" + tap + "\",\"baseVersion\":0,"
+            + "\"data\":{\"kind\":\"tap\",\"name\":\"PT-1\",\"geometry\":{\"type\":\"Point\","
+            + "\"coordinates\":[-103.52,31.92]},\"attachment\":{\"lineId\":\"" + line + "\",\"distanceM\":0}}}]}")),
+            "seed-script");
+        PyObject map = module.getMapImpl(P);
+        assertEquals(2, map.__len__());
+        boolean found = false;
+        for (int i = 0; i < 2; i++) {
+            com.inductiveautomation.ignition.common.gson.JsonObject item = TypeUtilities.pyToGson(map.__getitem__(i))
+                .getAsJsonObject();
+            if (tap.equals(item.get("id").getAsString())) {
+                assertEquals(JsonParser.parseString("{\"lineId\":\"" + line + "\",\"distanceM\":0.0}"),
+                    item.get("attachment"));
+                found = true;
+            } else {
+                assertTrue(item.get("attachment").isJsonNull());
+            }
+        }
+        assertTrue(found);
+    }
+
+    @Test
     void getMapAnswersKindSetups() {
         module.applyEditsImpl(P, TypeUtilities.gsonToPy(JsonParser.parseString("{\"batchId\":\"" + UUID.randomUUID()
             + "\",\"ops\":[{\"op\":\"create\",\"entity\":\"kindSetup\",\"id\":\"pad\",\"baseVersion\":0,"

@@ -58,9 +58,9 @@ test.describe('1440 px', () => {
             let r = await press(page, 'ok', 'ok');
             expect(r.kinds.status).toBe('ok');
             let s = await statusAfterReload(page);
-            expect(s.kinds).toEqual({ status: 'ok', count: '3', message: `3 kinds from ${KINDS_FN}.` });
+            expect(s.kinds).toEqual({ status: 'ok', count: '4', message: `4 kinds from ${KINDS_FN}.` });
             expect(s.assets).toEqual({ status: 'ok', count: '4', message: `4 assets from ${ASSETS_FN}.` });
-            expect(s.kindsRows).toBe('3');
+            expect(s.kindsRows).toBe('4');
             expect(s.assetsRows).toBe('4');
             await shot(page, 'mapstudio-adapters-ok-1440.png');
 
@@ -68,9 +68,9 @@ test.describe('1440 px', () => {
             await press(page, 'incomplete', 'incomplete');
             s = await statusAfterReload(page);
             expect(s.kinds.status).toBe('incomplete');
-            expect(s.kinds.count).toBe('3');
-            expect(s.kinds.message).toBe(`2 of 5 kinds from ${KINDS_FN} left out: row 4 (id tank): geometry must be point`
-                + ' or line; row 5 (id pad): the id appears twice.');
+            expect(s.kinds.count).toBe('4');
+            expect(s.kinds.message).toBe(`2 of 6 kinds from ${KINDS_FN} left out: row 5 (id tank): geometry must be point`
+                + ' or line; row 6 (id pad): the id appears twice.');
             expect(s.assets.status).toBe('incomplete');
             expect(s.assets.count).toBe('4');
             expect(s.assets.message).toBe(`2 of 6 assets from ${ASSETS_FN} left out: row 5 (id P99): basePath does not`
@@ -81,11 +81,11 @@ test.describe('1440 px', () => {
             await press(page, 'broken', 'broken');
             s = await statusAfterReload(page);
             expect(s.kinds.status).toBe('failing');
-            expect(s.kinds.count).toBe('3');
+            expect(s.kinds.count).toBe('4');
             expect(s.kinds.message).toMatch(new RegExp(`^The kind function ${KINDS_FN} failed: .*The dev adapter is in mode`
                 + ' broken \\(kinds\\).* Showing the list from \\d\\d:\\d\\d UTC\\.$'));
             expect(s.assets.status).toBe('failing');
-            expect(s.kindsRows).toBe('3');
+            expect(s.kindsRows).toBe('4');
             await shot(page, 'mapstudio-adapters-failing-1440.png');
 
             // Empty: a real answer, so the lists are replaced.
@@ -146,7 +146,7 @@ test.describe('1440 px', () => {
         await expect(map).toHaveAttribute('data-edit-level', 'none');
         const el = page.locator('.mapstudio-adapter-status');
         await expect(el).toHaveAttribute('data-kinds-status', 'ok');
-        await expect(el).toHaveAttribute('data-kinds-rows', '3');
+        await expect(el).toHaveAttribute('data-kinds-rows', '4');
         await expect(el).toHaveAttribute('data-assets-status', 'ok');
         await expect(el).toHaveAttribute('data-assets-count', '4');
         await expect(el).toHaveAttribute('data-assets-rows', '');

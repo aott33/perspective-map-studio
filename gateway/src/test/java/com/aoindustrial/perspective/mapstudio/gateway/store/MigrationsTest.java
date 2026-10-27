@@ -15,8 +15,8 @@ class MigrationsTest {
     @Test
     void migrationOneCreatesTheWholeFirstSchema() {
         List<Migrations.Migration> all = Migrations.all();
-        assertEquals(1, all.size());
-        assertEquals(1, Migrations.latest());
+        assertEquals(2, all.size());
+        assertEquals(2, Migrations.latest());
         Migrations.Migration first = all.get(0);
         assertEquals(1, first.version());
         String joined = String.join("\n", first.statements());
@@ -30,6 +30,19 @@ class MigrationsTest {
             assertFalse(statement.endsWith(";"), statement);
             assertFalse(statement.contains("--"), "comments are dropped: " + statement);
         }
+    }
+
+    @Test
+    void migrationTwoAddsTheAttachmentColumnAndItsIndexes() {
+        Migrations.Migration second = Migrations.all().get(1);
+        assertEquals(2, second.version());
+        assertEquals("0002_instrument_attachment.sql", second.name());
+        assertEquals(List.of(
+            "ALTER TABLE mapstudio_item ADD COLUMN attachment jsonb",
+            "CREATE INDEX mapstudio_item_attached_line ON mapstudio_item (project, (attachment->>'lineId'))\n"
+                + "    WHERE attachment IS NOT NULL AND NOT deleted",
+            "CREATE INDEX mapstudio_edit_project_entity ON mapstudio_edit (project, entity, entity_id)"),
+            second.statements());
     }
 
     @Test

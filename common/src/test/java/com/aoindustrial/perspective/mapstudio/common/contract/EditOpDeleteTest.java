@@ -77,7 +77,7 @@ class EditOpDeleteTest {
     @Test
     void aConflictRefusalCarriesItsConflictsInTheErrorBody() {
         MapItemRecord current = new MapItemRecord(ID, "pad", "P12", json("{\"type\":\"Point\",\"coordinates\":[1,2]}"),
-            new JsonObject(), null, new JsonObject(), null, 2, false);
+            new JsonObject(), null, new JsonObject(), null, null, 2, false);
         JsonArray conflicts = new JsonArray();
         conflicts.add(new Conflict(0, "item", ID, 1, current, "alex", "2026-10-26T14:02:00Z").toJson());
         JsonObject body = new MapStudioException(Messages.CODE_CONFLICT, "P12 was changed.", 0, ID, conflicts)

@@ -66,6 +66,13 @@ public interface MapStore {
         /** The last edit record of one entity, or empty when it has none. */
         Optional<LastEdit> lastEdit(String project, String entity, String entityId) throws SQLException;
 
+        /**
+         * The live map items attached to this line ({@code attachment.lineId}), ordered by
+         * {@code distanceM} then id; unlocked (epic 2 story 14). The project row lock taken by
+         * {@link #nextSeq} serialises the project's batches, so none can attach another meanwhile.
+         */
+        List<MapItemRecord> liveAttached(String project, String lineId) throws SQLException;
+
         /** Every map item of the project that is not deleted, ordered by id. */
         List<MapItemRecord> liveItems(String project) throws SQLException;
 

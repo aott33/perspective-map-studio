@@ -91,7 +91,7 @@ class StoreRegistryStateTest {
         StoreState state = stores.state("C");
         assertEquals(StoreState.Status.READ_ONLY, state.status());
         assertTrue(state.isReadable());
-        assertEquals(FailureLine.newerReason(999, 1), state.reason());
+        assertEquals(FailureLine.newerReason(999, Migrations.latest()), state.reason());
         assertFalse(db.executed.contains(Migrator.LOCK));
         assertFalse(db.executed.stream().anyMatch(s -> s.startsWith("CREATE")), "a newer schema is never altered");
     }
@@ -142,7 +142,7 @@ class StoreRegistryStateTest {
     @Test
     void aStandbyOnACurrentSchemaIsReady() {
         mayMigrate.set(false);
-        db.version = 1;
+        db.version = Migrations.latest();
         StoreRegistry stores = registry();
         stores.ensure("C");
         runAll();

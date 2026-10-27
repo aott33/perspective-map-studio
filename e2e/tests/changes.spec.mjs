@@ -83,10 +83,11 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
                 expect(byName.itemCsvNumber.ok).toBe(true);
                 const scriptSeq = byName.itemCsvNumber.value.seq;
                 expect(scriptSeq).toBeGreaterThan(byName.kindSetupSave.value.seq);
-                await expect(viewerMap).toHaveAttribute('data-items-loaded', String(viewerBefore + 3), { timeout: PUSH_MS });
+                // Three items of stories 1 and 9, and story 14's line and tap.
+                await expect(viewerMap).toHaveAttribute('data-items-loaded', String(viewerBefore + 5), { timeout: PUSH_MS });
                 await expect(viewerMap).toHaveAttribute('data-store-seq', String(scriptSeq), { timeout: PUSH_MS });
                 await expect(editorMap).toHaveAttribute('data-store-seq', String(scriptSeq), { timeout: PUSH_MS });
-                await expect(editorMap).toHaveAttribute('data-items-loaded', String(editorBefore + 3));
+                await expect(editorMap).toHaveAttribute('data-items-loaded', String(editorBefore + 5));
                 expect(await viewer.evaluate(() => window.__mapStudioChangesMarker)).toBe('kept');
                 await expect(viewerMap).toHaveAttribute('data-map-reloads', '0');
                 await expect(editorMap).toHaveAttribute('data-map-reloads', '0');

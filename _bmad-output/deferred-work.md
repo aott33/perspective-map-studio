@@ -63,3 +63,8 @@
   summary: CI steps never executed in a runner when written (`download-artifact`, `setup-node`, the Playwright browser cache and `playwright install --with-deps`), and `shellcheck` and `actionlint` were never run on the scripts and workflows.
   evidence: Story 5 and 7 Implementation Notes marked them unverified. Story 8 could not read the GitHub run status (the repository is not attached to its session). Adding shellcheck or actionlint to CI is a new gate, not cleanup.
   goes_to: owner (check the Actions run on `main`; decide on the two linters).
+
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-instruments-on-lines-attachment-stored-and-kept-on-the-line-plan.md`
+  summary: Phone editing may move an instrument along its own line by sending `attachment` with the new point (Open Question 5, option b).
+  evidence: Owner decision 2026-10-27 took option a for now: a phone editor's geometry or attachment change of an instrument is refused `role` ("An instrument moves along its line; only full editing can move it"); option b was recommended as a backlog entry.
+  goes_to: epic-phone

@@ -16,6 +16,13 @@ describe('host lists in map.load', () => {
         expect(lists.adapters?.assets.function).toBe('a.b');
     });
 
+    test('instrument marks a point kind, sent only when true (epic 2 story 14)', () => {
+        const tap = { id: 'tap', name: 'Tap', geometry: 'point', icon: 'tap', labelRank: 0, fields: [], instrument: true };
+        expect(readKind(tap)).toEqual(tap);
+        expect(readKind({ ...tap, instrument: false })).not.toHaveProperty('instrument');
+        expect(readKind({ ...tap, instrument: 'yes' })).not.toHaveProperty('instrument');
+    });
+
     test('a viewer gets no assets: null, not an empty list', () => {
         const lists = readHostLists({ kinds: [PAD], adapters: { kinds: OK, assets: OK } });
         expect(lists.assets).toBeNull();

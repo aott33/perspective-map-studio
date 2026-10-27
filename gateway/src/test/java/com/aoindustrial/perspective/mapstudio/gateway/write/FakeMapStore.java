@@ -195,6 +195,19 @@ public class FakeMapStore implements MapStore {
         }
 
         @Override
+        public List<MapItemRecord> liveAttached(String project, String lineId) {
+            List<MapItemRecord> out = new ArrayList<>();
+            for (MapItemRecord r : s.items.getOrDefault(project, new TreeMap<>()).values()) {
+                if (!r.deleted() && r.attachment() != null && r.attachment().lineId().equals(lineId)) {
+                    out.add(r);
+                }
+            }
+            out.sort(java.util.Comparator.comparingDouble((MapItemRecord r) -> r.attachment().distanceM())
+                .thenComparing(MapItemRecord::id));
+            return out;
+        }
+
+        @Override
         public List<MapItemRecord> liveItems(String project) {
             List<MapItemRecord> out = new ArrayList<>();
             for (MapItemRecord r : s.items.getOrDefault(project, new TreeMap<>()).values()) {

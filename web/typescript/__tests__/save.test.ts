@@ -14,7 +14,7 @@ import {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function item(id: string, geometry: MapItemRecord['geometry'], deleted = false): MapItemRecord {
-    return { id, kind: 'line', name: id, geometry, properties: {}, assetId: null, overrides: {}, ends: null, version: 1, deleted };
+    return { id, kind: 'line', name: id, geometry, properties: {}, assetId: null, overrides: {}, ends: null, attachment: null, version: 1, deleted };
 }
 
 describe('saving a drawn line', () => {

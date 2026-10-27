@@ -95,4 +95,22 @@ class KindListTest {
         assertEquals(false, p.kept().get(1).toJson().has("area"));
         assertEquals("row 2 (id pad): area applies to line kinds only", p.reasons().get(0));
     }
+
+    @Test
+    void instrumentMarksAPointKindAndALineKindWithItIsLeftOut() {
+        Parsed<Kind> p = Kind.parseList(rows("[{\"id\":\"tap\",\"name\":\"Tap\",\"geometry\":\"point\",\"icon\":\"tap\","
+            + "\"instrument\":true},"
+            + "{\"id\":\"meter\",\"name\":\"Meter\",\"geometry\":\"point\",\"instrument\":false},"
+            + "{\"id\":\"swd\",\"name\":\"SWD line\",\"geometry\":\"line\",\"instrument\":true},"
+            + "{\"id\":\"valve\",\"name\":\"Valve\",\"geometry\":\"point\",\"instrument\":\"yes\"}]"));
+        assertEquals(2, p.kept().size());
+        Kind tap = p.kept().get(0);
+        assertTrue(tap.instrument());
+        assertTrue(tap.toJson().get("instrument").getAsBoolean());
+        Kind meter = p.kept().get(1);
+        assertEquals(false, meter.instrument());
+        assertEquals(false, meter.toJson().has("instrument"), "written only when true");
+        assertEquals(List.of("row 3 (id swd): instrument applies to point kinds only",
+            "row 4 (id valve): instrument must be true or false"), p.reasons());
+    }
 }

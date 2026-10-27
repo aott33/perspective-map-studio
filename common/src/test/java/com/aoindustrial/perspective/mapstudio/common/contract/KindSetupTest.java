@@ -126,6 +126,27 @@ class KindSetupTest {
             + cases + "}}";
     }
 
+    @Test
+    void aLineKindTakesItsLookFromItsInstrumentsWithTheSourceAlone() {
+        JsonObject worst = json("{\"styleRule\":{\"source\":{\"instruments\":\"worst\"}}}");
+        assertEquals(worst, KindSetup.parse(worst, LINE, false));
+        assertEquals(worst, KindSetup.parse(worst, LINE, true), "an item override of a line may say the same");
+        assertEquals("styleRule.source: pad is a point kind; only a line kind that is not an area takes its look from its"
+            + " instruments.", refused(worst.toString(), PAD));
+        assertEquals("styleRule.source: geofence is an area kind; only a line kind that is not an area takes its look"
+            + " from its instruments.", refused(worst.toString(), GEOFENCE));
+        assertEquals("styleRule: a rule whose source is the instruments has no type; it is {\"source\": {\"instruments\":"
+            + " \"worst\"}} only, the worst of the instruments' own presets.",
+            refused("{\"styleRule\":{\"source\":{\"instruments\":\"worst\"},\"type\":\"states\",\"cases\":["
+                + "{\"value\":\"fault\",\"preset\":\"fault\"}]}}", LINE));
+        assertTrue(refused("{\"styleRule\":{\"source\":{\"instruments\":\"worst\"},\"expression\":\"x\"}}", LINE)
+            .contains("has no expression"));
+        assertEquals("styleRule.source must be {\"instruments\": \"worst\"}.",
+            refused("{\"styleRule\":{\"source\":{\"instruments\":\"best\"}}}", LINE));
+        assertEquals("styleRule.source must be {\"instruments\": \"worst\"}.",
+            refused("{\"styleRule\":{\"source\":{\"instruments\":\"worst\",\"kpi\":\"x\"}}}", LINE));
+    }
+
     private static String refused(String setup, Kind kind) {
         return assertThrows(InvalidValue.class, () -> KindSetup.parse(json(setup), kind, false)).getMessage();
     }

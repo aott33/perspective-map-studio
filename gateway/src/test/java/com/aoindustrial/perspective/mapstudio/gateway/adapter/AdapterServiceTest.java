@@ -395,6 +395,20 @@ class AdapterServiceTest {
     }
 
     @Test
+    void anInstrumentLineKindIsLeftOutAndTheListIsIncomplete() throws Exception {
+        // Epic 2 story 14's I/O matrix "Kind list" row: instrument true marks point kinds only.
+        caller.rows(KINDS, "[{\"id\":\"pad\",\"name\":\"Pad\",\"geometry\":\"point\",\"icon\":\"well-pad\"},"
+            + "{\"id\":\"tap\",\"name\":\"Tap\",\"geometry\":\"point\",\"icon\":\"tap\",\"instrument\":true},"
+            + "{\"id\":\"swd\",\"name\":\"SWD line\",\"geometry\":\"line\",\"icon\":\"swd\",\"instrument\":true}]");
+        AdapterSnapshot s = refresh();
+        assertEquals(AdapterStatus.INCOMPLETE, s.kindsStatus().status());
+        assertTrue(s.kindsStatus().message().contains("row 3 (id swd): instrument applies to point kinds only"),
+            s.kindsStatus().message());
+        assertEquals(List.of("pad", "tap"), s.kinds().stream().map(k -> k.id()).toList());
+        assertTrue(s.kinds().get(1).instrument());
+    }
+
+    @Test
     void somethingOtherThanAListIsFailingNamingItsType() throws Exception {
         for (String type : List.of("dict", "str", "None", "Dataset")) {
             caller.answers.put(KINDS, () -> new AdapterCaller.NotAList(type));

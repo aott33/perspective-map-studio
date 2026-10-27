@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Map store checks on the dev stack (epic 2 story 5): rights, a failed migration, the
-# lazy retry, and a schema newer than the module. Development only; run by hand
-# (owner decision, 2026-10-26), results recorded in docs/platform-checks.md.
+# lazy retry, a schema newer than the module, and (epic 2 story 14) an upgrade from schema 1
+# with data. Development only; run by hand (owner decision, 2026-10-26), results recorded in
+# docs/platform-checks.md.
 #
-# Usage: ops/store-checks.sh [scenario ...]    (default: rights partial healed newer)
+# Usage: ops/store-checks.sh [scenario ...]    (default: rights partial healed newer upgrade)
 #
 # Needs the dev stack from ops/up.sh on volumes made after this story (the MapStudioCheck
 # connection is seeded into a fresh Gateway volume and the check database into a fresh
@@ -19,7 +20,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
 SCENARIOS=("$@")
 if [[ ${#SCENARIOS[@]} -eq 0 ]]; then
-  SCENARIOS=(rights partial healed newer)
+  SCENARIOS=(rights partial healed newer upgrade)
 fi
 LINE_PREFIX="Map Studio cannot prepare its map store on database connection MapStudioCheck"
 CHECK_CONN="/usr/local/bin/ignition/data/config/resources/core/ignition/database-connection/MapStudioCheck/config.json"
@@ -196,8 +197,8 @@ for scenario in "${SCENARIOS[@]}"; do
       check_sql -c "INSERT INTO mapstudio_schema_version (version, module_version) VALUES (999, 'store-checks')"
       edits_before="$(check_sql -c "SELECT count(*) FROM mapstudio_edit")"
       restart_gateway
-      if wait_for_log "is at schema version 999, newer than this module knows (1)" 150; then
-        expect_one_line "is at schema version 999, newer than this module knows (1)" || true
+      if wait_for_log "is at schema version 999, newer than this module knows (2)" 150; then
+        expect_one_line "is at schema version 999, newer than this module knows (2)" || true
       else
         fail "no newer-schema warning within 150 s"
       fi
@@ -207,6 +208,48 @@ for scenario in "${SCENARIOS[@]}"; do
       ok "mapstudio_edit rows before and after the refused save: ${edits_before} and ${edits_after}"
       [[ "$(check_sql -c "SELECT max(version) FROM mapstudio_schema_version")" == "999" ]] \
         || fail "the newer schema version was changed"
+      ;;
+    upgrade)
+      # Epic 2 story 14: a store left at schema 1 with a map item, its tables owned by another role
+      # (the owner role mapstudio) and the connection's role given the runtime rights only. Migration 2
+      # (ALTER TABLE) fails with 42501 and changes nothing; once the tables are the connection role's,
+      # the next map.load after the retry interval upgrades it to 2 with no restart, the item kept.
+      reset_check_db
+      check_sql < "${PROJECT_ROOT}/gateway/src/main/resources/com/aoindustrial/perspective/mapstudio/gateway/store/migrations/0001_first_schema.sql"
+      check_sql -c "CREATE TABLE mapstudio_schema_version (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now(), module_version text NOT NULL)" \
+        -c "INSERT INTO mapstudio_schema_version (version, module_version) VALUES (1, 'store-checks')" \
+        -c "INSERT INTO mapstudio_project (project, seq) VALUES ('mapstudio-check', 1)" \
+        -c "INSERT INTO mapstudio_item (project, id, kind, name, geometry, version) VALUES ('mapstudio-check', 'c0ffee00-0000-4000-8000-000000000001', 'pad', 'Schema 1 pad', '{\"type\":\"Point\",\"coordinates\":[-104.97,39.74]}', 1)" \
+        -c "GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO mapstudio_check" \
+        -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO mapstudio_check" \
+        -c "GRANT CREATE ON SCHEMA public TO mapstudio_check"
+      restart_gateway
+      if wait_for_log "${LINE_PREFIX}" 150; then
+        expect_one_line "${LINE_PREFIX}" || true
+        for part in "migration 2, statement" "SQLState 42501"; do
+          log_lines "${LINE_PREFIX}" | grep -qF -- "${part}" || fail "the error line does not say '${part}'"
+        done
+      else
+        fail "no Map Studio error line for MapStudioCheck within 150 s"
+      fi
+      [[ "$(check_sql -c "SELECT max(version) FROM mapstudio_schema_version")" == "1" ]] \
+        || fail "the schema version changed after the failed upgrade"
+      [[ "$(check_sql -c "SELECT count(*) FROM information_schema.columns WHERE table_name = 'mapstudio_item' AND column_name = 'attachment'")" == "0" ]] \
+        || fail "the attachment column exists after the failed upgrade"
+      run_spec unavailable noshots
+      check_sql -c "DO \$\$ DECLARE t text; BEGIN FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'mapstudio_%' LOOP EXECUTE format('ALTER TABLE %I OWNER TO mapstudio_check', t); END LOOP; END \$\$"
+      info "Waiting 65 s, past the retry interval ..."
+      sleep 65
+      run_spec upgraded
+      if wait_for_log "Map Studio upgraded its map store schema on database connection MapStudioCheck: applied version(s) [2], now at schema version 2." 30; then
+        ok "$(log_lines "upgraded its map store schema on database connection MapStudioCheck" | sed 's/^.*\]: //')"
+      else
+        fail "no 'upgraded its map store schema ... [2]' line for MapStudioCheck"
+      fi
+      [[ "$(check_sql -c "SELECT max(version) FROM mapstudio_schema_version")" == "2" ]] || fail "the schema is not at version 2"
+      [[ "$(check_sql -c "SELECT count(*) FROM mapstudio_item WHERE attachment IS NULL AND name = 'Schema 1 pad'")" == "1" ]] \
+        || fail "the schema 1 item did not read back with attachment null"
+      ok "schema 1 to 2 with data: $(check_sql -c "SELECT string_agg(indexname, ', ' ORDER BY indexname) FROM pg_indexes WHERE indexname IN ('mapstudio_item_attached_line', 'mapstudio_edit_project_entity')")"
       ;;
     *)
       fail "unknown scenario ${scenario}"

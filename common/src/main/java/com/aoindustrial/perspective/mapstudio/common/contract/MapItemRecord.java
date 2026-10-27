@@ -15,7 +15,9 @@ import com.aoindustrial.perspective.mapstudio.common.Messages;
 
 /**
  * The stored map item record (AD-20), closed and typed:
- * {@code {id, kind, name, geometry, properties, assetId, overrides, ends, version, deleted}}.
+ * {@code {id, kind, name, geometry, properties, assetId, overrides, ends, attachment, version, deleted}}.
+ * {@code attachment} (epic 2 story 14) is an instrument's place on its line, null on every
+ * other map item (never {@code JsonNull} in Java; written as JSON null).
  * Derived fields (base path, unlinked reason, unknown kind) are never stored.
  *
  * <p>Geometry is GeoJSON (Point or LineString), longitude first, WGS 84, rounded
@@ -31,12 +33,13 @@ public record MapItemRecord(
     String assetId,
     JsonObject overrides,
     JsonElement ends,
+    Attachment attachment,
     int version,
     boolean deleted) implements StoredRecord {
 
     /** The fields an op's {@code data} may carry (the record minus id, version and deleted). */
     public static final Set<String> DATA_FIELDS =
-        Set.of("kind", "name", "geometry", "properties", "assetId", "overrides", "ends");
+        Set.of("kind", "name", "geometry", "properties", "assetId", "overrides", "ends", "attachment");
 
     @Override
     public JsonObject toJson() {
@@ -53,6 +56,7 @@ public record MapItemRecord(
         }
         o.add("overrides", overrides.deepCopy());
         o.add("ends", ends == null ? JsonNull.INSTANCE : ends.deepCopy());
+        o.add("attachment", attachment == null ? JsonNull.INSTANCE : attachment.toJson());
         o.addProperty("version", version);
         o.addProperty("deleted", deleted);
         return o;
@@ -72,10 +76,10 @@ public record MapItemRecord(
             throw invalid("A new map item needs a geometry.", id, opIndex);
         }
         MapItemRecord empty = new MapItemRecord(id, "", "", new JsonObject(), new JsonObject(), null,
-            new JsonObject(), JsonNull.INSTANCE, 0, false);
+            new JsonObject(), JsonNull.INSTANCE, null, 0, false);
         MapItemRecord merged = empty.merge(data, opIndex);
         return new MapItemRecord(id, merged.kind, merged.name, merged.geometry, merged.properties,
-            merged.assetId, merged.overrides, merged.ends, 1, false);
+            merged.assetId, merged.overrides, merged.ends, merged.attachment, 1, false);
     }
 
     /**
@@ -89,7 +93,7 @@ public record MapItemRecord(
         }
         MapItemRecord merged = merge(data, opIndex);
         return new MapItemRecord(id, merged.kind, merged.name, merged.geometry, merged.properties,
-            merged.assetId, merged.overrides, merged.ends, version + 1, deleted);
+            merged.assetId, merged.overrides, merged.ends, merged.attachment, version + 1, deleted);
     }
 
     private MapItemRecord merge(JsonObject data, int opIndex) {
@@ -100,6 +104,7 @@ public record MapItemRecord(
         String a = assetId;
         JsonObject ov = overrides;
         JsonElement e = ends;
+        Attachment at = attachment;
         for (Map.Entry<String, JsonElement> field : data.entrySet()) {
             JsonElement value = field.getValue();
             switch (field.getKey()) {
@@ -143,10 +148,29 @@ public record MapItemRecord(
                     }
                     e = value.deepCopy();
                 }
+                case "attachment" -> {
+                    try {
+                        at = value.isJsonNull() ? null : Attachment.parse(value);
+                    } catch (InvalidValue ex) {
+                        throw invalid(ex.getMessage(), id, opIndex);
+                    }
+                }
                 default -> throw invalid("Unknown field " + field.getKey() + ".", id, opIndex);
             }
         }
-        return new MapItemRecord(id, k, n, g, p, a, ov, e, version, deleted);
+        return new MapItemRecord(id, k, n, g, p, a, ov, e, at, version, deleted);
+    }
+
+    /** This record at another version and deleted flag (a tombstone, a restore). */
+    public MapItemRecord at(int newVersion, boolean nowDeleted) {
+        return new MapItemRecord(id, kind, name, geometry, properties, assetId, overrides, ends, attachment, newVersion,
+            nowDeleted);
+    }
+
+    /** True for a map item whose geometry is a LineString. */
+    public boolean isLine() {
+        JsonElement type = geometry.get("type");
+        return type != null && type.isJsonPrimitive() && "LineString".equals(type.getAsString());
     }
 
     private static void checkFields(JsonObject data, String id, int opIndex) {

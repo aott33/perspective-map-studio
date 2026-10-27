@@ -387,6 +387,7 @@ export function unsavedItems(entries: UnsavedEntry[]): MapItemRecord[] {
                 assetId: typeof d.assetId === 'string' ? d.assetId : null,
                 overrides: d.overrides || {},
                 ends: d.ends || null,
+                attachment: d.attachment || null,
                 version: 0,
                 deleted: false
             });

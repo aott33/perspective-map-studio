@@ -44,7 +44,8 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
  * setup, checks the level against each stored geometry, collects every stale op into one
  * {@code conflict}, then checks each op's record against the kind list
  * ({@link ItemCheck}, {@link KindSetup}; {@code invalid} naming the op) and writes it,
- * one edit record row per op and the batch row; it commits all or nothing; then the
+ * one edit record row per op, then checks the instruments on lines on the state the batch
+ * leaves ({@link AttachmentRules}, epic 2 story 14), then writes the batch row; it commits all or nothing; then the
  * change hook is called once. Any refusal is a {@link MapStudioException} with its
  * code and, where an op is at fault, the op's index and id; nothing is written.
  */
@@ -135,7 +136,7 @@ public final class WriteService {
                 }
                 for (EditOp op : batch.ops()) {
                     if (isItem(op)) {
-                        RoleMatrix.checkStored(level, op, stored.get(op.index()).map(MapItemRecord.class::cast));
+                        RoleMatrix.checkStored(level, op, stored.get(op.index()).map(MapItemRecord.class::cast), kinds);
                     }
                 }
                 ConflictReport conflicts = new ConflictReport();
@@ -146,15 +147,21 @@ public final class WriteService {
                     throw conflicts.refusal();
                 }
                 List<EditResult.OpResult> results = new ArrayList<>();
+                List<AttachmentRules.Written> items = new ArrayList<>();
                 for (EditOp op : batch.ops()) {
                     StoredRecord current = stored.get(op.index()).orElse(null);
                     StoredRecord written = isItem(op) ? write(tx, project, op, (MapItemRecord) current, kinds)
                         : writeKindSetup(tx, project, op, (KindSetupRecord) current, kinds);
+                    if (isItem(op)) {
+                        items.add(new AttachmentRules.Written(op, (MapItemRecord) current, (MapItemRecord) written));
+                    }
                     tx.insertEdit(new MapStore.EditRow(project, batch.batchId(), seq, op.entity(), op.id(),
                         op.op(), written.version(), actor.name(), actor.source()));
                     results.add(new EditResult.OpResult(op.entity(), op.id(), written.version()));
                     committed.add(new ChangeHook.CommittedOp(op.op(), op.entity(), op.id(), written));
                 }
+                // On the state the whole batch leaves (epic 2 story 14): instruments stay on their lines.
+                AttachmentRules.check(tx, project, items, kinds);
                 EditResult r = new EditResult(batch.batchId(), seq, List.copyOf(results));
                 tx.insertBatch(project, batch.batchId(), seq, actor.name(), r.toJson());
                 return r;
@@ -251,9 +258,7 @@ public final class WriteService {
                     return created;
                 }
                 // A restore: the tombstone's row takes the create's data, live again, version + 1.
-                MapItemRecord restored = new MapItemRecord(op.id(), created.kind(), created.name(), created.geometry(),
-                    created.properties(), created.assetId(), created.overrides(), created.ends(),
-                    current.version() + 1, false);
+                MapItemRecord restored = created.at(current.version() + 1, false);
                 tx.updateItem(project, restored);
                 return restored;
             }
@@ -263,9 +268,7 @@ public final class WriteService {
                 return updated;
             }
             case EditOp.DELETE -> {
-                MapItemRecord tombstone = new MapItemRecord(current.id(), current.kind(), current.name(),
-                    current.geometry(), current.properties(), current.assetId(), current.overrides(), current.ends(),
-                    current.version() + 1, true);
+                MapItemRecord tombstone = current.at(current.version() + 1, true);
                 tx.updateItem(project, tombstone);
                 return tombstone;
             }

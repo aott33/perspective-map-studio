@@ -19,6 +19,19 @@ terra-draw-maplibre-gl-adapter
     Copyright (c) James Milner (the licence text is in the project's LICENSE
     file on GitHub; the npm packages ship no copy)
 
+Turf 7.4.0 (https://github.com/Turfjs/turf): @turf/helpers, @turf/length,
+@turf/along and @turf/nearest-point-on-line, and the Turf packages they use
+(@turf/bearing, @turf/destination, @turf/distance, @turf/invariant,
+@turf/meta), pinned at exactly 7.4.0 in web/package.json for the shared
+geometry module (web/typescript/geometry.ts). In 0.2.0 draft nothing in the
+component calls that module yet, so they are not in the browser bundle; they
+are bundled once the editing tools call it. The Gateway's LineMeasure
+(common/.../contract/LineMeasure.java) is a Java port of Turf's distance,
+bearing, destination, length and along formulas.
+    MIT License
+    Copyright (c) 2017 TurfJS (the licence text ships in each package's
+    LICENSE file)
+
 This product's icon set (web/icons, served as /res/mapstudio/icons/) is drawn
 for Map Studio under the Apache License, Version 2.0, except the icons listed
 here, adapted from Tabler Icons 3.49.0 (https://github.com/tabler/tabler-icons)

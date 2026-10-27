@@ -73,7 +73,7 @@
         "onActionPerformed": [
          {
           "config": {
-           "script": "\t# Store checks (epic 2 story 5): getMap reads the map on a read-only store too; its list\n\t# also answers .readOnly (None when saving works). Reads only.\n\timport java.lang\n\n\tout = self.view.rootContainer.getChild('getMapResult')\n\ttry:\n\t\titems = system.mapstudio.getMap('mapstudio-check')\n\t\tout.props.text = system.util.jsonEncode({'count': len(items), 'readOnly': items.readOnly})\n\texcept java.lang.Throwable as ex:\n\t\tout.props.text = system.util.jsonEncode({'error': ex.getMessage()})\n\texcept Exception as ex:\n\t\tout.props.text = system.util.jsonEncode({'error': str(ex)})"
+           "script": "\t# Store checks (epic 2 story 5): getMap reads the map on a read-only store too; its list\n\t# also answers .readOnly (None when saving works); items are the records it read (epic 2 story 14). Reads only.\n\timport java.lang\n\n\tout = self.view.rootContainer.getChild('getMapResult')\n\ttry:\n\t\titems = system.mapstudio.getMap('mapstudio-check')\n\t\tout.props.text = system.util.jsonEncode({'count': len(items), 'readOnly': items.readOnly, 'items': [dict(i) for i in items]})\n\texcept java.lang.Throwable as ex:\n\t\tout.props.text = system.util.jsonEncode({'error': ex.getMessage()})\n\texcept Exception as ex:\n\t\tout.props.text = system.util.jsonEncode({'error': str(ex)})"
           },
           "scope": "G",
           "type": "script"
