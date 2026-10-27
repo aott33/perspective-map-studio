@@ -231,7 +231,7 @@ A kind setup may bind a map item's look to one value through a style rule: the i
 - Alarm state wins: a map item with an active alarm shows its alarm presentation (FR-2, FR-34), not its value style.
 - A stale value shows only as stale: the map item drops its last value style until a fresh value arrives (owner, 2026-10-26).
 - The style rule's value is a live value: read in the icon batch (NFR-9), and not read when the item has no style rule.
-- A line's style rule may take as its value an aggregate of its instruments, "worst of its instruments" (FR-40): for example dashed when any instrument is stale, attention when any instrument's value is outside its band (owner, 2026-10-27).
+- A line's style rule may take as its value an aggregate of its instruments (FR-40), drawn per line segment as the "worst of the instruments at the segment's ends": for example a segment is dashed when either end instrument is stale, attention when either end instrument's value is outside its band (owner, 2026-10-27).
 - Every preset is documented with its look in both themes, so every possible look is reviewable; the presets pass the same engineering review as the alarm glyphs (ER-27) before release.
 
 #### FR-39: Area category tints
@@ -404,7 +404,8 @@ Approved by the owner 2026-10-27. Pipeline instruments, that is taps (pressure t
 - The instruments split the line into line segments for display.
 - A line's popup lists its instruments in order along the line, between the map items its ends snap to, each with its live values and distance (for example CTB1 outlet, PT-1 at 1.1 km, PT-2 at 2.8 km, SWD1 inlet), plus the line's own KPIs and alarms.
 - Clicking or tapping a spot on a line opens the popup at that line segment (for example "PT-1 to PT-2"), with the instruments at its ends highlighted on the map and in the list.
-- A line's style rule (FR-38) may use the worst of its instruments as its value: dashed when any instrument is stale, attention when any instrument's value is outside its band.
+- A line's style rule (FR-38) may use its instruments as its value, and each line segment then draws the worst of the instruments at the segment's ends, as the template's map draws a segment from the taps at its ends: a segment is dashed when either end instrument is stale, attention when either end instrument's value is outside its band (owner, 2026-10-27).
+- Deleting a line deletes its instruments in the same save, and one undo restores the line and its instruments (owner, 2026-10-27).
 - An instrument's alarm shows at that instrument's place on the line, not only at the line's midpoint; the line's own alarms path keeps its midpoint glyph (FR-34).
 
 #### FR-17: Delete and undo
@@ -663,8 +664,8 @@ Target date for SM-1 to SM-5: end of January 2027, a target and not a deadline.
 6. Answered 2026-10-26: Ignition 8.3 has an Alarm Metrics folder on tag folders and UDT instances (IA docs). Its values can be subscribed but not read directly, which the architecture must respect for NFR-9.
 7. Answered 2026-10-26: the owner approved value-driven styles (FR-38) and area category tints (FR-39) as written.
 8. Answered 2026-10-26: a stale value shows only as stale; the map item drops its last value style until a fresh value arrives (FR-38).
-9. Does each line segment draw its own look from the instruments at its ends, as the template's map draws a segment from the taps at its ends (its `docs/map.md` section 2), or does the whole line draw the worst of all its instruments (FR-40)? Proposed: per segment, for parity with FR-34; the whole line when it has no instruments.
-10. What happens to a line's instruments when the line is deleted (FR-40)? Proposed: they are deleted with it in the same save, and one undo restores the line and its instruments.
+9. Answered 2026-10-27: each line segment draws from the instruments at its two ends, as the template's map draws a segment from the taps at its ends (its `docs/map.md` section 2), not the whole line from all its instruments (FR-40).
+10. Answered 2026-10-27: deleting a line deletes its instruments in the same save, and one undo restores the line and its instruments (FR-40).
 
 ## 10. Assumptions index
 
