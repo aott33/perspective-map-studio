@@ -3,13 +3,13 @@ title: 'Tag browse and asset-relative paths for the tag browser'
 type: 'feature'
 ticket: '15'
 created: '2026-10-27'
-status: 'draft'
-baseline_revision: ''
+status: 'in-review'
+baseline_revision: '8f042cd2c8088a8bfdd857975751975377dc5cd6'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
 context:
@@ -38,6 +38,12 @@ context:
 - Pure parts (path parsing and conversion, child type words) live in `common/` and are unit tested; the Ignition calls sit behind one Gateway interface so the lookups are tested with a fake.
 - No tag path, user name or item property in a log line above debug; refusals log at debug as the delegate does today.
 
+**Decisions (owner, 2026-10-27, "agree with all recommendations, start building"):**
+- The default provider is the session project's default tag provider; when it is blank or names a missing provider, `default` if it exists, else the first provider by name other than `System`; that one is marked `isDefault` and is what `tags.browse {}` browses.
+- Browse and existence checks run under the session user's roles (and security zones where the session exposes them **[unverified]**) through `SecurityContext.fromRolesAndZones`, so a tag the editor may not read is neither listed nor counted. If the live check shows that context cannot be built, the system context is used only with the owner's word (hitl).
+- A tag call that fails or passes 5 s answers the new code `tags-unavailable` ("The tag system did not answer within 5 s"), added to `Messages.CODES` and `docs/contract.md` as a draft contract addition.
+- One browse returns at most 1000 children, ordered by name, and `tags.browse.reply` carries `truncated: true|false`; paging can come later without breaking it.
+
 **Never:**
 - A database migration, a `mapstudio_` table or a setup schema change; any write-path, role-matrix, `map.load` or `map.changed` change; a scripting API function for tags.
 - The tree, the provider dropdown, the "Same tag for every <kind>" warning, the Kinds screen or any visible UI (epic-editing); storing or validating kind setup tag paths (story 9) or filling placeholders (story 9's fill function in `common/`).
@@ -58,13 +64,13 @@ context:
 | Prefix not a segment | base `[default]Mesa/P1`, path `[default]Mesa/P12/X` | `relative: false` | none |
 | Bad names | unknown kind or asset, asset of another kind, `Mesa/P12/X` without provider | - | `invalid` |
 | No linked items | kind has no item with a known asset | `relative: true, n: 0, m: 0` | none |
-| Tag system slow | a tag call past 5 s | - | per Open Question 3 |
+| Tag system slow | a tag call past 5 s | - | `tags-unavailable` |
 
 </frozen-after-approval>
 
 ## Code Map
 
-- `common/.../common/Messages.java` -- add `TAGS_BROWSE`, `TAGS_BROWSE_REPLY`, `TAGS_RESOLVE`, `TAGS_RESOLVE_REPLY` with body javadoc, to `INBOUND_TYPES` and `OUTBOUND_TYPES`; a new code only if Open Question 3 says so. Story 9 may edit this file too (merge, not conflict in meaning).
+- `common/.../common/Messages.java` -- add `TAGS_BROWSE`, `TAGS_BROWSE_REPLY`, `TAGS_RESOLVE`, `TAGS_RESOLVE_REPLY` with body javadoc, to `INBOUND_TYPES` and `OUTBOUND_TYPES`; and the new code `tags-unavailable` in `CODES`. Story 9 may edit this file too (merge, not conflict in meaning).
 - `gateway/.../MapStudioDelegate.java` -- `isStoreType` gains the two types; `submitStoreWork` already reads `SessionView` (project, user, roles) on the event thread and runs on `services.work`; route the tag types to a new static `tagsReply(TagLookups, SessionView, type, id, body)` beside `storeReply` (same `MapStudioException` to `error` mapping, `RuntimeException` to a logged failure). `services.tags` is the instance.
 - `gateway/.../MapStudioServices.java` -- create `TagLookups` after `adapters` from `setups`, `gate`, `store`, `adapters::snapshot` and `new IgnitionTagSource(context.getTagManager(), context.getProjectManager())`; nothing to start or stop.
 - `gateway/.../setup/SetupRegistry.require(project)` -- `store-unreachable` for no or invalid setup; `write/RoleMatrix.level(setup, roles)` -- the level; `store/StoreGate.requireReadable` and `store/MapStore.inTransaction(connection, tx -> tx.liveItems(project))` -- the items for M (map `SQLException` as `MapLoader.load` does); `adapter/AdapterSnapshot` `kinds()`, `assets()` and `common/.../contract/Asset.basePath()` (already checked to start with `[provider]`).
@@ -77,18 +83,18 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `docs/platform-checks.md` -- new section "Epic 2 story 15 - tag browse from the Gateway", done first on `ms-e2s15` (port 9131) with a throwaway check in the module or a Gateway script console call: provider names and how the default is found, a root and a folder browse of two providers, which `SecurityContext` sees what (a tag with read permissions), what an unknown folder returns, depth (one level), time for a UDT instance's members and for an existence check of 3 and of 300 paths, case comparison. Each fact labelled **[live 8.3.10]**; the code follows what it finds.
-- [ ] `common/.../common/contract/TagPaths.java` (new) -- pure: `folder(String)` check and trim, `parseFull(String)` provider and path, `resolve(path, basePath)` -> `{path, relative, suffix}`, `under(basePath, suffix)`; `invalid` reasons in plain words.
-- [ ] `common/.../common/contract/TagChild.java` (new) -- record `{name, path, type, dataType, hasChildren}`, `toJson`, `typeWord(String objectType)`.
-- [ ] `common/.../common/Messages.java` -- the four types (and any new code).
-- [ ] `gateway/.../tags/TagSource.java` (new) -- interface: `providers()`, `defaultProvider(project)`, `browse(provider, folder, roles)` -> found, children, truncated; `existing(List<String> fullPaths, roles)` -> set.
-- [ ] `gateway/.../tags/IgnitionTagSource.java` (new) -- `TagSource` over `GatewayTagManager` and `ProjectManager`, 5 s timeouts, child cap per Open Question 4, security context per Open Question 2.
-- [ ] `gateway/.../tags/TagLookups.java` (new) -- `browseReply(project, roles, body)`, `resolveReply(project, roles, body)` per the Always rules and the matrix.
-- [ ] `gateway/.../MapStudioServices.java`, `gateway/.../MapStudioDelegate.java` -- wiring and routing as in the Code Map.
-- [ ] `web/typescript/messages.ts`, `web/typescript/testHook.ts` -- the names.
-- [ ] `ops/config/core/ignition/tag-provider/default/*`, `tag-type-definition/default/udts.json` (UDT `Pad`: memory tags `Pressure` Float8, `Flow` Float8, `Comms` Boolean), `tag-definition/default/Mesa/...` (P12 and P14 instances of `Pad`, P15 a folder with `Flow` only, `Lines/L3` with `Flow`, `Plant/Header/Pressure`) -- dev test equipment; no value is ever written by Map Studio.
-- [ ] `docs/contract.md` -- both types in the Messages table, a section "tags.browse and tags.resolve: the tag browser's lookups" (shapes, rules, examples, refusals, role), the error-code table; `docs/kinds-and-assets.md` -- one paragraph on asset-relative tag paths and a link.
-- [ ] Tests: `common/src/test/.../contract/{TagPathsTest,TagChildTest}.java` (every matrix path case, segment boundary, trailing slash, provider case, length, placeholders); `gateway/src/test/.../tags/{FakeTagSource,TagLookupsTest}.java` (each matrix row, role before invalid, phone refused, M and N with a missing tag and an unlinked item, store unreadable, timeout); `MapStudioDelegateTest` (routing, busy pool); `e2e/tests/tags.spec.mjs` (new: editor creates three `pad` items linked to P12, P14, P15 through `edits.apply` with `status: "producing"`, then browse and resolve as in Verify; phone editor and anonymous viewer refused with `role`).
+- [x] `docs/platform-checks.md` -- new section "Epic 2 story 15 - tag browse from the Gateway", done first on `ms-e2s15` (port 9131) with a throwaway check in the module or a Gateway script console call: provider names and how the default is found, a root and a folder browse of two providers, which `SecurityContext` sees what (a tag with read permissions), what an unknown folder returns, depth (one level), time for a UDT instance's members and for an existence check of 3 and of 300 paths, case comparison. Each fact labelled **[live 8.3.10]**; the code follows what it finds.
+- [x] `common/.../common/contract/TagPaths.java` (new) -- pure: `folder(String)` check and trim, `parseFull(String)` provider and path, `resolve(path, basePath)` -> `{path, relative, suffix}`, `under(basePath, suffix)`; `invalid` reasons in plain words.
+- [x] `common/.../common/contract/TagChild.java` (new) -- record `{name, path, type, dataType, hasChildren}`, `toJson`, `typeWord(String objectType)`.
+- [x] `common/.../common/Messages.java` -- the four types and `tags-unavailable`.
+- [x] `gateway/.../tags/TagSource.java` (new) -- interface: `providers()`, `defaultProvider(project)`, `browse(provider, folder, roles)` -> found, children, truncated; `existing(List<String> fullPaths, roles)` -> set.
+- [x] `gateway/.../tags/IgnitionTagSource.java` (new) -- `TagSource` over `GatewayTagManager` and `ProjectManager`, 5 s timeouts, child cap 1000 with `truncated`, security context from the session's roles (Decisions).
+- [x] `gateway/.../tags/TagLookups.java` (new) -- `browseReply(project, roles, body)`, `resolveReply(project, roles, body)` per the Always rules and the matrix.
+- [x] `gateway/.../MapStudioServices.java`, `gateway/.../MapStudioDelegate.java` -- wiring and routing as in the Code Map.
+- [x] `web/typescript/messages.ts`, `web/typescript/testHook.ts` -- the names.
+- [x] `ops/config/core/ignition/tag-provider/default/*`, `tag-type-definition/default/udts.json` (UDT `Pad`: memory tags `Pressure` Float8, `Flow` Float8, `Comms` Boolean), `tag-definition/default/Mesa/...` (P12 and P14 instances of `Pad`, P15 a folder with `Flow` only, `Lines/L3` with `Flow`, `Plant/Header/Pressure`) -- dev test equipment; no value is ever written by Map Studio.
+- [x] `docs/contract.md` -- both types in the Messages table, a section "tags.browse and tags.resolve: the tag browser's lookups" (shapes, rules, examples, refusals, role), the error-code table; `docs/kinds-and-assets.md` -- one paragraph on asset-relative tag paths and a link.
+- [x] Tests: `common/src/test/.../contract/{TagPathsTest,TagChildTest}.java` (every matrix path case, segment boundary, trailing slash, provider case, length, placeholders); `gateway/src/test/.../tags/{FakeTagSource,TagLookupsTest}.java` (each matrix row, role before invalid, phone refused, M and N with a missing tag and an unlinked item, store unreadable, timeout); `MapStudioDelegateTest` (routing, busy pool); `e2e/tests/tags.spec.mjs` (new: editor creates three `pad` items linked to P12, P14, P15 through `edits.apply` with `status: "producing"`, then browse and resolve as in Verify; phone editor and anonymous viewer refused with `role`).
 
 **Acceptance Criteria:**
 - Given the dev stack on a fresh volume, when the e2e suite runs, then every existing spec passes unchanged and `tags.spec.mjs` passes.
@@ -97,7 +103,17 @@ context:
 
 ## Implementation Notes
 
+- The live check ran first, with a throwaway `TagCheck` class in the module (logged `TAGCHECK` lines 40 s after start, removed before the commit); its findings are in `docs/platform-checks.md`, "Epic 2 story 15".
+- Existence (N) is one browse per distinct parent folder, all fired at once and joined within one 5 s deadline, under the session user's roles; `getTagConfigsAsync` was as fast but takes no `SecurityContext`, so it would not follow the owner's permission decision.
+- `tags.resolve` checks the map store readable after the body and names, for every resolve (also a `relative: false` one), so the order is one order.
+- `tags.browse` asks Ignition for 1001 children (it reports no total, live) and sorts the first 1000 by name.
+- The anonymous viewer e2e test runs at `/` without a sign-in; the phone editor in its own context at 390 px.
+- Shared files touched, all additive: `Messages.java` (four types, one code), `MapStudioDelegate.java` (`isStoreType`, `tagsReply`, routing line), `MapStudioServices.java` (one field), `contract.ts` (`TAGS_UNAVAILABLE`), `messages.ts` (four names), `testHook.ts` (two names), `docs/contract.md` (rows and one section).
+
 ## Plan Change Log
+
+- 2026-10-27, approval (not a review loopback): the owner approved the plan with every recommended Open Question answer ("agree with all recommendations, start building"); the answers are the Decisions in the frozen block. Branch `ccr-3c8b84b9-f1vbsm` merged first (only the deterministic adapter deadlock test was new).
+- 2026-10-27, live check (the code follows what it finds, per the Tasks): Ignition compares path segments without letter case, so `tags.resolve` compares the provider and the base path's segments without case, the suffix keeping the pick's case (the frozen rule left this to the check). A UDT instance's browse holds a `Parameters` node with no full path: left out with the property nodes. Folders and instances report data type `String`: sent as null. A tag's read permissions do not hide it from a browse under any context, so the session-roles browse filters nothing more than the system context today; kept per the decision and documented, no owner fallback needed.
 
 ## Review Triage Log
 
@@ -123,10 +139,3 @@ N is checked by structure (tag configuration or a parent browse), not by reading
 
 **Manual checks:**
 - On the dev Gateway's Tag Browser, the seeded `default` provider shows Mesa/P12, P14, P15 and Plant as planned, and no tag value changed during the e2e run.
-
-## Open Questions
-
-1. **Which provider is "the Gateway's default"?** The 8.3 SDK shows a per-project default tag provider (`GlobalProps.getDefaultSQLTagsProviderName`) and no Gateway-wide one [unverified live]. (a) The session project's default tag provider; when it is blank or names a missing provider, `default` if it exists, else the first provider by name other than `System`, and that one is marked `isDefault`. (b) Always a provider named `default` when present. (c) A new setup field (changes setup v1). Recommended: (a); it is what a `[~]` path means in that project, and the docs call it "the project's default tag provider".
-2. **Under whose permissions does the browse run?** (a) The session user's roles (and security zones if the session exposes them [unverified]) through `SecurityContext.fromRolesAndZones`, so a tag with read permissions the editor lacks is not listed or counted. (b) The system context: every tag visible to every full editor. Recommended: (a); the live check confirms it filters, and falls back to (b) only with the owner's word if it cannot be built.
-3. **What error does a slow or failing tag system give?** No 0.2.0 code fits. (a) New code `tags-unavailable` ("The tag system did not answer within 5 s"), added to `Messages.CODES` and `docs/contract.md` (draft contract addition). (b) Reuse `store-unreachable` with a tag-specific message. Recommended: (a); `store-unreachable` makes the browser show the map store as down when it is not.
-4. **How many children may one browse return?** (a) At most 1000, ordered by name, and the reply gains `truncated: true|false` (an AD-8 shape addition). (b) No cap. (c) Paging with a continuation point. Recommended: (a); a big flat folder stays bounded, and paging can come later without breaking (a).

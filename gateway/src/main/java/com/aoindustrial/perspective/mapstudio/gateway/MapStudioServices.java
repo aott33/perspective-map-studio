@@ -32,13 +32,15 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.Migrations;
 import com.aoindustrial.perspective.mapstudio.gateway.store.Migrator;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreRegistry;
+import com.aoindustrial.perspective.mapstudio.gateway.tags.IgnitionTagSource;
+import com.aoindustrial.perspective.mapstudio.gateway.tags.TagLookups;
 import com.aoindustrial.perspective.mapstudio.gateway.write.WriteService;
 
 /**
  * The Gateway core's parts, wired once per module start: the setup loader, the
  * store registry (connection wait and migrations), the map store repository, the
  * write service, the change bus (its change hook), the host adapters (kind and asset
- * lists, with their own small pool), the map loader, the scripting module, three
+ * lists, with their own small pool), the map loader, the tag lookups (entry 15), the scripting module, three
  * small thread pools (one for the connection wait, one bounded pool for the delegates' database
  * work, one thread for the change bus), and the redundancy gate (epic 2 story 5: a
  * standby reads, refuses saves and does not migrate).
@@ -61,6 +63,8 @@ public final class MapStudioServices {
     final WriteService writes;
     final AdapterService adapters;
     final MapLoader loader;
+    /** The tag browser's lookups (entry 15); nothing to start or stop. */
+    final TagLookups tags;
     final GatewayScriptModule scriptModule;
     final RedundancyGate redundancy;
     private final SetupLifecycleFactory lifecycles;
@@ -90,6 +94,8 @@ public final class MapStudioServices {
         this.adapters = AdapterService.create(setups::find, setups::projects,
             new ProjectFunctionCaller(context.getProjectManager()));
         this.loader = new MapLoader(gate, store, adapters::snapshot);
+        this.tags = new TagLookups(setups, gate, store, adapters::snapshot,
+            new IgnitionTagSource(context.getTagManager(), context.getProjectManager()));
         this.scriptModule = new GatewayScriptModule(writes, loader, adapters);
         this.lifecycles = new SetupLifecycleFactory(context, setups);
     }

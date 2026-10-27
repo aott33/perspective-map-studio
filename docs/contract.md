@@ -16,6 +16,10 @@ Every message, both ways, is one JSON object `{v, type, id, body}` carried under
 | `edits.apply.reply` | Gateway to browser | `{batchId, seq, results: [{entity, id, version}]}`: the batch's change sequence number and each op's new version **[live 8.3.10]** |
 | `map.changed` | Gateway to browser | `{seq, batchId, actor, ops}`: one committed batch, sent to every open map of the project (below) **[live 8.3.10]** |
 | `error` | Gateway to browser | `{code, message}`, plus `batchId` and `op: {index, id}` when an `edits.apply` op is at fault, and `conflicts` on a `conflict` (below) |
+| `tags.browse` | browser to Gateway | `{provider?, folder?}` (entry 15, below) |
+| `tags.browse.reply` | Gateway to browser | `{provider, folder, providers: [{name, isDefault}], children: [{name, path, type, dataType, hasChildren}], truncated}` **[live 8.3.10]** |
+| `tags.resolve` | browser to Gateway | `{kindId, assetId, path}` (entry 15, below) |
+| `tags.resolve.reply` | Gateway to browser | `{path, relative, n?, m?}` **[live 8.3.10]** |
 | `point.click`, `point.click.reply` | both | the spike's round trip, unchanged |
 
 The `id` of a reply is the `id` of the message it answers.
@@ -42,6 +46,41 @@ After every committed batch, from a browser or from `system.mapstudio.applyEdits
 - A browser that was disconnected catches up at its next gap or its next page open; reloading on a Perspective reconnect is epic-viewing's (AD-6).
 - The dev component shows the state for tests as `data-store-seq` (the last `seq` applied) and `data-map-reloads` (gap reloads) on `.mapstudio-map`.
 
+## tags.browse and tags.resolve: the tag browser's lookups
+
+Added in 0.2.0 draft by entry 15 for epic-editing's tag browser (Map Studio's own tree with a provider dropdown). Both answer a **full editor** only: the level comes from the session user's roles on the Gateway, and anything but `full` (a phone editor, a viewer) is refused `role` ("Browsing tags needs a full editing role. Ask for a Map Studio editing role.") before the body is read, so a viewer learns nothing about tags **[live 8.3.10]**. Checks, in order: the project's setup (`store-unreachable`), the level (`role`), the body and the names (`invalid`), for `tags.resolve` the map store (`store-unreachable`; a read-only store still answers), then the tag calls (`tags-unavailable`). Both read tag structure only (browse), never a value: no tag is read, subscribed, written or edited (AD-1). Each runs on the module's work pool (a full pool gets the busy `store-unreachable` reply) and every tag call answers within 5 s or the reply is `tags-unavailable`. How Ignition answered each call: [platform-checks.md](platform-checks.md), epic 2 story 15.
+
+### tags.browse
+
+```json
+{"type": "tags.browse", "body": {"provider": "default", "folder": "Mesa/P12"}}
+{"type": "tags.browse.reply", "body": {"provider": "default", "folder": "Mesa/P12",
+  "providers": [{"name": "default", "isDefault": true}, {"name": "System", "isDefault": false}],
+  "children": [{"name": "Comms", "path": "[default]Mesa/P12/Comms", "type": "tag", "dataType": "Boolean", "hasChildren": false},
+               {"name": "Flow", "path": "[default]Mesa/P12/Flow", "type": "tag", "dataType": "Float8", "hasChildren": false},
+               {"name": "Pressure", "path": "[default]Mesa/P12/Pressure", "type": "tag", "dataType": "Float8", "hasChildren": false}],
+  "truncated": false}}
+```
+
+- `provider` omitted, null or empty is the default provider; a name is matched without letter case and answered in the Gateway's spelling, as Ignition matches it **[live 8.3.10]**. An unknown provider is `invalid`, "There is no tag provider named nope on this Gateway."
+- The default provider (owner decision, 2026-10-27) is the session project's default tag provider; when that is blank or names a missing provider, `default` if it exists, else the first provider by name other than `System` (else `System`). Exactly one entry of `providers` has `isDefault: true`. The dev project's own default is blank, so `default` is marked **[live 8.3.10]**; a project naming its own is unit tested only **[unverified]**.
+- `folder` omitted, null or empty is the provider's root; leading and trailing `/` are trimmed; a folder holding `[` or `]`, an empty part (`a//b`) or longer than 1024 characters is `invalid`; a folder the tag system does not have is `invalid`, "The folder Mesa/Nope was not found in tag provider default." **[live 8.3.10]**.
+- One level per call. Each child: `name`; `path`, its full path with `[provider]`; `type`, one of `folder`, `tag`, `udt-instance`, `udt-type` (in `_types_`), `other`; `dataType`, Ignition's data type name (`Float8`, `Boolean`, `Int4`, ...) for a tag, null for anything else; `hasChildren`. Tag properties and nodes without a path (a UDT instance's `Parameters`) are left out, so a tag browses as empty **[live 8.3.10]**.
+- At most 1000 children, ordered by name (ignoring letter case first); `truncated` is true when the folder has more. Paging may come later without changing these fields.
+- The browse runs under the session user's roles. A tag whose read permissions the user lacks was still listed on 8.3.10 **[live 8.3.10]**: the list is not a permission check.
+
+### tags.resolve
+
+```json
+{"type": "tags.resolve", "body": {"kindId": "pad", "assetId": "P12", "path": "[default]Mesa/P12/Pressure"}}
+{"type": "tags.resolve.reply", "body": {"path": "{asset.path}/Pressure", "relative": true, "n": 2, "m": 3}}
+```
+
+- `kindId` must be in the project's kind list and `assetId` in its asset list ([kinds-and-assets.md](kinds-and-assets.md)), the asset's kind equal to `kindId`; else `invalid`.
+- `path` is a full path `[provider]a/b`, `{asset.path}` or `{asset.path}/<suffix>`. Anything else is `invalid`: no provider (`Mesa/P12/X`), a relative provider (`[~]`, `[.]`), another placeholder (`{asset.name}`), a brace or bracket inside the path, an empty part, or over 1024 characters.
+- A full path equal to the asset's base path, or below it on a `/` boundary, comes back as `{asset.path}` or `{asset.path}/<suffix>` with `relative: true`. The provider and the base path's parts are compared without letter case, as Ignition compares tag paths **[live 8.3.10]**; the suffix keeps the picked path's case. `[default]Mesa/P12/X` is not below `[default]Mesa/P1`. Any other full path comes back unchanged with `relative: false` and no `n` or `m`: `{"path": "[default]Plant/Header/Pressure", "relative": false}` **[live 8.3.10]**. `{asset.path}/...` sent as it is answers the same as the full path it stands for.
+- `m` is the number of the project's live map items of kind `kindId` whose `assetId` names an asset in the asset list; `n` is how many of those have a tag at `<their asset's basePath>/<suffix>` (or at the base path itself for `{asset.path}`), checked by structure under the session user's roles, once per distinct path and in one call per parent folder **[live 8.3.10]**. A kind with no linked item answers `n: 0, m: 0`. The tag browser shows "resolves for n of m items".
+
 ## Error codes
 
 Stable kebab-case words; the message is plain words for the person.
@@ -53,6 +92,7 @@ Stable kebab-case words; the message is plain words for the person.
 | `invalid` | the message, batch or op is malformed (two ops on one id included), an update, delete or restore names a map item that was never saved, a `batchId` was already saved by another actor, or the op is not supported in this version (any `kindSetup` op, until entry 3) |
 | `stale` | the browser's map is behind (a gap in `seq`); used from entry 4 |
 | `read-only` | the map can be read but not saved here: the map store's schema is newer than this module, or this Gateway is the standby of a redundant pair (entry 5). Checked before the batch and the role, so every save is refused, a viewer's too; the message says which. Nothing is written |
+| `tags-unavailable` | a `tags.browse` or `tags.resolve` tag call failed or did not answer within 5 s: "The tag system did not answer within 5 s." (entry 15, draft addition; a slow tag system is unit tested only **[unverified]** live). Nothing is written either way |
 | `store-unreachable` | the project has no setup, its setup cannot be read (the reason lists every problem, `docs/setup.md`), its setup names a connection the Gateway does not have, the map store is starting or unavailable, or the Gateway is busy: when the module's bounded work pool (4 threads, 64 waiting messages) is full, a `map.load` or `edits.apply` is answered at once with this code and "Map Studio is busy with other map requests; nothing was saved. Try again in a moment." (no separate `busy` code in 0.2.0) |
 
 ## Batches and ops

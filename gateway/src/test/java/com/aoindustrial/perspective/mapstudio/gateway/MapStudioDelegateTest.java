@@ -1,6 +1,7 @@
 package com.aoindustrial.perspective.mapstudio.gateway;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
@@ -102,6 +103,18 @@ class MapStudioDelegateTest {
         assertEquals(null, MapStudioDelegate.check(envelope(1, "edits.apply", "e", null)));
         assertEquals("invalid", MapStudioDelegate.check(envelope(1, "map.changed", "c", null))
             .getAsJsonObject("body").get("code").getAsString(), "map.changed is sent, never received");
+    }
+
+    @Test
+    void theTagLookupsPassTheEnvelopeCheckAndGoToTheWorkPool() {
+        // Epic 2 story 15: tags.browse and tags.resolve run on the work pool like the store messages.
+        assertEquals(null, MapStudioDelegate.check(envelope(1, "tags.browse", "b", null)));
+        assertEquals(null, MapStudioDelegate.check(envelope(1, "tags.resolve", "r", null)));
+        assertTrue(MapStudioDelegate.isTagType("tags.browse"));
+        assertTrue(MapStudioDelegate.isTagType("tags.resolve"));
+        assertEquals(false, MapStudioDelegate.isTagType("map.load"));
+        assertEquals("invalid", MapStudioDelegate.check(envelope(1, "tags.browse.reply", "c", null))
+            .getAsJsonObject("body").get("code").getAsString(), "a reply is sent, never received");
     }
 
     @Test
