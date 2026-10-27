@@ -16,7 +16,7 @@ import com.inductiveautomation.ignition.common.gson.JsonParser;
 /**
  * The setup form's lists read from the open project (epic 2 story 16), with no SDK type: the
  * project library's functions, the Perspective page URLs and the project's identity provider.
- * {@link DesignerProjectLists} hands it the project's files.
+ * {@link ProjectResources} hands it the project's files.
  */
 public final class ProjectLists {
 
