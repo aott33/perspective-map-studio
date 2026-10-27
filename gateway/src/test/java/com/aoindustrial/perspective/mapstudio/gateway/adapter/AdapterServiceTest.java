@@ -22,8 +22,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import org.junit.jupiter.api.AfterEach;
@@ -113,6 +115,8 @@ class AdapterServiceTest {
     ExecutorService pool;
     ScheduledExecutorService ticker;
     AdapterService service;
+    /** Runs each time the service reads a setup, on the thread that reads it (which holds no list monitor). */
+    volatile Runnable onSetup;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -133,7 +137,13 @@ class AdapterServiceTest {
     }
 
     AdapterService service(ExecutorService pool, Duration timeout) {
-        return new AdapterService(p -> Optional.ofNullable(setups.get(p)), () -> setups.keySet(), caller, pool,
+        return new AdapterService(p -> {
+            var hook = onSetup;
+            if (hook != null) {
+                hook.run();
+            }
+            return Optional.ofNullable(setups.get(p));
+        }, () -> setups.keySet(), caller, pool,
             ticker, nanos::get, Clock.fixed(Instant.parse("2026-10-26T10:00:00Z"), ZoneOffset.UTC), timeout, log);
     }
 
@@ -227,7 +237,62 @@ class AdapterServiceTest {
         // Review finding: the kind call's settle used to run the asset step under the
         // kind monitor while an answering asset call held the asset monitor and asked
         // for the kind ids. Here the kind call's warning (logged under the kind monitor)
-        // lets the held asset call answer and gives it time to take its own monitor.
+        // lets the held asset call answer and waits until its thread is blocked on the
+        // kind monitor for the kind ids. Which thread then takes the asset monitor first
+        // is up to the scheduler, so the second refresh's asset step (on the kind call's
+        // thread, outside any monitor) waits until the asset call has answered and then
+        // starts its own; anOnDemandRefreshJoinsAnAssetCallInFlight is the other order.
+        service = service(pool, Duration.ofSeconds(5));
+        CountDownLatch assetsHold = new CountDownLatch(1);
+        AtomicReference<Thread> assetThread = new AtomicReference<>();
+        caller.answers.put(ASSETS, () -> {
+            assetThread.compareAndSet(null, Thread.currentThread());
+            try {
+                assetsHold.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+            return new AdapterCaller.Returned(JsonParser.parseString(GOOD_ASSETS).getAsJsonArray());
+        });
+        var first = service.refreshNow(P);
+        waitFor(() -> caller.calls(ASSETS) == 1);
+        AtomicReference<Thread> kindThread = new AtomicReference<>();
+        AtomicBoolean overlapped = new AtomicBoolean();
+        log.onWarn = line -> {
+            if (line.contains("kind function")) {
+                kindThread.set(Thread.currentThread());
+                assetsHold.countDown();
+                overlapped.set(within(() -> assetThread.get().getState() == Thread.State.BLOCKED));
+            }
+        };
+        AtomicBoolean ordered = new AtomicBoolean();
+        AtomicBoolean asked = new AtomicBoolean();
+        onSetup = () -> {
+            if (Thread.currentThread() == kindThread.get() && !asked.getAndSet(true)) {
+                ordered.set(within(() -> AdapterStatus.OK.equals(service.snapshot(P).assetsStatus().status())));
+            }
+        };
+        caller.answers.put(KINDS, () -> new AdapterCaller.Failed("ValueError: down"));
+        AdapterSnapshot s = service.refreshNow(P).get(5, TimeUnit.SECONDS);
+        first.get(5, TimeUnit.SECONDS);
+        assertTrue(overlapped.get(), "the asset call answered while the kind call held the kind monitor");
+        assertTrue(ordered.get(), "the asset call settled before the second refresh's asset step");
+        assertEquals(AdapterStatus.FAILING, s.kindsStatus().status());
+        assertEquals(AdapterStatus.OK, s.assetsStatus().status());
+        assertEquals(2, s.assets().size(), "assets checked against the kept kind list");
+        assertEquals(2, caller.calls(ASSETS), "the asset call had settled, so the second refresh made its own");
+        // The service still works afterwards.
+        onSetup = null;
+        log.onWarn = null;
+        caller.rows(KINDS, GOOD_KINDS);
+        caller.rows(ASSETS, GOOD_ASSETS);
+        assertEquals(AdapterStatus.OK, refresh().kindsStatus().status());
+    }
+
+    @Test
+    void anOnDemandRefreshJoinsAnAssetCallInFlight() throws Exception {
+        // A refresh whose kind call settles while the asset call has not answered
+        // joins that asset call instead of starting a second one.
         service = service(pool, Duration.ofSeconds(5));
         CountDownLatch assetsHold = new CountDownLatch(1);
         caller.answers.put(ASSETS, () -> {
@@ -240,28 +305,18 @@ class AdapterServiceTest {
         });
         var first = service.refreshNow(P);
         waitFor(() -> caller.calls(ASSETS) == 1);
-        log.onWarn = line -> {
-            if (line.contains("kind function")) {
-                assetsHold.countDown();
-                try {
-                    Thread.sleep(300);
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-        };
         caller.answers.put(KINDS, () -> new AdapterCaller.Failed("ValueError: down"));
-        AdapterSnapshot s = service.refreshNow(P).get(5, TimeUnit.SECONDS);
+        var second = service.refreshNow(P);
+        // The second kind call ran and its task ended, so its refresh took the asset step.
+        waitFor(() -> caller.calls(KINDS) == 2 && ((ThreadPoolExecutor) pool).getActiveCount() == 1);
+        assertFalse(second.isDone(), "the second refresh waits for the asset call in flight");
+        assetsHold.countDown();
+        AdapterSnapshot s = second.get(5, TimeUnit.SECONDS);
         first.get(5, TimeUnit.SECONDS);
+        assertEquals(1, caller.calls(ASSETS), "the second refresh joined the asset call in flight");
         assertEquals(AdapterStatus.FAILING, s.kindsStatus().status());
         assertEquals(AdapterStatus.OK, s.assetsStatus().status());
         assertEquals(2, s.assets().size(), "assets checked against the kept kind list");
-        assertEquals(1, caller.calls(ASSETS), "the second refresh joined the asset call in flight");
-        // The service still works afterwards.
-        log.onWarn = null;
-        caller.rows(KINDS, GOOD_KINDS);
-        caller.rows(ASSETS, GOOD_ASSETS);
-        assertEquals(AdapterStatus.OK, refresh().kindsStatus().status());
     }
 
     @Test
@@ -509,6 +564,18 @@ class AdapterServiceTest {
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    /** Whether {@code condition} holds within 5 s; for hooks that run on a service thread and must not throw. */
+    static boolean within(Supplier<Boolean> condition) {
+        long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!condition.get()) {
+            if (System.nanoTime() > end) {
+                return false;
+            }
+            sleepQuietly(10);
+        }
+        return true;
     }
 
     static void waitFor(Supplier<Boolean> condition) throws InterruptedException {
