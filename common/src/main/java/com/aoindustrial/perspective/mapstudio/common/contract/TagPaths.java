@@ -23,12 +23,6 @@ public final class TagPaths {
     /** The longest folder or path a lookup accepts, in characters. */
     public static final int MAX_LENGTH = 1024;
 
-    /**
-     * The placeholder for the asset's base path. Story 9 owns the closed placeholder list
-     * in {@code common/}; this one literal is the only one the tag lookups need.
-     */
-    public static final String ASSET_PATH = "{asset.path}";
-
     /** A full path split into its provider (without brackets) and the path after it. */
     public record Full(String provider, String path) {
 
@@ -65,7 +59,7 @@ public final class TagPaths {
         }
         String trimmed = trimSlashes(raw);
         if (!trimmed.isEmpty() && !segmentsOk(trimmed)) {
-            throw invalid("The folder " + echo(raw) + " has an empty part between two /.");
+            throw invalid("The folder " + Rows.echo(raw) + " has an empty part between two /.");
         }
         return trimmed;
     }
@@ -86,24 +80,24 @@ public final class TagPaths {
         }
         int close = raw.indexOf(']');
         if (!raw.startsWith("[") || close < 2) {
-            throw invalid("The tag path " + echo(raw) + " does not start with a [provider].");
+            throw invalid("The tag path " + Rows.echo(raw) + " does not start with a [provider].");
         }
         String provider = raw.substring(1, close);
         if (provider.equals("~") || provider.equals(".") || provider.indexOf('[') >= 0 || provider.isBlank()) {
-            throw invalid("The tag path " + echo(raw) + " must name its provider, not a relative one.");
+            throw invalid("The tag path " + Rows.echo(raw) + " must name its provider, not a relative one.");
         }
         String path = raw.substring(close + 1);
         while (path.endsWith("/")) {
             path = path.substring(0, path.length() - 1);
         }
         if (path.isEmpty()) {
-            throw invalid("The tag path " + echo(raw) + " names a provider but no tag or folder.");
+            throw invalid("The tag path " + Rows.echo(raw) + " names a provider but no tag or folder.");
         }
         if (path.indexOf('[') >= 0 || path.indexOf(']') >= 0 || path.indexOf('{') >= 0 || path.indexOf('}') >= 0) {
-            throw invalid("The tag path " + echo(raw) + " holds a bracket or a brace after its provider.");
+            throw invalid("The tag path " + Rows.echo(raw) + " holds a bracket or a brace after its provider.");
         }
         if (!segmentsOk(path)) {
-            throw invalid("The tag path " + echo(raw) + " has an empty part between two /.");
+            throw invalid("The tag path " + Rows.echo(raw) + " has an empty part between two /.");
         }
         return new Full(provider, path);
     }
@@ -136,7 +130,8 @@ public final class TagPaths {
             }
         }
         String suffix = String.join("/", p.subList(b.size(), p.size()));
-        return new Resolved(suffix.isEmpty() ? ASSET_PATH : ASSET_PATH + "/" + suffix, true, suffix);
+        String asset = Placeholders.ASSET_PATH;
+        return new Resolved(suffix.isEmpty() ? asset : asset + "/" + suffix, true, suffix);
     }
 
     /** The full path {@code suffix} names below {@code basePath} (the base path itself for {@code ""}). Pure. */
@@ -152,12 +147,13 @@ public final class TagPaths {
         if (raw.length() > MAX_LENGTH) {
             throw invalid("The tag path is longer than " + MAX_LENGTH + " characters.");
         }
-        if (raw.equals(ASSET_PATH)) {
-            return new Resolved(ASSET_PATH, true, "");
+        if (raw.equals(Placeholders.ASSET_PATH)) {
+            return new Resolved(Placeholders.ASSET_PATH, true, "");
         }
-        String prefix = ASSET_PATH + "/";
+        String prefix = Placeholders.ASSET_PATH + "/";
         if (!raw.startsWith(prefix)) {
-            throw invalid("The tag path " + echo(raw) + " uses a placeholder other than " + ASSET_PATH + ".");
+            throw invalid("The tag path " + Rows.echo(raw) + " uses a placeholder other than "
+                    + Placeholders.ASSET_PATH + ".");
         }
         String suffix = raw.substring(prefix.length());
         while (suffix.endsWith("/")) {
@@ -165,7 +161,7 @@ public final class TagPaths {
         }
         if (suffix.isEmpty() || suffix.indexOf('[') >= 0 || suffix.indexOf(']') >= 0 || suffix.indexOf('{') >= 0
                 || suffix.indexOf('}') >= 0 || !segmentsOk(suffix)) {
-            throw invalid("The tag path " + echo(raw) + " needs a plain path after " + prefix + ".");
+            throw invalid("The tag path " + Rows.echo(raw) + " needs a plain path after " + prefix + ".");
         }
         return new Resolved(prefix + suffix, true, suffix);
     }
@@ -189,11 +185,6 @@ public final class TagPaths {
             }
         }
         return true;
-    }
-
-    /** At most 80 characters of a path for a message (the person's own input). */
-    private static String echo(String s) {
-        return s.length() <= 80 ? s : s.substring(0, 77) + "...";
     }
 
     private static MapStudioException invalid(String message) {

@@ -216,10 +216,10 @@ public final class StoreRegistry {
             s.execute("SELECT 1");
             return Optional.empty();
         } catch (SQLException ex) {
-            return Optional.of("SQLState " + ex.getSQLState() + ": " + oneLine(ex.getMessage()));
+            return Optional.of("SQLState " + ex.getSQLState() + ": " + FailureLine.oneLine(ex.getMessage()));
         } catch (RuntimeException | LinkageError ex) {
             // The transient Driver$1 NoClassDefFoundError at Gateway start is a LinkageError (check 5).
-            return Optional.of(ex.getClass().getSimpleName() + ": " + oneLine(ex.getMessage()));
+            return Optional.of(ex.getClass().getSimpleName() + ": " + FailureLine.oneLine(ex.getMessage()));
         }
     }
 
@@ -303,32 +303,5 @@ public final class StoreRegistry {
         if (changed(connection, line)) {
             log.info(line);
         }
-    }
-
-    /**
-     * Story 1's rights line: the connection, the statement, the SQLState and the
-     * database's own words (from the spike's PostgresCheck, docs/platform-checks.md
-     * check 5). Kept for callers of story 1; the registry logs {@link FailureLine}.
-     */
-    public static String rightsMessage(String connection, String statement, String sqlState, String detail) {
-        String reason = SQLSTATE_INSUFFICIENT_PRIVILEGE.equals(sqlState)
-            ? "the database role lacks the right to run it"
-            : "it failed";
-        return String.format("Map Studio cannot create its tables on database connection %s: %s (statement: %s; "
-                + "SQLState %s): %s", connection, reason, firstLine(statement), sqlState,
-            detail == null ? "" : oneLine(detail));
-    }
-
-    private static String firstLine(String statement) {
-        if (statement == null) {
-            return "";
-        }
-        String s = statement.strip();
-        int nl = s.indexOf('\n');
-        return nl < 0 ? s : s.substring(0, nl).strip() + " ...";
-    }
-
-    private static String oneLine(String s) {
-        return s == null ? "" : s.replace('\n', ' ').strip();
     }
 }

@@ -8,13 +8,9 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
-import { TRACER } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, OPERATOR_USER, editorTest, expect, mapLoaded, nextFrames, openMap, signedInContext, watch
+    EDITOR_USER, OPERATOR_USER, drawLine, editorTest, expect, mapLoaded, nextFrames, openMap, signedInContext, watch
 } from './fixtures.mjs';
-
-// As in store.spec.mjs: the pause only keeps two vertex clicks from reading as a double click.
-const VERTEX_PAUSE_MS = 300;
 
 /** Send one message through the page's component and return the Gateway's reply envelope. */
 async function send(page, type, body) {
@@ -82,23 +78,6 @@ async function openEditor(page) {
     await mapLoaded(map);
     await expect(map).toHaveAttribute('data-edit-level', 'full');
     return map;
-}
-
-/** Draw a two-vertex line with the dev line tool and finish it with Enter. */
-async function drawLine(page, map) {
-    const box = await map.boundingBox();
-    const cx = box.x + box.width / 2;
-    const cy = box.y + box.height / 2;
-    const [a, b] = TRACER.drawOffsets.map(([dx, dy]) => [cx + dx, cy + dy]);
-    const reply = page.locator('.mapstudio-reply');
-    await page.locator('.mapstudio-draw-button').click();
-    await expect(reply).toHaveAttribute('data-drawing', 'true');
-    await page.mouse.click(a[0], a[1]);
-    await page.waitForTimeout(VERTEX_PAUSE_MS);
-    await page.mouse.click(b[0], b[1]);
-    await page.waitForTimeout(VERTEX_PAUSE_MS);
-    await page.keyboard.press('Enter');
-    await expect(reply).toHaveAttribute('data-line-points', '2');
 }
 
 editorTest.describe('write path', () => {

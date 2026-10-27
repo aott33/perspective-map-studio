@@ -2,8 +2,10 @@
 // the dev adapter (project library mapstudio_dev) is switched through each mode on
 // the /adapters page, and map.load after a reload reports the matching status,
 // count and message for both lists. A viewer gets the kinds and both statuses but
-// no asset rows. Two refreshes while a slow call is in flight call it once.
+// no asset rows. Two refreshes while a slow call is in flight call it once. With the
+// kind list empty a save is refused (epic 2 story 12: was unit tested only).
 
+import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
@@ -12,6 +14,12 @@ import { EDITOR_USER, editorTest, expect, mapLoaded, nextFrames, openMap, test }
 const PAGE = '/adapters';
 const KINDS_FN = 'mapstudio_dev.kinds';
 const ASSETS_FN = 'mapstudio_dev.assets';
+
+/** Send one message through the page's component (window.__mapStudioTest) and return the reply envelope. */
+async function send(page, type, body) {
+    await page.waitForFunction(() => Boolean(window.__mapStudioTest));
+    return page.evaluate(([t, b]) => window.__mapStudioTest.send(t, b), [type, body]);
+}
 
 async function shot(page, name) {
     await nextFrames(page);
@@ -95,6 +103,16 @@ test.describe('1440 px', () => {
             expect(s.assets).toEqual({ status: 'empty', count: '0',
                 message: `The asset function ${ASSETS_FN} returned no assets.` });
             expect(s.kindsRows).toBe('0');
+            // With no kind list a save other than a delete is refused, and nothing is saved.
+            const refused = await send(page, 'edits.apply', { batchId: randomUUID(), ops: [{
+                op: 'create', entity: 'item', id: randomUUID(), baseVersion: 0,
+                data: { kind: 'pad', name: 'Kind list empty', properties: { status: 'producing' },
+                    geometry: { type: 'Point', coordinates: [-104.97, 39.74] } }
+            }] });
+            expect(refused.type, JSON.stringify(refused.body)).toBe('error');
+            expect(refused.body.code).toBe('invalid');
+            expect(refused.body.message).toBe(`The kind list is not available (empty): The kind function ${KINDS_FN}`
+                + ' returned no kinds. Nothing was saved.');
 
             // Slow: no answer within 5 s.
             r = await press(page, 'slow', 'slow');
@@ -126,6 +144,8 @@ test.describe('1440 px', () => {
         try {
             // The first press switches to slow (zeroing the dev adapter's call counts) and refreshes;
             // the second, from another session within the 5 s timeout, only refreshes and joins it.
+            // The 1 s wait is a stated margin, not a synchronisation: nothing observable shows the first
+            // call in flight before its reply at 5 s, so the second press lands 1 s into a 5 s window (4 s spare).
             const first = press(page, 'slow', 'slow');
             await other.waitForTimeout(1000);
             const second = press(other, 'refresh', 'refresh');

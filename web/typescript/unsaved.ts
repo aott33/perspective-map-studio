@@ -12,6 +12,7 @@
  * entries live in memory only and move into storage once it is.
  */
 
+import { isRecord } from './json';
 import { EditBatch, EditLevel, ErrorCodes, MapItemRecord } from './contract';
 import { ErrorBody } from './messages';
 
@@ -80,10 +81,6 @@ export function isTransient(code: string): boolean {
 /** The Gateway's busy answer (MapStudioDelegate.busyReply): store-unreachable with this sentence. */
 export function isBusy(reason: UnsavedReason | undefined): boolean {
     return !!reason && reason.code === ErrorCodes.STORE_UNREACHABLE && reason.message.indexOf('Map Studio is busy') === 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function readBatch(value: unknown): EditBatch | null {

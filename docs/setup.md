@@ -91,11 +91,11 @@ A project with no setup resource at all is not an error until something uses it:
 Edit `setup.json` and have the Gateway read the project again; no Gateway or module restart is needed **[live 8.3.10]**:
 
 - **On disk** (a project in git, as `ops/project`): edit the file, then scan the projects: `POST /data/api/v1/scan/projects` with an API key that may write (`ops/scan.sh` on the dev stack). The Gateway reads the changed setup within a second of the scan; editing the file alone does nothing until a scan **[live 8.3.10]**.
-- **In the Designer:** save the project. The Designer setup form comes with entry 7; until then edit the file. A Designer save is expected to reach the same hook as a scan **[unverified]**.
+- **In the Designer:** edit the setup in the **Map Studio Setup** tab ([setup-editor.md](setup-editor.md), epic 2 story 7) and save the project. A Designer save is expected to reach the same hook as a scan **[unverified]**.
 
 The Gateway log then has one line, "Project P: Map Studio setup changed and applied on resource modified (connection ..., full editing roles [...], phone editing roles [...], refresh interval N s)", or the warning above. Adding the setup resource logs "... read on resource created", and deleting it "... setup removed; its map store is unavailable until a setup is added" **[live 8.3.10]**.
 
-A change applies at the next call: an open map gets the new editing level, refresh interval and connection at its next `map.load` (a reload of the view), and its next save is checked against the new roles. Open maps are not told of a change yet; entry 4 adds that. A changed `connection` starts that connection's wait and migrations as a Gateway start would (`docs/contract.md`, "The map store") **[unverified]**.
+A change applies at the next call: an open map gets the new editing level, refresh interval and connection at its next `map.load` (a reload of the view), and its next save is checked against the new roles. Open maps are not told of a setup change: no message carries one (`map.changed` carries saved edits only). A changed `connection` starts that connection's wait and migrations as a Gateway start would (`docs/contract.md`, "The map store") **[unverified]**.
 
 ## What the browser sees
 

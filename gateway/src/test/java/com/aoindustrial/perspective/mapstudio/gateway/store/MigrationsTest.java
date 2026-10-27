@@ -51,14 +51,4 @@ class MigrationsTest {
         assertEquals(List.of("CREATE TABLE a (\n  x int\n)", "CREATE INDEX i ON a (x)"), s);
         assertThrows(IllegalStateException.class, () -> Migrations.statements("CREATE TABLE a (x int)"));
     }
-
-    @Test
-    void theRightsLineNamesConnectionStatementAndSqlState() {
-        String line = StoreRegistry.rightsMessage("MapStudio", "CREATE TABLE IF NOT EXISTS mapstudio_schema_version (",
-            "42501", "ERROR: permission denied for schema public");
-        assertTrue(line.contains("database connection MapStudio"));
-        assertTrue(line.contains("lacks the right"));
-        assertTrue(line.contains("SQLState 42501"));
-        assertTrue(line.contains("CREATE TABLE IF NOT EXISTS mapstudio_schema_version"));
-    }
 }

@@ -139,7 +139,7 @@ public final class WriteService {
                         RoleMatrix.checkStored(level, op, stored.get(op.index()).map(MapItemRecord.class::cast), kinds);
                     }
                 }
-                ConflictReport conflicts = new ConflictReport();
+                ConflictReport conflicts = new ConflictReport(kinds);
                 for (EditOp op : batch.ops()) {
                     checkVersion(tx, project, op, stored.get(op.index()), conflicts);
                 }

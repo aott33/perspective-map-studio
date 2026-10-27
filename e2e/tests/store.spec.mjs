@@ -6,30 +6,9 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
-import { TRACER } from '../lib/geo.mjs';
-import { EDITOR_USER, editorTest, expect, mapLoaded, nextFrames, openMap, test } from './fixtures.mjs';
+import { EDITOR_USER, drawLine, editorTest, expect, mapLoaded, nextFrames, openMap, test } from './fixtures.mjs';
 
-// Terra Draw shows no state between two vertex clicks; the pause only keeps two
-// clicks from reading as a double click (as in tracer.spec.mjs).
-const VERTEX_PAUSE_MS = 300;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-
-/** Draw a two-vertex line with the dev line tool and finish it with Enter. */
-async function drawLine(page, map) {
-    const box = await map.boundingBox();
-    const cx = box.x + box.width / 2;
-    const cy = box.y + box.height / 2;
-    const [a, b] = TRACER.drawOffsets.map(([dx, dy]) => [cx + dx, cy + dy]);
-    const reply = page.locator('.mapstudio-reply');
-    await page.locator('.mapstudio-draw-button').click();
-    await expect(reply).toHaveAttribute('data-drawing', 'true');
-    await page.mouse.click(a[0], a[1]);
-    await page.waitForTimeout(VERTEX_PAUSE_MS);
-    await page.mouse.click(b[0], b[1]);
-    await page.waitForTimeout(VERTEX_PAUSE_MS);
-    await page.keyboard.press('Enter');
-    await expect(reply).toHaveAttribute('data-line-points', '2');
-}
 
 async function shot(page, name) {
     await nextFrames(page);

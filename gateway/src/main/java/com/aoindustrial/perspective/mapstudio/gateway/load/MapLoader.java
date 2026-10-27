@@ -20,6 +20,7 @@ import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 import com.aoindustrial.perspective.mapstudio.gateway.adapter.AdapterSnapshot;
 import com.aoindustrial.perspective.mapstudio.gateway.store.MapStore;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
+import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
 
 /**
  * Assembles {@code map.load}'s reply, {@code {level, seq, items, kinds, assets,
@@ -104,7 +105,7 @@ public final class MapLoader {
         JsonObject body = new JsonObject();
         body.addProperty("level", level);
         body.addProperty("seq", snapshot.seq());
-        boolean editor = Messages.LEVEL_PHONE.equals(level) || Messages.LEVEL_FULL.equals(level);
+        boolean editor = RoleMatrix.isEditor(level);
         JsonArray items = toJson(snapshot.items());
         if (!editor) {
             // An item's overrides hold full tag paths, which viewers do not get (as kindSetups).

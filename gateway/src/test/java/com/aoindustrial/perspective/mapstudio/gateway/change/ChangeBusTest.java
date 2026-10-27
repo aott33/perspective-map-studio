@@ -211,7 +211,7 @@ class ChangeBusTest {
 
     @Test
     void theEntityOfAnOpIsSentAsSaved() {
-        // CommittedOp carries a MapItemRecord until entry 3 widens it for kind setups; the entity passes through.
+        // The entity passes through as saved, whatever record the op carries (a map item record here).
         String id = "00000000-0000-4000-8000-000000000009";
         ChangeHook.CommittedBatch b = new ChangeHook.CommittedBatch("P", 9, "b-9", Actor.session("mapeditor"),
             List.of(new ChangeHook.CommittedOp("update", "kindSetup", id, line(id))));

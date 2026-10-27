@@ -82,7 +82,10 @@ public final class Messages {
     public static final String CODE_ROLE = "role";
     /** The message, batch or op is malformed or not supported by this version. */
     public static final String CODE_INVALID = "invalid";
-    /** The browser's map is behind the store (a gap in seq); used from entry 4. */
+    /**
+     * Reserved: the browser's map is behind the store (a gap in seq). Nothing sends it today; a gap
+     * makes the browser reload with map.load instead (owner decision, epic 2 story 12).
+     */
     public static final String CODE_STALE = "stale";
     /** The map store cannot be reached: no setup, no connection, or no schema. */
     public static final String CODE_STORE_UNREACHABLE = "store-unreachable";
