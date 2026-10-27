@@ -3,14 +3,14 @@ title: 'Setup editor in the Designer'
 type: 'feature'
 ticket: '7'
 created: '2026-10-26'
-status: 'in-review'
+status: 'built'
 baseline_revision: '2ece12f0055252198e65a7f466582c9dc18671b2'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-tracer-one-edit-saved-through-the-write-path-and-read-back-plan.md'
@@ -98,6 +98,7 @@ Implemented directly in the planning session (no implementation subagent was ava
 - **Matrix audit:** no setup (`defaultsAreTheSchemaDefaultsWithNoConnection`, `defaultsAskForTheConnectionInPlainWords`); edit and save (`devSetupReadAndWrittenUnchangedIsByteExact`, `anEditChangesOnlyItsOwnLineAndTheGatewayReadsIt`, `everyFieldRoundTripsThroughSetupParse`, `SetupPanelTest.showsTheSetupAndGivesItBackUnchanged`); invalid field (`invalidFieldsGiveAReasonBesideEachField`, `SetupPanelTest.reasonsFollowTheTyping`); unknown keys (`unknownKeysSurviveASaveAfterTheKnownKeys`); newer schema (`aNewerSchemaIsReadOnlyAndNeverRewritten`, `SetupPanelTest.aNewerSchemaIsShownReadOnly`); unreadable (`anUnreadableFileIsReadOnlyWithTheParseReason`, `otherUnreadableShapesSayWhy`, `SetupPanelTest.anUnreadableFileOffersStartFromDefaults`); inherited: banner and lock in `SetupPanelTest.anInheritedSetupShowsWhereItComesFrom`, the SDK side is the owner's check. All ran and passed.
 - **Acceptance:** AC 3 (minimal diff) is unit tested (one changed line); AC 2's file layout is unit tested in part: the defaults plus connection `MapStudio` are byte for byte story 1's dev `setup.json`, which the dev Gateway reads in every e2e run. AC 1 and 2 in the Designer wait for the owner's session.
 - **No new e2e test:** the editor is Swing in the Designer; the Playwright suite drives Perspective sessions only, and no Designer runs here.
+- **After the quick review (2026-10-27):** new `SetupCommit` and `SetupRefusedException` (moved out of `SetupEditor`), `notifyProjectSaveStart` in `MapStudioDesignerHook`; `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew clean build` green: Java 83 tests (common 8, gateway 43, designer 32: `SetupFormTest` 23, `SetupPanelTest` 9), Jest 42 (7 suites); `ops/up.sh` on `ms-e2s7`, the setup read for `mapstudio-dev`; `cd e2e && npm test` 16 of 16, teardown found no file holding the password.
 - **Not run:** a Designer (the owner's check and the screenshot `docs/screenshots/setup-editor.png`).
 
 ## Plan Change Log
@@ -106,6 +107,12 @@ Implemented directly in the planning session (no implementation subagent was ava
 - 2026-10-27, implementation deviations (not a review loopback): **Create setup** opens the form with the defaults in a dialog and writes the resource only when the form has no reasons, instead of writing the defaults first (the defaults have no connection, and Always says an invalid setup is never written); the Swing form is its own class `SetupPanel`, shared by the editor tab and that dialog (and by the Design Notes fallback); the type-folder path is `SETUP_RESOURCE_TYPE.rootPath()`; the refresh interval is a text field rather than a spinner, so the input check can say "a whole number" for any typed text; input checks are the ones Always names plus the shape `package.function` for the two functions (Decision 3) and a name listed twice; `Setup.parse` stops at its first fault, so `reasons()` asks it once per field in an otherwise valid setup and so shows every field's reason at once.
 
 ## Review Triage Log
+
+- 2026-10-27, lens quick (context-free), 4 findings, 4 patched (finding 1 in part), 0 rejected outright:
+  - **1 (medium) patched in part:** `SetupForm.fromJson` read a quoted `"refreshIntervalSeconds": "10"` as `10`, so the form called valid a file `Setup.parse` refuses and an unchanged save wrote nothing. Now a non-number refresh makes the file unreadable (the Gateway refuses it too), an integral decimal (`15.0`) is shown as `15`, and a guard makes any file the Gateway refuses but the form would regenerate as valid unreadable with the Gateway's message, so a future misread cannot pass. Rejected half: `10.5` stays refused by the form's input check although the Gateway truncates it to `10`; the form asks for the whole number the Gateway's own message promises, and the file keeps working on the Gateway meanwhile (`aFractionalRefreshIsShownAsWrittenAndAskedToBeWhole`).
+  - **2 (low) patched:** `"basemaps": null` gave the form the default `["none", "osm"]` while `Setup` reads no basemaps; `names()` now uses the fallback only for an absent key, JSON null is an empty list, as in `Setup` (`nullBasemapsAreNoBasemapsAsTheGatewayReadsThem`, `everyEditableFormReadsAsTheGatewayReadsTheFile`).
+  - **3 (low) patched:** the refusal and the commit step were untested. `SetupRefusedException` is now its own class and `SetupEditor.getObjectForSave` delegates to the SDK-free `SetupCommit.formToSave`, tested for read-only (newer schema, locked, no panel: the setup as read is handed back, so nothing is written), refused (reasons named) and valid; `describe()` and the log summary are tested; the panel's confirm step is an injectable `BooleanSupplier`, tested for cancel (form unchanged, no edit) and OK (defaults, one edit).
+  - **4 (low) patched, beyond the finding:** javap of `designer-8.3.0.jar` shows `ResourceEditor` has no dirty flag or change notification, and that a project save commits only the Designer's own workspaces and calls each module hook's `notifyProjectSaveStart`; nothing committed the setup tab at all. `MapStudioDesignerHook.notifyProjectSaveStart` now calls `SetupWorkspace.commitAll()` on the Swing thread; no edit callback is needed since `commit()` compares forms. `docs/platform-checks.md` records the javap reading and a [not verified] line: "a field edit alone makes the project save commit the setup".
 
 ## Design Notes
 

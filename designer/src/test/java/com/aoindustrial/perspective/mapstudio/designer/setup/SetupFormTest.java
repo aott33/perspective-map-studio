@@ -236,4 +236,98 @@ class SetupFormTest {
         assertTrue(fresh.canSave());
         assertNotEquals(SetupForm.fromJson("not json"), fresh);
     }
+
+    // Review (quick lens): the form never calls valid a file the Gateway refuses.
+
+    @Test
+    void aQuotedRefreshIsUnreadableAsTheGatewayRefusesIt() {
+        String in = "{\"schemaVersion\": 1, \"connection\": \"MapStudio\", \"refreshIntervalSeconds\": \"10\"}";
+        assertThrowsSetup(in);
+        SetupForm form = SetupForm.fromJson(in);
+        assertEquals(SetupForm.State.UNREADABLE, form.state());
+        assertTrue(form.stateReason().contains("\"refreshIntervalSeconds\""), form.stateReason());
+        assertFalse(form.canSave());
+        assertEquals(in, form.toJson());
+    }
+
+    @Test
+    void aWholeRefreshWrittenAsADecimalIsTheGatewaysWholeNumber() throws Setup.SetupException {
+        String in = "{\"schemaVersion\": 1, \"connection\": \"MapStudio\", \"refreshIntervalSeconds\": 15.0}";
+        assertEquals(15, Setup.parse(in).refreshIntervalSeconds());
+        SetupForm form = SetupForm.fromJson(in);
+        assertEquals("15", form.text(SetupForm.REFRESH));
+        assertTrue(form.canSave(), form.reasons().toString());
+        assertTrue(form.toJson().contains("\"refreshIntervalSeconds\": 15,"));
+    }
+
+    @Test
+    void aFractionalRefreshIsShownAsWrittenAndAskedToBeWhole() {
+        // The Gateway truncates 10.5 to 10; the form asks for the whole number its message promises.
+        SetupForm form = SetupForm.fromJson(
+            "{\"schemaVersion\": 1, \"connection\": \"MapStudio\", \"refreshIntervalSeconds\": 10.5}");
+        assertTrue(form.isEditable());
+        assertEquals("10.5", form.text(SetupForm.REFRESH));
+        assertEquals(List.of(SetupForm.REFRESH), List.copyOf(form.reasons().keySet()));
+    }
+
+    @Test
+    void nullBasemapsAreNoBasemapsAsTheGatewayReadsThem() throws Setup.SetupException {
+        String in = "{\"schemaVersion\": 1, \"connection\": \"MapStudio\", \"basemaps\": null}";
+        assertEquals(List.of(), Setup.parse(in).basemaps());
+        SetupForm form = SetupForm.fromJson(in);
+        assertEquals(List.of(), form.list(SetupForm.BASEMAPS));
+        assertEquals(List.of(), Setup.parse(form.toJson()).basemaps());
+        String absent = "{\"schemaVersion\": 1, \"connection\": \"MapStudio\"}";
+        assertEquals(Setup.DEFAULT_BASEMAPS, SetupForm.fromJson(absent).list(SetupForm.BASEMAPS));
+    }
+
+    @Test
+    void everyEditableFormReadsAsTheGatewayReadsTheFile() throws Setup.SetupException {
+        for (String in : List.of(
+            "{\"schemaVersion\": 1, \"connection\": \"MapStudio\", \"roles\": null, \"basemaps\": null}",
+            "{\"schemaVersion\": 1, \"connection\": \"MapStudio\", \"roles\": {\"full\": null}}",
+            "{\"schemaVersion\": 1, \"connection\": \"MapStudio\", \"refreshIntervalSeconds\": null}",
+            "{\"schemaVersion\": 1.0, \"connection\": \"MapStudio\", \"refreshIntervalSeconds\": 3}")) {
+            SetupForm form = SetupForm.fromJson(in);
+            assertTrue(form.canSave(), in);
+            assertEquals(Setup.parse(in), Setup.parse(form.toJson()), in);
+        }
+    }
+
+    private static void assertThrowsSetup(String json) {
+        try {
+            Setup.parse(json);
+        } catch (Setup.SetupException expected) {
+            return;
+        }
+        throw new AssertionError("the Gateway reads " + json);
+    }
+
+    // Row: invalid field, the refusal the save shows.
+
+    @Test
+    void aRefusalNamesEveryFieldForTheDialogAndTheLog() {
+        Map<String, List<String>> reasons = SetupForm.defaults()
+            .setText(SetupForm.REFRESH, "0").setText(SetupForm.KINDS_FUNCTION, "kinds").reasons();
+        SetupRefusedException refused = new SetupRefusedException(reasons);
+        assertEquals(reasons, refused.reasons());
+        String dialog = refused.describe();
+        assertTrue(dialog.startsWith(SetupForm.msg("setup.refused.message") + "\n- "), dialog);
+        assertTrue(dialog.contains("\n- " + SetupForm.msg("setup.label.connection") + ": Name the database connection"),
+            dialog);
+        assertTrue(dialog.contains("\n- " + SetupForm.msg("setup.label.refreshIntervalSeconds") + ": "), dialog);
+        assertTrue(dialog.contains("\n- " + SetupForm.msg("setup.label.kindsFunction") + ": "), dialog);
+        assertEquals(3, dialog.split("\n- ", -1).length - 1, dialog);
+        String log = refused.getMessage();
+        assertTrue(log.startsWith("connection: Name the database connection"), log);
+        assertTrue(log.contains("; kindsFunction: ") && log.contains("; refreshIntervalSeconds: "), log);
+    }
+
+    @Test
+    void aRefusalNamingNoFieldSaysSetup() {
+        Map<String, List<String>> reasons = Map.of(SetupForm.GENERAL, List.of("Something."));
+        SetupRefusedException refused = new SetupRefusedException(reasons);
+        assertEquals("setup: Something.", refused.getMessage());
+        assertEquals(SetupForm.msg("setup.refused.message") + "\n- Something.", refused.describe());
+    }
 }

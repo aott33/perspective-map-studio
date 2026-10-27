@@ -2,6 +2,8 @@ package com.aoindustrial.perspective.mapstudio.designer.setup;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -78,5 +80,66 @@ class SetupPanelTest {
         panel.show(SetupForm.fromJson(DEV), true, SetupForm.msg("setup.state.inheritedLocked", "parent-project"));
         assertFalse(panel.input(SetupForm.CONNECTION).isEditable());
         assertTrue(panel.isLocked());
+    }
+
+    @Test
+    void startFromDefaultsAsksFirstAndCancelKeepsTheFile() {
+        AtomicInteger asked = new AtomicInteger();
+        AtomicInteger edits = new AtomicInteger();
+        SetupPanel panel = new SetupPanel(edits::incrementAndGet, () -> {
+            asked.incrementAndGet();
+            return false;
+        });
+        SetupForm unreadable = SetupForm.fromJson("not json");
+        panel.show(unreadable, false, "");
+        panel.pressStartFromDefaults();
+        assertEquals(1, asked.get());
+        assertEquals(0, edits.get());
+        assertSame(unreadable, panel.current());
+        assertTrue(panel.isLocked());
+    }
+
+    @Test
+    void startFromDefaultsConfirmedGivesTheDefaultsAndReportsAnEdit() {
+        AtomicInteger edits = new AtomicInteger();
+        SetupPanel panel = new SetupPanel(edits::incrementAndGet, () -> true);
+        panel.show(SetupForm.fromJson("not json"), false, "");
+        panel.pressStartFromDefaults();
+        assertEquals(1, edits.get());
+        assertFalse(panel.isLocked());
+        assertFalse(panel.offersStartFromDefaults());
+        assertEquals(SetupForm.defaults(), panel.current());
+        assertTrue(panel.input(SetupForm.CONNECTION).isEditable());
+    }
+
+    // SetupEditor's commit step (getObjectForSave), on a panel.
+
+    @Test
+    void aReadOnlySetupIsHandedBackAsReadSoNothingIsWritten() throws Exception {
+        SetupPanel panel = new SetupPanel(null);
+        SetupForm newer = SetupForm.fromJson("{\"schemaVersion\": 2, \"x\": 1}");
+        panel.show(newer, false, "");
+        assertSame(newer, SetupCommit.formToSave(panel, newer));
+        SetupForm dev = SetupForm.fromJson(DEV);
+        panel.show(dev, true, "");
+        panel.input(SetupForm.CONNECTION).setText("");
+        assertSame(dev, SetupCommit.formToSave(panel, dev));
+        assertSame(dev, SetupCommit.formToSave(null, dev));
+    }
+
+    @Test
+    void aSetupWithReasonsIsRefusedAndAValidOneIsSaved() throws Exception {
+        SetupPanel panel = new SetupPanel(null);
+        SetupForm dev = SetupForm.fromJson(DEV);
+        panel.show(dev, false, "");
+        assertEquals(dev, SetupCommit.formToSave(panel, dev));
+        panel.input(SetupForm.REFRESH).setText("0");
+        SetupRefusedException refused =
+            assertThrows(SetupRefusedException.class, () -> SetupCommit.formToSave(panel, dev));
+        assertEquals(List.of(SetupForm.REFRESH), List.copyOf(refused.reasons().keySet()));
+        panel.input(SetupForm.REFRESH).setText("20");
+        SetupForm saved = SetupCommit.formToSave(panel, dev);
+        assertEquals("20", saved.text(SetupForm.REFRESH));
+        assertFalse(saved.equals(dev));
     }
 }

@@ -9,6 +9,7 @@ import java.awt.Insets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -41,6 +42,7 @@ public final class SetupPanel extends JPanel {
     private final JButton startFromDefaults = new JButton(SetupForm.msg("setup.state.startFromDefaults"));
     private final JTextField schemaVersion = new JTextField(4);
     private final Runnable onEdit;
+    private final BooleanSupplier confirmStartFromDefaults;
 
     private SetupForm base = SetupForm.defaults();
     private boolean locked;
@@ -48,8 +50,19 @@ public final class SetupPanel extends JPanel {
 
     /** @param onEdit called on the Swing thread after every change the user makes */
     public SetupPanel(Runnable onEdit) {
+        this(onEdit, null);
+    }
+
+    /**
+     * @param onEdit called on the Swing thread after every change the user makes
+     * @param confirmStartFromDefaults asks before "Start from defaults" replaces the form; null for the dialog
+     */
+    SetupPanel(Runnable onEdit, BooleanSupplier confirmStartFromDefaults) {
         super(new BorderLayout());
         this.onEdit = onEdit == null ? () -> { } : onEdit;
+        this.confirmStartFromDefaults = confirmStartFromDefaults != null ? confirmStartFromDefaults
+            : () -> JOptionPane.showConfirmDialog(this, SetupForm.msg("setup.state.startFromDefaults.confirm"),
+                SetupForm.msg("setup.state.startFromDefaults"), JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION;
 
         JPanel top = new JPanel(new BorderLayout());
         JPanel bannerRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -195,9 +208,7 @@ public final class SetupPanel extends JPanel {
     }
 
     private void askStartFromDefaults() {
-        int answer = JOptionPane.showConfirmDialog(this, SetupForm.msg("setup.state.startFromDefaults.confirm"),
-            SetupForm.msg("setup.state.startFromDefaults"), JOptionPane.OK_CANCEL_OPTION);
-        if (answer == JOptionPane.OK_OPTION) {
+        if (confirmStartFromDefaults.getAsBoolean()) {
             show(SetupForm.defaults(), false, "");
             onEdit.run();
         }
@@ -216,6 +227,11 @@ public final class SetupPanel extends JPanel {
     /** For tests: the banner line, as shown (empty when hidden). */
     String bannerText() {
         return banner.isVisible() ? banner.getText() : "";
+    }
+
+    /** For tests: presses "Start from defaults". */
+    void pressStartFromDefaults() {
+        startFromDefaults.doClick();
     }
 
     /** For tests: whether "Start from defaults" is offered. */

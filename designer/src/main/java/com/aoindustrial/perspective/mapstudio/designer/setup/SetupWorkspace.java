@@ -101,7 +101,7 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
             Map<String, List<String>> reasons = form.reasons();
             if (!reasons.isEmpty()) {
                 JOptionPane.showMessageDialog(dialog,
-                    new SetupEditor.SetupRefusedException(reasons).describe(),
+                    new SetupRefusedException(reasons).describe(),
                     SetupForm.msg("setup.refused.title"), JOptionPane.ERROR_MESSAGE);
                 return;
             }

@@ -171,11 +171,14 @@ public final class SetupForm {
             form.assetsFunction = string(o, ASSETS_FUNCTION, "");
             JsonElement refresh = o.get(REFRESH);
             if (refresh != null && !refresh.isJsonNull()) {
-                if (!refresh.isJsonPrimitive() || refresh.getAsJsonPrimitive().isBoolean()) {
+                // Setup.parse refuses anything but a JSON number, a quoted "10" included.
+                if (!refresh.isJsonPrimitive() || !refresh.getAsJsonPrimitive().isNumber()) {
                     throw new IllegalArgumentException(REFRESH + "|a number of seconds");
                 }
-                form.refreshText = refresh.getAsJsonPrimitive().isString()
-                    ? refresh.getAsString() : refresh.getAsJsonPrimitive().toString();
+                double seconds = refresh.getAsDouble();
+                // 10.0 is the Gateway's 10; 10.5 is shown as written and refused by the input check.
+                form.refreshText = seconds == Math.rint(seconds) && Math.abs(seconds) < 1e9
+                    ? String.valueOf((long) seconds) : refresh.getAsJsonPrimitive().toString();
             }
             form.alarmPage = string(o, ALARM_PAGE, "");
             form.basemaps = names(o, BASEMAPS, BASEMAPS, Setup.DEFAULT_BASEMAPS);
@@ -190,6 +193,13 @@ public final class SetupForm {
             }
         }
         form.originalText = text;
+        // Guard: a file the Gateway refuses must never look valid here. If the form
+        // read it into a setup the Gateway would accept, the form misread it, and a
+        // save of the unchanged form would write nothing (the editor's equals test).
+        String fileMessage = setupMessage(text);
+        if (fileMessage != null && setupMessage(form.toJson()) == null) {
+            return unreadable(text, display(fileMessage));
+        }
         return form;
     }
 
@@ -216,10 +226,14 @@ public final class SetupForm {
         return e.getAsString();
     }
 
+    /** As {@link Setup}: the fallback only when the key is absent; JSON null is an empty list. */
     private static List<String> names(JsonObject o, String key, String label, List<String> fallback) {
         JsonElement e = o.get(key);
-        if (e == null || e.isJsonNull()) {
+        if (e == null) {
             return fallback;
+        }
+        if (e.isJsonNull()) {
+            return List.of();
         }
         if (!e.isJsonArray()) {
             throw new IllegalArgumentException(label + "|a list of names");
