@@ -3,8 +3,8 @@ title: 'Setup form in the Designer: pickers and layout'
 type: 'feature'
 ticket: '16'
 created: '2026-10-27'
-status: 'draft'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: '2043e34c0bd1d20bf635db554c14f7f2f0ca5e75'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
@@ -36,6 +36,24 @@ context:
 - `tokenSecret` stays one string in setup schema 1, written `<provider>/<name>`: names only, never a value; the Designer never reads a secret.
 - A typed value is allowed in every field and kept as typed, even when it is not in its list.
 
+## Decisions (owner, 2026-10-27, plan answers: "agree with all recommendations, start building")
+
+- Gateway lists: one module RPC for all of them (connections, the IdP's roles, secret providers and names); no platform RPC.
+- Who may call it: any user who can open the Designer; it answers names only. A caller that is not a Designer session (a Vision client, an unauthenticated caller) is refused.
+- A story 7 `tokenSecret` with no `/` shows as the secret name, with the warning "Name the secret provider too." beside Map token; never blocks the save.
+- One story (no split).
+
+## Decisions (owner, 2026-10-27, the decluttered form; where the mockup or EXPERIENCE.md lag, these win)
+
+- No help line under fields: each label has a tooltip with the help text. The one visible line is under Map token: "Names only - the Designer never reads the token."
+- No green check marks: a status mark appears only for a warning, a reason, or a list that is unavailable.
+- One "Refresh lists" link in the form header beside "Schema version 1"; no per-field refresh buttons. No subtitle under the title.
+- The footer shows only when it has something to say: reasons left (a link that scrolls to and focuses the first reason), a new unsaved setup (with "Discard new setup"), Gateway not reachable.
+- The alarm page placeholder insert is the last dropdown item "Insert placeholder..."; no "{ }" button.
+- Section headings stay; no left section list; no create dialog (empty state in the tab with one Create setup button, then the same form marked "New setup - saves with the project").
+- Double-click on the node is the only way in; no node right-click menu; the node shows "(none)" or "(new, unsaved)".
+- A field's reason is never repeated in a dialog. No horizontal scroll bar; the form is at most 760 px wide.
+
 ## Boundaries & Constraints
 
 **Always:**
@@ -64,7 +82,7 @@ context:
 | Gateway unreachable | RPC throws or times out | banner with Try again; grey cloud in status slots; functions and pages still listed | typing works; no warnings from Gateway lists |
 | IdP cannot list roles | no user source of the IdP's name, or an OIDC/SAML IdP | role list says "This identity provider does not list its roles. Type them." | no unknown-role warnings |
 | Secret provider cannot list | `list()` throws | names list unavailable; provider kept | typing works |
-| tokenSecret | pick `Internal` + `mapbox-token` | `"tokenSecret": "Internal/mapbox-token"`; a stored value is split at its first `/` (a value with no `/`: Open Question 3) | never blocks |
+| tokenSecret | pick `Internal` + `mapbox-token` | `"tokenSecret": "Internal/mapbox-token"`; a stored value is split at its first `/`; a value with no `/` shows as the secret name with the warning "Name the secret provider too." | never blocks |
 | Narrow tab | tab 500 px wide | rows stack, no horizontal scroll bar | none |
 | Newer schema, unreadable, inherited | as story 7 | header "Schema N - read only" and "setup.json as written" box; Start from defaults; inherited banners | as story 7 |
 
@@ -85,8 +103,8 @@ context:
 
 **Execution:**
 - [ ] `docs/platform-checks.md` -- first, new section "Epic 2 story 16 - setup lists from the Gateway": the javap reading above, then a live probe on `ms-e2s16` (port 9138, `.env`): the Gateway half of each list (`getDatasources` names and vendors; the dev project's IdP and `getProfile(idp).getRoles()`; `getProviders()` names and `list()` of the built-in provider, names counted, never printed above debug; timings), the module RPC registered and its route; Designer lines [not verified] until the owner's session. Probe removed before commit.
-- [ ] `common/.../contract/SetupLookupRpc.java` (new) -- `@RpcInterface(packageId = "mapstudio-setup")`: `String lists(String project)` and `String secretNames(String provider)`, each a JSON reply (`SetupLists` record parsed in common, unit tested) so only `String` crosses the serializer.
-- [ ] `gateway/.../setuplookup/{SetupLookups, LookupSource, IgnitionLookupSource}.java` (new) and `MapStudioGatewayHook.getRpcImplementation` -- answers per list `ok`, `unavailable` with plain reason, or `not-listed` (roles); 5 s deadline each; no `@RunsOnClient`; never `read`.
+- [ ] `common/.../contract/SetupLookupRpc.java` (new) -- `@RpcInterface(packageId = "mapstudio-setup")`: `String lists(String identityProvider)` (the IdP name the Designer reads from the open project's Perspective general properties, `default` when unset) and `String secretNames(String provider)`, each a JSON reply (`SetupLists` record parsed in common, unit tested) so only `String` crosses the serializer.
+- [ ] `gateway/.../setuplookup/{SetupLookups, LookupSource, IgnitionLookupSource}.java` (new) and `MapStudioGatewayHook.getRpcImplementation` -- answers per list `ok`, `unavailable` with plain reason, or `not-listed` (roles); 5 s deadline each; no `@RunsOnClient`, and a caller whose `RpcDelegate.session()` is not a Designer is refused; never `read`.
 - [ ] `designer/.../setup/ProjectLists.java` (new, pure) -- functions from script resources (top-level `def name(` at column 0, path `a/b` to `a.b.name`, inherited included), page URLs, the project IdP name; tested on `ops/project` copies.
 - [ ] `designer/.../setup/GatewayLists.java` (new) -- the RPC client behind an interface; `SwingWorker` loading; states loading, ok, unavailable.
 - [ ] `designer/.../setup/{SetupPanel, ChipField, PickerCombo, StatusSlot}.java` -- layout and states per Decisions and EXPERIENCE.md; footer link scrolls to the first reason.
@@ -104,13 +122,6 @@ context:
 
 Why one module RPC for the Gateway lists: secrets have no platform RPC, so the module needs one anyway; putting connections and roles behind it too gives one security story, one round trip, and a Gateway half the implementer can check live with a probe, leaving the owner one Designer check. Fallback if the owner's check shows the RPC is not reachable from the Designer: platform RPCs for connections and IdPs (the Designer's own dropdowns use them), typing for secrets.
 
-## Open Questions
-
-1. **Gateway lists: one module RPC, or platform RPCs plus a module RPC for secrets only?** One module RPC (recommended, Design Notes) or `DATASOURCE_RPC` and `USERS_RPC` directly (less Gateway code, but their Designer-side behaviour is only the owner's to check).
-2. **Who may call it?** Any user who can open the Designer (recommended: a Designer user can already write Gateway scripts; names only) or a named permission (needs a Gateway setting the project cannot carry).
-3. **Story 7's `tokenSecret` value with no `/`** (story 7 labelled it a provider name): show it as the secret name with a warning "Name the secret provider too" (recommended, never blocks) or as the provider.
-4. **Plan size:** about 3200 tokens, double the 1600 guide. Keep one story (recommended: one owner Designer session, the verify line is one) or split into layout plus project lists, then Gateway lists.
-
 ## Verification
 
 **Commands:**
@@ -121,7 +132,7 @@ Why one module RPC for the Gateway lists: secrets have no platform RPC, so the m
 **Manual checks (hitl, the owner, in a Designer on `mapstudio-dev`, port 9138):**
 1. Project Browser: "Map Studio Setup" (no suffix); right-click shows no Map Studio menu; double-click opens the tab.
 2. The tab: four section headings, no section list, fields not wider than 760 px on a wide window; narrow the window: rows wrap, no horizontal scroll bar; "Schema version 1" is text.
-3. Open each list: connections with types, roles of `default`, functions `mapstudio_dev.kinds` and `.assets`, pages `/`, `/edit`, ..., secret providers then names; green checks beside found values.
+3. Open each list: connections with types, roles of `default`, functions `mapstudio_dev.kinds` and `.assets`, pages `/`, `/edit`, ... and last "Insert placeholder...", secret providers then names; no mark beside a found value; label tooltips hold the help.
 4. Pick `MapStudio`, keep `MapEditor`/`MapOperator`, pick the functions, an alarm page, tick Satellite, pick a provider and type a secret name; type role `MapEdtor`: warning, kept. File > Save; `git diff ops/project` shows the lines; a Perspective session's `map.load` reflects it; remove `MapEdtor`, save again.
 5. Set refresh `0`: reason beside it, footer "1 reason left" scrolls to it on click; File > Save: only the Designer's save failure, no Map Studio dialog; note what the rest of the save did.
 6. Stop the Gateway briefly (or disconnect): banner, Try again, typing works, functions and pages still listed.
