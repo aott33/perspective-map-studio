@@ -76,8 +76,9 @@ class ContractTest {
         MapItemRecord r = MapItemRecord.fromCreate(ID, json("{\"kind\":\"pad\",\"name\":\"P1\","
             + "\"geometry\":{\"type\":\"Point\",\"coordinates\":[-104.9903001,39.7392]}}"), 0);
         JsonObject o = r.toJson();
-        assertEquals(Set.of("id", "kind", "name", "geometry", "properties", "assetId", "overrides", "ends", "version",
-            "deleted"), o.keySet());
+        assertEquals(Set.of("id", "kind", "name", "geometry", "properties", "assetId", "overrides", "ends", "attachment",
+            "version", "deleted"), o.keySet());
+        assertTrue(o.get("attachment").isJsonNull(), "attachment is null on every map item but an attached instrument");
         assertEquals(1, o.get("version").getAsInt());
         assertEquals(false, o.get("deleted").getAsBoolean());
         assertTrue(o.get("assetId").isJsonNull());

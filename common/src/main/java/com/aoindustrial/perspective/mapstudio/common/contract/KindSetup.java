@@ -20,7 +20,8 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
  *  "alarms": {"path", "count", "summary"},
  *  "link": "/pad/{item.name}",                                    text and any placeholders
  *  "popupView": {"path", "params": {name: param}},
- *  "styleRule": {"source": {"path"} | {"kpi"}, "type": "states" | "bands" | "expression", "cases", "expression"},
+ *  "styleRule": {"source": {"path"} | {"kpi"}, "type": "states" | "bands" | "expression", "cases", "expression"}
+ *               | {"source": {"instruments": "worst"}},                line kinds that are not areas
  *  "areaTints": {"property", "tints": [{"category", "tint"}]}}  area kinds only
  * </pre>
  *
@@ -37,6 +38,9 @@ public final class KindSetup {
     public static final List<String> PARTS =
         List.of("comms", "kpis", "alarms", "link", "popupView", "styleRule", "areaTints");
     public static final List<String> RULE_TYPES = List.of("states", "bands", "expression");
+    /** The style source of a line kind that takes its look from its instruments (story 14). */
+    public static final String INSTRUMENTS = "instruments";
+    public static final String WORST = "worst";
 
     private static final Set<String> COMMS = Set.of("path", "on");
     private static final Set<String> KPI = Set.of("key", "label", "path", "unit", "on", "icon");
@@ -173,6 +177,11 @@ public final class KindSetup {
 
     private static void styleRule(JsonElement v, Kind kind, boolean override, Set<String> kpiKeys, String where) {
         JsonObject r = object(v, where, RULE);
+        JsonElement src = r.get("source");
+        if (src != null && src.isJsonObject() && src.getAsJsonObject().has(INSTRUMENTS)) {
+            instrumentsRule(r, kind, where);
+            return;
+        }
         String type = r.has("type") && isString(r.get("type")) ? r.get("type").getAsString() : null;
         if (type == null || !RULE_TYPES.contains(type)) {
             throw new InvalidValue(where + ".type must be " + String.join(", ", RULE_TYPES) + ".");
@@ -203,6 +212,30 @@ public final class KindSetup {
             states(c.getAsJsonArray(), kind, where + ".cases");
         } else {
             bands(c.getAsJsonArray(), kind, where + ".cases");
+        }
+    }
+
+    /**
+     * {@code {"source": {"instruments": "worst"}}} and nothing else (owner, 2026-10-27, epic 2
+     * story 14): a line's look from the worst of the instruments at each segment's ends, whose
+     * own style rules already give a preset, so the rule has no type, cases or expression.
+     * Line kinds only, never an area kind.
+     */
+    private static void instrumentsRule(JsonObject r, Kind kind, String where) {
+        if (!"line".equals(kind.geometry()) || kind.area()) {
+            throw new InvalidValue(where + ".source: " + Rows.echo(kind.id()) + " is " + ("line".equals(kind.geometry())
+                ? "an area kind" : "a point kind") + "; only a line kind that is not an area takes its look from its"
+                + " instruments.");
+        }
+        JsonObject s = r.getAsJsonObject("source");
+        if (s.size() != 1 || !isString(s.get(INSTRUMENTS)) || !WORST.equals(s.get(INSTRUMENTS).getAsString())) {
+            throw new InvalidValue(where + ".source must be {\"instruments\": \"worst\"}.");
+        }
+        for (String key : List.of("type", "cases", "expression")) {
+            if (r.has(key)) {
+                throw new InvalidValue(where + ": a rule whose source is the instruments has no " + key + "; it is"
+                    + " {\"source\": {\"instruments\": \"worst\"}} only, the worst of the instruments' own presets.");
+            }
         }
     }
 

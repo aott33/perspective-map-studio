@@ -14,6 +14,7 @@ const ITEM = {
     assetId: null,
     overrides: {},
     ends: null,
+    attachment: null,
     version: 1,
     deleted: false
 };
@@ -38,6 +39,17 @@ describe('the 0.2.0 draft contract', () => {
         expect(readMapItem({ ...ITEM, geometry: { type: 'Polygon', coordinates: [] } })).toBeNull();
         expect(readMapItem({ ...ITEM, version: '1' })).toBeNull();
         expect(readMapItem(null)).toBeNull();
+    });
+
+    test('an instrument carries its attachment; a missing or malformed one reads as null (epic 2 story 14)', () => {
+        const attachment = { lineId: '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d', distanceM: 1143 };
+        const tap = { ...ITEM, kind: 'tap', geometry: { type: 'Point', coordinates: [-103.508, 31.9204] }, attachment };
+        expect(readMapItem(tap)).toEqual(tap);
+        const { attachment: _gone, ...older } = ITEM;
+        expect(readMapItem(older)?.attachment).toBeNull();
+        expect(readMapItem({ ...tap, attachment: { lineId: 7, distanceM: 1 } })?.attachment).toBeNull();
+        expect(readMapItem({ ...tap, attachment: { lineId: 'x', distanceM: -1 } })?.attachment).toBeNull();
+        expect(readMapItem({ ...tap, attachment: { lineId: 'x', distanceM: Infinity } })?.attachment).toBeNull();
     });
 
     test('map.load.reply carries the level, seq and items', () => {

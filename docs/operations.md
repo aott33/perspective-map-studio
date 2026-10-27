@@ -22,6 +22,7 @@ pg_dump --host <db-host> --username <owner-role> --dbname <database> \
 ## Database rights
 
 - **First start and upgrades** need a role that may CREATE in the connection's schema: Map Studio creates its tables, and a newer module adds a migration, in one transaction under a PostgreSQL advisory lock. PostgreSQL 15 and later give ordinary roles no CREATE on schema `public`, so grant it, or use the database owner's role for the first start.
+- **Upgrading to schema 2** (epic 2 story 14, the module release that adds instruments on lines) runs `ALTER TABLE mapstudio_item ADD COLUMN attachment jsonb` and creates two indexes, so it needs the role that **owns the `mapstudio_` tables** (and CREATE on the schema), not the least-privilege runtime role: PostgreSQL lets only a table's owner alter it. Start the upgraded module once with the owner's role on the connection (the role that created the tables at the first start), or give the tables to the connection's role first (`ALTER TABLE mapstudio_item OWNER TO <role>`, and the same for the other `mapstudio_` tables). Until then the map store is unavailable with the error line below, naming `migration 2`, SQLState 42501 and the missing ownership, and nothing is changed: schema 1 and its map items stay as they were. Existing map items read back with `attachment` null. Take a backup first (above). **[live 8.3.10]**, `ops/store-checks.sh upgrade`.
 - **After that** a least-privilege role is enough: CONNECT on the database, USAGE on the schema, SELECT, INSERT and UPDATE on the `mapstudio_` tables, USAGE and SELECT on their sequences **[live 8.3.10]**. Map Studio reads the schema version first, with no lock and no DDL, and creates nothing when the schema is current.
 
 When the role lacks a right, the Gateway log has one error line from the logger `MapStudio.store` **[live 8.3.10]**:
@@ -51,10 +52,10 @@ The component shows the state on its map container (`data-store-state`: `ready`,
 Each module release knows a newest schema version; migrations only ever add (`gateway/src/main/resources/.../store/migrations/`, one file per version, never changed once released). When the recorded version is newer than the module knows, which happens after a downgrade or when an older Gateway shares the database with a newer one, Map Studio migrates nothing and changes nothing, logs one warning, and the map is read only:
 
 ```text
-Map Studio's map store on database connection MapStudioCheck is at schema version 999, newer than this module knows (1); the map is read only here until the Map Studio module is upgraded. Nothing was migrated or changed.
+Map Studio's map store on database connection MapStudioCheck is at schema version 999, newer than this module knows (2); the map is read only here until the Map Studio module is upgraded. Nothing was migrated or changed.
 ```
 
-The map shows "Map store: read only. The map store was upgraded by a newer Map Studio (schema 999, this module knows 1); saving is off until the module is upgraded." **[live 8.3.10]**. To downgrade for real, restore the `mapstudio_` tables from a backup taken before the upgrade; there is no down migration.
+The map shows "Map store: read only. The map store was upgraded by a newer Map Studio (schema 999, this module knows 2); saving is off until the module is upgraded." **[live 8.3.10]**. To downgrade for real, restore the `mapstudio_` tables from a backup taken before the upgrade; there is no down migration.
 
 ## Redundant pairs
 
@@ -67,7 +68,7 @@ The map shows "Map store: read only. The map store was upgraded by a newer Map S
 
 ## Proof
 
-`ops/store-checks.sh` (development only, run by hand) adds a check project on the connection `MapStudioCheck` and runs four scenarios against it: a role without CREATE, a table in the way, the retry after the fix, and a newer schema. Screenshots of the unavailable and read-only states at 1440 and 390 px:
+`ops/store-checks.sh` (development only, run by hand) adds a check project on the connection `MapStudioCheck` and runs five scenarios against it: a role without CREATE, a table in the way, the retry after the fix, a newer schema, and (epic 2 story 14) an upgrade from schema 1 with a map item, first refused because the connection's role does not own the tables, then done once it does. Screenshots of the unavailable and read-only states at 1440 and 390 px:
 
 ![Unavailable map store, 1440 px](screenshots/mapstudio-store-unavailable-1440.png)
 ![Unavailable map store, 390 px](screenshots/mapstudio-store-unavailable-390.png)

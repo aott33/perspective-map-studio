@@ -37,6 +37,15 @@ export interface LineGeometry {
 
 export type ItemGeometry = PointGeometry | LineGeometry;
 
+/**
+ * An instrument's place on its line (AD-19, epic 2 story 14): the line's id and the distance
+ * along it in metres from its first vertex (geodesic, geometry.ts), to 0.1 m.
+ */
+export interface Attachment {
+    lineId: string;
+    distanceM: number;
+}
+
 /** The stored map item record (AD-20), closed and typed. */
 export interface MapItemRecord {
     id: string;
@@ -47,6 +56,8 @@ export interface MapItemRecord {
     assetId: string | null;
     overrides: Record<string, unknown>;
     ends: { start?: { itemId: string }; end?: { itemId: string } } | null;
+    /** Only on a map item of an instrument kind attached to a line; null otherwise (and from an older Gateway). */
+    attachment: Attachment | null;
     version: number;
     deleted: boolean;
 }
@@ -165,6 +176,15 @@ function isGeometry(value: unknown): value is ItemGeometry {
     return false;
 }
 
+/** An attachment, or null when absent or not one (the record stays usable). */
+export function readAttachment(value: unknown): Attachment | null {
+    if (!isRecord(value) || typeof value.lineId !== 'string' || typeof value.distanceM !== 'number'
+        || !isFinite(value.distanceM) || value.distanceM < 0) {
+        return null;
+    }
+    return { lineId: value.lineId, distanceM: value.distanceM };
+}
+
 /** A map item record from the Gateway, or null when it is not one. */
 export function readMapItem(value: unknown): MapItemRecord | null {
     if (!isRecord(value) || typeof value.id !== 'string' || typeof value.kind !== 'string'
@@ -181,6 +201,7 @@ export function readMapItem(value: unknown): MapItemRecord | null {
         assetId: typeof value.assetId === 'string' ? value.assetId : null,
         overrides: isRecord(value.overrides) ? value.overrides : {},
         ends: isRecord(value.ends) ? value.ends as MapItemRecord['ends'] : null,
+        attachment: readAttachment(value.attachment),
         version: value.version,
         deleted: value.deleted
     };

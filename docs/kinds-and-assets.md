@@ -35,6 +35,7 @@ A list of dicts, one per kind:
 | `labelRank` | no | Whole number; when labels collide, the higher rank keeps its label longer. Default 0. |
 | `fields` | no | The form fields of the kind's map items (their `properties`), default none. |
 | `area` | no | `True` on a `line` kind drawn as a closed area; only an area kind's setup takes `areaTints` ([kind-setup.md](kind-setup.md)). Refused on a `point` kind. Default false; `map.load` sends it only when true. |
+| `instrument` | no | `True` on a `point` kind whose map items sit on a line, such as a tap, a meter or a line valve (epic 2 story 14, AD-19): only an instrument kind's map item may carry an `attachment` to a line ([contract.md](contract.md), "Instruments on lines"), and it may also be a free point (attachment null). A `line` kind with it is left out with the reason "instrument applies to point kinds only" and the list is `incomplete`. Default false; `map.load` sends it only when true. |
 
 A form field is `{key, label, type, required, choices}`: `key` text, at most 64 characters, unique in the kind; `label` defaults to the key; `type` is `text`, `number`, `integer`, `boolean` or `choice`; `required` defaults to false; a `choice` field needs a non-empty `choices` list of text. Adding a kind needs no module change: return one more row.
 
@@ -108,4 +109,4 @@ All seven words are stable kebab-case; messages are plain words and may change. 
 
 ## The dev adapter
 
-The dev project's library `mapstudio_dev` (`ops/project/ignition/script-python/mapstudio_dev/code.py`) is test equipment: three kinds (`pad`, `line`, and `geofence`, an area kind) and four assets, and a mode (`ok`, `empty`, `broken`, `slow`, `incomplete`) switched by the buttons of the `/adapters` page (map editors only) and kept in `system.util.getGlobals()`, which the page's session scripts and Map Studio's calls share **[live 8.3.10]**. Its setup refreshes every 30 s, so the e2e test's two overlapping refreshes are not crossed by a timed one.
+The dev project's library `mapstudio_dev` (`ops/project/ignition/script-python/mapstudio_dev/code.py`) is test equipment: four kinds (`pad`, `line`, `geofence`, an area kind, and `tap`, an instrument kind) and four assets, and a mode (`ok`, `empty`, `broken`, `slow`, `incomplete`) switched by the buttons of the `/adapters` page (map editors only) and kept in `system.util.getGlobals()`, which the page's session scripts and Map Studio's calls share **[live 8.3.10]**. Its setup refreshes every 30 s, so the e2e test's two overlapping refreshes are not crossed by a timed one.

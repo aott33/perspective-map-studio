@@ -35,7 +35,7 @@ After every committed batch, from a browser or from `system.mapstudio.applyEdits
                    "record": {"id": "<UUID>", "kind": "line", "name": "Line 21:05:09",
                               "geometry": {"type": "LineString", "coordinates": [[-104.99, 39.74], [-104.98, 39.75]]},
                               "properties": {}, "assetId": null, "overrides": {}, "ends": null,
-                              "version": 1, "deleted": false}}]}}
+                              "attachment": null, "version": 1, "deleted": false}}]}}
 ```
 
 - `seq` is the batch's change sequence number; `batchId` and `actor` are the saved batch's (the session's user name, or the actor a script named). A map at level `none` gets `actor` as `""`: an anonymous viewer never learns the editors' user names (`map.load` never names them either). `phone` and `full` maps get the name. The level is read when the change is sent (unit tested, `MapStudioDelegateTest`) **[unverified live]**.
@@ -124,7 +124,7 @@ Stable kebab-case words; the message is plain words for the person.
 - A create's `data` is the record's fields except `id`, `version` and `deleted`; `kind` and `geometry` are required. An update's `data` replaces only the top-level fields it carries (owner decision, 2026-10-26), so a moved point sends only `geometry`.
 - A batch is all or none: one transaction, every op's version checked, every saved op recorded. It takes the project's next change sequence number `seq`. At most 1000 ops per batch.
 - Supported in 0.2.0 draft: create, update, delete and restore of map items and (from entry 9) kind setups by a session with full editing or a script; a point's geometry and any map item's properties by a session with phone editing; retried `batchId`s; the conflicting records in a `conflict` reply. A kind setup op's `id` is the kind id and its `data` is `{"setup": {...}}` ([kind-setup.md](kind-setup.md)).
-- Checks, in order: the store is ready; the batch is well formed; a `batchId` already committed replays (below); the role matrix on each op's shape; there is an actor; a kind list is in use, read once for the batch, unless every op is a delete (entry 9); then, in the transaction, the project's row is locked, the `batchId` looked up again, the map items and kind setups locked, the role matrix checked on each stored geometry, every op's version compared, and each op's record checked against the kind list as it is written. A refusal writes nothing and takes no `seq` **[live 8.3.10]**.
+- Checks, in order: the store is ready; the batch is well formed; a `batchId` already committed replays (below); the role matrix on each op's shape; there is an actor; a kind list is in use, read once for the batch, unless every op is a delete (entry 9); then, in the transaction, the project's row is locked, the `batchId` looked up again, the map items and kind setups locked, the role matrix checked on each stored geometry, every op's version compared, each op's record checked against the kind list as it is written, and then (epic 2 story 14) the instruments on lines checked on the state the whole batch leaves (below). A refusal writes nothing and takes no `seq` **[live 8.3.10]**.
 
 ### Conflicts
 
@@ -167,7 +167,7 @@ The level comes from the session user's roles as the Gateway sees them against t
 | Level | May |
 | --- | --- |
 | `full` | create, update, delete and restore any map item |
-| `phone` | `update` of a map item whose `data` carries only `properties`, or `geometry` of a map item stored as a `Point` (moved to another `Point`), or both. Anything else, a create, delete, restore, a line's geometry, `name`, `kind`, `assetId`, `overrides`, `ends` or a kind setup, is refused `role`: "Phone editing may move a point and change a map item's properties; this change needs a full editing role. Nothing in this save was written." **[live 8.3.10]** |
+| `phone` | `update` of a map item whose `data` carries only `properties`, or `geometry` of a map item stored as a `Point` (moved to another `Point`), or both. Anything else, a create, delete, restore, a line's geometry, `name`, `kind`, `assetId`, `overrides`, `ends` or a kind setup, is refused `role`: "Phone editing may move a point and change a map item's properties; this change needs a full editing role. Nothing in this save was written." **[live 8.3.10]** A point of an instrument kind (or one with an attachment) is the exception (owner, 2026-10-27; epic 2 story 14): moving it, or sending `attachment`, is refused `role` with "An instrument moves along its line; only full editing can move it. Nothing in this save was written."; its properties may still be changed **[live 8.3.10]** |
 | `none` | nothing: `role`, "You do not have a role that lets you change the map. Ask for a Map Studio editing role." |
 
 ```json
@@ -182,26 +182,79 @@ saved for a phone editor; the same op with a `LineString` on a line is refused `
 ```json
 {"id": "<UUID>", "kind": "line", "name": "Line 21:05:09",
  "geometry": {"type": "LineString", "coordinates": [[-104.99, 39.74], [-104.98, 39.75]]},
- "properties": {}, "assetId": null, "overrides": {}, "ends": null, "version": 1, "deleted": false}
+ "properties": {}, "assetId": null, "overrides": {}, "ends": null, "attachment": null, "version": 1, "deleted": false}
 ```
 
-Closed: no other field is stored or accepted. Geometry is GeoJSON `Point` or `LineString`, longitude first, WGS 84, rounded to 6 decimals when saved. Every saved record is checked against the project's kind list (entry 9): a known `kind`, the geometry its kind takes, `properties` keyed and typed by the kind's form fields (CSV-style text numbers stored as numbers), `overrides` a partial kind setup with full tag paths ([kind-setup.md](kind-setup.md)). Versions start at 1.
+Closed: no other field is stored or accepted. `attachment` (added in 0.2.0 draft by epic 2 story 14, schema version 2) is an instrument's place on its line, `{lineId, distanceM}`, and null on every other map item (below); a reader treats a missing `attachment` (an older Gateway) as null. Geometry is GeoJSON `Point` or `LineString`, longitude first, WGS 84, rounded to 6 decimals when saved. Every saved record is checked against the project's kind list (entry 9): a known `kind`, the geometry its kind takes, `properties` keyed and typed by the kind's form fields (CSV-style text numbers stored as numbers), `overrides` a partial kind setup with full tag paths ([kind-setup.md](kind-setup.md)). Versions start at 1.
+
+## Instruments on lines (AD-19, epic 2 story 14)
+
+A tap, meter or line valve is a point of an **instrument kind** (`instrument: true` in the kind list, [kinds-and-assets.md](kinds-and-assets.md)) that may be attached to a line: its record's `attachment` is `{"lineId": "<the line's id>", "distanceM": 1143.0}`, the distance along the line in metres from its first vertex, measured geodesically on WGS 84 with Turf 7.4.0's formulas (haversine, earth radius 6371008.8 m), stored to 0.1 m (half up), and its `geometry` is the point at that distance, sent in the same op. The Gateway measures with the same formulas (`common/.../contract/LineMeasure.java`, test vectors shared with `web/typescript/__tests__/geometry.test.ts`); it never projects a point itself and never infers an attachment from nearness. Stored and checked only in 0.2.0 draft: drawing, the line popup's instrument list and the instruments style are epic-viewing's, the tools epic-editing's.
+
+Every save is checked on the state the whole batch leaves, after every op is written, so a line and its instruments created, moved or restored together pass in any op order. Each refusal is `invalid` naming the op `{index, id}`, and nothing is written **[live 8.3.10]**:
+
+- `attachment` is exactly `{lineId, distanceM}`: `lineId` a UUID (kept in lower-case form), `distanceM` a finite number, 0 or more ("attachment.distanceM must be 0 or more (metres from the line's first vertex), not -1.").
+- Only an instrument kind's map item has one; on any other kind it is refused ("attachment: kind pad is not an instrument kind, ..."). On an instrument kind it is optional: null is a free point (owner, 2026-10-27).
+- The line is a live map item (in this batch or stored) whose geometry is a `LineString` and whose kind is not an area: "instrument PT-1 is attached to map item <id>, which does not exist.", "... to line L-SWD, which is deleted.", "... to PT-2, which is a point, not a line.", "... to Fence, an area (kind geofence); instruments go on lines that are not areas."
+- `distanceM` is at most the line's length plus 1 m: "instrument PT-1 is at 2,924.0 m along line L-SWD, past its end (the line is 2,922.4 m long)."
+- The point is within 1 m of the place `distanceM` gives on the line (owner, 2026-10-27): "instrument PT-1 is 5.0 m from its place on line L-SWD (1,143.0 m along it); its point must be within 1.0 m of that place."
+- A batch that changes a line's geometry or deletes it carries an op with `attachment` (or a delete) for every live instrument attached to it; a rename or a property change of a line needs none (owner, 2026-10-27): "Op 0 (<id>): line L-SWD has 2 instruments (PT-1, PT-2) this save does not move or delete. Send each instrument's new place in the same save. Nothing in this save was written." (for a delete: "Delete its instruments in the same save."). The op named is the line's.
+
+A line batch that carries its instruments is one batch: one `seq`, all or none, each instrument's version bumped, so an instrument changed meanwhile by someone else makes the whole batch a `conflict` naming it, and story 8's queue replays it whole with its `baseVersion`s. Deleting a line deletes its instruments in the same batch, and the one reverse batch (a create at each tombstone's version, `web/typescript/undo.ts`) restores all of them (owner, 2026-10-27) **[live 8.3.10]**. The browser builds these batches with the shared geometry module `web/typescript/geometry.ts`: a reshape or vertex change places each instrument at its nearest place on the new geometry, a move carries them with the line, a split puts each on the part it lies on, measured from that part's start. A reshape of L-SWD, 2,922 m, with PT-1 and PT-2:
+
+```json
+{"batchId": "<UUID>", "ops": [
+ {"op": "update", "entity": "item", "id": "<L-SWD>", "baseVersion": 2,
+  "data": {"geometry": {"type": "LineString", "coordinates": [[-103.52, 31.92], [-103.505, 31.9223], [-103.490423, 31.926]]}}},
+ {"op": "update", "entity": "item", "id": "<PT-1>", "baseVersion": 1,
+  "data": {"geometry": {"type": "Point", "coordinates": [-103.508198, 31.92181]},
+           "attachment": {"lineId": "<L-SWD>", "distanceM": 1131.9}}},
+ {"op": "update", "entity": "item", "id": "<PT-2>", "baseVersion": 1,
+  "data": {"geometry": {"type": "Point", "coordinates": [-103.491243, 31.925792]},
+           "attachment": {"lineId": "<L-SWD>", "distanceM": 2793.8}}}]}
+```
+
+From a script, Jython 2.7: a tap created on a line saved in the same batch (the tap's point is where 1,143 m along the line falls, from the geometry module or the Gateway's `LineMeasure`):
+
+```python
+import java.lang
+import uuid
+
+logger = system.util.getLogger('MapStudio.instruments')
+project = 'my-project'
+line_id = str(uuid.uuid5(uuid.NAMESPACE_URL, 'my-project/lines/L-SWD'))
+tap_id = str(uuid.uuid5(uuid.NAMESPACE_URL, 'my-project/taps/PT-1'))
+batch = {'batchId': str(uuid.uuid4()), 'ops': [
+    {'op': 'create', 'entity': 'item', 'id': line_id, 'baseVersion': 0,
+     'data': {'kind': 'line', 'name': 'L-SWD', 'geometry': {'type': 'LineString',
+              'coordinates': [[-103.52, 31.92], [-103.505, 31.9205], [-103.490423, 31.926]]}}},
+    {'op': 'create', 'entity': 'item', 'id': tap_id, 'baseVersion': 0,
+     'data': {'kind': 'tap', 'name': 'PT-1', 'geometry': {'type': 'Point', 'coordinates': [-103.507899, 31.920404]},
+              'attachment': {'lineId': line_id, 'distanceM': 1143}}}]}
+try:
+    result = system.mapstudio.applyEdits(project, batch, 'seed-script')
+    logger.info('Saved as seq %s' % result['seq'])
+except java.lang.Throwable as ex:
+    logger.warn('Not saved: %s' % ex.getMessage())
+except Exception as ex:
+    logger.warn('Not saved: %s' % ex)
+```
 
 ## The project setup, schema version 1 (AD-5)
 
 The project resource `com.aoindustrial.perspective.mapstudio/setup/` (`setup.json`). Every field, its default and rule, the messages a wrong setup gives, and how to change it on a running Gateway: `docs/setup.md`. In short: only `schemaVersion` (1) and `connection` are required; unknown fields are refused; a wrong or missing setup makes the project's map store answer `store-unreachable` with the reason; a changed setup applies at the next call after a project scan, with no restart **[live 8.3.10]**. The map is keyed by the project's own name, even when a child project inherits the setup. The kind and asset functions (`kindsFunction`, `assetsFunction`) and how often they are called (`refreshIntervalSeconds`): [kinds-and-assets.md](kinds-and-assets.md).
 
-## The map store, schema version 1 (AD-3, AD-21)
+## The map store, schema version 2 (AD-3, AD-21)
 
-PostgreSQL only. On start, for each connection a setup names, Map Studio waits for the connection to be usable (every 5 s, up to 2 minutes), then reads the recorded schema version with no lock and no DDL (`to_regclass`, then `max(version)`); only when a migration is pending does it apply its versioned migrations (`gateway/src/main/resources/.../store/migrations/`), each in one transaction under `pg_advisory_xact_lock(hashtext('mapstudio_migrations'))`, and records the version **[live 8.3.10]**. When the connection never becomes usable it logs one error naming the connection; when a statement fails it logs one error naming the connection, the migration, the statement (its number in the migration's transaction and its first words), the SQLState ("none" for a failure that is not a database error), the missing right for 42501, and PostgreSQL's message (entry 5, `docs/operations.md`). Either way the map store is unavailable (`store-unreachable`), with no half-created schema, and Map Studio tries again at most once a minute on the next `map.load` or `applyEdits` **[live 8.3.10]**, logging the line again only when it changes (unit tested, `StoreRegistryStateTest`; **[unverified]** live: no live run has retried with the same failure). A recorded version newer than the module makes the map store read only: one warning naming the connection and both versions, nothing migrated or changed, `map.load` as usual with `readOnly`, saves refused `read-only` **[live 8.3.10]**. Of a redundant pair only the active node migrates and saves; a standby reads the version only and refuses saves `read-only` **[unverified]**. Rights: the first start needs a role that may CREATE in the schema; after that a least-privilege runtime role with CONNECT, USAGE on the schema, SELECT, INSERT and UPDATE on the tables and USAGE and SELECT on the sequences is enough **[live 8.3.10]** (docs/platform-checks.md). Map Studio has no backup of its own: the site's PostgreSQL backups cover these tables.
+PostgreSQL only. On start, for each connection a setup names, Map Studio waits for the connection to be usable (every 5 s, up to 2 minutes), then reads the recorded schema version with no lock and no DDL (`to_regclass`, then `max(version)`); only when a migration is pending does it apply its versioned migrations (`gateway/src/main/resources/.../store/migrations/`), each in one transaction under `pg_advisory_xact_lock(hashtext('mapstudio_migrations'))`, and records the version **[live 8.3.10]**. When the connection never becomes usable it logs one error naming the connection; when a statement fails it logs one error naming the connection, the migration, the statement (its number in the migration's transaction and its first words), the SQLState ("none" for a failure that is not a database error), the missing right for 42501, and PostgreSQL's message (entry 5, `docs/operations.md`). Either way the map store is unavailable (`store-unreachable`), with no half-created schema, and Map Studio tries again at most once a minute on the next `map.load` or `applyEdits` **[live 8.3.10]**, logging the line again only when it changes (unit tested, `StoreRegistryStateTest`; **[unverified]** live: no live run has retried with the same failure). A recorded version newer than the module makes the map store read only: one warning naming the connection and both versions, nothing migrated or changed, `map.load` as usual with `readOnly`, saves refused `read-only` **[live 8.3.10]**. Of a redundant pair only the active node migrates and saves; a standby reads the version only and refuses saves `read-only` **[unverified]**. Rights: the first start needs a role that may CREATE in the schema, and the upgrade to schema 2 (epic 2 story 14: `ALTER TABLE`) the role that owns the tables ([operations.md](operations.md)) **[live 8.3.10]**; after that a least-privilege runtime role with CONNECT, USAGE on the schema, SELECT, INSERT and UPDATE on the tables and USAGE and SELECT on the sequences is enough **[live 8.3.10]** (docs/platform-checks.md). Map Studio has no backup of its own: the site's PostgreSQL backups cover these tables.
 
 | Table | Key | Columns |
 | --- | --- | --- |
 | `mapstudio_schema_version` | `version` | `applied_at timestamptz`, `module_version text` |
 | `mapstudio_project` | `project` | `seq bigint`: the project's change sequence |
-| `mapstudio_item` | `(project, id uuid)` | `kind`, `name`, `geometry text` (GeoJSON), `properties jsonb`, `asset_id`, `overrides jsonb`, `ends jsonb`, `version`, `deleted`, `updated_at` |
+| `mapstudio_item` | `(project, id uuid)` | `kind`, `name`, `geometry text` (GeoJSON), `properties jsonb`, `asset_id`, `overrides jsonb`, `ends jsonb`, `version`, `deleted`, `updated_at`, `attachment jsonb` (schema 2, null but on an attached instrument); partial index `(project, (attachment->>'lineId'))` on live attached rows (schema 2) |
 | `mapstudio_kind_setup` | `(project, kind_id)` | `setup jsonb`, `version`, `deleted`, `updated_at` (written from entry 9) |
-| `mapstudio_edit` | `edit_id bigserial` | `project`, `batch_id uuid`, `seq`, `entity`, `entity_id`, `op`, `version` (after the op), `actor`, `source` (`session` or `script`), `at timestamptz` (UTC); index `(project, seq)` |
+| `mapstudio_edit` | `edit_id bigserial` | `project`, `batch_id uuid`, `seq`, `entity`, `entity_id`, `op`, `version` (after the op), `actor`, `source` (`session` or `script`), `at timestamptz` (UTC); indexes `(project, seq)` and (schema 2) `(project, entity, entity_id)` |
 | `mapstudio_batch` | `(project, batch_id)` | `seq`, `actor`, `result jsonb`, `committed_at` (the reply a retried `batchId` gets, from entry 2) |
 
 The edit record answers "who changed what, when": the Ignition user name of the session, or the actor a script names.
@@ -212,7 +265,7 @@ Gateway scope: Perspective session scripts **[live 8.3.10]**, and Gateway event 
 
 | Function | Returns |
 | --- | --- |
-| `system.mapstudio.getMap(project)` | a list of map item records (dicts), deleted ones left out; the list's attribute `readOnly` is None, or the reason the map cannot be saved here (entry 5) **[live 8.3.10]**; its attribute `kindSetups` is the list of live kind setup records (entry 9) **[live 8.3.10]** |
+| `system.mapstudio.getMap(project)` | a list of map item records (dicts, with `attachment` a dict or None, epic 2 story 14 **[live 8.3.10]**), deleted ones left out; the list's attribute `readOnly` is None, or the reason the map cannot be saved here (entry 5) **[live 8.3.10]**; its attribute `kindSetups` is the list of live kind setup records (entry 9) **[live 8.3.10]** |
 | `system.mapstudio.applyEdits(project, batch, actor)` | `{batchId, seq, results}`; `actor` is required and recorded in the edit record |
 | `system.mapstudio.refreshAdapters(project)` | `{kinds: status, assets: status}` after calling the project's kind and asset functions now; waits for both to answer or time out, at most 21 s ([kinds-and-assets.md](kinds-and-assets.md)) **[live 8.3.10]** |
 | `system.mapstudio.ping()` | a short text with the Gateway time (a health check) |

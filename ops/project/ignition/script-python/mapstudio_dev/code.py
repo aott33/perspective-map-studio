@@ -36,6 +36,9 @@ KINDS = [
          {'key': 'buried', 'label': 'Buried', 'type': 'boolean', 'required': False}]},
     {'id': 'geofence', 'name': 'Geofence', 'geometry': 'line', 'icon': 'geofence', 'labelRank': 0, 'area': True,
      'fields': [{'key': 'operator', 'label': 'Operator', 'type': 'text', 'required': False}]},
+    # An instrument kind (epic 2 story 14): its map items may be attached to a line.
+    {'id': 'tap', 'name': 'Tap', 'geometry': 'point', 'icon': 'tap', 'labelRank': 2, 'instrument': True,
+     'fields': [{'key': 'tag', 'label': 'Tag', 'type': 'text', 'required': False}]},
 ]
 
 ASSETS = [

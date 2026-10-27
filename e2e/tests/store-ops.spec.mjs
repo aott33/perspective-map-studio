@@ -92,7 +92,7 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             await expect(map).toHaveAttribute('data-load-state', 'loaded');
             await expect(map).toHaveAttribute('data-store-state', 'read-only');
             const before = Number(await map.getAttribute('data-items-loaded'));
-            const reason = 'The map store was upgraded by a newer Map Studio (schema 999, this module knows 1); '
+            const reason = 'The map store was upgraded by a newer Map Studio (schema 999, this module knows 2); '
                 + 'saving is off until the module is upgraded.';
             await expect(page.locator('.mapstudio-store-status')).toHaveText('Map store: read only. ' + reason);
 
@@ -132,5 +132,20 @@ test.describe('healing', () => {
         await expect(map).toHaveAttribute('data-load-state', 'loaded');
         await expect(page.locator('.mapstudio-load-status')).toHaveCount(0);
         expect(await getMapResult(page)).toEqual({ count: 0, readOnly: null });
+    });
+
+    test('a store left at schema 1 with a map item is upgraded once its owner role is used', async ({ page }) => {
+        test.skip(SCENARIO !== 'upgraded');
+        // Epic 2 story 14: migration 2 (ALTER TABLE) ran after the tables' owner was fixed; the item
+        // saved at schema 1 is still there.
+        let map = await openCheckMap(page);
+        for (let attempt = 0; attempt < 12; attempt++) {
+            if ((await map.getAttribute('data-store-state')) === 'ready') break;
+            await page.waitForTimeout(5_000);
+            await page.reload({ waitUntil: 'load' });
+            map = await openCheckMap(page);
+        }
+        await expect(map).toHaveAttribute('data-store-state', 'ready');
+        expect(await getMapResult(page)).toEqual({ count: 1, readOnly: null });
     });
 });

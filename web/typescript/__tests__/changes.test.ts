@@ -5,7 +5,7 @@ import { readReply } from '../messages';
 
 function item(id: string, version = 1, deleted = false, name = id): MapItemRecord {
     return {
-        id, kind: 'line', name, version, deleted, properties: {}, assetId: null, overrides: {}, ends: null,
+        id, kind: 'line', name, version, deleted, properties: {}, assetId: null, overrides: {}, ends: null, attachment: null,
         geometry: { type: 'LineString', coordinates: [[-104.99, 39.74], [-104.98, 39.75]] }
     };
 }

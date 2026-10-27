@@ -11,20 +11,28 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
 
 /**
  * One kind of the project's kind list (AD-4, docs/kinds-and-assets.md):
- * {@code {id, name, geometry, icon, labelRank, fields, area}}. {@code geometry} is
+ * {@code {id, name, geometry, icon, labelRank, fields, area, instrument}}. {@code geometry} is
  * {@code point} or {@code line}; a higher {@code labelRank} keeps its label
  * longer when labels collide (default 0); {@code area: true} marks a line kind drawn
  * as a closed area, the only kind whose setup may hold {@code areaTints} (owner,
- * 2026-10-27, epic 2 story 9). Unknown keys are ignored.
+ * 2026-10-27, epic 2 story 9); {@code instrument: true} marks a point kind whose map items
+ * may be attached to a line (a tap, meter or line valve; AD-16, AD-19, epic 2 story 14).
+ * Unknown keys are ignored.
  */
 public record Kind(String id, String name, String geometry, String icon, int labelRank, List<FormField> fields,
-                   boolean area) {
+                   boolean area, boolean instrument) {
 
     public static final Set<String> GEOMETRIES = Set.of("point", "line");
 
     /** A kind that is not an area. */
     public Kind(String id, String name, String geometry, String icon, int labelRank, List<FormField> fields) {
-        this(id, name, geometry, icon, labelRank, fields, false);
+        this(id, name, geometry, icon, labelRank, fields, false, false);
+    }
+
+    /** A kind that is not an instrument. */
+    public Kind(String id, String name, String geometry, String icon, int labelRank, List<FormField> fields,
+                boolean area) {
+        this(id, name, geometry, icon, labelRank, fields, area, false);
     }
 
     static Kind parse(JsonObject o) throws Rows.RowException {
@@ -52,8 +60,12 @@ public record Kind(String id, String name, String geometry, String icon, int lab
         if (Boolean.TRUE.equals(area) && !"line".equals(geometry)) {
             throw new Rows.RowException("area applies to line kinds only");
         }
+        Boolean instrument = Rows.bool(o, "instrument");
+        if (Boolean.TRUE.equals(instrument) && !"point".equals(geometry)) {
+            throw new Rows.RowException("instrument applies to point kinds only");
+        }
         return new Kind(id, name, geometry, icon == null ? "" : icon, rank == null ? 0 : rank, List.copyOf(fields),
-            Boolean.TRUE.equals(area));
+            Boolean.TRUE.equals(area), Boolean.TRUE.equals(instrument));
     }
 
     public JsonObject toJson() {
@@ -70,6 +82,9 @@ public record Kind(String id, String name, String geometry, String icon, int lab
         o.add("fields", f);
         if (area) {
             o.addProperty("area", true);
+        }
+        if (instrument) {
+            o.addProperty("instrument", true);
         }
         return o;
     }

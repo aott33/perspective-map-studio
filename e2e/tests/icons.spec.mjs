@@ -91,13 +91,13 @@ test.describe('kind icon check', () => {
             // The dev kinds name real icons: ok with no icon note.
             await press(page, 'ok', 'ok');
             let k = await kindsAfterReload(page);
-            expect(k).toEqual({ status: 'ok', message: `3 kinds from ${KINDS_FN}.`, rows: '3' });
+            expect(k).toEqual({ status: 'ok', message: `4 kinds from ${KINDS_FN}.`, rows: '4' });
 
             const r = await press(page, 'unknown-icon', 'unknown-icon');
             expect(r.kinds.status).toBe('ok');
-            expect(r.kinds.message).toBe(`3 kinds from ${KINDS_FN}. ${UNKNOWN}`);
+            expect(r.kinds.message).toBe(`4 kinds from ${KINDS_FN}. ${UNKNOWN}`);
             k = await kindsAfterReload(page);
-            expect(k).toEqual({ status: 'ok', message: `3 kinds from ${KINDS_FN}. ${UNKNOWN}`, rows: '3' });
+            expect(k).toEqual({ status: 'ok', message: `4 kinds from ${KINDS_FN}. ${UNKNOWN}`, rows: '4' });
 
             // A session that cannot edit gets the count only, no kind id or icon name.
             // An anonymous context: newContext would otherwise inherit the editor's sign-in.
@@ -111,7 +111,7 @@ test.describe('kind icon check', () => {
                 await expect(viewerMap).toHaveAttribute('data-edit-level', 'none');
                 const el = viewer.locator('.mapstudio-adapter-status');
                 await expect(el).toHaveAttribute('data-kinds-status', 'ok');
-                await expect(el).toHaveAttribute('data-kinds-message', `3 kinds from ${KINDS_FN}. ${VIEWER_NOTE}`);
+                await expect(el).toHaveAttribute('data-kinds-message', `4 kinds from ${KINDS_FN}. ${VIEWER_NOTE}`);
             } finally {
                 await viewerContext.close();
             }
@@ -119,6 +119,6 @@ test.describe('kind icon check', () => {
             await press(page, 'ok', 'ok');
         }
         const k = await kindsAfterReload(page);
-        expect(k.message).toBe(`3 kinds from ${KINDS_FN}.`);
+        expect(k.message).toBe(`4 kinds from ${KINDS_FN}.`);
     });
 });

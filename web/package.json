@@ -13,6 +13,10 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "@turf/along": "7.4.0",
+        "@turf/helpers": "7.4.0",
+        "@turf/length": "7.4.0",
+        "@turf/nearest-point-on-line": "7.4.0",
         "maplibre-gl": "6.16.0",
         "react": "16.14.0",
         "react-dom": "16.14.0",

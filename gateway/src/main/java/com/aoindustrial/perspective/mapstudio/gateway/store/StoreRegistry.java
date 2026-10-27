@@ -237,8 +237,10 @@ public final class StoreRegistry {
                 log.infof("Map Studio's map store on database connection %s is at schema version %d.", connection,
                     result.version());
             } else {
-                log.infof("Map Studio created its map store schema on database connection %s: applied version(s) %s, "
-                    + "now at schema version %d.", connection, result.applied(), result.version());
+                // From schema 1 on an existing store (epic 2 story 14) the words say upgraded, not created.
+                log.infof("Map Studio %s its map store schema on database connection %s: applied version(s) %s, "
+                    + "now at schema version %d.", result.applied().get(0) == 1 ? "created" : "upgraded", connection,
+                    result.applied(), result.version());
             }
             lastLine.remove(connection);
             states.put(connection, StoreState.ready());

@@ -3,13 +3,13 @@ title: 'Instruments on lines: attachment stored and kept on the line'
 type: 'feature'
 ticket: '14'
 created: '2026-10-27'
-status: 'draft'
+status: 'in-review'
 baseline_revision: '8e08240c41dac2ad126681278b0805b221c0ff09'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
 context:
@@ -46,6 +46,17 @@ context:
 | Style source | `{instruments: "worst"}` on a line kind; on `pad` | first saved; second refused | `invalid` |
 | Kind list | `instrument: true` on a line kind | that kind row left out with its reason | adapter status `incomplete` |
 
+## Decisions
+
+**2026-10-27, owner ("agree with all recommendations, start building"):**
+1. An instruments style rule is only `{"source": {"instruments": "worst"}}`; `type`, `cases` and `expression` beside it are refused.
+2. Only a changed geometry or a delete of a line needs its instruments in the batch; a rename or property change of a line needs nothing.
+3. An instrument's point must be within 1 m of the place its `distanceM` puts it on the line; the Gateway refuses it otherwise.
+4. `attachment` is optional on an instrument kind (null is a free point) and never allowed on any other kind.
+5. A phone editor may not move an instrument: a geometry or attachment change of an instrument kind item is refused `role`, "An instrument moves along its line; only full editing can move it". Phone editing that sends `attachment` is a backlog entry for epic-phone.
+6. No instruments on area kinds: an attachment to an area item and an `instruments` source on an area kind are refused.
+7. One story, kept whole (about 3,000 tokens).
+
 </frozen-after-approval>
 
 ## Code Map
@@ -68,20 +79,20 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `G/../migrations/0002_instrument_attachment.sql` (new), `Migrations.java` -- `ALTER TABLE mapstudio_item ADD COLUMN attachment jsonb`; partial index on `(project, (attachment->>'lineId'))` where attachment is not null and not deleted; also story 2's suggested `mapstudio_edit (project, entity, entity_id)` index.
-- [ ] `C/Attachment.java` (new) -- record `{lineId, distanceM}`: parse (exactly those keys, `lineId` a UUID in lower-case form, `distanceM` finite and not negative, rounded to 0.1 m), `toJson`.
-- [ ] `C/LineMeasure.java` (new) -- pure `lengthM(coords)` and `pointAt(coords, distanceM)` with turf 7.4.0's formulas (`length`, `along`); `distanceM(a, b)`.
-- [ ] `C/MapItemRecord.java`, `C/ItemCheck.java`, `C/Kind.java`, `C/KindSetup.java` -- as in Code Map.
-- [ ] `G/write/AttachmentRules.java` (new) -- `check(tx, project, ops, written)` on the batch's end state: each live written record with an attachment points at a live line item (written in this batch, else `tx.lockItem`) of a line kind, `distanceM` at most length + 1 m, point per Open Question 3; each line in the batch whose geometry changed or that was deleted has no live attached instrument (`tx.liveAttached`) left without an op in this batch carrying `attachment`.
-- [ ] `G/store/{MapStore,JdbcMapStore}.java`, `T/write/FakeMapStore.java` -- `attachment` column; `liveAttached(project, lineId)` (prepared, uses the index, ordered by `distanceM`).
-- [ ] `G/write/{WriteService,RoleMatrix}.java` -- call `AttachmentRules`; phone rule.
-- [ ] Tests: `common` `AttachmentTest`, `LineMeasureTest` (vectors shared with Jest), `KindListTest`, `ItemCheckTest`, `KindSetupTest` additions; `T/write/WriteServiceInstrumentTest.java` (new, every matrix row, op order, restore together, phone), `MigrationsTest`, `MigratorTest`, `MapLoaderTest`, `GatewayScriptModuleTest`.
-- [ ] `web/package.json`, `package-lock.json` -- `@turf/helpers`, `@turf/length`, `@turf/along`, `@turf/nearest-point-on-line` at exactly 7.4.0; `NOTICE` -- Turf (MIT) entry.
-- [ ] `W/geometry.ts` (new) -- `lengthM`, `pointAt`, `project(line, point)` (nearest place, `distanceM` to 0.1 m), `instrumentsOn(items, lineId)` ordered, and batch builders `lineGeometryBatch(line, newCoords, items)`, `lineSplitBatch(line, partA, newLine, items)` (each instrument to the part it projects onto, measured from that part's start), `lineDeleteBatch(line, items)`.
-- [ ] `W/undo.ts` (new) -- `reverseBatch(before, batch, results)`: an update reverses to the old fields at the new version, a delete to a create at the tombstone's version, a create to a delete; one batch for one undo step.
-- [ ] `W/contract.ts`, `W/adapters.ts`, `W/unsaved.ts`; Jest `geometry.test.ts`, `undo.test.ts` (new) on L-SWD-like data (PT-1 at 1,143 m, PT-2 at 2,841 m of 2,922 m), `contract.test.ts`, `adapters.test.ts`.
-- [ ] `mapstudio_dev/code.py`, `MapStudioEdit/view.json` (`instrumentSave`, `instrumentFromGetMap`), `e2e/tests/instruments.spec.mjs` (new) -- the verify line live through `applyEdits` and `window.__mapStudioTest` `edits.apply`, batches as fixed JSON.
-- [ ] `docs/contract.md` (record, attachment rules, a line batch example, schema version 2), `docs/kinds-and-assets.md` (`instrument`), `docs/kind-setup.md` (`instruments` source), `docs/operations.md` (upgrading to schema 2 runs `ALTER TABLE`, which needs the tables' owner role) -- with examples.
+- [x] `G/../migrations/0002_instrument_attachment.sql` (new), `Migrations.java` -- `ALTER TABLE mapstudio_item ADD COLUMN attachment jsonb`; partial index on `(project, (attachment->>'lineId'))` where attachment is not null and not deleted; also story 2's suggested `mapstudio_edit (project, entity, entity_id)` index.
+- [x] `C/Attachment.java` (new) -- record `{lineId, distanceM}`: parse (exactly those keys, `lineId` a UUID in lower-case form, `distanceM` finite and not negative, rounded to 0.1 m), `toJson`.
+- [x] `C/LineMeasure.java` (new) -- pure `lengthM(coords)` and `pointAt(coords, distanceM)` with turf 7.4.0's formulas (`length`, `along`); `distanceM(a, b)`.
+- [x] `C/MapItemRecord.java`, `C/ItemCheck.java`, `C/Kind.java`, `C/KindSetup.java` -- as in Code Map.
+- [x] `G/write/AttachmentRules.java` (new) -- `check(tx, project, ops, written)` on the batch's end state: each live written record with an attachment points at a live line item (written in this batch, else `tx.lockItem`) of a line kind, `distanceM` at most length + 1 m, point per Open Question 3; each line in the batch whose geometry changed or that was deleted has no live attached instrument (`tx.liveAttached`) left without an op in this batch carrying `attachment`.
+- [x] `G/store/{MapStore,JdbcMapStore}.java`, `T/write/FakeMapStore.java` -- `attachment` column; `liveAttached(project, lineId)` (prepared, uses the index, ordered by `distanceM`).
+- [x] `G/write/{WriteService,RoleMatrix}.java` -- call `AttachmentRules`; phone rule.
+- [x] Tests: `common` `AttachmentTest`, `LineMeasureTest` (vectors shared with Jest), `KindListTest`, `ItemCheckTest`, `KindSetupTest` additions; `T/write/WriteServiceInstrumentTest.java` (new, every matrix row, op order, restore together, phone), `MigrationsTest`, `MigratorTest`, `MapLoaderTest`, `GatewayScriptModuleTest`.
+- [x] `web/package.json`, `package-lock.json` -- `@turf/helpers`, `@turf/length`, `@turf/along`, `@turf/nearest-point-on-line` at exactly 7.4.0; `NOTICE` -- Turf (MIT) entry.
+- [x] `W/geometry.ts` (new) -- `lengthM`, `pointAt`, `project(line, point)` (nearest place, `distanceM` to 0.1 m), `instrumentsOn(items, lineId)` ordered, and batch builders `lineGeometryBatch(line, newCoords, items)`, `lineSplitBatch(line, partA, newLine, items)` (each instrument to the part it projects onto, measured from that part's start), `lineDeleteBatch(line, items)`.
+- [x] `W/undo.ts` (new) -- `reverseBatch(before, batch, results)`: an update reverses to the old fields at the new version, a delete to a create at the tombstone's version, a create to a delete; one batch for one undo step.
+- [x] `W/contract.ts`, `W/adapters.ts`, `W/unsaved.ts`; Jest `geometry.test.ts`, `undo.test.ts` (new) on L-SWD-like data (PT-1 at 1,143 m, PT-2 at 2,841 m of 2,922 m), `contract.test.ts`, `adapters.test.ts`.
+- [x] `mapstudio_dev/code.py`, `MapStudioEdit/view.json` (`instrumentSave`, `instrumentFromGetMap`), `e2e/tests/instruments.spec.mjs` (new) -- the verify line live through `applyEdits` and `window.__mapStudioTest` `edits.apply`, batches as fixed JSON.
+- [x] `docs/contract.md` (record, attachment rules, a line batch example, schema version 2), `docs/kinds-and-assets.md` (`instrument`), `docs/kind-setup.md` (`instruments` source), `docs/operations.md` (upgrading to schema 2 runs `ALTER TABLE`, which needs the tables' owner role) -- with examples.
 
 **Acceptance Criteria:**
 - Given a dev database at schema 1 with saved items, when the new module starts, then `mapstudio_schema_version` holds 2, existing items read back with `attachment` null, and nothing else changed.
@@ -99,19 +110,22 @@ context:
 
 The Gateway does not project; it only checks that the browser's result is on the line. The batch-level check runs after the per-op writes inside the transaction, so it sees the batch's end state; a refusal rolls everything back. The project row lock taken by `nextSeq` serialises the project's batches, so no instrument can be attached to a line between the check and the commit. Turf is used as separate 7.4.0 packages (the same code as `@turf/turf` 7.4.0 in the architecture's Stack, smaller bundle).
 
-## Open Questions
-
-1. **Shape of an instruments style rule.** (a) `{"source": {"instruments": "worst"}}` alone, with `type`, `cases` and `expression` refused, since the worst instrument already gives a preset; (b) also require `type: "states"` with cases mapping presets to presets. Recommended: (a).
-2. **Which line changes need the instruments in the batch.** (a) a changed geometry and a delete only (a rename or property change needs nothing); (b) any update of the line. Recommended: (a); (b) would make a phone editor's property edit of a line fail.
-3. **Must the instrument's point match its attachment.** (a) yes, the Gateway refuses a point more than 1 m from the place at `distanceM` on the line; (b) no, only the range of `distanceM`. Recommended: (a), so the point and the distance can never disagree.
-4. **Is an attachment required on an instrument kind.** (a) optional: an instrument kind item may be saved with `attachment` null (a free point until an editor places it); (b) required on every create and update. Recommended: (a), robust to a kind list that changes; a non-instrument kind must always have null.
-5. **Phone editors and instruments.** (a) a phone editor's geometry change of an instrument is refused `role` ("An instrument moves along its line; only full editing can move it"); (b) phone editing may also send `attachment` for an instrument staying on the same line. Recommended: (a) now, (b) as a backlog entry for epic-phone.
-6. **Area kinds.** (a) an attachment to an area item and an `instruments` source on an area kind are refused; (b) allowed. Recommended: (a); an area is not a pipeline.
-7. **Plan size.** About 3,000 tokens, above the 1,600 guide. (a) keep one story, as the owner sliced it and as story 9 did; (b) split the web geometry module and `reverseBatch` into their own entry. Recommended: (a); the Gateway rule and the module are tested against each other.
-
 ## Implementation Notes
 
+- Implemented directly from the plan (no subagent tool in this session), 2026-10-27.
+- `AttachmentRules` checks the lines first (a changed or deleted line with an instrument left behind), then each written attachment, both on the state the batch leaves; so a batch that reshapes a line and forgets an instrument is refused naming the line, not the instrument's now-wrong point. The instrument named in that message is the one as the batch leaves it (a renamed one by its new name).
+- The phone rule refuses a geometry change of a point whose kind is an instrument kind, or of any stored point with an attachment (a kind that stopped being an instrument), and any phone update carrying `attachment`, with the owner's words.
+- Distances: `LineMeasure` ports Turf 7.4.0's `distance`, `bearing`, `destination`, `length` and `along`, including Turf's `% 360` and `% 2 pi` normalisation; the shared vectors (`common/src/test/resources/.../line-measure-vectors.json`) were generated by Turf itself and Java agrees to 1e-6 m and 1e-11 degrees.
+- `web/typescript/geometry.ts` adds `lineMoveBatch` (a whole-line move by an offset, each instrument's point moved by the same offset before projecting), beside the plan's `lineGeometryBatch`, `lineSplitBatch` and `lineDeleteBatch`; projection uses `nearestPointOnLine`'s `lineDistance`, rounded to 0.1 m, and stores the point Turf's `along` gives at that rounded distance, so the Gateway's 1 m check always holds.
+- Nothing in the component imports `geometry.ts` or `undo.ts` yet, so Turf is not in the browser bundle (MapStudio.js 1,209,165 to 1,209,432 bytes, the contract and adapter reader changes); NOTICE says so.
+- `StoreRegistry` logs "upgraded" instead of "created" when the first applied migration is not 1.
+- The dev adapter gained `tap` (instrument); e2e kind counts went from 3 to 4, and the /edit script checks add a line and a tap (placed before story 9's checks so the script's last save is still the CSV pad), so `changes.spec.mjs` counts +5 and `store.spec.mjs` +4.
+- `ops/store-checks.sh` gained scenario `upgrade` (schema 1 with an item, tables owned by another role: refused 42501 on `ALTER TABLE`, then upgraded after the ownership is given, no restart); `store-ops.spec.mjs` gained scenario `upgraded`.
+- Phone editing that sends `attachment` (Open Question 5, option b) is in `_bmad-output/deferred-work.md` for epic-phone.
+
 ## Plan Change Log
+
+- 2026-10-27, implementation: added `lineMoveBatch` to `W/geometry.ts`, the `upgrade` scenario to `ops/store-checks.sh` (with `upgraded` in `e2e/tests/store-ops.spec.mjs`), the "upgraded" log wording in `G/store/StoreRegistry.java`, and count updates in `e2e/tests/{adapters,icons,changes,store}.spec.mjs` and `WriteServiceKindCheckTest` caused by the new `tap` kind and script checks. No frozen content changed.
 
 ## Review Triage Log
 

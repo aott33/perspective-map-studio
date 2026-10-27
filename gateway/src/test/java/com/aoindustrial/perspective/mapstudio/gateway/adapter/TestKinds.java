@@ -10,7 +10,7 @@ import com.aoindustrial.perspective.mapstudio.common.contract.Kind;
 /**
  * A kind list for the write path's tests (epic 2 story 9): every item a test saves is checked
  * against it. {@code pad} (point), {@code line} (line), {@code geofence} (an area line kind)
- * and {@code pipe} (line, no fields).
+ * {@code pipe} (line, no fields) and {@code tap} (an instrument point kind, epic 2 story 14).
  */
 public final class TestKinds {
 
@@ -24,7 +24,9 @@ public final class TestKinds {
         + "{\"key\":\"note\",\"type\":\"text\"},{\"key\":\"inspected\",\"type\":\"boolean\"}]},"
         + "{\"id\":\"geofence\",\"name\":\"Geofence\",\"geometry\":\"line\",\"area\":true,\"fields\":["
         + "{\"key\":\"operator\",\"type\":\"text\"}]},"
-        + "{\"id\":\"pipe\",\"name\":\"Pipe\",\"geometry\":\"line\"}]").getAsJsonArray()).kept();
+        + "{\"id\":\"pipe\",\"name\":\"Pipe\",\"geometry\":\"line\"},"
+        + "{\"id\":\"tap\",\"name\":\"Tap\",\"geometry\":\"point\",\"icon\":\"tap\",\"instrument\":true,\"fields\":["
+        + "{\"key\":\"tag\",\"type\":\"text\"}]}]").getAsJsonArray()).kept();
 
     private TestKinds() {
     }
