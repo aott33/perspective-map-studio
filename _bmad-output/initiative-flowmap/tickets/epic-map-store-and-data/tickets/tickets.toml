@@ -1,6 +1,7 @@
 # Epic 2 stories in build order. Table order is build order; ids are permanent.
 # Parallel groups (epic Notes, Decision 2026-10-26): 1 alone; group A = 2 to 7 after 1;
-# group B = 8, 9, 10; group C = 11; then 12 (sweep) and 13 (closing release check).
+# group B = 8, 9, 10 and 15 (added 2026-10-27, tag browse); group C = 11 and 14 (added 2026-10-27,
+# instruments on lines); then 12 (sweep) and 13 (closing release check). Stories 2 to 7 are being built now: do not disturb them.
 
 [[entry]]
 id = 1
@@ -33,6 +34,17 @@ description = "Calls the kind and asset functions the setup names on a bounded p
 verify = "map.load in the dev session carries the dev kinds and assets with status ok; emptying, breaking or slowing the dev adapter shows the matching plain-words status in map.load and one log line, without a Gateway restart."
 covers = ["R8", "R10", "R14"]
 after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 15
+type = "story"
+title = "Tag browse and asset-relative paths for the tag browser"
+description = "Owner-approved 2026-10-27, refined the same day (initiative R15; prd FR-12; architecture AD-8): the Gateway side of the tag browser, Map Studio's own tree with a tag provider dropdown (epic-editing), not Perspective's Tag Browse Tree component. First a short live check on the dev 8.3 Gateway of Ignition's tag browse API from the module's Gateway scope (which calls list the providers and find the Gateway's default, browse a folder of any provider, under whose permissions, how deep and how fast on a UDT instance), recorded in docs/platform-checks.md; the API is unverified until then. Then adds two message types to common/ and the delegate. tags.browse {provider, folder} is a general browse of any provider and folder (provider omitted is the Gateway's default, folder omitted or empty the provider's root), replying {provider, folder, providers: [{name, isDefault}], children: [{name, path, type, dataType, hasChildren}]}, each child with its full tag path. tags.resolve {kindId, assetId, path} converts a picked or typed tag path against the asset's base path from entry 3's cached asset list: a full path under the base path, or an {asset.path}/... path, replies {path: \"{asset.path}/...\", relative: true, n, m}, where m counts the kind's map items with a base path and n those it resolves for; any other full path replies {path (unchanged), relative: false}, for the browser's \"Same tag for every <kind>\" warning. Both for the full editing role only, checked on the Gateway (code role otherwise, phone editing included); an unknown provider, folder, asset or kind is refused with code invalid; reads tags, writes nothing; no migration. Docs for both messages (R14). Gateway and common/ only; no tree, dropdown, warning or Kinds screen. Group B (after 3)."
+verify = "docs/platform-checks.md records the live 8.3 browse check; on the dev Gateway a full editor's tags.browse with no provider returns the providers with the Gateway's default marked and that provider's root, and a browse of a second provider and of a dev pad's asset folder (for example [default]Mesa/P12) lists children with name, full path, type and data type, a folder opening to its children; tags.resolve of a tag picked under that folder returns {asset.path}/... with resolves for N of M across the dev pads, one pad with the tag missing, and of a tag outside it returns the full path with relative false; a viewer's or phone editor's tags.browse or tags.resolve is refused with code role, and an unknown provider or folder with code invalid; Gateway tests cover the conversion, the count and the refusals."
+covers = ["R17", "R14"]
+after = [3]
 hitl = false
 risk = "medium"
 
@@ -95,8 +107,8 @@ risk = "high"
 id = 9
 type = "story"
 title = "Kind setups in the map store, and items checked against the kind list"
-description = "Publishes the kind setup schema (comms path, up to 4 KPIs with one icon KPI, alarms path, popup parts, popup link, custom popup view, a switch per live value) in common/ and docs; kindSetup ops (one versioned row per project and kind id) go through the write service and come back in map.load and getMap; every map item op is validated and normalised against the cached kind list (known kind, geometry, form-field types) and refused with code invalid and the reason. Write service validation and kind setup storage. Group B (after 2 and 3)."
-verify = "Gateway tests and a live run: a kind setup saved by applyEdits returns in map.load; an item of an unknown kind, of the wrong geometry or with a mistyped property is refused with a plain-words reason; a CSV-style string number is stored as a number."
+description = "Publishes the kind setup schema (comms path, up to 4 KPIs with one icon KPI, alarms path, popup parts, popup link, custom popup view, a switch per live value) in common/ and docs; kindSetup ops (one versioned row per project and kind id) go through the write service and come back in map.load and getMap; every map item op is validated and normalised against the cached kind list (known kind, geometry, form-field types) and refused with code invalid and the reason. Owner-approved 2026-10-26 (initiative R40, architecture AD-16): the schema also carries the optional styleRule {source, type, cases, expression} and, for area kinds, areaTints {property, tints}, and a map item's overrides may hold its own styleRule; the write service stores them and refuses a preset or tint name outside the closed lists in common/, or a rule that does not match its type, with code invalid; nothing renders them here (epic-viewing). Owner-approved 2026-10-27 (initiative R8, R39; prd FR-5, FR-6, FR-37; architecture AD-7, AD-16): the custom popup view part is popupView {path, params}, each param a string literal or exactly one placeholder from the closed list published in common/ ({item.id}, {item.name}, {asset.id}, {asset.path}, {item.properties.X}), and the popup link uses the same placeholders; the view always receives mapItem, so no param may be named mapItem; a param may also be exactly {asset.path} followed by a tag path suffix, for example {asset.path}/Pressure (what a tag browser pick inside the asset folder gives; owner, 2026-10-27, answering question 17), accepted and resolved against the map item's asset base path, so the placeholder fill published in common/ gives [default]Mesa/P12/Pressure for pad P12; the write service refuses an unknown placeholder in a param or the link, any other mix of text and placeholders in a param or a param named mapItem with code invalid and the reason; stored and validated only, epic-viewing fills and renders them (per-item override, empty values and URL-encoding stay in the backlog). Owner-approved 2026-10-27 (the tag browser refined; initiative R15, R40; architecture AD-16): the popup link and the alarm page may mix text with any number of placeholders; every tag path in a kind setup (comms, KPIs, alarms, a style rule's value) is stored as an asset-relative {asset.path}/... path or a full tag path, and an override's tag path as a full tag path; the write service accepts both forms. Write service validation and kind setup storage. Group B (after 2 and 3)."
+verify = "Gateway tests and a live run: a kind setup saved by applyEdits returns in map.load; an item of an unknown kind, of the wrong geometry or with a mistyped property is refused with a plain-words reason; a CSV-style string number is stored as a number. A kind setup with a States rule, a Bands rule and areaTints, and an item override with its own styleRule, return unchanged in map.load and getMap, and a preset or tint name outside the closed lists, or a colour code, is refused with code invalid and a plain-words reason. A kind setup with popupView {path: \"Popups/PadDetails\", params: {padName: \"{item.name}\", tagPath: \"{asset.path}\", area: \"Mesa\"}} and the link /pad/{item.name} returns unchanged in map.load and getMap; a param pressure {asset.path}/Pressure is accepted, returns unchanged, and the common/ placeholder fill resolves it to [default]Mesa/P12/Pressure for pad P12 (base path [default]Mesa/P12); an unknown placeholder such as {item.foo} in a param or in the link, a param mixing text and placeholders in another way such as P-{item.name} or {item.name}/Pressure, or a param named mapItem, is refused with code invalid and a plain-words reason. A kind setup with comms {asset.path}/Comms and a KPI on the full path [default]Shared/GasPrice, and an override with a full-path KPI, return unchanged in map.load and getMap."
 covers = ["R8", "R11", "R14"]
 after = [2, 3]
 hitl = false
@@ -106,8 +118,8 @@ risk = "medium"
 id = 10
 type = "story"
 title = "Core oil and gas icon set"
-description = "Ships the sixteen FR-9 icons in one minimalist style as a sprite the module serves, with their source, licence and attribution in NOTICE, nothing derived from OpenBridge, and an icon catalogue in common/ that the kind list's icon names are checked against (an unknown name reported in the adapter status). The owner approves the look. Static assets, the catalogue and the adapter check only; epic-viewing draws them. Group B (after 3)."
-verify = "The sprite and catalogue are served by the dev Gateway, a docs page shows all sixteen icons, NOTICE carries their licence, and a dev kind naming an unknown icon is reported in map.load."
+description = "Ships the seventeen FR-9 icons (sixteen plus the instrument meter, a flow meter on a line, added 2026-10-27 with initiative R41; its glyph is new and distinct from meter station) in one minimalist style as a sprite the module serves, with their source, licence and attribution in NOTICE, nothing derived from OpenBridge, and an icon catalogue in common/ that the kind list's icon names are checked against (an unknown name reported in the adapter status). The owner approves the look. Static assets, the catalogue and the adapter check only; epic-viewing draws them. Group B (after 3)."
+verify = "The sprite and catalogue are served by the dev Gateway, a docs page shows all seventeen icons, NOTICE carries their licence, and a dev kind naming an unknown icon is reported in map.load."
 covers = ["R9"]
 after = [3]
 hitl = true
@@ -125,13 +137,24 @@ hitl = false
 risk = "medium"
 
 [[entry]]
+id = 14
+type = "story"
+title = "Instruments on lines: attachment stored and kept on the line"
+description = "Owner-approved 2026-10-27 (initiative R41; prd FR-40; architecture AD-16, AD-19, AD-20). Adds attachment {lineId, distanceM} to the map item record (the next migration number, per the epic's migration rule) and instrument: true on point kinds to the kind list contract; the write service validates an attachment (instrument kind only, a live line item, distanceM from 0 to the line's geodesic length within 1 m) and refuses with code invalid a batch that changes or deletes a line without updating or deleting every instrument attached to it; deleting a line deletes its instruments in the same batch, and undoing it restores both in one step (owner, 2026-10-27); the shared geometry module in web/ gains the projection that recomputes each attached instrument's distanceM and point on a line's new geometry (move, reshape, vertex insert or delete, split), sent in the same edits.apply batch as the line; a line kind's styleRule may take source {instruments: \"worst\"}, refused on other kinds; map.load and getMap return attachments; docs for the record, kind list and kind setup schema updated. Stores and validates only: no drawing, popup or tool (epic-viewing entry 2, epic-editing). Group C (after 2 and 9); stories 2 to 7, being built now, are not disturbed."
+verify = "Gateway tests and a live run: an instrument saved on a line with its distanceM returns unchanged in map.load and getMap; an attachment on a non-instrument kind, to a deleted or missing line, or past the line's end is refused with code invalid and a plain-words reason; a batch that reshapes or deletes a line without its instruments is refused; Jest tests of the shared geometry module turn a move, a reshape and a split of L-SWD-like test data (PT-1 at 1,143 m, PT-2 at 2,841 m of 2,922 m) into one batch that keeps each instrument on the line at its nearest place, saved all or none and undone as one step; deleting a line deletes its instruments in the same batch and one undo restores the line and its instruments; an instrument changed by another editor meanwhile makes the line's batch a conflict; an instruments style source on a point kind is refused."
+covers = ["R16"]
+after = [2, 9]
+hitl = false
+risk = "medium"
+
+[[entry]]
 id = 12
 type = "story"
 title = "Refactor sweep"
 description = "Cleans up what the other stories deferred, scoped at its start from their plans and review findings; cleanup only."
 verify = "The build, the Gateway and Jest tests and the e2e suite still pass after the sweep."
 covers = []
-after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15]
 hitl = false
 risk = "low"
 

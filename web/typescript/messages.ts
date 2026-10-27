@@ -5,6 +5,11 @@
  * `{code, message}`. Pure functions only, so this module is unit tested in node.
  */
 
+import { MapChangedBody, readMapChanged } from './changes';
+import {
+    Conflict, EditBatch, EditsApplyReplyBody, MapLoadReplyBody, readConflicts, readEditsApplyReply, readMapLoadReply
+} from './contract';
+
 /** Contract version carried in `v`. */
 export const MESSAGE_VERSION = 1;
 
@@ -15,6 +20,11 @@ export const MESSAGE_EVENT = 'mapstudio.message';
 export const MessageTypes = {
     POINT_CLICK: 'point.click',
     POINT_CLICK_REPLY: 'point.click.reply',
+    MAP_LOAD: 'map.load',
+    MAP_LOAD_REPLY: 'map.load.reply',
+    EDITS_APPLY: 'edits.apply',
+    EDITS_APPLY_REPLY: 'edits.apply.reply',
+    MAP_CHANGED: 'map.changed',
     ERROR: 'error'
 } as const;
 
@@ -37,13 +47,33 @@ export interface PointClickReplyBody {
 export interface ErrorBody {
     code: string;
     message: string;
+    /** Set when an edits.apply batch was refused. */
+    batchId?: string;
+    /** The op at fault, when one is. */
+    op?: { index: number; id?: string };
+    /** Every stale op, on a `conflict` (epic 2 story 2). */
+    conflicts?: Conflict[];
 }
 
 /** The outcome of reading one inbound envelope from the Gateway. */
 export type Reply =
     | { kind: 'point.click.reply'; id: string; body: PointClickReplyBody }
+    | { kind: 'map.load.reply'; id: string; body: MapLoadReplyBody }
+    | { kind: 'edits.apply.reply'; id: string; body: EditsApplyReplyBody }
+    /** `body` is null when the map.changed could not be read: the browser treats it as a gap. */
+    | { kind: 'map.changed'; id: string; body: MapChangedBody | null }
     | { kind: 'error'; id: string; body: ErrorBody }
     | { kind: 'invalid'; reason: string };
+
+/** The `map.load` message: the browser asks for the map. */
+export function mapLoad(id?: string): Envelope<Record<string, never>> {
+    return envelope(MessageTypes.MAP_LOAD, {}, id);
+}
+
+/** The `edits.apply` message for one batch. */
+export function editsApply(batch: EditBatch, id?: string): Envelope<EditBatch> {
+    return envelope(MessageTypes.EDITS_APPLY, batch, id);
+}
 
 /** A UUID v4 string: `crypto.randomUUID` where the browser has it, else a Math.random fallback. */
 export function newMessageId(): string {
@@ -94,15 +124,35 @@ export function readReply(raw: unknown): Reply {
                 id: raw.id,
                 body: { pointId: body.pointId, receivedAt: body.receivedAt }
             };
-        case MessageTypes.ERROR:
-            return {
-                kind: 'error',
-                id: raw.id,
-                body: {
-                    code: typeof body.code === 'string' ? body.code : 'unknown',
-                    message: typeof body.message === 'string' ? body.message : 'Unknown error.'
-                }
+        case MessageTypes.MAP_LOAD_REPLY: {
+            const loaded = readMapLoadReply(body);
+            return loaded ? { kind: 'map.load.reply', id: raw.id, body: loaded }
+                : { kind: 'invalid', reason: 'map.load.reply needs level, seq and items.' };
+        }
+        case MessageTypes.EDITS_APPLY_REPLY: {
+            const saved = readEditsApplyReply(body);
+            return saved ? { kind: 'edits.apply.reply', id: raw.id, body: saved }
+                : { kind: 'invalid', reason: 'edits.apply.reply needs batchId, seq and results.' };
+        }
+        case MessageTypes.MAP_CHANGED:
+            return { kind: 'map.changed', id: raw.id, body: readMapChanged(raw.body) };
+        case MessageTypes.ERROR: {
+            const error: ErrorBody = {
+                code: typeof body.code === 'string' ? body.code : 'unknown',
+                message: typeof body.message === 'string' ? body.message : 'Unknown error.'
             };
+            if (typeof body.batchId === 'string') {
+                error.batchId = body.batchId;
+            }
+            if (isRecord(body.op) && typeof body.op.index === 'number') {
+                error.op = typeof body.op.id === 'string'
+                    ? { index: body.op.index, id: body.op.id } : { index: body.op.index };
+            }
+            if (Array.isArray(body.conflicts)) {
+                error.conflicts = readConflicts(body.conflicts);
+            }
+            return { kind: 'error', id: raw.id, body: error };
+        }
         default:
             return { kind: 'invalid', reason: 'Unknown reply type: ' + raw.type };
     }
@@ -113,6 +163,13 @@ export function replyText(reply: Reply): string {
     switch (reply.kind) {
         case 'point.click.reply':
             return 'Gateway received click on ' + reply.body.pointId + ' at ' + reply.body.receivedAt;
+        case 'map.load.reply':
+            return 'Map loaded: ' + reply.body.items.length + ' map items at seq ' + reply.body.seq;
+        case 'edits.apply.reply':
+            return 'Saved batch ' + reply.body.batchId + ' as seq ' + reply.body.seq;
+        case 'map.changed':
+            return reply.body ? 'Map changed: seq ' + reply.body.seq + ', ' + reply.body.ops.length + ' op(s)'
+                : 'Map changed: unreadable change';
         case 'error':
             return 'Error (' + reply.body.code + '): ' + reply.body.message;
         default:

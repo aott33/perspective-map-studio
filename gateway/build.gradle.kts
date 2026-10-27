@@ -32,4 +32,6 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // GatewayScriptModuleTest starts Jython; keep it from writing a package cache into the checkout.
+    systemProperty("python.cachedir.skip", "true")
 }

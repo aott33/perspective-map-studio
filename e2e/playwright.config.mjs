@@ -23,6 +23,7 @@ export default defineConfig({
     timeout: 180_000,
     expect: { timeout: 15_000 },
     globalSetup: './global-setup.mjs',
+    globalTeardown: './global-teardown.mjs',
     outputDir: 'out/results',
     reporter: [['list'], ['html', { open: 'never', outputFolder: 'out/report' }]],
     use: {

@@ -1,0 +1,14 @@
+{
+  "scope": "A",
+  "description": "Docker secrets mounted into the Map Studio dev Gateway",
+  "version": 1,
+  "restricted": false,
+  "overridable": true,
+  "files": [
+    "config.json"
+  ],
+  "attributes": {
+    "uuid": "6fe32e36-4be4-4144-ba4b-a37cdc55e953",
+    "enabled": true
+  }
+}

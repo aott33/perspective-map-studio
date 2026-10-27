@@ -139,3 +139,14 @@
 .mapstudio-popup--view {
     padding-top: 0;
 }
+
+/* Save state of a drawn line, in words (AD-11: no colour of its own; a refusal is said, not coloured). */
+.mapstudio-save-status--saving {
+    color: var(--label--disabled);
+}
+
+.mapstudio-save-status--refused,
+.mapstudio-load-status,
+.mapstudio-store-status {
+    font-weight: 600;
+}

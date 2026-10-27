@@ -15,6 +15,14 @@
   "/fallback-missing": {
    "viewPath": "MapStudioFallbackMissing",
    "viewParams": {}
+  },
+  "/edit": {
+   "viewPath": "MapStudioEdit",
+   "viewParams": {}
+  },
+  "/adapters": {
+   "viewPath": "MapStudioAdapters",
+   "viewParams": {}
   }
  },
  "shared": {},

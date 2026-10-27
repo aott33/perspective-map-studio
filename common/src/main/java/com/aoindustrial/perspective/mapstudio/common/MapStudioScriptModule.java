@@ -3,25 +3,25 @@ package com.aoindustrial.perspective.mapstudio.common;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
+import org.python.core.PyObject;
+
 import com.inductiveautomation.ignition.common.BundleUtil;
-import com.inductiveautomation.ignition.common.script.hints.ScriptArg;
 import com.inductiveautomation.ignition.common.script.hints.JythonElement;
+import com.inductiveautomation.ignition.common.script.hints.ScriptArg;
 
 /**
- * The {@code system.mapstudio} scripting module (AD-18). Spike (story 3): one
- * function, {@code ping()}, proves that a module registers a scripting function
- * that project scripts and the Designer see; the real API (getMap, applyEdits)
- * is epic-map-store-and-data's.
+ * The {@code system.mapstudio} scripting module (AD-18), contract 0.2.0 (draft).
  *
- * <p>Lives in the common scope so the Gateway hook (where scripts run) and the
- * Designer hook (autocomplete and the script console) register the same class,
- * as IA's scripting-function example does. The real API's Gateway-only functions
- * will call the Gateway over RPC from the Designer, as in that example.
+ * <p>Abstract in the common scope, as in IA's scripting-function example: the
+ * Gateway hook registers a subclass that runs {@code getMap} and
+ * {@code applyEdits} on the map store's write service, and the Designer hook a
+ * subclass that offers them for autocomplete and raises "runs in Gateway scope
+ * only" when called there (owner decision, 2026-10-26).
  *
  * <p>Documentation comes from {@code MapStudioScriptModule.properties} through
  * the {@code PropertiesFileDocProvider} each hook registers it with.
  */
-public final class MapStudioScriptModule {
+public abstract class MapStudioScriptModule {
 
     static {
         BundleUtil.get().addBundle(
@@ -30,13 +30,44 @@ public final class MapStudioScriptModule {
             MapStudioScriptModule.class.getName().replace('.', '/'));
     }
 
+    /** A health check: a short text with the Gateway time. */
     @JythonElement(docBundlePrefix = "MapStudioScriptModule")
     public String ping() {
         return "Map Studio pong at " + Instant.now().truncatedTo(ChronoUnit.SECONDS);
     }
 
+    /**
+     * The project's map items as a list of dicts (the map item record, AD-20),
+     * deleted ones left out.
+     */
     @JythonElement(docBundlePrefix = "MapStudioScriptModule")
-    public String echo(@ScriptArg("text") String text) {
-        return text == null ? "" : text;
+    public PyObject getMap(@ScriptArg("project") String project) {
+        return getMapImpl(project);
     }
+
+    /**
+     * Save one batch {batchId, ops} through the write service, all ops or none,
+     * recorded under {@code actor}. Returns {batchId, seq, results}.
+     */
+    @JythonElement(docBundlePrefix = "MapStudioScriptModule")
+    public PyObject applyEdits(@ScriptArg("project") String project, @ScriptArg("batch") PyObject batch,
+                               @ScriptArg("actor") String actor) {
+        return applyEditsImpl(project, batch, actor);
+    }
+
+    /**
+     * Call the project's kind function and asset function now (instead of waiting
+     * for the refresh interval) and return both statuses, {kinds, assets}. Waits for
+     * the calls to answer or time out.
+     */
+    @JythonElement(docBundlePrefix = "MapStudioScriptModule")
+    public PyObject refreshAdapters(@ScriptArg("project") String project) {
+        return refreshAdaptersImpl(project);
+    }
+
+    protected abstract PyObject getMapImpl(String project);
+
+    protected abstract PyObject refreshAdaptersImpl(String project);
+
+    protected abstract PyObject applyEditsImpl(String project, PyObject batch, String actor);
 }

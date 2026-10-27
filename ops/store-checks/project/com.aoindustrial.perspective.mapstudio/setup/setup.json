@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "connection": "MapStudioCheck",
+  "roles": {
+    "full": [
+      "MapEditor"
+    ],
+    "phone": [
+      "MapOperator"
+    ]
+  },
+  "kindsFunction": "",
+  "assetsFunction": "",
+  "refreshIntervalSeconds": 10,
+  "alarmPage": "",
+  "basemaps": [
+    "none",
+    "osm"
+  ],
+  "tokenSecret": ""
+}

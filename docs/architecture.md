@@ -94,7 +94,7 @@ erDiagram
 
 ## Contracts you must not break
 
-The component's props and events, the message contract, the map item record and object, the live value shape, the asset contract, the kind list, the setup schema, the scripting API and the CSV formats are public. They follow semantic versioning: a breaking change needs a new major version (AD-9). Messages always use the envelope `{v, type, id, body}`, and errors are `{code, message}` (AD-8).
+The component's props and events, the message contract, the map item record and object, the live value shape, the asset contract, the kind list, the setup schema, the scripting API and the CSV formats are public. They follow semantic versioning: a breaking change needs a new major version (AD-9). Messages always use the envelope `{v, type, id, body}`, and errors are `{code, message}` (AD-8). The contract as built so far (messages, error codes, ops, the map item record, the setup schema, the map store tables and the scripting API, version 0.2.0 in draft) is written down in `docs/contract.md`, the project setup in `docs/setup.md`; the code in `common/` is its reference.
 
 ## Conventions
 
@@ -116,8 +116,11 @@ CI builds and signs the `.modl` and publishes it as a GitHub release. Projects i
 ## Operations
 
 - **Backup:** the map store is backed up with the site's PostgreSQL backups; export gives a portable copy.
-- **Database rights:** if Map Studio cannot create or upgrade its tables, it logs an error naming the connection and the missing right, as the historian and alarm journal do, and the map is unavailable until it is fixed.
-- **Redundancy:** only the active Gateway subscribes and saves; after a failover the caches rebuild and open maps reload (AD-21).
+- **Database rights:** if Map Studio cannot create or upgrade its tables, it logs an error naming the connection and the missing right, as the historian and alarm journal do, and the map is unavailable until it is fixed; it tries again at most once a minute, so no restart is needed.
+- **Newer schema:** a map store made by a newer Map Studio is read only, never altered.
+- **Redundancy:** only the active Gateway subscribes, saves and migrates; a standby reads and refuses saves; after a failover the caches rebuild and open maps reload (AD-21).
+
+The operator's page is `docs/operations.md`: backups, rights and the error line, the map store's states, schema versions and downgrades, redundant pairs.
 
 ## Still open
 

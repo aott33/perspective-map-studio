@@ -92,7 +92,7 @@ CHECK alarm-metrics PASS readAsync [default]Checks/Alarm Metrics.HasActive -> nu
 ### Check 4: a custom project resource type
 
 - The project folder `ops/project/com.aoindustrial.perspective.mapstudio/setup/` holds `setup.json` and a `resource.json` (`scope: "G"`, `files: ["setup.json"]`). The Gateway loaded it with no declaration anywhere; `ResourceCollectionLifecycleFactory.getResourceFilter()` with `ResourceFilter.newBuilder().addResourceType(new ResourceType(MODULE_ID, "setup"))` delivered it to `ChecksLifecycle.onStartup(List<Resource>)`, read with `resource.getData("setup.json").map(ImmutableBytes::getBytesAsString)` **[live 8.3.10]**.
-- `onResourcesModified` **[not verified]**: changing the file needs a project scan (an API key, which the fresh dev Gateway has none of) or a Designer save; the lifecycle logs `CHECK setup-modified` when it fires. The owner can trigger it from the Designer.
+- `onResourcesModified` **[not verified]** in the spike: changing the file needs a project scan (an API key, which the fresh dev Gateway has none of) or a Designer save; the lifecycle logs `CHECK setup-modified` when it fires. The owner can trigger it from the Designer. Since seen firing after a project scan, with `onResourcesCreated` and `onResourcesDeleted`: "Epic 2 story 6" below **[live 8.3.10]**.
 - Designer editor estimate (not built, owner's decision): IA's project-resource example is 306 lines of Swing in the designer scope (`DesignerHook` 58, `PythonResourceWorkspace` 100 extending `TabbedResourceWorkspace`, `PythonResourceEditor` 67, `HandlerSearchProvider` 81), plus an icon, a bundle and the `designer-api` dependency. A form for AD-5's fields (connection, adapter functions, roles, refresh interval, alarm page, basemaps, token secret) is one editor class of that size; about one day with the Designer round trips. Decision deferred to epic-map-store-and-data; the fallback (a project script function returning the setup) costs nothing in the Designer.
 
 ### Check 5: PostgreSQL on the Gateway's default connection settings
@@ -255,3 +255,157 @@ The 8 remaining findings (`axios`, `lodash`, `moment`, `@babel/runtime` and the 
 **Verification:** `./gradlew build` green with Jest 32 and 6 Gateway tests (was 18); `npm test` in `e2e/` 10 of 10 on a fresh dev Gateway (`ms-s8`), no `CHECK` line and no Map Studio warning or error in the Gateway log; `scripts/ci/test-signing.sh` passes. A dev Gateway restarted with a leftover `setup` resource in the project started the project and the module, with no `CHECK` line and no Map Studio warning or error **[live 8.3.10]**.
 
 **Still with the owner (listed for Story 9):** the headed frame-rate run; the Designer checks for `system.mapstudio.` autocomplete and `CHECK setup-modified` (run the second on the v0.1.0 module or on `51104c8`: the code behind it is gone from the current tree). Story 9 update, 2026-10-26: the frame-rate reading (60 fps on an integrated laptop GPU, by eye) and the autocomplete check (yes) are done and recorded in `docs/spike-report.md`; `CHECK setup-modified` is still open.
+
+## Epic 2 story 1 - session roles on the Gateway
+
+**Question (epic-map-store-and-data, Notes; story 1, Notes):** how does the component's Gateway delegate read the Perspective session user's roles, so that the write path checks roles on the Gateway and never trusts anything the browser sends?
+
+**Answer:** through the component's session: `component.getSession().getWebAuthStatus().getUser()` gives an `Optional<WebAuthUser>`, and `WebAuthUser.getRoles()` the user's roles by name **[live 8.3.10]**. `Session.getProjectName()` gives the project the map is keyed by. No fallback was needed. Date: 2026-10-26. Gateway: `inductiveautomation/ignition:8.3.10`, container `ms-e2s1` on port 9121, module 0.1.0 built from this branch with a temporary probe in `MapStudioDelegate.onStartup` (removed after this record).
+
+| Session | `isAuthenticated()` | `getUser()` | `getRoles()` | `getSecurityLevels()` |
+| --- | --- | --- | --- | --- |
+| Anonymous (the viewer) | false | empty | (none) | `SecurityZones` only |
+| `mapeditor` signed in through the project's identity provider | true | `mapeditor` | `[MapEditor]` | `SecurityZones`, `Authenticated/Roles/MapEditor` |
+
+The probe line, as logged by the delegate of the `MapStudioEdit` view (`ops/project`), before and after the sign-in:
+
+```text
+I [M.roles] PROBE project mapstudio-dev authenticated=false user=<none> roles=<none> securityLevels=[{"name":"SecurityZones",...}]
+I [M.roles] PROBE project mapstudio-dev authenticated=true user=mapeditor roles=[MapEditor] securityLevels=[{"name":"SecurityZones",...}, {"name":"Authenticated",...,"children":[{"name":"Roles",...,"children":[{"name":"MapEditor","children":[]}]}]}]
+```
+
+- The sign-in goes through the identity provider's page (`/idp/default/authn/login`, user name then password) and returns to the session URL; the page reloads, so the view and its delegate start again with the signed-in status **[live 8.3.10]**. The write path still reads the roles on every message rather than once per delegate, since a session can change user without the component restarting (sign out from another view) **[unverified]**.
+- `getSecurityLevels()` carries the same roles as `Authenticated/Roles/<role>`, so it stays available as a fallback; it is not used.
+- Signatures were first read from the SDK jars (`perspective-gateway` 3.3.0, `common` 8.3.0 with `javap`): `Component.getSession()`, `Session.getWebAuthStatus()`, `WebAuthStatus.getUser()`, `WebAuthUser.getUserName()`, `WebAuthUser.getRoles(): ImmutableCollection<String>`.
+
+### Facts learned on the way (the dev stack's user and sign-in)
+
+- A project needs its own identity provider for `system.perspective.login()`: without one the session shows "No Identity Provider Configured" and stays anonymous **[live 8.3.10]**. The project property lives in the binary `ignition/global-props/data.bin`; it was written by the Gateway, not by hand, with `PUT /data/api/v1/projects/mapstudio-dev {"identityProvider": "default"}` (the Gateway needs write access to the bind-mounted project folder for that call), and is committed in `ops/project/ignition/global-props/`.
+- An API key resource cannot carry `Authenticated/Roles/<role>`: 8.3.10 logs `Security level 'Authenticated/Roles' cannot be granted via config and will be ignored` and the key gets 403 **[live 8.3.10]**. The dev key carries `Authenticated/ApiKeys/MapStudioDev`, which `ops/up.sh` adds to the Gateway's Read and Write permissions (`ops/dev_security.py`).
+- First-boot commissioning writes `core` `security-properties` itself, so a copy seeded into `core` before the first boot is replaced **[live 8.3.10]**; `ops/up.sh` patches the Gateway's own file after the first RUNNING and restarts once.
+- The identity provider a fresh volume gets was `default` on most first boots and once `temp` ("Temporary Ignition Identity Provider created during password reset") **[live 8.3.10]**, as `ign-scada-template` saw on 8.3.9 (its GW-1). The dev project pins `default` (its Gateway-written `global-props`), so `ops/users.py` makes sure a provider named `default` exists: when it is missing and the system identity provider is an internal one, it copies that provider under the name `default` (same user source and settings; `POST /data/api/v1/resources/ignition/identity-provider`, the route `ign-scada-template`'s `ensure_identity.py` uses on 8.3.9), then creates the user in the user source behind `default`. The copy path is unit tested (`ops/tests/test_users.py`); the fresh volumes since then got `default`, so the copy itself is **[unverified]** on 8.3.10.
+- `GET /data/api/v1/resources/find/ignition/identity-provider/default` answered 404 on the volume whose only provider was `temp`: the route exists (it is in `/openapi.json`), and the 404 meant "no provider of that name" (an earlier version of this note read it as a missing route; corrected). `ops/users.py` reads `.../list/ignition/identity-provider` **[live 8.3.10]**. The SCIM routes of an internal user source (`/data/api/v1/scim/<userSource>/v2/Users` and `/Groups`) created `mapeditor` and the roles `MapEditor` and `MapOperator` as on 8.3.9 **[live 8.3.10]**.
+
+
+### Least-privilege runtime role on a migrated map store
+
+**Question (story 1 review, Quick lens, finding 2):** does a database role without CREATE bring the map store up once the schema exists? **Answer:** yes, now that the migrator reads the version first **[live 8.3.10]**. Date: 2026-10-26, `ms-e2s1`.
+
+- Before the fix the migrator ran `CREATE TABLE IF NOT EXISTS mapstudio_schema_version` on every start, which PostgreSQL 16 refuses with SQLState 42501 for a role without CREATE on the schema even when the table exists (the reviewer reproduced it). Now it runs `SELECT to_regclass('mapstudio_schema_version') IS NOT NULL` and `SELECT coalesce(max(version), 0)` first, with no lock and no DDL, and takes the advisory lock and creates anything only when a migration is pending.
+- Check: on the migrated dev database the owner role made `mapstudio_rt` (LOGIN; CONNECT on the database, USAGE on schema `public`, SELECT, INSERT and UPDATE on all tables, USAGE and SELECT on all sequences; `has_schema_privilege('mapstudio_rt', 'public', 'CREATE')` = f; its password passed to `psql` as a variable). The Gateway's `MapStudio` connection was pointed at `mapstudio_rt` and the Gateway restarted: its log said "map store on database connection MapStudio is at schema version 1" with no error, `pg_stat_activity` showed the Gateway connected as `mapstudio_rt`, and `e2e/tests/store.spec.mjs` passed 6 of 6 (editor saves, viewer refusals, script checks) on it.
+- The first start on an empty database still needs a role that may CREATE (the dev stack's owner role `mapstudio`); entry 5 owns the missing-rights messages.
+
+### The e2e sign-in without the password in a trace
+
+Playwright traces record each action's parameters, a `fill()` value included, and CI uploads `e2e/out`. The suite therefore signs the map editor in with a plain Playwright browser in a separate node process (`e2e/lib/signInCli.mjs`, no tracing, no report) right before each editor test, and the test starts from the saved browser state (`storageState`). A state saved once in the global setup was signed out by the time the full suite reached the editor tests, about two minutes later (cause not established), so each editor test signs in afresh. A Perspective session opened from that saved state is signed in as `mapeditor` **[live 8.3.10]**. The global teardown deletes the state file (kept in the system temp folder, not in `e2e/out`) and scans `e2e/out`, trace zips unzipped, for the password, deleting any file that holds it and failing the run (`e2e/lib/secretScan.mjs`, unit tested with a zipped trace).
+
+Check of the scan [live, Playwright 1.63.0]: a throwaway spec with `trace: 'on'` that `fill()`ed the password into a page input produced a `trace.zip` under `e2e/out/results`; the teardown found the password inside it (unzipped), deleted the file and failed the run (exit 1), and a scan of `e2e/out` afterwards, the HTML report included, found nothing. The spec was then deleted.
+
+## Epic 2 story 2 - conflicts, retries, deletes and the phone role, live
+
+**Question (story 2, Verification):** do the write path's new rules hold through a real Perspective session, for a map editor and a phone editor signed in in two browsers? **Answer:** yes **[live 8.3.10]**. Date: 2026-10-27 (UTC). Gateway: `inductiveautomation/ignition:8.3.10`, container `ms-e2s2` on port 9122, fresh volumes, module built from this branch; `e2e/tests/writepath.spec.mjs` 2 of 2 and the whole suite 18 of 18.
+
+- The e2e suite sends `map.load` and `edits.apply` through the component's own model event path with `window.__mapStudioTest.send(type, body)` (`web/typescript/testHook.ts`), so the Gateway reads the roles of the session that sent them, as for the component's own saves. The phone editor `mapoperator` (role `MapOperator`, `ops/users.py`) signs in the same way as the map editor, in its own node process; `map.load` reported `level: phone` for it.
+- A phone editor's properties change made the map editor's stale update a `conflict` whose `conflicts[0]` carried the stored record at version 2, `changedBy: mapoperator` and the UTC time; the message read "Conflict pad was changed by mapoperator at HH:MM UTC since you loaded it. Nothing in this save was written." `map.load`'s `seq` did not move.
+- One batch sent twice in turn, and another sent twice at the same moment from the page, each got one reply twice with the same `seq`; `select batch_id, count(*) from mapstudio_edit group by batch_id having count(*) > 2` returned no row, and the only batches with two rows are two-op batches. The phone editor resending the map editor's `batchId` was refused `invalid` ("already used").
+- Delete then restore of one line read, in `mapstudio_edit`: create v1, delete v2, create v3, actor `mapeditor`, source `session`, consecutive `seq`; `map.load` left the tombstone out and showed the restored item at version 3.
+- The phone editor's drawn line was refused `role` with "Not saved: Phone editing may move a point ..." (screenshot `mapstudio-store-phone-390.png` in `e2e/out/screenshots`); its point move and a line's properties change saved as version 2; a line's geometry, a rename and a delete were refused `role` with `seq` unchanged.
+- Order change seen live: the anonymous viewer's session has no user name, so the write service now looks for a retried `batchId` only when there is an actor and keeps entry 1's role-before-actor order; before that fix the viewer's save answered `invalid` ("needs an actor") instead of `role`.
+
+## Epic 2 story 3 - calling the project's kind and asset functions
+
+**Question (epic-map-store-and-data, entry 3):** can the module call the kind and asset functions the setup names on its own pool with a timeout, and see an edited function without a Gateway restart? **Answer:** yes **[live 8.3.10]**, on the `ms-e2s3` dev Gateway, 2026-10-27.
+
+- The spike's way 2 (`getProjectScriptManager(project)`, `runCode("import <module>\n", locals, ...)`, the dotted attribute, `runFunction`) runs on Map Studio's adapter pool (`MapStudio-adapter-N`, 2 threads, queue 8). A Python `RuntimeError` raised in the function reaches the module as `JythonExecException` whose `getPyCause()` gives the type name and message; the module reports "failed: RuntimeError: ..." **[live 8.3.10]**.
+- A function that sleeps 8 s leaves the list `slow` at 5 s; the call keeps its thread until it returns, and its answer is dropped. Two `refreshAdapters` from two Perspective sessions, one second apart, ran the dev functions once (`kinds: 1, assets: 1` in the dev adapter's own call count) **[live 8.3.10]**.
+- Edited function, no restart: with `raise ValueError(...)` added to `mapstudio_dev.kinds` and `POST /data/api/v1/scan/projects` (dev API key), the Gateway logged "Restarting gateway scripts... project=mapstudio-dev" and the next refresh (1.7 s later) reported `failing: ValueError: ...`, keeping the last good list; reverted and scanned again, the next refresh logged "recovered" **[live 8.3.10]**. So the module needs no hook into project scans: each call asks for the project's script manager afresh.
+- `system.util.getGlobals()` is shared between a Perspective session script and a project library function the module calls through the project's script manager: the dev adapter's mode, set from the `/adapters` page's buttons, reached the module's next call **[live 8.3.10]**. It is lost on a Gateway restart.
+- A fresh 8.3.10 Docker Gateway has only the `System` tag provider (no `default`) in its config collections **[live 8.3.10]**, so the dev adapter keeps its mode in `getGlobals()` rather than in a memory tag, and the dev stack seeds no tag provider.
+- The Gateway log shows the module's loggers abbreviated: `MapStudio.adapters` appears as `M.adapters` (as `M.setup`, `M.store`); grep for `M.adapters` **[live 8.3.10]**.
+
+## Epic 2 story 4 - pushing from the Gateway
+
+**Question (story 4, Tasks):** can the component's Gateway delegate send a message its browser did not ask for, from a thread of the module's own (the change bus), and which path reaches the browser: the session's execution queue, or `fireEvent` straight from the bus thread?
+
+**Answer:** the session's execution queue works: the delegate subscribes in `onStartup` with `component.getSession().getProjectName()`, and for each change submits `fireEvent("model", "mapstudio.message", <map.changed envelope>)` to `component.getSession().queue()` (`ExecutionQueue.submit(Runnable)`), and the browser receives it **[live 8.3.10]**. The fallback (calling `fireEvent` from the bus thread directly) was not needed and is not used. Date: 2026-10-27. Gateway: `inductiveautomation/ignition:8.3.10`, container `ms-e2s4` on port 9124, module built from this branch.
+
+- Seen by `e2e/tests/changes.spec.mjs` at 1440 and 390 px: an editor at `/edit` saves a line; an anonymous viewer at `/`, in a second browser context, draws it within 5 s (`data-items-loaded` + 1) with no page reload (a `window` marker set before the save survives) and no gap reload (`data-map-reloads` stays 0); then the dev page's "Run script checks" (`system.mapstudio.applyEdits` from a session script) reaches the viewer the same way, and both maps end at the same `data-store-seq` **[live 8.3.10]**.
+- `Component.getSession()` and `Session.getProjectName()` work in `ComponentModelDelegate.onStartup` **[live 8.3.10]**.
+- That `onShutdown` runs when a page or session closes, so the delegate leaves the bus, is **[unverified]**. A missed unsubscribe would keep the delegate, its component and its session reachable from the bus (the subscriber is the delegate's method) and submit every later change to a dead session's queue. So the delegate also leaves the bus at the next change when `component.isRunning()` is false or the session queue's `submit` throws (unit tested with a fake component and session in `MapStudioDelegateTest`); that a closed page or session gives either signal is also **[unverified]**. A subscriber that throws is logged at debug and the bus keeps serving the others.
+- A gap reload (`seq` skipped) and the bus's 2 s hold for an out-of-order commit are unit tested only (`ChangeBusTest`, `changes.test.ts`); no gap happened in the live runs **[unverified live]**.
+- Signatures read first from the SDK jars with `javap` (`perspective-gateway` 3.3.0, `common` 8.3.0): `Session.queue(): ExecutionQueue`, `ExecutionQueue.submit(Runnable)` (ordered per session; that it runs tasks one at a time in order is the class's documented purpose, not checked here).
+
+## Epic 2 story 5 - map store states
+
+**Question (epic-map-store-and-data R2, AD-21):** what does the map store do when the database role lacks a right, when a migration fails midway, when the schema is newer than the module, and on the standby of a redundant pair; and does fixing a right heal without a restart?
+
+**Answer:** a failed migration (any statement, any SQLState) is rolled back whole and logged once as one line naming the connection, the migration, the statement, the SQLState and, for 42501, the missing right; the map store is then unavailable and heals by itself at most a minute after the fix, with no restart. A schema newer than the module is read only: one warning, nothing migrated or changed, the map read as usual, every save refused `read-only` and nothing written **[live 8.3.10]**. The standby case is unit tested over a stand-in and **[unverified]** live (one Gateway only). Date: 2026-10-27. Gateway: `inductiveautomation/ignition:8.3.10`, container `ms-e2s5` on port 9125, PostgreSQL 16, module built from this branch.
+
+How: `ops/store-checks.sh` adds the project `mapstudio-check` (`ops/store-checks/project`, mounted by `ops/docker-compose.store-checks.yml`), whose setup names the connection `MapStudioCheck`: role `mapstudio_check` on database `mapstudio_check`, made by `ops/postgres-init/20-store-checks.sh` with no right beyond PostgreSQL 16's defaults (no CREATE on schema `public`). Per scenario it sets the check database with `psql` as the owner role, restarts the Gateway where the scenario needs a fresh start, reads the Gateway log and runs `e2e/tests/store-ops.spec.mjs`. At the end it empties the check database and recreates the Gateway without the check project. Runs: `E2E_DOCS=1 ops/store-checks.sh`, all four scenarios passed; then `E2E_DOCS=1 ops/store-checks.sh rights newer` (after `partial` stopped overwriting the `rights` screenshots), both passed again.
+
+| Scenario | Set up | Gateway log (`MapStudio.store`) | Map and database |
+| --- | --- | --- | --- |
+| `rights` | no grant | exactly one error line, below | `data-store-state="unavailable"`, "Map store: store-unreachable: The map store is unavailable: the database role of connection MapStudioCheck lacks the right to create Map Studio's tables. Ask an administrator (see the Gateway log)."; no `mapstudio_` table; still one line after the spec's `map.load`s (all within the 60 s retry interval, so this does not show a retry with the same failure logging nothing: that is unit tested only) |
+| `partial` | `GRANT CREATE ON SCHEMA public`; the owner creates a table `mapstudio_kind_setup` | one error line: `migration 1, statement 4 of 8 (CREATE TABLE mapstudio_kind_setup ...) failed with SQLState 42P07: ERROR: relation "mapstudio_kind_setup" already exists` | unavailable; `pg_tables` lists only the pre-created `mapstudio_kind_setup`: the three tables the migration had created were rolled back with it |
+| `healed` | the blocker dropped; no restart; 65 s wait | `Map Studio created its map store schema on database connection MapStudioCheck: applied version(s) [1], now at schema version 1.` | the first `map.load` after the 60 s retry interval started the migrator (and still answered unavailable); a reload a few seconds later was `ready`; the six `mapstudio_` tables exist; `getMap` from a view script gave `{"count": 0, "readOnly": null}` |
+| `newer` | version 999 recorded; Gateway restarted | exactly one warning, below | `data-store-state="read-only"`, "Map store: read only. The map store was upgraded by a newer Map Studio (schema 999, this module knows 1); saving is off until the module is upgraded."; a drawn line refused `read-only` with the same words; `getMap(...).readOnly` the same reason; `mapstudio_edit` 0 rows before and after; the recorded version still 999 |
+
+The two lines, as logged:
+
+```text
+E [M.store] Map Studio cannot prepare its map store on database connection MapStudioCheck: migration 1, statement 1 of 8 (CREATE TABLE IF NOT EXISTS mapstudio_schema_version ...) failed with SQLState 42501, the database role lacks CREATE on schema public: ERROR: permission denied for schema public   Position: 28
+W [M.store] Map Studio's map store on database connection MapStudioCheck is at schema version 999, newer than this module knows (1); the map is read only here until the Map Studio module is upgraded. Nothing was migrated or changed.
+```
+
+- PostgreSQL rolled back the DDL of the failed transaction (`partial`), as its docs say **[live 8.3.10, PostgreSQL 16]**.
+- The statements are numbered as the migration's transaction runs them: story 1's `CREATE TABLE IF NOT EXISTS mapstudio_schema_version` is statement 1, migration 1's six statements follow, the version record is last (8). The advisory lock and the version read are named but not numbered.
+- `getMap` returns a Java subclass of Jython's `PyList` that answers `readOnly`; a Perspective view script iterated it with `len()` and read `items.readOnly` on 8.3.10's Jython **[live 8.3.10]**, and story 1's dev script checks (which iterate it) still pass.
+- The anonymous viewer's save on the read-only store was refused `read-only`, not `role`: the write service checks the store state first (story 1's order).
+- The plain dev stack (no overlay) logged no Map Studio error with the `MapStudioCheck` connection present and unused, and the plain e2e suite passed (16 passed, `store-ops` skipped). The Gateway makes a store-and-forward engine per connection (`mapstudiocheck`), which is harmless.
+- Redundancy **[unverified]**: `RedundancyGate` reads `GatewayContext.getRedundancyManager()`, `isRedundancyEnabled()` and `isActive()` on every save and listens with `addRedundancyStateListener` **[SDK 8.3.0 javap]**; on this independent Gateway saving and migrating worked as before. A standby's refusal and migration on becoming active are unit tested only (`RedundancyGateTest`, `StoreRegistryStateTest`, `WriteServiceStoreStateTest`).
+- Screenshots (`docs/operations.md`): `mapstudio-store-unavailable-{1440,390}.png` (scenario `rights`), `mapstudio-store-readonly-{1440,390}.png` (scenario `newer`).
+
+## Epic 2 story 6 - setup change on a live Gateway
+
+**Question (story 6, proof first; check 4 above):** does a changed project setup reach the module's `ResourceCollectionLifecycle` without a Gateway restart, and through which hook? **Answer:** yes. After `setup.json` is edited on disk, a project scan (`POST /data/api/v1/scan/projects` with the dev API key, HTTP 200; `ops/scan.sh`) calls `onResourcesModified` with the setup resource, and the module applied it within about 50 ms of the request; the file edit alone called nothing in 15 s **[live 8.3.10]**. No fallback was needed. Date: 2026-10-27. Gateway: `inductiveautomation/ignition:8.3.10`, container `ms-e2s6` on port 9126, module 0.1.0 built from this branch.
+
+Sequence (by hand, then again by `e2e/tests/setup.spec.mjs`), log lines of `MapStudio.setup`, Gateway time:
+
+| Step | Hook | Log line |
+| --- | --- | --- |
+| Gateway start | `onStartup` | `00:49:25.111 Project mapstudio-dev: Map Studio setup read (connection MapStudio, ... refresh interval 10 s)` |
+| `roles` and `refreshIntervalSeconds` edited, no scan, 15 s | none | (nothing) |
+| scan requested at `00:49:53.464` | `onResourcesModified` | `00:49:53.517 ... setup changed and applied on resource modified (... full editing roles [Nobody], phone editing roles [MapEditor], refresh interval 30 s)` |
+| `refreshIntervalSeconds: "ten"`, scan | `onResourcesModified` | `W 00:49:56.713 The Map Studio setup of project mapstudio-dev ... cannot be read: refreshIntervalSeconds must be a whole number from 1 to 3600, not "ten".` |
+| file cut to 40 bytes, scan | `onResourcesModified` | `W ... setup.json is not valid JSON (line 3, column 17).` |
+| setup folder moved out of the project, scan | `onResourcesDeleted` | `00:50:03.141 ... setup removed; its map store is unavailable until a setup is added.` |
+| folder put back, scan | `onResourcesCreated` | `00:50:06.329 ... setup read on resource created (...)` |
+| `setup.json` removed from the folder, scan | `onResourcesModified` | `W ... setup.json is missing from the setup resource.` |
+| file put back, scan | `onResourcesModified` | `... setup changed and applied on resource modified (...)` |
+
+- The module started once in this sequence (one "Starting up module 'com.aoindustrial.perspective.mapstudio'" line) and the Gateway stayed `RUNNING`, so nothing was restarted. The e2e run did the same: the editor's level went from `full` to `phone` and the refresh interval from 10 to 30 at the first reload after the scan, the bad field gave `store-unreachable` with the reason in the component, and the restored file brought `full` back.
+- The modified, created and deleted lists hold only resources of the lifecycle factory's filter type (the setup), as the deleted case shows with a `ResourceId` of type `com.aoindustrial.perspective.mapstudio/setup`.
+- The lifecycle callbacks run on a Gateway thread whose log context carries `collection=mapstudio-dev` (the start's runs under `module-name=Map Studio`).
+- `setup.json` written by the Gateway: no. The scans left `ops/project` unchanged (`git status --porcelain ops/project` empty after the suite).
+- A Designer save is expected to call the same hook **[unverified]**; the owner can check it with any edit of the setup resource once entry 7 gives it a Designer editor.
+
+## Epic 2 story 7 - setup editor in the Designer
+
+**Question:** can a Designer workspace built on the SDK's `TabbedResourceWorkspace` and `ResourceEditor` create and edit the project's one Map Studio setup at the type folder (`com.aoindustrial.perspective.mapstudio/setup/`, story 1's layout)? **Answer:** built and unit tested; not yet seen in a Designer. Every line below is **[not verified]** until the owner's Designer session marks it **[owner, seen in the Designer, <date>]**.
+
+What the code relies on, read from the 8.3.0 SDK jars with `javap` (signatures and bytecode, not run) **[SDK 8.3.0 javap]**:
+
+- `ResourceEditor`'s constructor sets `workspace`, `context` and `resourcePath`, then reads `getProject().getResource(path)` and calls `loadResource`, which calls `deserialize(Resource)` and `init(T)`, before the subclass's own fields are set; a missing resource shows "Resource '...' not found!". So `SetupEditor` makes its panel inside `init`, and "Create setup" writes the resource before the tab is opened.
+- `ResourceEditor.commit()` calls `getObjectForSave()`; with `isOptimizeCommits()` true and an object equal to the one read it writes nothing; otherwise a local resource is modified (`toBuilder`, `serializeResource`, `setApplicationScope(descriptor scope)`, `modifyResource`) and a resource the project does not hold locally (an inherited one) is created as this project's own (`Resource.newBuilder()`, `setResourceCollectionName(project)`, `createResource`); an exception goes to `onCommitFailed`, whose default shows `ErrorUtil.showError`.
+- Nothing in the Designer commits a module's `TabbedResourceWorkspace`: `IgnitionDesigner.handleSave` runs `commitAll()` off the Swing thread, whose `getCommitTasks()` commits only the Designer's own module and script editors, `ScriptWorkspace` and `NamedQueryWorkspace`, then calls each module hook's `notifyProjectSaveStart(SaveContext)`; `WorkspaceManager` commits nothing. `ResourceEditor` has no dirty flag or change notification (its members are the constructor, `loadResource`, `updateResource`, `init`, `getObjectForSave`, the (de)serialize methods, `commit`, `dispose`, `onCommitFailed`). So `MapStudioDesignerHook.notifyProjectSaveStart` calls `SetupWorkspace.commitAll()` on the Swing thread (`invokeAndWait`), and the editor passes no edit callback.
+- `TabbedResourceWorkspace.registerNavTreeNode()` adds `createRootNavTreeNode()` under `DesignerContext.getProjectBrowserRoot()`; `getKey()` is left to the subclass; `ResourceType.rootPath()` gives the type-folder path.
+
+The owner's Designer session (the plan's manual check), to be recorded here:
+
+- [not verified] The project browser shows "Map Studio Setup"; double-click opens the dev project's setup in a "Map Studio Setup" tab with the values of `ops/project/.../setup/setup.json`.
+- [not verified] The type-folder resource opens in the tabbed workspace at all. If not, the plan's fallback applies (a plain node opening the same `SetupPanel` in a dialog, saved with `DesignableProject.createOrModify`), and this line says what the Designer did.
+- [not verified] On a scratch project with no setup, "Create setup" opens the form with the defaults, refuses Create while `connection` is empty, and after `MapStudio` and Create plus a project save `data/projects/<scratch>/com.aoindustrial.perspective.mapstudio/setup/` holds `resource.json` (scope `G`, `files: ["setup.json"]`) and `setup.json`.
+- [not verified] A field edit alone (no other project change) makes the project save commit the setup: File, Save is offered, and `setup.json` holds the edit afterwards.
+- [not verified] An invalid setup (refresh `0`) is refused at the project save with the dialog naming the field, and nothing is written; what the Designer does with the rest of that project save.
+- [not verified] With `MapEditor` removed from full editing, saved, and the dev Gateway restarted (story 6 not merged yet), `map.load` for `mapeditor` reports level `none`; restoring the role brings back `full`; `git diff ops/project` shows only the changed line.
+- [not verified] An inherited setup shows "Inherited from <project>" and a save makes this project's own copy.
