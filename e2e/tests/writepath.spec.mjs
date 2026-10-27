@@ -115,7 +115,7 @@ editorTest.describe('write path', () => {
                     kind: 'pad', name: 'Conflict pad', geometry: point(-104.97, 39.745)
                 }))), 1);
                 expectSaved(await send(operator.page, 'edits.apply',
-                    batch(update(pad, 1, { properties: { note: 'checked on site' } }))), 2);
+                    batch(update(pad, 1, { properties: { operator: 'checked on site' } }))), 2);
 
                 let before = await seq(page);
                 const conflict = expectRefused(await send(page, 'edits.apply',
@@ -129,7 +129,7 @@ editorTest.describe('write path', () => {
                 });
                 expect(conflict.conflicts[0].changedAt).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
                 expect(conflict.conflicts[0].current).toMatchObject({
-                    id: pad, version: 2, deleted: false, properties: { note: 'checked on site' }
+                    id: pad, version: 2, deleted: false, properties: { operator: 'checked on site' }
                 });
                 expect(await seq(page)).toBe(before);
 
@@ -197,7 +197,7 @@ editorTest.describe('write path', () => {
                 await op.screenshot({ path: path.join(screenshotDir, 'mapstudio-store-phone-390.png'), fullPage: false });
 
                 expectSaved(await send(op, 'edits.apply', batch(update(pad, 1, { geometry: point(-104.9745, 39.7442) }))), 2);
-                expectSaved(await send(op, 'edits.apply', batch(update(pipe, 1, { properties: { inspected: true } }))), 2);
+                expectSaved(await send(op, 'edits.apply', batch(update(pipe, 1, { properties: { buried: true } }))), 2);
 
                 const before = await seq(op);
                 const refusedGeometry = expectRefused(await send(op, 'edits.apply',
@@ -213,7 +213,7 @@ editorTest.describe('write path', () => {
                     version: 2, geometry: { coordinates: [-104.9745, 39.7442] }, name: 'Phone pad'
                 });
                 expect(loaded.body.items.find((i) => i.id === pipe)).toMatchObject({
-                    version: 2, properties: { inspected: true }, geometry: line
+                    version: 2, properties: { buried: true }, geometry: line
                 });
                 expect(operator.watched.errors).toEqual([]);
             } finally {

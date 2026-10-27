@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import com.inductiveautomation.ignition.common.gson.JsonObject;
 
+import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
 
 /**
@@ -67,5 +68,15 @@ public interface MapStore {
 
         /** Every map item of the project that is not deleted, ordered by id. */
         List<MapItemRecord> liveItems(String project) throws SQLException;
+
+        /** The stored kind setup, locked for update until the transaction ends; empty when there is none (story 9). */
+        Optional<KindSetupRecord> lockKindSetup(String project, String kindId) throws SQLException;
+
+        void insertKindSetup(String project, KindSetupRecord setup) throws SQLException;
+
+        void updateKindSetup(String project, KindSetupRecord setup) throws SQLException;
+
+        /** Every kind setup of the project that is not deleted, ordered by kind id. */
+        List<KindSetupRecord> liveKindSetups(String project) throws SQLException;
     }
 }

@@ -90,9 +90,9 @@ public final class MapStudioServices {
         this.gate = new StoreGate(setups, stores::state, redundancy::standbyReason);
         this.store = new JdbcMapStore(connections);
         this.changes = ChangeBus.start(Executors.newSingleThreadScheduledExecutor(daemon("MapStudio-changes")));
-        this.writes = new WriteService(gate, store, changes);
         this.adapters = AdapterService.create(setups::find, setups::projects,
             new ProjectFunctionCaller(context.getProjectManager()));
+        this.writes = new WriteService(gate, store, changes, adapters::snapshot);
         this.loader = new MapLoader(gate, store, adapters::snapshot);
         this.tags = new TagLookups(setups, gate, store, adapters::snapshot,
             new IgnitionTagSource(context.getTagManager(), context.getProjectManager()));

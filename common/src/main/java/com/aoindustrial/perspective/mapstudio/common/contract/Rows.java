@@ -11,7 +11,7 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
  * returns null for a missing key and throws {@link RowException} with a plain
  * reason for a value of the wrong type. Unknown keys are ignored by the callers.
  */
-final class Rows {
+public final class Rows {
 
     /** Ids (kind ids, asset ids, form field keys) are at most this many characters. */
     static final int MAX_ID = 64;
@@ -108,7 +108,7 @@ final class Rows {
      * tab, escape) and line or paragraph separator replaced by "?", so a reason
      * is one short line in a status message and in the Gateway log.
      */
-    static String echo(String value) {
+    public static String echo(String value) {
         if (value == null) {
             return "";
         }

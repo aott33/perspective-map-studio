@@ -320,4 +320,33 @@ class MapStudioDelegateTest {
         assertEquals(5, none.get("seq").getAsInt());
         assertEquals("mapeditor", body.get("actor").getAsString());
     }
+
+    @Test
+    void aViewerGetsKindSetupRecordsWithoutTheirTagPaths() {
+        JsonObject body = com.inductiveautomation.ignition.common.gson.JsonParser.parseString("{\"seq\":6,"
+            + "\"actor\":\"mapeditor\",\"ops\":[{\"op\":\"create\",\"entity\":\"kindSetup\",\"id\":\"pad\","
+            + "\"version\":1,\"record\":{\"kindId\":\"pad\",\"setup\":{\"comms\":{\"path\":\"{asset.path}/C\"}},"
+            + "\"version\":1,\"deleted\":false}}]}").getAsJsonObject();
+        JsonObject none = MapStudioDelegate.bodyFor(body, "none");
+        assertEquals("{\"kindId\":\"pad\",\"version\":1,\"deleted\":false}",
+            none.getAsJsonArray("ops").get(0).getAsJsonObject().get("record").toString());
+        assertEquals(true, body.getAsJsonArray("ops").get(0).getAsJsonObject().getAsJsonObject("record").has("setup"));
+        assertEquals(body, MapStudioDelegate.bodyFor(body, "full"));
+    }
+
+    @Test
+    void aViewerGetsMapItemRecordsWithoutTheirOverrides() {
+        JsonObject body = com.inductiveautomation.ignition.common.gson.JsonParser.parseString("{\"seq\":7,"
+            + "\"actor\":\"mapeditor\",\"ops\":[{\"op\":\"update\",\"entity\":\"item\",\"id\":\"4f6c\","
+            + "\"version\":2,\"record\":{\"id\":\"4f6c\",\"kind\":\"pad\",\"name\":\"P12\",\"overrides\":"
+            + "{\"kpis\":[{\"key\":\"p\",\"path\":\"[default]Mesa/P12/Pressure\"}]},\"version\":2,"
+            + "\"deleted\":false}}]}").getAsJsonObject();
+        JsonObject record = MapStudioDelegate.bodyFor(body, "none").getAsJsonArray("ops").get(0).getAsJsonObject()
+            .getAsJsonObject("record");
+        assertEquals("{}", record.get("overrides").toString());
+        assertEquals("P12", record.get("name").getAsString());
+        assertEquals(true, body.getAsJsonArray("ops").get(0).getAsJsonObject().getAsJsonObject("record")
+            .getAsJsonObject("overrides").has("kpis"), "the shared body is never changed");
+        assertEquals(body, MapStudioDelegate.bodyFor(body, "phone"));
+    }
 }

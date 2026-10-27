@@ -20,6 +20,7 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.StoreState;
 import com.aoindustrial.perspective.mapstudio.gateway.write.FakeMapStore;
 import com.aoindustrial.perspective.mapstudio.gateway.write.NoChangeHook;
 import com.aoindustrial.perspective.mapstudio.gateway.write.WriteService;
+import com.aoindustrial.perspective.mapstudio.gateway.adapter.TestKinds;
 
 /**
  * Epic 2 story 6: the delegate's {@code map.load} and {@code edits.apply} read the
@@ -57,7 +58,7 @@ class StoreReplyPerCallTest {
             return StoreState.ready();
         });
         loader = new MapLoader(gate, store, NoAdapters::snapshot);
-        writes = new WriteService(gate, store, new NoChangeHook());
+        writes = new WriteService(gate, store, new NoChangeHook(), TestKinds::snapshot);
     }
 
     private JsonObject load(List<String> roles) {

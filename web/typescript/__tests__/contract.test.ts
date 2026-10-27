@@ -1,5 +1,6 @@
 import {
-    CONTRACT_VERSION, ErrorCodes, readConflicts, readEditsApplyReply, readMapItem, readMapLoadReply, readMapSetup
+    CONTRACT_VERSION, ErrorCodes, readConflicts, readEditsApplyReply, readKindSetup, readMapItem, readMapLoadReply,
+    readMapSetup
 } from '../contract';
 import { NO_HOST_LISTS } from '../adapters';
 import { MessageTypes, editsApply, mapLoad, readReply } from '../messages';
@@ -108,5 +109,22 @@ describe('conflicts (epic 2 story 2)', () => {
         const role = readReply({ v: 1, type: 'error', id: 'e', body: { code: 'role', message: 'no' } });
         expect(role.kind === 'error' && role.body.conflicts).toBe(undefined);
         expect(readConflicts('nope')).toEqual([]);
+    });
+});
+
+describe('kind setups (epic 2 story 9)', () => {
+    const pad = { kindId: 'pad', setup: { link: '/pad/{item.name}' }, version: 2, deleted: false };
+
+    test('map.load.reply carries them for editors and leaves malformed ones out', () => {
+        const reply = readMapLoadReply({ level: 'full', seq: 3, items: [], kindSetups: [pad, { kindId: 'x' }] });
+        expect(reply?.kindSetups).toEqual([pad]);
+        expect(readMapLoadReply({ level: 'none', seq: 3, items: [] })?.kindSetups).toBeUndefined();
+    });
+
+    test('a conflict on a kind setup reads its stored record', () => {
+        const [c] = readConflicts([{ index: 0, entity: 'kindSetup', id: 'pad', baseVersion: 1, current: pad,
+            changedBy: 'mapeditor', changedAt: '2026-10-27T10:00:00Z' }]);
+        expect(c.current).toEqual(pad);
+        expect(readKindSetup({ kindId: 'pad', setup: [], version: 1, deleted: false })).toBeNull();
     });
 });

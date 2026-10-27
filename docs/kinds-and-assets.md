@@ -34,6 +34,7 @@ A list of dicts, one per kind:
 | `icon` | no | An icon id from [icons.md](icons.md) (`well-pad`, `pipeline`, ...); default `""`, drawn as `point`. A name the icon set does not have keeps the kind (drawn as `point`) and is reported in the kind status (see "Icon check"). |
 | `labelRank` | no | Whole number; when labels collide, the higher rank keeps its label longer. Default 0. |
 | `fields` | no | The form fields of the kind's map items (their `properties`), default none. |
+| `area` | no | `True` on a `line` kind drawn as a closed area; only an area kind's setup takes `areaTints` ([kind-setup.md](kind-setup.md)). Refused on a `point` kind. Default false; `map.load` sends it only when true. |
 
 A form field is `{key, label, type, required, choices}`: `key` text, at most 64 characters, unique in the kind; `label` defaults to the key; `type` is `text`, `number`, `integer`, `boolean` or `choice`; `required` defaults to false; a `choice` field needs a non-empty `choices` list of text. Adding a kind needs no module change: return one more row.
 
@@ -65,7 +66,7 @@ For both lists, keys Map Studio does not know are ignored, and the values must b
 - `system.mapstudio.refreshAdapters(project)` calls both now and returns both statuses; it waits for the calls to answer or time out, at most 21 s (four timeouts and 1 s: kinds then assets, each of which may wait for a timed-out call to end before its own call), then returns the statuses it has; a refresh still running lands in the cache later. It blocks the calling script's thread that long, so call it from a session or Gateway script, not a binding or a tag event. Call it after your own kind or asset data changed. A refresh asked for while a call is in flight joins it **[live 8.3.10]**.
 - A timed-out call cannot be stopped (Jython has no safe way): it keeps its thread until it returns, and its answer is dropped.
 - `map.load` carries `kinds` to every session, `assets` only to sessions with phone or full editing (asset rows carry tag paths), and `adapters: {kinds: status, assets: status}` to every session ([contract.md](contract.md)).
-- Later entries read the same cache: map item validation against the kind list (entry 9) and the icon check (entry 10, below). Nothing is stored in the database.
+- The write path checks every saved map item and kind setup against the same cache, read once per batch ([kind-setup.md](kind-setup.md), entry 9); with no list in use only deletes are saved. The icon check (entry 10) reads it too. Nothing is stored in the database.
 
 ## Icon check
 
@@ -107,4 +108,4 @@ All seven words are stable kebab-case; messages are plain words and may change. 
 
 ## The dev adapter
 
-The dev project's library `mapstudio_dev` (`ops/project/ignition/script-python/mapstudio_dev/code.py`) is test equipment: three kinds (`pad`, `line`, `geofence`) and four assets, and a mode (`ok`, `empty`, `broken`, `slow`, `incomplete`) switched by the buttons of the `/adapters` page (map editors only) and kept in `system.util.getGlobals()`, which the page's session scripts and Map Studio's calls share **[live 8.3.10]**. Its setup refreshes every 30 s, so the e2e test's two overlapping refreshes are not crossed by a timed one.
+The dev project's library `mapstudio_dev` (`ops/project/ignition/script-python/mapstudio_dev/code.py`) is test equipment: three kinds (`pad`, `line`, and `geofence`, an area kind) and four assets, and a mode (`ok`, `empty`, `broken`, `slow`, `incomplete`) switched by the buttons of the `/adapters` page (map editors only) and kept in `system.util.getGlobals()`, which the page's session scripts and Map Studio's calls share **[live 8.3.10]**. Its setup refreshes every 30 s, so the e2e test's two overlapping refreshes are not crossed by a timed one.

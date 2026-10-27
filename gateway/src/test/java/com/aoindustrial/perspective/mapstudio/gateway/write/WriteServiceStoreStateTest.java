@@ -25,6 +25,7 @@ import com.aoindustrial.perspective.mapstudio.gateway.setup.SetupRegistry;
 import com.aoindustrial.perspective.mapstudio.gateway.store.FailureLine;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreState;
+import com.aoindustrial.perspective.mapstudio.gateway.adapter.TestKinds;
 
 /** Read-only and standby refusals write nothing and call no change hook (epic 2 story 5). */
 class WriteServiceStoreStateTest {
@@ -47,7 +48,7 @@ class WriteServiceStoreStateTest {
         standby = Optional.empty();
         hooked = new ArrayList<>();
         StoreGate gate = new StoreGate(setups, c -> state, () -> standby);
-        writes = new WriteService(gate, store, hooked::add);
+        writes = new WriteService(gate, store, hooked::add, TestKinds::snapshot);
         loader = new MapLoader(gate, store, NoAdapters::snapshot);
     }
 

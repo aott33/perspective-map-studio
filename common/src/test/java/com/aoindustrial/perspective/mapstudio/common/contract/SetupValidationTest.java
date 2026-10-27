@@ -149,6 +149,9 @@ class SetupValidationTest {
         assertTrue(read("\"alarmPage\":\"\"").ok());
         assertEquals("alarmPage must be empty or a page path starting with /, not \"alarms\"",
             only(read("\"alarmPage\":\"alarms\"")).message());
+        assertTrue(read("\"alarmPage\":\"/alarms/{item.name}?op={item.properties.operator}\"").ok());
+        assertTrue(only(read("\"alarmPage\":\"/alarms/{item.foo}\"")).message()
+            .startsWith("alarmPage: {item.foo} is not a placeholder Map Studio knows"));
     }
 
     @Test

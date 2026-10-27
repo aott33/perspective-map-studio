@@ -133,9 +133,10 @@ test.describe('scripting API', () => {
         expect(byName.getMapAtEnd.value).toBe(2);
         expect(byName.ping.value).toMatch(/^Map Studio pong at /);
 
-        // A reload draws the script's point from the map store.
+        // Story 9's checks (kind setups, a CSV-style number) are asserted in kindsetup.spec.mjs.
+        // A reload draws the script's two points (the check pad and the CSV pad) from the map store.
         await page.reload({ waitUntil: 'load' });
         map = await openMap(page, '/edit');
-        expect(await mapLoaded(map)).toBe(before + 1);
+        expect(await mapLoaded(map)).toBe(before + 2);
     });
 });

@@ -54,6 +54,22 @@ export interface MapItemRecord {
 /** The fields an op's data may carry: the record minus id, version and deleted. */
 export type MapItemData = Partial<Omit<MapItemRecord, 'id' | 'version' | 'deleted'>>;
 
+/**
+ * A kind's stored setup (AD-16, epic 2 story 9; docs/kind-setup.md): what its map items
+ * show. Checked on the Gateway; the browser reads it as data (epic-viewing draws it).
+ */
+export interface KindSetupRecord {
+    kindId: string;
+    setup: Record<string, unknown>;
+    version: number;
+    deleted: boolean;
+}
+
+/** A kind setup op's data: the record minus kindId, version and deleted. */
+export interface KindSetupData {
+    setup: Record<string, unknown>;
+}
+
 export interface EditOp {
     op: 'create' | 'update' | 'delete';
     entity: 'item' | 'kindSetup';
@@ -61,6 +77,15 @@ export interface EditOp {
     /** 0 on create, the stored version otherwise. */
     baseVersion: number;
     data: MapItemData;
+}
+
+/** A kind setup op (epic 2 story 9): `id` is the kind id; a delete carries no data. */
+export interface KindSetupOp {
+    op: 'create' | 'update' | 'delete';
+    entity: 'kindSetup';
+    id: string;
+    baseVersion: number;
+    data?: KindSetupData;
 }
 
 export interface EditBatch {
@@ -88,6 +113,8 @@ export interface MapLoadReplyBody {
     readOnly?: string;
     /** Absent from a Gateway older than epic 2 entry 6, or when it is malformed. */
     setup?: MapSetup;
+    /** The project's kind setups, at levels phone and full only (epic 2 story 9); malformed ones left out. */
+    kindSetups?: KindSetupRecord[];
 }
 
 export interface EditsApplyReplyBody {
@@ -105,7 +132,8 @@ export interface Conflict {
     entity: string;
     id: string;
     baseVersion: number;
-    current: MapItemRecord | null;
+    /** The stored map item, or the stored kind setup when `entity` is `kindSetup`. */
+    current: MapItemRecord | KindSetupRecord | null;
     changedBy: string | null;
     changedAt: string | null;
 }
@@ -174,7 +202,19 @@ export function readMapLoadReply(body: Record<string, unknown>): MapLoadReplyBod
     if (setup) {
         reply.setup = setup;
     }
+    if (Array.isArray(body.kindSetups)) {
+        reply.kindSetups = body.kindSetups.map(readKindSetup).filter((k): k is KindSetupRecord => k !== null);
+    }
     return reply;
+}
+
+/** A kind setup record from the Gateway, or null when it is not one. */
+export function readKindSetup(value: unknown): KindSetupRecord | null {
+    if (!isRecord(value) || typeof value.kindId !== 'string' || !isRecord(value.setup)
+        || typeof value.version !== 'number' || typeof value.deleted !== 'boolean') {
+        return null;
+    }
+    return { kindId: value.kindId, setup: value.setup, version: value.version, deleted: value.deleted };
 }
 
 /** map.load.reply's setup, or null when it is absent or malformed (the reply stays usable). */
@@ -223,7 +263,7 @@ export function readConflicts(value: unknown): Conflict[] {
             entity: c.entity,
             id: c.id,
             baseVersion: c.baseVersion,
-            current: readMapItem(c.current),
+            current: c.entity === 'kindSetup' ? readKindSetup(c.current) : readMapItem(c.current),
             changedBy: typeof c.changedBy === 'string' ? c.changedBy : null,
             changedAt: typeof c.changedAt === 'string' ? c.changedAt : null
         });

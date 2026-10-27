@@ -26,7 +26,6 @@ class EditOpDeleteTest {
     void aDeleteWithNoDataOrEmptyDataIsReadAndSupported() {
         EditBatch b = EditBatch.parse(json("{\"batchId\":\"" + BATCH + "\",\"ops\":[{\"op\":\"delete\","
             + "\"entity\":\"item\",\"id\":\"" + ID + "\",\"baseVersion\":4}]}"));
-        b.requireSupported();
         assertEquals("delete", b.ops().get(0).op());
         assertEquals(4, b.ops().get(0).baseVersion());
         EditOp.parse(json("{\"op\":\"delete\",\"entity\":\"item\",\"id\":\"" + ID + "\",\"baseVersion\":1,\"data\":{}}"), 0);

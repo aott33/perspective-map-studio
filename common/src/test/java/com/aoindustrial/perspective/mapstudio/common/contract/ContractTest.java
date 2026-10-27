@@ -50,7 +50,6 @@ class ContractTest {
         assertEquals(ID, op.id());
         assertEquals(0, op.baseVersion());
         assertEquals(0, op.index());
-        b.requireSupported();
     }
 
     @Test
@@ -70,15 +69,6 @@ class ContractTest {
             "{\"op\":\"update\",\"entity\":\"item\",\"id\":\"p1\",\"baseVersion\":1}"), 0));
         assertThrows(MapStudioException.class, () -> EditOp.parse(JsonParser.parseString("[]"), 0));
         assertThrows(MapStudioException.class, () -> EditBatch.parse(json("{\"batchId\":\"" + BATCH + "\",\"ops\":[]}")));
-    }
-
-    @Test
-    void kindSetupOpsAreRefusedAsNotSupportedInThisVersion() {
-        EditBatch kind = EditBatch.parse(json("{\"batchId\":\"" + BATCH + "\",\"ops\":[{\"op\":\"update\","
-            + "\"entity\":\"kindSetup\",\"id\":\"pad\",\"baseVersion\":1,\"data\":{}}]}"));
-        MapStudioException ex = assertThrows(MapStudioException.class, kind::requireSupported);
-        assertEquals(Messages.CODE_INVALID, ex.code());
-        assertTrue(ex.plainMessage().contains("not supported in this version"));
     }
 
     @Test

@@ -56,20 +56,4 @@ public record EditBatch(String batchId, List<EditOp> ops) {
         }
         return new EditBatch(id.getAsString(), List.copyOf(parsed));
     }
-
-    /**
-     * Refuse, before anything is written, the ops this contract version does not carry
-     * out yet: any kind setup op (entry 3).
-     *
-     * @throws MapStudioException {@code invalid} naming the first such op
-     */
-    public void requireSupported() {
-        for (EditOp op : ops) {
-            if (EditOp.ENTITY_KIND_SETUP.equals(op.entity())) {
-                throw new MapStudioException(Messages.CODE_INVALID, "Op " + op.index()
-                    + ": saving kind setups is not supported in this version (" + Messages.CONTRACT_VERSION + ").",
-                    op.index(), op.id());
-            }
-        }
-    }
 }
