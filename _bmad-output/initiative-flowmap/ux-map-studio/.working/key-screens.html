@@ -378,8 +378,8 @@ function saveCluster(){return '<span style="display:inline-flex;align-items:cent
 var RECENT=[
   ['You','Today 10:44','Edited 3 well pads in one change: Gas rate switched on',1],
   ['Sam','Today 10:42','Moved P14 about 40 m north',0],
-  ['Sam','Today 09:50','Deleted line L-TEST and its 2 instruments in one change',0],
   ['You','Today 10:31','Unlinked P12 lateral from Mesa/P12-LAT',0],
+  ['Sam','Today 09:50','Deleted line L-TEST and its 2 instruments in one change',0],
   ['You','Today 08:05','Moved P21 12 m east',0],
   ['Sam','Yesterday 16:20','Added P12 lateral, ends snapped to P12 and CTB1',0]
 ];
@@ -597,7 +597,7 @@ function listBody(){
   }
   return h;
 }
-function listFoot(){return '<div class="pfoot"><button class="btn" style="flex:1;justify-content:center" data-act="tool" data-v="point">'+ic('plus',16)+'Add item</button><span class="small muted">1 unlinked</span></div>';}
+function listFoot(){return '<div class="pfoot"><button class="btn" style="flex:1;justify-content:center" data-act="tool" data-v="point">'+ic('plus',16)+'Add item</button>'+(S.empty?'':'<span class="small muted">1 unlinked</span>')+'</div>';}
 function detailsHead(it,back,close){
   var k=KINDS[it.kind];
   return '<div class="ph">'+(back?'<button class="btn ghost sm" style="margin:-4px 0 6px -8px" data-act="back">'+ic('back',16)+'All items</button>':'')+
@@ -925,7 +925,7 @@ function kindBody6(){
   h+='<div class="tiny muted" style="display:grid;grid-template-columns:1fr 18px 1fr 64px;gap:8px"><span>When Status is</span><span></span><span>Use preset</span><span>Preview</span></div>';
   [['Running','Normal','',''],['Shut in','Dimmed dashed','dim','Shut in'],['Testing','Attention','att','Testing']].forEach(function(r){
     h+='<div class="rule"><span class="input val small" style="height:30px">'+r[0]+'</span><span class="muted">'+ic('chevr',14)+'</span><span class="sel-like">'+r[1]+ic('chev',14)+'</span><span class="pv '+r[2]+'"><span class="disc">'+ic('well-pad',19)+'</span><span class="tiny" style="font-weight:600">P14'+(r[3]?' <span class="tag" style="font-size:10px;padding:0 4px">'+r[3]+'</span>':'')+'</span></span></div>';});
-  h+='<div class="note" style="margin-top:8px;display:flex;gap:10px;align-items:center"><span class="pv" style="width:auto"><span class="disc" style="position:relative">'+ic('well-pad',19)+'<span style="position:absolute;top:-9px;right:-14px;color:var(--error);font-weight:700;font-size:11px;display:flex">'+fi('a1u',16)+'1</span></span></span><span>Live now: P14 is <b>Running</b> (Normal), but its priority 1 alarm wins over the rule.</span></div></div>';
+  h+='<div class="note" style="margin-top:8px;display:flex;gap:22px;align-items:center;padding-top:14px"><span class="pv" style="width:auto"><span class="disc" style="position:relative">'+ic('well-pad',19)+'<span style="position:absolute;top:-9px;right:-14px;color:var(--error);font-weight:700;font-size:11px;display:flex">'+fi('a1u',16)+'1</span></span></span><span>Live now: P14 is <b>Running</b> (Normal), but its priority 1 alarm wins over the rule.</span></div></div>';
   return h;
 }
 function tagPop(){
