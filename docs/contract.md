@@ -11,7 +11,7 @@ Every message, both ways, is one JSON object `{v, type, id, body}` carried under
 | Type | Direction | Body |
 | --- | --- | --- |
 | `map.load` | browser to Gateway | `{}` |
-| `map.load.reply` | Gateway to browser | `{level, seq, items, kinds, assets, adapters, readOnly}`: `level` is `none`, `phone` or `full` for this session; `seq` is the project's last change sequence number; `items` are map item records, deleted ones left out; `kinds` the project's kind list; `assets` its asset list, sent only at level `phone` or `full`; `adapters` `{kinds: status, assets: status}`, at level `none` with viewer messages (no host error text, no row reasons) ([kinds-and-assets.md](kinds-and-assets.md)) **[live 8.3.10]**; `readOnly` is null, or the reason in plain words when the map can be read but not saved on this Gateway (a newer schema **[live 8.3.10]**, or a standby **[unverified]**; entry 5) |
+| `map.load.reply` | Gateway to browser | `{level, seq, items, kinds, assets, adapters, readOnly, setup?}`: `level` is `none`, `phone` or `full` for this session; `seq` is the project's last change sequence number; `items` are map item records, deleted ones left out; `kinds` the project's kind list; `assets` its asset list, sent only at level `phone` or `full`; `adapters` `{kinds: status, assets: status}`, at level `none` with viewer messages (no host error text, no row reasons) ([kinds-and-assets.md](kinds-and-assets.md)) **[live 8.3.10]**; `readOnly` is null, or the reason in plain words when the map can be read but not saved on this Gateway (a newer schema **[live 8.3.10]**, or a standby **[unverified]**; entry 5); `setup` (optional, added by epic 2 entry 6) is `{refreshIntervalSeconds, basemaps, alarmPage}` from the project setup (`docs/setup.md`), and a reader treats a missing or malformed `setup` as absent **[live 8.3.10]** |
 | `edits.apply` | browser to Gateway | `{batchId, ops}` (below) |
 | `edits.apply.reply` | Gateway to browser | `{batchId, seq, results: [{entity, id, version}]}`: the batch's change sequence number and each op's new version **[live 8.3.10]** |
 | `map.changed` | Gateway to browser | `{seq, batchId, actor, ops}`: one committed batch, sent to every open map of the project (below) **[live 8.3.10]** |
@@ -53,7 +53,7 @@ Stable kebab-case words; the message is plain words for the person.
 | `invalid` | the message, batch or op is malformed (two ops on one id included), an update, delete or restore names a map item that was never saved, a `batchId` was already saved by another actor, or the op is not supported in this version (any `kindSetup` op, until entry 3) |
 | `stale` | the browser's map is behind (a gap in `seq`); used from entry 4 |
 | `read-only` | the map can be read but not saved here: the map store's schema is newer than this module, or this Gateway is the standby of a redundant pair (entry 5). Checked before the batch and the role, so every save is refused, a viewer's too; the message says which. Nothing is written |
-| `store-unreachable` | the project has no setup, its setup names a connection the Gateway does not have, the map store is starting or unavailable, or the Gateway is busy: when the module's bounded work pool (4 threads, 64 waiting messages) is full, a `map.load` or `edits.apply` is answered at once with this code and "Map Studio is busy with other map requests; nothing was saved. Try again in a moment." (no separate `busy` code in 0.2.0) |
+| `store-unreachable` | the project has no setup, its setup cannot be read (the reason lists every problem, `docs/setup.md`), its setup names a connection the Gateway does not have, the map store is starting or unavailable, or the Gateway is busy: when the module's bounded work pool (4 threads, 64 waiting messages) is full, a `map.load` or `edits.apply` is answered at once with this code and "Map Studio is busy with other map requests; nothing was saved. Try again in a moment." (no separate `busy` code in 0.2.0) |
 
 ## Batches and ops
 
@@ -134,16 +134,7 @@ Closed: no other field is stored or accepted. Geometry is GeoJSON `Point` or `Li
 
 ## The project setup, schema version 1 (AD-5)
 
-The project resource `com.aoindustrial.perspective.mapstudio/setup/` holding `setup.json` and `resource.json` (`"scope": "G"`, `"files": ["setup.json"]`). Example: `ops/project/com.aoindustrial.perspective.mapstudio/setup/setup.json`.
-
-```json
-{"schemaVersion": 1, "connection": "MapStudio",
- "roles": {"full": ["MapEditor"], "phone": ["MapOperator"]},
- "kindsFunction": "", "assetsFunction": "", "refreshIntervalSeconds": 10,
- "alarmPage": "", "basemaps": ["none", "osm"], "tokenSecret": ""}
-```
-
-`schemaVersion` and `connection` are required; the rest have the defaults shown. `kindsFunction` and `assetsFunction` name the project library functions that return the kind list and the asset list, and `refreshIntervalSeconds` how often they are called: see [kinds-and-assets.md](kinds-and-assets.md). Role names are Ignition role names, compared exactly. The map is keyed by the project's own name, even when a child project inherits the setup. A project with no setup, or whose setup names a connection the Gateway does not have, logs one warning naming the project (and the connection) at its first `map.load` or `applyEdits` after a Gateway start, and answers `store-unreachable` **[live 8.3.10]**.
+The project resource `com.aoindustrial.perspective.mapstudio/setup/` (`setup.json`). Every field, its default and rule, the messages a wrong setup gives, and how to change it on a running Gateway: `docs/setup.md`. In short: only `schemaVersion` (1) and `connection` are required; unknown fields are refused; a wrong or missing setup makes the project's map store answer `store-unreachable` with the reason; a changed setup applies at the next call after a project scan, with no restart **[live 8.3.10]**. The map is keyed by the project's own name, even when a child project inherits the setup. The kind and asset functions (`kindsFunction`, `assetsFunction`) and how often they are called (`refreshIntervalSeconds`): [kinds-and-assets.md](kinds-and-assets.md).
 
 ## The map store, schema version 1 (AD-3, AD-21)
 

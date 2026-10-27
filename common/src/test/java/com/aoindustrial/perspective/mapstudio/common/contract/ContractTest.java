@@ -122,7 +122,7 @@ class ContractTest {
         assertTrue(noConnection.getMessage().contains("connection"));
         Setup.SetupException version = assertThrows(Setup.SetupException.class,
             () -> Setup.parse("{\"schemaVersion\":2,\"connection\":\"MapStudio\"}"));
-        assertTrue(version.getMessage().contains("schemaVersion"));
+        assertTrue(version.getMessage().contains("newer Map Studio (schema 2"));
         assertThrows(Setup.SetupException.class, () -> Setup.parse("not json"));
         assertThrows(Setup.SetupException.class,
             () -> Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\",\"roles\":{\"full\":\"MapEditor\"}}"));

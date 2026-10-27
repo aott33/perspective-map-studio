@@ -39,7 +39,11 @@ public final class Messages {
     public static final String POINT_CLICK_REPLY = "point.click.reply";
     /** Browser asks for the map: body {}. */
     public static final String MAP_LOAD = "map.load";
-    /** Body {level, seq, items: [map item record], readOnly: reason or null}. */
+    /**
+     * Body {level, seq, items: [map item record], kinds, assets, adapters, readOnly: reason or null,
+     * setup?: {refreshIntervalSeconds, basemaps, alarmPage}}; {@code setup} is optional (added in
+     * 0.2.0 draft by epic 2 entry 6).
+     */
     public static final String MAP_LOAD_REPLY = "map.load.reply";
     /** Body {batchId, ops: [{op, entity, id, baseVersion, data}]}. */
     public static final String EDITS_APPLY = "edits.apply";

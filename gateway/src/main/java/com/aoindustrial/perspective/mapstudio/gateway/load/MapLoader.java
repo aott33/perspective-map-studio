@@ -21,13 +21,14 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
 
 /**
  * Assembles {@code map.load}'s reply, {@code {level, seq, items, kinds, assets,
- * adapters, readOnly}}, and {@code getMap}'s list from the map store and the host
+ * adapters, readOnly, setup}}, and {@code getMap}'s list from the map store and the host
  * adapters' cache. {@code assets} (with their tag paths) go only to sessions that may link
  * items, {@code phone} and {@code full} (owner decision, 2026-10-26); every level
  * gets the kinds and both statuses, but level {@code none} gets the viewer
  * messages, without host error text or row ids. A read-only store (newer schema, or
  * this Gateway a standby) is read as usual; {@code readOnly} carries the reason, null
- * when saving works (epic 2 story 5).
+ * when saving works (epic 2 story 5). {@code setup} is the part of the project setup
+ * the browser needs (epic 2 story 6).
  */
 public final class MapLoader {
 
@@ -58,7 +59,10 @@ public final class MapLoader {
 
     /** @throws MapStudioException {@code store-unreachable} when the project's map store cannot be read */
     public Loaded load(String project) {
-        StoreGate.Readable readable = gate.requireReadable(project);
+        return load(project, gate.requireReadable(project));
+    }
+
+    private Loaded load(String project, StoreGate.Readable readable) {
         Setup setup = readable.setup();
         try {
             return new Loaded(store.inTransaction(setup.connection(),
@@ -71,9 +75,21 @@ public final class MapLoader {
         }
     }
 
-    /** The {@code map.load.reply} body for a session at {@code level}. */
+    /** The {@code map.load.reply} body for a session at a fixed {@code level}. */
     public JsonObject mapLoadReply(String project, String level) {
-        Loaded loaded = load(project);
+        return mapLoadReply(project, setup -> level);
+    }
+
+    /**
+     * The {@code map.load.reply} body, with the level worked out by {@code levelOf} from the
+     * same setup the reply is built from. The setup is read once per call (never kept here), so
+     * a changed setup applies at the next map.load and one reply never mixes two setups.
+     */
+    public JsonObject mapLoadReply(String project, Function<Setup, String> levelOf) {
+        StoreGate.Readable readable = gate.requireReadable(project);
+        Setup setup = readable.setup();
+        String level = levelOf.apply(setup);
+        Loaded loaded = load(project, readable);
         Snapshot snapshot = loaded.snapshot();
         JsonObject body = new JsonObject();
         body.addProperty("level", level);
@@ -91,7 +107,23 @@ public final class MapLoader {
         } else {
             body.addProperty("readOnly", loaded.readOnly());
         }
+        body.add("setup", setupJson(setup));
         return body;
+    }
+
+    /**
+     * The part of the setup the browser needs ({@code map.load.reply}'s optional
+     * {@code setup}, 0.2.0 draft): never the connection, the roles, the functions or
+     * the token secret's name.
+     */
+    public static JsonObject setupJson(Setup setup) {
+        JsonObject o = new JsonObject();
+        o.addProperty("refreshIntervalSeconds", setup.refreshIntervalSeconds());
+        JsonArray basemaps = new JsonArray();
+        setup.basemaps().forEach(basemaps::add);
+        o.add("basemaps", basemaps);
+        o.addProperty("alarmPage", setup.alarmPage());
+        return o;
     }
 
     public static JsonArray toJson(List<MapItemRecord> items) {

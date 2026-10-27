@@ -98,6 +98,8 @@ export interface MapStudioDelegateState {
     itemsRevision: number;
     /** The level map.load reported, or null before it answered. */
     level: EditLevel | null;
+    /** The project setup's refresh interval map.load reported, or null (not loaded, failed, or not sent). */
+    refreshIntervalSeconds: number | null;
     /** 'loading', 'loaded', or the store-unreachable (or other) reason map.load answered. */
     load: { state: 'loading' | 'loaded' | 'failed'; message: string };
     /** The last save of a drawn line. */
@@ -126,6 +128,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     });
     private itemsRevision = 0;
     private level: EditLevel | null = null;
+    private refreshIntervalSeconds: number | null = null;
     private load: MapStudioDelegateState['load'] = { state: 'loading', message: '' };
     private save: SaveState = SAVE_IDLE;
     private lists: HostLists = NO_HOST_LISTS;
@@ -148,6 +151,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             reloads: this.changes.reloads,
             itemsRevision: this.itemsRevision,
             level: this.level,
+            refreshIntervalSeconds: this.refreshIntervalSeconds,
             load: this.load,
             save: this.save,
             lists: this.lists,
@@ -236,6 +240,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         if (reply.kind === 'map.load.reply') {
             this.level = reply.body.level;
             this.lists = reply.body.lists;
+            this.refreshIntervalSeconds = reply.body.setup ? reply.body.setup.refreshIntervalSeconds : null;
             this.load = { state: 'loaded', message: '' };
             this.itemsRevision++;
             this.store = storeStateFromLoad(reply.body);
@@ -243,6 +248,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.changes.loaded(reply.body);
         } else if (reply.kind === 'error') {
             this.level = null;
+            this.refreshIntervalSeconds = null;
             this.load = { state: 'failed', message: reply.body.code + ': ' + reply.body.message };
             this.store = storeStateFromError(this.store, reply.body);
             this.changes.loadFailed();
@@ -737,7 +743,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                      data-load-state={load.state}
                      data-store-seq={delegate && delegate.seq !== null ? String(delegate.seq) : ''}
                      data-map-reloads={delegate ? String(delegate.reloads) : '0'}
-                     data-store-state={storeStateAttribute(store)} />
+                     data-store-state={storeStateAttribute(store)}
+                     data-refresh-interval={delegate && delegate.refreshIntervalSeconds !== null
+                         ? String(delegate.refreshIntervalSeconds) : ''} />
                 <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '')}
                      data-pending={pending ? 'true' : 'false'}
                      data-drawing={this.state.drawing ? 'true' : 'false'}

@@ -65,6 +65,8 @@ public class FakeMapStore implements MapStore {
     /** How many times nextSeq ran, committed or not. */
     public int nextSeqCalls;
     public int transactions;
+    /** The database connection the last transaction was opened on. */
+    public String lastConnection;
     /** When set, the next transaction throws it at its first write (a database failure). */
     public SQLException failNextWrite;
 
@@ -72,6 +74,7 @@ public class FakeMapStore implements MapStore {
     @Override
     public synchronized <T> T inTransaction(String connection, Work<T> work) throws SQLException {
         transactions++;
+        lastConnection = connection;
         State working = committed.copy();
         T result = work.run(new FakeTx(working));
         committed = working;

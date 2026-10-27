@@ -18,6 +18,7 @@ import com.inductiveautomation.ignition.common.gson.JsonParser;
 import com.aoindustrial.perspective.mapstudio.common.Messages;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
+import com.aoindustrial.perspective.mapstudio.gateway.adapter.NoAdapters;
 import com.aoindustrial.perspective.mapstudio.gateway.load.MapLoader;
 import com.aoindustrial.perspective.mapstudio.gateway.redundancy.RedundancyGate;
 import com.aoindustrial.perspective.mapstudio.gateway.setup.SetupRegistry;
@@ -47,7 +48,7 @@ class WriteServiceStoreStateTest {
         hooked = new ArrayList<>();
         StoreGate gate = new StoreGate(setups, c -> state, () -> standby);
         writes = new WriteService(gate, store, hooked::add);
-        loader = new MapLoader(gate, store);
+        loader = new MapLoader(gate, store, NoAdapters::snapshot);
     }
 
     static JsonObject createBatch() {

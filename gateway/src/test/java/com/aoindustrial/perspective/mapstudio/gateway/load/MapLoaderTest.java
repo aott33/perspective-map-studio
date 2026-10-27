@@ -26,6 +26,7 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.StoreState;
 import com.aoindustrial.perspective.mapstudio.gateway.write.Actor;
 import com.aoindustrial.perspective.mapstudio.gateway.write.FakeMapStore;
 import com.aoindustrial.perspective.mapstudio.gateway.write.NoChangeHook;
+import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
 import com.aoindustrial.perspective.mapstudio.gateway.write.WriteService;
 
 class MapLoaderTest {
@@ -120,5 +121,46 @@ class MapLoaderTest {
                 : failing.message(), kinds.get("message").getAsString(), level);
             assertTrue(!kinds.has("viewerMessage"), "no key of its own");
         }
+    }
+
+    @Test
+    void mapLoadSendsThePartOfTheSetupTheBrowserNeeds() {
+        JsonObject setup = loader.mapLoadReply("mapstudio-dev", Messages.LEVEL_FULL).getAsJsonObject("setup");
+        assertEquals(10, setup.get("refreshIntervalSeconds").getAsInt());
+        assertEquals("[\"none\",\"osm\"]", setup.get("basemaps").toString());
+        assertEquals("", setup.get("alarmPage").getAsString());
+        assertEquals(3, setup.size(), "never the connection, the roles, the functions or the token secret");
+    }
+
+    @Test
+    void aChangedSetupAppliesAtTheNextCallWithNoRestart() throws Exception {
+        String roles = "\"roles\":{\"full\":[\"MapEditor\"],\"phone\":[]}";
+        setups.put("mapstudio-dev", Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\"," + roles + "}"));
+        List<String> editor = List.of("MapEditor");
+        assertEquals("full", loader.mapLoadReply("mapstudio-dev", setup -> RoleMatrix.level(setup, editor))
+            .get("level").getAsString());
+
+        setups.put("mapstudio-dev", Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\","
+            + "\"roles\":{\"full\":[\"Nobody\"],\"phone\":[\"MapEditor\"]},\"refreshIntervalSeconds\":30}"),
+            "resource modified");
+        JsonObject reply = loader.mapLoadReply("mapstudio-dev", setup -> RoleMatrix.level(setup, editor));
+        assertEquals("phone", reply.get("level").getAsString(), "the level comes from the setup the reply is built from");
+        assertEquals(30, reply.getAsJsonObject("setup").get("refreshIntervalSeconds").getAsInt());
+
+        setups.putProblem("mapstudio-dev", "refreshIntervalSeconds must be a whole number from 1 to 3600, not \"ten\".");
+        MapStudioException load = assertThrows(MapStudioException.class,
+            () -> loader.mapLoadReply("mapstudio-dev", Messages.LEVEL_NONE));
+        assertEquals(Messages.CODE_STORE_UNREACHABLE, load.code());
+        assertTrue(load.plainMessage().contains("refreshIntervalSeconds must be a whole number"), load.plainMessage());
+        MapStudioException save = assertThrows(MapStudioException.class, () -> writes.apply("mapstudio-dev",
+            JsonParser.parseString("{\"batchId\":\"" + UUID.randomUUID() + "\",\"ops\":[]}"), Actor.script("t"),
+            Messages.LEVEL_FULL));
+        assertEquals(Messages.CODE_STORE_UNREACHABLE, save.code());
+        assertEquals(load.plainMessage(), save.plainMessage());
+        assertThrows(MapStudioException.class, () -> loader.snapshot("mapstudio-dev"));
+
+        setups.put("mapstudio-dev", Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\"," + roles + "}"));
+        assertEquals(10, loader.mapLoadReply("mapstudio-dev", "full").getAsJsonObject("setup")
+            .get("refreshIntervalSeconds").getAsInt());
     }
 }

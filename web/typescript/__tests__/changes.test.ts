@@ -1,4 +1,5 @@
 import { CHANGES_INITIAL, ChangeState, MapChanges, MapChangedBody, applyRecord, onChanged, onLoad, readMapChanged } from '../changes';
+import { NO_HOST_LISTS } from '../adapters';
 import { MapItemRecord, MapLoadReplyBody } from '../contract';
 import { readReply } from '../messages';
 
@@ -17,7 +18,7 @@ function changed(seq: number, ...records: MapItemRecord[]): MapChangedBody {
 }
 
 function loadReply(seq: number, items: MapItemRecord[] = []): MapLoadReplyBody {
-    return { level: 'none', seq, items };
+    return { level: 'none', seq, items, lists: NO_HOST_LISTS };
 }
 
 function loadedAt(seq: number, items: MapItemRecord[] = []): ChangeState {

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Function;
 
 import com.inductiveautomation.ignition.common.auth.web.WebAuthUser;
 import com.inductiveautomation.ignition.common.gson.JsonElement;
@@ -21,10 +22,13 @@ import com.inductiveautomation.perspective.gateway.messages.EventFiredMsg;
 
 import com.aoindustrial.perspective.mapstudio.common.Messages;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
+import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 import com.aoindustrial.perspective.mapstudio.gateway.change.ChangeBus;
+import com.aoindustrial.perspective.mapstudio.gateway.load.MapLoader;
 import com.aoindustrial.perspective.mapstudio.gateway.setup.SetupRegistry;
 import com.aoindustrial.perspective.mapstudio.gateway.write.Actor;
 import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
+import com.aoindustrial.perspective.mapstudio.gateway.write.WriteService;
 
 /**
  * The Gateway side of the Map Studio component: one instance per component
@@ -213,7 +217,7 @@ public class MapStudioDelegate extends ComponentModelDelegate {
             return;
         }
         try {
-            services.work.execute(() -> send(storeReply(services, view, type, id, body)));
+            services.work.execute(() -> send(storeReply(services.loader, services.writes, view, type, id, body)));
         } catch (RejectedExecutionException ex) {
             log.debugf("%s %s refused: the work pool is full or stopping.", type, id);
             send(busyReply(id));
@@ -222,20 +226,23 @@ public class MapStudioDelegate extends ComponentModelDelegate {
 
     /**
      * The reply to {@code map.load} or {@code edits.apply} for this session. Every
-     * refusal becomes an {@code error} envelope; nothing escapes.
+     * refusal becomes an {@code error} envelope; nothing escapes. The session's level is
+     * worked out from the one setup the loader or the write service reads for this call, so
+     * the level and the reply always come from the same setup.
      */
-    static JsonObject storeReply(MapStudioServices services, SessionView view, String type, String id, JsonObject body) {
+    static JsonObject storeReply(MapLoader loader, WriteService writes, SessionView view, String type, String id,
+            JsonObject body) {
         String batchId = null;
+        Function<Setup, String> level = setup -> RoleMatrix.level(setup, view.roles());
         try {
-            String level = RoleMatrix.level(services.setups.find(view.project()).orElse(null), view.roles());
             if (Messages.MAP_LOAD.equals(type)) {
-                return envelope(Messages.MAP_LOAD_REPLY, id, services.loader.mapLoadReply(view.project(), level));
+                return envelope(Messages.MAP_LOAD_REPLY, id, loader.mapLoadReply(view.project(), level));
             }
             JsonElement b = body.get("batchId");
             batchId = b != null && b.isJsonPrimitive() ? b.getAsString() : null;
             String user = view.userName() == null ? "" : view.userName();
             return envelope(Messages.EDITS_APPLY_REPLY, id,
-                services.writes.apply(view.project(), body, Actor.session(user), level).toJson());
+                writes.apply(view.project(), body, Actor.session(user), level).toJson());
         } catch (MapStudioException ex) {
             log.debugf("%s %s refused for project %s: %s", type, id, view.project(), ex.getMessage());
             JsonObject errorBody = ex.toErrorBody();
