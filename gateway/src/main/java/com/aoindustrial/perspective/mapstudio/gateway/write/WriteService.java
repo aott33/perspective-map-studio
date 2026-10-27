@@ -21,16 +21,18 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
  * The one write path (AD-2): every {@code edits.apply} batch, from the browser or
  * from {@code system.mapstudio.applyEdits}, goes through {@link #apply}.
  *
- * <p>Order (epic 2 story 2): the project's map store is ready; the batch and its ops
- * are well formed; a {@code batchId} already committed replays its stored reply (same
- * actor) or is refused; the level allows every op's shape; every op is one this
- * version carries out (kind setups from entry 3); there is an actor. Then one transaction takes the
- * project's next {@code seq} (locking the project row, which serialises a project's
- * batches), looks for the {@code batchId} again (found: roll back and replay), locks
- * every map item, checks the level against each stored geometry, collects every
- * stale op into one {@code conflict}, then writes the items, one edit record row per
- * op and the batch row; it commits all or nothing; then the change hook is called
- * once. Any refusal is a {@link MapStudioException}; nothing is written.
+ * <p>Order (epic 2 stories 2 and 5): the project's map store is ready and writable
+ * here (not read only: a newer schema or a standby refuses {@code read-only}); the
+ * batch and its ops are well formed; a {@code batchId} already committed replays its
+ * stored reply (same actor) or is refused; the level allows every op's shape; every
+ * op is one this version carries out (kind setups from entry 3); there is an actor.
+ * Then one transaction takes the project's next {@code seq} (locking the project row,
+ * which serialises a project's batches), looks for the {@code batchId} again (found:
+ * roll back and replay), locks every map item, checks the level against each stored
+ * geometry, collects every stale op into one {@code conflict}, then writes the items,
+ * one edit record row per op and the batch row; it commits all or nothing; then the
+ * change hook is called once. Any refusal is a {@link MapStudioException} with its
+ * code and, where an op is at fault, the op's index and id; nothing is written.
  */
 public final class WriteService {
 
@@ -66,7 +68,7 @@ public final class WriteService {
      * @throws MapStudioException when the batch is refused; nothing is written then
      */
     public EditResult apply(String project, JsonElement batchJson, Actor actor, String level) {
-        Setup setup = gate.requireReady(project);
+        Setup setup = gate.requireWritable(project);
         EditBatch batch = EditBatch.parse(batchJson);
         boolean hasActor = actor != null && actor.name() != null && !actor.name().isBlank();
         if (hasActor) {

@@ -30,6 +30,7 @@ import com.aoindustrial.perspective.mapstudio.gateway.write.WriteService;
  * required and recorded in the edit record. A refusal raises a
  * {@link MapStudioException} (a Java exception; its message starts with the code).
  * Python values cross with {@code TypeUtilities.pyToGson} and {@code gsonToPy}.
+ * {@code getMap} returns a {@link MapList}: the records, plus {@code readOnly}.
  */
 public final class GatewayScriptModule extends MapStudioScriptModule {
 
@@ -73,7 +74,9 @@ public final class GatewayScriptModule extends MapStudioScriptModule {
     @Override
     protected PyObject getMapImpl(String project) {
         requireProject(project);
-        return TypeUtilities.gsonToPy(MapLoader.toJson(loader.snapshot(project).items()));
+        MapLoader.Loaded loaded = loader.load(project);
+        // Still the list of records; it also answers .readOnly (epic 2 story 5).
+        return new MapList(TypeUtilities.gsonToPy(MapLoader.toJson(loaded.snapshot().items())), loaded.readOnly());
     }
 
     @Override

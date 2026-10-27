@@ -27,7 +27,7 @@ class ContractTest {
 
     @Test
     void theErrorCodesAndTypesAreTheContractsOnes() {
-        assertEquals(Set.of("conflict", "role", "invalid", "stale", "store-unreachable"), Messages.CODES);
+        assertEquals(Set.of("conflict", "role", "invalid", "stale", "store-unreachable", "read-only"), Messages.CODES);
         assertEquals(Set.of("point.click", "map.load", "edits.apply"), Messages.INBOUND_TYPES);
         assertTrue(Messages.OUTBOUND_TYPES.containsAll(
             Set.of("map.load.reply", "edits.apply.reply", "map.changed", "error")));
