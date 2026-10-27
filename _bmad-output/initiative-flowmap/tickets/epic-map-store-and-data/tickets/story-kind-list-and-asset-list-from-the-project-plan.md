@@ -3,7 +3,7 @@ title: 'Kind list and asset list from the project'
 type: 'feature'
 ticket: '3'
 created: '2026-10-26'
-status: 'in-review'
+status: 'built'
 baseline_revision: 'bf9737ec5f7bc182fc509c6490ba8a41f61e00ab'
 route: 'full'
 route_source: 'auto'
@@ -112,6 +112,7 @@ Implemented directly in the planning session (no implementation subagent was ava
   - Gateway log of the fresh run: one `M.adapters` line per status change, as listed above; no Map Studio warning or error except story 1's expected "Project no-such-project has no Map Studio setup" from its script checks.
   - No generated secret (admin and editor passwords, PostgreSQL password, API key) in either container's log or in any tracked or new file (a scratch script counted occurrences without printing them). `git grep` for an em dash over the changed files: none.
   - Matrix audit: every row of the I/O matrix has a passing `AdapterServiceTest` case (good, empty, raises, slow, bad rows, not a list, not configured, loading, recovers), and the e2e test covers good, empty, raises, slow, bad rows and recovers live.
+- **After the quick lens review (2026-10-27):** `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew clean build` green, Java 87 tests (common 15, gateway 72: adapter service 22, map loader 5), Jest 47 of 47 (8 suites); `ops/up.sh` on `ms-e2s3` then `cd e2e && npm test`: 19 of 19, teardown found no password in `e2e/out`. No em dash in the changed files.
 - **Not run:** the two example adapters on a live Gateway (compiled under Jython 2.7 only; marked unverified in the docs); Designer autocomplete of `refreshAdapters` (owner, optional).
 
 ## Plan Change Log
@@ -131,7 +132,28 @@ Implemented directly in the planning session (no implementation subagent was ava
 - *Browser:* `MapLoadReplyBody` gained `lists: HostLists` (`adapters.ts`); the hidden status element also carries `data-kinds-rows`.
 - *Story 1 files changed:* `SetupRegistry` (`projects()`), `MapStudioServices` (wiring), `MapLoader` (constructor and reply), `MapLoaderTest`, the scripting module trio and its `.properties`, `web/typescript/contract.ts`, `MapStudio.tsx`, `__tests__/contract.test.ts` (expected body), `setup.json` (function names, interval 30), `page-config/config.json`, `docs/contract.md`, `docs/platform-checks.md`.
 
+**Quick lens review, 2026-10-27 (review loopback, iteration 0).** Patches for the findings in the Review Triage Log; later entries read these:
+
+- *Locking:* no code holds both list monitors. A call's `settled` future and a list's `pending` future are completed only after the list monitor is left (the timeout task, `finish`), and the kind ids for an asset check are read before the asset monitor is entered. A rejected call still completes its new future under the monitor (nothing depends on it yet).
+- *Echoed row values:* `Rows.echo` cuts an echoed `id`, `kind` or field `key` to 64 characters plus "..." and turns every control character and line or paragraph separator into `?`; `firstLine` does the same for exception text (200 characters).
+- *Viewer messages (contract change):* `AdapterStatus` gained a seventh component, `viewerMessage` (a six-argument constructor keeps `viewerMessage = message`). `map.load` at level `none` sends it in `message`: `failing` without the host's error text ("The kind function X failed."), `incomplete` without the row reasons ("2 of 6 assets from X left out."), with "Showing the list from ..." when it applies. `phone`, `full`, `refreshAdapters` and the Gateway log keep the full message. `AdapterSnapshot.statusJson(boolean detail)` and `AdapterStatus.toJson(boolean detail)` carry the choice; no new JSON key.
+- *`refreshAdapters` wait:* at most 21 s (four timeouts and 1 s: kinds then assets, each may wait for a timed-out call to end and then time out itself), `GatewayScriptModule.refreshWait`; documented in `docs/contract.md` and `docs/kinds-and-assets.md`, with the advice to call it from a session or Gateway script, not a binding or tag event.
+- *Dev adapter:* every `system.util.getGlobals()` read goes through `_globals`, which catches `java.lang.Throwable` and `Exception`, logs the class name and re-raises; `mode()` no longer reports `ok` on a failed read.
+- *Example adapters:* the UDT example's asset id is the instance path below `ROOT` (unique across folders); both examples use `unicode()` for text, and a NULL column stays `None` so the row is left out with a reason.
+
 ## Review Triage Log
+
+**Quick lens, context-free, 2026-10-27 (iteration 0).** Seven findings; all patched, none rejected. Build, Jest and e2e re-run after the patches: green (see Implementation Notes).
+
+| # | Finding | Severity | Decision | Where |
+| --- | --- | --- | --- | --- |
+| 1 | Lock-order inversion between the kind and asset monitors: a settling kind call ran the asset step under the kind monitor while an answering asset call asked for the kind ids under the asset monitor | High | Patched: futures completed outside the monitors, kind ids read before the asset monitor; tests `aKindCallSettlingWhileAnAssetCallAnswersDoesNotDeadlock`, `manyOverlappingRefreshesAllSettle` | `AdapterService`, `AdapterServiceTest` |
+| 2 | Reasons and log lines echo raw `kind` (any length) and ids with control characters | Low | Patched: `Rows.echo` (64 characters, control characters to `?`) for ids, kinds and field keys; `firstLine` filters control characters; tests `reasonsEchoIdsAndKindsAsOneShortLine`, `errorTextIsOneLineInTheLog` | `Rows`, `Asset`, `Kind`, `FormField`, `AdapterService`, `docs/kinds-and-assets.md` |
+| 3 | Host exception text reaches sessions at level `none` | Low | Patched: viewer messages at level `none` (no error text, no row reasons); tests `aViewerMessageHasNoHostErrorTextAndNoRowReasons`, `aViewerGetsTheStatusWithoutTheHostErrorText` | `AdapterStatus`, `AdapterSnapshot`, `MapLoader`, `docs/contract.md`, `docs/kinds-and-assets.md` |
+| 4 | `refreshAdapters` waits 21 s, more than planned, unrecorded | Low | Patched by recording: the bound kept (four timeouts are reachable), named `refreshWait`, documented with the advice on where to call it | `GatewayScriptModule`, Change Log, `docs/contract.md`, `docs/kinds-and-assets.md` |
+| 5 | Dev adapter `system.util.getGlobals()` calls without both handlers; `mode()` swallowed a failure as `ok` | Low | Patched: `_globals` catches both, logs the class name, re-raises | `ops/project/.../mapstudio_dev/code.py` |
+| 6 | Example adapters: duplicate ids across folders, `str()` on non-ASCII text, NULL id as `'None'` | Low | Patched: id is the path below `ROOT`, `unicode()` for text, NULL stays `None` (row left out with a reason) | `docs/examples/adapters/udt_instances.py`, `named_query.py` |
+| 7 | The late-answer test did not check that nothing more is logged | Low | Patched: asserts the log line count is unchanged; overlap tests added for finding 1 | `AdapterServiceTest` |
 
 ## Design Notes
 

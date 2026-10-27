@@ -17,11 +17,19 @@ import com.aoindustrial.perspective.mapstudio.common.contract.Kind;
 public record AdapterSnapshot(List<Kind> kinds, List<Asset> assets, AdapterStatus kindsStatus,
                               AdapterStatus assetsStatus) {
 
-    /** {@code {kinds: status, assets: status}}. */
+    /** {@code {kinds: status, assets: status}} with the full messages. */
     public JsonObject statusJson() {
+        return statusJson(true);
+    }
+
+    /**
+     * {@code {kinds: status, assets: status}}; {@code detail} false gives the
+     * viewer messages (no host error text, no row ids) for level {@code none}.
+     */
+    public JsonObject statusJson(boolean detail) {
         JsonObject o = new JsonObject();
-        o.add("kinds", kindsStatus.toJson());
-        o.add("assets", assetsStatus.toJson());
+        o.add("kinds", kindsStatus.toJson(detail));
+        o.add("assets", assetsStatus.toJson(detail));
         return o;
     }
 }

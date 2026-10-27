@@ -10,7 +10,11 @@
 # Rules Map Studio's asset contract sets (docs/kinds-and-assets.md):
 # - return a list of dicts {id, name, kind, basePath}; kind must be in the kind list;
 # - basePath is fully qualified, provider included: "[default]Mesa/P12";
-# - raise on failure, never return [] for an error: [] reads as "no assets".
+# - raise on failure, never return [] for an error: [] reads as "no assets";
+# - ids are unique and at most 64 characters: this example uses the path below
+#   ROOT ("North/P12"), since two folders may hold instances of the same name;
+# - text is unicode: str() of a non-ASCII name ("Penasco" with a tilde) raises
+#   UnicodeEncodeError in Jython 2.7, so this example uses unicode().
 
 import java.lang
 
@@ -32,19 +36,27 @@ def _browse(path):
     return results.getResults()
 
 
+def _below_root(full_path):
+    """The instance path below ROOT ("North/P12"), unique in the tag tree."""
+    prefix = ROOT.rstrip('/') + '/'
+    if full_path.startswith(prefix):
+        return full_path[len(prefix):]
+    return full_path
+
+
 def assets():
     """One asset per UDT instance of a known type below ROOT."""
     rows = []
     try:
         for tag in _browse(ROOT):
-            type_id = str(tag['typeId'] or '')
+            type_id = unicode(tag['typeId'] or u'')
             kind = KIND_BY_TYPE.get(type_id)
             if kind is None:
                 continue
-            full_path = str(tag['fullPath'])
+            full_path = unicode(tag['fullPath'])
             rows.append({
-                'id': str(tag['name']),
-                'name': str(tag['name']),
+                'id': _below_root(full_path),
+                'name': unicode(tag['name']),
                 'kind': kind,
                 'basePath': full_path,
             })

@@ -35,7 +35,7 @@ public record Kind(String id, String name, String geometry, String icon, int lab
             for (int i = 0; i < f.size(); i++) {
                 FormField field = FormField.parse(f.get(i), i);
                 if (!keys.add(field.key())) {
-                    throw new Rows.RowException("field " + field.key() + " appears twice");
+                    throw new Rows.RowException("field " + Rows.echo(field.key()) + " appears twice");
                 }
                 fields.add(field);
             }

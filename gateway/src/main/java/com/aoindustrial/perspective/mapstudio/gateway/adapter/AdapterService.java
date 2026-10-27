@@ -58,6 +58,12 @@ import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
  * {@code MapStudio.adapters}: warn into a bad status, info into {@code ok} or
  * {@code not-configured}; ids and counts only, never row content.</li>
  * </ul>
+ *
+ * <p>Locking: each list has its own monitor and no code holds both. A future
+ * ({@link Call#settled}, {@link ListState#pending}) is completed only after its
+ * monitor is left, because completing it runs the next step of a refresh (the
+ * asset call after the kind call) on the completing thread; the kind ids for an
+ * asset check are read before the asset monitor is entered.
  */
 public final class AdapterService {
 
@@ -93,6 +99,14 @@ public final class AdapterService {
         }
     }
 
+    /** One call of one list. {@code done} is guarded by the list's monitor. */
+    private static final class Call {
+        /** Completes when the call settles (answers or times out), outside any monitor. */
+        final CompletableFuture<Void> settled = new CompletableFuture<>();
+        /** The call settled: its answer or its timeout set the status. */
+        boolean done;
+    }
+
     /** One list of one project. Guarded by its own monitor. */
     private static final class ListState<T> {
         List<T> good = List.of();
@@ -102,8 +116,8 @@ public final class AdapterService {
         String logged;
         /** A call is running on the pool (even after its timeout). */
         boolean running;
-        /** Completes when the current call settles (answers or times out). */
-        CompletableFuture<Void> settled = CompletableFuture.completedFuture(null);
+        /** The current or last call, or null before the first. */
+        Call call;
         /** An on-demand refresh asked for while a timed-out call still runs. */
         CompletableFuture<Void> pending;
     }
@@ -279,8 +293,8 @@ public final class AdapterService {
                 return CompletableFuture.completedFuture(null);
             }
             if (ls.running) {
-                if (!ls.settled.isDone()) {
-                    return ls.settled;
+                if (!ls.call.done) {
+                    return ls.call.settled;
                 }
                 if (!onDemand) {
                     return CompletableFuture.completedFuture(null);
@@ -294,12 +308,16 @@ public final class AdapterService {
         }
     }
 
-    /** Start one call; the caller holds {@code ls}'s monitor. */
+    /**
+     * Start one call; the caller holds {@code ls}'s monitor. The returned future
+     * is new, so nothing depends on it yet when a refused call completes it here.
+     */
     private <T> CompletableFuture<Void> startCall(String project, ProjectState ps, ListKind list, ListState<T> ls,
                                                   String function) {
-        CompletableFuture<Void> settled = new CompletableFuture<>();
+        Call call = new Call();
+        CompletableFuture<Void> settled = call.settled;
         ls.running = true;
-        ls.settled = settled;
+        ls.call = call;
         try {
             pool.execute(() -> {
                 AdapterCaller.Outcome outcome;
@@ -308,35 +326,46 @@ public final class AdapterService {
                 } catch (RuntimeException ex) {
                     outcome = new AdapterCaller.Failed(firstLine(ex.toString()));
                 }
-                finish(project, ps, list, ls, function, settled, outcome);
+                finish(project, ps, list, ls, function, call, outcome);
             });
         } catch (RejectedExecutionException ex) {
             ls.running = false;
+            call.done = true;
             setStatus(project, list, ls, slow(list, ls, function, "Map Studio is busy calling other project"
                 + " functions, so the " + list.one + " function " + function + " was not called."));
             settled.complete(null);
             return settled;
         }
         ticker.schedule(() -> {
+            boolean timedOut = false;
             synchronized (ls) {
-                if (!settled.isDone()) {
+                if (!call.done) {
+                    call.done = true;
+                    timedOut = true;
                     setStatus(project, list, ls, slow(list, ls, function, "The " + list.one + " function "
                         + function + " did not answer within " + seconds(timeout) + "."));
-                    settled.complete(null);
                 }
+            }
+            if (timedOut) {
+                settled.complete(null);
             }
         }, timeout.toMillis(), TimeUnit.MILLISECONDS);
         return settled;
     }
 
     private <T> void finish(String project, ProjectState ps, ListKind list, ListState<T> ls, String function,
-                            CompletableFuture<Void> settled, AdapterCaller.Outcome outcome) {
+                            Call call, AdapterCaller.Outcome outcome) {
+        // Read before entering the asset monitor: never hold both lists' monitors.
+        Set<String> kindIds = list == ListKind.ASSETS ? kindIds(ps) : Set.of();
+        boolean answered = false;
         CompletableFuture<Void> pending;
+        CompletableFuture<Void> next = null;
         synchronized (ls) {
             ls.running = false;
-            if (!settled.isDone()) {
-                apply(project, ps, list, ls, function, outcome);
-                settled.complete(null);
+            if (!call.done) {
+                call.done = true;
+                answered = true;
+                apply(project, list, ls, function, outcome, kindIds);
             }
             pending = ls.pending;
             ls.pending = null;
@@ -344,19 +373,26 @@ public final class AdapterService {
                 Optional<Setup> setup = setups.apply(project);
                 String now = setup.map(list.function).orElse("");
                 if (setup.isPresent() && !now.isBlank()) {
-                    startCall(project, ps, list, ls, now).whenComplete((v, ex) -> pending.complete(null));
-                    return;
+                    next = startCall(project, ps, list, ls, now);
                 }
             }
         }
+        // Complete outside the monitor: a dependent step may take another list's monitor.
+        if (answered) {
+            call.settled.complete(null);
+        }
         if (pending != null) {
-            pending.complete(null);
+            if (next != null) {
+                next.whenComplete((v, ex) -> pending.complete(null));
+            } else {
+                pending.complete(null);
+            }
         }
     }
 
     @SuppressWarnings("unchecked")
-    private <T> void apply(String project, ProjectState ps, ListKind list, ListState<T> ls, String function,
-                           AdapterCaller.Outcome outcome) {
+    private <T> void apply(String project, ListKind list, ListState<T> ls, String function,
+                           AdapterCaller.Outcome outcome, Set<String> kindIds) {
         Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         AdapterStatus status;
         if (outcome instanceof AdapterCaller.Returned returned) {
@@ -368,26 +404,28 @@ public final class AdapterService {
             } else {
                 Parsed<T> parsed = list == ListKind.KINDS
                     ? (Parsed<T>) Kind.parseList(returned.rows())
-                    : (Parsed<T>) Asset.parseList(returned.rows(), kindIds(ps));
+                    : (Parsed<T>) Asset.parseList(returned.rows(), kindIds);
                 ls.good = parsed.kept();
                 ls.goodAt = now;
                 if (parsed.left() == 0) {
                     status = new AdapterStatus(AdapterStatus.OK, parsed.kept().size() + " " + plural(list,
                         parsed.kept().size()) + " from " + function + ".", function, parsed.kept().size(), 0, iso(now));
                 } else {
-                    status = new AdapterStatus(AdapterStatus.INCOMPLETE, parsed.left() + " of " + parsed.total() + " "
-                        + list.many + " from " + function + " left out: " + parsed.firstReasons(MAX_REASONS)
+                    String head = parsed.left() + " of " + parsed.total() + " " + list.many + " from " + function
+                        + " left out";
+                    status = new AdapterStatus(AdapterStatus.INCOMPLETE, head + ": " + parsed.firstReasons(MAX_REASONS)
                         + (parsed.left() > MAX_REASONS ? "; ..." : "") + ".", function, parsed.kept().size(),
-                        parsed.left(), iso(now));
+                        parsed.left(), iso(now), head + ".");
                 }
             }
         } else if (outcome instanceof AdapterCaller.NotAList notAList) {
-            status = failing(list, ls, function, "The " + list.one + " function " + function + " returned a "
-                + notAList.typeName() + ", expected a list of dicts.");
+            String message = "The " + list.one + " function " + function + " returned a "
+                + firstLine(notAList.typeName()) + ", expected a list of dicts.";
+            status = failing(list, ls, function, message, message);
         } else {
-            String reason = ((AdapterCaller.Failed) outcome).reason();
+            String reason = firstLine(((AdapterCaller.Failed) outcome).reason());
             status = failing(list, ls, function, "The " + list.one + " function " + function + " failed: "
-                + firstLine(reason) + (reason.endsWith(".") ? "" : "."));
+                + reason + (reason.endsWith(".") ? "" : "."), "The " + list.one + " function " + function + " failed.");
         }
         setStatus(project, list, ls, status);
     }
@@ -402,20 +440,23 @@ public final class AdapterService {
         }
     }
 
-    private <T> AdapterStatus failing(ListKind list, ListState<T> ls, String function, String message) {
-        return kept(AdapterStatus.FAILING, list, ls, function, message);
+    /** {@code viewerMessage}: the same words without the host's error text (level {@code none}). */
+    private <T> AdapterStatus failing(ListKind list, ListState<T> ls, String function, String message,
+                                      String viewerMessage) {
+        return kept(AdapterStatus.FAILING, list, ls, function, message, viewerMessage);
     }
 
     private <T> AdapterStatus slow(ListKind list, ListState<T> ls, String function, String message) {
-        return kept(AdapterStatus.SLOW, list, ls, function, message);
+        return kept(AdapterStatus.SLOW, list, ls, function, message, message);
     }
 
     /** A bad status that keeps the last good list, and says so. */
     private static <T> AdapterStatus kept(String word, ListKind list, ListState<T> ls, String function,
-                                          String message) {
+                                          String message, String viewerMessage) {
         boolean keeps = ls.goodAt != null && !ls.good.isEmpty();
-        String text = message + (keeps ? " Showing the list from " + HH_MM.format(ls.goodAt) + " UTC." : "");
-        return new AdapterStatus(word, text, function, ls.good.size(), 0, keeps ? iso(ls.goodAt) : null);
+        String suffix = keeps ? " Showing the list from " + HH_MM.format(ls.goodAt) + " UTC." : "";
+        return new AdapterStatus(word, message + suffix, function, ls.good.size(), 0, keeps ? iso(ls.goodAt) : null,
+            viewerMessage + suffix);
     }
 
     /** Set the status; log one line when the status word changed. Caller holds {@code ls}'s monitor. */
@@ -452,7 +493,11 @@ public final class AdapterService {
         return t == null ? null : DateTimeFormatter.ISO_INSTANT.format(t);
     }
 
-    /** The first line of {@code text}, trimmed, at most 200 characters. */
+    /**
+     * The first line of {@code text}, trimmed, at most 200 characters, with any
+     * other control character (carriage return, tab, escape) or line or
+     * paragraph separator replaced by "?", so it is one line in the Gateway log.
+     */
     public static String firstLine(String text) {
         if (text == null) {
             return "";
@@ -462,7 +507,16 @@ public final class AdapterService {
         if (nl >= 0) {
             s = s.substring(0, nl).strip();
         }
-        return s.length() > MAX_ERROR ? s.substring(0, MAX_ERROR) + "..." : s;
+        boolean cut = s.length() > MAX_ERROR;
+        if (cut) {
+            s = s.substring(0, MAX_ERROR);
+        }
+        StringBuilder b = new StringBuilder(s.length() + 3);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            b.append(Character.isISOControl(c) || c == 0x2028 || c == 0x2029 ? '?' : c);
+        }
+        return cut ? b.append("...").toString() : b.toString();
     }
 
     private static ThreadFactory daemon(String name) {

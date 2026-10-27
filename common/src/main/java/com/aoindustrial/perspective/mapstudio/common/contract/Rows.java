@@ -96,14 +96,30 @@ final class Rows {
         if (row != null && row.isJsonObject()) {
             JsonElement id = row.getAsJsonObject().get("id");
             if (id != null && id.isJsonPrimitive() && id.getAsJsonPrimitive().isString()) {
-                String s = id.getAsString();
-                if (s.length() > MAX_ID) {
-                    s = s.substring(0, MAX_ID) + "...";
-                }
-                return label + " (id " + s + ")";
+                return label + " (id " + echo(id.getAsString()) + ")";
             }
         }
         return label;
+    }
+
+    /**
+     * A row value (an id, a key, a kind) as a reason may repeat it: at most
+     * {@link #MAX_ID} characters then "...", every control character (newline,
+     * tab, escape) and line or paragraph separator replaced by "?", so a reason
+     * is one short line in a status message and in the Gateway log.
+     */
+    static String echo(String value) {
+        if (value == null) {
+            return "";
+        }
+        boolean cut = value.length() > MAX_ID;
+        String s = cut ? value.substring(0, MAX_ID) : value;
+        StringBuilder b = new StringBuilder(s.length() + 3);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            b.append(Character.isISOControl(c) || c == 0x2028 || c == 0x2029 ? '?' : c);
+        }
+        return cut ? b.append("...").toString() : b.toString();
     }
 
     static String joinFirst(List<String> reasons, int n) {

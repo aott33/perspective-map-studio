@@ -1,5 +1,6 @@
 package com.aoindustrial.perspective.mapstudio.gateway.script;
 
+import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -44,17 +45,17 @@ public final class GatewayScriptModule extends MapStudioScriptModule {
 
     /**
      * Refresh both host lists now and return their statuses. Waits for both calls to
-     * settle: a call that times out, or one asked for while a timed-out call still
-     * runs, can take up to four timeouts in all; past that the current statuses come
-     * back (a later refresh still lands in the cache).
+     * settle, at most {@link #refreshWait} (21 s with the 5 s timeout): each list may
+     * wait for a timed-out call to end and then time out itself, so four timeouts and
+     * a margin; past that the current statuses come back (a later refresh still lands
+     * in the cache). Documented in docs/kinds-and-assets.md and docs/contract.md.
      */
     @Override
     protected PyObject refreshAdaptersImpl(String project) {
         requireProject(project);
         AdapterSnapshot snapshot;
         try {
-            snapshot = adapters.refreshNow(project).get(adapters.timeout().toMillis() * 4 + 1000,
-                TimeUnit.MILLISECONDS);
+            snapshot = adapters.refreshNow(project).get(refreshWait(adapters.timeout()), TimeUnit.MILLISECONDS);
         } catch (TimeoutException | ExecutionException ex) {
             snapshot = adapters.snapshot(project);
         } catch (InterruptedException ex) {
@@ -62,6 +63,11 @@ public final class GatewayScriptModule extends MapStudioScriptModule {
             snapshot = adapters.snapshot(project);
         }
         return TypeUtilities.gsonToPy(snapshot.statusJson());
+    }
+
+    /** How long {@code refreshAdapters} waits, in milliseconds: four timeouts and 1 s. */
+    static long refreshWait(Duration timeout) {
+        return timeout.toMillis() * 4 + 1000;
     }
 
     @Override

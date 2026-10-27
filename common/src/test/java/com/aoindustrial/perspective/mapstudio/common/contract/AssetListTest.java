@@ -47,6 +47,20 @@ class AssetListTest {
     }
 
     @Test
+    void reasonsEchoIdsAndKindsAsOneShortLine() {
+        String longKind = "k".repeat(5000);
+        Parsed<Asset> p = Asset.parseList(KindListTest.rows("["
+            + "{\"id\":\"P1\\nWARN fake line\",\"name\":\"P1\",\"kind\":\"pad\",\"basePath\":\"Mesa/P1\"},"
+            + "{\"id\":\"P2\",\"name\":\"P2\",\"kind\":\"" + longKind + "\",\"basePath\":\"[default]Mesa/P2\"},"
+            + "{\"id\":\"P3\",\"name\":\"P3\",\"kind\":\"t\\u001b[31m\\u2028x\",\"basePath\":\"[default]Mesa/P3\"}"
+            + "]"), Set.of("pad"));
+        List<String> r = p.reasons();
+        assertEquals("row 1 (id P1?WARN fake line): basePath does not start with a [provider]", r.get(0));
+        assertEquals("row 2 (id P2): kind " + "k".repeat(64) + "... is not in the kind list", r.get(1));
+        assertEquals("row 3 (id P3): kind t?[31m?x is not in the kind list", r.get(2));
+    }
+
+    @Test
     void withNoKindListEveryAssetIsLeftOut() {
         Parsed<Asset> p = Asset.parseList(KindListTest.rows(
             "[{\"id\":\"P1\",\"name\":\"P1\",\"kind\":\"pad\",\"basePath\":\"[default]Mesa/P1\"}]"), Set.of());

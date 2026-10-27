@@ -27,7 +27,7 @@ public record Asset(String id, String name, String kind, String basePath) {
         String kind = Rows.requiredString(o, "kind");
         String basePath = Rows.requiredString(o, "basePath");
         if (!kindIds.contains(kind)) {
-            throw new Rows.RowException("kind " + kind + " is not in the kind list");
+            throw new Rows.RowException("kind " + Rows.echo(kind) + " is not in the kind list");
         }
         if (!BASE_PATH.matcher(basePath).matches()) {
             throw new Rows.RowException("basePath does not start with a [provider]");

@@ -42,16 +42,21 @@ ASSETS = [
 ]
 
 
-def mode():
-    """The current mode; ok when none was set or the stored one is unknown."""
+def _globals(action):
+    """system.util.getGlobals(); a failure is logged by class name and re-raised."""
     try:
-        value = system.util.getGlobals().get(MODE_KEY)
+        return system.util.getGlobals()
     except java.lang.Throwable as ex:
-        logger.warn('Could not read the dev adapter mode: %s' % ex.getClass().getSimpleName())
-        return 'ok'
+        logger.warn('Could not %s: %s' % (action, ex.getClass().getSimpleName()))
+        raise
     except Exception as ex:
-        logger.warn('Could not read the dev adapter mode: %s' % type(ex).__name__)
-        return 'ok'
+        logger.warn('Could not %s: %s' % (action, type(ex).__name__))
+        raise
+
+
+def mode():
+    """The current mode; ok when none was set or the stored one is unknown. Re-raises a failed read."""
+    value = _globals('read the dev adapter mode').get(MODE_KEY)
     if value in MODES:
         return str(value)
     return 'ok'
@@ -61,7 +66,7 @@ def set_mode(new_mode):
     """Switch the mode (one of MODES) and zero the call counts; returns the mode now in force."""
     if new_mode not in MODES:
         raise ValueError('Unknown dev adapter mode %s; expected one of %s' % (new_mode, ', '.join(MODES)))
-    store = system.util.getGlobals()
+    store = _globals('set the dev adapter mode')
     store[MODE_KEY] = new_mode
     store[CALLS_KEY + '.kinds'] = 0
     store[CALLS_KEY + '.assets'] = 0
@@ -71,13 +76,13 @@ def set_mode(new_mode):
 
 def calls():
     """How many times Map Studio called kinds() and assets() since the last set_mode."""
-    store = system.util.getGlobals()
+    store = _globals('read the dev adapter call counts')
     return {'kinds': store.get(CALLS_KEY + '.kinds', 0), 'assets': store.get(CALLS_KEY + '.assets', 0)}
 
 
 def _count(what):
     # One key per function: Map Studio runs at most one call per function at a time.
-    store = system.util.getGlobals()
+    store = _globals('count a dev adapter call')
     key = CALLS_KEY + '.' + what
     store[key] = store.get(key, 0) + 1
 

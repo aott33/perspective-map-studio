@@ -60,7 +60,7 @@ For both lists, keys Map Studio does not know are ignored, and the values must b
 
 - It calls each function on its own small pool (2 threads, 8 waiting calls) with a **fixed 5 s timeout**, never on a Perspective thread or per click **[live 8.3.10]**.
 - It keeps the result per project in memory and calls again every `refreshIntervalSeconds` of the setup (the setup is read afresh each time), kinds first, then assets. At most one call per project and list is in flight: a call still running at the next refresh is not started again.
-- `system.mapstudio.refreshAdapters(project)` calls both now and returns both statuses; it waits for the calls to answer or time out. Call it after your own kind or asset data changed. A refresh asked for while a call is in flight joins it **[live 8.3.10]**.
+- `system.mapstudio.refreshAdapters(project)` calls both now and returns both statuses; it waits for the calls to answer or time out, at most 21 s (four timeouts and 1 s: kinds then assets, each of which may wait for a timed-out call to end before its own call), then returns the statuses it has; a refresh still running lands in the cache later. It blocks the calling script's thread that long, so call it from a session or Gateway script, not a binding or a tag event. Call it after your own kind or asset data changed. A refresh asked for while a call is in flight joins it **[live 8.3.10]**.
 - A timed-out call cannot be stopped (Jython has no safe way): it keeps its thread until it returns, and its answer is dropped.
 - `map.load` carries `kinds` to every session, `assets` only to sessions with phone or full editing (asset rows carry tag paths), and `adapters: {kinds: status, assets: status}` to every session ([contract.md](contract.md)).
 - Later entries read the same cache: map item validation against the kind list (entry 9) and the icon check (entry 10). Nothing is stored in the database.
@@ -79,7 +79,9 @@ Each list has a status: `{status, message, function, count, left, refreshedAt}`.
 | `not-configured` | the setup names no function | "The setup names no kind function." | none |
 | `loading` | the first call has not answered yet | "Loading the kind list from mapstudio_dev.kinds." | none |
 
-All seven words are stable kebab-case; messages are plain words and may change. Reasons name rows by position and `id` only, never other row content.
+All seven words are stable kebab-case; messages are plain words and may change. Reasons name rows by position and `id` only, never other row content; an echoed `id`, `kind` or field `key` is cut to 64 characters and every control character in it (newline, tab, escape) becomes `?`, and exception text is cut the same way to one line of 200 characters, so a host value cannot add a line to the Gateway log.
+
+**Viewers.** A session at level `none` gets the same status words and counts, but `failing` and `incomplete` messages without the host's error text or the row reasons: "The kind function mapstudio_dev.kinds failed.", "2 of 6 assets from mapstudio_dev.assets left out." (with "Showing the list from ..." when it applies). Sessions at `phone` and `full`, `refreshAdapters` and the Gateway log get the full message.
 
 **Gateway log.** One line per status change per project and list, on the logger `MapStudio.adapters` (the Gateway log shows it as `M.adapters`): a warning into `empty`, `failing`, `slow` or `incomplete`, an info line into `ok` (on the first good list, and "recovered" after a bad one) and into `not-configured`. A status that stays the same logs nothing **[live 8.3.10]**. Exception text is cut to its first line, 200 characters.
 

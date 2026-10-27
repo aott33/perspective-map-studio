@@ -23,7 +23,8 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
  * adapters}}, and {@code getMap}'s list from the map store and the host adapters'
  * cache. {@code assets} (with their tag paths) go only to sessions that may link
  * items, {@code phone} and {@code full} (owner decision, 2026-10-26); every level
- * gets the kinds and both statuses.
+ * gets the kinds and both statuses, but level {@code none} gets the viewer
+ * messages, without host error text or row ids.
  */
 public final class MapLoader {
 
@@ -66,10 +67,11 @@ public final class MapLoader {
         body.add("items", toJson(snapshot.items()));
         AdapterSnapshot lists = adapters.apply(project);
         body.add("kinds", Kind.toJson(lists.kinds()));
-        if (Messages.LEVEL_PHONE.equals(level) || Messages.LEVEL_FULL.equals(level)) {
+        boolean editor = Messages.LEVEL_PHONE.equals(level) || Messages.LEVEL_FULL.equals(level);
+        if (editor) {
             body.add("assets", Asset.toJson(lists.assets()));
         }
-        body.add("adapters", lists.statusJson());
+        body.add("adapters", lists.statusJson(editor));
         return body;
     }
 

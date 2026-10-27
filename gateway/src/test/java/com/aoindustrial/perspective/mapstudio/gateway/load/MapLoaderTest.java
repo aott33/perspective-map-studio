@@ -104,4 +104,21 @@ class MapLoaderTest {
             }
         }
     }
+
+    @Test
+    void aViewerGetsTheStatusWithoutTheHostErrorText() {
+        AdapterStatus failing = new AdapterStatus(AdapterStatus.FAILING,
+            "The kind function mapstudio_dev.kinds failed: OperationalError: host db7.corp user scada.",
+            "mapstudio_dev.kinds", 0, 0, null, "The kind function mapstudio_dev.kinds failed.");
+        MapLoader failingLoader = new MapLoader(new StoreGate(setups, c -> state), store,
+            project -> new AdapterSnapshot(List.of(), List.of(), failing, LISTS.assetsStatus()));
+        for (String level : List.of(Messages.LEVEL_NONE, Messages.LEVEL_PHONE, Messages.LEVEL_FULL)) {
+            JsonObject kinds = failingLoader.mapLoadReply("mapstudio-dev", level).getAsJsonObject("adapters")
+                .getAsJsonObject("kinds");
+            assertEquals("failing", kinds.get("status").getAsString());
+            assertEquals(Messages.LEVEL_NONE.equals(level) ? "The kind function mapstudio_dev.kinds failed."
+                : failing.message(), kinds.get("message").getAsString(), level);
+            assertTrue(!kinds.has("viewerMessage"), "no key of its own");
+        }
+    }
 }

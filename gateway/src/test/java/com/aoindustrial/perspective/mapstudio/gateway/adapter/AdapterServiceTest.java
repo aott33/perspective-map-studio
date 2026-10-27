@@ -82,6 +82,8 @@ class AdapterServiceTest {
 
     static final class Lines implements AdapterService.Log {
         final List<String> lines = Collections.synchronizedList(new ArrayList<>());
+        /** Runs inside {@code warn}, on the thread that logs (which holds that list's monitor). */
+        volatile java.util.function.Consumer<String> onWarn;
 
         @Override
         public void info(String line) {
@@ -91,6 +93,10 @@ class AdapterServiceTest {
         @Override
         public void warn(String line) {
             lines.add("WARN " + line);
+            var hook = onWarn;
+            if (hook != null) {
+                hook.accept(line);
+            }
         }
 
         List<String> about(String what) {
@@ -123,8 +129,12 @@ class AdapterServiceTest {
     }
 
     AdapterService service(ExecutorService pool) {
+        return service(pool, TIMEOUT);
+    }
+
+    AdapterService service(ExecutorService pool, Duration timeout) {
         return new AdapterService(p -> Optional.ofNullable(setups.get(p)), () -> setups.keySet(), caller, pool,
-            ticker, nanos::get, Clock.fixed(Instant.parse("2026-10-26T10:00:00Z"), ZoneOffset.UTC), TIMEOUT, log);
+            ticker, nanos::get, Clock.fixed(Instant.parse("2026-10-26T10:00:00Z"), ZoneOffset.UTC), timeout, log);
     }
 
     @AfterEach
@@ -203,11 +213,110 @@ class AdapterServiceTest {
         assertEquals(AdapterStatus.SLOW, s.kindsStatus().status());
         assertEquals("The kind function mapstudio_dev.kinds did not answer within 0.3 s.", s.kindsStatus().message());
         assertEquals(1, log.about("kind function").size());
+        int logged = log.lines.size();
         caller.hold.countDown();
         // The late answers arrive; the status stays slow and nothing more is logged.
         Thread.sleep(200);
         assertEquals(AdapterStatus.SLOW, service.snapshot(P).kindsStatus().status());
         assertEquals(0, service.snapshot(P).kinds().size());
+        assertEquals(logged, log.lines.size(), "a dropped late answer logs nothing");
+    }
+
+    @Test
+    void aKindCallSettlingWhileAnAssetCallAnswersDoesNotDeadlock() throws Exception {
+        // Review finding: the kind call's settle used to run the asset step under the
+        // kind monitor while an answering asset call held the asset monitor and asked
+        // for the kind ids. Here the kind call's warning (logged under the kind monitor)
+        // lets the held asset call answer and gives it time to take its own monitor.
+        service = service(pool, Duration.ofSeconds(5));
+        CountDownLatch assetsHold = new CountDownLatch(1);
+        caller.answers.put(ASSETS, () -> {
+            try {
+                assetsHold.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+            return new AdapterCaller.Returned(JsonParser.parseString(GOOD_ASSETS).getAsJsonArray());
+        });
+        var first = service.refreshNow(P);
+        waitFor(() -> caller.calls(ASSETS) == 1);
+        log.onWarn = line -> {
+            if (line.contains("kind function")) {
+                assetsHold.countDown();
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        };
+        caller.answers.put(KINDS, () -> new AdapterCaller.Failed("ValueError: down"));
+        AdapterSnapshot s = service.refreshNow(P).get(5, TimeUnit.SECONDS);
+        first.get(5, TimeUnit.SECONDS);
+        assertEquals(AdapterStatus.FAILING, s.kindsStatus().status());
+        assertEquals(AdapterStatus.OK, s.assetsStatus().status());
+        assertEquals(2, s.assets().size(), "assets checked against the kept kind list");
+        assertEquals(1, caller.calls(ASSETS), "the second refresh joined the asset call in flight");
+        // The service still works afterwards.
+        log.onWarn = null;
+        caller.rows(KINDS, GOOD_KINDS);
+        caller.rows(ASSETS, GOOD_ASSETS);
+        assertEquals(AdapterStatus.OK, refresh().kindsStatus().status());
+    }
+
+    @Test
+    void manyOverlappingRefreshesAllSettle() throws Exception {
+        // Kind and asset calls overlapping in every order, with timeouts on the ticker.
+        caller.answers.put(KINDS, () -> {
+            sleepQuietly((long) (Math.random() * 2 * TIMEOUT.toMillis()));
+            return new AdapterCaller.Returned(JsonParser.parseString(GOOD_KINDS).getAsJsonArray());
+        });
+        caller.answers.put(ASSETS, () -> {
+            sleepQuietly((long) (Math.random() * 2 * TIMEOUT.toMillis()));
+            return new AdapterCaller.Returned(JsonParser.parseString(GOOD_ASSETS).getAsJsonArray());
+        });
+        List<java.util.concurrent.CompletableFuture<AdapterSnapshot>> all = new ArrayList<>();
+        for (int i = 0; i < 40; i++) {
+            all.add(service.refreshNow(P));
+            sleepQuietly((long) (Math.random() * 40));
+        }
+        for (var f : all) {
+            f.get(10, TimeUnit.SECONDS);
+        }
+    }
+
+    @Test
+    void aViewerMessageHasNoHostErrorTextAndNoRowReasons() throws Exception {
+        caller.answers.put(KINDS, () -> new AdapterCaller.Failed("OperationalError: host db7 user scada"));
+        AdapterSnapshot s = refresh();
+        assertEquals("The kind function mapstudio_dev.kinds failed: OperationalError: host db7 user scada.",
+            s.kindsStatus().message());
+        assertEquals("The kind function mapstudio_dev.kinds failed.",
+            s.statusJson(false).getAsJsonObject("kinds").get("message").getAsString());
+        assertEquals(s.kindsStatus().message(),
+            s.statusJson(true).getAsJsonObject("kinds").get("message").getAsString());
+
+        caller.rows(KINDS, GOOD_KINDS);
+        caller.rows(ASSETS, "[{\"id\":\"P1\",\"name\":\"P1\",\"kind\":\"pad\",\"basePath\":\"[default]Mesa/P1\"},"
+            + "{\"id\":\"P2\",\"kind\":\"pad\",\"basePath\":\"[default]Mesa/P2\"}]");
+        s = refresh();
+        assertEquals("1 of 2 assets from mapstudio_dev.assets left out.",
+            s.statusJson(false).getAsJsonObject("assets").get("message").getAsString());
+        assertTrue(s.assetsStatus().message().contains("row 2 (id P2): no name"));
+
+        caller.answers.put(KINDS, () -> new AdapterCaller.Failed("ValueError: down"));
+        s = refresh();
+        assertEquals("The kind function mapstudio_dev.kinds failed. Showing the list from 10:00 UTC.",
+            s.statusJson(false).getAsJsonObject("kinds").get("message").getAsString());
+    }
+
+    @Test
+    void errorTextIsOneLineInTheLog() throws Exception {
+        caller.answers.put(KINDS, () -> new AdapterCaller.Failed("ValueError: a\rWARN forged\u001b[0m\tend"));
+        refresh();
+        String line = log.about("kind function").get(0);
+        assertFalse(line.contains("\r") || line.contains("\u001b") || line.contains("\t"), line);
+        assertTrue(line.contains("a?WARN forged?[0m?end"), line);
     }
 
     @Test
@@ -392,6 +501,14 @@ class AdapterServiceTest {
         assertEquals("a", AdapterService.firstLine(" a \n b"));
         assertEquals("y".repeat(200) + "...", AdapterService.firstLine("y".repeat(250)));
         assertEquals("", AdapterService.firstLine(null));
+    }
+
+    static void sleepQuietly(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     static void waitFor(Supplier<Boolean> condition) throws InterruptedException {

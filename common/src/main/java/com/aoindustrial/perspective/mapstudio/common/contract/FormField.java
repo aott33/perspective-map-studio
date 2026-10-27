@@ -55,7 +55,7 @@ public record FormField(String key, String label, String type, boolean required,
             return new FormField(key, label == null || label.isBlank() ? key : label, type,
                 required != null && required, choices);
         } catch (Rows.RowException ex) {
-            throw new Rows.RowException("field " + key + ": " + ex.getMessage());
+            throw new Rows.RowException("field " + Rows.echo(key) + ": " + ex.getMessage());
         }
     }
 

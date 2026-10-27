@@ -10,7 +10,10 @@
 #
 # Rules Map Studio's contracts set (docs/kinds-and-assets.md):
 # - return a list of dicts, not a Dataset;
-# - raise on failure, never return [] for an error: [] reads as "no rows".
+# - raise on failure, never return [] for an error: [] reads as "no rows";
+# - text is unicode: str() of a non-ASCII value raises UnicodeEncodeError in
+#   Jython 2.7, so this example uses unicode(); a NULL stays None, so Map Studio
+#   leaves that row out with a reason ("no id") instead of an id 'None'.
 
 import java.lang
 
@@ -32,15 +35,22 @@ def _rows(query):
     return [dict(zip(columns, list(row))) for row in ds]
 
 
+def _text(value):
+    """unicode text, or None for a NULL column."""
+    if value is None:
+        return None
+    return unicode(value)
+
+
 def kinds():
     """Columns id, name, geometry ('point' or 'line'), icon, label_rank."""
     out = []
     for row in _rows('MapAdapters/kinds'):
         out.append({
-            'id': str(row['id']),
-            'name': str(row['name']),
-            'geometry': str(row['geometry']),
-            'icon': str(row['icon'] or ''),
+            'id': _text(row['id']),
+            'name': _text(row['name']),
+            'geometry': _text(row['geometry']),
+            'icon': _text(row['icon']) or u'',
             'labelRank': int(row['label_rank'] or 0),
             'fields': [],
         })
@@ -52,9 +62,9 @@ def assets():
     out = []
     for row in _rows('MapAdapters/assets'):
         out.append({
-            'id': str(row['id']),
-            'name': str(row['name']),
-            'kind': str(row['kind']),
-            'basePath': str(row['base_path']),
+            'id': _text(row['id']),
+            'name': _text(row['name']),
+            'kind': _text(row['kind']),
+            'basePath': _text(row['base_path']),
         })
     return out
