@@ -1,5 +1,5 @@
 {
- "source": "Turf 7.4.0: @turf/length, @turf/along and @turf/distance with units meters (earth radius 6371008.8 m), generated in node; read by LineMeasureTest.java and geometry.test.ts.",
+ "source": "Turf 7.4.0: @turf/length, @turf/along and @turf/distance with units meters (earth radius 6371008.8 m), generated in node (closed-ring, repeated-vertex and zero-length added by the lens quick review of epic 2 story 14); read by LineMeasureTest.java and geometry.test.ts.",
  "lines": [
   {
    "name": "L-SWD",
@@ -305,6 +305,265 @@
      "point": [
       -179.99,
       -16.49
+     ]
+    }
+   ]
+  },
+  {
+   "name": "closed-ring",
+   "coordinates": [
+    [
+     -104.99,
+     39.74
+    ],
+    [
+     -104.98,
+     39.74
+    ],
+    [
+     -104.98,
+     39.75
+    ],
+    [
+     -104.99,
+     39.74
+    ]
+   ],
+   "lengthM": 3369.6363603803875,
+   "segmentsM": [
+    855.0383757997498,
+    1111.950802335108,
+    1402.6471822455296
+   ],
+   "along": [
+    {
+     "distanceM": 0,
+     "point": [
+      -104.99,
+      39.74
+     ]
+    },
+    {
+     "distanceM": 1,
+     "point": [
+      -104.98998830461852,
+      39.74000000050115
+     ]
+    },
+    {
+     "distanceM": 1123.2121201267958,
+     "point": [
+      -104.97999999999999,
+      39.74241174109291
+     ]
+    },
+    {
+     "distanceM": 1684.8181801901937,
+     "point": [
+      -104.97999999999999,
+      39.74746237875495
+     ]
+    },
+    {
+     "distanceM": 3369.1363603803875,
+     "point": [
+      -104.98999643582881,
+      39.74000356484115
+     ]
+    },
+    {
+     "distanceM": 3369.6363603803875,
+     "point": [
+      -104.99,
+      39.74
+     ]
+    },
+    {
+     "distanceM": 3379.6363603803875,
+     "point": [
+      -104.99,
+      39.74
+     ]
+    },
+    {
+     "distanceM": 855.0383757997498,
+     "point": [
+      -104.98,
+      39.74
+     ]
+    },
+    {
+     "distanceM": 1966.9891781348579,
+     "point": [
+      -104.98,
+      39.75
+     ]
+    }
+   ]
+  },
+  {
+   "name": "repeated-vertex",
+   "coordinates": [
+    [
+     -103.52,
+     31.92
+    ],
+    [
+     -103.505,
+     31.9205
+    ],
+    [
+     -103.505,
+     31.9205
+    ],
+    [
+     -103.490423,
+     31.926
+    ]
+   ],
+   "lengthM": 2922.354596705902,
+   "segmentsM": [
+    1416.8018110555483,
+    0,
+    1505.5527856503538
+   ],
+   "along": [
+    {
+     "distanceM": 0,
+     "point": [
+      -103.52,
+      31.92
+     ]
+    },
+    {
+     "distanceM": 1,
+     "point": [
+      -103.51998941283223,
+      31.920000353529023
+     ]
+    },
+    {
+     "distanceM": 974.1181989019674,
+     "point": [
+      -103.50968680865854,
+      31.920343962930872
+     ]
+    },
+    {
+     "distanceM": 1461.177298352951,
+     "point": [
+      -103.50457037445669,
+      31.92066213381741
+     ]
+    },
+    {
+     "distanceM": 2921.854596705902,
+     "point": [
+      -103.49042784136844,
+      31.92599817370467
+     ]
+    },
+    {
+     "distanceM": 2922.354596705902,
+     "point": [
+      -103.490423,
+      31.926
+     ]
+    },
+    {
+     "distanceM": 2932.354596705902,
+     "point": [
+      -103.490423,
+      31.926
+     ]
+    },
+    {
+     "distanceM": 1415.8018110555483,
+     "point": [
+      -103.5050105872828,
+      31.92049964771401
+     ]
+    },
+    {
+     "distanceM": 1416.8018110555483,
+     "point": [
+      -103.505,
+      31.9205
+     ]
+    },
+    {
+     "distanceM": 1417.8018110555483,
+     "point": [
+      -103.50499031842061,
+      31.920503653695626
+     ]
+    }
+   ]
+  },
+  {
+   "name": "zero-length",
+   "coordinates": [
+    [
+     -104.99,
+     39.74
+    ],
+    [
+     -104.99,
+     39.74
+    ]
+   ],
+   "lengthM": 0,
+   "segmentsM": [
+    0
+   ],
+   "along": [
+    {
+     "distanceM": 0,
+     "point": [
+      -104.99,
+      39.74
+     ]
+    },
+    {
+     "distanceM": 1,
+     "point": [
+      -104.99,
+      39.74
+     ]
+    },
+    {
+     "distanceM": 0,
+     "point": [
+      -104.99,
+      39.74
+     ]
+    },
+    {
+     "distanceM": 0,
+     "point": [
+      -104.99,
+      39.74
+     ]
+    },
+    {
+     "distanceM": 0,
+     "point": [
+      -104.99,
+      39.74
+     ]
+    },
+    {
+     "distanceM": 0,
+     "point": [
+      -104.99,
+      39.74
+     ]
+    },
+    {
+     "distanceM": 10,
+     "point": [
+      -104.99,
+      39.74
      ]
     }
    ]

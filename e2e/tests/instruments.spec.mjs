@@ -150,7 +150,10 @@ editorTest.describe('instruments on lines', () => {
             const live = (await load(page)).items.map((i) => i.id);
             expect(live).not.toContain(ids.line);
             expect(live).not.toContain(ids.pt1);
-            // The reverse batch (web/typescript/undo.ts): a create at each tombstone's version, instruments first.
+            expect(live).not.toContain(ids.pt2);
+            // The shape web/typescript/undo.ts reverseBatch gives (a create at each tombstone's version with every
+            // record field), built here by hand; reverseBatch's own output goes through the write path in
+            // WriteServiceBatchReplayTest.java (fixture from web/typescript/__tests__/batch-replay.test.ts).
             const reverse = batch(...before.reverse().map((r) => create(r.id, {
                 kind: r.kind, name: r.name, geometry: r.geometry, properties: r.properties, assetId: r.assetId,
                 overrides: r.overrides, ends: r.ends, attachment: r.attachment }, version(gone, r.id))));

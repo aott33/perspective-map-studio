@@ -58,7 +58,8 @@ function expectOnLine(data: Record<string, unknown>, coords: Position[]): void {
 
 describe('distances along a line, the same vectors as LineMeasureTest.java', () => {
     test('lengths and points along match Turf 7.4.0', () => {
-        expect(VECTORS.lines.map((l) => l.name)).toEqual(['L-SWD', 'dev-line', 'high-latitude', 'antimeridian']);
+        expect(VECTORS.lines.map((l) => l.name)).toEqual(['L-SWD', 'dev-line', 'high-latitude', 'antimeridian',
+            'closed-ring', 'repeated-vertex', 'zero-length']);
         let n = 0;
         for (const line of VECTORS.lines) {
             expect(lengthM(line.coordinates)).toBeCloseTo(line.lengthM, 6);
@@ -69,7 +70,7 @@ describe('distances along a line, the same vectors as LineMeasureTest.java', () 
                 n++;
             }
         }
-        expect(n).toBeGreaterThanOrEqual(30);
+        expect(n).toBeGreaterThanOrEqual(50);
         expect(lengthM(SWD)).toBeCloseTo(2922.35, 2);
     });
 
@@ -92,6 +93,30 @@ describe('distances along a line, the same vectors as LineMeasureTest.java', () 
         expect(metres(p.point, pointAt(SWD, p.distanceM))).toBeLessThan(0.2);
         expect(project(SWD, [-103.53, 31.92]).distanceM).toBe(0);
         expect(project(SWD, [-103.48, 31.93]).distanceM).toBe(round1(lengthM(SWD)));
+    });
+
+    test('a ring, a repeated vertex and a zero-length line project as the Gateway measures them', () => {
+        const byName = (name: string) => VECTORS.lines.find((l) => l.name === name)!.coordinates;
+        const ring = byName('closed-ring');
+        const start = project(ring, ring[0]);
+        expect(start.distanceM).toBe(0);
+        expect(start.point).toEqual(ring[0]);
+        const corner = project(ring, ring[1]);
+        expect(corner.distanceM).toBe(round1(metres(ring[0], ring[1])));
+        expect(metres(corner.point, ring[1])).toBeLessThan(0.1);
+        const repeated = byName('repeated-vertex');
+        const atVertex = round1(metres(repeated[0], repeated[1]));
+        for (const d of [atVertex - 1, atVertex, atVertex + 1]) {
+            const p = project(repeated, pointAt(repeated, d));
+            expect(Math.abs(p.distanceM - d)).toBeLessThanOrEqual(0.1);
+            expect(metres(p.point, pointAt(repeated, p.distanceM))).toBeLessThan(0.2); // 6 decimals is about 0.1 m
+            expect(metres(p.point, pointAt(SWD, p.distanceM))).toBeLessThan(0.2); // as if the vertex were not repeated
+        }
+        const zero = byName('zero-length');
+        const z = project(zero, [-104.98, 39.75]);
+        expect(z.distanceM).toBe(0);
+        expect(z.point).toEqual(zero[0]);
+        expect(lengthM(zero)).toBe(0);
     });
 
     test('the instruments on a line, ordered by distance; free and other items are not', () => {

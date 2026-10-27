@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.inductiveautomation.ignition.common.gson.JsonObject;
+import com.inductiveautomation.ignition.common.gson.JsonParser;
 
 import com.aoindustrial.perspective.mapstudio.common.Messages;
 import com.aoindustrial.perspective.mapstudio.common.contract.Attachment;
@@ -206,6 +207,18 @@ class WriteServiceInstrumentTest extends WriteFixture {
             ex.plainMessage());
     }
 
+    @Test
+    void anAttachmentToALineWhoseKindIsNotInTheKindListIsRefused() {
+        String retired = uuid();
+        JsonObject geometry = JsonParser.parseString(lineGeometry(SWD))
+            .getAsJsonObject();
+        store.committed.items.get(PROJECT).put(retired, new MapItemRecord(retired, "retired", "Old line", geometry,
+            new JsonObject(), null, new JsonObject(), null, null, 1, false));
+        MapStudioException ex = refusedFull(batch(uuid(), moveTap(pt1, 1, retired, SWD, 1143)));
+        assertRefusedInvalid(ex, 0, pt1, "instrument PT-1 is attached to Old line, whose kind retired is not in the"
+            + " kind list");
+    }
+
     // --- Line without its instruments --------------------------------------------
 
     @Test
@@ -223,6 +236,24 @@ class WriteServiceInstrumentTest extends WriteFixture {
         MapStudioException one = refusedFull(batch(uuid(), moveTap(pt1, 1, line, SWD_RESHAPED, 1143),
             update(pt2, 1, "{\"name\":\"PT-2B\"}"), update(line, 1, "{\"geometry\":" + lineGeometry(SWD_RESHAPED) + "}")));
         assertRefusedInvalid(one, 2, line, "line L-SWD has 1 instrument (PT-2B) this save", "the same save");
+    }
+
+    @Test
+    void aLineTurnedIntoAnAreaWithItsInstrumentsStillAttachedIsRefused() {
+        // Review finding (lens quick): the same LineString, only the kind changes to an area kind.
+        MapStudioException ex = refusedFull(batch(uuid(), update(line, 1, "{\"kind\":\"geofence\"}")));
+        assertRefusedInvalid(ex, 0, line, "line L-SWD has 2 instruments (PT-1, PT-2) this save does not move or"
+            + " delete.", "Its new kind geofence is not a line instruments go on");
+        // Moving them along the line in the same save does not help: the line is an area.
+        MapStudioException moved = refusedFull(batch(uuid(), update(line, 1, "{\"kind\":\"geofence\"}"),
+            moveTap(pt1, 1, line, SWD, 1143), moveTap(pt2, 1, line, SWD, 2841)));
+        assertRefusedInvalid(moved, 1, pt1, "an area (kind geofence)");
+        // Detached (free points) in the same save, the kind change saves.
+        save(batch(uuid(), update(line, 1, "{\"kind\":\"geofence\"}"), update(pt1, 1, "{\"attachment\":null}"),
+            update(pt2, 1, "{\"attachment\":null}")));
+        assertEquals("geofence", stored(line).kind());
+        assertNull(stored(pt1).attachment());
+        assertEquals(List.of(), attached(line));
     }
 
     @Test

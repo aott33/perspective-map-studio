@@ -1,0 +1,943 @@
+{
+  "steps": [
+    {
+      "name": "create the line and its two taps",
+      "batch": {
+        "batchId": "aaaaaaaa-aaaa-4aaa-8aaa-000000000001",
+        "ops": [
+          {
+            "op": "create",
+            "entity": "item",
+            "id": "11111111-1111-4111-8111-111111111111",
+            "baseVersion": 0,
+            "data": {
+              "kind": "line",
+              "name": "L-SWD",
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    -103.52,
+                    31.92
+                  ],
+                  [
+                    -103.505,
+                    31.9205
+                  ],
+                  [
+                    -103.490423,
+                    31.926
+                  ]
+                ]
+              },
+              "properties": {
+                "diameter": 8
+              }
+            }
+          },
+          {
+            "op": "create",
+            "entity": "item",
+            "id": "22222222-2222-4222-8222-222222222222",
+            "baseVersion": 0,
+            "data": {
+              "kind": "tap",
+              "name": "PT-1",
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.507899,
+                  31.920404
+                ]
+              },
+              "attachment": {
+                "lineId": "11111111-1111-4111-8111-111111111111",
+                "distanceM": 1143
+              }
+            }
+          },
+          {
+            "op": "create",
+            "entity": "item",
+            "id": "33333333-3333-4333-8333-333333333333",
+            "baseVersion": 0,
+            "data": {
+              "kind": "tap",
+              "name": "PT-2",
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.491211,
+                  31.925703
+                ]
+              },
+              "attachment": {
+                "lineId": "11111111-1111-4111-8111-111111111111",
+                "distanceM": 2841
+              }
+            }
+          }
+        ]
+      },
+      "results": [
+        {
+          "entity": "item",
+          "id": "11111111-1111-4111-8111-111111111111",
+          "version": 1
+        },
+        {
+          "entity": "item",
+          "id": "22222222-2222-4222-8222-222222222222",
+          "version": 1
+        },
+        {
+          "entity": "item",
+          "id": "33333333-3333-4333-8333-333333333333",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "reshape (lineGeometryBatch)",
+      "batch": {
+        "batchId": "aaaaaaaa-aaaa-4aaa-8aaa-000000000002",
+        "ops": [
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "11111111-1111-4111-8111-111111111111",
+            "baseVersion": 1,
+            "data": {
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    -103.52,
+                    31.92
+                  ],
+                  [
+                    -103.505,
+                    31.9223
+                  ],
+                  [
+                    -103.490423,
+                    31.926
+                  ]
+                ]
+              }
+            }
+          },
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "22222222-2222-4222-8222-222222222222",
+            "baseVersion": 1,
+            "data": {
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.508198,
+                  31.92181
+                ]
+              },
+              "attachment": {
+                "lineId": "11111111-1111-4111-8111-111111111111",
+                "distanceM": 1131.9
+              }
+            }
+          },
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "33333333-3333-4333-8333-333333333333",
+            "baseVersion": 1,
+            "data": {
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.491243,
+                  31.925792
+                ]
+              },
+              "attachment": {
+                "lineId": "11111111-1111-4111-8111-111111111111",
+                "distanceM": 2793.8
+              }
+            }
+          }
+        ]
+      },
+      "results": [
+        {
+          "entity": "item",
+          "id": "11111111-1111-4111-8111-111111111111",
+          "version": 2
+        },
+        {
+          "entity": "item",
+          "id": "22222222-2222-4222-8222-222222222222",
+          "version": 2
+        },
+        {
+          "entity": "item",
+          "id": "33333333-3333-4333-8333-333333333333",
+          "version": 2
+        }
+      ]
+    },
+    {
+      "name": "undo the reshape (reverseBatch)",
+      "batch": {
+        "batchId": "aaaaaaaa-aaaa-4aaa-8aaa-000000000003",
+        "ops": [
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "11111111-1111-4111-8111-111111111111",
+            "baseVersion": 2,
+            "data": {
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    -103.52,
+                    31.92
+                  ],
+                  [
+                    -103.505,
+                    31.9205
+                  ],
+                  [
+                    -103.490423,
+                    31.926
+                  ]
+                ]
+              }
+            }
+          },
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "22222222-2222-4222-8222-222222222222",
+            "baseVersion": 2,
+            "data": {
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.507899,
+                  31.920404
+                ]
+              },
+              "attachment": {
+                "lineId": "11111111-1111-4111-8111-111111111111",
+                "distanceM": 1143
+              }
+            }
+          },
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "33333333-3333-4333-8333-333333333333",
+            "baseVersion": 2,
+            "data": {
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.491211,
+                  31.925703
+                ]
+              },
+              "attachment": {
+                "lineId": "11111111-1111-4111-8111-111111111111",
+                "distanceM": 2841
+              }
+            }
+          }
+        ]
+      },
+      "results": [
+        {
+          "entity": "item",
+          "id": "11111111-1111-4111-8111-111111111111",
+          "version": 3
+        },
+        {
+          "entity": "item",
+          "id": "22222222-2222-4222-8222-222222222222",
+          "version": 3
+        },
+        {
+          "entity": "item",
+          "id": "33333333-3333-4333-8333-333333333333",
+          "version": 3
+        }
+      ]
+    },
+    {
+      "name": "insert a vertex (lineGeometryBatch)",
+      "batch": {
+        "batchId": "aaaaaaaa-aaaa-4aaa-8aaa-000000000004",
+        "ops": [
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "11111111-1111-4111-8111-111111111111",
+            "baseVersion": 3,
+            "data": {
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    -103.52,
+                    31.92
+                  ],
+                  [
+                    -103.513648,
+                    31.920212
+                  ],
+                  [
+                    -103.505,
+                    31.9205
+                  ],
+                  [
+                    -103.490423,
+                    31.926
+                  ]
+                ]
+              }
+            }
+          },
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "22222222-2222-4222-8222-222222222222",
+            "baseVersion": 3,
+            "data": {
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.507899,
+                  31.920404
+                ]
+              },
+              "attachment": {
+                "lineId": "11111111-1111-4111-8111-111111111111",
+                "distanceM": 1143
+              }
+            }
+          },
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "33333333-3333-4333-8333-333333333333",
+            "baseVersion": 3,
+            "data": {
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.491211,
+                  31.925703
+                ]
+              },
+              "attachment": {
+                "lineId": "11111111-1111-4111-8111-111111111111",
+                "distanceM": 2841
+              }
+            }
+          }
+        ]
+      },
+      "results": [
+        {
+          "entity": "item",
+          "id": "11111111-1111-4111-8111-111111111111",
+          "version": 4
+        },
+        {
+          "entity": "item",
+          "id": "22222222-2222-4222-8222-222222222222",
+          "version": 4
+        },
+        {
+          "entity": "item",
+          "id": "33333333-3333-4333-8333-333333333333",
+          "version": 4
+        }
+      ]
+    },
+    {
+      "name": "move the whole line (lineMoveBatch)",
+      "batch": {
+        "batchId": "aaaaaaaa-aaaa-4aaa-8aaa-000000000005",
+        "ops": [
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "11111111-1111-4111-8111-111111111111",
+            "baseVersion": 4,
+            "data": {
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    -103.51,
+                    31.915
+                  ],
+                  [
+                    -103.503648,
+                    31.915212
+                  ],
+                  [
+                    -103.495,
+                    31.9155
+                  ],
+                  [
+                    -103.480423,
+                    31.921
+                  ]
+                ]
+              }
+            }
+          },
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "22222222-2222-4222-8222-222222222222",
+            "baseVersion": 4,
+            "data": {
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.497899,
+                  31.915404
+                ]
+              },
+              "attachment": {
+                "lineId": "11111111-1111-4111-8111-111111111111",
+                "distanceM": 1143
+              }
+            }
+          },
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "33333333-3333-4333-8333-333333333333",
+            "baseVersion": 4,
+            "data": {
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.481211,
+                  31.920703
+                ]
+              },
+              "attachment": {
+                "lineId": "11111111-1111-4111-8111-111111111111",
+                "distanceM": 2841.1
+              }
+            }
+          }
+        ]
+      },
+      "results": [
+        {
+          "entity": "item",
+          "id": "11111111-1111-4111-8111-111111111111",
+          "version": 5
+        },
+        {
+          "entity": "item",
+          "id": "22222222-2222-4222-8222-222222222222",
+          "version": 5
+        },
+        {
+          "entity": "item",
+          "id": "33333333-3333-4333-8333-333333333333",
+          "version": 5
+        }
+      ]
+    },
+    {
+      "name": "split at a vertex (lineSplitBatch)",
+      "batch": {
+        "batchId": "aaaaaaaa-aaaa-4aaa-8aaa-000000000006",
+        "ops": [
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "11111111-1111-4111-8111-111111111111",
+            "baseVersion": 5,
+            "data": {
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    -103.51,
+                    31.915
+                  ],
+                  [
+                    -103.503648,
+                    31.915212
+                  ],
+                  [
+                    -103.495,
+                    31.9155
+                  ]
+                ]
+              }
+            }
+          },
+          {
+            "op": "create",
+            "entity": "item",
+            "id": "55555555-5555-4555-8555-555555555555",
+            "baseVersion": 0,
+            "data": {
+              "kind": "line",
+              "name": "L-SWD B",
+              "properties": {},
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    -103.495,
+                    31.9155
+                  ],
+                  [
+                    -103.480423,
+                    31.921
+                  ]
+                ]
+              }
+            }
+          },
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "22222222-2222-4222-8222-222222222222",
+            "baseVersion": 5,
+            "data": {
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.497899,
+                  31.915404
+                ]
+              },
+              "attachment": {
+                "lineId": "11111111-1111-4111-8111-111111111111",
+                "distanceM": 1143
+              }
+            }
+          },
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "33333333-3333-4333-8333-333333333333",
+            "baseVersion": 5,
+            "data": {
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.481211,
+                  31.920703
+                ]
+              },
+              "attachment": {
+                "lineId": "55555555-5555-4555-8555-555555555555",
+                "distanceM": 1424.2
+              }
+            }
+          }
+        ]
+      },
+      "results": [
+        {
+          "entity": "item",
+          "id": "11111111-1111-4111-8111-111111111111",
+          "version": 6
+        },
+        {
+          "entity": "item",
+          "id": "55555555-5555-4555-8555-555555555555",
+          "version": 1
+        },
+        {
+          "entity": "item",
+          "id": "22222222-2222-4222-8222-222222222222",
+          "version": 6
+        },
+        {
+          "entity": "item",
+          "id": "33333333-3333-4333-8333-333333333333",
+          "version": 6
+        }
+      ]
+    },
+    {
+      "name": "undo the split (reverseBatch)",
+      "batch": {
+        "batchId": "aaaaaaaa-aaaa-4aaa-8aaa-000000000007",
+        "ops": [
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "11111111-1111-4111-8111-111111111111",
+            "baseVersion": 6,
+            "data": {
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    -103.51,
+                    31.915
+                  ],
+                  [
+                    -103.503648,
+                    31.915212
+                  ],
+                  [
+                    -103.495,
+                    31.9155
+                  ],
+                  [
+                    -103.480423,
+                    31.921
+                  ]
+                ]
+              }
+            }
+          },
+          {
+            "op": "delete",
+            "entity": "item",
+            "id": "55555555-5555-4555-8555-555555555555",
+            "baseVersion": 1
+          },
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "22222222-2222-4222-8222-222222222222",
+            "baseVersion": 6,
+            "data": {
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.497899,
+                  31.915404
+                ]
+              },
+              "attachment": {
+                "lineId": "11111111-1111-4111-8111-111111111111",
+                "distanceM": 1143
+              }
+            }
+          },
+          {
+            "op": "update",
+            "entity": "item",
+            "id": "33333333-3333-4333-8333-333333333333",
+            "baseVersion": 6,
+            "data": {
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.481211,
+                  31.920703
+                ]
+              },
+              "attachment": {
+                "lineId": "11111111-1111-4111-8111-111111111111",
+                "distanceM": 2841.1
+              }
+            }
+          }
+        ]
+      },
+      "results": [
+        {
+          "entity": "item",
+          "id": "11111111-1111-4111-8111-111111111111",
+          "version": 7
+        },
+        {
+          "entity": "item",
+          "id": "55555555-5555-4555-8555-555555555555",
+          "version": 2
+        },
+        {
+          "entity": "item",
+          "id": "22222222-2222-4222-8222-222222222222",
+          "version": 7
+        },
+        {
+          "entity": "item",
+          "id": "33333333-3333-4333-8333-333333333333",
+          "version": 7
+        }
+      ]
+    },
+    {
+      "name": "delete the line with its taps (lineDeleteBatch)",
+      "batch": {
+        "batchId": "aaaaaaaa-aaaa-4aaa-8aaa-000000000008",
+        "ops": [
+          {
+            "op": "delete",
+            "entity": "item",
+            "id": "11111111-1111-4111-8111-111111111111",
+            "baseVersion": 7
+          },
+          {
+            "op": "delete",
+            "entity": "item",
+            "id": "22222222-2222-4222-8222-222222222222",
+            "baseVersion": 7
+          },
+          {
+            "op": "delete",
+            "entity": "item",
+            "id": "33333333-3333-4333-8333-333333333333",
+            "baseVersion": 7
+          }
+        ]
+      },
+      "results": [
+        {
+          "entity": "item",
+          "id": "11111111-1111-4111-8111-111111111111",
+          "version": 8
+        },
+        {
+          "entity": "item",
+          "id": "22222222-2222-4222-8222-222222222222",
+          "version": 8
+        },
+        {
+          "entity": "item",
+          "id": "33333333-3333-4333-8333-333333333333",
+          "version": 8
+        }
+      ]
+    },
+    {
+      "name": "undo the delete (reverseBatch)",
+      "batch": {
+        "batchId": "aaaaaaaa-aaaa-4aaa-8aaa-000000000009",
+        "ops": [
+          {
+            "op": "create",
+            "entity": "item",
+            "id": "11111111-1111-4111-8111-111111111111",
+            "baseVersion": 8,
+            "data": {
+              "kind": "line",
+              "name": "L-SWD",
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    -103.51,
+                    31.915
+                  ],
+                  [
+                    -103.503648,
+                    31.915212
+                  ],
+                  [
+                    -103.495,
+                    31.9155
+                  ],
+                  [
+                    -103.480423,
+                    31.921
+                  ]
+                ]
+              },
+              "properties": {
+                "diameter": 8
+              },
+              "assetId": null,
+              "overrides": {},
+              "ends": null,
+              "attachment": null
+            }
+          },
+          {
+            "op": "create",
+            "entity": "item",
+            "id": "22222222-2222-4222-8222-222222222222",
+            "baseVersion": 8,
+            "data": {
+              "kind": "tap",
+              "name": "PT-1",
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.497899,
+                  31.915404
+                ]
+              },
+              "properties": {},
+              "assetId": null,
+              "overrides": {},
+              "ends": null,
+              "attachment": {
+                "lineId": "11111111-1111-4111-8111-111111111111",
+                "distanceM": 1143
+              }
+            }
+          },
+          {
+            "op": "create",
+            "entity": "item",
+            "id": "33333333-3333-4333-8333-333333333333",
+            "baseVersion": 8,
+            "data": {
+              "kind": "tap",
+              "name": "PT-2",
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -103.481211,
+                  31.920703
+                ]
+              },
+              "properties": {},
+              "assetId": null,
+              "overrides": {},
+              "ends": null,
+              "attachment": {
+                "lineId": "11111111-1111-4111-8111-111111111111",
+                "distanceM": 2841.1
+              }
+            }
+          }
+        ]
+      },
+      "results": [
+        {
+          "entity": "item",
+          "id": "11111111-1111-4111-8111-111111111111",
+          "version": 9
+        },
+        {
+          "entity": "item",
+          "id": "22222222-2222-4222-8222-222222222222",
+          "version": 9
+        },
+        {
+          "entity": "item",
+          "id": "33333333-3333-4333-8333-333333333333",
+          "version": 9
+        }
+      ]
+    }
+  ],
+  "final": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "kind": "line",
+      "name": "L-SWD",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -103.51,
+            31.915
+          ],
+          [
+            -103.503648,
+            31.915212
+          ],
+          [
+            -103.495,
+            31.9155
+          ],
+          [
+            -103.480423,
+            31.921
+          ]
+        ]
+      },
+      "properties": {
+        "diameter": 8
+      },
+      "assetId": null,
+      "overrides": {},
+      "ends": null,
+      "attachment": null,
+      "version": 9,
+      "deleted": false
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "kind": "tap",
+      "name": "PT-1",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -103.497899,
+          31.915404
+        ]
+      },
+      "properties": {},
+      "assetId": null,
+      "overrides": {},
+      "ends": null,
+      "attachment": {
+        "lineId": "11111111-1111-4111-8111-111111111111",
+        "distanceM": 1143
+      },
+      "version": 9,
+      "deleted": false
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "kind": "tap",
+      "name": "PT-2",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -103.481211,
+          31.920703
+        ]
+      },
+      "properties": {},
+      "assetId": null,
+      "overrides": {},
+      "ends": null,
+      "attachment": {
+        "lineId": "11111111-1111-4111-8111-111111111111",
+        "distanceM": 2841.1
+      },
+      "version": 9,
+      "deleted": false
+    },
+    {
+      "id": "55555555-5555-4555-8555-555555555555",
+      "kind": "line",
+      "name": "L-SWD B",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -103.495,
+            31.9155
+          ],
+          [
+            -103.480423,
+            31.921
+          ]
+        ]
+      },
+      "properties": {},
+      "assetId": null,
+      "overrides": {},
+      "ends": null,
+      "attachment": null,
+      "version": 2,
+      "deleted": true
+    }
+  ]
+}

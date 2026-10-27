@@ -30,12 +30,14 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.MapStore;
  * rolls everything back.
  *
  * <ul>
- *   <li>Every line the batch deletes, or whose geometry it changes, has no live instrument
+ *   <li>Every line the batch deletes, whose geometry it changes, whose kind it changes, or whose
+ *       kind is not a line kind that is not an area, has no live instrument
  *       still attached to it that this batch has no op carrying {@code attachment} for
  *       (owner, 2026-10-27: a rename or a property change needs none). Checked first, so
  *       that refusal names the line.</li>
  *   <li>Every live map item the batch writes with an {@code attachment} points at a live line
- *       map item (written in this batch, else as stored) that is not an area, with
+ *       map item (written in this batch, else as stored) of a line kind in the kind list that is not
+ *       an area, with
  *       {@code distanceM} at most the line's length plus {@link #TOLERANCE_M}, and its point
  *       within {@link #TOLERANCE_M} of the place {@code distanceM} gives on the line (owner,
  *       2026-10-27). The Gateway never projects; it checks the browser's result.</li>
@@ -70,7 +72,11 @@ final class AttachmentRules {
             }
             MapItemRecord after = w.after();
             boolean moved = !after.deleted() && !after.geometry().equals(before.geometry());
-            if (!after.deleted() && !moved) {
+            // A kind change, or a kind that is not a line instruments may go on (an area, or not in the
+            // kind list), also needs every instrument in the batch: one left behind would sit on an area.
+            boolean notTarget = !after.deleted() && (!after.kind().equals(before.kind())
+                || !lineTarget(kinds.get(after.kind())));
+            if (!after.deleted() && !moved && !notTarget) {
                 continue;
             }
             List<String> left = new ArrayList<>();
@@ -82,9 +88,12 @@ final class AttachmentRules {
             }
             if (!left.isEmpty()) {
                 String count = left.size() == 1 ? "1 instrument" : left.size() + " instruments";
+                String fix = after.deleted() ? "Delete its instruments in the same save."
+                    : moved ? "Send each instrument's new place in the same save."
+                    : "Its new kind " + Rows.echo(after.kind()) + " is not a line instruments go on;"
+                        + " delete or detach its instruments in the same save.";
                 throw invalid(w.op(), "line " + name(before) + " has " + count + " (" + String.join(", ", left)
-                    + ") this save does not move or delete. " + (after.deleted()
-                    ? "Delete its instruments in the same save." : "Send each instrument's new place in the same save."));
+                    + ") this save does not move or delete. " + fix);
             }
         }
         Map<String, Optional<MapItemRecord>> read = new HashMap<>();
@@ -122,7 +131,11 @@ final class AttachmentRules {
             throw invalid(op, instrument + " is attached to " + name(line) + ", which is a point, not a line.");
         }
         Kind lineKind = kinds.get(line.kind());
-        if (lineKind != null && lineKind.area()) {
+        if (lineKind == null) {
+            throw invalid(op, instrument + " is attached to " + name(line) + ", whose kind " + Rows.echo(line.kind())
+                + " is not in the kind list; instruments go on lines of a line kind that is not an area.");
+        }
+        if (!lineTarget(lineKind)) {
             throw invalid(op, instrument + " is attached to " + name(line) + ", an area (kind " + Rows.echo(lineKind.id())
                 + "); instruments go on lines that are not areas.");
         }
@@ -140,6 +153,11 @@ final class AttachmentRules {
                 + metres(at.distanceM()) + " along it); its point must be within " + metres(TOLERANCE_M)
                 + " of that place.");
         }
+    }
+
+    /** A kind instruments may be attached to: a line kind that is not an area. */
+    private static boolean lineTarget(Kind kind) {
+        return kind != null && "line".equals(kind.geometry()) && !kind.area();
     }
 
     /** The positions of a Point (one) or a LineString, as stored. */
