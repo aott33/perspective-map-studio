@@ -206,6 +206,54 @@ class SetupPanelTest {
         assertFalse(saved.form().equals(dev));
     }
 
+    /**
+     * Fix 16 review: closing a tab with reasons left would drop its changes (the commit on close
+     * writes nothing), so the workspace asks first; a tab with changes and no reasons, or a
+     * read-only one, closes as before.
+     */
+    @Test
+    void closingATabWithReasonsLeftAsksFirst() {
+        SetupPanel panel = panel(null);
+        panel.show(SetupForm.fromJson(VALID), false, "");
+        assertFalse(SetupCommit.closeDropsChanges(panel));
+        panel.type(SetupForm.REFRESH, "0");
+        assertTrue(SetupCommit.closeDropsChanges(panel));
+        assertEquals(1, SetupCommit.reasonCount(panel));
+        panel.type(SetupForm.REFRESH, "20");
+        assertTrue(panel.hasUnsavedChanges());
+        assertFalse(SetupCommit.closeDropsChanges(panel), "no reasons: the close commits the changes");
+        panel.show(SetupForm.fromJson(VALID), true, "");
+        assertFalse(SetupCommit.closeDropsChanges(panel));
+        assertFalse(SetupCommit.closeDropsChanges(null));
+        assertEquals(0, SetupCommit.reasonCount(null));
+    }
+
+    /**
+     * Fix 16 review: after a save that wrote the setup, the form compares with what was written,
+     * so "(unsaved)" goes (ResourceEditor.commit() skips its own reload while it commits).
+     */
+    @Test
+    void unsavedGoesAfterASaveThatWroteTheSetup() {
+        SetupPanel panel = panel(null);
+        SetupForm dev = SetupForm.fromJson(VALID);
+        panel.show(dev, false, "");
+        panel.type(SetupForm.REFRESH, "20");
+        assertTrue(panel.hasUnsavedChanges());
+        SetupCommit.Decision saved = SetupCommit.formToSave(panel, dev);
+        assertFalse(saved.isHeldBack());
+        panel.markSaved(saved.form());
+        assertFalse(panel.hasUnsavedChanges());
+        assertEquals("Map Studio Setup", SetupCommit.nodeText(true, false, false, panel.hasUnsavedChanges()));
+        assertEquals("20", panel.current().text(SetupForm.REFRESH));
+        // Typing the old value back is a change now: the project holds 20.
+        panel.type(SetupForm.REFRESH, dev.text(SetupForm.REFRESH));
+        assertTrue(panel.hasUnsavedChanges());
+        // Only an editable setup moves its base.
+        panel.showEmpty();
+        panel.markSaved(dev);
+        assertFalse(panel.hasUnsavedChanges());
+    }
+
     // Story 16: lists, warnings, footer, states, layout.
 
     @Test
@@ -272,7 +320,7 @@ class SetupPanelTest {
     /** Fix 16: no Gateway-unreachable state; the Designer shows when it has no Gateway. */
     @Test
     void aGatewayThatIsDownLeavesItsListsEmptyWithNoMessageAndTypingStillWorks() {
-        source.reachable = false;
+        source.gatewayFails = true;
         SetupPanel panel = panel(null);
         panel.show(SetupForm.fromJson(VALID), false, "");
         assertEquals("", panel.footerText());
@@ -289,7 +337,7 @@ class SetupPanelTest {
         panel.type(SetupForm.REFRESH, "10");
         assertEquals("", panel.footerText());
         // The Gateway is back: the header's Refresh lists asks again.
-        source.reachable = true;
+        source.gatewayFails = false;
         panel.pressRefreshLists();
         assertEquals(List.of("MapStudio (PostgreSQL)", "MES (Microsoft SQL Server)"), panel.offered(SetupForm.CONNECTION));
         assertTrue(panel.warningText(SetupForm.CONNECTION).startsWith("MapStore is not"));
@@ -448,6 +496,7 @@ class SetupPanelTest {
         files.add(Path.of("src/main/java/com/aoindustrial/perspective/mapstudio/designer/MapStudioDesignerHook.java"));
         assertTrue(files.size() > 10, files.toString());
         int askFirst = 0;
+        int askClose = 0;
         for (Path file : files) {
             String code = Files.readString(file);
             assertFalse(code.contains("JDialog"), file.toString());
@@ -456,12 +505,17 @@ class SetupPanelTest {
             int shows = code.split("JOptionPane.show", -1).length - 1;
             if (file.getFileName().toString().equals("SetupPanel.java")) {
                 askFirst = shows;
+            } else if (file.getFileName().toString().equals("SetupWorkspace.java")) {
+                askClose = shows;
             } else {
                 assertEquals(0, shows, file.toString());
             }
         }
-        // The one dialog of the package is Start from defaults asking first.
+        // The dialogs of the package ask before something is lost: Start from defaults, and
+        // closing a setup tab whose changes cannot be kept (it names the count, not the reasons).
         assertEquals(1, askFirst);
+        assertEquals(1, askClose);
+        assertFalse(SetupForm.msg("setup.close.message.many", 2).contains("from 1 to 3600"));
     }
 
     /** Fix 16: the footer's count is plain text, with no link and no scroll-to. */
@@ -478,7 +532,7 @@ class SetupPanelTest {
 
     @Test
     void aNewSetupWithTheGatewayDownSaysNothingAboutIt() {
-        source.reachable = false;
+        source.gatewayFails = true;
         SetupPanel panel = panel(null);
         panel.showNew();
         assertEquals("1 reason left - this setup is not saved until it is fixed. | File > Save saves the rest of"

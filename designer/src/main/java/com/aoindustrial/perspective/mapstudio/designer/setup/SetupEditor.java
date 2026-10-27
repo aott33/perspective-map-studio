@@ -94,6 +94,27 @@ public final class SetupEditor extends ResourceEditor<SetupForm> {
         return was;
     }
 
+    /** Closing this tab would drop its changes (reasons left): the workspace asks first. */
+    boolean closeDropsChanges() {
+        return SetupCommit.closeDropsChanges(panel);
+    }
+
+    int reasonCount() {
+        return SetupCommit.reasonCount(panel);
+    }
+
+    /**
+     * After a project save that was not held back: the setup just committed is what the project
+     * has now, so the form compares with it and "(unsaved)" goes. {@code ResourceEditor.commit()}
+     * keeps the object it wrote as the resource read, and its own reload is skipped while it
+     * commits [SDK 8.3.0 javap], so nothing else moves the panel's base.
+     */
+    void markSaved() {
+        if (panel != null) {
+            panel.markSaved(getResource());
+        }
+    }
+
     private void edited() {
         if (workspace instanceof SetupWorkspace w) {
             w.refreshNode();
@@ -103,7 +124,9 @@ public final class SetupEditor extends ResourceEditor<SetupForm> {
     @Override
     protected SetupForm getObjectForSave() {
         SetupCommit.Decision d = SetupCommit.formToSave(panel, getResource());
-        if (d.isHeldBack()) {
+        // Only a project save holds the setup back; a commit from closing the tab is not a save
+        // (the workspace asks before a close that would drop changes).
+        if (d.isHeldBack() && workspace instanceof SetupWorkspace w && w.isSavingAll()) {
             heldBack = true;
             LOG.warn(SetupForm.msg("setup.heldBack.log", context.getProject().getName(), d.summary()));
         }

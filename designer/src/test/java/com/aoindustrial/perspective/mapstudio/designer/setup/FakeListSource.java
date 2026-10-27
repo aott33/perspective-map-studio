@@ -8,10 +8,10 @@ import com.aoindustrial.perspective.mapstudio.common.contract.SetupLists;
 import com.aoindustrial.perspective.mapstudio.common.contract.SetupLists.Entry;
 import com.aoindustrial.perspective.mapstudio.common.contract.SetupLists.Part;
 
-/** The dev Gateway and project as the form's lists see them; switchable to a Gateway that is down. */
+/** The dev Gateway and project as the form's lists see them; switchable to a Gateway whose calls fail. */
 final class FakeListSource implements SetupListSource {
 
-    boolean reachable = true;
+    boolean gatewayFails;
     /** When set, the Gateway answers every call with this failure (a refusal, an older module). */
     Exception failure;
     SetupLists gateway = new SetupLists(
@@ -35,8 +35,8 @@ final class FakeListSource implements SetupListSource {
         if (failure != null) {
             throw failure;
         }
-        if (!reachable) {
-            throw new java.net.ConnectException("Gateway not reachable");
+        if (gatewayFails) {
+            throw new java.net.ConnectException("Connection refused");
         }
         return gateway.toJson();
     }
@@ -47,8 +47,8 @@ final class FakeListSource implements SetupListSource {
         if (failure != null) {
             throw failure;
         }
-        if (!reachable) {
-            throw new java.net.ConnectException("Gateway not reachable");
+        if (gatewayFails) {
+            throw new java.net.ConnectException("Connection refused");
         }
         List<String> names = secrets.get(provider);
         return names == null ? Part.unavailable("no").toJson() : Part.okNames(names).toJson();

@@ -924,6 +924,17 @@ public final class SetupPanel extends JPanel {
         return mode == Mode.EDIT && !current().equals(base);
     }
 
+    /**
+     * The project has this setup now (a project save wrote it): it becomes the setup the form
+     * compares with, so "(unsaved)" goes. The fields are left as they are. Only for an editable
+     * setup; any other state keeps what {@link #show} set.
+     */
+    void markSaved(SetupForm saved) {
+        if (mode == Mode.EDIT && saved != null) {
+            base = saved;
+        }
+    }
+
     private void askStartFromDefaults() {
         if (confirmStartFromDefaults.getAsBoolean()) {
             show(SetupForm.defaults(), false, "");

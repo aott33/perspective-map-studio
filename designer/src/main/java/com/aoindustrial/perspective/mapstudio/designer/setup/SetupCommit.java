@@ -51,6 +51,21 @@ final class SetupCommit {
         return reasons.isEmpty() ? new Decision(form, Map.of()) : new Decision(read, reasons);
     }
 
+    /**
+     * True when closing the setup tab would drop its changes: they differ from the project's setup
+     * and reasons are left, so the commit on close writes nothing (fix 16 review). Closing then
+     * asks Discard or Cancel. A tab with changes and no reasons is committed on close as usual.
+     */
+    static boolean closeDropsChanges(SetupPanel panel) {
+        return panel != null && !panel.isLocked() && panel.hasUnsavedChanges()
+            && !panel.current().reasons().isEmpty();
+    }
+
+    /** How many reasons are left, for the close question. */
+    static int reasonCount(SetupPanel panel) {
+        return panel == null ? 0 : panel.current().reasons().values().stream().mapToInt(List::size).sum();
+    }
+
     /** What a project save does with a new setup (the workspace's own tab). */
     static Decision newSetupToSave(SetupPanel draft) {
         SetupForm form = draft.current();

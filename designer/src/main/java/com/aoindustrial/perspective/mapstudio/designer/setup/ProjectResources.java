@@ -39,6 +39,7 @@ final class ProjectResources {
      *
      * @param ofType the project's resources of a type (in the Designer
      *               {@code DesignableProject.getResourcesOfType})
+     * @return the lists; functions null (no list, no warnings) when no script with code is found
      */
     static ProjectLists.Snapshot read(Function<ResourceType, List<Resource>> ofType) {
         Map<String, String> scripts = new LinkedHashMap<>();
@@ -47,7 +48,9 @@ final class ProjectResources {
         }
         String pages = first(ofType.apply(PAGE_CONFIG), "config.json");
         String general = first(ofType.apply(GENERAL_PROPERTIES), null);
-        return ProjectLists.of(scripts, pages, general);
+        // No script at all reads as "not known", not as an empty library: a child project whose
+        // inherited scripts were left out [unverified] gets no "not a function" warnings.
+        return ProjectLists.of(scripts.isEmpty() ? null : scripts, pages, general);
     }
 
     private static String first(List<Resource> resources, String file) {

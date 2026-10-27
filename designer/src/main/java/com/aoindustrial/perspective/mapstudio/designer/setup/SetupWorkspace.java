@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import javax.swing.AbstractAction;
+import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
 import javax.swing.tree.TreePath;
@@ -38,7 +39,9 @@ import com.aoindustrial.perspective.mapstudio.common.MapStudioModule;
  * close action is replaced so it closes that tab too (the SDK's casts the selected tab to
  * {@code ResourceEditor}); the tab popup ignores a tab that is not an editor (the SDK catches the
  * cast). Whether a resource created during {@code notifyProjectSaveStart} goes up with that same
- * save is part of the owner's check.
+ * save is part of the owner's check. Closing a setup tab whose changes cannot be written (reasons
+ * left) asks Discard or Cancel instead of dropping them; after a save that wrote the setup, the
+ * tab compares with what was written, so "(unsaved)" goes (fix 16 review).
  */
 public final class SetupWorkspace extends TabbedResourceWorkspace {
 
@@ -51,6 +54,8 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
 
     private SetupPanel draft;
     private boolean draftNew;
+    /** True while {@link #commitAll()} runs (a project save), so only a save logs a held-back setup. */
+    private boolean savingAll;
 
     public SetupWorkspace(DesignerContext context) {
         super(context, ResourceDescriptor.builder()
@@ -167,6 +172,50 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
     }
 
     /**
+     * Closes a tab (its X, and the tab menu's Close, Close others and Close all, which call this
+     * [SDK 8.3.0 javap]). The SDK's close commits the editor first; a setup with reasons left
+     * cannot be written, so closing it would silently drop its changes (fix 16 review). Such a tab
+     * is brought forward and the user is asked: Discard closes it without a commit, Cancel keeps it
+     * open with its changes and reasons.
+     */
+    @Override
+    public void close(ResourcePath path) {
+        for (ResourceEditor<?> e : getEditors()) {
+            if (e instanceof SetupEditor editor && path.equals(editor.getResourcePath())
+                && editor.closeDropsChanges()) {
+                if (indexOfComponent(editor) >= 0) {
+                    setSelectedComponent(editor);
+                }
+                if (!confirmDiscard(editor.reasonCount())) {
+                    return;
+                }
+                LOG.info("Map Studio setup: tab closed and its unsaved changes discarded.");
+                super.close(path, false);
+                refreshNode();
+                return;
+            }
+        }
+        super.close(path);
+        refreshNode();
+    }
+
+    /** Discard / Cancel, Cancel the default. */
+    private boolean confirmDiscard(int reasons) {
+        String discard = SetupForm.msg("setup.close.discard");
+        String cancel = SetupForm.msg("setup.close.cancel");
+        int choice = JOptionPane.showOptionDialog(this,
+            reasons == 1 ? SetupForm.msg("setup.close.message.one") : SetupForm.msg("setup.close.message.many", reasons),
+            SetupForm.msg("setup.close.title"), JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE, null,
+            new Object[] {discard, cancel}, cancel);
+        return choice == 0;
+    }
+
+    /** True while a project save commits this workspace. */
+    boolean isSavingAll() {
+        return savingAll;
+    }
+
+    /**
      * Commits the open editors (story 7), then a new setup. A setup with reasons left is held back
      * from this save (owner, 2026-10-27, fix 16): the open tab's commit writes nothing (its
      * {@code getObjectForSave} hands back the setup as read), a new setup is not created, the rest
@@ -182,15 +231,26 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
             dropDraft();
             refreshNode();
         }
-        super.commitAll();
+        savingAll = true;
+        try {
+            super.commitAll();
+        } finally {
+            savingAll = false;
+        }
         for (ResourceEditor<?> e : getEditors()) {
-            if (e instanceof SetupEditor editor && editor.takeHeldBack()) {
-                SwingUtilities.invokeLater(() -> {
-                    if (indexOfComponent(editor) >= 0) {
-                        setSelectedComponent(editor);
-                    }
-                    refreshNode();
-                });
+            if (e instanceof SetupEditor editor) {
+                if (editor.takeHeldBack()) {
+                    SwingUtilities.invokeLater(() -> {
+                        if (indexOfComponent(editor) >= 0) {
+                            setSelectedComponent(editor);
+                        }
+                        refreshNode();
+                    });
+                } else {
+                    // Written with this save: the form compares with it now, so "(unsaved)" goes.
+                    editor.markSaved();
+                    SwingUtilities.invokeLater(this::refreshNode);
+                }
             }
         }
         if (!draftNew || draft == null) {

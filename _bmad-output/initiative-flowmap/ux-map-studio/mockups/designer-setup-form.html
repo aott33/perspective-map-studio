@@ -10,7 +10,8 @@
    Swing stand-ins: every colour below maps to a UIManager key named in DESIGN.md
    (designer-* tokens). The Swing form reads the keys; these hex values are only the
    mock's stand-ins for the Designer's light theme. Render one state with ?v=STATE:
-   normal, reasons, unreachable, inherited, newer, picker, empty, new.
+   normal, reasons, inherited, newer, picker, empty, new.
+   No Gateway-unreachable state (owner, 2026-10-27, fix 16).
    There is no create dialog: empty and new are the same tab.
    No section list (owner, 2026-10-27): the tab body is the form alone, left aligned.
    Quiet form (owner, 2026-10-27): no help line under fields (each label has a tooltip;
@@ -196,7 +197,6 @@ const states = {
       refresh: [['err', 'refreshIntervalSeconds must be a whole number from 1 to 3600, not 0.']],
     },
   },
-  unreachable: { gwDown: true, connection: { v: 'MapStudio', state: 'down' } },
   newer: { readonly: true },
   empty: { none: true },
   new: {

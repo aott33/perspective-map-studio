@@ -66,16 +66,18 @@ public final class ProjectLists {
     /**
      * The project's lists.
      *
-     * @param scripts each script resource's folder path ({@code a/b}) and its {@code code.py}
+     * @param scripts each script resource's folder path ({@code a/b}) and its {@code code.py}; null
+     *                when not known (functions null: no list, no warnings)
      * @param pageConfig the page configuration's {@code config.json}, or null
      * @param generalProperties the Perspective general properties' JSON, or null
      */
     public static Snapshot of(Map<String, String> scripts, String pageConfig, String generalProperties) {
+        if (scripts == null) {
+            return new Snapshot(null, pages(pageConfig), identityProvider(generalProperties));
+        }
         TreeSet<String> functions = new TreeSet<>(Comparator.comparing((String s) -> s.toLowerCase(Locale.ROOT))
             .thenComparing(s -> s));
-        if (scripts != null) {
-            scripts.forEach((path, code) -> functions.addAll(functions(path, code)));
-        }
+        scripts.forEach((path, code) -> functions.addAll(functions(path, code)));
         return new Snapshot(new ArrayList<>(functions), pages(pageConfig), identityProvider(generalProperties));
     }
 

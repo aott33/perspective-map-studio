@@ -2,6 +2,7 @@ package com.aoindustrial.perspective.mapstudio.designer.setup;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -99,5 +100,21 @@ class ProjectResourcesTest {
             type -> type.equals(ProjectResources.SCRIPTS) ? List.of(folder, adapter) : List.of());
         assertEquals(List.of("site.adapter.kinds"), s.functions());
         assertEquals(null, s.pages());
+    }
+
+    /**
+     * Fix 16 review: no script found at all reads as "not known" (a child project whose inherited
+     * scripts might be left out), so the function fields give no warning.
+     */
+    @Test
+    void noScriptAtAllIsUnknownAndWarnsNothing() {
+        ProjectLists.Snapshot s = ProjectResources.read(type -> List.of());
+        assertNull(s.functions());
+        assertTrue(s.offeredFunctions().isEmpty());
+        SetupForm form = SetupForm.defaults().setText(SetupForm.KINDS_FUNCTION, "mapstudio_dev.kinds");
+        assertFalse(form.warnings(FormLists.none().withProject(s)).containsKey(SetupForm.KINDS_FUNCTION));
+        // A library that was read and lacks the function still warns.
+        ProjectLists.Snapshot known = new ProjectLists.Snapshot(List.of("site.other"), null, null);
+        assertTrue(form.warnings(FormLists.none().withProject(known)).containsKey(SetupForm.KINDS_FUNCTION));
     }
 }
