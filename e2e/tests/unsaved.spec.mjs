@@ -212,7 +212,7 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
                     await expect(opMap).toHaveAttribute('data-edit-level', 'phone');
                     const opSave = await send(opPage, 'edits.apply', {
                         batchId: randomUUID(),
-                        ops: [{ op: 'update', entity: 'item', id, baseVersion: 1, data: { properties: { note: 'checked on site' } } }]
+                        ops: [{ op: 'update', entity: 'item', id, baseVersion: 1, data: { properties: { buried: true } } }]
                     });
                     expect(opSave.type, JSON.stringify(opSave.body)).toBe('edits.apply.reply');
                 } finally {
