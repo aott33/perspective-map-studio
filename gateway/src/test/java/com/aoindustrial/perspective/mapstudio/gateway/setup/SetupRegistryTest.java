@@ -121,4 +121,53 @@ class SetupRegistryTest {
         assertThrows(MapStudioException.class, () -> registry.require("b"));
         assertThrows(MapStudioException.class, () -> registry.require(null));
     }
+    @Test
+    void callsRacingScansNeverWarnTwiceForOneBadRead() throws Exception {
+        Setup good = setup("MapStudio");
+        registry.put(P, good);
+        int reads = 200;
+        java.util.concurrent.atomic.AtomicBoolean stop = new java.util.concurrent.atomic.AtomicBoolean();
+        List<Thread> callers = new ArrayList<>();
+        for (int t = 0; t < 4; t++) {
+            Thread caller = new Thread(() -> {
+                while (!stop.get()) {
+                    try {
+                        registry.require(P);
+                    } catch (MapStudioException expected) {
+                        // invalid at this moment
+                    }
+                }
+            });
+            caller.start();
+            callers.add(caller);
+        }
+        for (int i = 0; i < reads; i++) {
+            registry.putProblem(P, "x " + i + ".");
+            Thread.yield();
+            registry.put(P, good);
+        }
+        stop.set(true);
+        for (Thread caller : callers) {
+            caller.join();
+        }
+        assertEquals(reads, log.warnings.size(), "exactly one warning per bad read, none from the calls");
+    }
+
+    @Test
+    void aMissingSetupWarnsOnceUnderConcurrentCalls() throws Exception {
+        List<Thread> callers = new ArrayList<>();
+        for (int t = 0; t < 8; t++) {
+            Thread caller = new Thread(() -> {
+                for (int i = 0; i < 100; i++) {
+                    assertThrows(MapStudioException.class, () -> registry.require(P));
+                }
+            });
+            caller.start();
+            callers.add(caller);
+        }
+        for (Thread caller : callers) {
+            caller.join();
+        }
+        assertEquals(1, log.warnings.size(), log.warnings.toString());
+    }
 }

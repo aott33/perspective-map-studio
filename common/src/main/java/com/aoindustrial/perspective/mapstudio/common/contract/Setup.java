@@ -124,6 +124,8 @@ public record Setup(
             return failed(SetupProblem.FILE, "setup.json must be a JSON object {\"schemaVersion\": 1, ...}");
         }
         JsonObject o = element.getAsJsonObject();
+        // The parser keeps the last of two equal keys; a field set twice is a problem, never a silent choice.
+        problems.addAll(duplicateKeys(text));
 
         JsonElement version = present(o, "schemaVersion");
         if (version == null) {
@@ -242,6 +244,52 @@ public record Setup(
             throw new JsonParseException("more after the JSON value at " + reader.toString());
         }
         return element;
+    }
+
+    /**
+     * One problem per key set more than once in the same object, at any depth
+     * ({@code refreshIntervalSeconds is set twice}, {@code roles.full is set twice}).
+     * Walks the text with the streaming reader, which sees every key; the text is
+     * already known to be valid JSON.
+     */
+    static List<SetupProblem> duplicateKeys(String text) {
+        List<SetupProblem> problems = new ArrayList<>();
+        try {
+            JsonReader reader = new JsonReader(new StringReader(text));
+            reader.setLenient(false);
+            walk(reader, "", problems);
+        } catch (IOException | IllegalStateException | JsonParseException ex) {
+            // Not reachable for text strictParse accepted; the parse problem is reported there.
+        }
+        return problems;
+    }
+
+    private static void walk(JsonReader reader, String prefix, List<SetupProblem> problems) throws IOException {
+        switch (reader.peek()) {
+            case BEGIN_OBJECT -> {
+                reader.beginObject();
+                Set<String> seen = new HashSet<>();
+                Set<String> reported = new HashSet<>();
+                while (reader.hasNext()) {
+                    String key = reader.nextName();
+                    String field = prefix + key;
+                    if (!seen.add(key) && reported.add(key)) {
+                        problems.add(new SetupProblem(field, field + " is set twice"));
+                    }
+                    walk(reader, field + ".", problems);
+                }
+                reader.endObject();
+            }
+            case BEGIN_ARRAY -> {
+                reader.beginArray();
+                String element = prefix.endsWith(".") ? prefix.substring(0, prefix.length() - 1) + "[]." : prefix;
+                while (reader.hasNext()) {
+                    walk(reader, element, problems);
+                }
+                reader.endArray();
+            }
+            default -> reader.skipValue();
+        }
     }
 
     private static String where(Exception ex) {

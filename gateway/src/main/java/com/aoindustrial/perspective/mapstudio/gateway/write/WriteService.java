@@ -4,6 +4,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 
 import com.inductiveautomation.ignition.common.gson.JsonElement;
 import com.inductiveautomation.ignition.common.util.LoggerEx;
@@ -53,7 +54,19 @@ public final class WriteService {
      * @throws MapStudioException when the batch is refused; nothing is written then
      */
     public EditResult apply(String project, JsonElement batchJson, Actor actor, String level) {
+        return apply(project, batchJson, actor, setup -> level);
+    }
+
+    /**
+     * Save one batch for a project, with the caller's level worked out by {@code levelOf}
+     * from the same setup the batch is checked and saved against: the setup is read once
+     * per call, so a role removed by a scan between two reads cannot let a batch through.
+     *
+     * @throws MapStudioException when the batch is refused; nothing is written then
+     */
+    public EditResult apply(String project, JsonElement batchJson, Actor actor, Function<Setup, String> levelOf) {
         Setup setup = gate.requireReady(project);
+        String level = levelOf.apply(setup);
         EditBatch batch = EditBatch.parse(batchJson);
         batch.requireSupported();
         for (EditOp op : batch.ops()) {

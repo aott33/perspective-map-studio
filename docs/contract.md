@@ -30,7 +30,7 @@ Stable kebab-case words; the message is plain words for the person.
 | `role` | the session has no role that allows the op (checked on the Gateway against the session user's roles, never anything the browser sends) |
 | `invalid` | the message, batch or op is malformed, an update names a map item that does not exist, a `batchId` was already saved, or the op is not supported in this version (deletes and any `kindSetup` op, until entries 2 and 3) |
 | `stale` | the browser's map is behind (a gap in `seq`); used from entry 4 |
-| `store-unreachable` | the project has no setup, its setup names a connection the Gateway does not have, the map store is starting or unavailable, or the Gateway is busy: when the module's bounded work pool (4 threads, 64 waiting messages) is full, a `map.load` or `edits.apply` is answered at once with this code and "Map Studio is busy with other map requests; nothing was saved. Try again in a moment." (no separate `busy` code in 0.2.0) |
+| `store-unreachable` | the project has no setup, its setup cannot be read (the reason lists every problem, `docs/setup.md`), its setup names a connection the Gateway does not have, the map store is starting or unavailable, or the Gateway is busy: when the module's bounded work pool (4 threads, 64 waiting messages) is full, a `map.load` or `edits.apply` is answered at once with this code and "Map Studio is busy with other map requests; nothing was saved. Try again in a moment." (no separate `busy` code in 0.2.0) |
 
 ## Batches and ops
 

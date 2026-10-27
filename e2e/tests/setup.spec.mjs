@@ -2,13 +2,16 @@
 // changed setup.json applies after a project scan with no restart (level and
 // refresh interval follow at the next map.load), a bad field makes the map store
 // unavailable with the reason naming the field, and the fixed file brings it back.
+// No restart is checked, not assumed: the Gateway's uptime only grows and the
+// module's start time stays the same across the run, and the bad read logs exactly
+// one MapStudio.setup warning however many map.loads follow it.
 // The spec changes the committed dev setup and always puts it back (finally, and
 // the global setup after a crashed run). Screenshots at 1440 and 390 px.
 
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
-import { backUpSetup, committedSetup, restoreSetup, scanProject, writeSetup } from '../lib/gateway.mjs';
+import { backUpSetup, committedSetup, gatewayRun, putBackSetup, scanProject, setupWarnings, writeSetup } from '../lib/gateway.mjs';
 import { EDITOR_USER, editorTest, expect, nextFrames, openMap, test } from './fixtures.mjs';
 
 /** How long a scanned change may take to reach a fresh map.load (seen well under 1 s, docs/platform-checks.md). */
@@ -47,7 +50,7 @@ async function shot(page, name) {
 }
 
 async function putBack() {
-    if (restoreSetup()) await scanProject();
+    await putBackSetup();
 }
 
 test.describe('1440 px', () => {
@@ -56,6 +59,7 @@ test.describe('1440 px', () => {
     editorTest('a changed setup applies after a scan, a bad field says why, and the fix brings it back', async ({ page }) => {
         backUpSetup();
         const good = committedSetup();
+        const run = await gatewayRun();
         try {
             let state = await loadedState(page, '/edit');
             await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
@@ -67,9 +71,15 @@ test.describe('1440 px', () => {
             await reloadUntil(page, '/edit', { load: 'loaded', level: 'phone', refresh: '30' });
 
             // A bad field: the map store is unavailable and the component shows the reason naming the field.
+            const badReadAt = Date.now() - 1_000;
             writeSetup({ ...good, refreshIntervalSeconds: 'ten' });
             await scanProject();
             await reloadUntil(page, '/edit', { load: 'failed' });
+            await loadedState(page, '/edit');
+            await loadedState(page, '/edit');
+            const warnings = (await setupWarnings(badReadAt)).filter((m) => m.includes('mapstudio-dev'));
+            expect(warnings, 'one warning for the bad read, none from the map.loads after it').toHaveLength(1);
+            expect(warnings[0]).toContain(TEN_REASON);
             const status = page.locator('.mapstudio-load-status');
             await expect(status).toContainText('store-unreachable');
             await expect(status).toContainText('The Map Studio setup of project mapstudio-dev cannot be read: ' + TEN_REASON);
@@ -80,6 +90,10 @@ test.describe('1440 px', () => {
         }
         // Fixed: the committed setup applies again.
         await reloadUntil(page, '/edit', { load: 'loaded', level: 'full', refresh: String(good.refreshIntervalSeconds) });
+        // And nothing restarted on the way.
+        const after = await gatewayRun();
+        expect(after.uptimeMs, 'the Gateway uptime did not reset').toBeGreaterThan(run.uptimeMs);
+        expect(after.moduleStartupTime, 'the Map Studio module did not restart').toBe(run.moduleStartupTime);
     });
 });
 

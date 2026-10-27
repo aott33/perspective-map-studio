@@ -46,12 +46,15 @@ public class FakeMapStore implements MapStore {
 
     public State committed = new State();
     public int transactions;
+    /** The database connection the last transaction was opened on. */
+    public String lastConnection;
     /** When set, the next transaction throws it at its first write (a database failure). */
     public SQLException failNextWrite;
 
     @Override
     public <T> T inTransaction(String connection, Work<T> work) throws SQLException {
         transactions++;
+        lastConnection = connection;
         State working = committed.copy();
         T result = work.run(new FakeTx(working));
         committed = working;

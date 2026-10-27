@@ -179,4 +179,15 @@ class SetupValidationTest {
         assertEquals("mapboxToken is not a setup field of schema 1", far.message());
         assertNull(Setup.closest("zzz", Setup.FIELDS));
     }
+    @Test
+    void aFieldSetTwiceIsAProblemNeverASilentChoice() {
+        SetupProblem p = only(Setup.read("{" + BASE + ",\"refreshIntervalSeconds\":\"ten\",\"refreshIntervalSeconds\":10}"));
+        assertEquals("refreshIntervalSeconds", p.field());
+        assertEquals("refreshIntervalSeconds is set twice", p.message());
+        SetupProblem nested = only(read("\"roles\":{\"full\":[\"A\"],\"full\":[\"B\"],\"full\":[]}"));
+        assertEquals("roles.full is set twice", nested.message(), "reported once however many times it is set");
+        Setup.Reading two = Setup.read("{" + BASE + ",\"connection\":\"Other\",\"alarmPage\":\"\",\"alarmPage\":\"\"}");
+        assertEquals(2, two.problems().size(), two.problems().toString());
+        assertEquals("2 problems: connection is set twice; alarmPage is set twice.", two.reason());
+    }
 }

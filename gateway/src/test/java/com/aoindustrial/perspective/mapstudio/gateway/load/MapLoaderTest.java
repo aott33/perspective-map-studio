@@ -92,14 +92,15 @@ class MapLoaderTest {
         String roles = "\"roles\":{\"full\":[\"MapEditor\"],\"phone\":[]}";
         setups.put("mapstudio-dev", Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\"," + roles + "}"));
         List<String> editor = List.of("MapEditor");
-        assertEquals("full", RoleMatrix.level(setups.find("mapstudio-dev").orElse(null), editor));
+        assertEquals("full", loader.mapLoadReply("mapstudio-dev", setup -> RoleMatrix.level(setup, editor))
+            .get("level").getAsString());
 
         setups.put("mapstudio-dev", Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\","
             + "\"roles\":{\"full\":[\"Nobody\"],\"phone\":[\"MapEditor\"]},\"refreshIntervalSeconds\":30}"),
             "resource modified");
-        assertEquals("phone", RoleMatrix.level(setups.find("mapstudio-dev").orElse(null), editor));
-        assertEquals(30, loader.mapLoadReply("mapstudio-dev", "phone").getAsJsonObject("setup")
-            .get("refreshIntervalSeconds").getAsInt());
+        JsonObject reply = loader.mapLoadReply("mapstudio-dev", setup -> RoleMatrix.level(setup, editor));
+        assertEquals("phone", reply.get("level").getAsString(), "the level comes from the setup the reply is built from");
+        assertEquals(30, reply.getAsJsonObject("setup").get("refreshIntervalSeconds").getAsInt());
 
         setups.putProblem("mapstudio-dev", "refreshIntervalSeconds must be a whole number from 1 to 3600, not \"ten\".");
         MapStudioException load = assertThrows(MapStudioException.class,

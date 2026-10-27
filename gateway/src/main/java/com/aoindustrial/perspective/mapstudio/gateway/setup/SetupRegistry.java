@@ -61,7 +61,16 @@ public final class SetupRegistry {
 
     private final Log log;
 
-    private final ConcurrentHashMap<String, SetupState> states = new ConcurrentHashMap<>();
+    /**
+     * A project's state and whether its one warning has been logged, swapped together
+     * ({@code ConcurrentHashMap.compute}), so a call racing a scan never warns twice for
+     * one bad read or one missing setup. No entry means missing and not yet warned.
+     */
+    private record Entry(SetupState state, boolean warned) {
+    }
+
+    private final ConcurrentHashMap<String, Entry> states = new ConcurrentHashMap<>();
+    /** Keys other than a project's own state ({@link #warnOnce}, for example the store gate's project and connection). */
     private final Set<String> warned = ConcurrentHashMap.newKeySet();
     private final Consumer<Setup> onSetup;
     private final List<SetupChangeListener> listeners = new CopyOnWriteArrayList<>();
@@ -91,8 +100,7 @@ public final class SetupRegistry {
      * ({@code "resource modified"}; null when not known).
      */
     public void put(String project, Setup setup, String cause) {
-        warned.remove(project);
-        SetupState before = swap(project, SetupState.valid(setup));
+        SetupState before = swap(project, SetupState.valid(setup), false);
         boolean change = before.status() != SetupState.Status.MISSING;
         log.info(String.format("Project %s: Map Studio setup %s%s (connection %s, full editing roles %s, "
                 + "phone editing roles %s, refresh interval %d s).", project, change ? "changed and applied" : "read",
@@ -113,17 +121,16 @@ public final class SetupRegistry {
     /** As {@link #putProblem(String, String)}, {@code cause} naming what read it (null when not known). */
     public void putProblem(String project, String reason, String cause) {
         SetupState after = SetupState.invalid(reason);
-        SetupState before = swap(project, after);
+        // Marked warned in the same swap: a call that sees the invalid state never warns again.
+        SetupState before = swap(project, after, true);
         log.warn(cause == null ? invalidReason(project, reason)
             : "The Map Studio setup of project " + project + " (read on " + cause + ") cannot be read: " + reason);
-        warned.add(project);
         tell(project, before, after);
     }
 
     /** The setup resource was deleted: the project has no setup from the next call. */
     public void deleted(String project) {
-        SetupState before = swap(project, SetupState.missing());
-        warned.remove(project);
+        SetupState before = swap(project, SetupState.missing(), false);
         if (before.status() != SetupState.Status.MISSING) {
             log.info("Project " + project
                 + ": Map Studio setup removed; its map store is unavailable until a setup is added.");
@@ -133,15 +140,14 @@ public final class SetupRegistry {
 
     /** The project stopped: forget its state, quietly. */
     public void remove(String project) {
-        SetupState before = swap(project, SetupState.missing());
-        warned.remove(project);
+        SetupState before = swap(project, SetupState.missing(), false);
         tell(project, before, SetupState.missing());
     }
 
     /** The project's state now ({@code missing} when nothing was read). */
     public SetupState state(String project) {
-        SetupState s = project == null ? null : states.get(project);
-        return s == null ? SetupState.missing() : s;
+        Entry e = project == null ? null : states.get(project);
+        return e == null ? SetupState.missing() : e.state();
     }
 
     public Optional<Setup> find(String project) {
@@ -158,12 +164,29 @@ public final class SetupRegistry {
         if (s.isValid()) {
             return s.setup();
         }
-        String reason = s.status() == SetupState.Status.INVALID
-            ? invalidReason(project, s.reason())
-            : "Project " + project + " has no Map Studio setup (project resource "
-                + "com.aoindustrial.perspective.mapstudio/setup), so its map store is unavailable.";
-        warnOnce(project, reason);
+        if (s.status() == SetupState.Status.INVALID) {
+            // Warned once at the read (putProblem), never again at use.
+            throw new MapStudioException(Messages.CODE_STORE_UNREACHABLE, invalidReason(project, s.reason()));
+        }
+        String reason = "Project " + project + " has no Map Studio setup (project resource "
+            + "com.aoindustrial.perspective.mapstudio/setup), so its map store is unavailable.";
+        if (project == null ? warned.add("null") : markMissingWarned(project)) {
+            log.warn(reason);
+        }
         throw new MapStudioException(Messages.CODE_STORE_UNREACHABLE, reason);
+    }
+
+    /** True the first time a missing project is marked warned since it went missing; atomic with the swaps. */
+    private boolean markMissingWarned(String project) {
+        boolean[] first = {false};
+        states.compute(project, (k, e) -> {
+            if (e == null) {
+                first[0] = true;
+                return new Entry(SetupState.missing(), true);
+            }
+            return e;
+        });
+        return first[0];
     }
 
     /** Log {@code message} at warn the first time for this project (and key) since the Gateway started. */
@@ -177,10 +200,10 @@ public final class SetupRegistry {
         return "The Map Studio setup of project " + project + " cannot be read: " + reason;
     }
 
-    private SetupState swap(String project, SetupState after) {
-        SetupState before = after.status() == SetupState.Status.MISSING ? states.remove(project)
-            : states.put(project, after);
-        return before == null ? SetupState.missing() : before;
+    private SetupState swap(String project, SetupState after, boolean warnedAfter) {
+        Entry next = after.status() == SetupState.Status.MISSING && !warnedAfter ? null : new Entry(after, warnedAfter);
+        Entry before = next == null ? states.remove(project) : states.put(project, next);
+        return before == null ? SetupState.missing() : before.state();
     }
 
     private void tell(String project, SetupState before, SetupState after) {

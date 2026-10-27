@@ -2,6 +2,7 @@ package com.aoindustrial.perspective.mapstudio.gateway.load;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.function.Function;
 
 import com.inductiveautomation.ignition.common.gson.JsonArray;
 import com.inductiveautomation.ignition.common.gson.JsonObject;
@@ -51,10 +52,19 @@ public final class MapLoader {
         }
     }
 
-    /** The {@code map.load.reply} body for a session at {@code level}. */
+    /** The {@code map.load.reply} body for a session at a fixed {@code level}. */
     public JsonObject mapLoadReply(String project, String level) {
-        // The setup is read on every call (never kept here), so a changed setup applies at the next map.load.
+        return mapLoadReply(project, setup -> level);
+    }
+
+    /**
+     * The {@code map.load.reply} body, with the level worked out by {@code levelOf} from the
+     * same setup the reply is built from. The setup is read once per call (never kept here), so
+     * a changed setup applies at the next map.load and one reply never mixes two setups.
+     */
+    public JsonObject mapLoadReply(String project, Function<Setup, String> levelOf) {
         Setup setup = gate.requireReady(project);
+        String level = levelOf.apply(setup);
         Snapshot snapshot = snapshot(project, setup);
         JsonObject body = new JsonObject();
         body.addProperty("level", level);
