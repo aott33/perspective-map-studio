@@ -11,13 +11,12 @@ import com.aoindustrial.perspective.mapstudio.common.contract.SetupLists;
  * or before the first load), the chosen secret provider's secret names, and the project's. A list
  * that is not OK gives no warnings: there is nothing to compare with.
  *
- * @param gateway the Gateway lists, or null when not loaded
- * @param reachable false when the Gateway could not be asked at all
+ * @param gateway the Gateway lists, or null when not loaded (a failed call is unavailable lists)
  * @param secretNamesProvider the provider {@code secretNames} belongs to, or null
  * @param secretNames that provider's secret names, or null when not loaded
  * @param project the project's lists
  */
-public record FormLists(SetupLists gateway, boolean reachable, String secretNamesProvider,
+public record FormLists(SetupLists gateway, String secretNamesProvider,
                         SetupLists.Part secretNames, ProjectLists.Snapshot project) {
 
     public FormLists {
@@ -26,19 +25,19 @@ public record FormLists(SetupLists gateway, boolean reachable, String secretName
 
     /** Nothing loaded yet: no warnings. */
     public static FormLists none() {
-        return new FormLists(null, true, null, null, ProjectLists.Snapshot.unknown());
+        return new FormLists(null, null, null, ProjectLists.Snapshot.unknown());
     }
 
-    public FormLists withGateway(SetupLists lists, boolean reached) {
-        return new FormLists(lists, reached, secretNamesProvider, secretNames, project);
+    public FormLists withGateway(SetupLists lists) {
+        return new FormLists(lists, secretNamesProvider, secretNames, project);
     }
 
     public FormLists withSecretNames(String provider, SetupLists.Part names) {
-        return new FormLists(gateway, reachable, provider, names, project);
+        return new FormLists(gateway, provider, names, project);
     }
 
     public FormLists withProject(ProjectLists.Snapshot snapshot) {
-        return new FormLists(gateway, reachable, secretNamesProvider, secretNames, snapshot);
+        return new FormLists(gateway, secretNamesProvider, secretNames, snapshot);
     }
 
     /** The connections list when it loaded, else null. */

@@ -15,7 +15,6 @@ import com.inductiveautomation.perspective.designer.DesignerComponentRegistry;
 import com.inductiveautomation.perspective.designer.api.PerspectiveDesignerInterface;
 
 import com.aoindustrial.perspective.mapstudio.common.MapStudioComponent;
-import com.aoindustrial.perspective.mapstudio.designer.setup.SetupRefusedException;
 import com.aoindustrial.perspective.mapstudio.designer.setup.SetupWorkspace;
 
 /**
@@ -56,28 +55,31 @@ public class MapStudioDesignerHook extends AbstractDesignerModuleHook {
      * nothing commits a module's {@code TabbedResourceWorkspace} for it. The SDK has no
      * dirty flag on {@code ResourceEditor}: {@code commit()} compares the form with the
      * one read, so every save is asked and an unchanged setup writes nothing. A setup with
-     * reasons left (an open tab or a new setup) fails the save here, with no Map Studio dialog.
+     * reasons left is held back and this returns normally, so the rest of the project saves
+     * (owner, 2026-10-27, fix 16). Nothing is thrown from here: the Designer turns a throw
+     * into "Error encountered in module ... while saving." and stops the whole save
+     * [SDK 8.3.0 javap: {@code IgnitionDesigner.commitAll}, {@code handleSave}].
      */
     @Override
-    public void notifyProjectSaveStart(SaveContext save) throws Exception {
+    public void notifyProjectSaveStart(SaveContext save) {
         SetupWorkspace workspace = this.setupWorkspace;
         if (workspace == null) {
             return;
         }
         // The save runs off the Swing thread; the editors read Swing fields.
-        if (EventQueue.isDispatchThread()) {
-            workspace.commitAll();
-        } else {
-            try {
+        try {
+            if (EventQueue.isDispatchThread()) {
+                workspace.commitAll();
+            } else {
                 EventQueue.invokeAndWait(workspace::commitAll);
-            } catch (InvocationTargetException ex) {
-                if (ex.getCause() instanceof SetupRefusedException.NotSaved) {
-                    // Already logged; failing here fails the project save with the Designer's own
-                    // save failure and no Map Studio dialog (owner, 2026-10-27) [unverified wording].
-                    throw (SetupRefusedException.NotSaved) ex.getCause();
-                }
-                log.error("Map Studio setup could not be committed for the project save.", ex.getCause());
             }
+        } catch (InvocationTargetException ex) {
+            log.error("Map Studio setup could not be committed for the project save.", ex.getCause());
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            log.error("Map Studio setup commit was interrupted; the setup is not in this save.", ex);
+        } catch (RuntimeException ex) {
+            log.error("Map Studio setup could not be committed for the project save.", ex);
         }
     }
 
