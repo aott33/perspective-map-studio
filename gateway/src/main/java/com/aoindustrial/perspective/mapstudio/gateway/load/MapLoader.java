@@ -132,7 +132,7 @@ public final class MapLoader {
 
     /**
      * The part of the setup the browser needs ({@code map.load.reply}'s optional
-     * {@code setup}, 0.2.0 draft): never the connection, the roles, the functions or
+     * {@code setup}, since 0.2.0): never the connection, the roles, the functions or
      * the token secret's name.
      */
     public static JsonObject setupJson(Setup setup) {

@@ -32,7 +32,7 @@ Do this on a trusted machine with a JDK 17 `keytool`.
 
 ## Cutting a release
 
-1. Merge to `main`; CI must be green.
+1. Merge to `main`; CI must be green. `CHANGELOG.md` has a section for the version, and every contract document names it (`scripts/ci/check-contract-versions.sh`, run by CI).
 2. Tag the merge commit with a plain `vX.Y.Z` (no `-rc` or other suffix: Ignition's module version is numeric) and push the tag:
 
    ```bash

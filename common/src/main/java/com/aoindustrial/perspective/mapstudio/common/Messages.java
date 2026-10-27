@@ -12,7 +12,7 @@ import java.util.Set;
  * {@code batchId} and {@code op: {index, id}} when an {@code edits.apply} op is
  * at fault.
  *
- * <p>Contract version {@link #CONTRACT_VERSION} (draft): see {@code docs/contract.md}.
+ * <p>Contract version {@link #CONTRACT_VERSION}: see {@code docs/contract.md}.
  */
 public final class Messages {
 
@@ -22,8 +22,8 @@ public final class Messages {
     /** Envelope version carried in {@code v}. */
     public static final int VERSION = 1;
 
-    /** Public contract version these shapes belong to (AD-9); draft until release 0.2.0. */
-    public static final String CONTRACT_VERSION = "0.2.0-draft";
+    /** Public contract version these shapes belong to (AD-9); released in 0.2.0. */
+    public static final String CONTRACT_VERSION = "0.2.0";
 
     /** Model event name the envelope travels under, browser to Gateway and back. */
     public static final String EVENT_NAME = "mapstudio.message";
@@ -42,7 +42,7 @@ public final class Messages {
     /**
      * Body {level, seq, items: [map item record], kinds, assets, adapters, readOnly: reason or null,
      * setup?: {refreshIntervalSeconds, basemaps, alarmPage}}; {@code setup} is optional (added in
-     * 0.2.0 draft by epic 2 entry 6).
+     * 0.2.0 by epic 2 entry 6).
      */
     public static final String MAP_LOAD_REPLY = "map.load.reply";
     /** Body {batchId, ops: [{op, entity, id, baseVersion, data}]}. */
@@ -95,7 +95,7 @@ public final class Messages {
      */
     public static final String CODE_READ_ONLY = "read-only";
 
-    /** The tag system did not answer a tag lookup within 5 s, or failed (entry 15, draft addition). */
+    /** The tag system did not answer a tag lookup within 5 s, or failed (entry 15, added in 0.2.0). */
     public static final String CODE_TAGS_UNAVAILABLE = "tags-unavailable";
 
     /** Every error code of this contract version. */

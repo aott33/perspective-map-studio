@@ -1,6 +1,6 @@
-# Kind setups and item checks, version 0.2.0 (draft)
+# Kind setups and item checks, version 0.2.0
 
-A **kind setup** says what the map items of one kind show: the comms tag, up to four KPI values, the alarms, the popup and its link, and a style rule (AD-16). Map Studio keeps one per project and kind id in the map store, saved through the same write path as map items (`edits.apply` and `system.mapstudio.applyEdits`), and returns them in `map.load` and `getMap`. It stores and checks them only: epic-viewing fills and draws them. Every map item saved is also checked against the project's kind list ([kinds-and-assets.md](kinds-and-assets.md)). **Draft:** part of contract 0.2.0 in draft ([contract.md](contract.md)); it may still change until release 0.2.0. The code is the reference: `common/.../contract/KindSetup.java`, `Placeholders.java`, `StylePresets.java` and `ItemCheck.java`.
+A **kind setup** says what the map items of one kind show: the comms tag, up to four KPI values, the alarms, the popup and its link, and a style rule (AD-16). Map Studio keeps one per project and kind id in the map store, saved through the same write path as map items (`edits.apply` and `system.mapstudio.applyEdits`), and returns them in `map.load` and `getMap`. It stores and checks them only: epic-viewing fills and draws them. Every map item saved is also checked against the project's kind list ([kinds-and-assets.md](kinds-and-assets.md)). Part of contract 0.2.0 ([contract.md](contract.md)). The code is the reference: `common/.../contract/KindSetup.java`, `Placeholders.java`, `StylePresets.java` and `ItemCheck.java`.
 
 Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway by `e2e/tests/kindsetup.spec.mjs`; **[unverified]** written but not seen working.
 

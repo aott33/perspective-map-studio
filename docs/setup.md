@@ -99,7 +99,7 @@ A change applies at the next call: an open map gets the new editing level, refre
 
 ## What the browser sees
 
-`map.load.reply` carries `setup: {refreshIntervalSeconds, basemaps, alarmPage}` (optional, contract 0.2.0 draft; `docs/contract.md`). The connection, the roles, the function names and the token secret's name stay on the Gateway. The component shows the interval as `data-refresh-interval` on `.mapstudio-map`.
+`map.load.reply` carries `setup: {refreshIntervalSeconds, basemaps, alarmPage}` (optional, contract 0.2.0; `docs/contract.md`). The connection, the roles, the function names and the token secret's name stay on the Gateway. The component shows the interval as `data-refresh-interval` on `.mapstudio-map`.
 
 ## Versions
 
