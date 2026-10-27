@@ -49,7 +49,7 @@ With that setup nobody may edit the map (both role lists are empty), and everyon
 | `kindsFunction` | text | no | `""` | Empty, or a project script function as a dotted name: `mapstudio.kinds.get` (letters, digits and `_`, at least one dot, no brackets). Used from entry 3. |
 | `assetsFunction` | text | no | `""` | As `kindsFunction`, for example `mapstudio.assets.find`. Used from entry 3. |
 | `refreshIntervalSeconds` | whole number | no | `10` | From 1 to 3600 seconds. Sent to the browser in `map.load.reply`. |
-| `alarmPage` | text | no | `""` | Empty, or a Perspective page path starting with `/`. |
+| `alarmPage` | text | no | `""` | Empty, or a Perspective page path starting with `/`, with any number of placeholders (`/alarms/{item.name}`; the list in [kind-setup.md](kind-setup.md), epic 2 entry 9). |
 | `basemaps` | list of text | no | `["none", "osm"]` | At least one of `none`, `osm`, `satellite`, `mapbox`, each at most once. |
 | `tokenSecret` | text | no | `""` | The name of a secret (a secret provider's entry), never the token itself. Its value is never written to the Gateway log or into a message. |
 
@@ -79,6 +79,7 @@ The messages, as `Setup.read` gives them (several are joined as "2 problems: fir
 | Functions | `kindsFunction must be empty or a project script function name such as mapstudio.kinds.get, not "kinds"` |
 | Refresh interval | `refreshIntervalSeconds must be a whole number from 1 to 3600, not "ten"` |
 | Alarm page | `alarmPage must be empty or a page path starting with /, not "alarms"` |
+| Alarm page placeholder | `alarmPage: {item.foo} is not a placeholder Map Studio knows; use {item.id}, {item.name}, {asset.id}, {asset.path} or {item.properties.<field key>}.` |
 | Basemaps | `basemaps must be a list from none, osm, satellite, mapbox, not "osm"`; `basemaps must name at least one of none, osm, satellite, mapbox`; `basemaps has "google"; each entry must be one of none, osm, satellite, mapbox`; `basemaps lists osm twice` |
 | Token secret | `tokenSecret must be the name of a secret as text (its value is not shown)` |
 | Unknown field | `refreshInterval is not a setup field of schema 1 (did you mean refreshIntervalSeconds?)` (the value is not shown) |

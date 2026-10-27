@@ -3,13 +3,13 @@ title: 'Kind setups in the map store, and items checked against the kind list'
 type: 'feature'
 ticket: '9'
 created: '2026-10-27'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '0759b1b47326e2a5140eaacf8be441bc8ee22171'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
 context:
@@ -82,18 +82,18 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `common/.../contract/Placeholders.java` (new) -- closed list `{item.id}`, `{item.name}`, `{asset.id}`, `{asset.path}`, `{item.properties.X}`; `checkParam`, `checkTemplate` (link, alarm page), `checkTagPath(value, assetRelativeAllowed)`; pure `fill(template, ItemView)` returning the filled text or null when a placeholder has no value -- one rule set for validation and epic-viewing.
-- [ ] `common/.../contract/StylePresets.java` (new) -- closed `PRESETS`, `LINE_PRESETS`, `TINTS` per Decisions 2 and 3; colour-code detection for the message.
-- [ ] `common/.../contract/KindSetup.java` (new) -- the schema (Design Notes): `parse(JsonObject, Kind, boolean override)` validates and returns the normalised JSON; style rule `source` parsed through one switch (`path`, `kpi`) so story 14 adds `instruments` as one case. `KindSetupRecord` (new) `{kindId, setup, version, deleted}`; `StoredRecord` (new) interface.
-- [ ] `common/.../contract/ItemCheck.java` (new) -- `check(MapItemRecord, Kind)`: geometry type matches, properties keyed and typed by fields with CSV-string conversion, `overrides` through `KindSetup.parse(..., override=true)`; returns the normalised record.
-- [ ] `EditBatch.java`, `EditOp.java`, `Conflict.java`, `MapItemRecord.java` (implements `StoredRecord`), `Setup.java` -- as in Code Map.
-- [ ] `gateway/.../store/{MapStore,JdbcMapStore}.java`, test `FakeMapStore.java` -- kind setup rows.
-- [ ] `gateway/.../write/{WriteService,ConflictReport,ChangeHook}.java`, `MapStudioServices.java` -- kind list read once per batch; item ops checked after the lock (stored kind for updates), `kindSetup` ops checked against their kind; rules of Decision 4.
-- [ ] `gateway/.../load/MapLoader.java`, `script/{MapList,GatewayScriptModule}.java` -- return kind setups.
-- [ ] Tests: `common` `PlaceholdersTest`, `KindSetupTest`, `ItemCheckTest`, `SetupValidationTest` (alarm page); `gateway` `WriteServiceKindSetupTest` (create, update, delete, restore, conflict, retry, phone refused, `map.changed` record), `WriteServiceKindCheckTest` (the I/O matrix), `MapLoaderTest`, `GatewayScriptModuleTest`; existing tests given a kind list fixture in `WriteFixture`.
-- [ ] `web/typescript/{contract,messages}.ts`, `placeholders.ts` (new, mirrors `fill` and the closed list), `__tests__/placeholders.test.ts` -- same cases as the Java test.
-- [ ] `ops/project/.../MapStudioEdit/view.json`, `e2e/tests/kindsetup.spec.mjs` (new) -- live run of the verify line through `applyEdits` and `edits.apply`.
-- [ ] `docs/kind-setup.md` (new), `docs/contract.md`, `docs/kinds-and-assets.md`, `docs/setup.md` -- schema with examples, placeholders, presets, tints, item checks, `kindSetups` in `map.load` and `getMap`; drop the "until entry 3" text.
+- [x] `common/.../contract/Placeholders.java` (new) -- closed list `{item.id}`, `{item.name}`, `{asset.id}`, `{asset.path}`, `{item.properties.X}`; `checkParam`, `checkTemplate` (link, alarm page), `checkTagPath(value, assetRelativeAllowed)`; pure `fill(template, ItemView)` returning the filled text or null when a placeholder has no value -- one rule set for validation and epic-viewing.
+- [x] `common/.../contract/StylePresets.java` (new) -- closed `PRESETS`, `LINE_PRESETS`, `TINTS` per Decisions 2 and 3; colour-code detection for the message.
+- [x] `common/.../contract/KindSetup.java` (new) -- the schema (Design Notes): `parse(JsonObject, Kind, boolean override)` validates and returns the normalised JSON; style rule `source` parsed through one switch (`path`, `kpi`) so story 14 adds `instruments` as one case. `KindSetupRecord` (new) `{kindId, setup, version, deleted}`; `StoredRecord` (new) interface.
+- [x] `common/.../contract/ItemCheck.java` (new) -- `check(MapItemRecord, Kind)`: geometry type matches, properties keyed and typed by fields with CSV-string conversion, `overrides` through `KindSetup.parse(..., override=true)`; returns the normalised record.
+- [x] `EditBatch.java`, `EditOp.java`, `Conflict.java`, `MapItemRecord.java` (implements `StoredRecord`), `Setup.java` -- as in Code Map.
+- [x] `gateway/.../store/{MapStore,JdbcMapStore}.java`, test `FakeMapStore.java` -- kind setup rows.
+- [x] `gateway/.../write/{WriteService,ConflictReport,ChangeHook}.java`, `MapStudioServices.java` -- kind list read once per batch; item ops checked after the lock (stored kind for updates), `kindSetup` ops checked against their kind; rules of Decision 4.
+- [x] `gateway/.../load/MapLoader.java`, `script/{MapList,GatewayScriptModule}.java` -- return kind setups.
+- [x] Tests: `common` `PlaceholdersTest`, `KindSetupTest`, `ItemCheckTest`, `SetupValidationTest` (alarm page); `gateway` `WriteServiceKindSetupTest` (create, update, delete, restore, conflict, retry, phone refused, `map.changed` record), `WriteServiceKindCheckTest` (the I/O matrix), `MapLoaderTest`, `GatewayScriptModuleTest`; existing tests given a kind list fixture in `WriteFixture`.
+- [x] `web/typescript/{contract,messages}.ts`, `placeholders.ts` (new, mirrors `fill` and the closed list), `__tests__/placeholders.test.ts` -- same cases as the Java test.
+- [x] `ops/project/.../MapStudioEdit/view.json`, `e2e/tests/kindsetup.spec.mjs` (new) -- live run of the verify line through `applyEdits` and `edits.apply`.
+- [x] `docs/kind-setup.md` (new), `docs/contract.md`, `docs/kinds-and-assets.md`, `docs/setup.md` -- schema with examples, placeholders, presets, tints, item checks, `kindSetups` in `map.load` and `getMap`; drop the "until entry 3" text.
 
 **Acceptance Criteria:**
 - Given the dev Gateway, when the I/O matrix rows run through `applyEdits` and `edits.apply`, then each saves or is refused as listed and psql shows one `mapstudio_kind_setup` row and one `kindSetup` edit record per saved op.
@@ -122,7 +122,22 @@ Placeholder fill is published twice on purpose: Java in `common/` (the contract 
 
 ## Implementation Notes
 
+- Implemented directly in this session (no subagent tool here). Baseline `0759b1b47326e2a5140eaacf8be441bc8ee22171`; the plan approval is commit `e4b72d6`.
+- A kind setup op's `data` is `{"setup": {...}}`, the record minus `kindId`, `version` and `deleted` (as a map item op's data is its record minus `id`, `version`, `deleted`); an update replaces the whole setup. Unknown data keys are refused.
+- Refusals come from pure `common/` checks as `InvalidValue` (the reason, naming the part: `styleRule.cases[0].preset: ...`); `WriteService` wraps them as `invalid` "Op i (id): ...". Item and kind setup data are checked inside the transaction, after the version check, so a stale op is reported `conflict` before its data is judged (as before for malformed item data).
+- The whole merged record is checked on an update (so a stored legacy property not in the kind's fields makes later updates of that item refused until it is cleared); the kind list is "in use" when the snapshot's list is non-empty (the adapter keeps the last good list for `failing` and `slow`).
+- Conflict messages call a kind setup "The pad kind setup" (the kind id, not the kind name: `ConflictReport` has no kind list); several conflicts name "kind setups" or "map items and kind setups".
+- A viewer's `map.changed` carries a kind setup record without `setup` (`MapStudioDelegate.bodyFor`), matching Decision 6; small change in a shared file.
+- `Kind` gained `area` (6-argument constructor kept); `toJson` writes `area` only when true, so existing kind JSON and the web reader stay as they were; a point kind with `area: true` is a left-out row.
+- `Setup.alarmPage` placeholders accept any `{item.properties.X}` key (the alarm page serves every kind).
+- Number normalising keeps a sent JSON number as sent; a string becomes the number (an integer when it has no fraction). Blank strings in number, integer and boolean fields become null.
+- Web: `contract.ts` adds `KindSetupRecord`, `KindSetupData`, a separate `KindSetupOp` (widening `EditOp.data` broke `MapStudio.tsx`), `readKindSetup`, `kindSetups?` on the reply and kind setup conflicts; `adapters.ts` reads `area`; `messages.ts` and `testHook.ts` unchanged.
+- Dev project: `geofence` is an area kind with an `operator` field; "Run script checks" adds `kindSetupSave`, `kindSetupFromGetMap`, `kindSetupBadPlaceholder`, `itemCsvNumber`, `itemCsvNumberStored`, `itemUnknownKind`. Existing e2e changed where named: `writepath.spec.mjs` uses form fields (`operator`, `buried`) instead of `note` and `inspected`; `store.spec.mjs` and `changes.spec.mjs` count the script's second point and take the last script seq.
+- The volume ran out of space once during the build (other sessions' stacks); `web/node_modules` was half written and reinstalled with `npm ci`; nothing else was lost.
+
 ## Plan Change Log
+
+- 2026-10-27: Open Questions resolved by the owner to every recommended option (Decisions block, frozen); status in-progress.
 
 ## Review Triage Log
 

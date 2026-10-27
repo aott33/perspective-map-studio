@@ -77,11 +77,16 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
                 const { results } = JSON.parse(await out.innerText());
                 const byName = Object.fromEntries(results.map((r) => [r.name, r]));
                 expect(byName.updateAtStoredVersion.ok).toBe(true);
-                const scriptSeq = byName.updateAtStoredVersion.value.seq;
-                await expect(viewerMap).toHaveAttribute('data-items-loaded', String(viewerBefore + 2), { timeout: PUSH_MS });
+                // The script's last save is story 9's CSV pad, after its kind setup save: a viewer
+                // applies the kind setup's map.changed (sent without its setup) with no reload.
+                expect(byName.kindSetupSave.ok).toBe(true);
+                expect(byName.itemCsvNumber.ok).toBe(true);
+                const scriptSeq = byName.itemCsvNumber.value.seq;
+                expect(scriptSeq).toBeGreaterThan(byName.kindSetupSave.value.seq);
+                await expect(viewerMap).toHaveAttribute('data-items-loaded', String(viewerBefore + 3), { timeout: PUSH_MS });
                 await expect(viewerMap).toHaveAttribute('data-store-seq', String(scriptSeq), { timeout: PUSH_MS });
                 await expect(editorMap).toHaveAttribute('data-store-seq', String(scriptSeq), { timeout: PUSH_MS });
-                await expect(editorMap).toHaveAttribute('data-items-loaded', String(editorBefore + 2));
+                await expect(editorMap).toHaveAttribute('data-items-loaded', String(editorBefore + 3));
                 expect(await viewer.evaluate(() => window.__mapStudioChangesMarker)).toBe('kept');
                 await expect(viewerMap).toHaveAttribute('data-map-reloads', '0');
                 await expect(editorMap).toHaveAttribute('data-map-reloads', '0');

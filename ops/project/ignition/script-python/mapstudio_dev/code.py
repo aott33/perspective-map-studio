@@ -31,7 +31,8 @@ KINDS = [
      'fields': [
          {'key': 'diameter', 'label': 'Diameter (in)', 'type': 'number', 'required': False},
          {'key': 'buried', 'label': 'Buried', 'type': 'boolean', 'required': False}]},
-    {'id': 'geofence', 'name': 'Geofence', 'geometry': 'line', 'icon': 'fence', 'labelRank': 0, 'fields': []},
+    {'id': 'geofence', 'name': 'Geofence', 'geometry': 'line', 'icon': 'fence', 'labelRank': 0, 'area': True,
+     'fields': [{'key': 'operator', 'label': 'Operator', 'type': 'text', 'required': False}]},
 ]
 
 ASSETS = [
