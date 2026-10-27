@@ -19,31 +19,31 @@ after = [{ epic = 1, needs = "the module skeleton, build and signing" }]
 id = 3
 slug = "epic-viewing"
 title = "Everyone reads live state from the map"
-description = "Every user sees the one project map on a basemap, opened on its starting area: icons with comms, the icon KPI and alarms, lines with state, labels, search, popups with the alarm table and links, matching the template's current map."
-covers = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R36", "R37", "R39"]
+description = "Every user sees the one project map on a basemap, opened on its starting area: icons with comms, the icon KPI and alarms, lines with state, labels, search, popups with the alarm table and links, a legend and a Needs you summary, matching the template's current map."
+covers = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R36", "R37", "R39", "R40", "R41", "R42", "R43"]
 after = [{ epic = 2, needs = "map items, kinds and kind setups readable from the map store" }]
 
 [[epic]]
 id = 4
 slug = "epic-editing"
 title = "Map editors build and keep the map in the browser"
-description = "Map editors draw and change points, lines and areas with snapping and undo, fill item forms with the place check, link map items to assets, and write kind setups and overrides, with one clear mode and a first-run path."
-covers = ["R10", "R11", "R14", "R15", "R16", "R17", "R18", "R19", "R20", "R21", "R22", "R23", "R24", "R38"]
+description = "Map editors enter Edit mode from an Edit switch or a prop into a docked studio with a grouped item list, draw and change points, lines and areas with snapping, Undo and Recent changes, fill item forms with the place check, link map items to assets, and write kind setups and overrides, with one clear mode and a first-run checklist."
+covers = ["R10", "R11", "R14", "R15", "R16", "R17", "R18", "R19", "R20", "R21", "R22", "R23", "R24", "R38", "R40", "R41", "R44", "R45", "R46", "R47"]
 after = [{ epic = 2, needs = "saving, roles and the asset list" }, { epic = 3, needs = "the map view to draw on" }]
 
 [[epic]]
 id = 5
 slug = "epic-import-export"
 title = "Integrators provision and move maps with files"
-description = "Map editors download CSV templates, import CSV, KML and GeoJSON as a preview matched to assets, bulk edit shared properties, show reference layers, and export the map as GeoJSON or CSV."
-covers = ["R25", "R26", "R27", "R28", "R29", "R35"]
+description = "Map editors download CSV templates, import CSV, KML and GeoJSON through a guided preview matched to assets, bulk edit shared properties of items selected in the list or by box or lasso, and export the map as GeoJSON or CSV; reference layers are deferred."
+covers = ["R25", "R26", "R27", "R28", "R35"]
 after = [{ epic = 4, needs = "map items, forms, linking and undo" }]
 
 [[epic]]
 id = 6
 slug = "epic-phone"
 title = "Operators fix map items from a phone"
-description = "On a 390 px phone, touch only, a user with phone editing moves a point and edits its properties, with an Undo bar and no drawing tools."
+description = "On a 390 px phone, touch only, a user with phone editing starts from Edit in the item's bottom sheet, moves a point with a fixed centre crosshair and edits its properties, with an Undo bar and no drawing tools."
 covers = ["R30", "R31"]
 after = [{ epic = 4, needs = "geometry edits, forms and undo" }]
 
