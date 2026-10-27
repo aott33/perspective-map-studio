@@ -60,8 +60,12 @@ export async function openMap(page, pagePath = '/') {
     return map;
 }
 
-/** The counts the component read back from MapLibre's sources. */
+/**
+ * The counts the component read back from MapLibre's item sources after the first map.load's
+ * items were drawn (only features in the loaded tiles count).
+ */
 export async function loadedCounts(map) {
+    await expect(map).toHaveAttribute('data-points-loaded', /^[0-9]+$/, { timeout: 60_000 });
     return {
         points: Number(await map.getAttribute('data-points-loaded')),
         lines: Number(await map.getAttribute('data-lines-loaded'))
@@ -118,4 +122,46 @@ export async function mapLoaded(map) {
     await expect(map).toHaveAttribute('data-load-state', 'loaded');
     await expect(map).toHaveAttribute('data-items-loaded', /^[0-9]+$/);
     return Number(await map.getAttribute('data-items-loaded'));
+}
+
+/**
+ * Press the /edit page's "Seed the dev map" button (ops/project/ignition/script-python/mapstudio_seed)
+ * on a page already open there, and return its result: {created, updated, restored, unchanged, seq,
+ * ids, scale} or {error} or {refused}, each with ranAt (the Gateway's time in ms), which tells this
+ * run's result from the one the label showed before.
+ */
+export async function runSeed(page) {
+    const out = page.locator('#mapstudio-dev-seed-result');
+    const before = await out.innerText();
+    await page.locator('#mapstudio-dev-seed').click();
+    await expect.poll(async () => {
+        const text = await out.innerText();
+        return text !== before && /"(created|error|refused)"/.test(text);
+    }, { timeout: 60_000 }).toBe(true);
+    return JSON.parse(await out.innerText());
+}
+
+let seedResult = null;
+
+/**
+ * Seed the dev map once per worker (epic 2 story 11): an editor context opens /edit, presses
+ * "Seed the dev map" and returns its result; later calls return the same result. Specs that
+ * draw or click the 30-pad set or the tracer's points call it in beforeAll.
+ */
+export async function ensureSeeded(browser) {
+    if (seedResult) return seedResult;
+    const context = await signedInContext(browser, EDITOR_USER);
+    try {
+        const page = await context.newPage();
+        const map = await openMap(page, '/edit');
+        await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
+        await mapLoaded(map);
+        const result = await runSeed(page);
+        expect(result.error, 'the seed saved').toBeUndefined();
+        expect(result.scale, 'the scale set after the seed').toEqual({ pads: 30, lines: 30 });
+        seedResult = result;
+        return result;
+    } finally {
+        await context.close();
+    }
 }

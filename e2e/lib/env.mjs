@@ -37,7 +37,7 @@ export const measuresOutFile = path.join(outDir, 'measures.json');
 /** The committed copy: only with E2E_DOCS=1, and only when every measure test passed. */
 export const measuresDocsFile = docsMode ? path.join(repoRoot, 'docs', 'spike-measures.json') : null;
 
-/** The project's session URL for a page path such as '/' or '/scale'. */
+/** The project's session URL for a page path such as '/' or '/edit'. */
 export function sessionUrl(pagePath = '/') {
     return `${gatewayUrl()}/data/perspective/client/mapstudio-dev${pagePath === '/' ? '' : pagePath}`;
 }
