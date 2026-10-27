@@ -49,6 +49,11 @@ public record EditOp(String op, String entity, String id, int baseVersion, JsonO
         if (ENTITY_ITEM.equals(entity) && !isUuid(id)) {
             throw invalid("Op " + index + ": a map item id must be a UUID string.", index, id);
         }
+        if (ENTITY_ITEM.equals(entity)) {
+            // The store keys map items by uuid, so ids differing only in letter case are one item:
+            // carry the canonical lower-case form so the one-op-per-id check and the edit log agree.
+            id = UUID.fromString(id).toString();
+        }
         JsonElement bv = o.get("baseVersion");
         if (bv == null || !bv.isJsonPrimitive() || !bv.getAsJsonPrimitive().isNumber()
                 || bv.getAsDouble() != Math.rint(bv.getAsDouble()) || bv.getAsDouble() < 0

@@ -41,7 +41,7 @@ Stable kebab-case words; the message is plain words for the person.
                    "geometry": {"type": "LineString", "coordinates": [[-104.99, 39.74], [-104.98, 39.75]]}}}]}
 ```
 
-- `op` is `create`, `update` or `delete`; `entity` is `item` (a map item) or `kindSetup`. A map item `id` is a UUID string made by the caller (the browser, or UUIDv5 from a stable name in a script).
+- `op` is `create`, `update` or `delete`; `entity` is `item` (a map item) or `kindSetup`. A map item `id` is a UUID string made by the caller (the browser, or UUIDv5 from a stable name in a script). Letter case does not matter: the Gateway turns a map item id into lower-case canonical form, and replies, conflicts and the edit log carry that form.
 - `baseVersion` is 0 on create and the stored version otherwise; a create at a deleted map item's version restores it (below). A delete carries no `data`. At most one op per id in a batch.
 - A create's `data` is the record's fields except `id`, `version` and `deleted`; `kind` and `geometry` are required. An update's `data` replaces only the top-level fields it carries (owner decision, 2026-10-26), so a moved point sends only `geometry`.
 - A batch is all or none: one transaction, every op's version checked, every saved op recorded. It takes the project's next change sequence number `seq`. At most 1000 ops per batch.

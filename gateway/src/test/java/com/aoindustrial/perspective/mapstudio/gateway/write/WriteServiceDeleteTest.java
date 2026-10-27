@@ -1,6 +1,7 @@
 package com.aoindustrial.perspective.mapstudio.gateway.write;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -86,8 +87,10 @@ class WriteServiceDeleteTest extends WriteFixture {
         save(batch(uuid(), delete(id, 1)));
         assertEquals(Messages.CODE_CONFLICT, refused(batch(uuid(), restore(id, 1)), Messages.LEVEL_FULL).code());
         assertEquals(Messages.CODE_CONFLICT, refused(batch(uuid(), restore(id, 3)), Messages.LEVEL_FULL).code());
-        assertEquals(Messages.CODE_CONFLICT, refused(batch(uuid(), create(id)), Messages.LEVEL_FULL).code(),
-            "a create at 0 of a tombstoned id");
+        MapStudioException tomb = refused(batch(uuid(), create(id)), Messages.LEVEL_FULL);
+        assertEquals(Messages.CODE_CONFLICT, tomb.code(), "a create at 0 of a tombstoned id");
+        assertTrue(tomb.plainMessage().contains("was deleted"), tomb.plainMessage());
+        assertFalse(tomb.plainMessage().contains("already exists"), tomb.plainMessage());
         assertEquals(Messages.CODE_INVALID, refused(batch(uuid(), restore(uuid(), 2)), Messages.LEVEL_FULL).code());
         String live = uuid();
         save(batch(uuid(), create(live)));

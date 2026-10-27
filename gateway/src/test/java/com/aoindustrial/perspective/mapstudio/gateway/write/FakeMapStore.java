@@ -55,6 +55,15 @@ public class FakeMapStore implements MapStore {
      * insert throws SQLState 23505, as PostgreSQL's primary key would.
      */
     public BatchRow racingBatch;
+    /**
+     * When set, the next nextSeq finds this row committed by another transaction while it
+     * waited for the project row lock (a concurrent send of the same batchId that won the
+     * lock): the row and its seq join the committed state and this transaction's view, so the
+     * findBatch after nextSeq sees it, while every lookup before nextSeq did not.
+     */
+    public BatchRow batchCommittedDuringSeqLock;
+    /** How many times nextSeq ran, committed or not. */
+    public int nextSeqCalls;
     public int transactions;
     /** When set, the next transaction throws it at its first write (a database failure). */
     public SQLException failNextWrite;
@@ -91,6 +100,16 @@ public class FakeMapStore implements MapStore {
         @Override
         public long nextSeq(String project) throws SQLException {
             maybeFail();
+            nextSeqCalls++;
+            if (batchCommittedDuringSeqLock != null) {
+                BatchRow won = batchCommittedDuringSeqLock;
+                batchCommittedDuringSeqLock = null;
+                String key = won.project() + "|" + won.batchId();
+                committed.batches.put(key, won);
+                committed.seqs.put(won.project(), won.seq());
+                s.batches.put(key, won);
+                s.seqs.put(won.project(), won.seq());
+            }
             long next = s.seqs.getOrDefault(project, 0L) + 1;
             s.seqs.put(project, next);
             return next;

@@ -75,6 +75,21 @@ class WriteServiceRetryTest extends WriteFixture {
     }
 
     @Test
+    void aBatchCommittedWhileWaitingForTheSeqLockIsReplayedAndItsSeqRolledBack() {
+        String batchId = uuid();
+        EditResult stored = new EditResult(batchId, 7, List.of(new EditResult.OpResult("item", uuid(), 1)));
+        store.batchCommittedDuringSeqLock = new FakeMapStore.BatchRow(PROJECT, batchId, 7, "mapeditor",
+            stored.toJson());
+        assertEquals(stored, save(batch(batchId, create(uuid()))));
+        assertEquals(1, store.nextSeqCalls, "the check after nextSeq is the one that found the batch");
+        assertEquals(7, store.committed.seqs.get(PROJECT), "the seq this send took was rolled back");
+        assertEquals(1, store.committed.batches.size());
+        assertTrue(store.committed.edits.isEmpty());
+        assertTrue(store.items(PROJECT).isEmpty());
+        assertTrue(hooked.isEmpty(), "the hook is not called for a replay");
+    }
+
+    @Test
     void aBatchIdUsedByAnotherActorIsInvalidAndNothingIsWritten() {
         String batchId = uuid();
         save(batch(batchId, create(uuid())));

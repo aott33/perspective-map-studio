@@ -29,7 +29,7 @@ final class ConflictReport {
         Optional<MapStore.LastEdit> last = tx.lastEdit(project, op.entity(), op.id());
         conflicts.add(new Conflict(op.index(), op.entity(), op.id(), op.baseVersion(), current,
             last.map(MapStore.LastEdit::actor).orElse(null), last.map(MapStore.LastEdit::at).orElse(null)));
-        exists.add(EditOp.CREATE.equals(op.op()) && op.baseVersion() == 0);
+        exists.add(EditOp.CREATE.equals(op.op()) && op.baseVersion() == 0 && current != null && !current.deleted());
     }
 
     boolean isEmpty() {

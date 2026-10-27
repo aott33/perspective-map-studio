@@ -3,7 +3,7 @@ title: 'Conflicts, retries, deletes and the phone role'
 type: 'feature'
 ticket: '2'
 created: '2026-10-26'
-status: 'in-review'
+status: 'built'
 baseline_revision: 'eb7e576bd6566be057ae37aee17a1521baadaa68'
 route: 'full'
 route_source: 'auto'
@@ -104,13 +104,25 @@ Real names after entry 1 (merged at `192c91a`; its plan's Change Log). `G` = `ga
 - Given every refused case of the matrix, when it is sent, then `mapstudio_project.seq` is unchanged.
 - Given the existing e2e specs and entry 1's `store.spec.mjs` (its dev script check's delete now expecting `conflict`), when the suite runs, then they pass.
 
+## Review Triage Log
+
+Pass 1 (lens: quick, context-free, on commit 89f58c9, 2026-10-27; each finding checked again here against the code): medium 1, low 2, false 0, maybe-false 0. All three patched in this session; none rejected or deferred; no loopback (each fix is local and the plan's intent stands; finding 1 adds one contract sentence).
+
+| # | Finding | Verdict | Route | Evidence and action |
+|---|---|---|---|---|
+| 1 | Map item ids were compared as strings, so the one-op-per-id rule and `lastEdit` could be bypassed by letter case (`UUID.fromString` accepts upper case, the store keys by `uuid`) | medium | patch | Real: `EditBatch` keyed `seen` on the raw id while `lockItem` matched `id = ?::uuid`, so an upper and a lower case update of one item both passed and the second overwrote the first from the pre-write copy. Patched: `EditOp.parse` carries a map item id in canonical lower-case form (`UUID.fromString(id).toString()`), so the duplicate check, the edit log's `entity_id`, `lastEdit`, replies and conflicts all use one form. Unit test `aMapItemIdIsCanonicalLowerCaseSoMixedCaseDuplicatesAreOneId`. `docs/contract.md` says ids are case-insensitive and come back lower case. |
+| 2 | A create at `baseVersion` 0 on a deleted id answered "<name> already exists" | low | patch | Real: `ConflictReport` set `exists` for any create at 0. Patched: only when the stored record is live; a tombstone gets "<name> was deleted ...". `WriteServiceDeleteTest.aRestoreAtAnotherVersionIsAConflictAndOfAnUnknownIdIsInvalid` asserts the message. |
+| 3 | No test reliably drove the batch lookup after `nextSeq` (the `Replay` rollback) | low | patch | Real: the two-thread test passes whichever lookup catches the second send. Patched: `FakeMapStore.batchCommittedDuringSeqLock` commits the batch row (and its seq) while `nextSeq` runs, after the first lookup; `WriteServiceRetryTest.aBatchCommittedWhileWaitingForTheSeqLockIsReplayedAndItsSeqRolledBack` asserts the replayed reply, one `nextSeq` call, the seq left at the winner's, no edit or item rows and no hook call. |
+
+Re-run after the patches: `./gradlew clean build` green (Java common 14, gateway 67; Jest 48 of 48), `ops/up.sh` then `cd e2e && npm test` 18 of 18 on `ms-e2s2`; the retried-batch `psql` query of Acceptance returns no row.
+
 ## Design Notes
 
 - Retry: the stored `mapstudio_batch.result` is the reply. The lookup after `nextSeq` serialises a project's batches, so two concurrent sends cannot both commit; a found batch rolls the transaction back (no `seq` taken) by throwing a private replay signal caught outside. The first lookup (before the role check) is a read-only transaction; a replay never calls the hook again. Same actor means the same actor name (the batch row stores the name).
 - Check order inside the transaction: role on stored geometry for every op, then conflicts for every op (a missing item for update, delete or restore is `invalid` at once), then each op's data. A stale op's malformed data is reported as the conflict.
 - Restore: `create` with `baseVersion` 0 means new (an existing id, live or tombstoned, is a conflict); equal to a tombstone's version means restore, full data as a create, version +1; any other value is a conflict, and a restore of an id never stored is `invalid`.
 - Phone rules (op shape): only `update` of an `item`, `data` keys within `{geometry, properties}`, `geometry` a `Point`; inside the transaction a `geometry` op needs a stored `Point`.
-- Conflict message: one: "<name> was changed by <actor> at HH:mm UTC since you loaded it. Nothing in this save was written." (a create on an existing id: "<name> already exists ..."); several: "N map items were changed by others since you loaded them. Nothing in this save was written." `op` in the error body names the first conflicting op, as in entry 1.
+- Conflict message: one: "<name> was changed by <actor> at HH:mm UTC since you loaded it. Nothing in this save was written." (a create at 0 on a live id: "<name> already exists ..."; on a deleted id: "<name> was deleted by ..."); several: "N map items were changed by others since you loaded them. Nothing in this save was written." `op` in the error body names the first conflicting op, as in entry 1.
 - Known gap for epic-editing: a phone move of a point that lines snap to cannot carry the line ends a phone editor may not change (AD-19).
 - No migration. An index on `mapstudio_edit (project, entity, entity_id)` would speed `changedBy` and could ride the next migration another entry adds.
 
@@ -119,6 +131,7 @@ Real names after entry 1 (merged at `192c91a`; its plan's Change Log). `G` = `ga
 - 2026-10-26: entry 1 merged (`192c91a`); Code Map, Tasks and Design Notes moved to its real names (`MapStudioException` for `EditRefusal`, `map.load.reply` and `edits.apply.reply`, `ChangeHook.onCommitted(CommittedBatch)`, `FakeMapStore` and `FakeJdbc` in their own files, `StoreGate`, the bounded work pool, `editorTest`). Owner approved with the recommended answers; Open Questions resolved into the frozen block; status in-progress.
 - Implementation, 2026-10-27: the unsupported-op check (`requireSupported`) moved after the role check, so a phone editor's or viewer's kind setup op answers `role` as the matrix says (a full editor's still answers `invalid` until entry 3). The retry lookup runs only when there is an actor, and the actor check stays after the role check (entry 1's order): the live run showed the anonymous viewer's save answering `invalid` ("needs an actor") before this. Entry 1's `WriteServiceTest` helpers moved to `WriteFixture` (shared by the new tests); `FakeMapStore` serialises its transactions and gained `racingBatch`. `e2e/lib/editorAuth.mjs` signs in any dev user (`stateFile(user)`, `userPassword(user)`); `fixtures.mjs` adds `signedInContext(browser, user)`; the teardown scans every dev password.
 - The dev `/edit` script check's `delete` (entry 1) expected "not supported"; deletes are supported now, so it sends a stale delete and expects `conflict` (view and `store.spec.mjs`).
+- Review, 2026-10-27 (quick, context-free): map item ids are carried in lower-case canonical form from parse on, a create at 0 on a tombstone reports it deleted, and the fake store can drive the lookup after `nextSeq`; status built. See the Review Triage Log.
 
 ## Verification
 

@@ -61,6 +61,21 @@ class EditOpDeleteTest {
     }
 
     @Test
+    void aMapItemIdIsCanonicalLowerCaseSoMixedCaseDuplicatesAreOneId() {
+        String upper = ID.toUpperCase(java.util.Locale.ROOT);
+        EditOp op = EditOp.parse(json("{\"op\":\"update\",\"entity\":\"item\",\"id\":\"" + upper
+            + "\",\"baseVersion\":1,\"data\":{\"name\":\"a\"}}"), 0);
+        assertEquals(ID, op.id());
+        MapStudioException ex = assertThrows(MapStudioException.class, () -> EditBatch.parse(json(
+            "{\"batchId\":\"" + BATCH + "\",\"ops\":[{\"op\":\"update\",\"entity\":\"item\",\"id\":\"" + upper
+            + "\",\"baseVersion\":1,\"data\":{\"name\":\"a\"}},{\"op\":\"update\",\"entity\":\"item\",\"id\":\"" + ID
+            + "\",\"baseVersion\":1,\"data\":{\"geometry\":{\"type\":\"Point\",\"coordinates\":[1,2]}}}]}")));
+        assertEquals(Messages.CODE_INVALID, ex.code());
+        assertEquals(1, ex.opIndex());
+        assertEquals(ID, ex.opId());
+    }
+
+    @Test
     void aConflictRefusalCarriesItsConflictsInTheErrorBody() {
         MapItemRecord current = new MapItemRecord(ID, "pad", "P12", json("{\"type\":\"Point\",\"coordinates\":[1,2]}"),
             new JsonObject(), null, new JsonObject(), null, 2, false);
