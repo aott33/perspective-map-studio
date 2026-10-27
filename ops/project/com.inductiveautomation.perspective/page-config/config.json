@@ -4,10 +4,6 @@
    "viewPath": "MapStudioDev",
    "viewParams": {}
   },
-  "/scale": {
-   "viewPath": "MapStudioScale",
-   "viewParams": {}
-  },
   "/fallback-empty": {
    "viewPath": "MapStudioFallbackEmpty",
    "viewParams": {}

@@ -1,6 +1,6 @@
 // The spike's measures (epic-module-foundation R6): bundle size, frame rate on
-// the 30-pad scale set, the size of one value batch, and what breaks on a
-// phone. Writes e2e/out/measures.json always, and docs/spike-measures.json only
+// the 30-pad scale set (from epic 2 story 11 the seeded map store items on /), the
+// size of one value batch, and what breaks on a phone. Writes e2e/out/measures.json always, and docs/spike-measures.json only
 // with E2E_DOCS=1 and only when every measure test passed.
 //
 // Every number is labelled 'measured' or 'stand-in' with its method and the
@@ -19,7 +19,7 @@ import { TRACER, pagePixel } from '../lib/geo.mjs';
 import { unavailable, validateMeasures, without, writeJson } from '../lib/measures.mjs';
 import { frameStats, median } from '../lib/stats.mjs';
 import { batchSize, buildValuesBatch } from '../lib/valueBatch.mjs';
-import { expect, loadedCounts, nextFrames, openMap, test, watch } from './fixtures.mjs';
+import { ensureSeeded, expect, loadedCounts, mapLoaded, nextFrames, openMap, test, watch } from './fixtures.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -35,6 +35,8 @@ const ZOOM_EVENTS_PER_SECOND = 25;
 
 const m = {};
 let allPassed = true;
+/** The seed's result (epic 2 story 11): the tracer's ids and the scale set's counts. */
+let seed;
 
 function playwrightVersion() {
     try {
@@ -59,6 +61,7 @@ function envFor(viewport) {
 }
 
 test.beforeAll(async ({ browser }, testInfo) => {
+    seed = await ensureSeeded(browser);
     const page = await browser.newPage();
     const renderer = await webglRenderer(page);
     await page.close();
@@ -140,7 +143,7 @@ test('bundle size', async ({ page }) => {
     }
     m.bundle = {
         label: 'measured',
-        method: 'Bytes of each /res/mapstudio/* file as the dev Gateway served it during a page load of the tracer view (response body decoded, gzip of that body, and the body bytes actually transferred), plus the .modl in ops/modules, the file the Gateway was given (name and SHA-256 recorded). Production webpack build, unsigned. File sizes do not depend on the viewport.',
+        method: 'Bytes of each /res/mapstudio/* file as the dev Gateway served it during a page load of the dev map at / (response body decoded, gzip of that body, and the body bytes actually transferred), plus the .modl in ops/modules, the file the Gateway was given (name and SHA-256 recorded). Production webpack build, unsigned. File sizes do not depend on the viewport.',
         env: envFor('1440x900'),
         files,
         modl: stagedModl(),
@@ -209,6 +212,9 @@ async function zoomGesture(page, box, ms) {
 
 async function measureView(page, pagePath) {
     const map = await openMap(page, pagePath);
+    await mapLoaded(map);
+    // What the map drew: read back from MapLibre's item sources after the items' first idle.
+    const drawn = await loadedCounts(map);
     const box = await map.boundingBox();
     await panGesture(page, box, 2000); // warm-up, not sampled
     const runs = [];
@@ -224,6 +230,7 @@ async function measureView(page, pagePath) {
     }
     const fps = (key) => runs.map((r) => r[key].fps).filter((v) => typeof v === 'number');
     return {
+        drawn,
         runs,
         medianFps: { pan: median(fps('pan')), zoom: median(fps('zoom')) },
         fpsRange: {
@@ -239,23 +246,25 @@ test('frame rate on the 30-pad scale set', async ({ page }) => {
         m.frameRate = unavailable('Chromium gave no WebGL context, so MapLibre cannot draw');
         return;
     }
-    const scale = await measureView(page, '/scale');
-    const tracer = await measureView(page, '/');
+    const seeded = await measureView(page, '/');
     m.frameRate = {
         label: 'measured',
-        method: `requestAnimationFrame timestamps and long tasks sampled in the page while Playwright drives a 4 s circular drag (at most ${PAN_MOVES_PER_SECOND} mouse moves per second) and a 4 s wheel zoom (at most ${ZOOM_EVENTS_PER_SECOND} wheel events per second, so about 25 when the page keeps up and fewer when it does not; in for 2 s then out for 2 s) on the map, after a 2 s warm-up; 3 runs per view. The driver's input events are handled on the page's main thread, so that load shares it with rendering and is the same in every run. Frames are the page's frame cadence during the gesture, not MapLibre's own render count (the map object is not reachable by design).`,
+        method: `requestAnimationFrame timestamps and long tasks sampled in the page while Playwright drives a 4 s circular drag (at most ${PAN_MOVES_PER_SECOND} mouse moves per second) and a 4 s wheel zoom (at most ${ZOOM_EVENTS_PER_SECOND} wheel events per second, so about 25 when the page keeps up and fewer when it does not; in for 2 s then out for 2 s) on the map, after a 2 s warm-up; 3 runs on / with the seeded map store items (one view since epic 2 story 11; drawn counts the points and lines MapLibre held). The driver's input events are handled on the page's main thread, so that load shares it with rendering and is the same in every run. Frames are the page's frame cadence during the gesture, not MapLibre's own render count (the map object is not reachable by design).`,
         env: envFor('1440x900'),
         deviceScaleFactor: 1,
         views: {
-            scale30: { stage: 'stand-in data: 30 seeded pads and 30 lines, circle and line layers only', ...scale },
-            tracer: { stage: '3 points and 1 line, for contrast', ...tracer }
+            seeded: {
+                stage: 'map store items from the dev seed (epic 2 story 11): the 30-pad set (30 pads, 30 lines) and the tracer\'s 3 points and 1 line, plus any items earlier specs saved inside the view; circle and line layers only',
+                scale: seed.scale,
+                ...seeded
+            }
         },
         limits: [
             m.env.softwareWebGL
                 ? 'Software WebGL (CPU rendered): a laptop GPU is expected to do better, which is unverified here.'
                 : 'Hardware WebGL renderer as named in env.renderer.',
             'Only circle and line layers: no icons, labels, KPI values or alarm styling.',
-            'The pads are a seeded stand-in for the template\'s 30-pad set, which this repository cannot read.'
+            'The pads are the dev seed\'s 30-pad set at the spike stand-in\'s coordinates, not the template\'s own set, which this repository cannot read.'
         ],
         note: 'The run-to-run spread on software WebGL is recorded in docs/platform-checks.md, section "Story 7". NFR-1 asks for 60 frames per second in a laptop browser; the renderer this ran on is in env.renderer.'
     };
@@ -270,21 +279,23 @@ test('size of one value batch', async ({ page }) => {
         ws.on('framesent', (f) => frames.push({ dir: 'sent', payload: f.payload }));
         ws.on('framereceived', (f) => frames.push({ dir: 'received', payload: f.payload }));
     });
-    const map = await openMap(page, '/scale');
-    const counts = await loadedCounts(map);
-    expect(counts.points, 'pads the scale view loaded into MapLibre').toBeGreaterThan(0);
-    const pads = counts.points;
+    // Sized for the seed's 30-pad set (epic 2 story 11), counted by the seed from getMap.
+    const pads = seed.scale.pads;
+    expect(pads, 'pads of the seeded scale set').toBe(30);
 
     const full = batchSize(buildValuesBatch({ pads, full: true }));
     const changes = batchSize(buildValuesBatch({ pads, full: false, every: 10 }));
 
-    // The round trip on the tracer view, with frames counted from just before the click.
+    // The round trip on the tracer's point 1, with frames counted from just before the click.
     const tracerMap = await openMap(page, '/');
+    await mapLoaded(tracerMap);
+    await loadedCounts(tracerMap);
+    const p1 = seed.ids[TRACER.points.p1.key];
     const box = await tracerMap.boundingBox();
     frames.length = 0;
     const [x, y] = pagePixel(box, TRACER.points.p1.lngLat, TRACER.center, TRACER.zoom);
     await page.mouse.click(x, y);
-    await expect(page.locator('.mapstudio-reply')).toContainText('Gateway received click on p1', { timeout: 15_000 });
+    await expect(page.locator('.mapstudio-reply')).toContainText('Gateway received click on ' + p1, { timeout: 15_000 });
     const readable = () => frames
         .map((f) => ({ dir: f.dir, buf: Buffer.isBuffer(f.payload) ? f.payload : Buffer.from(String(f.payload), 'utf8') }))
         .filter((f) => f.buf.includes('point.click'))
@@ -298,7 +309,7 @@ test('size of one value batch', async ({ page }) => {
 
     m.valueBatch = {
         label: 'stand-in',
-        method: 'values.batch does not exist yet. The AD-6 envelope {v, type, id, body: {seq, full, items}} is built for the scale view\'s pads with three LiveValue slots per pad (comms, icon KPI, alarm count) and its JSON size is measured (UTF-8 bytes, and gzip of the same text). The pad count is the number MapLibre loaded on /scale.',
+        method: 'values.batch does not exist yet. The AD-6 envelope {v, type, id, body: {seq, full, items}} is built for the scale set\'s pads with three LiveValue slots per pad (comms, icon KPI, alarm count) and its JSON size is measured (UTF-8 bytes, and gzip of the same text). The pad count is the seed\'s scale set as getMap counted it (epic 2 story 11).',
         env: envFor('1440x900'),
         assumption: 'AD-6 fixes only the LiveValue fields {value, quality, t, stale, reason}; the item layout (pad id plus three named slots) is this story\'s guess, unverified. Whether Perspective compresses websocket frames is unverified, so gzip is an upper bound on the saving, not the wire size.',
         pads,
@@ -342,8 +353,11 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
     };
 
     const map = await openMap(page, '/');
+    await mapLoaded(map);
+    await loadedCounts(map);
     const box = await map.boundingBox();
     const reply = page.locator('.mapstudio-reply');
+    const p1 = seed.ids[TRACER.points.p1.key];
 
     await probe('page-has-no-horizontal-overflow', async () => {
         const d = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth }));
@@ -367,8 +381,8 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
     await probe('tap-a-point-gives-reply-and-popup', async () => {
         const [x, y] = pagePixel(box, TRACER.points.p1.lngLat, TRACER.center, TRACER.zoom);
         await page.touchscreen.tap(x, y);
-        await expect(reply).toContainText('Gateway received click on p1', { timeout: 10_000 });
-        await expect(page.locator('.maplibregl-popup .mapstudio-popup--view')).toContainText('Id: p1', { timeout: 20_000 });
+        await expect(reply).toContainText('Gateway received click on ' + p1, { timeout: 10_000 });
+        await expect(page.locator('.maplibregl-popup .mapstudio-popup--view')).toContainText('Id: ' + p1, { timeout: 20_000 });
         return { ok: true, detail: 'reply text and popup view shown after a touch tap' };
     });
 
@@ -462,7 +476,7 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
     await context.close();
     m.phone = {
         label: 'measured',
-        method: 'Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the tracer view; each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device\'s touch handling is unverified. Pan and pinch are read from the open popup\'s tip position (a DOM stand-in for the point\'s map position), not from the map\'s centre or zoom, which the suite cannot reach by design.',
+        method: 'Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the dev map at / with the seeded items; each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device\'s touch handling is unverified. Pan and pinch are read from the open popup\'s tip position (a DOM stand-in for the point\'s map position), not from the map\'s centre or zoom, which the suite cannot reach by design.',
         env: envFor('390x844'),
         deviceScaleFactor: 2,
         findings,

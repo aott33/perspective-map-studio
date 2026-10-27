@@ -42,7 +42,6 @@ import {
 } from './unsaved';
 import { UnsavedSender } from './unsavedSender';
 import { AuthorParams, PopupPoint, popupMountPath } from './popupParams';
-import { TestData, selectTestData } from './testSet';
 import { registerTestHook, takeTestReply } from './testHook';
 import { drawColor, themeColor } from './theme';
 
@@ -68,13 +67,6 @@ export interface MapStudioProps {
         path: string;
         params: AuthorParams;
     };
-    /**
-     * Spike-only (story 7): which fixed test data the map draws, 'tracer' (three
-     * points and a line) or 'scale30' (a seeded 30-pad stand-in for the
-     * template's scale set). Removed when the map store supplies the data
-     * (epic-map-store-and-data).
-     */
-    testSet: string;
 }
 
 /** The popup that is open: the clicked point with its map coordinates. */
@@ -447,11 +439,15 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
 type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
 
-const SOURCE_POINTS = 'mapstudio-points';
-const SOURCE_LINE = 'mapstudio-line';
-const LAYER_LINE = 'mapstudio-line';
-const LAYER_POINTS = 'mapstudio-points';
-/** The map store's items (map.load and this session's saves); separate from the test data's sources. */
+/**
+ * Where the map starts until epic-viewing fits it to the items: the dev map's 30-pad set
+ * fills a 1440 by 860 px map at this view (epic 2 story 11).
+ */
+export const START_VIEW: { center: [number, number]; zoom: number } = {
+    center: [-104.9725, 39.7445],
+    zoom: 12
+};
+/** The map store's items (map.load and this session's saves). */
 const SOURCE_ITEM_LINES = 'mapstudio-items-line';
 const SOURCE_ITEM_POINTS = 'mapstudio-items-point';
 const LAYER_ITEM_LINES = 'mapstudio-items-line';
@@ -463,15 +459,13 @@ const LAYER_UNSAVED_LINES = 'mapstudio-unsaved-line';
 const LAYER_UNSAVED_POINTS = 'mapstudio-unsaved-point';
 
 /**
- * The Map Studio component: a MapLibre map on a blank style with fixed test
- * data (three points and one line). Clicking a point sends `point.click`
- * through the delegate; the reply is shown as text over the map.
+ * The Map Studio component: a MapLibre map on a blank style that draws the
+ * project's map items from the map store. Clicking a point item sends
+ * `point.click` through the delegate; the reply is shown as text over the map.
  */
 export class MapStudio extends Component<Props, MapStudioState> {
     state: MapStudioState = { ...DRAW_IDLE, popup: null };
 
-    /** Chosen once from the testSet prop; the map is built from it at mount. */
-    private testData: TestData = selectTestData(this.props.props.testSet);
     private mapContainer: HTMLDivElement | null = null;
     private map: MapLibreMap | null = null;
     private resizeObserver: ResizeObserver | null = null;
@@ -485,6 +479,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private itemsReady = false;
     /** The items revision last drawn. */
     private drawnRevision = -1;
+    /** Whether the e2e item counts were asked for (after the first loaded items are drawn). */
+    private itemCountsAsked = false;
     /** The unsaved and items revisions last drawn into the unsaved sources. */
     private drawnUnsaved = '';
     /** Terra Draw features of finished lines: removed once queued, as the unsaved layer draws them. */
@@ -501,7 +497,6 @@ export class MapStudio extends Component<Props, MapStudioState> {
             point: themeColor(root, '--label'),
             pointStroke: themeColor(root, '--containerRoot')
         };
-        const data = this.testData;
         const map = new MapLibreMap({
             container: this.mapContainer,
             style: {
@@ -513,32 +508,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     paint: { 'background-color': colors.background }
                 }]
             },
-            center: data.center,
-            zoom: data.zoom,
+            center: START_VIEW.center,
+            zoom: START_VIEW.zoom,
             attributionControl: false
         });
         map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
         map.on('load', () => {
-            map.addSource(SOURCE_LINE, { type: 'geojson', data: data.lines });
-            map.addSource(SOURCE_POINTS, { type: 'geojson', data: data.points });
-            map.addLayer({
-                id: LAYER_LINE,
-                type: 'line',
-                source: SOURCE_LINE,
-                layout: { 'line-cap': 'round', 'line-join': 'round' },
-                paint: { 'line-color': colors.line, 'line-width': 3 }
-            });
-            map.addLayer({
-                id: LAYER_POINTS,
-                type: 'circle',
-                source: SOURCE_POINTS,
-                paint: {
-                    'circle-radius': 9,
-                    'circle-color': colors.point,
-                    'circle-stroke-color': colors.pointStroke,
-                    'circle-stroke-width': 2
-                }
-            });
             const empty = itemsToGeoJson([]);
             map.addSource(SOURCE_ITEM_LINES, { type: 'geojson', data: empty.lines });
             map.addSource(SOURCE_ITEM_POINTS, { type: 'geojson', data: empty.points });
@@ -586,13 +561,13 @@ export class MapStudio extends Component<Props, MapStudioState> {
             if (delegate) {
                 delegate.sendMapLoad();
             }
-            map.on('click', LAYER_POINTS, this.onPointClick);
+            map.on('click', LAYER_ITEM_POINTS, this.onPointClick);
             map.on('click', this.onMapClick);
-            map.on('mouseenter', LAYER_POINTS, () => { map.getCanvas().style.cursor = 'pointer'; });
-            map.on('mouseleave', LAYER_POINTS, () => { map.getCanvas().style.cursor = ''; });
+            map.on('mouseenter', LAYER_ITEM_POINTS, () => { map.getCanvas().style.cursor = 'pointer'; });
+            map.on('mouseleave', LAYER_ITEM_POINTS, () => { map.getCanvas().style.cursor = ''; });
             this.startTerraDraw(map, root);
             // Readiness for the e2e suite: set once the map has gone idle with
-            // both sources and layers added, counted from MapLibre itself.
+            // its sources and layers added.
             map.once('idle', () => this.publishReadiness(map));
         });
         this.drawControl = new DrawControl(this.toggleDrawing);
@@ -654,6 +629,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
             if (this.mapContainer) {
                 this.mapContainer.setAttribute('data-items-loaded',
                     String(data.lines.features.length + data.points.features.length));
+            }
+            if (!this.itemCountsAsked && delegate.load.state === 'loaded') {
+                // The first map.load's items, counted back from MapLibre once it has gone idle with them.
+                this.itemCountsAsked = true;
+                const map = this.map;
+                map.once('idle', () => this.publishItemCounts(map));
             }
         }
     }
@@ -765,13 +746,22 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     }
 
-    /**
-     * Spike and e2e only: tell a test the map is drawn. The counts are read
-     * back from MapLibre's own sources (querySourceFeatures, unique by the
-     * feature's id property), so they prove the data reached the map, not only
-     * that the component was constructed with it.
-     */
+    /** For the e2e suite: tell a test the map is drawn (its first idle, sources and layers added). */
     private publishReadiness(map: MapLibreMap): void {
+        const el = this.mapContainer;
+        if (!el || this.map !== map) {
+            return;
+        }
+        el.setAttribute('data-map-ready', 'true');
+    }
+
+    /**
+     * For the e2e suite: the point and line items of the first map.load, read back from
+     * MapLibre's own item sources (querySourceFeatures, unique by the feature's id
+     * property) after the map went idle with them, so they prove the items reached the
+     * map. Only features in the loaded tiles count, so on a small viewport some may not.
+     */
+    private publishItemCounts(map: MapLibreMap): void {
         const el = this.mapContainer;
         if (!el || this.map !== map) {
             return;
@@ -786,9 +776,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             }
             return ids.size;
         };
-        el.setAttribute('data-points-loaded', String(count(SOURCE_POINTS)));
-        el.setAttribute('data-lines-loaded', String(count(SOURCE_LINE)));
-        el.setAttribute('data-map-ready', 'true');
+        el.setAttribute('data-points-loaded', String(count(SOURCE_ITEM_POINTS)));
+        el.setAttribute('data-lines-loaded', String(count(SOURCE_ITEM_LINES)));
     }
 
     private toggleDrawing = (): void => {
@@ -874,7 +863,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (this.state.drawing || !this.map || !this.popup || !this.popup.isOpen()) {
             return;
         }
-        const onPoint = this.map.queryRenderedFeatures(ev.point, { layers: [LAYER_POINTS] });
+        const onPoint = this.map.queryRenderedFeatures(ev.point, { layers: [LAYER_ITEM_POINTS] });
         if (onPoint.length === 0) {
             this.popup.remove();
         }
@@ -1012,7 +1001,6 @@ export class MapStudio extends Component<Props, MapStudioState> {
         return (
             <div {...this.props.emit({ classes: ['mapstudio'] })}>
                 <div className="mapstudio-map" ref={this.setMapContainer}
-                     data-test-set={this.testData.name}
                      data-edit-level={delegate && delegate.level ? delegate.level : ''}
                      data-load-state={load.state}
                      data-store-seq={delegate && delegate.seq !== null ? String(delegate.seq) : ''}
@@ -1071,7 +1059,6 @@ export class MapStudioMeta implements ComponentMeta {
 
     getPropsReducer(tree: PropertyTree): MapStudioProps {
         return {
-            testSet: tree.readString('testSet', 'tracer'),
             popupView: {
                 path: tree.readString('popupView.path', ''),
                 params: tree.readObject<AuthorParams>('popupView.params', {})

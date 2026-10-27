@@ -9,11 +9,11 @@ An open-source Ignition 8.3 Perspective component module: the project's map, sho
 
 ## Status
 
-The tracer: a MapLibre map on a blank style with three fixed points and one line, and one round trip to the Gateway through the component model delegate. Clicking a point sends `{v, type: "point.click", id, body: {pointId}}`; the Gateway answers `point.click.reply` with the time it received the click, shown on the map. A "Draw a line" toggle (top right) starts Terra Draw's line tool: click to add points, Enter to finish, Escape to cancel; the status line reports the finished line. Nothing drawn is saved yet.
+The map draws the project's map items from the map store (epic-map-store-and-data), on a blank style, with one round trip to the Gateway through the component model delegate. Clicking a point sends `{v, type: "point.click", id, body: {pointId}}`; the Gateway answers `point.click.reply` with the time it received the click, shown on the map. A "Draw a line" toggle (top right) starts Terra Draw's line tool: click to add points, Enter to finish, Escape to cancel; the status line reports the finished line, which is saved to the map store. Scripts read and save the map through `system.mapstudio` ([docs/contract.md](docs/contract.md), "The scripting API").
 
 The platform checks the spike answered, with their evidence, are in [docs/platform-checks.md](docs/platform-checks.md) (toolchain pins: MapLibre GL JS 6.16.0, Terra Draw 1.38.0, adapter 1.5.0).
 
-Story 4 (spike): a point click also opens a popup that renders a project view by path, the way the built-in Perspective Map renders a view from a `path`. The spike-only prop `popupView` (`path`, `params`) names the view; it receives the point as its `mapItem` parameter (`{id, name}`) beside `params`, and an empty or failing path falls back to a text popup. Its evidence is in the same file. Story 7 (spike): the spike-only prop `testSet` (`tracer` or `scale30`) picks the fixed data the map draws; `scale30` is the seeded 30-pad stand-in the frame-rate measure uses. Both props stay until the map store and the kind setup replace them.
+Story 4 (spike): a point click also opens a popup that renders a project view by path, the way the built-in Perspective Map renders a view from a `path`. The spike-only prop `popupView` (`path`, `params`) names the view; it receives the point as its `mapItem` parameter (`{id, name}`) beside `params`, and an empty or failing path falls back to a text popup. Its evidence is in the same file. `popupView` stays until the kind setup replaces it (epic-viewing). Story 7's spike-only prop `testSet` and its fixed data are gone (epic 2 story 11): the dev map's 30-pad set and the tracer's points are map items seeded into the map store through `system.mapstudio.applyEdits` (the `/edit` page's "Seed the dev map", MapEditor only, safe to re-run).
 
 ![mapstudio-dev at 1440 px](docs/screenshots/mapstudio-dev-1440.png)
 
@@ -33,11 +33,11 @@ Layout:
 | Folder | What lives there |
 | --- | --- |
 | `common/` | component descriptor, props schema (`mapstudio.props.json`), the message contract (`Messages.java`) |
-| `gateway/` | gateway hook and the component model delegate (`MapStudioDelegate`); `system.mapstudio` script functions are in `common/` (`MapStudioScriptModule`: `ping`, `echo`) |
+| `gateway/` | gateway hook and the component model delegate (`MapStudioDelegate`); `system.mapstudio` script functions are declared and documented in `common/` (`MapStudioScriptModule` and its `.properties`: `getMap`, `applyEdits`, `refreshAdapters`, `ping`) and run in `gateway/.../script/` |
 | `designer/` | the Designer palette entry |
 | `web/` | the TypeScript and React component, MapLibre map, Terra Draw line tool (`DrawControl.tsx`, `draw.ts`), message client (`messages.ts`), the point popup (`PointPopup.tsx`, `popupParams.ts`) and their tests |
 | `e2e/` | the Playwright suite (pinned `@playwright/test`): smoke tests at 1440 and 390 px, the popup checks and the spike's measures |
-| `ops/` | the local development Gateway (Docker) and its `mapstudio-dev` project (`MapStudioDev`, `MapStudioScale`, two popup fallback pages, `Popups/PointDetails`) |
+| `ops/` | the local development Gateway (Docker) and its `mapstudio-dev` project (`MapStudioDev` at `/`, `MapStudioEdit` at `/edit` with the script checks and the seed button, `MapStudioAdapters`, two popup fallback pages, `Popups/PointDetails`; project libraries `mapstudio_dev`, the dev kind and asset adapter, and `mapstudio_seed`, the dev seed) |
 | `docs/` | contributor architecture, the platform checks and screenshots |
 
 ## Run the development Gateway
