@@ -55,6 +55,10 @@ Decision 2026-10-27 (owner: "agree with all recommendations, start"; all eight r
 7. The template pull request is opened as a draft by Claude only on the owner's go; the owner merges.
 8. The owner's Designer session happens before the tag, on the dev Gateway of `main`.
 
+Decision 2026-10-27 (owner, after the rehearsal's `module_version` finding):
+9. The `module_version` `dev` defect is fixed before the tag, in this branch: every module jar carries `Implementation-Version` = the build's version (the tag in a release, `x.y.z-SNAPSHOT` locally), the gateway reads it through `ModuleVersion`, `GatewayJarManifestTest` fails when the gateway jar's manifest lacks it and `MigratorTest` checks the migrator records the version it is given. Gate G4 is cleared by this fix.
+10. Decision 2's wording: handing the test database password to `psql` on standard input (the shell's `printf` builtin, the value read inside the container) is accepted as meeting the decision: off the command line, out of logs and files.
+
 </frozen-after-approval>
 
 ## Code Map
@@ -81,7 +85,7 @@ Template (read only here; changed only in the scratch clone):
 - G1 Story 16 reviewed and merged to `main`; CI green on `main`.
 - G2 ER-27 engineering review of the alarm presentation 0.2.0 ships: the alarm glyphs and state examples on `/res/mapstudio/icons/contact-sheet.html` and the differences listed in `docs/icons.md` "Differences from the template's reviewed set". Recorded with reviewer and date in `docs/icons.md`. Changes asked for are fixed before the tag.
 - G3 Designer session on the dev Gateway of `main`: story 16 steps 1 to 8, story 7's open items, story 11's autocomplete text (`system.mapstudio.` shows `getMap`, `applyEdits`, `refreshAdapters`, `ping`). Results into `docs/platform-checks.md` as **[owner, seen in the Designer, date]**.
-- G4 The rehearsal's `module_version` `dev` finding (`docs/template-install.md`, "0.2.0 rehearsal", Findings): under the Never rule above it stops the release; its fix is its own pull request merged before the tag, unless the owner waives it in writing (a new Decisions line). Default: block.
+- G4 The rehearsal's `module_version` `dev` finding (`docs/template-install.md`, "0.2.0 rehearsal", Findings): under the Never rule above it stops the release; its fix lands before the tag. **Cleared 2026-10-27 (Decision 9):** the fix is in this branch (manifest `Implementation-Version` from the Gradle version, `ModuleVersion`, `GatewayJarManifestTest`, `MigratorTest`); a build with `-PreleaseVersion=0.2.0` (the way `build-signed.sh` passes the tag) puts `Implementation-Version: 0.2.0` in every jar of the `.modl`.
 
 **Execution (me):**
 - [x] `common/.../Messages.java`, `web/typescript/contract.ts`, `ContractTest.java`, `contract.test.ts` -- `CONTRACT_VERSION` `"0.2.0"`.
@@ -106,7 +110,7 @@ Template (read only here; changed only in the scratch clone):
 
 ## Owner steps (hitl; Claude cannot do these)
 
-1. G1, G2 (ER-27), G3 and G4 above; confirm the Decision 2 wording note in the Review Triage Log.
+1. G1, G2 (ER-27) and G3 above (G4 cleared and the Decision 2 wording accepted: Decisions 9 and 10, 2026-10-27).
 2. Merge the version pull request; tag `v0.2.0` on `main` and push the tag.
 3. Approve the `build-sign` job under Review deployments (`release` environment); review the draft (`modl-verify.sh`), publish it.
 4. Review and merge the template pull request (after `local.sh` and `stack.sh` evidence in its body, since its Actions may not run).
@@ -142,7 +146,9 @@ What it proves: 0.2.0 installs by lock on 8.3.9, migrates an empty database, sav
 | 5 | Old **[unverified]** lines left beside the new rehearsal section | patch | `docs/contract.md` (another project's maps) and `docs/platform-checks.md` (user without an editing role, real browser reopened, `storage` between tabs) now carry **[live 8.3.9, rehearsal, throwaway-signed]** with a pointer to "Epic 2 story 13"; the 8.3.10 labels stay |
 | 6 | Rehearsal evidence claimed more than was run | patch | template-install.md says "the same way as" CI's signing check (2 days and its own CN there); platform-checks row says the lock entry was hand-written from `inspect`, `fetch` downloaded nothing, `check --write` was not run |
 | 7 | `module_version` `dev` written as optional to fix, against the Never rule | patch | template-install.md and deferred-work.md say it blocks the tag unless the owner waives it in Decisions; new gate G4. No waiver was given: the relayed "agree with all recommendations, start" answered the eight decisions above, before this finding existed |
-| 8 | Plan record and stale version text | patch, part rejected | "Open Question N" now "Decision N"; RELEASING.md example uses `vX.Y.Z`; README says 0.2.0 is for a host to install through its lock once published and that the template still pins 0.1.0. Rejected: changing `build.gradle.kts:20` (`0.1.0-SNAPSHOT`), which follows owner Decision 5 (`0.3.0-SNAPSHOT` after the tag; the release takes its version from the tag). Not changed: Decision 2 says the password is "passed by environment"; the rehearsal handed it to `psql` on standard input with the shell's `printf` builtin, which keeps the decision's intent (never on a command line, in a log or a file). The block is frozen, so the owner confirms the wording (owner step 1) |
+| 8 | Plan record and stale version text | patch, part rejected | "Open Question N" now "Decision N"; RELEASING.md example uses `vX.Y.Z`; README says 0.2.0 is for a host to install through its lock once published and that the template still pins 0.1.0. Rejected: changing `build.gradle.kts:20` (`0.1.0-SNAPSHOT`), which follows owner Decision 5 (`0.3.0-SNAPSHOT` after the tag; the release takes its version from the tag). Not changed: Decision 2 says the password is "passed by environment"; the rehearsal handed it to `psql` on standard input with the shell's `printf` builtin, which keeps the decision's intent (never on a command line, in a log or a file). The owner accepted that wording on 2026-10-27 (Decision 10) |
 
 Re-run after the patches (2026-10-27): `./gradlew clean build` (JDK 17) passed, 445 JUnit tests, 0 failures, 1 skipped; `web` `tsc --noEmit` clean and Jest 17 suites, 145 tests passed; `check-contract-versions.sh` OK (contract 0.2.0, setup schema 1, map store schema 2), `test-contract-versions.sh` OK (15 refusals plus the git work tree and five release-version cases), `check-release-version.sh 0.2.0` OK. The template rehearsal was not repeated: no finding showed its evidence wrong, only its wording (findings 5 and 6). Plan stays in-progress: gates G1 to G4, the tag and the published-release steps are ahead.
+
+G4 fix (2026-10-27, Decision 9): `./gradlew clean build` (JDK 17) passed, 450 JUnit tests, 0 failures, 1 skipped (five new: `GatewayJarManifestTest` 3, `MigratorTest` 2); every jar's manifest says `Implementation-Version: 0.1.0-SNAPSHOT` locally and `0.2.0` with `-PreleaseVersion=0.2.0`, inside `Map-Studio.unsigned.modl` too; with the manifest block removed `GatewayJarManifestTest` fails (2 of 3), so the test guards the fix; `check-contract-versions.sh`, `test-contract-versions.sh` and `check-release-version.sh 0.2.0` OK.
 

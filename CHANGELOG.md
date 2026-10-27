@@ -43,7 +43,7 @@ The map store and its data (epic-map-store-and-data). Contract 0.2.0; project se
 ### Development
 
 - The dev stack (`ops/`) runs the Gateway as the developer's uid and gid (`IGNITION_UID` and `IGNITION_GID`, recorded in the ignored `.env` on the first run), so Designer saves to the bind-mounted `ops/project` work. A Gateway container made before this change is recreated by `ops/up.sh`.
-- The `web` and `e2e` packages are at 0.2.0. Release builds take their version from the tag.
+- The `web` and `e2e` packages are at 0.2.0. Release builds take their version from the tag, and every module jar's manifest carries it as `Implementation-Version`: `mapstudio_schema_version.module_version` records the real version (the 0.2.0 rehearsal found `dev` there).
 
 ## 0.1.0
 
