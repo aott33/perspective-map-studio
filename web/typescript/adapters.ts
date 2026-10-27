@@ -4,6 +4,8 @@
  * Pure readers, tolerant of a Gateway that sends none of them; unit tested in node.
  */
 
+import { isRecord } from './json';
+
 /** Stable status words of a host list. */
 export type AdapterStatusWord = 'ok' | 'empty' | 'failing' | 'slow' | 'incomplete' | 'not-configured' | 'loading';
 
@@ -53,10 +55,6 @@ export interface HostLists {
     /** null when map.load sent no assets (a viewer, or an older Gateway). */
     assets: Asset[] | null;
     adapters: { kinds: AdapterStatus; assets: AdapterStatus } | null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 const FIELD_TYPES: ReadonlySet<string> = new Set(['text', 'number', 'integer', 'boolean', 'choice']);

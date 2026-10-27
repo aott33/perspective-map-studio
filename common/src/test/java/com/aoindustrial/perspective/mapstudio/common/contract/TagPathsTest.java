@@ -134,4 +134,16 @@ class TagPathsTest {
         assertEquals("Mesa/P12", f.path());
         assertEquals(java.util.List.of("Mesa", "P12"), f.segments());
     }
+
+    @Test
+    void aRefusedPathIsEchoedOnOneShortLine() {
+        String raw = "Mesa\nP12/" + "a".repeat(191);
+        MapStudioException ex = assertThrows(MapStudioException.class, () -> TagPaths.resolve(raw, P12));
+        assertEquals(Messages.CODE_INVALID, ex.code());
+        assertEquals("The tag path " + Rows.echo(raw) + " does not start with a [provider].", ex.plainMessage());
+        assertFalse(ex.plainMessage().contains("\n"));
+        assertTrue(ex.plainMessage().contains("Mesa?P12/"));
+        assertTrue(Rows.echo(raw).endsWith("..."));
+        assertEquals(Rows.MAX_ID + 3, Rows.echo(raw).length());
+    }
 }

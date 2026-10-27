@@ -61,6 +61,28 @@ def _globals(action):
         raise
 
 
+def holdsMapEditor(session):
+    """True when the Perspective session is signed in and its user holds MapEditor.
+
+    The dev views' buttons write to the map store or change test equipment for every
+    session, and the scripting API trusts its caller (docs/contract.md), so each view
+    script checks the role itself through this one function (epic 2 story 12). The
+    session's auth props are set by the Gateway from its identity provider. Any failure
+    to read them counts as not holding the role.
+    """
+    try:
+        if not session.props.auth.authenticated:
+            return False
+        roles = [str(r) for r in (session.props.auth.user.roles or [])]
+    except java.lang.Throwable as ex:
+        logger.debug('Dev role check could not read the session roles: %s' % ex.getClass().getSimpleName())
+        return False
+    except Exception as ex:
+        logger.debug('Dev role check could not read the session roles: %s' % type(ex).__name__)
+        return False
+    return 'MapEditor' in roles
+
+
 def mode():
     """The current mode; ok when none was set or the stored one is unknown. Re-raises a failed read."""
     value = _globals('read the dev adapter mode').get(MODE_KEY)

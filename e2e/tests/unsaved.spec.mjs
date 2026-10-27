@@ -19,32 +19,13 @@ import path from 'node:path';
 import { envFileValue, gatewayUrl, screenshotDir } from '../lib/env.mjs';
 import { TRACER } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, OPERATOR_USER, editorTest, expect, mapLoaded, nextFrames, openMap, signedInContext, test
+    EDITOR_USER, OPERATOR_USER, drawLine, editorTest, expect, mapLoaded, nextFrames, openMap, signedInContext, test
 } from './fixtures.mjs';
 
-// As in store.spec.mjs: the pause only keeps two vertex clicks from reading as a double click.
-const VERTEX_PAUSE_MS = 300;
 const PROJECT = 'mapstudio-dev';
 const KEY = `mapstudio.unsaved.v1:${PROJECT}:${EDITOR_USER}`;
 // The component's reply timeout is 15 s; the assertion waits a little longer.
 const UNSENT_TIMEOUT_MS = 25_000;
-
-async function drawLine(page, map) {
-    const box = await map.boundingBox();
-    const cx = box.x + box.width / 2;
-    const cy = box.y + box.height / 2;
-    // 200 px above store.spec's lines, so the dashed unsaved line is not hidden under a saved one.
-    const [a, b] = TRACER.drawOffsets.map(([dx, dy]) => [cx + dx, cy + dy - 200]);
-    const reply = page.locator('.mapstudio-reply');
-    await page.locator('.mapstudio-draw-button').click();
-    await expect(reply).toHaveAttribute('data-drawing', 'true');
-    await page.mouse.click(a[0], a[1]);
-    await page.waitForTimeout(VERTEX_PAUSE_MS);
-    await page.mouse.click(b[0], b[1]);
-    await page.waitForTimeout(VERTEX_PAUSE_MS);
-    await page.keyboard.press('Enter');
-    await expect(reply).toHaveAttribute('data-line-points', '2');
-}
 
 async function shot(page, name) {
     await nextFrames(page);
@@ -159,7 +140,7 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
                 await expect(map).toHaveAttribute('data-editing', 'on');
 
                 gate.drop = true;
-                await drawLine(page, map);
+                await drawLine(page, map, { dy: -200 });
                 // Written before the send, so it is in storage at once.
                 await expect.poll(async () => (await storedQueue(page)).length).toBe(1);
                 const row = page.locator('.mapstudio-unsaved-row');
@@ -282,7 +263,7 @@ editorTest.describe('a map.load that fails after the map loaded', () => {
 
             // A line the Gateway never sees: queued and drawn as unsaved.
             gate.drop = true;
-            await drawLine(page, map);
+            await drawLine(page, map, { dy: -200 });
             await expect(map).toHaveAttribute('data-unsaved-count', '1');
             await expect(map).toHaveAttribute('data-unsaved-drawn', '1');
             // From here only that batch is dropped, so the hook's saves below reach the Gateway.
@@ -358,7 +339,7 @@ test.describe('with the dev Gateway stopped', () => {
 
         docker('stop', container);
         try {
-            await drawLine(page, map);
+            await drawLine(page, map, { dy: -200 });
             const row = page.locator('.mapstudio-unsaved-row');
             await expect(row).toHaveAttribute('data-code', /^(timeout|disconnected)$/, { timeout: UNSENT_TIMEOUT_MS });
             await expect(row).toHaveAttribute('data-unsaved-state', 'unsent');

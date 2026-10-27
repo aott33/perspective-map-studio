@@ -59,6 +59,11 @@ public final class RoleMatrix {
         return Messages.LEVEL_NONE;
     }
 
+    /** True for an editing level ({@code phone} or {@code full}); false for {@code none} or anything else. */
+    public static boolean isEditor(String level) {
+        return Messages.LEVEL_FULL.equals(level) || Messages.LEVEL_PHONE.equals(level);
+    }
+
     /**
      * Refuse the op with {@code role} when the level may not do it, from the op alone.
      *

@@ -4,6 +4,7 @@
  * the reference. Pure types and readers only, unit tested in node.
  */
 
+import { isRecord } from './json';
 import { HostLists, readHostLists } from './adapters';
 
 /** Public contract version these shapes belong to (AD-9). */
@@ -14,6 +15,7 @@ export const ErrorCodes = {
     CONFLICT: 'conflict',
     ROLE: 'role',
     INVALID: 'invalid',
+    /** Reserved: nothing sends it today; a gap in `seq` reloads with `map.load` instead (epic 2 story 12). */
     STALE: 'stale',
     STORE_UNREACHABLE: 'store-unreachable',
     /** Readable but not saved here: a newer map store schema, or a standby Gateway (epic 2 story 5). */
@@ -153,10 +155,6 @@ export interface Conflict {
     current: MapItemRecord | KindSetupRecord | null;
     changedBy: string | null;
     changedAt: string | null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isPosition(value: unknown): value is [number, number] {

@@ -5,11 +5,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
 import { TRACER, pagePixel } from '../lib/geo.mjs';
-import { ensureSeeded, expect, loadedCounts, nextFrames, openMap, test } from './fixtures.mjs';
-
-// Terra Draw shows no state between two vertex clicks, so there is nothing to
-// await; this pause only keeps two clicks from reading as a double click.
-const VERTEX_PAUSE_MS = 300;
+import { VERTEX_PAUSE_MS, ensureSeeded, expect, loadedCounts, nextFrames, openMap, test } from './fixtures.mjs';
 
 let seed;
 test.beforeAll(async ({ browser }) => {

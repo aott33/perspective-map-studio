@@ -153,7 +153,7 @@ public class MapStudioDelegate extends ComponentModelDelegate {
      * never changed. Pure.
      */
     static JsonObject bodyFor(JsonObject body, String level) {
-        if (Messages.LEVEL_FULL.equals(level) || Messages.LEVEL_PHONE.equals(level)) {
+        if (RoleMatrix.isEditor(level)) {
             return body;
         }
         JsonObject copy = body.deepCopy();
@@ -325,8 +325,7 @@ public class MapStudioDelegate extends ComponentModelDelegate {
     static JsonObject withUser(JsonObject body, String userName) {
         JsonElement level = body.get("level");
         String l = level != null && level.isJsonPrimitive() ? level.getAsString() : "";
-        if (userName != null && !userName.isEmpty()
-            && (Messages.LEVEL_PHONE.equals(l) || Messages.LEVEL_FULL.equals(l))) {
+        if (userName != null && !userName.isEmpty() && RoleMatrix.isEditor(l)) {
             body.addProperty("user", userName);
         }
         return body;

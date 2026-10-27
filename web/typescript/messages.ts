@@ -5,6 +5,7 @@
  * `{code, message}`. Pure functions only, so this module is unit tested in node.
  */
 
+import { isRecord } from './json';
 import { MapChangedBody, readMapChanged } from './changes';
 import {
     Conflict, EditBatch, EditsApplyReplyBody, MapLoadReplyBody, readConflicts, readEditsApplyReply, readMapLoadReply
@@ -101,10 +102,6 @@ export function envelope<B>(type: string, body: B, id: string = newMessageId()):
 /** The `point.click` message for one point. */
 export function pointClick(pointId: string, id?: string): Envelope<PointClickBody> {
     return envelope(MessageTypes.POINT_CLICK, { pointId }, id);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /** Read one envelope from the Gateway into a typed reply; never throws. */

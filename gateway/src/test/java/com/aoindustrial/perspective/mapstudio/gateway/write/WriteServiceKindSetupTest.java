@@ -4,14 +4,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 
 import com.inductiveautomation.ignition.common.gson.JsonObject;
 import com.inductiveautomation.ignition.common.gson.JsonParser;
 
 import com.aoindustrial.perspective.mapstudio.common.Messages;
+import com.aoindustrial.perspective.mapstudio.common.contract.AdapterStatus;
+import com.aoindustrial.perspective.mapstudio.common.contract.Kind;
 import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
+import com.aoindustrial.perspective.mapstudio.common.contract.Rows;
+import com.aoindustrial.perspective.mapstudio.gateway.adapter.AdapterSnapshot;
+import com.aoindustrial.perspective.mapstudio.gateway.adapter.TestKinds;
+import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
 import com.aoindustrial.perspective.mapstudio.gateway.change.ChangeEvent;
 
 /**
@@ -79,12 +87,43 @@ class WriteServiceKindSetupTest extends WriteFixture {
         save(batch(uuid(), kindSetup("update", "pad", 1, "{}")));
         MapStudioException ex = refused(batch(uuid(), kindSetup("update", "pad", 1, SETUP)), Messages.LEVEL_FULL);
         assertEquals(Messages.CODE_CONFLICT, ex.code());
-        assertTrue(ex.plainMessage().startsWith("The pad kind setup was changed by mapeditor at 14:02 UTC"),
-            ex.plainMessage());
+        assertEquals("The Well pad kind setup was changed by mapeditor at 14:02 UTC since you loaded it."
+            + " Nothing in this save was written.", ex.plainMessage());
         JsonObject c = ex.conflicts().get(0).getAsJsonObject();
         assertEquals("kindSetup", c.get("entity").getAsString());
         assertEquals(JsonParser.parseString("{\"kindId\":\"pad\",\"setup\":{},\"version\":2,\"deleted\":false}"),
             c.get("current"));
+        assertNothingWritten(2, 2);
+    }
+
+    @Test
+    void aStaleKindSetupWhoseKindIsNotInTheListIsNamedByItsId() {
+        store.committed.kindSetups.computeIfAbsent(PROJECT, p -> new java.util.TreeMap<>())
+            .put("old", new KindSetupRecord("old", new JsonObject(), 2, false));
+        MapStudioException ex = refused(batch(uuid(), kindSetup("update", "old", 1, "{}")), Messages.LEVEL_FULL);
+        assertEquals(Messages.CODE_CONFLICT, ex.code());
+        assertEquals("The old kind setup was changed since you loaded it. Nothing in this save was written.",
+            ex.plainMessage());
+        assertNothingWritten(0, 0);
+    }
+
+    @Test
+    void aLongOrMultiLineKindNameIsEchoedOnOneShortLine() {
+        String name = "Pad\nwith a newline " + "x".repeat(10_000);
+        List<Kind> kinds = new java.util.ArrayList<>(TestKinds.KINDS);
+        kinds.replaceAll(k -> k.id().equals("pad") ? new Kind("pad", name, k.geometry(), k.icon(), k.labelRank(),
+            k.fields()) : k);
+        AdapterStatus ok = new AdapterStatus(AdapterStatus.OK, "ok", "test.kinds", kinds.size(), 0, null);
+        writes = new WriteService(new StoreGate(setups, c -> state), store, hooked::add,
+            p -> new AdapterSnapshot(kinds, List.of(), ok, ok));
+        save(batch(uuid(), kindSetup("create", "pad", 0, "{}")));
+        save(batch(uuid(), kindSetup("update", "pad", 1, "{}")));
+        MapStudioException ex = refused(batch(uuid(), kindSetup("update", "pad", 1, "{}")), Messages.LEVEL_FULL);
+        assertEquals(Messages.CODE_CONFLICT, ex.code());
+        assertEquals("The " + Rows.echo(name) + " kind setup was changed by mapeditor at 14:02 UTC since you loaded"
+            + " it. Nothing in this save was written.", ex.plainMessage());
+        assertFalse(ex.plainMessage().contains("\n"));
+        assertTrue(ex.plainMessage().startsWith("The Pad?with a newline x"), ex.plainMessage());
         assertNothingWritten(2, 2);
     }
 
