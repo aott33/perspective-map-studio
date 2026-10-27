@@ -2,7 +2,7 @@
 
 The public contract between the browser, the Gateway, the host project and the map store, as epic-map-store-and-data builds it (AD-8, AD-9). **Draft:** everything here is version 0.2.0 in draft until release 0.2.0; it may still change, and each change is recorded in the plan of the entry that makes it. The code is the reference: `common/src/main/java/com/aoindustrial/perspective/mapstudio/common/Messages.java` and `common/.../common/contract/`, mirrored in `web/typescript/contract.ts` and `web/typescript/messages.ts`.
 
-Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway by this repository's e2e suite (`e2e/tests/store.spec.mjs`); **[unverified]** written but not seen working.
+Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway by this repository's e2e suite (`e2e/tests/store.spec.mjs`, `e2e/tests/changes.spec.mjs`); **[unverified]** written but not seen working.
 
 ## Messages
 
@@ -14,11 +14,32 @@ Every message, both ways, is one JSON object `{v, type, id, body}` carried under
 | `map.load.reply` | Gateway to browser | `{level, seq, items}`: `level` is `none`, `phone` or `full` for this session; `seq` is the project's last change sequence number; `items` are map item records, deleted ones left out **[live 8.3.10]** |
 | `edits.apply` | browser to Gateway | `{batchId, ops}` (below) |
 | `edits.apply.reply` | Gateway to browser | `{batchId, seq, results: [{entity, id, version}]}`: the batch's change sequence number and each op's new version **[live 8.3.10]** |
-| `map.changed` | Gateway to browser | `{seq, ops}`: declared; sent to every open map of the project from entry 4 **[unverified]** |
+| `map.changed` | Gateway to browser | `{seq, batchId, actor, ops}`: one committed batch, sent to every open map of the project (below) **[live 8.3.10]** |
 | `error` | Gateway to browser | `{code, message}`, plus `batchId` and `op: {index, id}` when an `edits.apply` op is at fault |
 | `point.click`, `point.click.reply` | both | the spike's round trip, unchanged |
 
 The `id` of a reply is the `id` of the message it answers.
+
+## map.changed: saved edits reach every open map
+
+After every committed batch, from a browser or from `system.mapstudio.applyEdits`, the Gateway sends one `map.changed` to every open Map Studio component of that project, whatever its level (`none`, `phone`, `full`), the saving session included; another project's maps get nothing **[live 8.3.10]**. Its `id` is a new UUID (it answers nothing).
+
+```json
+{"v": 1, "type": "map.changed", "id": "<UUID>",
+ "body": {"seq": 5, "batchId": "<UUID>", "actor": "mapeditor",
+          "ops": [{"op": "create", "entity": "item", "id": "<UUID>", "version": 1,
+                   "record": {"id": "<UUID>", "kind": "line", "name": "Line 21:05:09",
+                              "geometry": {"type": "LineString", "coordinates": [[-104.99, 39.74], [-104.98, 39.75]]},
+                              "properties": {}, "assetId": null, "overrides": {}, "ends": null,
+                              "version": 1, "deleted": false}}]}}
+```
+
+- `seq` is the batch's change sequence number; `batchId` and `actor` are the saved batch's (the session's user name, or the actor a script named).
+- Each op carries `version` (after the op) and `record`, the full stored record after the op: a map item record for `entity` `item` (a tombstone has `deleted: true`), a kind setup record `{kindId, setup, version, deleted}` for `kindSetup` (from entry 3). Full records, because an update carries only the fields it changes.
+- **Order.** The Gateway sends a project's changes in `seq` order: a batch whose hook runs before an earlier batch's is held up to 2 s for it; a `seq` that never arrives is skipped after 2 s. Delivery never runs inside the write transaction and never delays the saver's reply.
+- **Browser rule.** Before its `map.load.reply` the browser holds `map.changed`, then applies the held ones above the loaded `seq` in order. On a loaded map: `seq` at or below the current one is ignored; `seq` one above is applied, each record only when its `version` is above the drawn one (so a repeated or self-sent change does nothing); a `seq` further ahead, or an unreadable `map.changed` (no `seq` or `ops`, or a bad record), is a gap: the browser sends `map.load` once, replaces its items with the reply and keeps holding changes until then. `seq` advances only through `map.load.reply` and `map.changed`, never through `edits.apply.reply`.
+- A browser that was disconnected catches up at its next gap or its next page open; reloading on a Perspective reconnect is epic-viewing's (AD-6).
+- The dev component shows the state for tests as `data-store-seq` (the last `seq` applied) and `data-map-reloads` (gap reloads) on `.mapstudio-map`.
 
 ## Error codes
 
@@ -119,4 +140,4 @@ A re-run of this script finds `pad_id` already stored and is refused with `confl
 
 ## Change hook (Gateway, for contributors)
 
-Every committed batch calls `ChangeHook.onCommitted(CommittedBatch)` once, after the commit: `{project, seq, batchId, actor, ops: [{op, entity, id, record}]}` with the full stored record of each op. In 0.2.0 draft the hook does nothing; entry 4 sends `map.changed` from it.
+Every committed batch calls `ChangeHook.onCommitted(CommittedBatch)` once, after the commit: `{project, seq, batchId, actor, ops: [{op, entity, id, record}]}` with the full stored record of each op. The module's hook is the change bus (`gateway/.../change/ChangeBus.java`): it builds the `map.changed` body on the caller's thread and delivers it from its own thread, in `seq` order, to the open Map Studio delegates of the project, each subscribed from its `onStartup` to its `onShutdown`. `CommittedOp.record` is a `MapItemRecord` today; the entry that saves kind setups (entry 3) widens it and extends `ChangeEvent.of` to write `{kindId, setup, version, deleted}`.

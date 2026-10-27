@@ -5,6 +5,7 @@
  * `{code, message}`. Pure functions only, so this module is unit tested in node.
  */
 
+import { MapChangedBody, readMapChanged } from './changes';
 import { EditBatch, EditsApplyReplyBody, MapLoadReplyBody, readEditsApplyReply, readMapLoadReply } from './contract';
 
 /** Contract version carried in `v`. */
@@ -55,6 +56,8 @@ export type Reply =
     | { kind: 'point.click.reply'; id: string; body: PointClickReplyBody }
     | { kind: 'map.load.reply'; id: string; body: MapLoadReplyBody }
     | { kind: 'edits.apply.reply'; id: string; body: EditsApplyReplyBody }
+    /** `body` is null when the map.changed could not be read: the browser treats it as a gap. */
+    | { kind: 'map.changed'; id: string; body: MapChangedBody | null }
     | { kind: 'error'; id: string; body: ErrorBody }
     | { kind: 'invalid'; reason: string };
 
@@ -127,6 +130,8 @@ export function readReply(raw: unknown): Reply {
             return saved ? { kind: 'edits.apply.reply', id: raw.id, body: saved }
                 : { kind: 'invalid', reason: 'edits.apply.reply needs batchId, seq and results.' };
         }
+        case MessageTypes.MAP_CHANGED:
+            return { kind: 'map.changed', id: raw.id, body: readMapChanged(raw.body) };
         case MessageTypes.ERROR: {
             const error: ErrorBody = {
                 code: typeof body.code === 'string' ? body.code : 'unknown',
@@ -155,6 +160,9 @@ export function replyText(reply: Reply): string {
             return 'Map loaded: ' + reply.body.items.length + ' map items at seq ' + reply.body.seq;
         case 'edits.apply.reply':
             return 'Saved batch ' + reply.body.batchId + ' as seq ' + reply.body.seq;
+        case 'map.changed':
+            return reply.body ? 'Map changed: seq ' + reply.body.seq + ', ' + reply.body.ops.length + ' op(s)'
+                : 'Map changed: unreadable change';
         case 'error':
             return 'Error (' + reply.body.code + '): ' + reply.body.message;
         default:

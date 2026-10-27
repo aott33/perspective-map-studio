@@ -87,4 +87,18 @@ class MapStudioDelegateTest {
         assertEquals("invalid", MapStudioDelegate.check(envelope(1, "map.changed", "c", null))
             .getAsJsonObject("body").get("code").getAsString(), "map.changed is sent, never received");
     }
+
+    @Test
+    void mapChangedIsSentInTheEnvelopeWithItsOwnId() {
+        // Epic 2 story 4: the change bus's body goes out unchanged under a new message id.
+        JsonObject body = new JsonObject();
+        body.addProperty("seq", 5);
+        JsonObject a = MapStudioDelegate.changedEnvelope(body);
+        JsonObject b = MapStudioDelegate.changedEnvelope(body);
+        assertEquals(1, a.get("v").getAsInt());
+        assertEquals("map.changed", a.get("type").getAsString());
+        assertEquals(5, a.getAsJsonObject("body").get("seq").getAsInt());
+        assertEquals(36, a.get("id").getAsString().length());
+        assertEquals(false, a.get("id").getAsString().equals(b.get("id").getAsString()));
+    }
 }

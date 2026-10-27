@@ -7,6 +7,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
 
 import com.inductiveautomation.ignition.common.auth.web.WebAuthUser;
@@ -20,6 +21,7 @@ import com.inductiveautomation.perspective.gateway.messages.EventFiredMsg;
 
 import com.aoindustrial.perspective.mapstudio.common.Messages;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
+import com.aoindustrial.perspective.mapstudio.gateway.change.ChangeBus;
 import com.aoindustrial.perspective.mapstudio.gateway.write.Actor;
 import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
 
@@ -34,6 +36,11 @@ import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
  * every message, docs/platform-checks.md, epic 2 story 1), then run on the
  * module's bounded work pool and answer from there.
  *
+ * <p>From startup to shutdown the delegate is subscribed to the change bus for its
+ * session's project and sends each committed batch to its browser as
+ * {@code map.changed} (epic 2 story 4, AD-17), through the session's execution
+ * queue so the events reach the browser in the bus's order.
+ *
  * <p>No exception escapes {@code handleEvent}: a malformed or unknown message
  * is answered with an {@code error} envelope and logged at warn.
  */
@@ -44,6 +51,8 @@ public class MapStudioDelegate extends ComponentModelDelegate {
     private static final DateTimeFormatter ISO_UTC = DateTimeFormatter.ISO_INSTANT;
 
     private final MapStudioServices services;
+    /** The change bus subscription from onStartup, or null. */
+    private volatile ChangeBus.Subscription changes;
 
     public MapStudioDelegate(Component component, MapStudioServices services) {
         super(component);
@@ -53,11 +62,37 @@ public class MapStudioDelegate extends ComponentModelDelegate {
     @Override
     protected void onStartup() {
         log.debugf("Delegate started for %s", component.getComponentAddressPath());
+        try {
+            String project = component.getSession().getProjectName();
+            this.changes = services.changes.subscribe(project, this::sendChange);
+        } catch (RuntimeException ex) {
+            log.warn("Could not subscribe an open map to its project's changes: " + ex.getClass().getSimpleName(), ex);
+        }
     }
 
     @Override
     protected void onShutdown() {
         log.debugf("Delegate stopped for %s", component.getComponentAddressPath());
+        ChangeBus.Subscription s = this.changes;
+        this.changes = null;
+        if (s != null) {
+            s.cancel();
+        }
+    }
+
+    /**
+     * Called on the change bus thread: queue the {@code map.changed} envelope on the
+     * session's execution queue (ordered per session; that fireEvent from it reaches
+     * the browser is recorded live in docs/platform-checks.md, epic 2 story 4).
+     */
+    private void sendChange(JsonObject body) {
+        JsonObject message = changedEnvelope(body);
+        component.getSession().queue().submit(() -> send(message));
+    }
+
+    /** The {@code map.changed} envelope for one change event's body, with a new message id. Pure. */
+    static JsonObject changedEnvelope(JsonObject body) {
+        return envelope(Messages.MAP_CHANGED, UUID.randomUUID().toString(), body);
     }
 
     @Override

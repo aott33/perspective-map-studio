@@ -26,10 +26,11 @@ import {
     finishLine,
     startDrawing
 } from './draw';
+import { MapChanges, MapChangedBody } from './changes';
 import { EditLevel, MapItemRecord } from './contract';
 import { MESSAGE_EVENT, Reply, editsApply, mapLoad, pointClick, readReply, replyText } from './messages';
 import { PointPopup } from './PointPopup';
-import { SAVE_IDLE, SaveState, itemsToGeoJson, lineCreateBatch, newId, refusedSave, saveStatusText, withItem } from './save';
+import { SAVE_IDLE, SaveState, itemsToGeoJson, lineCreateBatch, newId, refusedSave, saveStatusText } from './save';
 import { AuthorParams, PopupPoint, popupMountPath } from './popupParams';
 import { TestData, selectTestData } from './testSet';
 import { drawColor, themeColor } from './theme';
@@ -81,8 +82,12 @@ export interface MapStudioDelegateState {
     lastReply: string;
     /** Id of the point.click message whose reply is awaited, or null. */
     pendingId: string | null;
-    /** The map store's items, as map.load sent them plus this session's saves. */
+    /** The map store's items: map.load's, then every map.changed and this session's saves. */
     items: MapItemRecord[];
+    /** The last change sequence number applied (map.load.reply or map.changed), or null before the first. */
+    seq: number | null;
+    /** How many times a gap in map.changed made this map reload with map.load. */
+    reloads: number;
     /** Bumped whenever items change, so the component knows to redraw them. */
     itemsRevision: number;
     /** The level map.load reported, or null before it answered. */
@@ -97,12 +102,18 @@ export interface MapStudioDelegateState {
  * Browser side of the component delegate: sends envelopes to the Gateway
  * delegate and keeps what the replies say. Point-click replies set the reply
  * line; map.load and edits.apply replies are routed by message id and never
- * change it, and they log to the console at info only.
+ * change it, and they log to the console at info only. map.changed (sent to
+ * every open map of the project after each committed batch) goes to changes.ts
+ * first and never touches the reply line or the pending point click; a gap in
+ * its seq sends map.load once.
  */
 export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private lastReply = '';
     private pendingId: string | null = null;
-    private items: MapItemRecord[] = [];
+    /** map.load.reply, map.changed and own saves, by the rule of changes.ts; sends map.load on a gap. */
+    private changes = new MapChanges(() => this.sendMapLoadMessage(), (afterSeq) => {
+        console.info('[MapStudio] A change was missed (gap in seq after ' + afterSeq + '); reloading the map.');
+    });
     private itemsRevision = 0;
     private level: EditLevel | null = null;
     private load: MapStudioDelegateState['load'] = { state: 'loading', message: '' };
@@ -119,7 +130,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         return {
             lastReply: this.lastReply,
             pendingId: this.pendingId,
-            items: this.items,
+            items: this.changes.state.items,
+            seq: this.changes.seq,
+            reloads: this.changes.reloads,
             itemsRevision: this.itemsRevision,
             level: this.level,
             load: this.load,
@@ -137,6 +150,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
     /** Ask the Gateway for the map (map.load); the items and the level arrive in handleEvent. */
     sendMapLoad(): void {
+        this.changes.load();
+    }
+
+    private sendMapLoadMessage(): void {
         const message = mapLoad();
         this.mapLoadId = message.id;
         this.load = { state: 'loading', message: '' };
@@ -174,6 +191,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             return;
         }
         const reply = readReply(eventObject);
+        if (reply.kind === 'map.changed') {
+            this.onMapChanged(reply.body);
+            return;
+        }
         if (reply.kind === 'map.load.reply' || (reply.kind === 'error' && reply.id === this.mapLoadId)) {
             this.onMapLoad(reply);
             return;
@@ -192,18 +213,29 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     }
 
     private onMapLoad(reply: Reply): void {
+        this.mapLoadId = null;
+        console.info('[MapStudio] ' + replyText(reply));
         if (reply.kind === 'map.load.reply') {
-            this.items = reply.body.items;
-            this.itemsRevision++;
             this.level = reply.body.level;
             this.load = { state: 'loaded', message: '' };
+            this.itemsRevision++;
+            // May send one more map.load (a gap among the changes held during the load).
+            this.changes.loaded(reply.body);
         } else if (reply.kind === 'error') {
             this.level = null;
             this.load = { state: 'failed', message: reply.body.code + ': ' + reply.body.message };
+            this.changes.loadFailed();
         }
-        this.mapLoadId = null;
-        console.info('[MapStudio] ' + replyText(reply));
         this.notify();
+    }
+
+    /** A map.changed from the Gateway; `body` is null when it could not be read (a gap). */
+    private onMapChanged(body: MapChangedBody | null): void {
+        if (this.changes.changed(body)) {
+            this.itemsRevision++;
+            console.debug('[MapStudio] Map changed: seq ' + this.changes.seq);
+            this.notify();
+        }
     }
 
     private onSave(reply: Reply): void {
@@ -219,8 +251,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         if (reply.kind === 'edits.apply.reply') {
             const result = reply.body.results.find((r) => r.id === pending.id);
             const version = result ? result.version : 1;
-            this.items = withItem(this.items, { ...pending, version });
-            this.itemsRevision++;
+            if (this.changes.saved({ ...pending, version })) {
+                this.itemsRevision++;
+            }
             this.save = { state: 'saved', itemId: pending.id, version };
         } else {
             this.save = refusedSave(pending.id, reply.body);
@@ -659,7 +692,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 <div className="mapstudio-map" ref={this.setMapContainer}
                      data-test-set={this.testData.name}
                      data-edit-level={delegate && delegate.level ? delegate.level : ''}
-                     data-load-state={load.state} />
+                     data-load-state={load.state}
+                     data-store-seq={delegate && delegate.seq !== null ? String(delegate.seq) : ''}
+                     data-map-reloads={delegate ? String(delegate.reloads) : '0'} />
                 <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '')}
                      data-pending={pending ? 'true' : 'false'}
                      data-drawing={this.state.drawing ? 'true' : 'false'}

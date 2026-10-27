@@ -45,7 +45,10 @@ public final class Messages {
     public static final String EDITS_APPLY = "edits.apply";
     /** Body {batchId, seq, results: [{entity, id, version}]}. */
     public static final String EDITS_APPLY_REPLY = "edits.apply.reply";
-    /** Body {seq, ops}. Declared in 0.2.0; sent from epic-map-store-and-data entry 4. */
+    /**
+     * Body {seq, batchId, actor, ops: [{op, entity, id, version, record}]}, record the full stored
+     * record after the op; sent to every open map of the project after each committed batch (entry 4).
+     */
     public static final String MAP_CHANGED = "map.changed";
     public static final String ERROR = "error";
 

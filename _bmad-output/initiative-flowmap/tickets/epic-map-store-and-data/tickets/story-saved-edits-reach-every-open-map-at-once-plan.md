@@ -3,14 +3,14 @@ title: 'Saved edits reach every open map at once'
 type: 'feature'
 ticket: '4'
 created: '2026-10-26'
-status: 'draft'
-baseline_revision: ''
+status: 'in-review'
+baseline_revision: 'c8b272cce024d7d26864d8592ca0114838be87e2'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: [quick]
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-tracer-one-edit-saved-through-the-write-path-and-read-back-plan.md'
@@ -39,6 +39,11 @@ context:
 - Conflicts, retries, deletes, the phone matrix (entry 2), kind or asset lists (entry 3), live setup change (entry 6), `values.batch` or the live-value resubscribe (epic-viewing), the unsaved-edit queue (entry 8).
 - Change entry 1's message shapes other than adding `map.changed`'s body, or change the existing e2e specs.
 
+**Decisions (owner, "approve 2 to 7, recommendations", 2026-10-26, answers to the plan's Open Questions):**
+- `map.changed` carries each op's full stored record after commit, plus `batchId` and `actor` (Design Notes, Body).
+- The change hook gets the committed records from entry 1 (`ChangeHook.onCommitted(CommittedBatch(project, seq, batchId, actor, ops))`, each `CommittedOp(op, entity, id, record)`); entry 1 built it that way, so this story does not edit `WriteService`.
+- Events missed while a browser is disconnected are caught at the next `map.changed` (gap, reload) or the next page open; reload on Perspective reconnect is deferred to epic-viewing (AD-6).
+
 ## I/O & Edge-Case Matrix
 
 | Scenario | Input / State | Expected Output / Behavior | Error Handling |
@@ -58,25 +63,25 @@ context:
 
 ## Code Map
 
-- Entry 1 plan (context) -- the contracts. `write/ChangeHook.java` is the interface this story implements; `write/NoChangeHook.java` stays for unit tests; `WriteService` calls the hook once per commit, after commit; `MapStudioGatewayHook` builds the services and the delegate factory (`MapStudioDelegate::new` today); `Messages.java` declares `map.changed`.
+- Entry 1 plan (context; its Plan Change Log has the final names) -- `write/ChangeHook.java`: `onCommitted(CommittedBatch(String project, long seq, String batchId, Actor actor, List<CommittedOp> ops))`, `CommittedOp(String op, String entity, String id, MapItemRecord record)` (the version is `record.version()`); `write/NoChangeHook.java` stays for unit tests; `WriteService` calls the hook once per commit, after commit, and logs a hook exception. `MapStudioServices` builds every part (`ChangeHook hook = new NoChangeHook()` today) and `stop()` shuts its pools; `MapStudioGatewayHook` registers the delegate factory `component -> new MapStudioDelegate(component, services)`. `Messages.MAP_CHANGED` is already in `OUTBOUND_TYPES`. Refusals are `MapStudioException`; the write service refuses any `kindSetup` op `invalid` until entry 3.
 - `gateway/.../gateway/MapStudioDelegate.java` -- `onStartup`/`onShutdown` exist (debug lines); `fireEvent(name, JsonObject)` calls `component.fireEvent("model", ...)`; `envelope(type, id, body)` is static and reusable; keep the "no exception escapes" rule.
 - SDK [SDK 8.3.10 javap], behaviour unverified: `Component.getSession()`, `Session.getProjectName()`, `Session.queue(): ExecutionQueue` (`submit(Runnable)`, ordered per session), `ComponentModelDelegate.fireEvent(String, JsonObject)`.
 - `web/typescript/MapStudio.tsx` -- `MapStudioStoreDelegate.handleEvent` (line ~108) writes every reply into `lastReply` and warns on an id mismatch: route `map.changed` before that code. Entry 1 adds `map.load` on mount, the items sources `mapstudio-items-point`/`-line` and `data-items-loaded`; reuse its item drawing, do not add a second one.
-- `web/typescript/messages.ts` -- `readReply` returns `invalid` for unknown types; add a `map.changed` case. `web/typescript/contract.ts` (entry 1) -- `MapItemRecord` type.
-- `e2e/tests/fixtures.mjs` (`openMap`, `watch`, entry 1's `signIn`), `e2e/tests/store.spec.mjs` (entry 1) -- patterns; not edited.
+- `web/typescript/messages.ts` -- `readReply` returns `invalid` for unknown types; add a `map.changed` case. `web/typescript/contract.ts` (entry 1) -- `MapItemRecord`, `readMapItem`, `MapLoadReplyBody`; `save.ts` `itemsToGeoJson` and `withItem` draw the items; the delegate's `onSave` already adds a saved record to `items`.
+- `e2e/tests/fixtures.mjs` (`openMap`, `watch`, `mapLoaded`, `editorTest`: a signed-in `test` whose context starts from a fresh sign-in's `storageState`), `e2e/tests/store.spec.mjs` (entry 1: `drawLine`, the `/edit` page's `#mapstudio-dev-script-checks` and `#mapstudio-dev-script-results`) -- patterns; not edited. The dev stack takes `MAPSTUDIO_CONTAINER` and `GATEWAY_HTTP_PORT` from the git-ignored `.env` (one compose project per checkout).
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `gateway/.../change/ChangeEvent.java`, `ChangeBus.java` (new) -- `ChangeBus implements ChangeHook`: subscribers per project (`ConcurrentHashMap` of `CopyOnWriteArraySet`), `subscribe(project, Consumer<JsonObject>)` returning an unsubscribe handle; one single-thread executor; per project a next-expected `seq` (taken from the first event after start) with a 2 s hold for a missing one; builds the `map.changed` body once per event; catches per subscriber; `close()` stops the executor -- AD-17.
-- [ ] `gateway/.../gateway/MapStudioDelegate.java` -- in `onStartup` subscribe with the session's project; in `onShutdown` unsubscribe; deliver through `component.getSession().queue().submit(...)` then `fireEvent(EVENT_NAME, envelope(MAP_CHANGED, <new UUID>, body))` (fallback if the queue path does not reach the browser live: `fireEvent` directly from the bus thread; record which worked).
-- [ ] `gateway/.../gateway/MapStudioGatewayHook.java` -- build one `ChangeBus`, hand it to `WriteService` in place of `NoChangeHook` and to the delegate factory the same way the write service is handed in; close it in `shutdown`.
-- [ ] `common/.../common/Messages.java` -- `MAP_CHANGED` in `OUTBOUND_TYPES` if entry 1 left it out.
-- [ ] `web/typescript/changes.ts` (new, pure) -- `ChangeState {seq, loaded, buffer, items}`; `onLoad(state, reply)`, `onChanged(state, raw)` returning `{state, action: 'apply'|'ignore'|'reload'}`; version rule; tombstone (`deleted`) removes the item.
-- [ ] `web/typescript/messages.ts`, `MapStudio.tsx` -- read `map.changed`; in the store delegate send it to `changes.ts`, redraw the items sources, set `data-store-seq` and `data-map-reloads`, on `reload` send `map.load` once (no second while one is pending).
-- [ ] `gateway/src/test/.../change/ChangeBusTest.java`, `MapStudioDelegateTest.java` (extend), `web/typescript/__tests__/changes.test.ts` (new) -- every matrix row; the bus with a fake clock for the hold.
-- [ ] `e2e/tests/changes.spec.mjs` (new) -- editor at `/edit` and anonymous viewer at `/` in two browser contexts; editor draws a line; viewer's `data-items-loaded` grows by 1 within 5 s, a `window` marker set before the save survives (no navigation), `data-map-reloads` stays 0; then "Run script checks" and the viewer sees the script's point; screenshots `mapstudio-changes-{1440,390}.png`.
-- [ ] `docs/contract.md` (the `map.changed` section: body, ordering, gap rule, example), `docs/platform-checks.md` (section "Epic 2 story 4 - pushing from the Gateway": which delivery path reached the browser).
+- [x] `gateway/.../change/ChangeEvent.java`, `ChangeBus.java` (new) -- `ChangeBus implements ChangeHook`: subscribers per project (`ConcurrentHashMap` of `CopyOnWriteArraySet`), `subscribe(project, Consumer<JsonObject>)` returning an unsubscribe handle; one single-thread executor; per project a next-expected `seq` (taken from the first event after start) with a 2 s hold for a missing one; builds the `map.changed` body once per event; catches per subscriber; `close()` stops the executor -- AD-17.
+- [x] `gateway/.../gateway/MapStudioDelegate.java` -- in `onStartup` subscribe with the session's project; in `onShutdown` unsubscribe; deliver through `component.getSession().queue().submit(...)` then `fireEvent(EVENT_NAME, envelope(MAP_CHANGED, <new UUID>, body))` (fallback if the queue path does not reach the browser live: `fireEvent` directly from the bus thread; record which worked).
+- [x] `gateway/.../gateway/MapStudioServices.java` -- build one `ChangeBus` (field `changes`), hand it to `WriteService` in place of `NoChangeHook`; the delegate reaches it through the services it already gets; close it in `stop()`.
+- [x] `common/.../common/Messages.java` -- the `MAP_CHANGED` comment names the body (the type is already in `OUTBOUND_TYPES`).
+- [x] `web/typescript/changes.ts` (new, pure) -- `ChangeState {seq, loaded, buffer, items}`; `onLoad(state, reply)`, `onChanged(state, raw)` returning `{state, action: 'apply'|'ignore'|'reload'}`; version rule; tombstone (`deleted`) removes the item.
+- [x] `web/typescript/messages.ts`, `MapStudio.tsx` -- read `map.changed`; in the store delegate send it to `changes.ts`, redraw the items sources, set `data-store-seq` and `data-map-reloads`, on `reload` send `map.load` once (no second while one is pending).
+- [x] `gateway/src/test/.../change/ChangeBusTest.java`, `MapStudioDelegateTest.java` (extend), `web/typescript/__tests__/changes.test.ts` (new) -- every matrix row; the bus with a fake clock for the hold.
+- [x] `e2e/tests/changes.spec.mjs` (new) -- editor (`editorTest`) at `/edit` and anonymous viewer at `/` in a second browser context; editor draws a line; viewer's `data-items-loaded` grows by 1 within 5 s, a `window` marker set before the save survives (no navigation), `data-map-reloads` stays 0; then "Run script checks" and the viewer sees the script's point; screenshots `mapstudio-changes-{1440,390}.png`.
+- [x] `docs/contract.md` (the `map.changed` section: body, ordering, gap rule, example), `docs/platform-checks.md` (section "Epic 2 story 4 - pushing from the Gateway": which delivery path reached the browser).
 
 **Acceptance Criteria:**
 - Given the dev stack with two browsers open on the dev view, when a line is saved in one, then it appears in the other within 5 s without a page reload (verify line; e2e).
@@ -85,7 +90,17 @@ context:
 
 ## Implementation Notes
 
+Implemented directly in the planning session (no implementation subagent was available), 2026-10-27, on the `ms-e2s4` dev Gateway (port 9124, `inductiveautomation/ignition:8.3.10`, `postgres:16-alpine`, fresh volumes).
+
+- **Delivery path:** the session's execution queue (`component.getSession().queue().submit(...)`, then `fireEvent`) reached the browser on the first run; the fallback was not needed (`docs/platform-checks.md`, "Epic 2 story 4 - pushing from the Gateway").
+- **Gateway:** `change/ChangeBus` is the change hook, built and closed by `MapStudioServices` (field `changes`, one daemon thread `MapStudio-changes` that also runs the 2 s hold timer); `change/ChangeEvent.of(CommittedBatch)` builds the body once. An early or stale hold timer re-arms for the rest of the hold, so a gap is never stuck. A late seq (after its gap was skipped) is still delivered; browsers ignore it.
+- **Browser:** `changes.ts` holds the pure rule and `MapChanges`, the delegate's change handling (sends `map.load` at mount and once per gap, counts gap reloads), so the delegate's reload behaviour is unit tested in node without Perspective. A buffer beyond 500 held changes, or an unreadable change while loading, marks the state stale and reloads once after the reply. The own save now applies its record by the version rule (so a `map.changed` for it that arrived first is not overwritten with the browser's unrounded geometry). `map.changed` logs at `console.debug`; a gap reload at info.
+- **Runs:** `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew clean build --warning-mode all` green: common 8, gateway 54 (`ChangeBusTest` 10, `MapStudioDelegateTest` 8), Jest 57 in 8 suites (`changes.test.ts` 15). `ops/up.sh --fresh`, then `cd e2e && npm test`: 18 of 18 (the 16 existing unchanged, `changes.spec.mjs` 2: the viewer drew the editor's line and the script's point within 5 s, no reload, `data-map-reloads` 0, both maps at the same `data-store-seq`). Gateway log after the suite: no Map Studio warning or error. No em dash in changed files.
+- **Not seen live:** a gap reload and the out-of-order hold (unit tested only); that `onShutdown` runs when a page closes (marked unverified in the docs).
+
 ## Plan Change Log
+
+**Real names from entry 1, 2026-10-27 (before implementation; not a loopback).** After merging entry 1 (`ccr-3c8b84b9-f1vbsm`), the plan uses its final names: `MapStudioException`, `map.load.reply` and `edits.apply.reply`, the error body `{code, message, batchId?, op?: {index, id}}`, `ChangeHook.onCommitted(CommittedBatch)` with full records, services wired in `MapStudioServices`, `editorTest` for the editor's e2e context. Open Questions resolved by the owner's approval (recorded under Decisions in the frozen block).
 
 ## Review Triage Log
 
@@ -102,12 +117,6 @@ seq <= current:      ignore
 seq == current + 1:  apply records with version > drawn; current = seq
 seq >  current + 1:  reload (map.load), keep buffering until the reply
 ```
-
-## Open Questions
-
-1. **What `map.changed` carries.** (a) Each op's full stored record after commit, plus `batchId` and `actor` (recommended; self-contained; a 120-pad batch is about as large as its `edits.apply`). (b) Only `{entity, id, version}` per op; browsers fetch the records with a new message type: smaller pushes, one more round trip per change and a new type in the contract.
-2. **Records in the change hook.** Entry 1 is being built and fixes the `ChangeHook` signature. (a) Ask entry 1 now to pass the committed records (project, seq, batchId, actor, records) to the hook, so this story never edits `WriteService` (recommended; entry 2 rewrites `WriteService`). (b) Take whatever entry 1 passes; if it lacks the records, this story adds them to `WriteService` and rebases after entry 2.
-3. **Missed events while the browser is disconnected.** (a) Caught at the next `map.changed` (gap, reload) or at the next page open; reload on Perspective reconnect deferred to epic-viewing, which sends the full value batch on reconnect (AD-6) (recommended). (b) Also reload on reconnect now: the client-side reconnect signal is unverified.
 
 ## Verification
 
