@@ -37,7 +37,23 @@ export const measuresOutFile = path.join(outDir, 'measures.json');
 /** The committed copy: only with E2E_DOCS=1, and only when every measure test passed. */
 export const measuresDocsFile = docsMode ? path.join(repoRoot, 'docs', 'spike-measures.json') : null;
 
-/** The project's session URL for a page path such as '/' or '/edit'. */
-export function sessionUrl(pagePath = '/') {
-    return `${gatewayUrl()}/data/perspective/client/mapstudio-dev${pagePath === '/' ? '' : pagePath}`;
+/**
+ * The Perspective project the suite drives: MAPSTUDIO_E2E_PROJECT, else the dev project. The perf
+ * run (perf/, epic 2 story 17) sets mapstudio-perf, so the sign-in and the shared helpers open its pages.
+ */
+export function e2eProject() {
+    return process.env.MAPSTUDIO_E2E_PROJECT || 'mapstudio-dev';
 }
+
+/** A project's session URL for a page path such as '/' or '/edit' (default project: e2eProject()). */
+export function sessionUrl(pagePath = '/', project = e2eProject()) {
+    return `${gatewayUrl()}/data/perspective/client/${project}${pagePath === '/' ? '' : pagePath}`;
+}
+
+/** The perf run's output folder (git-ignored with e2e/out) and its per-phase result files. */
+export const perfOutDir = path.join(outDir, 'perf');
+export function perfPhaseFile(phase) {
+    return path.join(perfOutDir, `phase-${phase}.json`);
+}
+/** The merged result of a run, with a verdict per limit. */
+export const perfOutFile = path.join(outDir, 'perf.json');

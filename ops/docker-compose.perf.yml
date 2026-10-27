@@ -1,0 +1,9 @@
+# Overlay for ops/perf.sh (epic 2 story 17). DEVELOPMENT ONLY.
+#
+# Adds the scratch project mapstudio-perf (ops/perf/project), whose Map Studio setup names the dev
+# stack's MapStudio connection. Its map items are made by the run through edits.apply and deleted by
+# ops/perf.sh afterwards (rows with project = 'mapstudio-perf' only); the plain stack never has it.
+services:
+  gateway:
+    volumes:
+      - ./perf/project:/usr/local/bin/ignition/data/projects/mapstudio-perf

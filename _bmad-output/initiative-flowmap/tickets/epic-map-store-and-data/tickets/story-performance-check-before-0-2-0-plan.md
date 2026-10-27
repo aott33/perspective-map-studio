@@ -3,13 +3,13 @@ title: 'Performance check before 0.2.0'
 type: 'chore'
 ticket: '17'
 created: '2026-10-27'
-status: 'draft'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: '273dccd7dfd61e3bc1bbcf90d128988b3ffb1f8c'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'coordinator'
 lenses_ran: []
 review_loop_iteration: 0
 context:
@@ -30,6 +30,15 @@ context:
 - A repeatable script; results with their method in docs/platform-checks.md; compared release to release from now on.
 - Measures and limits: map.load time and payload at 30, 1,000 and 5,000 items (5,000 under 1 s); edits.apply median and p95, 1-op and 50-op batches, 1 and 10 editors at once (p95 under 300 ms); a save reaching other open maps (map.changed) with 10 and 50 open sessions (all within 1 s); kind and asset list refresh with 300 assets (under 1 s, no CPU spike); Gateway CPU and memory idle and with 20 sessions open (small next to a Gateway without Map Studio, "small" defined as a number here); browser bundle versus 0.1.0 (grows less than 10%); the frame-rate measure repeated as `e2e/tests/measures.spec.mjs` does (recorded, not pass/fail).
 - A miss is fixed before the release or accepted by the owner.
+
+## Decision (owner, 2026-10-27: "agree with all recommendations, start building")
+
+1. One story: the template-stack run is the same script with `--target template`.
+2. "Small" and "spike" as below are the limits: idle, Map Studio adds at most 2% of one core (mean) and 64 MiB heap; with 20 sessions open on the 1,000-item map at most 10% of one core and 200 MiB more than 20 sessions on `/plain` without the module; no spike = no 1 s CPU reading during list refreshes above the idle mean plus 50% of one core. map.load is judged on p95 of 10 runs; map.changed is timed from the editor's send (the save included).
+3. Template stack: hand-install the unsigned 0.2.0 candidate on the kept 300-pad stack. If that Gateway refuses unsigned modules, record it and run the template measures right after the 0.2.0 tag (story 13); a miss found then is fixed in 0.2.1.
+4. A miss is fixed in this story when the fix is small; otherwise it becomes a new entry before story 13, or the owner accepts it in docs/platform-checks.md.
+5. A busy refusal is counted, never retried, and makes its measure a miss.
+6. 50 sessions are tried here at 320x240; when they do not all load within 5 minutes the measure is `unavailable` with the count reached, and the laptop run fills it.
 
 ## Boundaries & Constraints
 
@@ -96,16 +105,23 @@ context:
 
 ## Open Questions
 
-1. **Plan size.** About 3,300 tokens, above the 1,600 guide. Keep, or split the template-stack run into its own entry? Recommended: keep; it is the same script with a target flag.
-2. **Limit numbers.** Accept "small" and "no spike" as in Design Notes, map.load judged on p95 of 10, map.changed measured from the editor's send (save included)? Recommended: yes.
-3. **0.2.0 candidate on the template stack.** Its image bakes the signed 0.1.0. Options: hand-install the unsigned candidate on the kept 300-pad stack (needs unsigned modules allowed there [unverified]); or run the template measures right after the 0.2.0 tag in story 13. Recommended: hand-install; if the Gateway refuses it, run after the tag and treat a miss as a 0.2.1 fix.
-4. **A miss.** Fix in this story when the fix is small, otherwise a new entry before story 13 or the owner accepts it in docs/platform-checks.md? Recommended: yes.
-5. **Busy refusal.** Count it, no retry, the measure is a miss? Recommended: yes; a retry would hide the limit.
-6. **50 sessions here.** Try at 320x240 and record `unavailable` if they do not all load in 5 min? Recommended: yes; the laptop fills it.
+None: all six were answered by the owner on 2026-10-27 (Decision above).
 
 ## Implementation Notes
 
 ## Plan Change Log
+
+- 2026-10-27, approval: the owner approved with all six recommended answers; Decision recorded, Open Questions resolved, status in-progress. A context-free review of the plan alone (before any code) found eight gaps; each is addressed in the build as below.
+- Finding 1 (template cleanup): `ops/perf.sh` cleans up per target. Dev: the EXIT trap recreates the plain stack with `docker compose -p <this checkout>` and deletes only `project = 'mapstudio-perf'` rows. Template: never `compose up` or `down` on `ign-og-test`; the project is copied in with `docker cp` plus a project scan and removed on exit the same way, only perf rows are deleted, and the trap compares the Gateway's project list and every other project's row counts before and after (a change fails the run). The dev run compares the same row counts.
+- Finding 2 (timeouts pass as fast): every send is classified (`ok`, `busy`, `timeout`, `error:<code>`) in `e2e/perf/result.mjs`; any non-ok outcome makes the measure a miss, and a verdict needs exactly the planned number of good samples (`latencyVerdict`, unit tested with every sample timed out).
+- Finding 3 (fewer items than claimed): before each map.load measure the warm-up reply must hold the target count and every timed reply is checked; open-to-drawn, frame rate and viewer pages check `data-items-loaded`; editors check their map.load. A wrong count makes the measure unavailable (or that sample an error).
+- Finding 4 (percentile method): nearest-rank (`PERCENTILE_METHOD` in result.mjs, recorded in every result), n with every statistic, unit tests for n of 10 and 20; edits.apply samples are pooled over the editors (n 20 or 200).
+- Finding 5 (baseline comparable): the dev image brings no third-party module and `ops/modules` holds only the staged Map Studio `.modl`, so the nomodule overlay mounting an empty folder over `/external-modules` removes Map Studio only; each phase records the Gateway's module list (`/data/api/v1/modules/healthy`) in its env. Both phases recreate the Gateway, settle the same `PERF_SETTLE_S`, mount the same perf project and run back to back.
+- Finding 6 (secret in traces): `perf/playwright.perf.config.mjs` sets trace, video and screenshot off; sign-in stays in `lib/signInCli.mjs`'s own process; the global teardown's password scan runs, and `ops/perf.sh` greps `e2e/out` for every secret of the run (dev passwords, admin password, API token, PostgreSQL password), deleting a hit and failing the run.
+- Finding 7 (map.changed observer gap): the MutationObserver is attached on every viewer before the first save; each save records how many sessions saw its seq against N; fewer than N within 10 s is a miss.
+- Finding 8 (warm-up): every timed measure discards one warm-up (map.load, each editor's edits.apply per batch size, list refresh); frame rate keeps measureView's 2 s warm-up.
+- Implementation: the `/tools` page is part of `/edit` (one signed-in page holds the map, the sign-in and the "Time a list refresh" button); its dom ids for the user label and the login button are the dev `/edit` page's, so `lib/editorAuth.mjs` signs in unchanged apart from the project in its URL check (`e2eProject()`, from `MAPSTUDIO_E2E_PROJECT`). Frame rate is also taken at 1,000 items (Design Notes name 30, 1,000 and 5,000; the run order named two). The bundle is judged on the files a page load fetches against every non-licence file of the v0.1.0 web jar.
+- Decision 3, read from `ign-scada-template/docker-compose.yml` (read only): its Gateway command has no `-Dignition.allowunsignedmodules=true`, so the kept 300-pad stack refuses the unsigned candidate [unverified live, read from the compose file]; no template stack is kept on this box either. Per decision 3 the template measures run right after the 0.2.0 tag (story 13); `ops/perf.sh --target template` refuses (exit 2) until the test Gateway runs Map Studio 0.2.x.
 
 ## Review Triage Log
 
