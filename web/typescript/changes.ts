@@ -183,6 +183,8 @@ export class MapChanges {
     /** True once a map.load.reply has arrived. */
     loadedOnce = false;
     private loadPending = false;
+    /** True from a failed map.load until the next map.load.reply. */
+    private loadFailedLast = false;
 
     constructor(private readonly sendLoad: () => void, private readonly onReload: (afterSeq: number) => void = () => {}) {
     }
@@ -200,6 +202,7 @@ export class MapChanges {
 
     loaded(reply: MapLoadReplyBody): boolean {
         this.loadPending = false;
+        this.loadFailedLast = false;
         this.loadedOnce = true;
         const s = onLoad(this.state, reply);
         this.state = s.state;
@@ -209,15 +212,24 @@ export class MapChanges {
         return true;
     }
 
-    /** map.load was answered with an error: the map stays not loaded; changes keep buffering. */
+    /**
+     * map.load was answered with an error (the busy reply among them): the map stays
+     * not loaded and changes keep buffering; the next map.changed retries the load once.
+     */
     loadFailed(): void {
         this.loadPending = false;
+        this.loadFailedLast = true;
     }
 
+    /**
+     * A map.changed. While not loaded after a failed map.load (nothing pending), it
+     * starts one new reload, so a single refused load never leaves the map stale
+     * until the page is reloaded; a load that fails again waits for the next change.
+     */
     changed(body: MapChangedBody | null): boolean {
         const s = onChanged(this.state, body);
         this.state = s.state;
-        if (s.action === 'reload') {
+        if (s.action === 'reload' || (!this.state.loaded && this.loadFailedLast && !this.loadPending)) {
             this.reload();
         }
         return s.action === 'apply';

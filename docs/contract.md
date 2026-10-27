@@ -22,7 +22,7 @@ The `id` of a reply is the `id` of the message it answers.
 
 ## map.changed: saved edits reach every open map
 
-After every committed batch, from a browser or from `system.mapstudio.applyEdits`, the Gateway sends one `map.changed` to every open Map Studio component of that project, whatever its level (`none`, `phone`, `full`), the saving session included; another project's maps get nothing **[live 8.3.10]**. Its `id` is a new UUID (it answers nothing).
+After every committed batch, from a browser or from `system.mapstudio.applyEdits`, the Gateway sends one `map.changed` to every open Map Studio component of that project, whatever its level, the saving session included: a `full` editor and a `none` viewer of one project **[live 8.3.10]**; `phone` maps, and another project's maps getting nothing, are unit tested only (`ChangeBusTest`, `MapStudioDelegateTest`) **[unverified live]**. Its `id` is a new UUID (it answers nothing).
 
 ```json
 {"v": 1, "type": "map.changed", "id": "<UUID>",
@@ -34,10 +34,11 @@ After every committed batch, from a browser or from `system.mapstudio.applyEdits
                               "version": 1, "deleted": false}}]}}
 ```
 
-- `seq` is the batch's change sequence number; `batchId` and `actor` are the saved batch's (the session's user name, or the actor a script named).
-- Each op carries `version` (after the op) and `record`, the full stored record after the op: a map item record for `entity` `item` (a tombstone has `deleted: true`), a kind setup record `{kindId, setup, version, deleted}` for `kindSetup` (from entry 3). Full records, because an update carries only the fields it changes.
-- **Order.** The Gateway sends a project's changes in `seq` order: a batch whose hook runs before an earlier batch's is held up to 2 s for it; a `seq` that never arrives is skipped after 2 s. Delivery never runs inside the write transaction and never delays the saver's reply.
+- `seq` is the batch's change sequence number; `batchId` and `actor` are the saved batch's (the session's user name, or the actor a script named). A map at level `none` gets `actor` as `""`: an anonymous viewer never learns the editors' user names (`map.load` never names them either). `phone` and `full` maps get the name. The level is read when the change is sent (unit tested, `MapStudioDelegateTest`) **[unverified live]**.
+- Each op carries `version` (after the op) and `record`, the full stored record after the op: a map item record for `entity` `item` (a tombstone has `deleted: true`), a kind setup record `{kindId, setup, version, deleted}` for `kindSetup` (from entry 3). Full records, because an update carries only the fields it changes. Every op carries both: the Gateway refuses to send a batch with an op that has no record (it logs the hook failure at error) rather than send a body every browser would read as unreadable; the skipped `seq` then reaches browsers as a gap.
+- **Order.** The Gateway sends a project's changes in `seq` order: a batch whose hook runs before an earlier batch's is held up to 2 s for it; a `seq` that never arrives is skipped after 2 s. The first event of a project after a Gateway start sets the expected `seq`, so an out-of-order pair among the very first batches after a start is not held: open browsers reload once on that gap. Delivery never runs inside the write transaction and never delays the saver's reply.
 - **Browser rule.** Before its `map.load.reply` the browser holds `map.changed`, then applies the held ones above the loaded `seq` in order. On a loaded map: `seq` at or below the current one is ignored; `seq` one above is applied, each record only when its `version` is above the drawn one (so a repeated or self-sent change does nothing); a `seq` further ahead, or an unreadable `map.changed` (no `seq` or `ops`, or a bad record), is a gap: the browser sends `map.load` once, replaces its items with the reply and keeps holding changes until then. `seq` advances only through `map.load.reply` and `map.changed`, never through `edits.apply.reply`.
+- A `map.load` answered with an error (the busy `store-unreachable` reply among them) leaves the map not loaded and holding changes; the next `map.changed` sends one new `map.load`, so a refused reload never leaves the map stale until the page is reloaded.
 - A browser that was disconnected catches up at its next gap or its next page open; reloading on a Perspective reconnect is epic-viewing's (AD-6).
 - The dev component shows the state for tests as `data-store-seq` (the last `seq` applied) and `data-map-reloads` (gap reloads) on `.mapstudio-map`.
 

@@ -163,13 +163,34 @@ describe('the store delegate\'s change handling (MapChanges)', () => {
         expect(changes.state.items.length).toBe(1);
     });
 
-    test('a failed map.load leaves the map not loaded and changes buffered', () => {
+    test('a failed map.load leaves the map not loaded; the next change retries the load once', () => {
         const sent: number[] = [];
         const changes = new MapChanges(() => sent.push(1));
         changes.load();
         changes.loadFailed();
         changes.changed(changed(3, item('L3')));
         expect(changes.state.buffer.length).toBe(1);
-        expect(sent.length).toBe(1);
+        expect(sent.length).toBe(2);
+        changes.changed(changed(4, item('L4')));
+        expect(sent.length).toBe(2);
+        changes.loaded(loadReply(2));
+        expect(changes.seq).toBe(4);
+        expect(changes.state.items.length).toBe(2);
+    });
+
+    test('a gap reload refused as busy is retried at the next change, not left stale', () => {
+        const sent: number[] = [];
+        const changes = new MapChanges(() => sent.push(1));
+        changes.load();
+        changes.loaded(loadReply(5));
+        changes.changed(changed(7, item('L7')));
+        expect(sent.length).toBe(2);
+        changes.loadFailed();
+        changes.changed(changed(8, item('L8')));
+        expect(sent.length).toBe(3);
+        expect(changes.reloads).toBe(2);
+        changes.loaded(loadReply(6));
+        expect(changes.seq).toBe(8);
+        expect(changes.state.loaded).toBe(true);
     });
 });

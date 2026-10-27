@@ -2,8 +2,24 @@ package com.aoindustrial.perspective.mapstudio.gateway;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import com.inductiveautomation.ignition.common.gson.JsonObject;
+import com.inductiveautomation.ignition.common.gson.JsonParser;
+import com.inductiveautomation.ignition.common.util.ExecutionQueue;
+import com.inductiveautomation.ignition.common.util.LoggerEx;
+import com.inductiveautomation.perspective.gateway.api.Component;
+import com.inductiveautomation.perspective.gateway.api.Session;
 import org.junit.jupiter.api.Test;
+
+import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
+import com.aoindustrial.perspective.mapstudio.gateway.change.ChangeBus;
+import com.aoindustrial.perspective.mapstudio.gateway.setup.SetupRegistry;
+import com.aoindustrial.perspective.mapstudio.gateway.write.Actor;
+import com.aoindustrial.perspective.mapstudio.gateway.write.ChangeHook;
 
 /** The I/O matrix of story 1's plan, one test per row. */
 class MapStudioDelegateTest {
@@ -100,5 +116,117 @@ class MapStudioDelegateTest {
         assertEquals(5, a.getAsJsonObject("body").get("seq").getAsInt());
         assertEquals(36, a.get("id").getAsString().length());
         assertEquals(false, a.get("id").getAsString().equals(b.get("id").getAsString()));
+    }
+
+    /** A fake open map: a component of project {@code project} whose session queue runs tasks at once. */
+    private static final class FakeMap {
+        final AtomicBoolean running = new AtomicBoolean(true);
+        final AtomicBoolean queueRefuses = new AtomicBoolean();
+        final List<JsonObject> fired = new ArrayList<>();
+        final Component component;
+
+        FakeMap(String project) {
+            ExecutionQueue queue = new ExecutionQueue(task -> {
+                if (queueRefuses.get()) {
+                    throw new IllegalStateException("session closed");
+                }
+                task.run();
+            });
+            Session session = (Session) Proxy.newProxyInstance(Session.class.getClassLoader(),
+                new Class<?>[] {Session.class}, (proxy, method, args) -> switch (method.getName()) {
+                    case "getProjectName" -> project;
+                    case "queue" -> queue;
+                    case "isRunning" -> true;
+                    default -> null;
+                });
+            this.component = (Component) Proxy.newProxyInstance(Component.class.getClassLoader(),
+                new Class<?>[] {Component.class}, (proxy, method, args) -> switch (method.getName()) {
+                    case "getSession" -> session;
+                    case "getLogger" -> LoggerEx.newBuilder().build("MapStudio.test");
+                    case "getComponentAddressPath" -> "root/map";
+                    case "isRunning" -> running.get();
+                    case "fireEvent" -> {
+                        fired.add((JsonObject) args[2]);
+                        yield null;
+                    }
+                    default -> null;
+                });
+        }
+    }
+
+    private static ChangeHook.CommittedBatch batch(String project, long seq) {
+        String id = "00000000-0000-4000-8000-" + String.format("%012d", seq);
+        JsonObject data = JsonParser.parseString("{\"kind\":\"line\",\"name\":\"L\",\"geometry\":{\"type\":"
+            + "\"LineString\",\"coordinates\":[[-104.99,39.74],[-104.98,39.75]]}}").getAsJsonObject();
+        return new ChangeHook.CommittedBatch(project, seq, "b-" + seq, Actor.session("mapeditor"),
+            List.of(new ChangeHook.CommittedOp("create", "item", id, MapItemRecord.fromCreate(id, data, 0))));
+    }
+
+    private static ChangeBus directBus() {
+        return new ChangeBus(Runnable::run, (task, delay) -> { }, () -> 0L, () -> { });
+    }
+
+    @Test
+    void anOpenMapSubscribesWithItsProjectAndLeavesAtShutdown() {
+        // Matrix row "Map closed": delegate shut down, unsubscribed, no further delivery.
+        ChangeBus bus = directBus();
+        FakeMap map = new FakeMap("P");
+        MapStudioDelegate delegate = new MapStudioDelegate(map.component, null, bus, new SetupRegistry(s -> { }));
+        delegate.startup();
+        assertEquals(1, bus.subscriberCount("P"));
+        assertEquals(0, bus.subscriberCount("Q"));
+        bus.onCommitted(batch("P", 5));
+        assertEquals(1, map.fired.size());
+        assertEquals("map.changed", map.fired.get(0).get("type").getAsString());
+        assertEquals(5, map.fired.get(0).getAsJsonObject("body").get("seq").getAsInt());
+        delegate.shutdown();
+        assertEquals(0, bus.subscriberCount("P"));
+        bus.onCommitted(batch("P", 6));
+        assertEquals(1, map.fired.size());
+    }
+
+    @Test
+    void aMapThatStoppedRunningLeavesTheBusAtTheNextChange() {
+        // A missed onShutdown must not keep the delegate (and its session) on the bus.
+        ChangeBus bus = directBus();
+        FakeMap map = new FakeMap("P");
+        new MapStudioDelegate(map.component, null, bus, new SetupRegistry(s -> { })).startup();
+        map.running.set(false);
+        bus.onCommitted(batch("P", 5));
+        assertEquals(0, map.fired.size());
+        assertEquals(0, bus.subscriberCount("P"));
+    }
+
+    @Test
+    void aMapWhoseQueueRefusesTheSendLeavesTheBus() {
+        ChangeBus bus = directBus();
+        FakeMap map = new FakeMap("P");
+        new MapStudioDelegate(map.component, null, bus, new SetupRegistry(s -> { })).startup();
+        map.queueRefuses.set(true);
+        bus.onCommitted(batch("P", 5));
+        assertEquals(0, bus.subscriberCount("P"));
+    }
+
+    @Test
+    void aNoneLevelMapGetsTheChangeWithoutTheActor() {
+        // The fake session has no user and the project no setup: level none.
+        ChangeBus bus = directBus();
+        FakeMap map = new FakeMap("P");
+        new MapStudioDelegate(map.component, null, bus, new SetupRegistry(s -> { })).startup();
+        bus.onCommitted(batch("P", 5));
+        assertEquals("", map.fired.get(0).getAsJsonObject("body").get("actor").getAsString());
+    }
+
+    @Test
+    void theActorIsKeptForPhoneAndFullAndTheSharedBodyIsNeverChanged() {
+        JsonObject body = new JsonObject();
+        body.addProperty("seq", 5);
+        body.addProperty("actor", "mapeditor");
+        assertEquals("mapeditor", MapStudioDelegate.bodyFor(body, "full").get("actor").getAsString());
+        assertEquals("mapeditor", MapStudioDelegate.bodyFor(body, "phone").get("actor").getAsString());
+        JsonObject none = MapStudioDelegate.bodyFor(body, "none");
+        assertEquals("", none.get("actor").getAsString());
+        assertEquals(5, none.get("seq").getAsInt());
+        assertEquals("mapeditor", body.get("actor").getAsString());
     }
 }

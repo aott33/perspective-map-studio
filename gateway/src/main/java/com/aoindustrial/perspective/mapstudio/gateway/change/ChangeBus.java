@@ -33,7 +33,12 @@ import com.aoindustrial.perspective.mapstudio.gateway.write.ChangeHook;
  * can run before seq 6's. The bus holds an event that arrives ahead of a missing
  * seq for up to {@link #HOLD_MILLIS}; a seq that never arrives (a crash between
  * commit and hook) is then skipped and browsers reload on the gap. The next
- * expected seq of a project is taken from its first event after start.
+ * expected seq of a project is taken from its first event after start, so an
+ * out-of-order pair among the very first batches after start is not held: the
+ * earlier seq goes out late and open browsers reload once on the gap. Accepted:
+ * the store's seq read when the first hook runs already includes that hook's own
+ * commit, and holding every first event would delay each project's first change
+ * after a start by the whole hold.
  *
  * <p>One failing subscriber never stops delivery to the others: its exception is
  * logged at debug and the next subscriber is served.

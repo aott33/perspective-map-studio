@@ -112,7 +112,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private pendingId: string | null = null;
     /** map.load.reply, map.changed and own saves, by the rule of changes.ts; sends map.load on a gap. */
     private changes = new MapChanges(() => this.sendMapLoadMessage(), (afterSeq) => {
-        console.info('[MapStudio] A change was missed (gap in seq after ' + afterSeq + '); reloading the map.');
+        console.info('[MapStudio] Reloading the map after seq ' + afterSeq + ' (a missed change, or a failed load).');
     });
     private itemsRevision = 0;
     private level: EditLevel | null = null;

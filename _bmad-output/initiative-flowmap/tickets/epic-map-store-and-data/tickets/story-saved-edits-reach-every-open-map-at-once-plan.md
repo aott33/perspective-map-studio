@@ -3,7 +3,7 @@ title: 'Saved edits reach every open map at once'
 type: 'feature'
 ticket: '4'
 created: '2026-10-26'
-status: 'in-review'
+status: 'built'
 baseline_revision: 'c8b272cce024d7d26864d8592ca0114838be87e2'
 route: 'full'
 route_source: 'auto'
@@ -103,6 +103,20 @@ Implemented directly in the planning session (no implementation subagent was ava
 **Real names from entry 1, 2026-10-27 (before implementation; not a loopback).** After merging entry 1 (`ccr-3c8b84b9-f1vbsm`), the plan uses its final names: `MapStudioException`, `map.load.reply` and `edits.apply.reply`, the error body `{code, message, batchId?, op?: {index, id}}`, `ChangeHook.onCommitted(CommittedBatch)` with full records, services wired in `MapStudioServices`, `editorTest` for the editor's e2e context. Open Questions resolved by the owner's approval (recorded under Decisions in the frozen block).
 
 ## Review Triage Log
+
+Pass 1 (lens: quick, context-free, on commits c8b272c..908465c, 2026-10-27; the reviewer read the code only and ran no tests, the findings were checked again here against the code): high 0, medium 2, low 5, false 0, maybe-false 0. Six patched, one rejected with the limitation documented; no loopback (each fix is local and the plan's intent and contracts stand).
+
+| # | Finding | Verdict | Route | Evidence and action |
+|---|---|---|---|---|
+| 1 | A map whose reload `map.load` failed (the busy `store-unreachable` reply) stayed not loaded and stale until the page was reloaded | medium | patch | Real: `loadFailed()` cleared `loadPending` only and the not-loaded branch of `onChanged` never asks for a reload. Patched in `MapChanges`: after a failed load, the next `map.changed` that arrives while not loaded with nothing pending sends one new `map.load` (a load that fails again waits for the next change). The test that locked the old behaviour now checks the retry, and a new test covers a gap reload refused as busy. `docs/contract.md` says so. |
+| 2 | No test of the delegate's subscribe/unsubscribe; the bus kept every delegate whose `onShutdown` did not run; platform-checks understated it | medium | patch | Real. Patched: the delegate takes its bus and setups through a package constructor; `MapStudioDelegateTest` drives it with a proxy `Component`/`Session` (subscribes with the session's project, delivers, leaves at shutdown, nothing after). `sendChange` now leaves the bus when `component.isRunning()` is false or the session queue's `submit` throws (both unit tested; that a closed page gives either signal is [unverified]). `docs/platform-checks.md` now names the retained delegate, component and session. |
+| 3 | `actor` (an editor's user name) went to anonymous `none` viewers | low | patch | Real: `map.load` never disclosed editors. Patched: the delegate reads the session's level in the queued task (as for store messages) and sends a copy with `actor` `""` to `none` maps; the bus's shared body is never changed. Unit tested (`aNoneLevelMapGetsTheChangeWithoutTheActor`, `theActorIsKeptForPhoneAndFull...`); `docs/contract.md` states it, [unverified live]. |
+| 4 | An op with no record produced a body every browser rejects, so each would reload the whole map | low | patch | Real as a trap for entry 3's kind setups. Patched: `ChangeEvent.of` refuses an op without a record (`IllegalArgumentException`, logged at error by the write service's hook guard), so it fails loudly instead of sending a half-written body; Java tests for a `kindSetup` op without and with a record. `docs/contract.md` says every op carries both. |
+| 5 | Out-of-order commits among the first batches after a Gateway start are not held | low | reject (documented) | True but accepted: the store's seq read when the first hook runs already includes that hook's commit and possibly later ones, so it cannot give the expected seq, and holding every project's first event would delay its first change after each start by the whole 2 s hold. The cost is one gap reload per open map in a rare race right after a start. Stated in the `ChangeBus` javadoc and `docs/contract.md` (Order). |
+| 6 | `aStoppedBusDropsChangesQuietly` closed a bus with no subscribers, so it checked nothing | low | patch | Real. Patched: the stopped bus's subscriber is asserted to get nothing, and `bus` gets a subscriber before `close()`, then the count is asserted 0 and a later `onCommitted` delivers nothing. |
+| 7 | `docs/contract.md` labelled `phone` and other-project delivery [live 8.3.10] though only unit tested | low | patch | Real: the e2e run had a `full` editor and a `none` viewer of one project. The line now labels those two live and the `phone` and other-project parts unit tested only, [unverified live]. |
+
+Re-run after the patches: `./gradlew clean build` green (69 Java tests, 58 Jest tests); e2e on `ms-e2s4` (port 9124) 18 of 18, `changes.spec` at 1440 and 390 px included, secret scan clean.
 
 ## Design Notes
 

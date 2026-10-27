@@ -1,7 +1,7 @@
 package com.aoindustrial.perspective.mapstudio.gateway.change;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -182,13 +182,42 @@ class ChangeBusTest {
 
     @Test
     void aStoppedBusDropsChangesQuietly() {
+        List<JsonObject> onStopped = new ArrayList<>();
         ChangeBus stopped = new ChangeBus(r -> {
             throw new RejectedExecutionException("stopped");
         }, (t, d) -> { }, now::get, () -> { });
-        stopped.subscribe("P", body -> { });
+        stopped.subscribe("P", onStopped::add);
         stopped.onCommitted(batch("P", 1));
+        assertTrue(onStopped.isEmpty(), "a rejected change is dropped, not delivered on the caller's thread");
+
+        List<JsonObject> got = new ArrayList<>();
+        bus.subscribe("P", got::add);
+        assertEquals(1, bus.subscriberCount("P"));
         bus.close();
         assertTrue(closed.get());
-        assertFalse(bus.subscriberCount("P") > 0);
+        assertEquals(0, bus.subscriberCount("P"));
+        bus.onCommitted(batch("P", 1));
+        assertTrue(got.isEmpty());
+    }
+
+    @Test
+    void anOpWithoutARecordIsRefusedRatherThanSentHalfWritten() {
+        // A body without version and record would make every browser reload the whole map.
+        ChangeHook.CommittedBatch noRecord = new ChangeHook.CommittedBatch("P", 3, "b-3", Actor.session("mapeditor"),
+            List.of(new ChangeHook.CommittedOp("update", "kindSetup", "k1", null)));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> ChangeEvent.of(noRecord));
+        assertTrue(ex.getMessage().contains("k1"));
+    }
+
+    @Test
+    void theEntityOfAnOpIsSentAsSaved() {
+        // CommittedOp carries a MapItemRecord until entry 3 widens it for kind setups; the entity passes through.
+        String id = "00000000-0000-4000-8000-000000000009";
+        ChangeHook.CommittedBatch b = new ChangeHook.CommittedBatch("P", 9, "b-9", Actor.session("mapeditor"),
+            List.of(new ChangeHook.CommittedOp("update", "kindSetup", id, line(id))));
+        JsonObject op = ChangeEvent.of(b).body().getAsJsonArray("ops").get(0).getAsJsonObject();
+        assertEquals("kindSetup", op.get("entity").getAsString());
+        assertEquals(1, op.get("version").getAsInt());
+        assertTrue(op.has("record"));
     }
 }
