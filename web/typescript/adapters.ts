@@ -28,6 +28,8 @@ export interface Kind {
     fields: FormField[];
     /** A line kind drawn as a closed area (epic 2 story 9); sent only when true. */
     area?: boolean;
+    /** A point kind whose map items may be attached to a line (epic 2 story 14); sent only when true. */
+    instrument?: boolean;
 }
 
 export interface Asset {
@@ -95,7 +97,8 @@ export function readKind(value: unknown): Kind | null {
         icon: typeof value.icon === 'string' ? value.icon : '',
         labelRank: typeof value.labelRank === 'number' && isFinite(value.labelRank) ? value.labelRank : 0,
         fields,
-        ...(value.area === true ? { area: true } : {})
+        ...(value.area === true ? { area: true } : {}),
+        ...(value.instrument === true ? { instrument: true } : {})
     };
 }
 

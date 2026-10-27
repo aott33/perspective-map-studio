@@ -42,7 +42,7 @@ class WriteServiceKindCheckTest extends WriteFixture {
 
     @Test
     void anUnknownKindAWrongGeometryOrAMistypedPropertyIsRefused() {
-        assertEquals("Op 0 (%s): kind tank is not in the project's kind list (pad, line, geofence, pipe).",
+        assertEquals("Op 0 (%s): kind tank is not in the project's kind list (pad, line, geofence, pipe, tap).",
             refusedWith(createItem("%s", "tank", POINT, "")));
         assertEquals("Op 0 (%s): kind line is a line kind, so its geometry is a LineString, not a Point.",
             refusedWith(createItem("%s", "line", POINT, "")));

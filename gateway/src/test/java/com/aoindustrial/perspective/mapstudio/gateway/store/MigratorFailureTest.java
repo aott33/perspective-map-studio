@@ -96,7 +96,7 @@ class MigratorFailureTest {
             m.migrate(spy);
         });
         assertEquals(5, ex.found());
-        assertEquals(1, ex.known());
+        assertEquals(Migrations.latest(), ex.known());
         assertFalse(db.executed.stream().anyMatch(FILE::contains), "nothing migrated");
         assertEquals("commit", db.events.get(0));
         assertEquals(1, db.events.stream().filter("commit"::equals).count(), "only the first read is committed");
@@ -106,13 +106,13 @@ class MigratorFailureTest {
     @Test
     void aStandbyOnlyReadsTheVersion() throws Exception {
         FakeJdbc db = new FakeJdbc();
-        db.version = 1;
+        db.version = Migrations.latest();
         db.failOn = "CREATE";
-        assertEquals(1, migrator().recordedVersion(db.connection()));
+        assertEquals(Migrations.latest(), migrator().recordedVersion(db.connection()));
         assertEquals(List.of(Migrator.VERSION_TABLE_EXISTS, Migrator.READ_VERSION), db.executed);
         FakeJdbc empty = new FakeJdbc();
         assertEquals(0, migrator().recordedVersion(empty.connection()));
         assertEquals(List.of(Migrator.VERSION_TABLE_EXISTS), empty.executed, "no table, no further read, no DDL");
-        assertEquals(1, migrator().known());
+        assertEquals(Migrations.latest(), migrator().known());
     }
 }

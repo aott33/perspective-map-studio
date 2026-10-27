@@ -18,6 +18,7 @@ import com.inductiveautomation.ignition.common.gson.JsonNull;
 import com.inductiveautomation.ignition.common.gson.JsonObject;
 import com.inductiveautomation.ignition.common.gson.JsonParser;
 
+import com.aoindustrial.perspective.mapstudio.common.contract.Attachment;
 import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
 
@@ -29,7 +30,8 @@ import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
 public final class JdbcMapStore implements MapStore {
 
     static final String ITEM_COLUMNS =
-        "id::text, kind, name, geometry, properties::text, asset_id, overrides::text, ends::text, version, deleted";
+        "id::text, kind, name, geometry, properties::text, asset_id, overrides::text, ends::text, version, deleted, "
+        + "attachment::text";
 
     static final String KIND_SETUP_COLUMNS = "kind_id, setup::text, version, deleted";
 
@@ -116,8 +118,8 @@ public final class JdbcMapStore implements MapStore {
         @Override
         public void insertItem(String project, MapItemRecord item) throws SQLException {
             try (PreparedStatement ps = c.prepareStatement("INSERT INTO mapstudio_item (project, id, kind, name, geometry, "
-                    + "properties, asset_id, overrides, ends, version, deleted, updated_at) "
-                    + "VALUES (?, ?::uuid, ?, ?, ?, ?::jsonb, ?, ?::jsonb, ?::jsonb, ?, ?, now())")) {
+                    + "properties, asset_id, overrides, ends, version, deleted, attachment, updated_at) "
+                    + "VALUES (?, ?::uuid, ?, ?, ?, ?::jsonb, ?, ?::jsonb, ?::jsonb, ?, ?, ?::jsonb, now())")) {
                 ps.setString(1, project);
                 ps.setString(2, item.id());
                 bindItem(ps, 3, item);
@@ -129,7 +131,7 @@ public final class JdbcMapStore implements MapStore {
         public void updateItem(String project, MapItemRecord item) throws SQLException {
             try (PreparedStatement ps = c.prepareStatement("UPDATE mapstudio_item SET kind = ?, name = ?, geometry = ?, "
                     + "properties = ?::jsonb, asset_id = ?, overrides = ?::jsonb, ends = ?::jsonb, version = ?, "
-                    + "deleted = ?, updated_at = now() WHERE project = ? AND id = ?::uuid")) {
+                    + "deleted = ?, attachment = ?::jsonb, updated_at = now() WHERE project = ? AND id = ?::uuid")) {
                 int next = bindItem(ps, 1, item);
                 ps.setString(next, project);
                 ps.setString(next + 1, item.id());
@@ -139,7 +141,7 @@ public final class JdbcMapStore implements MapStore {
             }
         }
 
-        /** Binds kind through deleted from {@code start}; returns the next parameter index. */
+        /** Binds kind through deleted, then attachment, from {@code start}; returns the next parameter index. */
         private static int bindItem(PreparedStatement ps, int start, MapItemRecord item) throws SQLException {
             int i = start;
             ps.setString(i++, item.kind());
@@ -159,6 +161,11 @@ public final class JdbcMapStore implements MapStore {
             }
             ps.setInt(i++, item.version());
             ps.setBoolean(i++, item.deleted());
+            if (item.attachment() == null) {
+                ps.setNull(i++, Types.VARCHAR);
+            } else {
+                ps.setString(i++, item.attachment().toJson().toString());
+            }
             return i;
         }
 
@@ -225,6 +232,24 @@ public final class JdbcMapStore implements MapStore {
                             .truncatedTo(ChronoUnit.SECONDS).toInstant())));
                 }
             }
+        }
+
+        @Override
+        public List<MapItemRecord> liveAttached(String project, String lineId) throws SQLException {
+            List<MapItemRecord> items = new ArrayList<>();
+            // The partial index mapstudio_item_attached_line (migration 2) serves this predicate.
+            try (PreparedStatement ps = c.prepareStatement("SELECT " + ITEM_COLUMNS + " FROM mapstudio_item"
+                    + " WHERE project = ? AND (attachment->>'lineId') = ? AND attachment IS NOT NULL AND NOT deleted"
+                    + " ORDER BY (attachment->>'distanceM')::double precision, id")) {
+                ps.setString(1, project);
+                ps.setString(2, lineId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        items.add(item(rs));
+                    }
+                }
+            }
+            return items;
         }
 
         @Override
@@ -305,12 +330,14 @@ public final class JdbcMapStore implements MapStore {
         private static MapItemRecord item(ResultSet rs) throws SQLException {
             String ends = rs.getString(8);
             JsonElement endsJson = ends == null ? JsonNull.INSTANCE : JsonParser.parseString(ends);
+            String attachment = rs.getString(11);
+            Attachment at = attachment == null ? null : Attachment.parse(JsonParser.parseString(attachment));
             return new MapItemRecord(rs.getString(1), rs.getString(2), rs.getString(3),
                 JsonParser.parseString(rs.getString(4)).getAsJsonObject(),
                 JsonParser.parseString(rs.getString(5)).getAsJsonObject(),
                 rs.getString(6),
                 JsonParser.parseString(rs.getString(7)).getAsJsonObject(),
-                endsJson, rs.getInt(9), rs.getBoolean(10));
+                endsJson, at, rs.getInt(9), rs.getBoolean(10));
         }
     }
 }

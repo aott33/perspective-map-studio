@@ -14,7 +14,7 @@ import com.inductiveautomation.ignition.common.gson.JsonPrimitive;
  * matches the kind ({@code point}: a Point, {@code line}: a LineString), every property is
  * a form field of the kind and has the field's type, and the overrides are a partial kind
  * setup ({@link KindSetup#parse} with full tag paths only). Field-driven, so a new record
- * field (story 14's attachment) is one more case.
+ * field is one more case: an {@code attachment} (story 14) needs an instrument kind.
  *
  * <p>Normalising (once, on the Gateway): a CSV-style string in a {@code number},
  * {@code integer} or {@code boolean} field becomes the value ({@code "12"} to 12,
@@ -61,8 +61,13 @@ public final class ItemCheck {
         } catch (InvalidValue ex) {
             throw ex.at("overrides");
         }
+        if (item.attachment() != null && !kind.instrument()) {
+            throw new InvalidValue("attachment: kind " + Rows.echo(kind.id()) + " is not an instrument kind, so its map"
+                + " items are not attached to a line; send attachment null, or mark the kind instrument true in the"
+                + " kind list.");
+        }
         return new MapItemRecord(item.id(), item.kind(), item.name(), item.geometry(), properties, item.assetId(),
-            item.overrides(), item.ends(), item.version(), item.deleted());
+            item.overrides(), item.ends(), item.attachment(), item.version(), item.deleted());
     }
 
     /** One property value by its field's type, CSV strings converted. */

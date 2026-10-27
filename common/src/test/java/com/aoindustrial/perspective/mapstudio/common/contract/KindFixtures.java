@@ -5,7 +5,7 @@ import java.util.List;
 import com.inductiveautomation.ignition.common.gson.JsonObject;
 import com.inductiveautomation.ignition.common.gson.JsonParser;
 
-/** Kinds and a full kind setup for the story 9 tests (the dev adapter's kinds, area flag included). */
+/** Kinds and a full kind setup for the story 9 and 14 tests (the dev adapter's kinds, area and instrument flags included). */
 final class KindFixtures {
 
     static final List<Kind> KINDS = Kind.parseList(JsonParser.parseString("["
@@ -15,10 +15,14 @@ final class KindFixtures {
         + "{\"id\":\"line\",\"name\":\"Gathering line\",\"geometry\":\"line\",\"fields\":["
         + "{\"key\":\"diameter\",\"type\":\"number\"},{\"key\":\"buried\",\"type\":\"boolean\"}]},"
         + "{\"id\":\"geofence\",\"name\":\"Geofence\",\"geometry\":\"line\",\"area\":true,\"fields\":["
-        + "{\"key\":\"operator\",\"type\":\"text\"}]}]").getAsJsonArray()).kept();
+        + "{\"key\":\"operator\",\"type\":\"text\"}]},"
+        + "{\"id\":\"tap\",\"name\":\"Tap\",\"geometry\":\"point\",\"icon\":\"tap\",\"instrument\":true,\"fields\":["
+        + "{\"key\":\"tag\",\"type\":\"text\"}]}]").getAsJsonArray()).kept();
     static final Kind PAD = KINDS.get(0);
     static final Kind LINE = KINDS.get(1);
     static final Kind GEOFENCE = KINDS.get(2);
+    /** An instrument kind (epic 2 story 14). */
+    static final Kind TAP = KINDS.get(3);
 
     /** The I/O matrix's "Save setup" row, with a States rule. */
     static final String PAD_SETUP = "{\"comms\":{\"path\":\"{asset.path}/Comms\",\"on\":true},"

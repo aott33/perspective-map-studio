@@ -16,29 +16,30 @@ class MigratorTest {
     }
 
     @Test
-    void anEmptyDatabaseGetsTheWholeFirstSchemaAndVersionOneInOneTransaction() throws Exception {
+    void anEmptyDatabaseGetsEveryMigrationEachInOneTransaction() throws Exception {
         FakeJdbc db = new FakeJdbc();
         Migrator.Result result = migrator().migrate(db.connection());
-        assertEquals(List.of(1), result.applied());
-        assertEquals(1, result.version());
+        assertEquals(List.of(1, 2), result.applied());
+        assertEquals(2, result.version());
         assertEquals(Migrator.VERSION_TABLE_EXISTS, db.executed.get(0), "a read without a lock comes first");
         assertEquals(Migrator.LOCK, db.executed.get(1), "then the advisory lock, before any DDL");
         assertEquals(Migrator.CREATE_VERSION_TABLE, db.executed.get(2));
         assertEquals(Migrator.READ_VERSION, db.executed.get(3));
         assertTrue(db.executed.containsAll(Migrations.all().get(0).statements()));
+        assertTrue(db.executed.containsAll(Migrations.all().get(1).statements()));
         assertEquals(Migrator.RECORD_VERSION, db.executed.get(db.executed.size() - 1));
-        assertEquals(List.of("commit", "commit"), db.events,
-            "the read's commit, then one commit for the whole first schema; no rollback");
+        assertEquals(List.of("commit", "commit", "commit"), db.events,
+            "the read's commit, then one commit per migration; no rollback");
         assertTrue(db.autoCommit, "auto-commit is restored");
     }
 
     @Test
     void aMigratedDatabaseIsOnlyRead() throws Exception {
         FakeJdbc db = new FakeJdbc();
-        db.version = 1;
+        db.version = 2;
         Migrator.Result result = migrator().migrate(db.connection());
         assertEquals(List.of(), result.applied());
-        assertEquals(1, result.version());
+        assertEquals(2, result.version());
         assertEquals(List.of(Migrator.VERSION_TABLE_EXISTS, Migrator.READ_VERSION), db.executed,
             "no lock and no CREATE on a migrated database");
     }
@@ -47,18 +48,49 @@ class MigratorTest {
     void aRoleWithoutCreateComesUpOnAMigratedDatabase() throws Exception {
         // The reviewer's case: a SELECT/INSERT/UPDATE role on PostgreSQL 16 gets 42501 on any CREATE.
         FakeJdbc db = new FakeJdbc();
-        db.version = 1;
+        db.version = 2;
         db.failOn = "CREATE";
-        assertEquals(1, migrator().migrate(db.connection()).version());
+        assertEquals(2, migrator().migrate(db.connection()).version());
+    }
+
+    @Test
+    void schemaOneIsUpgradedToTwoAlone() throws Exception {
+        // Epic 2 story 14: a store left at schema 1 gets migration 2 only, in one transaction.
+        FakeJdbc db = new FakeJdbc();
+        db.version = 1;
+        Migrator.Result result = migrator().migrate(db.connection());
+        assertEquals(List.of(2), result.applied());
+        assertEquals(2, result.version());
+        assertTrue(db.executed.containsAll(Migrations.all().get(1).statements()));
+        assertTrue(db.executed.stream().noneMatch(Migrations.all().get(0).statements()::contains),
+            "migration 1 is not run again");
+        assertEquals(List.of("commit", "commit", "commit"), db.events,
+            "the first read, migration 1 found applied under the lock, then migration 2");
+    }
+
+    @Test
+    void anUpgradeByARoleThatDoesNotOwnTheTableFailsWholeAndNamesTheAlter() {
+        // ALTER TABLE needs the table's owner (docs/operations.md): a runtime role gets 42501 and nothing changes.
+        FakeJdbc db = new FakeJdbc();
+        db.version = 1;
+        db.failOn = "ALTER TABLE mapstudio_item";
+        db.failMessage = "must be owner of table mapstudio_item";
+        Migrator.MigrationFailure ex = assertThrows(Migrator.MigrationFailure.class,
+            () -> migrator().migrate(db.connection()));
+        assertEquals(2, ex.migration());
+        assertEquals(2, ex.ordinal(), "after CREATE TABLE IF NOT EXISTS mapstudio_schema_version");
+        assertEquals("42501", ex.getSQLState());
+        assertEquals(List.of("commit", "commit", "rollback"), db.events, "migration 2 rolled back whole");
+        assertTrue(db.executed.stream().noneMatch(s -> s.startsWith("CREATE INDEX mapstudio_item_attached_line")));
     }
 
     @Test
     void aNewerSchemaIsRefused() {
         FakeJdbc db = new FakeJdbc();
-        db.version = 2;
+        db.version = 3;
         Migrator.SchemaNewerException ex = assertThrows(Migrator.SchemaNewerException.class,
             () -> migrator().migrate(db.connection()));
-        assertEquals(2, ex.found());
+        assertEquals(3, ex.found());
         assertEquals(List.of(Migrator.VERSION_TABLE_EXISTS, Migrator.READ_VERSION), db.executed,
             "nothing is locked or changed");
     }
