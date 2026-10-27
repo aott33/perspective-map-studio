@@ -28,9 +28,11 @@ import java.util.function.Supplier;
 
 import com.inductiveautomation.ignition.common.util.LoggerEx;
 
+import com.aoindustrial.perspective.mapstudio.common.IconCatalogue;
 import com.aoindustrial.perspective.mapstudio.common.contract.AdapterStatus;
 import com.aoindustrial.perspective.mapstudio.common.contract.Asset;
 import com.aoindustrial.perspective.mapstudio.common.contract.Kind;
+import com.aoindustrial.perspective.mapstudio.common.contract.KindIcons;
 import com.aoindustrial.perspective.mapstudio.common.contract.Parsed;
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 
@@ -57,6 +59,10 @@ import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
  * <li>One log line per status change per project and list on
  * {@code MapStudio.adapters}: warn into a bad status, info into {@code ok} or
  * {@code not-configured}; ids and counts only, never row content.</li>
+ * <li>Kinds naming an icon Map Studio does not ship (story 2.10) stay in the
+ * list and keep their status word; the message adds one sentence per kind
+ * ({@link KindIcons}), and the log gets one line (kind ids only) when that set
+ * of kinds changes: a warning, or info once it clears.</li>
  * </ul>
  *
  * <p>Locking: each list has its own monitor and no code holds both. A future
@@ -120,6 +126,8 @@ public final class AdapterService {
         Call call;
         /** An on-demand refresh asked for while a timed-out call still runs. */
         CompletableFuture<Void> pending;
+        /** The kinds naming unknown icons as last logged ({@link KindIcons#key()}); kinds only. */
+        String iconsLogged = "";
     }
 
     private static final class ProjectState {
@@ -395,7 +403,10 @@ public final class AdapterService {
                            AdapterCaller.Outcome outcome, Set<String> kindIds) {
         Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         AdapterStatus status;
+        String logLine = null;
+        KindIcons icons = null;
         if (outcome instanceof AdapterCaller.Returned returned) {
+            icons = KindIcons.NONE;
             if (returned.rows().isEmpty()) {
                 ls.good = List.of();
                 ls.goodAt = now;
@@ -407,15 +418,23 @@ public final class AdapterService {
                     : (Parsed<T>) Asset.parseList(returned.rows(), kindIds);
                 ls.good = parsed.kept();
                 ls.goodAt = now;
+                if (list == ListKind.KINDS) {
+                    icons = KindIcons.check((List<Kind>) parsed.kept(), IconCatalogue.shipped());
+                }
                 if (parsed.left() == 0) {
-                    status = new AdapterStatus(AdapterStatus.OK, parsed.kept().size() + " " + plural(list,
-                        parsed.kept().size()) + " from " + function + ".", function, parsed.kept().size(), 0, iso(now));
+                    String head = parsed.kept().size() + " " + plural(list, parsed.kept().size()) + " from "
+                        + function + ".";
+                    status = new AdapterStatus(AdapterStatus.OK, head + with(icons.note()), function,
+                        parsed.kept().size(), 0, iso(now), head + with(icons.viewerNote()));
+                    logLine = head + with(icons.logNote());
                 } else {
                     String head = parsed.left() + " of " + parsed.total() + " " + list.many + " from " + function
                         + " left out";
-                    status = new AdapterStatus(AdapterStatus.INCOMPLETE, head + ": " + parsed.firstReasons(MAX_REASONS)
-                        + (parsed.left() > MAX_REASONS ? "; ..." : "") + ".", function, parsed.kept().size(),
-                        parsed.left(), iso(now), head + ".");
+                    String reasons = head + ": " + parsed.firstReasons(MAX_REASONS)
+                        + (parsed.left() > MAX_REASONS ? "; ..." : "") + ".";
+                    status = new AdapterStatus(AdapterStatus.INCOMPLETE, reasons + with(icons.note()), function,
+                        parsed.kept().size(), parsed.left(), iso(now), head + "." + with(icons.viewerNote()));
+                    logLine = reasons + with(icons.logNote());
                 }
             }
         } else if (outcome instanceof AdapterCaller.NotAList notAList) {
@@ -427,7 +446,22 @@ public final class AdapterService {
             status = failing(list, ls, function, "The " + list.one + " function " + function + " failed: "
                 + reason + (reason.endsWith(".") ? "" : "."), "The " + list.one + " function " + function + " failed.");
         }
-        setStatus(project, list, ls, status);
+        boolean logged = setStatus(project, list, ls, status, logLine, icons != null && !icons.isEmpty());
+        if (list == ListKind.KINDS && icons != null) {
+            if (!logged && !icons.key().equals(ls.iconsLogged)) {
+                if (icons.isEmpty()) {
+                    log.info("Project " + project + ": every kind from " + function + " names an icon Map Studio has.");
+                } else {
+                    log.warn("Project " + project + ": " + icons.logNote());
+                }
+            }
+            ls.iconsLogged = icons.key();
+        }
+    }
+
+    /** " " and the sentence, or nothing for an empty one. */
+    private static String with(String sentence) {
+        return sentence.isEmpty() ? "" : " " + sentence;
     }
 
     private static Set<String> kindIds(ProjectState ps) {
@@ -461,22 +495,40 @@ public final class AdapterService {
 
     /** Set the status; log one line when the status word changed. Caller holds {@code ls}'s monitor. */
     private <T> void setStatus(String project, ListKind list, ListState<T> ls, AdapterStatus status) {
+        setStatus(project, list, ls, status, null, false);
+    }
+
+    /**
+     * Set the status; log one line when the status word changed, with
+     * {@code logMessage} in place of the message when it is not null, and as a
+     * warning even into {@code ok} when {@code warn}. Returns true when a line
+     * was logged. Caller holds {@code ls}'s monitor.
+     */
+    private <T> boolean setStatus(String project, ListKind list, ListState<T> ls, AdapterStatus status,
+                                  String logMessage, boolean warn) {
         String before = ls.logged;
         ls.status = status;
         if (status.status().equals(before)) {
-            return;
+            return false;
         }
         ls.logged = status.status();
-        String line = "Project " + project + ": " + status.message();
+        String message = logMessage != null ? logMessage : status.message();
+        String line = "Project " + project + ": " + message;
         if (AdapterStatus.OK.equals(status.status())) {
-            log.info(before == null || AdapterStatus.NOT_CONFIGURED.equals(before) ? line
+            String ok = before == null || AdapterStatus.NOT_CONFIGURED.equals(before) ? line
                 : "Project " + project + ": the " + list.one + " function " + status.function() + " recovered: "
-                    + status.message());
+                    + message;
+            if (warn) {
+                log.warn(ok);
+            } else {
+                log.info(ok);
+            }
         } else if (AdapterStatus.NOT_CONFIGURED.equals(status.status())) {
             log.info(line);
         } else {
             log.warn(line);
         }
+        return true;
     }
 
     /** "5 s", or "0.3 s" for a timeout that is not whole seconds (tests). */

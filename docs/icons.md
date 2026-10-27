@@ -2,6 +2,8 @@
 
 Map Studio ships one icon set in one minimalist style (epic 2 R9, PRD FR-9, NFR-10, NFR-11): a glyph for each oil and gas kind a project's kind list may name, and the state glyphs the map uses for comms lost, stale values and alarms. A kind names an icon by its id in the kind list's `icon` field. Catalogue version **0.2.0** (draft, versioned with the public contract, NFR-8).
 
+Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway (`inductiveautomation/ignition:8.3.10`); **[unverified]** written but not seen working.
+
 > **Engineering review:** every alarm glyph (`alarm-1-*`, `alarm-2-*`, `alarm-3`) and the state examples below are alarm presentation. They need the template's engineering review (ER-27, `docs/ux.md` section 11 in `ign-scada-template`) before release.
 
 ## What the module serves
@@ -12,9 +14,9 @@ Map Studio ships one icon set in one minimalist style (epic 2 R9, PRD FR-9, NFR-
 | `/res/mapstudio/icons/icons.json` | the catalogue: `{version, fallback, icons: [{id, label, group, geometry}]}` |
 | `/res/mapstudio/icons/contact-sheet.html` | the review page: every icon at 16, 24 and 44 px in a light and a dark panel, and the state examples |
 
-The Gateway's content types for these three files are **[UNVERIFIED]**: `e2e/tests/icons.spec.mjs` checks them, but it has not yet run against a dev Gateway (the screenshots below came from a stand-in static server, see "Proof").
+The Gateway serves them as `image/svg+xml`, `application/json` and `text/html` (with `X-Content-Type-Options: nosniff`) **[live 8.3.10]**, checked by `e2e/tests/icons.spec.mjs` on the dev Gateway, 2026-10-27 (`docs/platform-checks.md`, epic 2 story 10).
 
-The Gateway reads the same catalogue from the module (`common/.../IconCatalogue.java`); `IconCatalogue.resolve(id)` gives the icon a kind is drawn with, `point` when the name is missing or unknown. Reporting an unknown name in `map.load` comes with the kind list (story 3; story 2.10 phase B).
+The Gateway reads the same catalogue from the module (`common/.../IconCatalogue.java`); `IconCatalogue.resolve(id)` gives the icon a kind is drawn with, `point` when the name is missing or unknown. The kind list check reports an unknown name in the kind status of `map.load` and in one Gateway log line, and keeps the kind ([kinds-and-assets.md](kinds-and-assets.md), "Icon check").
 
 ## The icons
 
@@ -91,6 +93,7 @@ The sprite is SVG, not a MapLibre SDF sprite: the map rasterises each glyph in t
 
 - `web/typescript/__tests__/icons.test.ts` (Jest, in `npm test` and `gradlew build`): the committed set passes; drift, a stale catalogue, a forbidden source or licence, an unpinned seed release, NOTICE drift, a rule-breaking SVG, the review's attribute probes (single-quoted and unquoted named colours, `style`, `url()`), a filled kind icon and a kind icon with a circle or square outline each fail with the entry named.
 - `gateway/.../IconCatalogueTest.java`: the shipped catalogue, the fallback, unknown names.
-- `e2e/tests/icons.spec.mjs`: the Gateway serves the three files with usable content types **[UNVERIFIED: not yet run on a dev Gateway]**; the contact sheet draws every icon with no horizontal scroll at 1440 and 390 px. The committed screenshots were taken by that spec against a stand-in static server serving the built `mounted/` folder, not the Gateway (2026-10-26); rerun `npm run docs` in `e2e/` on the dev Gateway to replace them.
+- `common/.../contract/KindIconsTest.java` and `gateway/.../adapter/AdapterIconCheckTest.java`: a known, unknown and missing kind icon, the status message, the viewer message and one log line per change.
+- `e2e/tests/icons.spec.mjs`: the Gateway serves the three files with usable content types **[live 8.3.10]**; the contact sheet draws every icon with no horizontal scroll at 1440 and 390 px; a kind naming an unknown icon stays listed and its status names the kind and the icon. The committed screenshots were taken by that spec (`npm run docs`) on the dev Gateway, 2026-10-27.
 - `grep -ri openbridge web/icons` finds nothing.
 - The owner reviews the look on the contact sheet (story 2.10, hitl).

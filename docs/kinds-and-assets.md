@@ -31,7 +31,7 @@ A list of dicts, one per kind:
 | `id` | yes | Text, at most 64 characters, unique in the list. A map item's `kind` names it. |
 | `name` | yes | Text people read. |
 | `geometry` | yes | `point` or `line`. |
-| `icon` | no | Icon name (checked against the icon set from entry 10); default `""`. |
+| `icon` | no | An icon id from [icons.md](icons.md) (`well-pad`, `pipeline`, ...); default `""`, drawn as `point`. A name the icon set does not have keeps the kind (drawn as `point`) and is reported in the kind status (see "Icon check"). |
 | `labelRank` | no | Whole number; when labels collide, the higher rank keeps its label longer. Default 0. |
 | `fields` | no | The form fields of the kind's map items (their `properties`), default none. |
 
@@ -63,7 +63,16 @@ For both lists, keys Map Studio does not know are ignored, and the values must b
 - `system.mapstudio.refreshAdapters(project)` calls both now and returns both statuses; it waits for the calls to answer or time out, at most 21 s (four timeouts and 1 s: kinds then assets, each of which may wait for a timed-out call to end before its own call), then returns the statuses it has; a refresh still running lands in the cache later. It blocks the calling script's thread that long, so call it from a session or Gateway script, not a binding or a tag event. Call it after your own kind or asset data changed. A refresh asked for while a call is in flight joins it **[live 8.3.10]**.
 - A timed-out call cannot be stopped (Jython has no safe way): it keeps its thread until it returns, and its answer is dropped.
 - `map.load` carries `kinds` to every session, `assets` only to sessions with phone or full editing (asset rows carry tag paths), and `adapters: {kinds: status, assets: status}` to every session ([contract.md](contract.md)).
-- Later entries read the same cache: map item validation against the kind list (entry 9) and the icon check (entry 10). Nothing is stored in the database.
+- Later entries read the same cache: map item validation against the kind list (entry 9) and the icon check (entry 10, below). Nothing is stored in the database.
+
+## Icon check
+
+Each kind's `icon` is checked against the icon set the module ships ([icons.md](icons.md), `IconCatalogue`) every time the kind list is read (`e2e/tests/icons.spec.mjs` checks it on the dev Gateway):
+
+- A known icon, or no icon: nothing is reported; no icon means `point`.
+- An unknown icon (`wel-pad`): the kind stays in the list with the name it gave, the map draws it as `point`, and the status word does not change (`ok`, or `incomplete` for other left-out rows). The kind status message adds one sentence per kind, the first three named: "3 kinds from mapstudio_dev.kinds. Kind pad names icon wel-pad, which Map Studio does not have; it shows as a plain point." A session that cannot edit gets the count only ("1 kind names an icon Map Studio does not have and shows as a plain point.").
+- The Gateway log gets one warning on `MapStudio.adapters` when the set of kinds naming unknown icons changes, naming kind ids only ("Kind pad names an icon Map Studio does not have."), and one info line when it clears; the same set again logs nothing. When the status word changes at the same time, its one line carries that sentence instead.
+- The dev adapter's mode `unknown-icon` (the `/adapters` page) gives the pad kind the icon `wel-pad`.
 
 ## Status
 

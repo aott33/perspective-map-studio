@@ -2,11 +2,12 @@
 // the catalogue and the owner's contact sheet under /res/mapstudio/icons/ with
 // usable content types, and the contact sheet renders every icon at a laptop
 // and a phone width with no horizontal scroll. The screenshots are the owner's
-// review pictures (docs/icons.md).
+// review pictures (docs/icons.md). Phase B: a kind naming an icon the set does
+// not have stays listed and map.load's kind status names it in words.
 
 import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
-import { expect, test } from './fixtures.mjs';
+import { EDITOR_USER, editorTest, expect, mapLoaded, openMap, test } from './fixtures.mjs';
 
 const BASE = '/res/mapstudio/icons/';
 const ICON_COUNT = 28;
@@ -53,3 +54,49 @@ for (const width of [1440, 390]) {
         await page.screenshot({ path: path.join(screenshotDir, `icons-contact-sheet-${width}.png`), fullPage: true });
     });
 }
+
+test.describe('kind icon check', () => {
+    test.use({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+
+    const PAGE = '/adapters';
+    const KINDS_FN = 'mapstudio_dev.kinds';
+    const UNKNOWN = 'Kind pad names icon wel-pad, which Map Studio does not have; it shows as a plain point.';
+
+    async function press(page, button, mode) {
+        await page.locator('#mapstudio-dev-adapter-' + button).click();
+        await expect(page.locator('#mapstudio-dev-adapter-result')).toContainText(`"mode":"${mode}"`, { timeout: 60_000 });
+        return JSON.parse(await page.locator('#mapstudio-dev-adapter-result').textContent());
+    }
+
+    async function kindsAfterReload(page) {
+        await page.reload({ waitUntil: 'load' });
+        await mapLoaded(await openMap(page, PAGE));
+        const el = page.locator('.mapstudio-adapter-status');
+        await expect(el).toHaveAttribute('data-kinds-status', /.+/);
+        return {
+            status: await el.getAttribute('data-kinds-status'),
+            message: await el.getAttribute('data-kinds-message'),
+            rows: await el.getAttribute('data-kinds-rows')
+        };
+    }
+
+    editorTest('a kind naming an unknown icon stays listed and its status names the kind and the icon', async ({ page }) => {
+        await mapLoaded(await openMap(page, PAGE));
+        await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
+
+        // The dev kinds name real icons: ok with no icon note.
+        await press(page, 'ok', 'ok');
+        let k = await kindsAfterReload(page);
+        expect(k).toEqual({ status: 'ok', message: `3 kinds from ${KINDS_FN}.`, rows: '3' });
+
+        const r = await press(page, 'unknown-icon', 'unknown-icon');
+        expect(r.kinds.status).toBe('ok');
+        expect(r.kinds.message).toBe(`3 kinds from ${KINDS_FN}. ${UNKNOWN}`);
+        k = await kindsAfterReload(page);
+        expect(k).toEqual({ status: 'ok', message: `3 kinds from ${KINDS_FN}. ${UNKNOWN}`, rows: '3' });
+
+        await press(page, 'ok', 'ok');
+        k = await kindsAfterReload(page);
+        expect(k.message).toBe(`3 kinds from ${KINDS_FN}.`);
+    });
+});
