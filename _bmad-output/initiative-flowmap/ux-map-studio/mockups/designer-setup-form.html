@@ -10,7 +10,8 @@
    Swing stand-ins: every colour below maps to a UIManager key named in DESIGN.md
    (designer-* tokens). The Swing form reads the keys; these hex values are only the
    mock's stand-ins for the Designer's light theme. Render one state with ?v=STATE:
-   normal, reasons, unreachable, inherited, newer, picker. */
+   normal, reasons, unreachable, inherited, newer, picker, empty, new.
+   There is no create dialog: empty and new are the same tab. */
 :root {
   --d-panel: #f2f3f5;          /* Panel.background */
   --d-surface: #ffffff;        /* TextField.background, Tree.background */
@@ -118,6 +119,21 @@ section h2::after { content: ''; flex: 1; height: 1px; background: var(--d-divid
 .statusbar { display: flex; align-items: center; gap: 16px; padding: 0 10px; border-top: 1px solid var(--d-divider); font-size: 12px; color: var(--d-text-2); background: var(--d-surface); }
 .statusbar .gw { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
 .statusbar .gw.down { color: var(--d-error); }
+.empty { max-width: 560px; margin-top: 56px; }
+.empty .glyph { width: 40px; height: 40px; border-radius: 8px; background: var(--d-info-tint); display: grid; place-items: center; margin-bottom: 12px; }
+.empty h2 { font-size: 14px; font-weight: 700; margin: 0 0 6px; }
+.empty p { margin: 0 0 14px; }
+.empty .help { margin-top: 10px; }
+.btn.primary { background: var(--d-accent); border-color: var(--d-accent); color: #fff; font-weight: 600; padding: 0 14px; display: inline-grid; }
+.newtag { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 2px 8px; border-radius: 3px; background: var(--d-info-tint); border: 1px solid #a9c7ea; font-size: 12px; }
+.newtag i { width: 7px; height: 7px; border-radius: 50%; background: var(--d-accent); display: inline-block; }
+.footer .link { margin-left: auto; color: var(--d-accent); white-space: nowrap; }
+.footer .note { color: var(--d-text-2); }
+.footer span { white-space: nowrap; }
+.ctxmenu { position: absolute; background: var(--d-surface); border: 1px solid var(--d-border); border-radius: 4px; box-shadow: 0 4px 14px rgba(0,0,0,.16); padding: 4px 0; font-size: 12.5px; z-index: 5; width: 168px; }
+.ctxmenu div { height: 24px; padding: 0 12px; display: flex; align-items: center; }
+.ctxmenu .hi { background: var(--d-accent); color: #fff; }
+.ctxmenu .dim { color: var(--d-text-2); }
 .raw { max-width: 760px; margin-top: 14px; }
 .raw .lbl { font-weight: 700; margin-bottom: 6px; display: flex; gap: 10px; align-items: center; }
 .raw .lbl::after { content: ''; flex: 1; height: 1px; background: var(--d-divider); }
@@ -177,6 +193,18 @@ const states = {
   },
   unreachable: { gwDown: true, connection: { v: 'MapStudio', state: 'down' } },
   newer: { readonly: true },
+  empty: { none: true },
+  new: {
+    isNew: true,
+    connection: { v: '', state: '' },
+    full: [{ n: 'MapEditor' }],
+    phone: [{ n: 'MapOperator' }],
+    kinds: { v: '', state: '' },
+    assets: { v: '', state: '' },
+    alarm: { v: '', state: '' },
+    msgs: { connection: [['err', 'Name the database connection Map Studio stores the map in.']] },
+    counts: { store: ['err', 1] },
+  },
 };
 const v = new URLSearchParams(location.search).get('v') || 'normal';
 const S = Object.assign({}, base, states[v] || {});
@@ -218,7 +246,9 @@ const reasonsLeft = Object.values(S.msgs).flat().filter(m => m[0] === 'err').len
 const warningsLeft = Object.values(S.msgs).flat().filter(m => m[0] === 'warn').length;
 
 let form;
-if (S.readonly) {
+if (S.none) {
+  form = `<div class="empty"><div class="glyph">${I.map}</div><h2>No Map Studio setup</h2><p>This project has no Map Studio setup yet. The map store is unavailable until it has one.</p><span class="btn primary">Create setup</span><div class="help">Create setup fills this tab with the defaults. Nothing is written until File &gt; Save. Also on the Map Studio Setup node's right-click menu.</div></div>`;
+} else if (S.readonly) {
   form = `
   <div class="banner warn">${I.lock}<div><b>Read only.</b> This setup was written by a newer Map Studio (schema 2). This Designer edits schema 1. It is shown as written and never rewritten here.</div></div>
   <div class="raw"><div class="lbl">setup.json as written</div><pre>{
@@ -244,7 +274,7 @@ if (S.readonly) {
   const secretRow = `<div class="pair">${combo(S.secretProvider, 170, { ph: S.gwDown ? 'Type a provider' : 'Select one...' })}${combo(S.secretName, 202, { ph: 'Secret name', mono: true })}${refreshBtn('Refresh the secret providers')}<span class="status"></span></div>`;
   form = `${inh}${unreach}
   <section id="s-store"><h2>Map store</h2>
-    ${row('Database connection', combo(conn.v, 340, { cls: connCls }) + refreshBtn('Refresh the Gateway\'s database connections') + status(conn.state),
+    ${row('Database connection', combo(conn.v, 340, { cls: S.isNew ? 'err focus' : connCls, ph: S.isNew ? 'Select one or type a name...' : 'Select one...' }) + refreshBtn('Refresh the Gateway\'s database connections') + status(conn.state),
       'The Gateway database connection (PostgreSQL) the map is stored in. Pick one or type a name.', 'connection')}
   </section>
   <section id="s-who"><h2>Who can edit</h2>
@@ -256,7 +286,7 @@ if (S.readonly) {
   <section id="s-kinds"><h2>Kinds and assets</h2>
     ${row('Kinds function', combo(S.kinds.v, 340, { mono: true, ph: 'Select one...' }) + status(S.kinds.state),
       'The project library function that returns the kind list, as package.function.', 'kinds')}
-    ${row('Assets function', combo(S.assets.v, 340, { mono: true }) + status(S.assets.state),
+    ${row('Assets function', combo(S.assets.v, 340, { mono: true, ph: 'Select one...' }) + status(S.assets.state),
       'The project library function that returns the asset list, as package.function.', 'assets')}
     ${row('Refresh interval', `<div class="field ${S.refresh === '0' ? 'err' : ''}" style="width:96px;padding-right:0"><span class="val">${S.refresh}</span><span class="arrow" style="display:flex;flex-direction:column;justify-content:center;gap:0"><span style="transform:rotate(180deg);line-height:8px">${I.chev}</span><span style="line-height:8px">${I.chev}</span></span></div><span style="color:var(--d-text-2)">seconds</span>`,
       'How often kinds and assets are read again. 1 to 3600.', 'refresh')}
@@ -264,20 +294,24 @@ if (S.readonly) {
   <section id="s-map"><h2>Map</h2>
     ${row('Basemaps', `<div class="checks">${[['none', 'None'], ['osm', 'OpenStreetMap'], ['satellite', 'Satellite'], ['mapbox', 'Mapbox']].map(([k, l]) => `<span class="cb"><span class="box ${S.basemaps[k] ? 'on' : ''}">${S.basemaps[k] ? I.tick : ''}</span>${l}</span>`).join('')}</div>`,
       'The basemaps the map offers. At least one. Mapbox needs the map token below.', 'basemaps')}
-    ${row('Alarm page', combo(S.alarm.v, 340, { mono: true }) + `<span class="btn" title="Insert a placeholder" style="font-family:var(--mono);font-size:12px">{ }</span>` + status(S.alarm.state),
+    ${row('Alarm page', combo(S.alarm.v, 340, { mono: true, ph: 'Select a page...' }) + `<span class="btn" title="Insert a placeholder" style="font-family:var(--mono);font-size:12px">{ }</span>` + status(S.alarm.state),
       'The Perspective page View alarms opens. Add a placeholder such as {item.name} to filter it to the item.', 'alarm')}
     ${row('Map token', secretRow,
       'The secret that holds the basemap token: a provider and a secret name. Names only - the Designer never reads, shows or logs the token.', 'secret')}
   </section>`;
 }
 
-const footer = S.readonly
+const footer = S.none
+  ? `<div class="footer"><span class="note">No setup in this project.</span></div>`
+  : S.isNew
+  ? `<div class="footer err">${I.err}<span>${reasonsLeft} reason left - this setup is not saved until it is fixed.</span><span class="note" style="margin-left:6px">File &gt; Save shows the Designer's standard save failure.</span><span class="link">Discard new setup</span></div>`
+  : S.readonly
   ? `<div class="footer">${I.lock}<span>Read only - this Designer does not save this setup.</span></div>`
   : reasonsLeft
     ? `<div class="footer err">${I.err}<span>${reasonsLeft} reasons left - this setup is not saved until they are fixed.</span><span style="color:var(--d-text-2);margin-left:6px">${warningsLeft} warnings do not stop a save.</span></div>`
     : `<div class="footer">${I.check}<span>Saves with the project (File &gt; Save).</span></div>`;
 
-const cats = S.readonly ? '' : [['store', 'Map store'], ['who', 'Who can edit'], ['kinds', 'Kinds and assets'], ['map', 'Map']]
+const cats = (S.readonly || S.none) ? '' : [['store', 'Map store'], ['who', 'Who can edit'], ['kinds', 'Kinds and assets'], ['map', 'Map']]
   .map(([k, l], i) => `<div class="${i === 0 ? 'on' : ''}"><span>${l}</span>${wrapCount(k)}</div>`).join('');
 
 document.getElementById('app').innerHTML = `
@@ -296,16 +330,16 @@ document.getElementById('app').innerHTML = `
       <div style="padding-left:40px">${I.doc}Gateway Events</div>
       <div style="padding-left:8px">${I.right}${I.folder}Named Queries</div>
       <div style="padding-left:8px">${I.right}${I.folder}Reports</div>
-      <div class="sel" style="padding-left:22px">${I.map}Map Studio Setup${S.inherited ? '<span class="inh">(inherited)</span>' : ''}</div>
+      <div class="sel" style="padding-left:22px">${I.map}<span id="node">Map Studio Setup</span>${S.inherited ? '<span class="inh">(inherited)</span>' : ''}${S.none ? '<span class="inh">(none)</span>' : ''}${S.isNew ? '<span class="inh">(new, unsaved)</span>' : ''}</div>
     </div>
   </div>
   <div class="workspace">
     <div class="tabs"><div class="tab">${I.map}<span>Map Studio Setup</span><span class="x">${I.x}</span></div></div>
-    <div class="tabbody">
-      <div class="cats ${S.readonly ? 'off' : ''}">${cats}</div>
+    <div class="tabbody" style="${S.none ? 'grid-template-columns:1fr' : ''}">
+      <div class="cats ${S.readonly ? 'off' : ''}" style="${S.none ? 'display:none' : ''}">${cats}</div>
       <div class="formwrap">
         <div class="scroll" id="scroll">
-          <div class="hdr"><div><h1>Map Studio Setup</h1><div class="sub">Project mapstudio-dev - how Map Studio stores, guards and draws this project's map.</div></div><span class="schema">${S.readonly ? 'Schema 2 - read only' : 'Schema version 1'}</span></div>
+          <div class="hdr"><div><h1>Map Studio Setup</h1><div class="sub">Project mapstudio-dev - how Map Studio stores, guards and draws this project's map.</div>${S.isNew ? '<div class="newtag"><i></i>New setup - saves with the project</div>' : ''}</div><span class="schema">${S.none ? '' : S.readonly ? 'Schema 2 - read only' : 'Schema version 1'}</span></div>
           ${form}
           <div class="scrollbar" id="sb"></div>
         </div>
@@ -314,11 +348,19 @@ document.getElementById('app').innerHTML = `
     </div>
   </div>
 </div>
-<div class="statusbar"><span>${S.readonly ? 'Read only' : 'Ready'}</span><span class="gw ${S.gwDown ? 'down' : ''}">${I.gw}${S.gwDown ? 'Gateway localhost:8088 - not reachable' : 'Gateway localhost:8088 - connected'}</span></div>`;
+<div class="statusbar"><span>${S.readonly ? 'Read only' : S.isNew ? 'New Map Studio setup - not saved yet' : 'Ready'}</span><span class="gw ${S.gwDown ? 'down' : ''}">${I.gw}${S.gwDown ? 'Gateway localhost:8088 - not reachable' : 'Gateway localhost:8088 - connected'}</span></div>`;
 
 const sc = document.getElementById('scroll');
 if (sc.scrollHeight > sc.clientHeight + 4) document.getElementById('sb').style.display = 'block';
 
+if (S.none) {
+  const n = document.getElementById('node').getBoundingClientRect();
+  const m = document.createElement('div');
+  m.className = 'ctxmenu';
+  m.style.left = (n.left + 40) + 'px'; m.style.top = (n.bottom + 2) + 'px';
+  m.innerHTML = '<div class="hi">Create setup</div><div class="dim">Open setup</div>';
+  document.body.appendChild(m);
+}
 if (S.picker) {
   const ch = document.getElementById('chips-full').getBoundingClientRect();
   const p = document.createElement('div');
