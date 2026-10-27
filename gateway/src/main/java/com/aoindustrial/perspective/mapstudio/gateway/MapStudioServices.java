@@ -13,6 +13,7 @@ import com.inductiveautomation.ignition.gateway.model.GatewayContext;
 
 import com.aoindustrial.perspective.mapstudio.gateway.adapter.AdapterService;
 import com.aoindustrial.perspective.mapstudio.gateway.adapter.ProjectFunctionCaller;
+import com.aoindustrial.perspective.mapstudio.gateway.change.ChangeBus;
 import com.aoindustrial.perspective.mapstudio.gateway.load.MapLoader;
 import com.aoindustrial.perspective.mapstudio.gateway.script.GatewayScriptModule;
 import com.aoindustrial.perspective.mapstudio.gateway.setup.SetupLifecycleFactory;
@@ -26,16 +27,15 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.Migrations;
 import com.aoindustrial.perspective.mapstudio.gateway.store.Migrator;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreRegistry;
-import com.aoindustrial.perspective.mapstudio.gateway.write.ChangeHook;
-import com.aoindustrial.perspective.mapstudio.gateway.write.NoChangeHook;
 import com.aoindustrial.perspective.mapstudio.gateway.write.WriteService;
 
 /**
  * The Gateway core's parts, wired once per module start: the setup loader, the
  * store registry (connection wait and migrations), the map store repository, the
- * write service, the host adapters (kind and asset lists, with their own small pool),
- * the map loader, the scripting module and two small thread pools (one for the
- * connection wait, one bounded pool for the delegates' database work).
+ * write service, the change bus (its change hook), the host adapters (kind and asset
+ * lists, with their own small pool), the map loader, the scripting module and three
+ * small thread pools (one for the connection wait, one bounded pool for the delegates' database
+ * work, one thread for the change bus).
  * Each part is its own class, so later entries change one without the others.
  */
 public final class MapStudioServices {
@@ -51,6 +51,7 @@ public final class MapStudioServices {
     final StoreRegistry stores;
     final StoreGate gate;
     final MapStore store;
+    final ChangeBus changes;
     final WriteService writes;
     final AdapterService adapters;
     final MapLoader loader;
@@ -66,8 +67,8 @@ public final class MapStudioServices {
         this.setups = new SetupRegistry(setup -> stores.ensure(setup.connection()));
         this.gate = new StoreGate(setups, stores::state);
         this.store = new JdbcMapStore(connections);
-        ChangeHook hook = new NoChangeHook();
-        this.writes = new WriteService(gate, store, hook);
+        this.changes = ChangeBus.start(Executors.newSingleThreadScheduledExecutor(daemon("MapStudio-changes")));
+        this.writes = new WriteService(gate, store, changes);
         this.adapters = AdapterService.create(setups::find, setups::projects,
             new ProjectFunctionCaller(context.getProjectManager()));
         this.loader = new MapLoader(gate, store, adapters::snapshot);
@@ -85,6 +86,7 @@ public final class MapStudioServices {
         lifecycles.shutdown();
         scheduler.shutdownNow();
         work.shutdownNow();
+        changes.close();
     }
 
     /**

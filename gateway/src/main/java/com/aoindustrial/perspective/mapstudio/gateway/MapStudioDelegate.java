@@ -7,6 +7,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
 
 import com.inductiveautomation.ignition.common.auth.web.WebAuthUser;
@@ -20,6 +21,8 @@ import com.inductiveautomation.perspective.gateway.messages.EventFiredMsg;
 
 import com.aoindustrial.perspective.mapstudio.common.Messages;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
+import com.aoindustrial.perspective.mapstudio.gateway.change.ChangeBus;
+import com.aoindustrial.perspective.mapstudio.gateway.setup.SetupRegistry;
 import com.aoindustrial.perspective.mapstudio.gateway.write.Actor;
 import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
 
@@ -34,6 +37,15 @@ import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
  * every message, docs/platform-checks.md, epic 2 story 1), then run on the
  * module's bounded work pool and answer from there.
  *
+ * <p>From startup to shutdown the delegate is subscribed to the change bus for its
+ * session's project and sends each committed batch to its browser as
+ * {@code map.changed} (epic 2 story 4, AD-17), through the session's execution
+ * queue so the events reach the browser in the bus's order. A delegate whose
+ * component is no longer running, or whose session queue refuses the send, leaves
+ * the bus at that change, so a missed {@code onShutdown} does not keep it
+ * subscribed. A map whose session is at level {@code none} gets the change with
+ * {@code actor} blank: an anonymous viewer never learns the editors' user names.
+ *
  * <p>No exception escapes {@code handleEvent}: a malformed or unknown message
  * is answered with an {@code error} envelope and logged at warn.
  */
@@ -44,20 +56,102 @@ public class MapStudioDelegate extends ComponentModelDelegate {
     private static final DateTimeFormatter ISO_UTC = DateTimeFormatter.ISO_INSTANT;
 
     private final MapStudioServices services;
+    private final ChangeBus bus;
+    private final SetupRegistry setups;
+    /** The change bus subscription from onStartup, or null. */
+    private volatile ChangeBus.Subscription changes;
 
     public MapStudioDelegate(Component component, MapStudioServices services) {
+        this(component, services, services.changes, services.setups);
+    }
+
+    /** A delegate over an explicit bus and setups (tests pass {@code services} null and send no store messages). */
+    MapStudioDelegate(Component component, MapStudioServices services, ChangeBus bus, SetupRegistry setups) {
         super(component);
         this.services = services;
+        this.bus = bus;
+        this.setups = setups;
     }
 
     @Override
     protected void onStartup() {
         log.debugf("Delegate started for %s", component.getComponentAddressPath());
+        try {
+            String project = component.getSession().getProjectName();
+            this.changes = bus.subscribe(project, this::sendChange);
+        } catch (RuntimeException ex) {
+            log.warn("Could not subscribe an open map to its project's changes: " + ex.getClass().getSimpleName(), ex);
+        }
     }
 
     @Override
     protected void onShutdown() {
         log.debugf("Delegate stopped for %s", component.getComponentAddressPath());
+        leaveBus();
+    }
+
+    private void leaveBus() {
+        ChangeBus.Subscription s = this.changes;
+        this.changes = null;
+        if (s != null) {
+            s.cancel();
+        }
+    }
+
+    /**
+     * Called on the change bus thread: queue the {@code map.changed} envelope on the
+     * session's execution queue (ordered per session; that fireEvent from it reaches
+     * the browser is recorded live in docs/platform-checks.md, epic 2 story 4). The
+     * session's level is read in the queued task, as for every store message, and
+     * decides whether {@code actor} is sent.
+     *
+     * <p>A component that is no longer running, or a queue that refuses the task,
+     * means the map is gone: the delegate unsubscribes so the bus stops holding it
+     * (that {@code isRunning()} turns false and {@code submit} throws on a closed
+     * session are [unverified]; {@code onShutdown} still unsubscribes as well).
+     */
+    private void sendChange(JsonObject body) {
+        if (!component.isRunning()) {
+            log.debugf("Open map %s is no longer running; leaving the change bus.", component.getComponentAddressPath());
+            leaveBus();
+            return;
+        }
+        try {
+            component.getSession().queue().submit(() -> send(changedEnvelope(bodyFor(body, levelNow()))));
+        } catch (RuntimeException ex) {
+            log.debugf("Open map %s could not be sent a change (%s); leaving the change bus.",
+                component.getComponentAddressPath(), ex.getClass().getSimpleName());
+            leaveBus();
+        }
+    }
+
+    /** The session's level now, or {@code none} when the session cannot be read. */
+    private String levelNow() {
+        try {
+            SessionView view = sessionView();
+            return RoleMatrix.level(setups.find(view.project()).orElse(null), view.roles());
+        } catch (RuntimeException ex) {
+            return Messages.LEVEL_NONE;
+        }
+    }
+
+    /**
+     * The change bus's body as a map at {@code level} gets it: unchanged for
+     * {@code phone} and {@code full}; for {@code none}, a copy with {@code actor}
+     * blank (the bus's body is shared, so it is never changed). Pure.
+     */
+    static JsonObject bodyFor(JsonObject body, String level) {
+        if (Messages.LEVEL_FULL.equals(level) || Messages.LEVEL_PHONE.equals(level)) {
+            return body;
+        }
+        JsonObject copy = body.deepCopy();
+        copy.addProperty("actor", "");
+        return copy;
+    }
+
+    /** The {@code map.changed} envelope for one change event's body, with a new message id. Pure. */
+    static JsonObject changedEnvelope(JsonObject body) {
+        return envelope(Messages.MAP_CHANGED, UUID.randomUUID().toString(), body);
     }
 
     @Override
