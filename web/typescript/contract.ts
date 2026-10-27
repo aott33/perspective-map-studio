@@ -62,10 +62,19 @@ export interface EditBatch {
     ops: EditOp[];
 }
 
+/** The part of the project setup map.load sends the browser (optional; docs/setup.md). */
+export interface MapSetup {
+    refreshIntervalSeconds: number;
+    basemaps: string[];
+    alarmPage: string;
+}
+
 export interface MapLoadReplyBody {
     level: EditLevel;
     seq: number;
     items: MapItemRecord[];
+    /** Absent from a Gateway older than epic 2 entry 6, or when it is malformed. */
+    setup?: MapSetup;
 }
 
 export interface EditsApplyReplyBody {
@@ -130,7 +139,23 @@ export function readMapLoadReply(body: Record<string, unknown>): MapLoadReplyBod
             items.push(item);
         }
     }
-    return { level, seq: body.seq, items };
+    const setup = readMapSetup(body.setup);
+    return setup ? { level, seq: body.seq, items, setup } : { level, seq: body.seq, items };
+}
+
+/** map.load.reply's setup, or null when it is absent or malformed (the reply stays usable). */
+export function readMapSetup(value: unknown): MapSetup | null {
+    if (!isRecord(value) || typeof value.refreshIntervalSeconds !== 'number'
+        || !Number.isInteger(value.refreshIntervalSeconds) || value.refreshIntervalSeconds < 1
+        || !Array.isArray(value.basemaps) || !value.basemaps.every((b) => typeof b === 'string')
+        || typeof value.alarmPage !== 'string') {
+        return null;
+    }
+    return {
+        refreshIntervalSeconds: value.refreshIntervalSeconds,
+        basemaps: value.basemaps as string[],
+        alarmPage: value.alarmPage
+    };
 }
 
 /** The body of an edits.apply.reply, or null when it is malformed. */

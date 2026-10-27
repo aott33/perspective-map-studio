@@ -11,7 +11,7 @@ Every message, both ways, is one JSON object `{v, type, id, body}` carried under
 | Type | Direction | Body |
 | --- | --- | --- |
 | `map.load` | browser to Gateway | `{}` |
-| `map.load.reply` | Gateway to browser | `{level, seq, items}`: `level` is `none`, `phone` or `full` for this session; `seq` is the project's last change sequence number; `items` are map item records, deleted ones left out **[live 8.3.10]** |
+| `map.load.reply` | Gateway to browser | `{level, seq, items, setup?}`: `level` is `none`, `phone` or `full` for this session; `seq` is the project's last change sequence number; `items` are map item records, deleted ones left out; `setup` (optional, added by epic 2 entry 6) is `{refreshIntervalSeconds, basemaps, alarmPage}` from the project setup (`docs/setup.md`), and a reader treats a missing or malformed `setup` as absent **[live 8.3.10]** |
 | `edits.apply` | browser to Gateway | `{batchId, ops}` (below) |
 | `edits.apply.reply` | Gateway to browser | `{batchId, seq, results: [{entity, id, version}]}`: the batch's change sequence number and each op's new version **[live 8.3.10]** |
 | `map.changed` | Gateway to browser | `{seq, ops}`: declared; sent to every open map of the project from entry 4 **[unverified]** |
@@ -59,16 +59,7 @@ Closed: no other field is stored or accepted. Geometry is GeoJSON `Point` or `Li
 
 ## The project setup, schema version 1 (AD-5)
 
-The project resource `com.aoindustrial.perspective.mapstudio/setup/` holding `setup.json` and `resource.json` (`"scope": "G"`, `"files": ["setup.json"]`). Example: `ops/project/com.aoindustrial.perspective.mapstudio/setup/setup.json`.
-
-```json
-{"schemaVersion": 1, "connection": "MapStudio",
- "roles": {"full": ["MapEditor"], "phone": ["MapOperator"]},
- "kindsFunction": "", "assetsFunction": "", "refreshIntervalSeconds": 10,
- "alarmPage": "", "basemaps": ["none", "osm"], "tokenSecret": ""}
-```
-
-`schemaVersion` and `connection` are required; the rest have the defaults shown. Role names are Ignition role names, compared exactly. The map is keyed by the project's own name, even when a child project inherits the setup. A project with no setup, or whose setup names a connection the Gateway does not have, logs one warning naming the project (and the connection) at its first `map.load` or `applyEdits` after a Gateway start, and answers `store-unreachable` **[live 8.3.10]**.
+The project resource `com.aoindustrial.perspective.mapstudio/setup/` (`setup.json`). Every field, its default and rule, the messages a wrong setup gives, and how to change it on a running Gateway: `docs/setup.md`. In short: only `schemaVersion` (1) and `connection` are required; unknown fields are refused; a wrong or missing setup makes the project's map store answer `store-unreachable` with the reason; a changed setup applies at the next call after a project scan, with no restart **[live 8.3.10]**. The map is keyed by the project's own name, even when a child project inherits the setup.
 
 ## The map store, schema version 1 (AD-3, AD-21)
 

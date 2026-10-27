@@ -15,7 +15,7 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.MapStore;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
 
 /**
- * Assembles {@code map.load}'s reply, {@code {level, seq, items}}, and
+ * Assembles {@code map.load}'s reply, {@code {level, seq, items, setup}}, and
  * {@code getMap}'s list from the map store. Kind setups join the reply in entry 3.
  */
 public final class MapLoader {
@@ -36,7 +36,10 @@ public final class MapLoader {
 
     /** @throws MapStudioException {@code store-unreachable} when the project's map store cannot be read */
     public Snapshot snapshot(String project) {
-        Setup setup = gate.requireReady(project);
+        return snapshot(project, gate.requireReady(project));
+    }
+
+    private Snapshot snapshot(String project, Setup setup) {
         try {
             return store.inTransaction(setup.connection(),
                 tx -> new Snapshot(tx.currentSeq(project), tx.liveItems(project)));
@@ -50,12 +53,30 @@ public final class MapLoader {
 
     /** The {@code map.load.reply} body for a session at {@code level}. */
     public JsonObject mapLoadReply(String project, String level) {
-        Snapshot snapshot = snapshot(project);
+        // The setup is read on every call (never kept here), so a changed setup applies at the next map.load.
+        Setup setup = gate.requireReady(project);
+        Snapshot snapshot = snapshot(project, setup);
         JsonObject body = new JsonObject();
         body.addProperty("level", level);
         body.addProperty("seq", snapshot.seq());
         body.add("items", toJson(snapshot.items()));
+        body.add("setup", setupJson(setup));
         return body;
+    }
+
+    /**
+     * The part of the setup the browser needs ({@code map.load.reply}'s optional
+     * {@code setup}, 0.2.0 draft): never the connection, the roles, the functions or
+     * the token secret's name.
+     */
+    public static JsonObject setupJson(Setup setup) {
+        JsonObject o = new JsonObject();
+        o.addProperty("refreshIntervalSeconds", setup.refreshIntervalSeconds());
+        JsonArray basemaps = new JsonArray();
+        setup.basemaps().forEach(basemaps::add);
+        o.add("basemaps", basemaps);
+        o.addProperty("alarmPage", setup.alarmPage());
+        return o;
     }
 
     public static JsonArray toJson(List<MapItemRecord> items) {

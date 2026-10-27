@@ -87,6 +87,8 @@ export interface MapStudioDelegateState {
     itemsRevision: number;
     /** The level map.load reported, or null before it answered. */
     level: EditLevel | null;
+    /** The project setup's refresh interval map.load reported, or null (not loaded, failed, or not sent). */
+    refreshIntervalSeconds: number | null;
     /** 'loading', 'loaded', or the store-unreachable (or other) reason map.load answered. */
     load: { state: 'loading' | 'loaded' | 'failed'; message: string };
     /** The last save of a drawn line. */
@@ -105,6 +107,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private items: MapItemRecord[] = [];
     private itemsRevision = 0;
     private level: EditLevel | null = null;
+    private refreshIntervalSeconds: number | null = null;
     private load: MapStudioDelegateState['load'] = { state: 'loading', message: '' };
     private save: SaveState = SAVE_IDLE;
     private mapLoadId: string | null = null;
@@ -122,6 +125,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             items: this.items,
             itemsRevision: this.itemsRevision,
             level: this.level,
+            refreshIntervalSeconds: this.refreshIntervalSeconds,
             load: this.load,
             save: this.save
         };
@@ -196,9 +200,11 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.items = reply.body.items;
             this.itemsRevision++;
             this.level = reply.body.level;
+            this.refreshIntervalSeconds = reply.body.setup ? reply.body.setup.refreshIntervalSeconds : null;
             this.load = { state: 'loaded', message: '' };
         } else if (reply.kind === 'error') {
             this.level = null;
+            this.refreshIntervalSeconds = null;
             this.load = { state: 'failed', message: reply.body.code + ': ' + reply.body.message };
         }
         this.mapLoadId = null;
@@ -659,6 +665,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 <div className="mapstudio-map" ref={this.setMapContainer}
                      data-test-set={this.testData.name}
                      data-edit-level={delegate && delegate.level ? delegate.level : ''}
+                     data-refresh-interval={delegate && delegate.refreshIntervalSeconds !== null
+                         ? String(delegate.refreshIntervalSeconds) : ''}
                      data-load-state={load.state} />
                 <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '')}
                      data-pending={pending ? 'true' : 'false'}

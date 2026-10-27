@@ -1,4 +1,4 @@
-import { CONTRACT_VERSION, ErrorCodes, readEditsApplyReply, readMapItem, readMapLoadReply } from '../contract';
+import { CONTRACT_VERSION, ErrorCodes, readEditsApplyReply, readMapItem, readMapLoadReply, readMapSetup } from '../contract';
 import { MessageTypes, editsApply, mapLoad, readReply } from '../messages';
 
 const ITEM = {
@@ -41,6 +41,20 @@ describe('the 0.2.0 draft contract', () => {
         expect(reply).toEqual({ kind: 'map.load.reply', id: 'm1', body: { level: 'full', seq: 3, items: [ITEM] } });
         expect(readMapLoadReply({ level: 'admin', seq: 1, items: [] })).toBeNull();
         expect(readReply({ v: 1, type: 'map.load.reply', id: 'm1', body: {} }).kind).toBe('invalid');
+    });
+
+    test('map.load.reply may carry the part of the setup the browser needs (epic 2 entry 6)', () => {
+        const setup = { refreshIntervalSeconds: 30, basemaps: ['none', 'osm'], alarmPage: '/alarms' };
+        expect(readMapLoadReply({ level: 'phone', seq: 2, items: [], setup })).toEqual({ level: 'phone', seq: 2, items: [], setup });
+        // Absent (an older Gateway) or malformed: the reply stays usable, without setup.
+        expect(readMapLoadReply({ level: 'full', seq: 0, items: [] })).toEqual({ level: 'full', seq: 0, items: [] });
+        expect(readMapLoadReply({ level: 'full', seq: 0, items: [], setup: { refreshIntervalSeconds: 'ten' } }))
+            .toEqual({ level: 'full', seq: 0, items: [] });
+        expect(readMapSetup({ ...setup, refreshIntervalSeconds: 0 })).toBeNull();
+        expect(readMapSetup({ ...setup, refreshIntervalSeconds: 2.5 })).toBeNull();
+        expect(readMapSetup({ ...setup, basemaps: [1] })).toBeNull();
+        expect(readMapSetup({ ...setup, alarmPage: null })).toBeNull();
+        expect(readMapSetup(null)).toBeNull();
     });
 
     test('edits.apply.reply carries the batch, seq and versions', () => {

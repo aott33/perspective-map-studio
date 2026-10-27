@@ -92,7 +92,7 @@ CHECK alarm-metrics PASS readAsync [default]Checks/Alarm Metrics.HasActive -> nu
 ### Check 4: a custom project resource type
 
 - The project folder `ops/project/com.aoindustrial.perspective.mapstudio/setup/` holds `setup.json` and a `resource.json` (`scope: "G"`, `files: ["setup.json"]`). The Gateway loaded it with no declaration anywhere; `ResourceCollectionLifecycleFactory.getResourceFilter()` with `ResourceFilter.newBuilder().addResourceType(new ResourceType(MODULE_ID, "setup"))` delivered it to `ChecksLifecycle.onStartup(List<Resource>)`, read with `resource.getData("setup.json").map(ImmutableBytes::getBytesAsString)` **[live 8.3.10]**.
-- `onResourcesModified` **[not verified]**: changing the file needs a project scan (an API key, which the fresh dev Gateway has none of) or a Designer save; the lifecycle logs `CHECK setup-modified` when it fires. The owner can trigger it from the Designer.
+- `onResourcesModified` **[not verified]** in the spike: changing the file needs a project scan (an API key, which the fresh dev Gateway has none of) or a Designer save; the lifecycle logs `CHECK setup-modified` when it fires. The owner can trigger it from the Designer. Since seen firing after a project scan, with `onResourcesCreated` and `onResourcesDeleted`: "Epic 2 story 6" below **[live 8.3.10]**.
 - Designer editor estimate (not built, owner's decision): IA's project-resource example is 306 lines of Swing in the designer scope (`DesignerHook` 58, `PythonResourceWorkspace` 100 extending `TabbedResourceWorkspace`, `PythonResourceEditor` 67, `HandlerSearchProvider` 81), plus an icon, a bundle and the `designer-api` dependency. A form for AD-5's fields (connection, adapter functions, roles, refresh interval, alarm page, basemaps, token secret) is one editor class of that size; about one day with the Designer round trips. Decision deferred to epic-map-store-and-data; the fallback (a project script function returning the setup) costs nothing in the Designer.
 
 ### Check 5: PostgreSQL on the Gateway's default connection settings
@@ -300,3 +300,28 @@ I [M.roles] PROBE project mapstudio-dev authenticated=true user=mapeditor roles=
 Playwright traces record each action's parameters, a `fill()` value included, and CI uploads `e2e/out`. The suite therefore signs the map editor in with a plain Playwright browser in a separate node process (`e2e/lib/signInCli.mjs`, no tracing, no report) right before each editor test, and the test starts from the saved browser state (`storageState`). A state saved once in the global setup was signed out by the time the full suite reached the editor tests, about two minutes later (cause not established), so each editor test signs in afresh. A Perspective session opened from that saved state is signed in as `mapeditor` **[live 8.3.10]**. The global teardown deletes the state file (kept in the system temp folder, not in `e2e/out`) and scans `e2e/out`, trace zips unzipped, for the password, deleting any file that holds it and failing the run (`e2e/lib/secretScan.mjs`, unit tested with a zipped trace).
 
 Check of the scan [live, Playwright 1.63.0]: a throwaway spec with `trace: 'on'` that `fill()`ed the password into a page input produced a `trace.zip` under `e2e/out/results`; the teardown found the password inside it (unzipped), deleted the file and failed the run (exit 1), and a scan of `e2e/out` afterwards, the HTML report included, found nothing. The spec was then deleted.
+
+## Epic 2 story 6 - setup change on a live Gateway
+
+**Question (story 6, proof first; check 4 above):** does a changed project setup reach the module's `ResourceCollectionLifecycle` without a Gateway restart, and through which hook? **Answer:** yes. After `setup.json` is edited on disk, a project scan (`POST /data/api/v1/scan/projects` with the dev API key, HTTP 200; `ops/scan.sh`) calls `onResourcesModified` with the setup resource, and the module applied it within about 50 ms of the request; the file edit alone called nothing in 15 s **[live 8.3.10]**. No fallback was needed. Date: 2026-10-27. Gateway: `inductiveautomation/ignition:8.3.10`, container `ms-e2s6` on port 9126, module 0.1.0 built from this branch.
+
+Sequence (by hand, then again by `e2e/tests/setup.spec.mjs`), log lines of `MapStudio.setup`, Gateway time:
+
+| Step | Hook | Log line |
+| --- | --- | --- |
+| Gateway start | `onStartup` | `00:49:25.111 Project mapstudio-dev: Map Studio setup read (connection MapStudio, ... refresh interval 10 s)` |
+| `roles` and `refreshIntervalSeconds` edited, no scan, 15 s | none | (nothing) |
+| scan requested at `00:49:53.464` | `onResourcesModified` | `00:49:53.517 ... setup changed and applied on resource modified (... full editing roles [Nobody], phone editing roles [MapEditor], refresh interval 30 s)` |
+| `refreshIntervalSeconds: "ten"`, scan | `onResourcesModified` | `W 00:49:56.713 The Map Studio setup of project mapstudio-dev ... cannot be read: refreshIntervalSeconds must be a whole number from 1 to 3600, not "ten".` |
+| file cut to 40 bytes, scan | `onResourcesModified` | `W ... setup.json is not valid JSON (line 3, column 17).` |
+| setup folder moved out of the project, scan | `onResourcesDeleted` | `00:50:03.141 ... setup removed; its map store is unavailable until a setup is added.` |
+| folder put back, scan | `onResourcesCreated` | `00:50:06.329 ... setup read on resource created (...)` |
+| `setup.json` removed from the folder, scan | `onResourcesModified` | `W ... setup.json is missing from the setup resource.` |
+| file put back, scan | `onResourcesModified` | `... setup changed and applied on resource modified (...)` |
+
+- The module started once in this sequence (one "Starting up module 'com.aoindustrial.perspective.mapstudio'" line) and the Gateway stayed `RUNNING`, so nothing was restarted. The e2e run did the same: the editor's level went from `full` to `phone` and the refresh interval from 10 to 30 at the first reload after the scan, the bad field gave `store-unreachable` with the reason in the component, and the restored file brought `full` back.
+- The modified, created and deleted lists hold only resources of the lifecycle factory's filter type (the setup), as the deleted case shows with a `ResourceId` of type `com.aoindustrial.perspective.mapstudio/setup`.
+- The lifecycle callbacks run on a Gateway thread whose log context carries `collection=mapstudio-dev` (the start's runs under `module-name=Map Studio`).
+- `setup.json` written by the Gateway: no. The scans left `ops/project` unchanged (`git status --porcelain ops/project` empty after the suite).
+- A Designer save is expected to call the same hook **[unverified]**; the owner can check it with any edit of the setup resource once entry 7 gives it a Designer editor.
+

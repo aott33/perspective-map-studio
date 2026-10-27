@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +22,7 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.StoreState;
 import com.aoindustrial.perspective.mapstudio.gateway.write.Actor;
 import com.aoindustrial.perspective.mapstudio.gateway.write.FakeMapStore;
 import com.aoindustrial.perspective.mapstudio.gateway.write.NoChangeHook;
+import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
 import com.aoindustrial.perspective.mapstudio.gateway.write.WriteService;
 
 class MapLoaderTest {
@@ -74,5 +76,45 @@ class MapLoaderTest {
         assertEquals(Messages.CODE_STORE_UNREACHABLE, noConnection.code());
         assertTrue(noConnection.plainMessage().contains("MapStudio"));
         assertEquals(0, store.transactions, "nothing is read when the store is unreachable");
+    }
+
+    @Test
+    void mapLoadSendsThePartOfTheSetupTheBrowserNeeds() {
+        JsonObject setup = loader.mapLoadReply("mapstudio-dev", Messages.LEVEL_FULL).getAsJsonObject("setup");
+        assertEquals(10, setup.get("refreshIntervalSeconds").getAsInt());
+        assertEquals("[\"none\",\"osm\"]", setup.get("basemaps").toString());
+        assertEquals("", setup.get("alarmPage").getAsString());
+        assertEquals(3, setup.size(), "never the connection, the roles, the functions or the token secret");
+    }
+
+    @Test
+    void aChangedSetupAppliesAtTheNextCallWithNoRestart() throws Exception {
+        String roles = "\"roles\":{\"full\":[\"MapEditor\"],\"phone\":[]}";
+        setups.put("mapstudio-dev", Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\"," + roles + "}"));
+        List<String> editor = List.of("MapEditor");
+        assertEquals("full", RoleMatrix.level(setups.find("mapstudio-dev").orElse(null), editor));
+
+        setups.put("mapstudio-dev", Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\","
+            + "\"roles\":{\"full\":[\"Nobody\"],\"phone\":[\"MapEditor\"]},\"refreshIntervalSeconds\":30}"),
+            "resource modified");
+        assertEquals("phone", RoleMatrix.level(setups.find("mapstudio-dev").orElse(null), editor));
+        assertEquals(30, loader.mapLoadReply("mapstudio-dev", "phone").getAsJsonObject("setup")
+            .get("refreshIntervalSeconds").getAsInt());
+
+        setups.putProblem("mapstudio-dev", "refreshIntervalSeconds must be a whole number from 1 to 3600, not \"ten\".");
+        MapStudioException load = assertThrows(MapStudioException.class,
+            () -> loader.mapLoadReply("mapstudio-dev", Messages.LEVEL_NONE));
+        assertEquals(Messages.CODE_STORE_UNREACHABLE, load.code());
+        assertTrue(load.plainMessage().contains("refreshIntervalSeconds must be a whole number"), load.plainMessage());
+        MapStudioException save = assertThrows(MapStudioException.class, () -> writes.apply("mapstudio-dev",
+            JsonParser.parseString("{\"batchId\":\"" + UUID.randomUUID() + "\",\"ops\":[]}"), Actor.script("t"),
+            Messages.LEVEL_FULL));
+        assertEquals(Messages.CODE_STORE_UNREACHABLE, save.code());
+        assertEquals(load.plainMessage(), save.plainMessage());
+        assertThrows(MapStudioException.class, () -> loader.snapshot("mapstudio-dev"));
+
+        setups.put("mapstudio-dev", Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\"," + roles + "}"));
+        assertEquals(10, loader.mapLoadReply("mapstudio-dev", "full").getAsJsonObject("setup")
+            .get("refreshIntervalSeconds").getAsInt());
     }
 }
