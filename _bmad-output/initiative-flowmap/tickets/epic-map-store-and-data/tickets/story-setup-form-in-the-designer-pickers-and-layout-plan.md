@@ -3,13 +3,13 @@ title: 'Setup form in the Designer: pickers and layout'
 type: 'feature'
 ticket: '16'
 created: '2026-10-27'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '2043e34c0bd1d20bf635db554c14f7f2f0ca5e75'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
 context:
