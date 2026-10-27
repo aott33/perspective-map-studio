@@ -2,7 +2,7 @@
 type: epic
 title: "Map editors build and keep the map in the browser"
 parent: initiative-flowmap
-covers: ["R10", "R11", "R14", "R15", "R16", "R17", "R18", "R19", "R20", "R21", "R22", "R23", "R24", "R38", "R40"]
+covers: ["R10", "R11", "R14", "R15", "R16", "R17", "R18", "R19", "R20", "R21", "R22", "R23", "R24", "R38", "R40", "R41"]
 sources: []
 companions: []
 after: []
@@ -48,3 +48,4 @@ A map editor new to the Mesa demo field lays it out with the tools alone in unde
 - Waits on epic-map-store-and-data because: saving, roles and the asset list.
 - Waits on epic-viewing because: the map view to draw on.
 - Decision: 2026-10-26 The owner approved value-driven styles and area category tints (initiative R40; prd FR-38, FR-39; architecture AD-11, AD-16); this epic covers writing a kind's style rule, area tints and per-item overrides in the kind setup screen, which embeds epic-viewing's preview of every state before saving.
+- Decision: 2026-10-27 The owner approved instruments on lines (initiative R41; prd FR-16, FR-40; architecture AD-16, AD-19). This epic owns the "add instrument on this line" tool: with a line selected, a map editor picks an instrument kind (tap, meter, line valve) and places it by clicking the line or typing its distance along the line, then moves it along the line, never off it, by dragging or by typing a new distance (WCAG 2.5.7); instruments snap onto a line, not to its vertices; moving, reshaping or splitting a line keeps its instruments on it through the shared geometry module and epic-map-store-and-data entry 14's checks; and the kind setup screen offers "worst of its instruments" as a line's style source. A story for it is planned when this epic is refined; it waits on epic-map-store-and-data entry 14 and on epic-viewing entry 2.

@@ -2,6 +2,7 @@
 # The epic is not refined yet (refined: false); its stories are planned when it is.
 # Entry 1 (owner-approved 2026-10-26, initiative R40) is held here ahead of refinement;
 # it cites initiative R40 until the epic has its own Requirements.
+# Entry 2 (owner-approved 2026-10-27, initiative R41) is held the same way and cites initiative R41.
 
 [[entry]]
 id = 1
@@ -11,5 +12,16 @@ description = "Initiative R40 (owner, 2026-10-26; prd FR-38, FR-39; architecture
 verify = "On the dev Gateway with seeded kind setups: a States rule and a Bands rule change an icon's and a line's look as the source tag changes, within one refresh interval; an active alarm draws over the value style; a stale source value drops the style and shows stale until a fresh value arrives; an area takes its category tint and a point never does; the preview shows every state in its preset; no colour literal is in the stored rules or the module's styles; the owner's engineering review of the presets and tints (ER-27) is recorded."
 covers = ["R40"]
 after = ["2.9"]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 2
+type = "story"
+title = "Instruments drawn on lines, the ordered line popup, segment click and the aggregate line style"
+description = "Initiative R41 (owner, 2026-10-27; prd FR-4, FR-5, FR-34, FR-38, FR-40; architecture AD-7, AD-11, AD-16, AD-19). Draws each instrument (tap, meter, line valve) as its kind's icon at its place on its line, from the stored attachment, and splits the line into line segments for display; a line's default popup lists its instruments in order along the line, between the map items its ends snap to, each with its live values and distance (for example CTB1 outlet, PT-1 at 1.1 km, PT-2 at 2.8 km, SWD1 inlet), plus the line's own KPIs and alarm summary, with the Gateway pushing every listed instrument's values while it is open; a click or tap on a line opens the popup at that segment (for example PT-1 to PT-2) with the instruments at its ends highlighted on the map and in the list, on desktop and as a bottom sheet at 390 px; an instrument's alarm glyph draws at its place on the line, the line's own alarms keeping the midpoint glyph; a line style rule with the instruments source draws dashed when any instrument is stale and otherwise the worst instrument preset, alarm state still winning; the map item object of a line carries its ordered instruments and the open segment for custom popup views. Whether a segment draws from the instruments at its ends or the whole line from all of them is settled with the owner before this starts (prd section 9, question 9). The engineering review of instrument alarms and the aggregate look (ER-27) is a hitl step."
+verify = "On the dev Gateway with a seeded L-SWD-like line (PT-1 at 1,143 m, PT-2 at 2,841 m of 2,922 m, ends snapped to CTB1 and SWD1): the instruments draw at their places; the line popup lists CTB1 outlet, PT-1, PT-2, SWD1 inlet in order with live values that update while open; a click between PT-1 and PT-2 opens it at \"PT-1 to PT-2\" with both highlighted; an alarm on PT-2 draws at PT-2's place on the line; with the instruments style source, making PT-1 stale dashes the line and pushing PT-2 outside its band shows attention, an active alarm drawing over both; the same at 390 px; the owner's engineering review (ER-27) is recorded."
+covers = ["R41"]
+after = ["2.14", 1]
 hitl = true
 risk = "medium"

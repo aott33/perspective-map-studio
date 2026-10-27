@@ -1,6 +1,7 @@
 # Epic 2 stories in build order. Table order is build order; ids are permanent.
 # Parallel groups (epic Notes, Decision 2026-10-26): 1 alone; group A = 2 to 7 after 1;
-# group B = 8, 9, 10; group C = 11; then 12 (sweep) and 13 (closing release check).
+# group B = 8, 9, 10; group C = 11 and 14 (added 2026-10-27, instruments on lines);
+# then 12 (sweep) and 13 (closing release check). Stories 2 to 7 are being built now: do not disturb them.
 
 [[entry]]
 id = 1
@@ -106,8 +107,8 @@ risk = "medium"
 id = 10
 type = "story"
 title = "Core oil and gas icon set"
-description = "Ships the sixteen FR-9 icons in one minimalist style as a sprite the module serves, with their source, licence and attribution in NOTICE, nothing derived from OpenBridge, and an icon catalogue in common/ that the kind list's icon names are checked against (an unknown name reported in the adapter status). The owner approves the look. Static assets, the catalogue and the adapter check only; epic-viewing draws them. Group B (after 3)."
-verify = "The sprite and catalogue are served by the dev Gateway, a docs page shows all sixteen icons, NOTICE carries their licence, and a dev kind naming an unknown icon is reported in map.load."
+description = "Ships the seventeen FR-9 icons (sixteen plus the instrument meter, a flow meter on a line, added 2026-10-27 with initiative R41; its glyph is new and distinct from meter station) in one minimalist style as a sprite the module serves, with their source, licence and attribution in NOTICE, nothing derived from OpenBridge, and an icon catalogue in common/ that the kind list's icon names are checked against (an unknown name reported in the adapter status). The owner approves the look. Static assets, the catalogue and the adapter check only; epic-viewing draws them. Group B (after 3)."
+verify = "The sprite and catalogue are served by the dev Gateway, a docs page shows all seventeen icons, NOTICE carries their licence, and a dev kind naming an unknown icon is reported in map.load."
 covers = ["R9"]
 after = [3]
 hitl = true
@@ -125,13 +126,24 @@ hitl = false
 risk = "medium"
 
 [[entry]]
+id = 14
+type = "story"
+title = "Instruments on lines: attachment stored and kept on the line"
+description = "Owner-approved 2026-10-27 (initiative R41; prd FR-40; architecture AD-16, AD-19, AD-20). Adds attachment {lineId, distanceM} to the map item record (the next migration number, per the epic's migration rule) and instrument: true on point kinds to the kind list contract; the write service validates an attachment (instrument kind only, a live line item, distanceM from 0 to the line's geodesic length within 1 m) and refuses with code invalid a batch that changes or deletes a line without updating or deleting every instrument attached to it; the shared geometry module in web/ gains the projection that recomputes each attached instrument's distanceM and point on a line's new geometry (move, reshape, vertex insert or delete, split), sent in the same edits.apply batch as the line; a line kind's styleRule may take source {instruments: \"worst\"}, refused on other kinds; map.load and getMap return attachments; docs for the record, kind list and kind setup schema updated. Stores and validates only: no drawing, popup or tool (epic-viewing entry 2, epic-editing). Group C (after 2 and 9); stories 2 to 7, being built now, are not disturbed."
+verify = "Gateway tests and a live run: an instrument saved on a line with its distanceM returns unchanged in map.load and getMap; an attachment on a non-instrument kind, to a deleted or missing line, or past the line's end is refused with code invalid and a plain-words reason; a batch that reshapes or deletes a line without its instruments is refused; Jest tests of the shared geometry module turn a move, a reshape and a split of L-SWD-like test data (PT-1 at 1,143 m, PT-2 at 2,841 m of 2,922 m) into one batch that keeps each instrument on the line at its nearest place, saved all or none and undone as one step; an instrument changed by another editor meanwhile makes the line's batch a conflict; an instruments style source on a point kind is refused."
+covers = ["R16"]
+after = [2, 9]
+hitl = false
+risk = "medium"
+
+[[entry]]
 id = 12
 type = "story"
 title = "Refactor sweep"
 description = "Cleans up what the other stories deferred, scoped at its start from their plans and review findings; cleanup only."
 verify = "The build, the Gateway and Jest tests and the e2e suite still pass after the sweep."
 covers = []
-after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14]
 hitl = false
 risk = "low"
 

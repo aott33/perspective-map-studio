@@ -2,7 +2,7 @@
 title: Map Studio for Ignition Perspective - PRD
 status: final
 created: 2026-10-25
-updated: 2026-10-26
+updated: 2026-10-27
 ---
 
 # PRD: Map Studio for Ignition Perspective
@@ -120,6 +120,9 @@ Every later section, and every document built from this PRD, uses these terms ex
 - **Property** - a named value on a map item, entered in its form or imported.
 - **Vertex** - a point on a line or an area. A **midpoint handle** sits between two vertices of the selected item and adds a vertex there.
 - **Snapped end** and **floating end** - a line end attached to a map item or a vertex, and one that is not. They look different.
+- **Instrument** - (FR-40) a point map item that sits on a line: a tap (a pressure transmitter such as the template's Rangers), a meter (flow) or a line valve. The kind list marks its kind as an instrument kind; it has its own kind setup (comms, KPIs, alarms path) like any point, and stays on its line when the line is moved or reshaped.
+- **Distance along line** - (FR-40) where an instrument sits on its line, in metres from the line's start, stored with the instrument together with which line it sits on.
+- **Line segment** - (FR-40) the part of a line between two neighbours in order along it (the line's start, its instruments by distance along line, the line's end), for example "PT-1 to PT-2". Drawn and clicked separately; worked out from the stored instruments, never stored itself.
 
 **Links to the project's data**
 
@@ -163,7 +166,7 @@ Every later section, and every document built from this PRD, uses these terms ex
 
 **Description:** Every user sees the map, its icons and their state, and can search it.
 
-**Engineering review:** icons, lines and popups that show state are alarm presentation. The template's engineering review (ER-27, `docs/ux.md` section 11) applies to FR-2, FR-4 to FR-6, FR-34 and FR-37 before release, and to the style presets of FR-38 and the area tints of FR-39.
+**Engineering review:** icons, lines and popups that show state are alarm presentation. The template's engineering review (ER-27, `docs/ux.md` section 11) applies to FR-2, FR-4 to FR-6, FR-34 and FR-37 before release, to the style presets of FR-38 and the area tints of FR-39, and to instrument alarms and the instrument-based line style of FR-40.
 
 #### FR-1: Show the map
 
@@ -207,7 +210,7 @@ Every user can search map items by name or asset; choosing a result zooms the ma
 Map Studio shows everything the template's current map shows, as approved in its engineering review (ER-27), so SM-1 can retire the current map. Realizes UJ-5.
 
 **Consequences (testable):**
-- Lines carry state: weight by pipe size, the hue of the highest alarm on the line's alarms path, dashed for no data or comms lost, and the alarm glyph with its digit at the line's midpoint, so a line's alarm never reads by colour alone.
+- Lines carry state: weight by pipe size, the hue of the highest alarm on the line's alarms path, dashed for no data or comms lost, and the alarm glyph with its digit at the line's midpoint, so a line's alarm never reads by colour alone. An instrument's alarm shows at that instrument's place on the line (FR-40).
 - The flow direction shows as an arrow on the selected line only.
 - Map items within 20 m of each other draw as one shared marker; a tap lists them to pick from.
 - Controls offer Fit to the starting area and Return to the selection, and toggles hide lines and names.
@@ -228,6 +231,7 @@ A kind setup may bind a map item's look to one value through a style rule: the i
 - Alarm state wins: a map item with an active alarm shows its alarm presentation (FR-2, FR-34), not its value style.
 - A stale value shows only as stale: the map item drops its last value style until a fresh value arrives (owner, 2026-10-26).
 - The style rule's value is a live value: read in the icon batch (NFR-9), and not read when the item has no style rule.
+- A line's style rule may take as its value an aggregate of its instruments, "worst of its instruments" (FR-40): for example dashed when any instrument is stale, attention when any instrument's value is outside its band (owner, 2026-10-27).
 - Every preset is documented with its look in both themes, so every possible look is reviewable; the presets pass the same engineering review as the alarm glyphs (ER-27) before release.
 
 #### FR-39: Area category tints
@@ -252,6 +256,7 @@ A user opens a map item's popup by clicking or tapping it; the popup shows the p
 - A kind setup with no popup parts enabled opens no popup.
 - Values update live while the popup is open; stale values are marked stale.
 - On a 390 px phone the popup opens as a bottom sheet with a visible close button.
+- A line's popup lists its instruments in order along the line, each with its live values, and opens at the line segment that was clicked (FR-40).
 
 #### FR-37: Custom popup view
 
@@ -270,6 +275,7 @@ Where enabled, the default popup shows the alarm summary for the map item's alar
 - The summary counts only alarms under the map item's alarms path and names the most important active ones in words.
 - "View alarms" goes to the configured alarm page, filled from the map item (for example `/alarms?source={asset.id}`); with no page configured, the button is hidden.
 - Map Studio acknowledges nothing itself.
+- On a line's popup the summary covers the line's own alarms path; each instrument's alarm state shows on its row in the line's instrument list (FR-40).
 
 #### FR-6: Popup link
 
@@ -319,7 +325,8 @@ The project supplies the list of kinds, each with its geometry, icon and form fi
 
 **Consequences (testable):**
 - Adding a kind to the project's list makes it available in the tools without rebuilding the module.
-- Map Studio ships a core icon set in one minimalist style for the oil and gas kinds: well pad, wellhead, tank battery, compressor station, booster station, meter station, pig launcher or receiver, line valve, tap, RTU or comms tower, pipeline, lateral, lease road, geofence, region and site footprint. A kind may name any icon from it.
+- Map Studio ships a core icon set in one minimalist style for the oil and gas kinds: well pad, wellhead, tank battery, compressor station, booster station, meter station, pig launcher or receiver, line valve, tap, meter, RTU or comms tower, pipeline, lateral, lease road, geofence, region and site footprint. A kind may name any icon from it. `meter` (a flow meter on a line, FR-40) was added 2026-10-27 and needs its own instrument glyph, distinct from meter station.
+- The kind list marks which point kinds are instrument kinds (for example tap, meter and line valve), which sit on a line (FR-40).
 
 #### FR-10: Asset list through the asset contract
 
@@ -384,6 +391,21 @@ Line ends and vertices snap to nearby map items and vertices while drawing, with
 **Consequences (testable):**
 - A snapped end and a floating end look different on the map.
 - With snapping off, nothing snaps.
+- An instrument (FR-40) snaps onto a line, not to its vertices: it is placed on the line and stays on it.
+
+#### FR-40: Instruments on lines
+
+Approved by the owner 2026-10-27. Pipeline instruments, that is taps (pressure transmitters such as the template's Rangers), meters (flow) and line valves, are their own map items snapped onto a line, because a real line carries several instruments, each with its own comms and alarms. This matches the template's registry, which lists the Rangers as taps of L-SWD (`L-SWD/PT-1` at 1,143 m and `L-SWD/PT-2` at 2,841 m of 2,922 m) and of L-GL21 (the template's `docs/map.md`, section 6). It extends FR-4, FR-5, FR-16, FR-34 and FR-38. Realizes UJ-1, UJ-5.
+
+**Consequences (testable):**
+- An instrument is a point map item of an instrument kind, with its own kind setup (comms path, KPIs, alarms path, popup parts), overrides and asset link, like any point.
+- Map Studio stores which line an instrument sits on and its distance along line in metres from the line's start. Moving or reshaping the line keeps each instrument on it, at its nearest place on the new shape, in the same save; splitting a line (FR-15) keeps each instrument on the part it sits on, measured from that part's start.
+- An instrument is placed by clicking the line or by typing its distance along line, and moved along the line, never off it, by dragging or by typing a new distance (NFR-3).
+- The instruments split the line into line segments for display.
+- A line's popup lists its instruments in order along the line, between the map items its ends snap to, each with its live values and distance (for example CTB1 outlet, PT-1 at 1.1 km, PT-2 at 2.8 km, SWD1 inlet), plus the line's own KPIs and alarms.
+- Clicking or tapping a spot on a line opens the popup at that line segment (for example "PT-1 to PT-2"), with the instruments at its ends highlighted on the map and in the list.
+- A line's style rule (FR-38) may use the worst of its instruments as its value: dashed when any instrument is stale, attention when any instrument's value is outside its band.
+- An instrument's alarm shows at that instrument's place on the line, not only at the line's midpoint; the line's own alarms path keeps its midpoint glyph (FR-34).
 
 #### FR-17: Delete and undo
 
@@ -574,9 +596,9 @@ The project offers none, OpenStreetMap, satellite and Mapbox basemaps; the user 
 Not a cut line: every item in 6.1 ships. The order makes Map Studio useful on the template early.
 
 1. The spike (6.4).
-2. The map store and data: kinds, the asset contract, roles, saving (FR-7, FR-9, FR-10, FR-29 to FR-31).
-3. Viewing: the map, icons, popups, search, basemaps (FR-1 to FR-6, FR-32 to FR-34, FR-37), and drawing value styles and area tints (FR-38, FR-39).
-4. Drawing and editing, forms, location, linking and kind setup (FR-8, FR-11 to FR-21, FR-36).
+2. The map store and data: kinds, the asset contract, roles, saving (FR-7, FR-9, FR-10, FR-29 to FR-31), and storing each instrument's line and distance along line (FR-40).
+3. Viewing: the map, icons, popups, search, basemaps (FR-1 to FR-6, FR-32 to FR-34, FR-37), drawing value styles and area tints (FR-38, FR-39), and drawing instruments on lines with the ordered line popup (FR-40).
+4. Drawing and editing, forms, location, linking and kind setup (FR-8, FR-11 to FR-21, FR-36), and placing instruments on lines (FR-40).
 5. Import, bulk edit, reference layer and export (FR-22 to FR-26, FR-35).
 6. Phone editing (FR-27, FR-28).
 7. The template cut-over (SM-1).
@@ -606,8 +628,8 @@ One to two days before any feature: a blank component module built from an open-
 
 **Primary**
 
-- **SM-1: It replaces the template's map pages.** The template's map and map editing run on Map Studio, the Leaflet map and drawing layer are retired, and the map lives in the map store. Validates FR-1 to FR-39.
-- **SM-2: A field from nothing in 30 minutes.** A map editor who has not seen the Mesa demo field (the template's sample field) lays it out (sites, pipelines split at taps, one geofence, every map item linked) with the tools alone, without help, in under 30 minutes. Validates FR-9 to FR-21.
+- **SM-1: It replaces the template's map pages.** The template's map and map editing run on Map Studio, the Leaflet map and drawing layer are retired, and the map lives in the map store. Validates FR-1 to FR-40.
+- **SM-2: A field from nothing in 30 minutes.** A map editor who has not seen the Mesa demo field (the template's sample field) lays it out (sites, pipelines with their taps as instruments on them, one geofence, every map item linked) with the tools alone, without help, in under 30 minutes. Validates FR-9 to FR-21 and FR-40.
 
 **Secondary**
 
@@ -641,6 +663,8 @@ Target date for SM-1 to SM-5: end of January 2027, a target and not a deadline.
 6. Answered 2026-10-26: Ignition 8.3 has an Alarm Metrics folder on tag folders and UDT instances (IA docs). Its values can be subscribed but not read directly, which the architecture must respect for NFR-9.
 7. Answered 2026-10-26: the owner approved value-driven styles (FR-38) and area category tints (FR-39) as written.
 8. Answered 2026-10-26: a stale value shows only as stale; the map item drops its last value style until a fresh value arrives (FR-38).
+9. Does each line segment draw its own look from the instruments at its ends, as the template's map draws a segment from the taps at its ends (its `docs/map.md` section 2), or does the whole line draw the worst of all its instruments (FR-40)? Proposed: per segment, for parity with FR-34; the whole line when it has no instruments.
+10. What happens to a line's instruments when the line is deleted (FR-40)? Proposed: they are deleted with it in the same save, and one undo restores the line and its instruments.
 
 ## 10. Assumptions index
 
