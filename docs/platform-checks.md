@@ -389,3 +389,23 @@ Sequence (by hand, then again by `e2e/tests/setup.spec.mjs`), log lines of `MapS
 - `setup.json` written by the Gateway: no. The scans left `ops/project` unchanged (`git status --porcelain ops/project` empty after the suite).
 - A Designer save is expected to call the same hook **[unverified]**; the owner can check it with any edit of the setup resource once entry 7 gives it a Designer editor.
 
+## Epic 2 story 7 - setup editor in the Designer
+
+**Question:** can a Designer workspace built on the SDK's `TabbedResourceWorkspace` and `ResourceEditor` create and edit the project's one Map Studio setup at the type folder (`com.aoindustrial.perspective.mapstudio/setup/`, story 1's layout)? **Answer:** built and unit tested; not yet seen in a Designer. Every line below is **[not verified]** until the owner's Designer session marks it **[owner, seen in the Designer, <date>]**.
+
+What the code relies on, read from the 8.3.0 SDK jars with `javap` (signatures and bytecode, not run) **[SDK 8.3.0 javap]**:
+
+- `ResourceEditor`'s constructor sets `workspace`, `context` and `resourcePath`, then reads `getProject().getResource(path)` and calls `loadResource`, which calls `deserialize(Resource)` and `init(T)`, before the subclass's own fields are set; a missing resource shows "Resource '...' not found!". So `SetupEditor` makes its panel inside `init`, and "Create setup" writes the resource before the tab is opened.
+- `ResourceEditor.commit()` calls `getObjectForSave()`; with `isOptimizeCommits()` true and an object equal to the one read it writes nothing; otherwise a local resource is modified (`toBuilder`, `serializeResource`, `setApplicationScope(descriptor scope)`, `modifyResource`) and a resource the project does not hold locally (an inherited one) is created as this project's own (`Resource.newBuilder()`, `setResourceCollectionName(project)`, `createResource`); an exception goes to `onCommitFailed`, whose default shows `ErrorUtil.showError`.
+- Nothing in the Designer commits a module's `TabbedResourceWorkspace`: `IgnitionDesigner.handleSave` runs `commitAll()` off the Swing thread, whose `getCommitTasks()` commits only the Designer's own module and script editors, `ScriptWorkspace` and `NamedQueryWorkspace`, then calls each module hook's `notifyProjectSaveStart(SaveContext)`; `WorkspaceManager` commits nothing. `ResourceEditor` has no dirty flag or change notification (its members are the constructor, `loadResource`, `updateResource`, `init`, `getObjectForSave`, the (de)serialize methods, `commit`, `dispose`, `onCommitFailed`). So `MapStudioDesignerHook.notifyProjectSaveStart` calls `SetupWorkspace.commitAll()` on the Swing thread (`invokeAndWait`), and the editor passes no edit callback.
+- `TabbedResourceWorkspace.registerNavTreeNode()` adds `createRootNavTreeNode()` under `DesignerContext.getProjectBrowserRoot()`; `getKey()` is left to the subclass; `ResourceType.rootPath()` gives the type-folder path.
+
+The owner's Designer session (the plan's manual check), to be recorded here:
+
+- [not verified] The project browser shows "Map Studio Setup"; double-click opens the dev project's setup in a "Map Studio Setup" tab with the values of `ops/project/.../setup/setup.json`.
+- [not verified] The type-folder resource opens in the tabbed workspace at all. If not, the plan's fallback applies (a plain node opening the same `SetupPanel` in a dialog, saved with `DesignableProject.createOrModify`), and this line says what the Designer did.
+- [not verified] On a scratch project with no setup, "Create setup" opens the form with the defaults, refuses Create while `connection` is empty, and after `MapStudio` and Create plus a project save `data/projects/<scratch>/com.aoindustrial.perspective.mapstudio/setup/` holds `resource.json` (scope `G`, `files: ["setup.json"]`) and `setup.json`.
+- [not verified] A field edit alone (no other project change) makes the project save commit the setup: File, Save is offered, and `setup.json` holds the edit afterwards.
+- [not verified] An invalid setup (refresh `0`) is refused at the project save with the dialog naming the field, and nothing is written; what the Designer does with the rest of that project save.
+- [not verified] With `MapEditor` removed from full editing, saved, and the dev Gateway restarted (story 6 not merged yet), `map.load` for `mapeditor` reports level `none`; restoring the role brings back `full`; `git diff ops/project` shows only the changed line.
+- [not verified] An inherited setup shows "Inherited from <project>" and a save makes this project's own copy.
