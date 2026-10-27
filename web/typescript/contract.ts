@@ -76,7 +76,8 @@ export interface EditOp {
     id: string;
     /** 0 on create, the stored version otherwise. */
     baseVersion: number;
-    data: MapItemData;
+    /** The record's fields (all of a create's, the changed ones of an update); a delete carries none. */
+    data?: MapItemData;
 }
 
 /** A kind setup op (epic 2 story 9): `id` is the kind id; a delete carries no data. */
@@ -115,6 +116,11 @@ export interface MapLoadReplyBody {
     setup?: MapSetup;
     /** The project's kind setups, at levels phone and full only (epic 2 story 9); malformed ones left out. */
     kindSetups?: KindSetupRecord[];
+    /**
+     * The session user name, sent at level `phone` and `full` only (epic 2 story 8); absent
+     * at level `none`, for an anonymous session, or from an older Gateway.
+     */
+    user?: string;
 }
 
 export interface EditsApplyReplyBody {
@@ -204,6 +210,9 @@ export function readMapLoadReply(body: Record<string, unknown>): MapLoadReplyBod
     }
     if (Array.isArray(body.kindSetups)) {
         reply.kindSetups = body.kindSetups.map(readKindSetup).filter((k): k is KindSetupRecord => k !== null);
+    }
+    if (typeof body.user === 'string' && body.user !== '') {
+        reply.user = body.user;
     }
     return reply;
 }

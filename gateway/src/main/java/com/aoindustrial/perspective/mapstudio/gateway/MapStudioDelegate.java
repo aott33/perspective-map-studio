@@ -274,7 +274,8 @@ public class MapStudioDelegate extends ComponentModelDelegate {
         Function<Setup, String> level = setup -> RoleMatrix.level(setup, view.roles());
         try {
             if (Messages.MAP_LOAD.equals(type)) {
-                return envelope(Messages.MAP_LOAD_REPLY, id, loader.mapLoadReply(view.project(), level));
+                return envelope(Messages.MAP_LOAD_REPLY, id,
+                    withUser(loader.mapLoadReply(view.project(), level), view.userName()));
             }
             JsonElement b = body.get("batchId");
             batchId = b != null && b.isJsonPrimitive() ? b.getAsString() : null;
@@ -314,6 +315,21 @@ public class MapStudioDelegate extends ComponentModelDelegate {
                 + ex.getClass().getSimpleName(), ex);
             return error(id, Messages.CODE_TAGS_UNAVAILABLE, "Map Studio could not look up tags; see the Gateway log.");
         }
+    }
+
+    /**
+     * {@code map.load.reply}'s {@code user} (epic 2 story 8, additive 0.2.0): the session user
+     * name, added only at level {@code phone} or {@code full}, so a viewer never learns it and
+     * the browser keeps unsaved edits per project and user. Pure; returns {@code body}.
+     */
+    static JsonObject withUser(JsonObject body, String userName) {
+        JsonElement level = body.get("level");
+        String l = level != null && level.isJsonPrimitive() ? level.getAsString() : "";
+        if (userName != null && !userName.isEmpty()
+            && (Messages.LEVEL_PHONE.equals(l) || Messages.LEVEL_FULL.equals(l))) {
+            body.addProperty("user", userName);
+        }
+        return body;
     }
 
     /**

@@ -29,13 +29,18 @@ import {
 import { MapChanges, MapChangedBody } from './changes';
 import { EditLevel, MapItemRecord } from './contract';
 import { AdapterStatus, HostLists, NO_HOST_LISTS } from './adapters';
-import { MESSAGE_EVENT, Reply, editsApply, mapLoad, pointClick, readReply, replyText } from './messages';
+import { MESSAGE_EVENT, Reply, mapLoad, pointClick, readReply, replyText } from './messages';
 import {
     STORE_UNKNOWN, StoreState, storeStateAttribute, storeStateFromError, storeStateFromLoad, storeStateFromSaveError,
     storeStatusText
 } from './storeState';
 import { PointPopup } from './PointPopup';
 import { SAVE_IDLE, SaveState, itemsToGeoJson, lineCreateBatch, newId, refusedSave, saveStatusText } from './save';
+import {
+    KeyValueStore, REPLAY_INTERVAL_MS, STORAGE_WARNING, UnsavedEntry, UnsavedQueue, UnsavedReason, entryText, isBusy,
+    reasonFromError, savedRecords, storageKey, summaryText, unsavedItems
+} from './unsaved';
+import { UnsavedSender } from './unsavedSender';
 import { AuthorParams, PopupPoint, popupMountPath } from './popupParams';
 import { TestData, selectTestData } from './testSet';
 import { registerTestHook, takeTestReply } from './testHook';
@@ -108,6 +113,42 @@ export interface MapStudioDelegateState {
     lists: HostLists;
     /** The map store's state: ready, read only (with the reason) or unavailable (epic 2 story 5). */
     store: StoreState;
+    /** Every queued batch of this project and user, oldest first (epic 2 story 8, unsaved.ts). */
+    unsaved: UnsavedEntry[];
+    /** Bumped whenever the queue changes, so the component knows to redraw the unsaved items. */
+    unsavedRevision: number;
+    /** The queued batches this tab waits on a reply for: their Discard is off meanwhile. */
+    sending: string[];
+    /**
+     * 'off' while map.load says the map store is unreachable (not the busy answer): the draw
+     * tool is disabled and no store item is drawn; map.load is re-sent every 15 s meanwhile.
+     */
+    editing: 'on' | 'off';
+    /** The one warning when this browser cannot keep unsaved edits, or ''. */
+    storageWarning: string;
+}
+
+/** `localStorage`, or null when the browser refuses it (a private window, blocked site data). */
+function browserStorage(): KeyValueStore | null {
+    try {
+        return typeof window !== 'undefined' && window.localStorage ? window.localStorage : null;
+    } catch (err) {
+        return null;
+    }
+}
+
+/** What the delegate reads of the Perspective client: the project name and the connection [unverified live]. */
+interface ClientView {
+    projectName?: unknown;
+    connection?: { connected?: unknown };
+}
+
+function clientOf(component: AbstractUIElementStore): ClientView | null {
+    try {
+        return component.view.page.parent as unknown as ClientView;
+    } catch (err) {
+        return null;
+    }
 }
 
 /**
@@ -134,12 +175,42 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private lists: HostLists = NO_HOST_LISTS;
     private store: StoreState = STORE_UNKNOWN;
     private mapLoadId: string | null = null;
-    /** edits.apply message id -> the map item it creates and the record it would store. */
-    private pendingSaves = new Map<string, MapItemRecord>();
+    /** The queue of unsent and refused batches (unsaved.ts), in localStorage per project and user. */
+    private unsaved: UnsavedQueue;
+    /** Sends the queue: reply timer, replay chain and level gate (unsavedSender.ts). */
+    private sender: UnsavedSender;
+    private unsavedRevision = 0;
+    private storageWarning = '';
+    /** Re-sends map.load every 15 s while the last one failed (store unreachable, busy). */
+    private loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
+    /** The batch whose save the save status shows (the last line drawn here), or null. */
+    private saveBatchId: string | null = null;
 
     constructor(componentStore: AbstractUIElementStore) {
         super(componentStore);
         registerTestHook((message) => this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject));
+        const storage = browserStorage();
+        this.unsaved = new UnsavedQueue(storage, () => this.warnStorage());
+        this.sender = new UnsavedSender(this.unsaved, {
+            level: () => this.level,
+            connected: () => this.connected(),
+            fire: (message) => this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject),
+            changed: () => {
+                this.unsavedRevision++;
+                this.notify();
+            },
+            unsent: (batchId, reason) => this.onUnsent(batchId, reason)
+        });
+        if (!storage) {
+            this.warnStorage();
+        }
+    }
+
+    private warnStorage(): void {
+        if (this.storageWarning === '') {
+            this.storageWarning = STORAGE_WARNING;
+            console.info('[MapStudio] ' + STORAGE_WARNING);
+        }
     }
 
     mapStateToProps(): MapStudioDelegateState {
@@ -155,7 +226,12 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             load: this.load,
             save: this.save,
             lists: this.lists,
-            store: this.store
+            store: this.store,
+            unsaved: this.unsaved.list(),
+            unsavedRevision: this.unsavedRevision,
+            sending: this.sender.sending(),
+            editing: this.store.status === 'unavailable' ? 'off' : 'on',
+            storageWarning: this.storageWarning
         };
     }
 
@@ -180,28 +256,78 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject);
     }
 
-    /** Save a finished line as one new map item (edits.apply with one create op). */
+    /**
+     * Save a finished line as one new map item (edits.apply with one create op). The batch is
+     * queued (localStorage) before it is sent, and stays queued until its reply or a Discard.
+     */
     sendLineCreate(coordinates: Array<[number, number]>): string {
         const itemId = newId();
-        const batch = lineCreateBatch(itemId, newId(), coordinates, new Date());
-        const message = editsApply(batch);
-        const data = batch.ops[0].data;
-        this.pendingSaves.set(message.id, {
-            id: itemId,
-            kind: data.kind as string,
-            name: data.name as string,
-            geometry: data.geometry as MapItemRecord['geometry'],
-            properties: {},
-            assetId: null,
-            overrides: {},
-            ends: null,
-            version: 0,
-            deleted: false
-        });
+        const now = new Date();
+        const batch = lineCreateBatch(itemId, newId(), coordinates, now);
         this.save = { state: 'saving', itemId };
-        this.notify();
-        this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject);
+        this.saveBatchId = batch.batchId;
+        this.sender.enqueueAndSend(batch, now);
         return itemId;
+    }
+
+    /** Try again: a refused entry becomes unsent and the queue replays now. */
+    retryUnsaved(batchId: string): void {
+        this.sender.retry(batchId);
+    }
+
+    /** Discard: the entry leaves storage and the map, and is never sent again (not while in flight). */
+    discardUnsaved(batchId: string): void {
+        if (!this.sender.discard(batchId)) {
+            console.info('[MapStudio] Batch ' + batchId + ' is being sent; Discard waits for its answer.');
+        }
+    }
+
+    /** A `storage` event: another tab may have changed this queue. */
+    onStorage(key: string | null): void {
+        this.sender.storage(key);
+    }
+
+    /** Stop the replay and load retry timers (the component unmounted). */
+    stopReplay(): void {
+        this.sender.stop();
+        if (this.loadRetryTimer !== null) {
+            clearTimeout(this.loadRetryTimer);
+            this.loadRetryTimer = null;
+        }
+    }
+
+    /** The client's connection state; true when it cannot be read [unverified live]. */
+    private connected(): boolean {
+        const client = clientOf(this.component);
+        const connection = client ? client.connection : undefined;
+        return !connection || connection.connected !== false;
+    }
+
+    /** The project for the storage key, or null when the client does not say [unverified live]. */
+    private projectName(): string | null {
+        const client = clientOf(this.component);
+        return client && typeof client.projectName === 'string' && client.projectName !== '' ? client.projectName : null;
+    }
+
+    /** No answer, or not connected: the save status says unsent; the sender replays it. */
+    private onUnsent(batchId: string, reason: UnsavedReason): void {
+        if (this.save.state !== 'idle' && batchId === this.saveBatchId) {
+            this.save = { state: 'unsent', itemId: this.save.itemId, code: reason.code };
+        }
+        console.info('[MapStudio] Batch ' + batchId + ' not saved yet (' + reason.code + '); kept to replay.');
+    }
+
+    /** While the last map.load failed, send it again in 15 s (MapChanges.retryFailedLoad). */
+    private scheduleLoadRetry(): void {
+        if (this.loadRetryTimer !== null) {
+            return;
+        }
+        this.loadRetryTimer = setTimeout(() => {
+            this.loadRetryTimer = null;
+            if (this.changes.retryFailedLoad()) {
+                console.info('[MapStudio] Sending map.load again after a failed load.');
+            }
+        }, REPLAY_INTERVAL_MS);
     }
 
     handleEvent(eventName: string, eventObject: JsObject): void {
@@ -221,7 +347,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.onMapLoad(reply);
             return;
         }
-        if (reply.kind === 'edits.apply.reply' || (reply.kind === 'error' && this.pendingSaves.has(reply.id))) {
+        if (reply.kind === 'edits.apply.reply' || (reply.kind === 'error' && this.sender.owns(reply.id))) {
             this.onSave(reply);
             return;
         }
@@ -246,14 +372,31 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.store = storeStateFromLoad(reply.body);
             // May send one more map.load (a gap among the changes held during the load).
             this.changes.loaded(reply.body);
+            // The queue of this project and user (owner decision, 2026-10-27); '' when map.load names none.
+            const project = this.projectName();
+            if (project !== null) {
+                this.unsaved.setKey(storageKey(project, reply.body.user || ''));
+            } else {
+                console.info('[MapStudio] The project name is unknown; unsaved edits are kept in this page only.');
+                this.warnStorage();
+            }
+            this.unsavedRevision++;
         } else if (reply.kind === 'error') {
-            this.level = null;
-            this.refreshIntervalSeconds = null;
             this.load = { state: 'failed', message: reply.body.code + ': ' + reply.body.message };
-            this.store = storeStateFromError(this.store, reply.body);
             this.changes.loadFailed();
+            this.scheduleLoadRetry();
+            if (!isBusy(reply.body)) {
+                this.level = null;
+                this.refreshIntervalSeconds = null;
+                this.store = storeStateFromError(this.store, reply.body);
+                // No store item is drawn as current while the store is unreachable.
+                this.itemsRevision++;
+            }
+            // The busy answer of the bounded pool is a short spell: the level, the store
+            // state and the items drawn stay, editing stays on, and the retry loads again.
         }
         this.notify();
+        this.sender.replay();
     }
 
     /** A map.changed from the Gateway; `body` is null when it could not be read (a gap). */
@@ -263,30 +406,41 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             console.debug('[MapStudio] Map changed: seq ' + this.changes.seq);
             this.notify();
         }
+        this.sender.replay();
     }
 
     private onSave(reply: Reply): void {
         if (reply.kind !== 'edits.apply.reply' && reply.kind !== 'error') {
             return;
         }
-        const pending = this.pendingSaves.get(reply.id);
-        this.pendingSaves.delete(reply.id);
-        if (!pending) {
-            console.info('[MapStudio] A save reply ' + reply.id + ' matches no pending save.');
+        const outcome = reply.kind === 'edits.apply.reply'
+            ? this.sender.onSaved(reply.id, reply.body.batchId)
+            : this.sender.onError(reply.id, reasonFromError(reply.body));
+        console.info('[MapStudio] ' + replyText(reply));
+        if (outcome.kind === 'ignored') {
+            console.info('[MapStudio] The save reply ' + reply.id + ' changes nothing (an earlier send, or discarded).');
             return;
         }
-        if (reply.kind === 'edits.apply.reply') {
-            const result = reply.body.results.find((r) => r.id === pending.id);
-            const version = result ? result.version : 1;
-            if (this.changes.saved({ ...pending, version })) {
-                this.itemsRevision++;
+        const shown = outcome.batchId === this.saveBatchId && this.save.state !== 'idle';
+        if (reply.kind === 'edits.apply.reply' && outcome.kind === 'saved') {
+            if (outcome.entry) {
+                for (const record of savedRecords(outcome.entry.batch, reply.body.results)) {
+                    if (this.changes.saved(record)) {
+                        this.itemsRevision++;
+                    }
+                }
             }
-            this.save = { state: 'saved', itemId: pending.id, version };
-        } else {
-            this.save = refusedSave(pending.id, reply.body);
+            if (shown && this.save.state !== 'idle') {
+                const itemId = this.save.itemId;
+                const result = reply.body.results.find((r) => r.id === itemId);
+                this.save = { state: 'saved', itemId, version: result ? result.version : 1 };
+            }
+        } else if (reply.kind === 'error') {
+            if (shown && this.save.state !== 'idle') {
+                this.save = refusedSave(this.save.itemId, reply.body);
+            }
             this.store = storeStateFromSaveError(this.store, reply.body);
         }
-        console.info('[MapStudio] ' + replyText(reply));
         this.notify();
     }
 }
@@ -302,6 +456,11 @@ const SOURCE_ITEM_LINES = 'mapstudio-items-line';
 const SOURCE_ITEM_POINTS = 'mapstudio-items-point';
 const LAYER_ITEM_LINES = 'mapstudio-items-line';
 const LAYER_ITEM_POINTS = 'mapstudio-items-point';
+/** The queued (unsaved) map items, drawn dashed (epic 2 story 8). */
+const SOURCE_UNSAVED_LINES = 'mapstudio-unsaved-line';
+const SOURCE_UNSAVED_POINTS = 'mapstudio-unsaved-point';
+const LAYER_UNSAVED_LINES = 'mapstudio-unsaved-line';
+const LAYER_UNSAVED_POINTS = 'mapstudio-unsaved-point';
 
 /**
  * The Map Studio component: a MapLibre map on a blank style with fixed test
@@ -326,8 +485,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private itemsReady = false;
     /** The items revision last drawn. */
     private drawnRevision = -1;
-    /** Map item id of a line being saved -> its Terra Draw feature id, removed once the store has it. */
-    private savingFeatures = new Map<string, string | number>();
+    /** The unsaved and items revisions last drawn into the unsaved sources. */
+    private drawnUnsaved = '';
+    /** Terra Draw features of finished lines: removed once queued, as the unsaved layer draws them. */
+    private queuedFeatures: Array<string | number> = [];
 
     componentDidMount(): void {
         if (!this.mapContainer) {
@@ -399,6 +560,26 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     'circle-stroke-width': 2
                 }
             });
+            map.addSource(SOURCE_UNSAVED_LINES, { type: 'geojson', data: empty.lines });
+            map.addSource(SOURCE_UNSAVED_POINTS, { type: 'geojson', data: empty.points });
+            map.addLayer({
+                id: LAYER_UNSAVED_LINES,
+                type: 'line',
+                source: SOURCE_UNSAVED_LINES,
+                layout: { 'line-cap': 'butt', 'line-join': 'round' },
+                paint: { 'line-color': colors.point, 'line-width': 3, 'line-dasharray': [2, 1.5] }
+            });
+            map.addLayer({
+                id: LAYER_UNSAVED_POINTS,
+                type: 'circle',
+                source: SOURCE_UNSAVED_POINTS,
+                paint: {
+                    'circle-radius': 7,
+                    'circle-color': colors.pointStroke,
+                    'circle-stroke-color': colors.point,
+                    'circle-stroke-width': 2
+                }
+            });
             this.itemsReady = true;
             this.drawItems();
             const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
@@ -417,6 +598,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.drawControl = new DrawControl(this.toggleDrawing);
         map.addControl(this.drawControl, 'top-right');
         this.map = map;
+        this.applyEditing();
+        if (typeof window !== 'undefined') {
+            window.addEventListener('storage', this.onStorage);
+        }
 
         if (typeof ResizeObserver !== 'undefined') {
             this.resizeObserver = new ResizeObserver(() => { map.resize(); });
@@ -426,16 +611,40 @@ export class MapStudio extends Component<Props, MapStudioState> {
 
     componentDidUpdate(): void {
         this.drawItems();
-        this.dropSavedFeature();
+        this.dropQueuedFeatures();
+        this.applyEditing();
     }
 
-    /** Put the delegate's items into the items sources when they changed. */
+    private onStorage = (ev: StorageEvent): void => {
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        if (delegate) {
+            delegate.onStorage(ev.key);
+        }
+    };
+
+    /** The draw tool is off while map.load says the store is unreachable; a drawing in progress is cancelled. */
+    private applyEditing(): void {
+        const off = !!this.props.delegate && this.props.delegate.editing === 'off';
+        if (this.drawControl) {
+            this.drawControl.setDisabled(off);
+        }
+        if (off && this.state.drawing && this.draw) {
+            this.draw.setMode(DRAW_MODE_OFF);
+            this.setDrawState(cancelDrawing());
+        }
+    }
+
+    /**
+     * Put the delegate's items into the items sources when they changed; none while map.load
+     * says the store is unreachable (nothing stale drawn as current). Then the unsaved items.
+     */
     private drawItems(): void {
+        this.drawUnsaved();
         const delegate = this.props.delegate;
         if (!this.map || !this.itemsReady || !delegate || delegate.itemsRevision === this.drawnRevision) {
             return;
         }
-        const data = itemsToGeoJson(delegate.items);
+        const data = itemsToGeoJson(delegate.editing === 'off' ? [] : delegate.items);
         const lines = this.map.getSource(SOURCE_ITEM_LINES) as GeoJSONSource | undefined;
         const points = this.map.getSource(SOURCE_ITEM_POINTS) as GeoJSONSource | undefined;
         if (lines && points) {
@@ -449,24 +658,53 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     }
 
-    /** A saved line is drawn from the items source: remove Terra Draw's copy of it. */
-    private dropSavedFeature(): void {
+    /** The queued items, dashed, leaving out any the store already draws (saved in another tab). */
+    private drawUnsaved(): void {
         const delegate = this.props.delegate;
-        if (!delegate || delegate.save.state !== 'saved' || !this.draw) {
+        if (!this.map || !this.itemsReady || !delegate
+            || delegate.unsavedRevision + ':' + delegate.itemsRevision === this.drawnUnsaved) {
             return;
         }
-        const featureId = this.savingFeatures.get(delegate.save.itemId);
-        if (featureId !== undefined) {
-            this.savingFeatures.delete(delegate.save.itemId);
+        const stored = new Set(delegate.items.filter((i) => i.version > 0).map((i) => i.id));
+        const data = itemsToGeoJson(unsavedItems(delegate.unsaved).filter((i) => !stored.has(i.id)));
+        const lines = this.map.getSource(SOURCE_UNSAVED_LINES) as GeoJSONSource | undefined;
+        const points = this.map.getSource(SOURCE_UNSAVED_POINTS) as GeoJSONSource | undefined;
+        if (lines && points) {
+            lines.setData(data.lines);
+            points.setData(data.points);
+            this.drawnUnsaved = delegate.unsavedRevision + ':' + delegate.itemsRevision;
+            if (this.mapContainer) {
+                // For tests: the features put into the unsaved sources (dashed lines and points).
+                this.mapContainer.setAttribute('data-unsaved-drawn',
+                    String(data.lines.features.length + data.points.features.length));
+            }
+        }
+    }
+
+    /** A finished line is queued and drawn from the unsaved layer: remove Terra Draw's copy of it. */
+    private dropQueuedFeatures(): void {
+        if (!this.draw || this.queuedFeatures.length === 0) {
+            return;
+        }
+        const ids = this.queuedFeatures;
+        this.queuedFeatures = [];
+        for (const id of ids) {
             try {
-                this.draw.removeFeatures([featureId]);
+                this.draw.removeFeatures([id]);
             } catch (err) {
-                console.info('[MapStudio] The drawn copy of a saved line was already gone.');
+                console.info('[MapStudio] The drawn copy of a queued line was already gone.');
             }
         }
     }
 
     componentWillUnmount(): void {
+        if (typeof window !== 'undefined') {
+            window.removeEventListener('storage', this.onStorage);
+        }
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        if (delegate) {
+            delegate.stopReplay();
+        }
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
             this.resizeObserver = null;
@@ -554,7 +792,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     }
 
     private toggleDrawing = (): void => {
-        if (!this.draw) {
+        if (!this.draw || (this.props.delegate && this.props.delegate.editing === 'off')) {
             return;
         }
         if (this.state.drawing) {
@@ -580,8 +818,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
         if (delegate && geometry && geometry.type === 'LineString') {
             const coordinates = geometry.coordinates.map((c) => [c[0], c[1]] as [number, number]);
-            const itemId = delegate.sendLineCreate(coordinates);
-            this.savingFeatures.set(itemId, id);
+            delegate.sendLineCreate(coordinates);
+            this.queuedFeatures.push(id);
+            // After Terra Draw's finish handler has returned; componentDidUpdate may do it first.
+            setTimeout(() => this.dropQueuedFeatures(), 0);
         }
     };
 
@@ -722,6 +962,38 @@ export class MapStudio extends Component<Props, MapStudioState> {
         );
     }
 
+    /** The queued edits, each with its reason, Try again and Discard (epic 2 story 8). */
+    private renderUnsaved(unsaved: UnsavedEntry[], level: EditLevel | null, warning: string, sending: string[]):
+        React.ReactNode {
+        if (unsaved.length === 0 && warning === '') {
+            return null;
+        }
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        const summary = summaryText(unsaved, level);
+        return (
+            <div className="mapstudio-unsaved" data-unsaved-count={String(unsaved.length)}>
+                {warning !== '' ? <div className="mapstudio-unsaved-warning">{warning}</div> : null}
+                {summary !== '' ? <div className="mapstudio-unsaved-summary">{summary}</div> : null}
+                {unsaved.map((entry) => (
+                    <div key={entry.batchId} className={'mapstudio-unsaved-row mapstudio-unsaved-row--' + entry.state}
+                         data-batch-id={entry.batchId}
+                         data-unsaved-state={entry.state}
+                         data-code={entry.reason ? entry.reason.code : ''}>
+                        <span className="mapstudio-unsaved-text">{entryText(entry, level)}</span>
+                        {entry.reason ? (
+                            <button type="button" className="mapstudio-unsaved-retry"
+                                    onClick={() => delegate && delegate.retryUnsaved(entry.batchId)}>Try again</button>
+                        ) : null}
+                        <button type="button" className="mapstudio-unsaved-discard"
+                                disabled={sending.indexOf(entry.batchId) >= 0}
+                                title={sending.indexOf(entry.batchId) >= 0 ? 'Being sent; wait for the answer.' : undefined}
+                                onClick={() => delegate && delegate.discardUnsaved(entry.batchId)}>Discard</button>
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
     private setMapContainer = (el: HTMLDivElement | null): void => {
         this.mapContainer = el;
     };
@@ -735,6 +1007,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const saveText = saveStatusText(save);
         const load = delegate ? delegate.load : { state: 'loading', message: '' };
         const store = delegate ? delegate.store : STORE_UNKNOWN;
+        const unsaved = delegate ? delegate.unsaved : [];
+        const editing = delegate ? delegate.editing : 'on';
         return (
             <div {...this.props.emit({ classes: ['mapstudio'] })}>
                 <div className="mapstudio-map" ref={this.setMapContainer}
@@ -745,7 +1019,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                      data-map-reloads={delegate ? String(delegate.reloads) : '0'}
                      data-store-state={storeStateAttribute(store)}
                      data-refresh-interval={delegate && delegate.refreshIntervalSeconds !== null
-                         ? String(delegate.refreshIntervalSeconds) : ''} />
+                         ? String(delegate.refreshIntervalSeconds) : ''}
+                     data-unsaved-count={String(unsaved.length)}
+                     data-editing={editing} />
                 <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '')}
                      data-pending={pending ? 'true' : 'false'}
                      data-drawing={this.state.drawing ? 'true' : 'false'}
@@ -757,7 +1033,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              data-save-state={save.state}
                              data-item-id={save.state === 'idle' ? '' : save.itemId}
                              data-version={save.state === 'saved' ? String(save.version) : ''}
-                             data-code={save.state === 'refused' ? save.code : ''}>
+                             data-code={save.state === 'refused' || save.state === 'unsent' ? save.code : ''}>
                             {saveText}
                         </div>
                     ) : null}
@@ -766,6 +1042,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     {store.status === 'read-only'
                         ? <div className="mapstudio-store-status" data-store-state="read-only">{storeStatusText(store)}</div>
                         : null}
+                    {this.renderUnsaved(unsaved, delegate ? delegate.level : null,
+                        delegate ? delegate.storageWarning : '', delegate ? delegate.sending : [])}
                 </div>
                 {this.renderAdapterStatus(delegate ? delegate.lists : NO_HOST_LISTS)}
                 {this.renderPopup()}

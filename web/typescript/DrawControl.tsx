@@ -52,6 +52,18 @@ export class DrawControl implements IControl {
         }
     }
 
+    /**
+     * Turn the tool off and on (epic 2 story 8): off while map.load says the map
+     * store is unreachable. A disabled button ignores clicks.
+     */
+    setDisabled(disabled: boolean): void {
+        if (this.button) {
+            this.button.disabled = disabled;
+            this.button.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+            this.button.title = disabled ? 'Drawing is off: the map store is unreachable' : 'Draw a line';
+        }
+    }
+
     private handleClick = (ev: MouseEvent): void => {
         ev.preventDefault();
         ev.stopPropagation();
