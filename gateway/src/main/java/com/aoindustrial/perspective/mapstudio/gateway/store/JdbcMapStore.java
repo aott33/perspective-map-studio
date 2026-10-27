@@ -5,6 +5,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -183,6 +187,40 @@ public final class JdbcMapStore implements MapStore {
                 ps.setString(4, actor);
                 ps.setString(5, result.toString());
                 ps.executeUpdate();
+            }
+        }
+
+        @Override
+        public Optional<StoredBatch> findBatch(String project, String batchId) throws SQLException {
+            try (PreparedStatement ps = c.prepareStatement(
+                    "SELECT actor, result::text FROM mapstudio_batch WHERE project = ? AND batch_id = ?::uuid")) {
+                ps.setString(1, project);
+                ps.setString(2, batchId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next()
+                        ? Optional.of(new StoredBatch(rs.getString(1), JsonParser.parseString(rs.getString(2)).getAsJsonObject()))
+                        : Optional.empty();
+                }
+            }
+        }
+
+        @Override
+        public Optional<LastEdit> lastEdit(String project, String entity, String entityId) throws SQLException {
+            // No index on (project, entity, entity_id) in schema 1: a scan per conflict, fine at this size.
+            try (PreparedStatement ps = c.prepareStatement("SELECT actor, at FROM mapstudio_edit "
+                    + "WHERE project = ? AND entity = ? AND entity_id = ? ORDER BY edit_id DESC LIMIT 1")) {
+                ps.setString(1, project);
+                ps.setString(2, entity);
+                ps.setString(3, entityId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        return Optional.empty();
+                    }
+                    OffsetDateTime at = rs.getObject(2, OffsetDateTime.class);
+                    return Optional.of(new LastEdit(rs.getString(1), at == null ? null
+                        : DateTimeFormatter.ISO_INSTANT.format(at.withOffsetSameInstant(ZoneOffset.UTC)
+                            .truncatedTo(ChronoUnit.SECONDS).toInstant())));
+                }
             }
         }
 

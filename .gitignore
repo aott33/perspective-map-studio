@@ -20,6 +20,10 @@ ops/modules/*.modl
 ops/project/**/thumbnail.png
 ops/project/com.inductiveautomation.perspective/session-props/
 ops/project/com.inductiveautomation.vision/
+# The same for the store-check project (ops/store-checks.sh, epic 2 story 5)
+ops/store-checks/project/**/thumbnail.png
+ops/store-checks/project/com.inductiveautomation.perspective/session-props/
+ops/store-checks/project/com.inductiveautomation.vision/
 
 # Signing material (never committed)
 ops/signing/

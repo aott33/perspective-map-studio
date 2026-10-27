@@ -146,6 +146,7 @@
 }
 
 .mapstudio-save-status--refused,
-.mapstudio-load-status {
+.mapstudio-load-status,
+.mapstudio-store-status {
     font-weight: 600;
 }

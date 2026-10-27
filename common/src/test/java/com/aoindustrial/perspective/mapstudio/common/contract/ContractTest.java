@@ -27,7 +27,7 @@ class ContractTest {
 
     @Test
     void theErrorCodesAndTypesAreTheContractsOnes() {
-        assertEquals(Set.of("conflict", "role", "invalid", "stale", "store-unreachable"), Messages.CODES);
+        assertEquals(Set.of("conflict", "role", "invalid", "stale", "store-unreachable", "read-only"), Messages.CODES);
         assertEquals(Set.of("point.click", "map.load", "edits.apply"), Messages.INBOUND_TYPES);
         assertTrue(Messages.OUTBOUND_TYPES.containsAll(
             Set.of("map.load.reply", "edits.apply.reply", "map.changed", "error")));
@@ -53,7 +53,7 @@ class ContractTest {
     @Test
     void malformedOpsAreInvalidAndNamed() {
         MapStudioException createWithVersion = assertThrows(MapStudioException.class, () -> EditOp.parse(json(
-            "{\"op\":\"create\",\"entity\":\"item\",\"id\":\"" + ID + "\",\"baseVersion\":3}"), 2));
+            "{\"op\":\"create\",\"entity\":\"item\",\"id\":\"" + ID + "\",\"baseVersion\":-1}"), 2));
         assertEquals(Messages.CODE_INVALID, createWithVersion.code());
         assertEquals(2, createWithVersion.opIndex());
         assertEquals(ID, createWithVersion.opId());
@@ -70,15 +70,12 @@ class ContractTest {
     }
 
     @Test
-    void deletesAndKindSetupOpsAreRefusedAsNotSupportedInThisVersion() {
-        EditBatch delete = EditBatch.parse(json("{\"batchId\":\"" + BATCH + "\",\"ops\":[{\"op\":\"delete\","
-            + "\"entity\":\"item\",\"id\":\"" + ID + "\",\"baseVersion\":1}]}"));
-        MapStudioException ex = assertThrows(MapStudioException.class, delete::requireSupported);
-        assertEquals(Messages.CODE_INVALID, ex.code());
-        assertTrue(ex.plainMessage().contains("not supported in this version"));
+    void kindSetupOpsAreRefusedAsNotSupportedInThisVersion() {
         EditBatch kind = EditBatch.parse(json("{\"batchId\":\"" + BATCH + "\",\"ops\":[{\"op\":\"update\","
             + "\"entity\":\"kindSetup\",\"id\":\"pad\",\"baseVersion\":1,\"data\":{}}]}"));
-        assertThrows(MapStudioException.class, kind::requireSupported);
+        MapStudioException ex = assertThrows(MapStudioException.class, kind::requireSupported);
+        assertEquals(Messages.CODE_INVALID, ex.code());
+        assertTrue(ex.plainMessage().contains("not supported in this version"));
     }
 
     @Test
@@ -125,7 +122,7 @@ class ContractTest {
         assertTrue(noConnection.getMessage().contains("connection"));
         Setup.SetupException version = assertThrows(Setup.SetupException.class,
             () -> Setup.parse("{\"schemaVersion\":2,\"connection\":\"MapStudio\"}"));
-        assertTrue(version.getMessage().contains("schemaVersion"));
+        assertTrue(version.getMessage().contains("newer Map Studio (schema 2"));
         assertThrows(Setup.SetupException.class, () -> Setup.parse("not json"));
         assertThrows(Setup.SetupException.class,
             () -> Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\",\"roles\":{\"full\":\"MapEditor\"}}"));

@@ -5,7 +5,10 @@
  * `{code, message}`. Pure functions only, so this module is unit tested in node.
  */
 
-import { EditBatch, EditsApplyReplyBody, MapLoadReplyBody, readEditsApplyReply, readMapLoadReply } from './contract';
+import { MapChangedBody, readMapChanged } from './changes';
+import {
+    Conflict, EditBatch, EditsApplyReplyBody, MapLoadReplyBody, readConflicts, readEditsApplyReply, readMapLoadReply
+} from './contract';
 
 /** Contract version carried in `v`. */
 export const MESSAGE_VERSION = 1;
@@ -48,6 +51,8 @@ export interface ErrorBody {
     batchId?: string;
     /** The op at fault, when one is. */
     op?: { index: number; id?: string };
+    /** Every stale op, on a `conflict` (epic 2 story 2). */
+    conflicts?: Conflict[];
 }
 
 /** The outcome of reading one inbound envelope from the Gateway. */
@@ -55,6 +60,8 @@ export type Reply =
     | { kind: 'point.click.reply'; id: string; body: PointClickReplyBody }
     | { kind: 'map.load.reply'; id: string; body: MapLoadReplyBody }
     | { kind: 'edits.apply.reply'; id: string; body: EditsApplyReplyBody }
+    /** `body` is null when the map.changed could not be read: the browser treats it as a gap. */
+    | { kind: 'map.changed'; id: string; body: MapChangedBody | null }
     | { kind: 'error'; id: string; body: ErrorBody }
     | { kind: 'invalid'; reason: string };
 
@@ -127,6 +134,8 @@ export function readReply(raw: unknown): Reply {
             return saved ? { kind: 'edits.apply.reply', id: raw.id, body: saved }
                 : { kind: 'invalid', reason: 'edits.apply.reply needs batchId, seq and results.' };
         }
+        case MessageTypes.MAP_CHANGED:
+            return { kind: 'map.changed', id: raw.id, body: readMapChanged(raw.body) };
         case MessageTypes.ERROR: {
             const error: ErrorBody = {
                 code: typeof body.code === 'string' ? body.code : 'unknown',
@@ -138,6 +147,9 @@ export function readReply(raw: unknown): Reply {
             if (isRecord(body.op) && typeof body.op.index === 'number') {
                 error.op = typeof body.op.id === 'string'
                     ? { index: body.op.index, id: body.op.id } : { index: body.op.index };
+            }
+            if (Array.isArray(body.conflicts)) {
+                error.conflicts = readConflicts(body.conflicts);
             }
             return { kind: 'error', id: raw.id, body: error };
         }
@@ -155,6 +167,9 @@ export function replyText(reply: Reply): string {
             return 'Map loaded: ' + reply.body.items.length + ' map items at seq ' + reply.body.seq;
         case 'edits.apply.reply':
             return 'Saved batch ' + reply.body.batchId + ' as seq ' + reply.body.seq;
+        case 'map.changed':
+            return reply.body ? 'Map changed: seq ' + reply.body.seq + ', ' + reply.body.ops.length + ' op(s)'
+                : 'Map changed: unreadable change';
         case 'error':
             return 'Error (' + reply.body.code + '): ' + reply.body.message;
         default:

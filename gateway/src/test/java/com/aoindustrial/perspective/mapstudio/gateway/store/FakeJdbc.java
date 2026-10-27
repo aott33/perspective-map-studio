@@ -23,6 +23,10 @@ final class FakeJdbc {
     Boolean tableExists;
     String failOn;
     String failSqlState = "42501";
+    /** The message of failOn's SQLException (epic 2 story 5 checks it reaches the log line). */
+    String failMessage = "permission denied for schema public";
+    /** When set, the first statement containing it throws an IllegalStateException (a non-SQL failure). */
+    String failOnRuntime;
     boolean autoCommit = true;
 
     Connection connection() {
@@ -45,8 +49,11 @@ final class FakeJdbc {
 
     private void run(String sql) throws SQLException {
         executed.add(sql);
+        if (failOnRuntime != null && sql.contains(failOnRuntime)) {
+            throw new IllegalStateException("driver bug");
+        }
         if (failOn != null && sql.contains(failOn)) {
-            throw new SQLException("permission denied for schema public", failSqlState);
+            throw new SQLException(failMessage, failSqlState);
         }
     }
 

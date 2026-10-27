@@ -19,6 +19,10 @@
   "/edit": {
    "viewPath": "MapStudioEdit",
    "viewParams": {}
+  },
+  "/adapters": {
+   "viewPath": "MapStudioAdapters",
+   "viewParams": {}
   }
  },
  "shared": {},
