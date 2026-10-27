@@ -51,11 +51,25 @@ class SetupFormTest {
     }
 
     @Test
-    void createWithConnectionMapStudioWritesStoryOnesDevSetupByteForByte() throws IOException {
-        // Acceptance 2: the defaults plus connection MapStudio are the setup the dev Gateway reads in e2e.
+    void createWithConnectionMapStudioWritesTheFullExampleByteForByte() {
+        // Acceptance 2: the defaults plus connection MapStudio are docs/setup.md's full example
+        // (story 1's dev setup; story 3 gave the dev project its own functions and interval).
         SetupForm form = SetupForm.defaults().setText(SetupForm.CONNECTION, "MapStudio");
         assertTrue(form.canSave());
-        assertEquals(devSetup(), form.toJson());
+        assertEquals("{\n"
+            + "  \"schemaVersion\": 1,\n"
+            + "  \"connection\": \"MapStudio\",\n"
+            + "  \"roles\": {\n"
+            + "    \"full\": [\"MapEditor\"],\n"
+            + "    \"phone\": [\"MapOperator\"]\n"
+            + "  },\n"
+            + "  \"kindsFunction\": \"\",\n"
+            + "  \"assetsFunction\": \"\",\n"
+            + "  \"refreshIntervalSeconds\": 10,\n"
+            + "  \"alarmPage\": \"\",\n"
+            + "  \"basemaps\": [\"none\", \"osm\"],\n"
+            + "  \"tokenSecret\": \"\"\n"
+            + "}\n", form.toJson());
     }
 
     // Row: edit and save.
@@ -140,8 +154,8 @@ class SetupFormTest {
             reasons.get(SetupForm.CONNECTION));
         assertEquals(List.of("Name a project library function as package.function, for example mapstudio_adapter.kinds."),
             reasons.get(SetupForm.KINDS_FUNCTION));
-        // The refresh rule is Setup's (the Gateway's), shown without the "setup.json " prefix.
-        assertEquals(List.of("\"refreshIntervalSeconds\" must be a whole number of seconds, 1 or more."),
+        // The refresh rule is Setup's (the Gateway's), worded as the Gateway words it.
+        assertEquals(List.of("refreshIntervalSeconds must be a whole number from 1 to 3600, not 0."),
             reasons.get(SetupForm.REFRESH));
         assertFalse(form.canSave());
     }
@@ -162,23 +176,51 @@ class SetupFormTest {
     }
 
     @Test
-    void aSetupMessageIsMappedToTheFieldItNames() {
-        assertEquals(SetupForm.REFRESH, SetupForm.fieldOf("setup.json \"refreshIntervalSeconds\" must be ..."));
-        assertEquals(SetupForm.FULL_ROLES, SetupForm.fieldOf("setup.json \"roles.full\" must be a list of names."));
-        assertEquals(SetupForm.FULL_ROLES, SetupForm.fieldOf("setup.json \"roles\" must be an object."));
-        assertEquals(SetupForm.GENERAL, SetupForm.fieldOf("setup.json must be a JSON object."));
-        assertEquals("Must be a JSON object.", SetupForm.display("setup.json must be a JSON object."));
+    void aSetupProblemIsPlacedBesideTheFieldItNames() {
+        assertEquals(SetupForm.REFRESH, SetupForm.fieldOf("refreshIntervalSeconds"));
+        assertEquals(SetupForm.FULL_ROLES, SetupForm.fieldOf("roles.full"));
+        assertEquals(SetupForm.PHONE_ROLES, SetupForm.fieldOf("roles.phone"));
+        assertEquals(SetupForm.FULL_ROLES, SetupForm.fieldOf("roles"));
+        assertEquals(SetupForm.GENERAL, SetupForm.fieldOf("setup.json"));
+        assertEquals(SetupForm.GENERAL, SetupForm.fieldOf("schemaVersion"));
+        assertEquals(SetupForm.GENERAL, SetupForm.fieldOf("refreshInterval"));
+        assertEquals("basemaps lists osm twice.", SetupForm.display("basemaps lists osm twice"));
+        assertEquals("Something.", SetupForm.display("Something."));
     }
 
-    // Row: unknown keys.
+    @Test
+    void everyGatewayProblemOfAFieldIsShownBesideIt() {
+        // Two bad entries are two reasons; an empty list is the Gateway's one reason, once.
+        SetupForm form = SetupForm.defaults().setText(SetupForm.CONNECTION, "MapStudio")
+            .setList(SetupForm.BASEMAPS, List.of("google", "bing"))
+            .setText(SetupForm.ALARM_PAGE, "alarms");
+        Map<String, List<String>> reasons = form.reasons();
+        assertEquals(List.of(SetupForm.ALARM_PAGE, SetupForm.BASEMAPS), List.copyOf(reasons.keySet()));
+        assertEquals(List.of("alarmPage must be empty or a page path starting with /, not \"alarms\"."),
+            reasons.get(SetupForm.ALARM_PAGE));
+        assertEquals(List.of("basemaps has \"google\"; each entry must be one of none, osm, satellite, mapbox.",
+            "basemaps has \"bing\"; each entry must be one of none, osm, satellite, mapbox."),
+            reasons.get(SetupForm.BASEMAPS));
+        assertEquals(
+            Map.of(SetupForm.BASEMAPS, List.of("basemaps must name at least one of none, osm, satellite, mapbox.")),
+            form.setText(SetupForm.ALARM_PAGE, "").setList(SetupForm.BASEMAPS, List.of()).reasons());
+    }
+
+    // Row: unknown keys. The Gateway refuses a key it does not know (a misspelt field
+    // is never silently ignored), so the form keeps them, writes them back unchanged
+    // and reports each at the top of the form until the file is fixed.
 
     @Test
-    void unknownKeysSurviveASaveAfterTheKnownKeys() {
+    void unknownKeysSurviveASaveAfterTheKnownKeysAndAreReported() {
         String in = "{\"note\": \"x\", \"schemaVersion\": 1, \"connection\": \"MapStudio\","
             + " \"roles\": {\"full\": [\"MapEditor\"], \"extra\": {\"a\": [1, {\"b\": null}]}},"
             + " \"later\": {\"deep\": []}}";
         SetupForm form = SetupForm.fromJson(in).copy().setText(SetupForm.ALARM_PAGE, "/alarms");
-        assertTrue(form.reasons().isEmpty(), form.reasons().toString());
+        assertTrue(form.isEditable());
+        assertEquals(Map.of(SetupForm.GENERAL, List.of(
+            "note is not a setup field of schema 1.",
+            "later is not a setup field of schema 1.",
+            "roles.extra is not a setup field of schema 1.")), form.reasons());
         String out = form.toJson();
         assertTrue(out.endsWith("  \"tokenSecret\": \"\",\n  \"note\": \"x\",\n  \"later\": {\n    \"deep\": []\n  }\n}\n"),
             out);
@@ -208,7 +250,8 @@ class SetupFormTest {
     void anUnreadableFileIsReadOnlyWithTheParseReason() {
         SetupForm form = SetupForm.fromJson("{\"schemaVersion\": 1,");
         assertEquals(SetupForm.State.UNREADABLE, form.state());
-        assertTrue(form.stateReason().startsWith("This setup cannot be read: setup.json is not valid JSON: "),
+        assertTrue(
+            form.stateReason().startsWith("This setup cannot be read: setup.json is not valid JSON (line 1, column "),
             form.stateReason());
         assertEquals("{\"schemaVersion\": 1,", form.toJson());
         assertFalse(form.canSave());
@@ -216,16 +259,21 @@ class SetupFormTest {
 
     @Test
     void otherUnreadableShapesSayWhy() {
-        assertEquals("This setup cannot be read: setup.json must be a JSON object.",
+        // Each reason is the Gateway's own message (docs/setup.md).
+        assertEquals("This setup cannot be read: setup.json must be a JSON object {\"schemaVersion\": 1, ...}.",
             SetupForm.fromJson("[1]").stateReason());
-        assertEquals("This setup cannot be read: setup.json needs schemaVersion 1.",
+        assertEquals("This setup cannot be read: schemaVersion is missing; it must be 1.",
             SetupForm.fromJson("{\"connection\": \"MapStudio\"}").stateReason());
-        assertEquals("This setup cannot be read: setup.json has schemaVersion 0; this Designer edits schema 1.",
+        assertEquals("This setup cannot be read: schemaVersion must be 1, not 0.",
             SetupForm.fromJson("{\"schemaVersion\": 0}").stateReason());
-        assertEquals("This setup cannot be read: setup.json \"roles.full\" is not what this Designer can show"
-                + " (a list of names).",
+        assertEquals("This setup cannot be read: schemaVersion must be 1, not \"1\".",
+            SetupForm.fromJson("{\"schemaVersion\": \"1\"}").stateReason());
+        assertEquals("This setup cannot be read: roles.full must be a list of role names, not \"MapEditor\".",
             SetupForm.fromJson("{\"schemaVersion\": 1, \"roles\": {\"full\": \"MapEditor\"}}").stateReason());
-        assertEquals("This setup cannot be read: the resource has no setup.json.",
+        assertEquals("This setup cannot be read: tokenSecret must be the name of a secret as text"
+                + " (its value is not shown).",
+            SetupForm.fromJson("{\"schemaVersion\": 1, \"tokenSecret\": {\"v\": \"pk.SECRET\"}}").stateReason());
+        assertEquals("This setup cannot be read: setup.json is missing from the setup resource.",
             SetupForm.missingFile().stateReason());
     }
 
@@ -245,7 +293,8 @@ class SetupFormTest {
         assertThrowsSetup(in);
         SetupForm form = SetupForm.fromJson(in);
         assertEquals(SetupForm.State.UNREADABLE, form.state());
-        assertTrue(form.stateReason().contains("\"refreshIntervalSeconds\""), form.stateReason());
+        assertEquals("This setup cannot be read: refreshIntervalSeconds must be a whole number from 1 to 3600,"
+            + " not \"10\".", form.stateReason());
         assertFalse(form.canSave());
         assertEquals(in, form.toJson());
     }
@@ -262,7 +311,7 @@ class SetupFormTest {
 
     @Test
     void aFractionalRefreshIsShownAsWrittenAndAskedToBeWhole() {
-        // The Gateway truncates 10.5 to 10; the form asks for the whole number its message promises.
+        // The Gateway refuses 10.5; the form shows it as written and asks for a whole number.
         SetupForm form = SetupForm.fromJson(
             "{\"schemaVersion\": 1, \"connection\": \"MapStudio\", \"refreshIntervalSeconds\": 10.5}");
         assertTrue(form.isEditable());
@@ -271,14 +320,24 @@ class SetupFormTest {
     }
 
     @Test
-    void nullBasemapsAreNoBasemapsAsTheGatewayReadsThem() throws Setup.SetupException {
+    void nullBasemapsAreTheDefaultBasemapsAsTheGatewayReadsThem() throws Setup.SetupException {
+        // A field set to JSON null takes its default (docs/setup.md).
         String in = "{\"schemaVersion\": 1, \"connection\": \"MapStudio\", \"basemaps\": null}";
-        assertEquals(List.of(), Setup.parse(in).basemaps());
+        assertEquals(Setup.DEFAULT_BASEMAPS, Setup.parse(in).basemaps());
         SetupForm form = SetupForm.fromJson(in);
-        assertEquals(List.of(), form.list(SetupForm.BASEMAPS));
-        assertEquals(List.of(), Setup.parse(form.toJson()).basemaps());
+        assertEquals(Setup.DEFAULT_BASEMAPS, form.list(SetupForm.BASEMAPS));
+        assertEquals(Setup.DEFAULT_BASEMAPS, Setup.parse(form.toJson()).basemaps());
         String absent = "{\"schemaVersion\": 1, \"connection\": \"MapStudio\"}";
         assertEquals(Setup.DEFAULT_BASEMAPS, SetupForm.fromJson(absent).list(SetupForm.BASEMAPS));
+    }
+
+    @Test
+    void aKeySetTwiceIsUnreadableAsTheFormWouldKeepOnlyOne() {
+        String in = "{\"schemaVersion\": 1, \"connection\": \"MapStudio\", \"connection\": \"Other\"}";
+        SetupForm form = SetupForm.fromJson(in);
+        assertEquals(SetupForm.State.UNREADABLE, form.state());
+        assertEquals("This setup cannot be read: connection is set twice.", form.stateReason());
+        assertEquals(in, form.toJson());
     }
 
     @Test

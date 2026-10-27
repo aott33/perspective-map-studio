@@ -219,9 +219,9 @@ public final class SetupPanel extends JPanel {
         return inputs.get(field);
     }
 
-    /** For tests: the reason line under a field, as shown. */
+    /** For tests: the reason line under a field ({@link SetupForm#GENERAL}: the line at the top), as shown. */
     String reasonText(String field) {
-        return reasonLabels.get(field).getText();
+        return field.equals(SetupForm.GENERAL) ? general.getText() : reasonLabels.get(field).getText();
     }
 
     /** For tests: the banner line, as shown (empty when hidden). */

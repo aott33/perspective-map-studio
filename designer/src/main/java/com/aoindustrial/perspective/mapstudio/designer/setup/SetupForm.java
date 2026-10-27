@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.ResourceBundle;
 import java.util.Set;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.inductiveautomation.ignition.common.gson.Gson;
@@ -21,6 +20,7 @@ import com.inductiveautomation.ignition.common.gson.JsonParser;
 import com.inductiveautomation.ignition.common.gson.JsonPrimitive;
 
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
+import com.aoindustrial.perspective.mapstudio.common.contract.SetupProblem;
 
 /**
  * The values of the setup editor's form (epic 2 story 7), with no Swing: read from
@@ -29,8 +29,8 @@ import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
  * <p>The form owns no setup rule. {@link #reasons()} adds only input checks (a
  * required field is filled, a number is a whole number, a function name has the
  * shape {@code package.function}, a list names nothing twice) and otherwise asks
- * {@link Setup#parse(String)}, the Gateway's own reader, mapping each of its
- * messages to the field whose key it names.
+ * {@link Setup#read(String)}, the Gateway's own reader, placing each of its
+ * problems beside the field it names ({@link SetupProblem#field()}).
  *
  * <p>Writing keeps keys the form does not know (a later schema's or a hand-added
  * one) after the known keys, writes the known keys in story 1's order with
@@ -74,7 +74,6 @@ public final class SetupForm {
 
     private static final Pattern FUNCTION_PATH = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+");
     private static final Pattern WHOLE_NUMBER = Pattern.compile("[0-9]{1,9}");
-    private static final Pattern QUOTED_KEY = Pattern.compile("\"([A-Za-z]+(?:\\.[A-Za-z]+)?)\"");
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
 
     static final ResourceBundle TEXT =
@@ -122,31 +121,28 @@ public final class SetupForm {
 
     /** Reads {@code setup.json}; never throws: a setup it cannot show comes back read only with the reason. */
     public static SetupForm fromJson(String text) {
-        JsonElement element;
-        try {
-            element = JsonParser.parseString(text);
-        } catch (RuntimeException ex) {
-            return unreadable(text, msg("setup.state.notJson", plain(ex.getMessage())));
+        // The Gateway's reading decides what is wrong; the form only decides what it can show.
+        Setup.Reading reading = Setup.read(text);
+        SetupProblem file = problem(reading, SetupProblem.FILE);
+        if (file != null) {
+            return unreadable(text, file.message());
         }
-        if (element == null || !element.isJsonObject()) {
-            return unreadable(text, msg("setup.state.notObject"));
-        }
-        JsonObject o = element.getAsJsonObject();
+        JsonObject o = JsonParser.parseString(text).getAsJsonObject();
         JsonElement version = o.get(SCHEMA_VERSION);
-        if (version == null || !version.isJsonPrimitive() || !version.getAsJsonPrimitive().isNumber()) {
-            return unreadable(text, msg("setup.state.noVersion"));
+        if (version != null && version.isJsonPrimitive() && version.getAsJsonPrimitive().isNumber()) {
+            double v = version.getAsDouble();
+            if (v > Setup.SCHEMA_VERSION && v == Math.rint(v)) {
+                SetupForm form = new SetupForm();
+                form.state = State.NEWER_SCHEMA;
+                form.originalText = text;
+                form.schemaVersionText = String.valueOf((long) v);
+                form.stateReason = msg("setup.state.newer", form.schemaVersionText);
+                return form;
+            }
         }
-        double v = version.getAsDouble();
-        if (v > Setup.SCHEMA_VERSION && v == Math.rint(v)) {
-            SetupForm form = new SetupForm();
-            form.state = State.NEWER_SCHEMA;
-            form.originalText = text;
-            form.schemaVersionText = version.getAsJsonPrimitive().toString();
-            form.stateReason = msg("setup.state.newer", form.schemaVersionText);
-            return form;
-        }
-        if (v != Setup.SCHEMA_VERSION) {
-            return unreadable(text, msg("setup.state.badVersion", version.toString()));
+        SetupProblem schema = problem(reading, SCHEMA_VERSION);
+        if (schema != null) {
+            return unreadable(text, schema.message());
         }
         SetupForm form = new SetupForm();
         try {
@@ -156,7 +152,7 @@ public final class SetupForm {
             JsonElement roles = o.get(ROLES);
             if (roles != null && !roles.isJsonNull()) {
                 if (!roles.isJsonObject()) {
-                    throw new IllegalArgumentException(ROLES + "|an object {full: [...], phone: [...]}");
+                    throw new NotShown(ROLES);
                 }
                 JsonObject r = roles.getAsJsonObject();
                 form.fullRoles = names(r, "full", FULL_ROLES, List.of());
@@ -171,9 +167,9 @@ public final class SetupForm {
             form.assetsFunction = string(o, ASSETS_FUNCTION, "");
             JsonElement refresh = o.get(REFRESH);
             if (refresh != null && !refresh.isJsonNull()) {
-                // Setup.parse refuses anything but a JSON number, a quoted "10" included.
+                // Setup.read refuses anything but a JSON number, a quoted "10" included.
                 if (!refresh.isJsonPrimitive() || !refresh.getAsJsonPrimitive().isNumber()) {
-                    throw new IllegalArgumentException(REFRESH + "|a number of seconds");
+                    throw new NotShown(REFRESH);
                 }
                 double seconds = refresh.getAsDouble();
                 // 10.0 is the Gateway's 10; 10.5 is shown as written and refused by the input check.
@@ -183,9 +179,10 @@ public final class SetupForm {
             form.alarmPage = string(o, ALARM_PAGE, "");
             form.basemaps = names(o, BASEMAPS, BASEMAPS, Setup.DEFAULT_BASEMAPS);
             form.tokenSecret = string(o, TOKEN_SECRET, "");
-        } catch (IllegalArgumentException ex) {
-            String[] parts = ex.getMessage().split("\\|", 2);
-            return unreadable(text, msg("setup.state.badField", parts[0], parts[1]));
+        } catch (NotShown ex) {
+            // A value of a JSON type the field cannot show; the Gateway's problem says what it must be.
+            SetupProblem p = problem(reading, ex.getMessage());
+            return unreadable(text, p != null ? p.message() : msg("setup.state.badField", ex.getMessage()));
         }
         for (Map.Entry<String, JsonElement> e : o.entrySet()) {
             if (!KNOWN_KEYS.contains(e.getKey())) {
@@ -194,54 +191,65 @@ public final class SetupForm {
         }
         form.originalText = text;
         // Guard: a file the Gateway refuses must never look valid here. If the form
-        // read it into a setup the Gateway would accept, the form misread it, and a
-        // save of the unchanged form would write nothing (the editor's equals test).
-        String fileMessage = setupMessage(text);
-        if (fileMessage != null && setupMessage(form.toJson()) == null) {
-            return unreadable(text, display(fileMessage));
+        // read it into a setup the Gateway would accept (a key set twice, say), the
+        // form misread it, and a save of the unchanged form would write nothing (the
+        // editor's equals test).
+        if (!reading.ok() && Setup.read(form.toJson()).ok()) {
+            return unreadable(text, reading.problems().get(0).message());
         }
         return form;
+    }
+
+    /** A value the form has no field for, named by the field ({@link #FULL_ROLES}, ...). */
+    private static final class NotShown extends Exception {
+        NotShown(String field) {
+            super(field);
+        }
+    }
+
+    /** The reading's first problem about {@code field}, else null. */
+    private static SetupProblem problem(Setup.Reading reading, String field) {
+        for (SetupProblem p : reading.problems()) {
+            if (p.field().equals(field)) {
+                return p;
+            }
+        }
+        return null;
     }
 
     private static SetupForm unreadable(String text, String reason) {
         SetupForm form = new SetupForm();
         form.state = State.UNREADABLE;
         form.originalText = text;
-        form.stateReason = msg("setup.state.unreadable", reason);
+        form.stateReason = msg("setup.state.unreadable", display(reason));
         return form;
     }
 
-    private static String plain(String message) {
-        return message == null ? "" : message;
-    }
-
-    private static String string(JsonObject o, String key, String fallback) {
+    private static String string(JsonObject o, String key, String fallback) throws NotShown {
         JsonElement e = o.get(key);
         if (e == null || e.isJsonNull()) {
             return fallback;
         }
         if (!e.isJsonPrimitive() || !e.getAsJsonPrimitive().isString()) {
-            throw new IllegalArgumentException(key + "|a text");
+            throw new NotShown(key);
         }
         return e.getAsString();
     }
 
-    /** As {@link Setup}: the fallback only when the key is absent; JSON null is an empty list. */
-    private static List<String> names(JsonObject o, String key, String label, List<String> fallback) {
+    /** As {@link Setup}: the fallback when the key is absent or JSON null. */
+    private static List<String> names(JsonObject o, String key, String label, List<String> fallback)
+        throws NotShown {
         JsonElement e = o.get(key);
-        if (e == null) {
+        if (e == null || e.isJsonNull()) {
             return fallback;
         }
-        if (e.isJsonNull()) {
-            return List.of();
-        }
         if (!e.isJsonArray()) {
-            throw new IllegalArgumentException(label + "|a list of names");
+            throw new NotShown(label);
         }
         List<String> out = new ArrayList<>();
         for (JsonElement item : (JsonArray) e) {
             if (!item.isJsonPrimitive() || !item.getAsJsonPrimitive().isString()) {
-                throw new IllegalArgumentException(label + "|a list of names");
+                throw new NotShown(label);
             }
             out.add(item.getAsString());
         }
@@ -379,21 +387,13 @@ public final class SetupForm {
                 }
             }
         }
-        // The Gateway's rules: Setup.parse stops at its first fault, so each field
-        // is asked on its own, in a setup that is valid apart from that field.
-        for (String f : FIELDS) {
-            if (out.containsKey(f)) {
-                continue;
-            }
-            String message = setupMessage(probe(f));
-            if (message != null) {
-                add(out, fieldOf(message), display(message));
-            }
-        }
-        if (out.isEmpty()) {
-            String message = setupMessage(toJson());
-            if (message != null) {
-                add(out, fieldOf(message), display(message));
+        // The Gateway's rules, each beside its field; a field an input check already
+        // explains (a refresh of "ten", a name listed twice) is not explained twice.
+        Set<String> explained = Set.copyOf(out.keySet());
+        for (SetupProblem p : Setup.read(toJson()).problems()) {
+            String field = fieldOf(p.field());
+            if (!explained.contains(field)) {
+                add(out, field, display(p.message()));
             }
         }
         return orderedByField(out);
@@ -404,50 +404,21 @@ public final class SetupForm {
         return reasons().isEmpty();
     }
 
-    private String probe(String field) {
-        SetupForm p = new SetupForm();
-        p.connection = field.equals(CONNECTION) ? connection : "probe";
-        p.fullRoles = List.of();
-        p.phoneRoles = List.of();
-        p.basemaps = List.of();
-        p.refreshText = String.valueOf(Setup.DEFAULT_REFRESH_SECONDS);
-        switch (field) {
-            case FULL_ROLES: p.fullRoles = fullRoles; break;
-            case PHONE_ROLES: p.phoneRoles = phoneRoles; break;
-            case BASEMAPS: p.basemaps = basemaps; break;
-            case CONNECTION: break;
-            default: p.setText(field, text(field)); break;
+    /**
+     * The form field a {@link SetupProblem#field()} belongs to: the field itself,
+     * {@link #FULL_ROLES} for {@code roles} as a whole, else {@link #GENERAL} (the
+     * file, the schema version, an unknown key).
+     */
+    static String fieldOf(String problemField) {
+        if (FIELDS.contains(problemField)) {
+            return problemField;
         }
-        return p.toJson();
+        return problemField.equals(ROLES) ? FULL_ROLES : GENERAL;
     }
 
-    private static String setupMessage(String json) {
-        try {
-            Setup.parse(json);
-            return null;
-        } catch (Setup.SetupException ex) {
-            return ex.getMessage();
-        }
-    }
-
-    /** The field a {@link Setup} message names by its quoted key, else {@link #GENERAL}. */
-    static String fieldOf(String message) {
-        Matcher m = QUOTED_KEY.matcher(message);
-        while (m.find()) {
-            if (FIELDS.contains(m.group(1))) {
-                return m.group(1);
-            }
-            if (m.group(1).equals(ROLES)) {
-                return FULL_ROLES;
-            }
-        }
-        return GENERAL;
-    }
-
-    /** A {@link Setup} message as the form shows it: without the leading "setup.json ". */
+    /** A {@link Setup} message as the form shows it: as the Gateway words it, as a sentence. */
     static String display(String message) {
-        String m = message.startsWith("setup.json ") ? message.substring("setup.json ".length()) : message;
-        return m.isEmpty() ? m : Character.toUpperCase(m.charAt(0)) + m.substring(1);
+        return message.isEmpty() || message.endsWith(".") ? message : message + ".";
     }
 
     private static void add(Map<String, List<String>> out, String field, String reason) {

@@ -14,6 +14,10 @@ import org.junit.jupiter.api.Test;
 /** The Swing form built headless: fields filled, reasons as the user types, read-only states. */
 class SetupPanelTest {
 
+    /** A valid setup the Gateway accepts. */
+    private static final String VALID = "{\"schemaVersion\": 1, \"connection\": \"MapStudio\","
+        + " \"roles\": {\"full\": [\"MapEditor\"], \"phone\": [\"MapOperator\"]}}";
+    /** The same with a key the Gateway refuses (not a setup field), which the panel keeps and reports. */
     private static final String DEV = "{\"schemaVersion\": 1, \"connection\": \"MapStudio\","
         + " \"roles\": {\"full\": [\"MapEditor\"], \"phone\": [\"MapOperator\"]}, \"note\": \"x\"}";
 
@@ -26,6 +30,7 @@ class SetupPanelTest {
         assertEquals("none\nosm", panel.input(SetupForm.BASEMAPS).getText());
         assertEquals(form, panel.current());
         assertTrue(panel.current().toJson().contains("\"note\": \"x\""));
+        assertTrue(panel.reasonText(SetupForm.GENERAL).contains("note is not a setup field of schema 1."));
         assertEquals("", panel.bannerText());
         assertTrue(panel.input(SetupForm.CONNECTION).isEditable());
     }
@@ -34,11 +39,11 @@ class SetupPanelTest {
     void reasonsFollowTheTyping() {
         AtomicInteger edits = new AtomicInteger();
         SetupPanel panel = new SetupPanel(edits::incrementAndGet);
-        panel.show(SetupForm.fromJson(DEV), false, "");
+        panel.show(SetupForm.fromJson(VALID), false, "");
         panel.input(SetupForm.CONNECTION).setText("");
         assertTrue(panel.reasonText(SetupForm.CONNECTION).contains("Name the database connection"));
         panel.input(SetupForm.REFRESH).setText("0");
-        assertTrue(panel.reasonText(SetupForm.REFRESH).contains("1 or more"));
+        assertTrue(panel.reasonText(SetupForm.REFRESH).contains("from 1 to 3600"));
         panel.input(SetupForm.CONNECTION).setText("MapStudio");
         panel.input(SetupForm.REFRESH).setText("15");
         assertEquals(" ", panel.reasonText(SetupForm.CONNECTION));
@@ -130,7 +135,7 @@ class SetupPanelTest {
     @Test
     void aSetupWithReasonsIsRefusedAndAValidOneIsSaved() throws Exception {
         SetupPanel panel = new SetupPanel(null);
-        SetupForm dev = SetupForm.fromJson(DEV);
+        SetupForm dev = SetupForm.fromJson(VALID);
         panel.show(dev, false, "");
         assertEquals(dev, SetupCommit.formToSave(panel, dev));
         panel.input(SetupForm.REFRESH).setText("0");
