@@ -1,0 +1,121 @@
+{
+ "custom": {},
+ "params": {},
+ "props": {
+  "defaultSize": {
+   "width": 1440,
+   "height": 900
+  }
+ },
+ "root": {
+  "type": "ia.container.flex",
+  "version": 0,
+  "props": {
+   "direction": "column"
+  },
+  "meta": {
+   "name": "root"
+  },
+  "position": {},
+  "custom": {},
+  "children": [
+   {
+    "type": "ia.container.flex",
+    "version": 0,
+    "props": {
+     "direction": "row",
+     "alignItems": "center",
+     "wrap": "wrap"
+    },
+    "meta": {
+     "name": "toolbar"
+    },
+    "position": {
+     "shrink": 0
+    },
+    "custom": {},
+    "children": [
+     {
+      "type": "ia.display.label",
+      "version": 0,
+      "props": {
+       "text": "Map Studio store checks: project mapstudio-check, connection MapStudioCheck.",
+       "style": {
+        "padding": "4px 12px"
+       }
+      },
+      "meta": {
+       "name": "title"
+      },
+      "position": {
+       "basis": "auto",
+       "shrink": 1
+      },
+      "custom": {}
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Read with getMap"
+      },
+      "meta": {
+       "name": "getMap",
+       "domId": "mapstudio-check-getmap"
+      },
+      "position": {
+       "basis": "160px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Store checks (epic 2 story 5): getMap reads the map on a read-only store too; its list\n\t# also answers .readOnly (None when saving works). Reads only.\n\timport java.lang\n\n\tout = self.view.rootContainer.getChild('getMapResult')\n\ttry:\n\t\titems = system.mapstudio.getMap('mapstudio-check')\n\t\tout.props.text = system.util.jsonEncode({'count': len(items), 'readOnly': items.readOnly})\n\texcept java.lang.Throwable as ex:\n\t\tout.props.text = system.util.jsonEncode({'error': ex.getMessage()})\n\texcept Exception as ex:\n\t\tout.props.text = system.util.jsonEncode({'error': str(ex)})"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     }
+    ]
+   },
+   {
+    "type": "ao.mapstudio",
+    "version": 0,
+    "props": {},
+    "meta": {
+     "name": "map"
+    },
+    "position": {
+     "basis": "0px",
+     "grow": 1
+    },
+    "custom": {}
+   },
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {
+     "text": "",
+     "style": {
+      "padding": "4px 12px"
+     }
+    },
+    "meta": {
+     "name": "getMapResult",
+     "domId": "mapstudio-check-getmap-result"
+    },
+    "position": {
+     "basis": "24px",
+     "shrink": 0
+    },
+    "custom": {}
+   }
+  ]
+ }
+}

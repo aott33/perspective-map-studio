@@ -28,6 +28,9 @@ import {
 } from './draw';
 import { EditLevel, MapItemRecord } from './contract';
 import { MESSAGE_EVENT, Reply, editsApply, mapLoad, pointClick, readReply, replyText } from './messages';
+import {
+    STORE_UNKNOWN, StoreState, storeStateAttribute, storeStateFromError, storeStateFromLoad, storeStatusText
+} from './storeState';
 import { PointPopup } from './PointPopup';
 import { SAVE_IDLE, SaveState, itemsToGeoJson, lineCreateBatch, newId, refusedSave, saveStatusText, withItem } from './save';
 import { AuthorParams, PopupPoint, popupMountPath } from './popupParams';
@@ -91,6 +94,8 @@ export interface MapStudioDelegateState {
     load: { state: 'loading' | 'loaded' | 'failed'; message: string };
     /** The last save of a drawn line. */
     save: SaveState;
+    /** The map store's state: ready, read only (with the reason) or unavailable (epic 2 story 5). */
+    store: StoreState;
 }
 
 /**
@@ -107,6 +112,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private level: EditLevel | null = null;
     private load: MapStudioDelegateState['load'] = { state: 'loading', message: '' };
     private save: SaveState = SAVE_IDLE;
+    private store: StoreState = STORE_UNKNOWN;
     private mapLoadId: string | null = null;
     /** edits.apply message id -> the map item it creates and the record it would store. */
     private pendingSaves = new Map<string, MapItemRecord>();
@@ -123,7 +129,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             itemsRevision: this.itemsRevision,
             level: this.level,
             load: this.load,
-            save: this.save
+            save: this.save,
+            store: this.store
         };
     }
 
@@ -197,9 +204,11 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.itemsRevision++;
             this.level = reply.body.level;
             this.load = { state: 'loaded', message: '' };
+            this.store = storeStateFromLoad(reply.body);
         } else if (reply.kind === 'error') {
             this.level = null;
             this.load = { state: 'failed', message: reply.body.code + ': ' + reply.body.message };
+            this.store = storeStateFromError(this.store, reply.body);
         }
         this.mapLoadId = null;
         console.info('[MapStudio] ' + replyText(reply));
@@ -224,6 +233,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.save = { state: 'saved', itemId: pending.id, version };
         } else {
             this.save = refusedSave(pending.id, reply.body);
+            this.store = storeStateFromError(this.store, reply.body);
         }
         console.info('[MapStudio] ' + replyText(reply));
         this.notify();
@@ -654,12 +664,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const save = delegate ? delegate.save : SAVE_IDLE;
         const saveText = saveStatusText(save);
         const load = delegate ? delegate.load : { state: 'loading', message: '' };
+        const store = delegate ? delegate.store : STORE_UNKNOWN;
         return (
             <div {...this.props.emit({ classes: ['mapstudio'] })}>
                 <div className="mapstudio-map" ref={this.setMapContainer}
                      data-test-set={this.testData.name}
                      data-edit-level={delegate && delegate.level ? delegate.level : ''}
-                     data-load-state={load.state} />
+                     data-load-state={load.state}
+                     data-store-state={storeStateAttribute(store)} />
                 <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '')}
                      data-pending={pending ? 'true' : 'false'}
                      data-drawing={this.state.drawing ? 'true' : 'false'}
@@ -677,6 +689,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     ) : null}
                     {load.state === 'failed'
                         ? <div className="mapstudio-load-status">Map store: {load.message}</div> : null}
+                    {store.status === 'read-only'
+                        ? <div className="mapstudio-store-status" data-store-state="read-only">{storeStatusText(store)}</div>
+                        : null}
                 </div>
                 {this.renderPopup()}
             </div>

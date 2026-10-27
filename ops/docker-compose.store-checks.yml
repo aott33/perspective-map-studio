@@ -1,0 +1,11 @@
+# Overlay for ops/store-checks.sh (epic 2 story 5). DEVELOPMENT ONLY.
+#
+# Adds the project mapstudio-check, whose Map Studio setup names the connection
+# MapStudioCheck (role mapstudio_check on database mapstudio_check, both made by
+# ops/postgres-init/20-store-checks.sh). Without this overlay no project names
+# that connection, so the plain dev stack never touches it and logs no Map Studio
+# error.
+services:
+  gateway:
+    volumes:
+      - ./store-checks/project:/usr/local/bin/ignition/data/projects/mapstudio-check

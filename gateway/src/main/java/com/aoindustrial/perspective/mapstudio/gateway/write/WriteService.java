@@ -21,7 +21,8 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
  * The one write path (AD-2): every {@code edits.apply} batch, from the browser or
  * from {@code system.mapstudio.applyEdits}, goes through {@link #apply}.
  *
- * <p>Order: the project's map store is ready; the batch and its ops are well
+ * <p>Order: the project's map store is ready and writable here (not read only:
+ * a newer schema or a standby refuses {@code read-only}, epic 2 story 5); the batch and its ops are well
  * formed; every op is one this version carries out; the level allows every op;
  * then one transaction takes the project's next {@code seq}, locks and checks each
  * map item's version, writes the items, one edit record row per op and the batch
@@ -53,7 +54,7 @@ public final class WriteService {
      * @throws MapStudioException when the batch is refused; nothing is written then
      */
     public EditResult apply(String project, JsonElement batchJson, Actor actor, String level) {
-        Setup setup = gate.requireReady(project);
+        Setup setup = gate.requireWritable(project);
         EditBatch batch = EditBatch.parse(batchJson);
         batch.requireSupported();
         for (EditOp op : batch.ops()) {

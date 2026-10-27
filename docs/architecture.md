@@ -116,8 +116,11 @@ CI builds and signs the `.modl` and publishes it as a GitHub release. Projects i
 ## Operations
 
 - **Backup:** the map store is backed up with the site's PostgreSQL backups; export gives a portable copy.
-- **Database rights:** if Map Studio cannot create or upgrade its tables, it logs an error naming the connection and the missing right, as the historian and alarm journal do, and the map is unavailable until it is fixed.
-- **Redundancy:** only the active Gateway subscribes and saves; after a failover the caches rebuild and open maps reload (AD-21).
+- **Database rights:** if Map Studio cannot create or upgrade its tables, it logs an error naming the connection and the missing right, as the historian and alarm journal do, and the map is unavailable until it is fixed; it tries again at most once a minute, so no restart is needed.
+- **Newer schema:** a map store made by a newer Map Studio is read only, never altered.
+- **Redundancy:** only the active Gateway subscribes, saves and migrates; a standby reads and refuses saves; after a failover the caches rebuild and open maps reload (AD-21).
+
+The operator's page is `docs/operations.md`: backups, rights and the error line, the map store's states, schema versions and downgrades, redundant pairs.
 
 ## Still open
 

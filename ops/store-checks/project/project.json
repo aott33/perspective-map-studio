@@ -1,0 +1,7 @@
+{
+  "title": "mapstudio-check",
+  "description": "Map Studio store checks (epic 2 story 5): a project whose setup names the MapStudioCheck connection. Mounted only by ops/store-checks.sh (ops/docker-compose.store-checks.yml). Development only.",
+  "enabled": true,
+  "inheritable": false,
+  "parent": ""
+}

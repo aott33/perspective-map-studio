@@ -13,7 +13,9 @@ export const ErrorCodes = {
     ROLE: 'role',
     INVALID: 'invalid',
     STALE: 'stale',
-    STORE_UNREACHABLE: 'store-unreachable'
+    STORE_UNREACHABLE: 'store-unreachable',
+    /** Readable but not saved here: a newer map store schema, or a standby Gateway (epic 2 story 5). */
+    READ_ONLY: 'read-only'
 } as const;
 
 /** Editing levels map.load reports (AD-2). */
@@ -66,6 +68,11 @@ export interface MapLoadReplyBody {
     level: EditLevel;
     seq: number;
     items: MapItemRecord[];
+    /**
+     * Why the map cannot be saved on this Gateway (epic 2 story 5); left out when it
+     * can (the Gateway sends null then).
+     */
+    readOnly?: string;
 }
 
 export interface EditsApplyReplyBody {
@@ -130,7 +137,11 @@ export function readMapLoadReply(body: Record<string, unknown>): MapLoadReplyBod
             items.push(item);
         }
     }
-    return { level, seq: body.seq, items };
+    const reply: MapLoadReplyBody = { level, seq: body.seq, items };
+    if (typeof body.readOnly === 'string' && body.readOnly !== '') {
+        reply.readOnly = body.readOnly;
+    }
+    return reply;
 }
 
 /** The body of an edits.apply.reply, or null when it is malformed. */

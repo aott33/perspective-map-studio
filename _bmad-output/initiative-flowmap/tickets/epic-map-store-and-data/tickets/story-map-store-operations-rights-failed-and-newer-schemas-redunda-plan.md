@@ -3,13 +3,13 @@ title: 'Map store operations: rights, failed and newer schemas, redundancy'
 type: 'feature'
 ticket: '5'
 created: '2026-10-26'
-status: 'draft'
-baseline_revision: ''
+status: 'in-review'
+baseline_revision: 'f3a63a29cb7c8c5ed80bef5acbeaf29fe341fb63'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
 context:
@@ -52,53 +52,78 @@ context:
 | Becomes active | state listener sees active | gate opens; migrator runs if not yet run | none |
 | Independent Gateway | redundancy disabled | writes accepted | none |
 
+## Decisions (owner, "approve 2 to 7, recommendations", 2026-10-26)
+
+- **Recovery from `unavailable`:** the migrator runs again lazily on `map.load` or `applyEdits`, at most once per 60 s per connection, and logs the error line again only when it changes, so fixing the grant heals without a restart.
+- **Error code for read only:** one new code `read-only` for both the newer schema and the standby, with distinct messages; additive to the 0.2.0 draft.
+- **Migrations on a standby:** only an independent or active node migrates; a standby only reads the version and runs the migrator on becoming active.
+- **Where the store checks run:** by hand (`ops/store-checks.sh`), results recorded in `docs/platform-checks.md`; no CI job.
+
 </frozen-after-approval>
 
 ## Code Map
 
-Story 1 files this story extends (paths under `gateway/src/main/java/com/aoindustrial/perspective/mapstudio/gateway/` unless shown):
-- `store/Migrator.java` -- run each migration through `SqlScript`, catch per statement, rollback, `MigrationFailure` line; newer-version check before applying.
-- `store/StoreRegistry.java` -- the state story 1 defines gains `READ_ONLY(reason)`; exposes `writeRefusal(connection)` combining state and `RedundancyGate`.
-- `write/WriteService.java` -- one change: where story 1 refuses `store-unreachable`, call `writeRefusal` (also yields `read-only`).
-- `load/MapLoader.java` -- add `readOnly` (reason or null) to the reply and to `getMap`'s result.
-- `MapStudioGatewayHook.java` -- build `RedundancyGate` from `getRedundancyManager()`, add and remove its listener.
-- `common/.../common/Messages.java`, the `map.load` reply type in `common/.../common/contract/`, `web/typescript/contract.ts`, `messages.ts` -- code `read-only`, field `readOnly`.
-- `web/typescript/MapStudio.tsx` -- `data-store-state` (`ready|read-only|unavailable`) from the `map.load` reply or error; save status reuses "Not saved: <message>".
-- `ops/docker-compose.yml` (postgres: mount `ops/postgres-init/`), `ops/lib.sh` (`MAPSTUDIO_STORE_CHECKS=1` adds the overlay, as the spike's `MAPSTUDIO_CHECKS` did at `51104c8`).
-- `docs/contract.md`, `docs/architecture.md` (Operations links `docs/operations.md`), `docs/platform-checks.md`.
+Story 1 files this story extends (paths under `gateway/src/main/java/com/aoindustrial/perspective/mapstudio/gateway/` unless shown), with the names story 1 shipped (its Plan Change Log):
+- `store/Migrator.java` -- keep story 1's order (read the version with no lock and no DDL, then lock, `CREATE TABLE IF NOT EXISTS mapstudio_schema_version` and the migration only when one is pending). `Migrator.MigrationFailure` gains the migration number, the statement ordinal and count, and wraps a runtime failure too (SQLState "none"); `recordedVersion(Connection)` reads only (for a standby). `Migrations.statements` already splits a migration (no new splitter).
+- `store/FailureLine.java` (new, pure) -- the AD-21 error line and the user reason from a `MigrationFailure`.
+- `store/StoreState.java` -- status `READ_ONLY` (reason); `isReadable()`.
+- `store/StoreRegistry.java` -- newer schema becomes `READ_ONLY` with one warning; failures logged through `FailureLine` once per distinct line; lazy retry of an `UNAVAILABLE` connection at most once per 60 s from `ensure`; a `BooleanSupplier mayMigrate` (the redundancy gate) so a standby only reads the version; `retryNow()` on becoming active.
+- `store/StoreGate.java` -- story 1's one check gains `requireWritable` (also refuses `read-only`: newer schema or standby) and `requireReadable` (returns the setup and the read-only reason); `requireReady` stays as `requireWritable`.
+- `redundancy/RedundancyGate.java` (new) -- `ActiveNode` interface, adapter over `RedundancyManager`, `mayWrite() = !isRedundancyEnabled() || isActive()`, info line once per state change, `onActive` callback.
+- `MapStudioServices.java` -- builds the gate from `context.getRedundancyManager()`, adds and removes its listener (`RedundancyStateAdapter`) in `start`/`stop`.
+- `write/WriteService.java` -- one change: `gate.requireReady` becomes `gate.requireWritable`.
+- `load/MapLoader.java` -- `load(project)` (snapshot plus read-only reason); `map.load.reply` gains `readOnly` (reason or null).
+- `script/GatewayScriptModule.java`, `script/MapList.java` (new) -- `getMap` still returns the list of records; the list also answers `readOnly` (reason or None), so story 1's callers are unchanged.
+- `common/.../common/Messages.java` (`CODE_READ_ONLY`), `web/typescript/contract.ts` (`ErrorCodes.READ_ONLY`, `MapLoadReplyBody.readOnly`), `web/typescript/storeState.ts` (new, pure), `web/typescript/MapStudio.tsx` (`data-store-state` `ready|read-only|unavailable` on `.mapstudio-map`, `.mapstudio-store-status` line).
+- `ops/docker-compose.yml` (postgres mounts `ops/postgres-init/`), `ops/lib.sh` (`MAPSTUDIO_STORE_CHECKS=1` adds `ops/docker-compose.store-checks.yml` to `COMPOSE`).
+- `docs/contract.md`, `docs/architecture.md`, `docs/platform-checks.md`, `docs/operations.md` (new).
 
-Reuse: `rightsMessage` from story 1 (itself from `51104c8` `PostgresCheck.java`); `ops/psql.sh`; e2e `signIn`.
+Reuse: story 1's `FakeJdbc` (extended: `failOnRuntime`), `FakeMapStore`, `StoreRegistryTest`'s manual scheduler pattern; `ops/psql.sh`; e2e `test`, `mapLoaded`, `nextFrames` from `e2e/tests/fixtures.mjs`. Do not change story 1's specs or test assertions, except the two "every error code" lists (`ContractTest`, `contract.test.ts`) that must name the new code (decision 2).
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `gateway/.../store/SqlScript.java`, `store/MigrationFailure.java` (new, pure) -- split a migration on `;` at line end (comment in `migrations/` forbids `;` inside a statement); build the AD-21 line and the user reason.
-- [ ] `store/Migrator.java`, `store/StoreRegistry.java` -- as Code Map; newer version check reads `max(version)` before the lock work.
-- [ ] `gateway/.../redundancy/RedundancyGate.java` (new: `ActiveNode` interface, adapter over `RedundancyManager`, `!isRedundancyEnabled() || isActive()`, info line once per state change), `MapStudioGatewayHook.java`.
-- [ ] `write/WriteService.java`, `load/MapLoader.java`, contract files, `MapStudio.tsx` -- as Code Map.
-- [ ] Tests (new files only): `gateway/src/test/.../store/{SqlScriptTest,MigrationFailureTest,MigratorFailureTest}.java` (fake JDBC: failing statement N rolls back, no commit, later statements not run, one line, state `unavailable`; newer version: no statement run, `READ_ONLY`), `redundancy/RedundancyGateTest.java`, `write/WriteServiceStoreStateTest.java` (read-only and standby: nothing written, no hook), `web/typescript/__tests__/storeState.test.ts`.
-- [ ] `ops/postgres-init/20-store-checks.sh` (new: database `mapstudio_check`, role `mapstudio_check` with CONNECT only, password from the existing `pg_password` secret via `psql -v`), `ops/config/core/ignition/database-connection/MapStudioCheck/{config,resource}.json` (new, beside story 1's `MapStudio`), `ops/docker-compose.store-checks.yml` (new: mounts `ops/store-checks/project` as `mapstudio-check`), `ops/store-checks/project/**` (new: setup naming `MapStudioCheck`, one map view, page `/`).
-- [ ] `ops/store-checks.sh` (new) -- per scenario: set the check database with psql, restart the Gateway, wait, grep the log, run the spec: `rights` (no grant), `partial` (grant CREATE; superuser pre-creates `mapstudio_kind_setup`), `migrated` (blocker dropped), `newer` (insert version 999); restores `rights` at the end.
-- [ ] `e2e/tests/store-ops.spec.mjs` (new; skipped unless `MAPSTUDIO_STORE_SCENARIO` is set) -- `unavailable`: state and message; `read-only`: editor's line refused `read-only`, item count unchanged after reload; screenshots `mapstudio-store-{unavailable,readonly}-{1440,390}.png`.
-- [ ] `docs/operations.md` (new) -- backups (site PostgreSQL backups, `pg_dump -t 'mapstudio_*'` example, export later), rights (first start and upgrades need CREATE; the error line; recovery), schema versions and downgrade, redundancy (unverified marks), screenshots; `docs/contract.md`, `docs/architecture.md`, `docs/platform-checks.md` section "Epic 2 story 5 - map store states" (live results, independent-node gate).
+- [x] `store/Migrator.java`, `store/FailureLine.java`, `store/StoreState.java`, `store/StoreRegistry.java`, `store/StoreGate.java` -- as Code Map.
+- [x] `redundancy/RedundancyGate.java`, `MapStudioServices.java` -- as Code Map.
+- [x] `write/WriteService.java`, `load/MapLoader.java`, `script/GatewayScriptModule.java`, `script/MapList.java`, `Messages.java`, `contract.ts`, `storeState.ts`, `MapStudio.tsx`.
+- [x] Tests (new files): `gateway/src/test/.../store/{FailureLineTest,MigratorFailureTest,StoreRegistryStateTest,StoreGateTest}.java`, `redundancy/RedundancyGateTest.java`, `write/WriteServiceStoreStateTest.java` (read-only and standby: nothing written, no hook), `script/MapListTest.java`, `web/typescript/__tests__/storeState.test.ts`.
+- [x] `ops/postgres-init/20-store-checks.sh` (new: database `mapstudio_check` owned by `mapstudio`, role `mapstudio_check` LOGIN with no CREATE, password from the `pg_password` Docker secret through a psql variable), `ops/config/core/ignition/database-connection/MapStudioCheck/{config,resource}.json` (new), `ops/docker-compose.store-checks.yml` (new: mounts `ops/store-checks/project` as project `mapstudio-check`), `ops/store-checks/project/**` (new: setup naming `MapStudioCheck`, one map view with a `getMap` button, page `/`).
+- [x] `ops/store-checks.sh` (new) -- ensures the check database and role (kept volumes), then per scenario sets the database with psql, restarts the Gateway where needed, greps the log and runs `e2e/tests/store-ops.spec.mjs` with `MAPSTUDIO_STORE_SCENARIO`: `rights` (no grant), `partial` (CREATE granted; the owner pre-creates `mapstudio_kind_setup`), `healed` (blocker dropped, no restart: the lazy retry), `newer` (version 999 recorded); restores the check database and the plain Gateway at the end.
+- [x] `e2e/tests/store-ops.spec.mjs` (new; skipped unless `MAPSTUDIO_STORE_SCENARIO` is set): `unavailable` state and message; `ready` after healing; `read-only`: a drawn line refused `read-only`, item count unchanged after reload, `getMap(...).readOnly` the reason; screenshots `mapstudio-store-{unavailable,readonly}-{1440,390}.png`.
+- [x] `docs/operations.md` (new), `docs/contract.md`, `docs/architecture.md`, `docs/platform-checks.md` section "Epic 2 story 5 - map store states".
 
 **Acceptance Criteria:**
-- Given `ops/store-checks.sh` on a fresh stack, when scenario `rights` runs, then the Gateway log has exactly one Map Studio error line naming `MapStudioCheck`, statement 1, SQLState 42501, and the spec sees `unavailable`.
+- Given `ops/store-checks.sh` on the dev stack, when scenario `rights` runs, then the Gateway log has exactly one Map Studio error line naming `MapStudioCheck`, migration 1, statement 1, SQLState 42501, and the spec sees `unavailable`.
 - Given scenario `partial`, then the log names migration 1's `mapstudio_kind_setup` statement and its SQLState, and `pg_tables` in `mapstudio_check` lists only the pre-created table.
+- Given scenario `healed`, then without a Gateway restart the spec sees `ready` within the retry interval and `mapstudio_check` holds the whole first schema.
 - Given scenario `newer`, then the log has one warning naming both versions and the spec sees `read-only` with the save refused; `mapstudio_edit` in `mapstudio_check` gains no row.
 - Given the plain dev stack (no overlay), when story 1's checks run, then they still pass and no Map Studio error is logged.
 
 ## Implementation Notes
 
-Starts after story 1 is merged; set `baseline_revision` then. No migration (frees the slot for another group A story).
+Baseline is the merge of story 1 (`f3a63a2`). No migration. Redundancy is unit tested over the `ActiveNode` interface; only the independent Gateway is seen live.
 
 ## Plan Change Log
+
+**Implementation, 2026-10-27 (not a review loopback).** Built as planned with these details:
+- The e2e check project page view has a "Read with getMap" button (a Gateway-scope view script, reads only) so `getMap(...).readOnly` is checked live.
+- `ops/store-checks.sh` passes `MAPSTUDIO_STORE_SHOTS=0` to the second `unavailable` run (`partial`), so the screenshots show the `rights` case.
+- `map.load.reply` always carries `readOnly` (JSON null when writable); the browser's `MapLoadReplyBody.readOnly` is optional and left out when null, so story 1's reader test stands unchanged.
+- The standby reason gained a second sentence ("Open the map on the active Gateway to save.").
+- Verified: `./gradlew clean build` green (JUnit 78, Jest 46); plain e2e 16 passed, 5 skipped (`store-ops`); `E2E_DOCS=1 ops/store-checks.sh` all four scenarios passed, then `rights newer` again for the screenshots; results in `docs/platform-checks.md`.
+
+**Approval and names, 2026-10-27 (not a review loopback).** The owner approved the plan with the recommended answers on 2026-10-26 ("approve 2 to 7, recommendations"); the four answers are in the frozen block as decisions and the Open Questions are gone. After story 1 merged (`ccr-3c8b84b9-f1vbsm`), the Code Map and Tasks use its real names: `MapStudioException` (no `EditRefusal`), `StoreGate` as the one check (so `writeRefusal` lives there, not in `StoreRegistry`), `Migrator.MigrationFailure` and `Migrations.statements` already exist (no `SqlScript`; the AD-21 line moves to `FailureLine`), story 1's migrator order kept, `FakeMapStore` and `store/FakeJdbc` extended, the e2e helpers of `e2e/tests/fixtures.mjs`. Contract decisions others need:
+- `getMap(project)` still returns a list (story 1's callers iterate it); the list also has a `readOnly` attribute. Changing it to a dict would break story 1's contract.
+- The write service checks the store state first (story 1's order), so on a read-only store every save is refused `read-only`, an anonymous viewer's too; the e2e read-only check draws as the anonymous viewer on the check project (no sign-in on a second project).
+- The 42501 case: the first statement of migration 1's transaction is story 1's `CREATE TABLE IF NOT EXISTS mapstudio_schema_version`, so the line numbers statements as the transaction runs them (that create is statement 1, the file's statements follow, the version record is last); the lock and the version read are named but not numbered.
+- `healed` replaces "migrated after a restart": with decision 1 the check proves the 60 s retry without a restart.
+- Story 1's two code lists (`ContractTest`, `contract.test.ts`) gain `read-only`: decision 2 adds a code, and those assertions mirror the code list.
 
 ## Review Triage Log
 
 ## Design Notes
 
-Error line, 42501: `Map Studio cannot prepare its map store on connection MapStudioCheck: migration 1, statement 1 (CREATE TABLE IF NOT EXISTS mapstudio_schema_version) failed with SQLState 42501, the database role lacks CREATE on schema public: ERROR: permission denied for schema public`. The right is derived from the statement verb (`CREATE TABLE|INDEX` -> CREATE on the schema; `ALTER` -> ownership), else omitted. User reason: "The map store is unavailable: the database role cannot create Map Studio's tables. Ask an administrator (see the Gateway log)."
+Error line, 42501: `Map Studio cannot prepare its map store on database connection MapStudioCheck: migration 1, statement 1 of 8 (CREATE TABLE IF NOT EXISTS mapstudio_schema_version ...) failed with SQLState 42501, the database role lacks CREATE on schema public: ERROR: permission denied for schema public`. The right is derived from the statement verb (`CREATE TABLE|INDEX` -> CREATE on the schema; `ALTER` -> ownership), else omitted. User reason (story 1's words kept, one sentence added): "The map store is unavailable: the database role of connection MapStudioCheck lacks the right to create Map Studio's tables. Ask an administrator (see the Gateway log)."
 
 Read-only reasons: "The map store was upgraded by a newer Map Studio (schema 3, this module knows 1); saving is off until the module is upgraded." and "This Gateway is the standby of a redundant pair; saving is off here."
 
@@ -107,18 +132,11 @@ The check harness is always present (database, role, connection: harmless, `Vali
 ## Verification
 
 **Commands:**
-- `./gradlew build` -- expected: green with the new tests.
-- `MAPSTUDIO_STORE_CHECKS=1 ops/store-checks.sh` -- expected: four scenarios pass as in Acceptance.
+- `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew clean build` -- expected: green with the new tests (Jest included).
+- `ops/store-checks.sh` -- expected: four scenarios pass as in Acceptance.
 - `cd e2e && npm test` -- expected: all pass; `store-ops` skipped.
 - `git grep -nP '\x{2014}'` -- expected: no match.
 
 **Manual checks (hitl, the owner):**
 - The four `mapstudio-store-*` screenshots and the scenario log excerpts in `docs/platform-checks.md`.
 - `docs/operations.md` reads as an operator page; redundancy is marked unverified.
-
-## Open Questions
-
-1. **Recovery from `unavailable`.** (a) Recommended: re-run the migrator lazily on `map.load` or `applyEdits`, at most once per 60 s, logging the error line again only when the reason changes, so fixing the grant heals without a restart. (b) Only at Gateway or module restart (and story 6's setup change): simplest, but an operator must restart after fixing rights. (c) A 60 s timer while unavailable: heals with no map open, one more background task.
-2. **Error code for read only.** (a) Recommended: one new code `read-only` for both newer schema and standby, distinct messages; additive to the 0.2.0 draft. (b) Two codes, `read-only` and `standby`: the browser can tell them apart, one more code to keep stable. (c) Reuse `store-unreachable`: no contract change, but the browser cannot tell a readable map from a missing one.
-3. **Migrations on a standby.** (a) Recommended: only an independent or active node migrates; a standby reads the version only and runs the migrator on becoming active. (b) Both nodes migrate under the advisory lock: simpler, but a standby with a different module build could upgrade the schema under the active node.
-4. **Where the store checks run.** (a) Recommended: by hand (`ops/store-checks.sh`, about five Gateway restarts), results recorded in `docs/platform-checks.md`. (b) Also a CI job: catches regressions, adds about 5 minutes per run.

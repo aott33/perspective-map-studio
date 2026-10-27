@@ -74,6 +74,11 @@ ADMIN_PASS="${GATEWAY_ADMIN_PASSWORD}"
 # checkout's own compose project (MAPSTUDIO_CONTAINER, above), so parallel
 # Gateways get separate containers, volumes and networks.
 COMPOSE=(docker compose -p "${MAPSTUDIO_CONTAINER}" -f "${OPS_DIR}/docker-compose.yml")
+# MAPSTUDIO_STORE_CHECKS=1 (set by ops/store-checks.sh) adds the store-check project
+# mapstudio-check to the Gateway (epic 2 story 5).
+if [[ "${MAPSTUDIO_STORE_CHECKS:-}" == "1" ]]; then
+  COMPOSE+=(-f "${OPS_DIR}/docker-compose.store-checks.yml")
+fi
 
 # --- logging --------------------------------------------------------------
 if [[ -t 1 ]]; then
