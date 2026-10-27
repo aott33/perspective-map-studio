@@ -17,7 +17,14 @@ services:
   # One-shot volume prep, run before every start:
   # - On a brand-new volume Docker would create the project bind mount's parent
   #   (data/projects/) as root and the Gateway would then fault with "unable to
-  #   create resource dir". Hand the directory to the ignition user first.
+  #   create resource dir". Hand the directory to the Gateway's user first: the
+  #   developer's uid and gid (IGNITION_UID / IGNITION_GID from .env, see the
+  #   gateway service), which also re-owns a volume made before that mapping.
+  #   Only the volume is mounted here, never ops/project. (The Gateway's own
+  #   entrypoint does re-own, on each container creation, whatever under its
+  #   install folder is not IGNITION_UID:IGNITION_GID, the bind-mounted
+  #   projects included, so those ids must be the developer's own: then the
+  #   repository's files are already theirs and nothing changes.)
   # - On a fresh volume, seed the core config collection from ops/config/core
   #   (config-mode.json included: a pre-filled core without it faults the
   #   Gateway). Copied, not bind-mounted, so the Gateway owns the files and
@@ -36,7 +43,7 @@ services:
         mkdir -p /usr/local/bin/ignition/data/config/resources/core
         && cp -R /ops-config/core/. /usr/local/bin/ignition/data/config/resources/core/; fi
         && cp -R /ops-secrets/core/. /usr/local/bin/ignition/data/config/resources/core/
-        && chown -R ignition:ignition /usr/local/bin/ignition/data/projects /usr/local/bin/ignition/data/config
+        && chown -R ${IGNITION_UID:-2003}:${IGNITION_GID:-2003} /usr/local/bin/ignition/data/projects /usr/local/bin/ignition/data/config
     volumes:
       - gateway-data:/usr/local/bin/ignition/data
       - ./config:/ops-config:ro
@@ -70,6 +77,15 @@ services:
     image: inductiveautomation/ignition:8.3.10
     # Overridable so several dev Gateways can run side by side (one per worktree).
     container_name: ${MAPSTUDIO_CONTAINER:?run the ops/ scripts, which set it in .env}
+    # Started as root so the image's entrypoint can remap its ignition user to
+    # IGNITION_UID:IGNITION_GID (the developer's own ids, written into .env by
+    # ops/lib.sh), re-own the install and the data volume, and step down to that
+    # user with gosu before the Gateway starts [live 8.3.10]. The dev project is
+    # bind-mounted from ops/project, owned by the developer, so the Gateway must
+    # run as the developer to write a Designer save back; as the image's own
+    # user 2003 every save failed ("PushException: I/O error during prepare").
+    # With a root checkout (uid 0) the entrypoint keeps running as root.
+    user: root
     depends_on:
       init:
         condition: service_completed_successfully
@@ -95,6 +111,10 @@ services:
       ACCEPT_MODULE_LICENSES: "com.aoindustrial.perspective.mapstudio"
       ACCEPT_MODULE_CERTS: "com.aoindustrial.perspective.mapstudio"
       TZ: "${GATEWAY_TZ:-UTC}"
+      # The developer's uid and gid (see "user: root" above). Both are needed:
+      # the entrypoint refuses one without the other.
+      IGNITION_UID: "${IGNITION_UID:-2003}"
+      IGNITION_GID: "${IGNITION_GID:-2003}"
     volumes:
       # Gateway state across restarts (removed by down.sh --purge).
       - gateway-data:/usr/local/bin/ignition/data

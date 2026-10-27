@@ -35,6 +35,13 @@ running=""
 if "${COMPOSE[@]}" ps --status running --services 2>/dev/null | grep -q '^gateway$'; then
   running="yes"
 fi
+# A running Gateway container made before the uid mapping (docker-compose.yml
+# started it as the image's user, not root with IGNITION_UID) is recreated, not
+# restarted: a restart keeps the old container configuration.
+if [[ -n "${running}" ]] && [[ "$(docker inspect -f '{{.Config.User}}' "${CONTAINER_NAME}" 2>/dev/null)" != "root" ]]; then
+  info "The running Gateway container predates the uid mapping; recreating it ..."
+  running=""
+fi
 
 if [[ -n "${running}" ]]; then
   info "Restarting the Gateway to load the staged build..."
