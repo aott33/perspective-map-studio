@@ -86,6 +86,11 @@ export interface MapLoadReplyBody {
     readOnly?: string;
     /** Absent from a Gateway older than epic 2 entry 6, or when it is malformed. */
     setup?: MapSetup;
+    /**
+     * The session user name, sent at level `phone` and `full` only (epic 2 story 8); absent
+     * at level `none`, for an anonymous session, or from an older Gateway.
+     */
+    user?: string;
 }
 
 export interface EditsApplyReplyBody {
@@ -171,6 +176,9 @@ export function readMapLoadReply(body: Record<string, unknown>): MapLoadReplyBod
     const setup = readMapSetup(body.setup);
     if (setup) {
         reply.setup = setup;
+    }
+    if (typeof body.user === 'string' && body.user !== '') {
+        reply.user = body.user;
     }
     return reply;
 }

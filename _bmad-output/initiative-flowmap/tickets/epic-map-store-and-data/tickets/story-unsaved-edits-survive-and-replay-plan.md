@@ -3,14 +3,14 @@ title: 'Unsaved edits survive and replay'
 type: 'feature'
 ticket: '8'
 created: '2026-10-27'
-status: 'draft'
+status: 'in-review'
 baseline_revision: '0759b1b47326e2a5140eaacf8be441bc8ee22171'
 route: 'full'
 route_source: 'pinned'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-saved-edits-reach-every-open-map-at-once-plan.md'
@@ -56,6 +56,14 @@ context:
 | Storage fails | `setItem` throws | batch still sent; one plain-words warning | none |
 | Two tabs | same project in two tabs | both may replay one entry; the second gets the first reply (same actor) and removes it | none |
 
+## Decisions
+
+Owner, 2026-10-27: "agree with all recommendations, start building" - every Open Question takes its recommended option.
+
+1. **Whose queue: per project and user.** The Gateway adds `user` (the session user name, levels `phone` and `full` only) to `map.load.reply`, an additive contract 0.2.0 field, no migration; the key is `mapstudio.unsaved.v1:<project>:<user>`. Other users' entries stay untouched and hidden. Before a `map.load.reply` names the user, nothing is drawn or replayed from storage.
+2. **A refused batch in the middle of the queue: replay continues past it.** Each batch is judged alone; `baseVersion`s refuse any later batch that depended on it.
+3. **Drawing while the Gateway is gone: editing goes off only when `map.load` says the store is unreachable.** A lost connection after load keeps editing on and queues; epic-editing revisits with the save banner.
+
 </frozen-after-approval>
 
 ## Code Map
@@ -72,13 +80,13 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `web/typescript/unsaved.ts` (new, pure) -- key `mapstudio.unsaved.v1:<project>`; entry `{batchId, batch, queuedAt, state: 'unsent'|'refused', reason?: {code, message, changedBy?}}`; read (drop malformed entries, keep the rest), `enqueue`, `onReply`, `onError` (class rule), `discard`, `nextToReplay`, `unsavedItems` (create ops as records), status texts.
-- [ ] `web/typescript/__tests__/unsaved.test.ts` (new) -- every matrix row with a fake store and clock; malformed storage; quota throw; order.
-- [ ] `web/typescript/MapStudio.tsx` -- delegate holds the queue, sends through it, 15 s reply timer, replay rule, `storage` listener, state `unsaved` and `editing`; component draws `mapstudio-unsaved-line`/`-point` (dashed, theme token), removes the Terra Draw copy once queued, renders `.mapstudio-unsaved` rows (`data-batch-id`, `data-unsaved-state`, `data-code`, Discard) and Try again, sets `data-unsaved-count` and `data-editing`; disables the draw tool on a failed load.
-- [ ] `web/typescript/save.ts`, `DrawControl.tsx`, `mapstudio.css` -- `unsent` save state and words; `setDisabled`; styles from tokens.
-- [ ] `e2e/tests/unsaved.spec.mjs` (new) -- editor: `context.setOffline(true)` [unverified that Perspective sees it as a disconnect], draw, unsaved shown; close the page, open a new one in the same context online, saved and `data-items-loaded` +1. Conflict: seed storage with a stale update (two hook saves first), reload, conflict text names `mapeditor`, Discard empties the list. Screenshots at 1440 and 390 px.
-- [ ] `e2e/tests/store-ops.spec.mjs` -- `unavailable` scenario also asserts `data-items-loaded` 0 and the draw button disabled.
-- [ ] `docs/contract.md` (new section "Unsaved edits in the browser"), `docs/architecture.md` ("How a save works"), `docs/platform-checks.md` ("Epic 2 story 8": projectName, connection state, and a manual run with the dev Gateway stopped).
+- [x] `web/typescript/unsaved.ts` (new, pure) -- key `mapstudio.unsaved.v1:<project>`; entry `{batchId, batch, queuedAt, state: 'unsent'|'refused', reason?: {code, message, changedBy?}}`; read (drop malformed entries, keep the rest), `enqueue`, `onReply`, `onError` (class rule), `discard`, `nextToReplay`, `unsavedItems` (create ops as records), status texts.
+- [x] `web/typescript/__tests__/unsaved.test.ts` (new) -- every matrix row with a fake store and clock; malformed storage; quota throw; order.
+- [x] `web/typescript/MapStudio.tsx` -- delegate holds the queue, sends through it, 15 s reply timer, replay rule, `storage` listener, state `unsaved` and `editing`; component draws `mapstudio-unsaved-line`/`-point` (dashed, theme token), removes the Terra Draw copy once queued, renders `.mapstudio-unsaved` rows (`data-batch-id`, `data-unsaved-state`, `data-code`, Discard) and Try again, sets `data-unsaved-count` and `data-editing`; disables the draw tool on a failed load.
+- [x] `web/typescript/save.ts`, `DrawControl.tsx`, `mapstudio.css` -- `unsent` save state and words; `setDisabled`; styles from tokens.
+- [x] `e2e/tests/unsaved.spec.mjs` (new) -- editor: `context.setOffline(true)` [unverified that Perspective sees it as a disconnect], draw, unsaved shown; close the page, open a new one in the same context online, saved and `data-items-loaded` +1. Conflict: seed storage with a stale update (two hook saves first), reload, conflict text names `mapeditor`, Discard empties the list. Screenshots at 1440 and 390 px.
+- [x] `e2e/tests/store-ops.spec.mjs` -- `unavailable` scenario also asserts `data-items-loaded` 0 and the draw button disabled.
+- [x] `docs/contract.md` (new section "Unsaved edits in the browser"), `docs/architecture.md` ("How a save works"), `docs/platform-checks.md` ("Epic 2 story 8": projectName, connection state, and a manual run with the dev Gateway stopped).
 
 **Acceptance Criteria:**
 - Given the dev Gateway stopped with the editor's map open, when a line is drawn, then it shows as unsaved, survives closing the browser, and saves on reopen once the Gateway is back (verify line; manual live run recorded).
@@ -88,19 +96,23 @@ context:
 
 ## Implementation Notes
 
+- Built 2026-10-27 directly in this session (no implementation subagent available). Verification: Jest 92 passed (`unsaved.test.ts` 18 of them), `tsc --noEmit` clean; `./gradlew clean build` green (gateway 165 tests; the known timing-sensitive `AdapterServiceTest.aKindCallSettlingWhileAnAssetCallAnswersDoesNotDeadlock` failed once and passed on the rerun, unchanged); e2e on `ms-e2s8`: 29 passed, 5 skipped (store-ops, run by `ops/store-checks.sh`, and the gated stopped-Gateway test); `unsaved.spec.mjs` 4 passed; the stopped-Gateway test passed with `MAPSTUDIO_GATEWAY_STOP=1`; `ops/store-checks.sh` all four scenarios passed with the new `unavailable` assertions.
+- Matrix audit: Saved, Gateway gone, Page reopened, Conflict: unit and e2e; Busy, Role, Storage fails, Two tabs: unit (`unsaved.test.ts`); Role also by story 1's viewer e2e; Store unreachable at load: `store-ops.spec.mjs` under `ops/store-checks.sh`.
+- Quick review: no subagents in this session, so the Quick lens prompt is written beside this plan (`story-unsaved-edits-survive-and-replay-plan-quick.md`, not committed) for a separate session; triage waits for its findings.
+
 ## Plan Change Log
+
+- 2026-10-27, owner approval ("agree with all recommendations, start building"): Open Questions 1 B, 2 A, 3 A recorded under Decisions in the frozen block; the Gateway change is `MapStudioDelegate.withUser` (one pure helper called from `storeReply`, unit tested in `StoreReplyPerCallTest`), not `MapLoader`, to keep the shared loader untouched.
+- Per-user key, consequence: a stored queue is shown and replayed only once a `map.load.reply` names the key, not at mount; entries made before that (or with no project name) stay in memory and move into storage then. "Store unreachable at load" draws this page's queued items only.
+- A new batch is always sent at once, at any level (keeps story 1's viewer refusal test); only replays of stored entries wait for level `phone` or `full`. Error replies keep the compat save status `refused` with `data-code` (store-unreachable and read-only included); the new save state `unsent` is for no reply and a disconnected client only.
+- DOM names: the list is `.mapstudio-unsaved`, one `.mapstudio-unsaved-row` per entry (with `data-batch-id`, `data-unsaved-state`, `data-code`); Try again shows once an entry has a reason.
+- e2e "Gateway gone": instead of `context.setOffline(true)` (whether it closes an open websocket is [unverified]), the spec routes the page's websockets (`routeWebSocket`) and drops frames carrying `edits.apply`, so the reply timer runs out deterministically; the stopped-Gateway run is a gated test in the same spec (`MAPSTUDIO_GATEWAY_STOP=1`), recorded in `docs/platform-checks.md`.
 
 ## Review Triage Log
 
 ## Design Notes
 
 Status line rule: one `.mapstudio-save-status` for the latest save stays (compat); the `.mapstudio-unsaved` list below it holds every queued entry. A transient entry is only ever replayed by the tab that holds its in-flight message id, so one tab never sends one batch twice at once.
-
-## Open Questions
-
-1. **Whose queue?** AD-10 says "per project". On a shared control-room PC, user B would replay user A's unsent edits under B's name. (A) Key per project only, as AD-10 reads. (B) Gateway adds `user` (the session user name, levels `phone` and `full` only) to `map.load.reply`, an additive 0.2.0 field, no migration; the key becomes `<project>:<user>` and other users' entries stay untouched and hidden. Recommended: B.
-2. **A refused batch in the middle of the queue.** (A) Replay continues past it: each batch is judged alone, and `baseVersion`s refuse any later batch that depended on it. (B) Strict order: later batches wait behind it until it is discarded. Recommended: A.
-3. **Drawing while the Gateway is gone.** EXPERIENCE.md pauses the tools while the store is unreachable; the verify line draws a line while the Gateway is stopped. (A) Editing goes off only when `map.load` says the store is unreachable; a lost connection after load keeps editing on and queues. (B) Editing also goes off on a lost connection (then the verify line cannot be met). Recommended: A; epic-editing revisits with the save banner.
 
 ## Verification
 

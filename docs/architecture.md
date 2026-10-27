@@ -48,7 +48,7 @@ Every change, from a dragged vertex to a 120-pad import, is one **batch of edits
 4. It records who made the change and when, and increments each version.
 5. It tells every open map in the project at once (`map.changed`), and the live-value service picks up any new tags to watch (AD-17).
 
-If someone else changed the same map item first, the save is refused with their change attached, so nobody overwrites anyone silently. If the save fails for another reason, the batch waits in the browser and is retried (AD-10). Deletes are kept as tombstones, so undo can bring an item back.
+If someone else changed the same map item first, the save is refused with their change attached, so nobody overwrites anyone silently. Before the browser sends a batch it writes it to a queue in the browser's storage, kept per project and user; the batch leaves the queue only when the Gateway confirms the save or the user discards it. If the Gateway does not answer, is busy or is unreachable, the batch waits there, survives a closed page, and is sent again unchanged (same batch id and versions, so a save that did go through is never written twice) once the map has loaded for an editor (AD-10; `docs/contract.md`, Unsaved edits in the browser). A refusal such as a conflict stays listed with its reason until the user tries again or discards it. Deletes are kept as tombstones, so undo can bring an item back.
 
 ```mermaid
 sequenceDiagram

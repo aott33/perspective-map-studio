@@ -48,7 +48,9 @@ export type SaveState =
     | { state: 'idle' }
     | { state: 'saving'; itemId: string }
     | { state: 'saved'; itemId: string; version: number }
-    | { state: 'refused'; itemId: string; code: string; message: string };
+    | { state: 'refused'; itemId: string; code: string; message: string }
+    /** No answer within the reply timeout, or the client is disconnected: kept and replayed (unsaved.ts). */
+    | { state: 'unsent'; itemId: string; code: string };
 
 export const SAVE_IDLE: SaveState = { state: 'idle' };
 
@@ -61,6 +63,8 @@ export function saveStatusText(save: SaveState): string {
             return 'Saved as version ' + save.version;
         case 'refused':
             return 'Not saved: ' + save.message;
+        case 'unsent':
+            return 'Not saved: the store is unreachable. The line is kept here and saves when it is back.';
         default:
             return '';
     }

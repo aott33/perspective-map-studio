@@ -43,6 +43,10 @@ describe('the 0.2.0 draft contract', () => {
         const reply = readReply({ v: 1, type: 'map.load.reply', id: 'm1', body: { level: 'full', seq: 3, items: [ITEM, { bad: 1 }] } });
         expect(reply).toEqual({ kind: 'map.load.reply', id: 'm1', body: { level: 'full', seq: 3, items: [ITEM],
             lists: { kinds: [], assets: null, adapters: null } } });
+        // Epic 2 story 8: the session user, at phone and full; an empty or non-string one is left out.
+        expect(readMapLoadReply({ level: 'full', seq: 1, items: [], user: 'mapeditor' })!.user).toBe('mapeditor');
+        expect(readMapLoadReply({ level: 'full', seq: 1, items: [], user: '' })!.user).toBeUndefined();
+        expect(readMapLoadReply({ level: 'full', seq: 1, items: [], user: 7 })!.user).toBeUndefined();
         expect(readMapLoadReply({ level: 'admin', seq: 1, items: [] })).toBeNull();
         expect(readReply({ v: 1, type: 'map.load.reply', id: 'm1', body: {} }).kind).toBe('invalid');
     });

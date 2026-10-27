@@ -77,6 +77,10 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             await expect(status).toContainText('store-unreachable: The map store is unavailable');
             await expect(status).toContainText('MapStudioCheck');
             await expect(status).toContainText('Ask an administrator (see the Gateway log).');
+            // Epic 2 story 8: no map item drawn as current, and the draw tool is off.
+            await expect(map).toHaveAttribute('data-items-loaded', '0');
+            await expect(map).toHaveAttribute('data-editing', 'off');
+            await expect(page.locator('.mapstudio-draw-button')).toBeDisabled();
             await shot(page, `mapstudio-store-unavailable-${width}.png`);
         });
 
