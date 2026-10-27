@@ -74,6 +74,20 @@ export interface EditsApplyReplyBody {
     results: Array<{ entity: string; id: string; version: number }>;
 }
 
+/**
+ * One stale op of a refused batch (epic 2 story 2), listed in a `conflict` error body:
+ * the stored record, and who changed it last and when (ISO 8601, UTC), null when unknown.
+ */
+export interface Conflict {
+    index: number;
+    entity: string;
+    id: string;
+    baseVersion: number;
+    current: MapItemRecord | null;
+    changedBy: string | null;
+    changedAt: string | null;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -146,4 +160,28 @@ export function readEditsApplyReply(body: Record<string, unknown>): EditsApplyRe
         results.push({ entity: r.entity, id: r.id, version: r.version });
     }
     return { batchId: body.batchId, seq: body.seq, results };
+}
+
+/** The conflicts of a `conflict` error body; entries that are not conflicts are left out. */
+export function readConflicts(value: unknown): Conflict[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+    const out: Conflict[] = [];
+    for (const c of value) {
+        if (!isRecord(c) || typeof c.index !== 'number' || typeof c.entity !== 'string' || typeof c.id !== 'string'
+            || typeof c.baseVersion !== 'number') {
+            continue;
+        }
+        out.push({
+            index: c.index,
+            entity: c.entity,
+            id: c.id,
+            baseVersion: c.baseVersion,
+            current: readMapItem(c.current),
+            changedBy: typeof c.changedBy === 'string' ? c.changedBy : null,
+            changedAt: typeof c.changedAt === 'string' ? c.changedAt : null
+        });
+    }
+    return out;
 }

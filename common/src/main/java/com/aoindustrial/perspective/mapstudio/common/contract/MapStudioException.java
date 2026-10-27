@@ -1,5 +1,6 @@
 package com.aoindustrial.perspective.mapstudio.common.contract;
 
+import com.inductiveautomation.ignition.common.gson.JsonArray;
 import com.inductiveautomation.ignition.common.gson.JsonObject;
 
 /**
@@ -15,17 +16,24 @@ public class MapStudioException extends RuntimeException {
     private final String plainMessage;
     private final Integer opIndex;
     private final String opId;
+    private final JsonArray conflicts;
 
     public MapStudioException(String code, String message) {
         this(code, message, null, null);
     }
 
     public MapStudioException(String code, String message, Integer opIndex, String opId) {
+        this(code, message, opIndex, opId, null);
+    }
+
+    /** A refusal carrying the conflicting records ({@link Conflict#toJson()}), for {@code conflict}. */
+    public MapStudioException(String code, String message, Integer opIndex, String opId, JsonArray conflicts) {
         super(code + ": " + message);
         this.code = code;
         this.plainMessage = message;
         this.opIndex = opIndex;
         this.opId = opId;
+        this.conflicts = conflicts;
     }
 
     public String code() {
@@ -47,7 +55,12 @@ public class MapStudioException extends RuntimeException {
         return opId;
     }
 
-    /** The error body {code, message, op?: {index, id}}; the caller adds batchId. */
+    /** The conflicts of a {@code conflict} refusal (a copy), or null. */
+    public JsonArray conflicts() {
+        return conflicts == null ? null : conflicts.deepCopy();
+    }
+
+    /** The error body {code, message, op?: {index, id}, conflicts?}; the caller adds batchId. */
     public JsonObject toErrorBody() {
         JsonObject body = new JsonObject();
         body.addProperty("code", code);
@@ -59,6 +72,9 @@ public class MapStudioException extends RuntimeException {
                 op.addProperty("id", opId);
             }
             body.add("op", op);
+        }
+        if (conflicts != null) {
+            body.add("conflicts", conflicts.deepCopy());
         }
         return body;
     }

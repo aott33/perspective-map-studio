@@ -57,7 +57,7 @@ ensure_dev_users
 echo
 ok "Map Studio dev Gateway is running."
 echo "    Gateway:  ${GATEWAY_URL}  (user ${ADMIN_USER}; password in .env)"
-echo "    Session:  ${SESSION_URL}  (map editor: user mapeditor, MAPSTUDIO_EDITOR_PASSWORD in .env)"
+echo "    Session:  ${SESSION_URL}  (map editor: user mapeditor, MAPSTUDIO_EDITOR_PASSWORD; phone editor: user mapoperator, MAPSTUDIO_OPERATOR_PASSWORD; both in .env)"
 echo "    Map store: ops/psql.sh  (psql in the PostgreSQL container)"
 echo "    Logs:     ops/logs.sh        Tests: cd e2e && npm test"
 echo "    Stop:     ops/down.sh        Wipe: ops/down.sh --purge"

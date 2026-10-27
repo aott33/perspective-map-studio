@@ -5,7 +5,9 @@
  * `{code, message}`. Pure functions only, so this module is unit tested in node.
  */
 
-import { EditBatch, EditsApplyReplyBody, MapLoadReplyBody, readEditsApplyReply, readMapLoadReply } from './contract';
+import {
+    Conflict, EditBatch, EditsApplyReplyBody, MapLoadReplyBody, readConflicts, readEditsApplyReply, readMapLoadReply
+} from './contract';
 
 /** Contract version carried in `v`. */
 export const MESSAGE_VERSION = 1;
@@ -48,6 +50,8 @@ export interface ErrorBody {
     batchId?: string;
     /** The op at fault, when one is. */
     op?: { index: number; id?: string };
+    /** Every stale op, on a `conflict` (epic 2 story 2). */
+    conflicts?: Conflict[];
 }
 
 /** The outcome of reading one inbound envelope from the Gateway. */
@@ -138,6 +142,9 @@ export function readReply(raw: unknown): Reply {
             if (isRecord(body.op) && typeof body.op.index === 'number') {
                 error.op = typeof body.op.id === 'string'
                     ? { index: body.op.index, id: body.op.id } : { index: body.op.index };
+            }
+            if (Array.isArray(body.conflicts)) {
+                error.conflicts = readConflicts(body.conflicts);
             }
             return { kind: 'error', id: raw.id, body: error };
         }

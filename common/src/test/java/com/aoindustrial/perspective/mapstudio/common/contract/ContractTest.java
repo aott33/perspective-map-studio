@@ -53,7 +53,7 @@ class ContractTest {
     @Test
     void malformedOpsAreInvalidAndNamed() {
         MapStudioException createWithVersion = assertThrows(MapStudioException.class, () -> EditOp.parse(json(
-            "{\"op\":\"create\",\"entity\":\"item\",\"id\":\"" + ID + "\",\"baseVersion\":3}"), 2));
+            "{\"op\":\"create\",\"entity\":\"item\",\"id\":\"" + ID + "\",\"baseVersion\":-1}"), 2));
         assertEquals(Messages.CODE_INVALID, createWithVersion.code());
         assertEquals(2, createWithVersion.opIndex());
         assertEquals(ID, createWithVersion.opId());
@@ -70,15 +70,12 @@ class ContractTest {
     }
 
     @Test
-    void deletesAndKindSetupOpsAreRefusedAsNotSupportedInThisVersion() {
-        EditBatch delete = EditBatch.parse(json("{\"batchId\":\"" + BATCH + "\",\"ops\":[{\"op\":\"delete\","
-            + "\"entity\":\"item\",\"id\":\"" + ID + "\",\"baseVersion\":1}]}"));
-        MapStudioException ex = assertThrows(MapStudioException.class, delete::requireSupported);
-        assertEquals(Messages.CODE_INVALID, ex.code());
-        assertTrue(ex.plainMessage().contains("not supported in this version"));
+    void kindSetupOpsAreRefusedAsNotSupportedInThisVersion() {
         EditBatch kind = EditBatch.parse(json("{\"batchId\":\"" + BATCH + "\",\"ops\":[{\"op\":\"update\","
             + "\"entity\":\"kindSetup\",\"id\":\"pad\",\"baseVersion\":1,\"data\":{}}]}"));
-        assertThrows(MapStudioException.class, kind::requireSupported);
+        MapStudioException ex = assertThrows(MapStudioException.class, kind::requireSupported);
+        assertEquals(Messages.CODE_INVALID, ex.code());
+        assertTrue(ex.plainMessage().contains("not supported in this version"));
     }
 
     @Test
