@@ -291,12 +291,13 @@ A user opens a map item's popup by clicking or tapping it; the popup shows the p
 
 #### FR-37: Custom popup view
 
-A kind setup may name a project view to open instead of the default popup, as a table's row subview does, as `popupView {path, params}`. The view always receives the map item object as its `mapItem` parameter; `params` adds extra named parameters, each value either a string literal or exactly one placeholder from the closed list (FR-6), and no param may be named `mapItem` (owner, 2026-10-27). This lets a project reuse an existing view whose parameters have their own names (for example `padName`, `tagPath`) without a wrapper view or script (owner, 2026-10-27). Realizes UJ-5. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
+A kind setup may name a project view to open instead of the default popup, as a table's row subview does, as `popupView {path, params}`. The view always receives the map item object as its `mapItem` parameter; `params` adds extra named parameters, each value a string literal, exactly one placeholder from the closed list (FR-6), or `{asset.path}` followed by a tag path suffix such as `{asset.path}/Pressure`, which a tag browser pick inside the asset folder gives (FR-12) and which resolves against the map item's asset base path; any other mix of text and placeholders is refused, and no param may be named `mapItem` (owner, 2026-10-27). This lets a project reuse an existing view whose parameters have their own names (for example `padName`, `tagPath`) without a wrapper view or script (owner, 2026-10-27). Realizes UJ-5. [UNVERIFIED: Perspective or SDK behaviour, to check on a live 8.3 Gateway]
 
 **Consequences (testable):**
 - A kind setup with a custom popup view opens that view, with the map item object filled, instead of the default popup.
 - A kind setup with `popupView {path: "Popups/PadDetails", params: {padName: "{item.name}", tagPath: "{asset.path}", area: "Mesa"}}` opens that view on pad P12 with `mapItem`, `padName` `P12`, `tagPath` the asset's base path and `area` `Mesa` (owner, 2026-10-27).
-- A kind setup whose params name a placeholder outside the closed list, mix text with a placeholder, or name a param `mapItem` is refused when it is saved, with a plain-words reason (owner, 2026-10-27).
+- A param `pressure: "{asset.path}/Pressure"` is accepted and, on pad P12 with base path `[default]Mesa/P12`, gives `[default]Mesa/P12/Pressure` (owner, 2026-10-27).
+- A kind setup whose params name a placeholder outside the closed list, mix text with a placeholder in any other way (for example `P-{item.name}` or `{item.name}/Pressure`), or name a param `mapItem` is refused when it is saved, with a plain-words reason (owner, 2026-10-27).
 - The map item object's fields are documented, with an example view that embeds the alarm table filtered to the alarms path; acknowledging there follows Ignition's acknowledge permissions.
 - A custom popup view that is missing or fails to load falls back to the default popup with a message.
 
@@ -778,7 +779,7 @@ Target date for SM-1 to SM-5: end of January 2027, a target and not a deadline.
 14. Answered in the UX workshop (ux-map-studio, 2026-10-27): there is no Publish step; live saves, Undo and Recent changes cover it (FR-17, FR-29, FR-44).
 15. Answered 2026-10-27 (owner): a custom popup view is `popupView {path, params}`, the view always receiving `mapItem`, with params mapped from a literal or one placeholder from a closed list that popup links and the alarm page share (FR-5, FR-6, FR-37). Still open, in the backlog: a per-item override of params, what an empty or missing placeholder value does in a param, and URL-encoding of link values.
 16. Answered 2026-10-27 (owner): the Kinds screen's tag browser is in the first version, built as Map Studio's own tree rather than Perspective's Tag Browse Tree component (FR-12). Refined the same day: a tag tree with a provider dropdown, opened for every tag pick, converting a pick inside the preview asset's folder to `{asset.path}/...` and storing any other pick, and every pick on an override, as the full path (FR-12).
-17. Open: a popup param picked with the tag browser inside the asset folder becomes `{asset.path}/...`, which is neither a literal nor exactly one placeholder, so FR-37 refuses it. Recommended: allow exactly one more param form, `{asset.path}/<path below it>` (FR-12, FR-37).
+17. Answered 2026-10-27 (owner): a popup param may also be exactly `{asset.path}` followed by a tag path suffix (for example `{asset.path}/Pressure`), what a tag browser pick inside the asset folder gives; a param is a string literal, exactly one placeholder, or `{asset.path}/<suffix>`, and any other mix of text and placeholders, or a param named `mapItem`, is still refused (FR-12, FR-37).
 
 ## 10. Assumptions index
 
