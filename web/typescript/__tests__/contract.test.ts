@@ -38,7 +38,8 @@ describe('the 0.2.0 draft contract', () => {
 
     test('map.load.reply carries the level, seq and items', () => {
         const reply = readReply({ v: 1, type: 'map.load.reply', id: 'm1', body: { level: 'full', seq: 3, items: [ITEM, { bad: 1 }] } });
-        expect(reply).toEqual({ kind: 'map.load.reply', id: 'm1', body: { level: 'full', seq: 3, items: [ITEM] } });
+        expect(reply).toEqual({ kind: 'map.load.reply', id: 'm1', body: { level: 'full', seq: 3, items: [ITEM],
+            lists: { kinds: [], assets: null, adapters: null } } });
         expect(readMapLoadReply({ level: 'admin', seq: 1, items: [] })).toBeNull();
         expect(readReply({ v: 1, type: 'map.load.reply', id: 'm1', body: {} }).kind).toBe('invalid');
     });

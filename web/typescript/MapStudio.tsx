@@ -27,6 +27,7 @@ import {
     startDrawing
 } from './draw';
 import { EditLevel, MapItemRecord } from './contract';
+import { AdapterStatus, HostLists, NO_HOST_LISTS } from './adapters';
 import { MESSAGE_EVENT, Reply, editsApply, mapLoad, pointClick, readReply, replyText } from './messages';
 import { PointPopup } from './PointPopup';
 import { SAVE_IDLE, SaveState, itemsToGeoJson, lineCreateBatch, newId, refusedSave, saveStatusText, withItem } from './save';
@@ -92,6 +93,8 @@ export interface MapStudioDelegateState {
     load: { state: 'loading' | 'loaded' | 'failed'; message: string };
     /** The last save of a drawn line. */
     save: SaveState;
+    /** The project's kind list, asset list (editors only) and their statuses, from map.load. */
+    lists: HostLists;
 }
 
 /**
@@ -108,6 +111,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private level: EditLevel | null = null;
     private load: MapStudioDelegateState['load'] = { state: 'loading', message: '' };
     private save: SaveState = SAVE_IDLE;
+    private lists: HostLists = NO_HOST_LISTS;
     private mapLoadId: string | null = null;
     /** edits.apply message id -> the map item it creates and the record it would store. */
     private pendingSaves = new Map<string, MapItemRecord>();
@@ -125,7 +129,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             itemsRevision: this.itemsRevision,
             level: this.level,
             load: this.load,
-            save: this.save
+            save: this.save,
+            lists: this.lists
         };
     }
 
@@ -201,6 +206,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.items = reply.body.items;
             this.itemsRevision++;
             this.level = reply.body.level;
+            this.lists = reply.body.lists;
             this.load = { state: 'loaded', message: '' };
         } else if (reply.kind === 'error') {
             this.level = null;
@@ -647,6 +653,25 @@ export class MapStudio extends Component<Props, MapStudioState> {
         );
     }
 
+    /**
+     * The host lists' statuses as one hidden element, for tests and the dev page;
+     * showing them to people is epic-editing's.
+     */
+    private renderAdapterStatus(lists: HostLists): React.ReactNode {
+        const attrs = (name: 'kinds' | 'assets', status: AdapterStatus | null): Record<string, string> => ({
+            ['data-' + name + '-status']: status ? status.status : '',
+            ['data-' + name + '-count']: status ? String(status.count) : '',
+            ['data-' + name + '-message']: status ? status.message : ''
+        });
+        return (
+            <div className="mapstudio-adapter-status" hidden
+                 {...attrs('kinds', lists.adapters ? lists.adapters.kinds : null)}
+                 {...attrs('assets', lists.adapters ? lists.adapters.assets : null)}
+                 data-kinds-rows={String(lists.kinds.length)}
+                 data-assets-rows={lists.assets === null ? '' : String(lists.assets.length)} />
+        );
+    }
+
     private setMapContainer = (el: HTMLDivElement | null): void => {
         this.mapContainer = el;
     };
@@ -683,6 +708,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     {load.state === 'failed'
                         ? <div className="mapstudio-load-status">Map store: {load.message}</div> : null}
                 </div>
+                {this.renderAdapterStatus(delegate ? delegate.lists : NO_HOST_LISTS)}
                 {this.renderPopup()}
             </div>
         );

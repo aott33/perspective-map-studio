@@ -8,8 +8,8 @@ import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException
 
 /**
  * {@code system.mapstudio} in the Designer: registered so the Script Console and
- * the script editors autocomplete it with its docs; {@code getMap} and
- * {@code applyEdits} raise "runs in Gateway scope only" when called here (owner
+ * the script editors autocomplete it with its docs; {@code getMap},
+ * {@code applyEdits} and {@code refreshAdapters} raise "runs in Gateway scope only" when called here (owner
  * decision, 2026-10-26: no RPC in this version). {@code ping} answers locally.
  */
 public final class DesignerScriptModule extends MapStudioScriptModule {
@@ -22,6 +22,11 @@ public final class DesignerScriptModule extends MapStudioScriptModule {
     @Override
     protected PyObject applyEditsImpl(String project, PyObject batch, String actor) {
         throw gatewayOnly("applyEdits");
+    }
+
+    @Override
+    protected PyObject refreshAdaptersImpl(String project) {
+        throw gatewayOnly("refreshAdapters");
     }
 
     private static MapStudioException gatewayOnly(String function) {
