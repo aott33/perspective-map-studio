@@ -24,3 +24,4 @@ Mockups (`mockups/`):
 - `key-screen-9-save-states-saved.png`, `-saving.png`, `-conflict.png`, `-unreachable.png`, `-busy.png` - save states.
 - `editor-direction-a-1366.png`, `editor-direction-a-1440.png`, `editor-direction-a-kinds-1366.png`, `editor-direction-a-bulk-1440.png` - Direction A.
 - `view-mode-1440.png`, `view-mode-needs-you-1440.png` - view mode at 1440.
+- `designer-setup-form.html` - the Map Studio Setup tab in the Ignition 8.3 Designer (`?v=normal|reasons|unreachable|inherited|newer|picker|empty|new`); `designer-setup-form-normal.png`, `-reasons.png`, `-unreachable.png`, `-inherited.png`, `-newer.png`, `-picker.png`, `-empty.png`, `-new.png` (owner, 2026-10-27; no create dialog).

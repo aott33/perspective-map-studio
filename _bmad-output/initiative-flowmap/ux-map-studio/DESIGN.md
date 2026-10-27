@@ -30,6 +30,21 @@ colors:
   alarm-2: 'host theme priority 2 alarm token'   # Open Question: no Perspective variable named yet
   alarm-3: 'host theme priority 3 alarm token'   # Open Question: no Perspective variable named yet
   area-tint: 'closed palette of low-saturation host theme tokens'  # FR-39; palette not chosen yet
+  # Designer setup form (Swing, owner 2026-10-27): not a Perspective surface, so these are
+  # UIManager keys of the Designer's look and feel, read at runtime so the form follows the
+  # Designer's light or dark theme. Hex values in mockups/designer-setup-form.html are stand-ins.
+  designer-panel: 'UIManager Panel.background'
+  designer-surface: 'UIManager TextField.background'        # inputs, chip field, tab body
+  designer-border: 'UIManager Component.borderColor'
+  designer-divider: 'UIManager Separator.foreground'        # section heading rule, list edge, footer edge
+  designer-text: 'UIManager Label.foreground'
+  designer-text-secondary: 'UIManager Label.disabledForeground'  # schema version, placeholders, the Map token note
+  designer-accent: 'UIManager Component.accentColor'        # focus ring, ticked checkbox, highlighted list row
+  designer-error: 'UIManager Component.error.focusedBorderColor'   # reasons (block the save), with the error glyph
+  designer-warning: 'UIManager Component.warning.focusedBorderColor' # warnings (never block), with the warning glyph
+  designer-tooltip-background: 'UIManager ToolTip.background'  # label tooltips (the help, owner 2026-10-27)
+  designer-tooltip-foreground: 'UIManager ToolTip.foreground'
+  designer-tooltip-border: 'UIManager ToolTip.border (its line colour)'
 typography:
   # Font family is the host theme's; Map Studio sets sizes and weights only.
   body:
@@ -73,6 +88,26 @@ typography:
     fontSize: 28px
     fontWeight: '700'
     lineHeight: '1'
+  designer-body:
+    fontFamily: 'UIManager defaultFont (the Designer font; the mock uses Noto Sans)'
+    fontSize: 13px
+    fontWeight: '400'
+    lineHeight: '1.35'
+  designer-heading:
+    fontFamily: 'UIManager defaultFont'
+    fontSize: 13px
+    fontWeight: '700'
+    lineHeight: '1.3'
+  designer-title:
+    fontFamily: 'UIManager defaultFont'
+    fontSize: 15px
+    fontWeight: '700'
+    lineHeight: '1.3'
+  designer-note:   # the one visible line under Map token, the empty state's line, the header link, the schema version
+    fontFamily: 'UIManager defaultFont'
+    fontSize: 11.5px
+    fontWeight: '400'
+    lineHeight: '1.35'
 rounded:
   sm: 3px      # state word chip on the map
   DEFAULT: 6px # buttons, inputs, list rows, note boxes
@@ -100,7 +135,48 @@ spacing:
   target-marker-mouse: 24px
   target-touch: 44px       # every touch target on a phone (FR-27, template TUX 1.8)
   app-bar-clearance: 76px  # bottom-right corner kept clear for the Perspective App Bar toggle
+  designer-control-height: 28px  # combo boxes, text fields, spinner
+  designer-label-column: 184px   # labels left, as in Project Properties
+  designer-field: 340px          # combo boxes and text fields (never the tab's width)
+  designer-chip-field: 420px     # role pickers
+  designer-message-width: 560px  # reasons, warnings and the Map token note wrap here
+  designer-row-gap: 10px
+  designer-section-gap: 14px
+  designer-form-max: 760px       # the whole form, left aligned; the rest of a wide tab stays empty
 components:
+  designer-setup-form:
+    background: '{colors.designer-surface}'
+    section-heading: '{typography.designer-heading}'
+    section-rule: '1px {colors.designer-divider}'
+    label: '{typography.designer-body}'
+    note: '{typography.designer-note}'
+    note-foreground: '{colors.designer-text-secondary}'
+    reason: '{colors.designer-error}'
+    warning: '{colors.designer-warning}'
+    control-height: '{spacing.designer-control-height}'
+    field-width: '{spacing.designer-field}'
+    chip-field-width: '{spacing.designer-chip-field}'
+    max-width: '{spacing.designer-form-max}'
+  designer-chip:
+    height: 22px
+    radius: 3px
+    background: 'UIManager Button.background'
+    warning-edge: '1px {colors.designer-warning}'
+    reason-edge: '1px {colors.designer-error}'
+  designer-tooltip:
+    background: '{colors.designer-tooltip-background}'
+    foreground: '{colors.designer-tooltip-foreground}'
+    border: '1px {colors.designer-tooltip-border}'
+    typography: '{typography.designer-body} at 12px'
+    max-width: '{spacing.designer-message-width}'
+  designer-header-link:
+    foreground: '{colors.designer-accent}'
+    typography: '{typography.designer-note}'
+    gap-to-schema: 16px
+  designer-banner:
+    radius: 4px
+    info-background: '{colors.designer-accent} at about 10 % over {colors.designer-panel}'
+    warning-background: '{colors.designer-warning} at about 12 % over {colors.designer-panel}'
   mode-rail:
     background: '{colors.surface-panel}'
     width: '{spacing.rail-width}'
@@ -316,6 +392,8 @@ Chosen layout: Direction A, **Docked studio** ([editor-direction-a-1366.png](moc
 
 The final key screens are in [key-screens.html](mockups/key-screens.html) (nine screens, one picker) with a PNG per state in `mockups/`, linked at the sections below.
 
+**The Designer is the one exception to the host theme.** The Map Studio Setup tab in the Ignition 8.3 Designer (owner, 2026-10-27) is a Swing form, not Perspective, so it wears the Designer's own look: the light theme, font, spacing and controls of Ignition's Project Properties dialog (bold section headings, labels left, dropdowns, "Select one..." placeholders). It is quiet (owner, 2026-10-27): labels, fields and section headings, with text only when it means something; help lives in label tooltips and a mark shows only when something is wrong. It takes nothing from the web component's tokens. See [designer-setup-form-normal.png](mockups/designer-setup-form-normal.png) and the interactive [designer-setup-form.html](mockups/designer-setup-form.html) (`?v=normal|reasons|unreachable|inherited|newer|picker|empty|new`).
+
 ## Colors
 
 Every colour token is a reference to a host Perspective theme variable. No colour code is stored, typed or offered anywhere (PRD NFR-4, architecture AD-11). The names in the frontmatter are the Perspective theme variables the workshop mocks used; light and dark values come from the host theme. In the ign-scada-template host, the state tokens map to its `--st-*` set (`--st-alarm-1/2/3` with `-tint` and `-edge`, `--st-focus` for selection, `--st-backdrop` for halos); Map Studio itself only names the reference.
@@ -328,6 +406,8 @@ Every colour token is a reference to a host Perspective theme variable. No colou
 - **Comms lost and stale have no colour.** They are a glyph, a word and a shape (dashed ring, dashed line), drawn in `glyph-normal`.
 - **"All OK"** in the Needs you bar is neutral `text-secondary`: no hue when nothing needs attention.
 - **`area-tint`** is a closed palette of low-saturation theme tokens for area categories only (FR-39), distinct from every alarm and preset hue. Points and lines never take a tint.
+
+- **Designer setup form colours (`designer-*`)** are UIManager keys of the Designer's look and feel, read when the form is built, so the form follows the Designer's light or dark theme. A fallback colour applies only when a key is missing, kept in one place in the code (`SetupPanel` already falls back for `Component.error.focusedBorderColor`). `designer-error` marks a **reason** (the setup is not saved until it is fixed); `designer-warning` marks a **warning** (saved as typed). Each always comes with its glyph and words. There is no success colour: a valid field shows no mark (owner, 2026-10-27). `designer-tooltip-*` are the Designer's own tooltip keys, so label tooltips look like every other Designer tooltip.
 
 Draw order: alarm over value style over area tint (AD-11).
 
@@ -359,6 +439,8 @@ A 4 px base: `{spacing.1}` 4, `{spacing.2}` 8, `{spacing.3}` 12, `{spacing.4}` 1
 **Reserved corner**: the bottom-right corner is kept clear for the Perspective App Bar toggle at every width. Anything docked right pads its footer by `{spacing.app-bar-clearance}`.
 
 **Phone (390 px)**: the map fills the page; one top bar (`{components.phone-top-bar}`, `{spacing.phone-float-inset}` from the edges) holds search and Needs you and expands on tap; zoom (plus, minus, Fit) top-right under the bar; Legend bottom-left; popups and the edit form are bottom sheets `{spacing.phone-float-inset}` from the sides that stop above the App Bar toggle. Side gutter `{spacing.page-gutter-phone}` for content, every target `{spacing.target-touch}`. See [key-screen-2-phone-sheet.png](mockups/key-screen-2-phone-sheet.png).
+
+**Designer setup form** (`{components.designer-setup-form}`): the setup tab holds one scrolling form and nothing beside it (no section list, owner 2026-10-27): the section headings Map store, Who can edit, Kinds and assets and Map sit inside the form, which is left aligned in the tab with the tab's 24 px padding and at most `{spacing.designer-form-max}` wide, so a 2000 px tab shows the same form as a 1440 px one with empty space to the right. No horizontal scroll bar: a narrower tab wraps the form; only the form scrolls vertically, with the footer in view. Labels sit in a `{spacing.designer-label-column}` column; combo boxes and fields are `{spacing.designer-field}`, role pickers `{spacing.designer-chip-field}`, the refresh interval 96 px, all `{spacing.designer-control-height}` tall; reasons, warnings and the Map token note wrap at `{spacing.designer-message-width}`. Rows are `{spacing.designer-row-gap}` apart, sections `{spacing.designer-section-gap}`. A footer line across the bottom of the tab shows only when it has something to say (reasons left, a new unsaved setup, the Gateway not reachable).
 
 ## Elevation & Depth
 
@@ -414,6 +496,8 @@ Visual specs. Behaviour lives in EXPERIENCE.md, Component Patterns.
 - **Instrument marker** - `{components.instrument-marker}`: a tap, meter or line valve sits on its line [ASSUMPTION: a 24 px neutral disc with its glyph and the marker halo, name below at 11 px; the stale treatment is the dashed ring and the "Stale" word chip as for markers]; highlighted instruments take the marker's selected ring. The `meter` instrument glyph is new and distinct from meter station.
 - **Phone crosshair** - `{components.phone-crosshair}`: a fixed 64 px crosshair at the map centre: a `selection` ring on a panel fill with the kind glyph inside and four `attention` ticks. A floating card at the top names the move ("Moving P14 - Drag the map to put the crosshair on the pad. 38 m from where it was."), the old position stays as a faded dashed marker labelled "Was here", and a bottom bar holds the coordinates, Cancel and a primary Done, both 44 px. See [key-screen-2-phone-move.png](mockups/key-screen-2-phone-move.png).
 
+- **Designer setup form** - `{components.designer-setup-form}`, a Swing tab in the Ignition 8.3 Designer (owner, 2026-10-27). Header: "Map Studio Setup" in `{typography.designer-title}` with no subline (the tab names the project), and on the right a "Refresh lists" link (`{components.designer-header-link}`, accent text, no button chrome) 16 px before the schema version, small read-only text ("Schema version 1"; "Schema 2 - read only"), never a field. The link is the only refresh control in the form; it is absent in the empty and newer states. Banners under the header (`{components.designer-banner}`): info for "Inherited from <project>", warning for the read-only states (lock glyph). "Gateway not reachable" is a footer, not a banner. Sections with a `{typography.designer-heading}` title and a rule to the right, as Project Properties' "Tag Settings". Rows: label left, carrying the field's help as a tooltip (`{components.designer-tooltip}`: the Designer's tooltip colours, a 1 px edge, 12 px text, one line up to `{spacing.designer-message-width}` then wrapping; the mock draws the Phone-editing roles tooltip open under the pointer); the control (an editable combo box with a chevron), then the warning glyph only when the value is not in its list (nothing when found, empty or the list is unavailable); under the control the reasons in `designer-error` with the error glyph and the warnings in `designer-warning` with the warning glyph. No help line under any field. The one visible note is under Map token, "Names only - the Designer never reads the token.", in `{typography.designer-note}` `designer-text-secondary`. Function names, page paths and secret names in monospace. Role pickers are chip fields (`{components.designer-chip}`): one chip per role with a remove cross, an "Add a role..." input, a chevron that opens the provider's roles; an unknown role's chip takes the warning edge and glyph, a role listed twice takes the reason edge and glyph. The role list popup heads "Roles of identity provider default matching "Ma"", lists roles already added with a secondary-text check and "added", highlights the next one, and ends with a line on typing a name it does not have. Basemaps are four checkboxes in a row (None, OpenStreetMap, Satellite, Mapbox). Alarm page has nothing beside it: its list ends with the item "Insert placeholder...". Map token is a secret provider combo ("Select one...") and a secret name combo side by side. The newer-schema state replaces the form with "setup.json as written" in a read-only monospace box. Footer (`designer-panel`, 34 px, only when it has something to say): with reasons, the error glyph and "2 reasons left - this setup is not saved until they are fixed." ("2 reasons left" underlined, as it scrolls to the first reason on click) plus "2 warnings do not stop a save." in secondary text; Gateway not reachable, the cloud glyph, "Gateway not reachable - lists unavailable, typing still works." in semibold, the lists line in secondary text and "Try again" at the right in `designer-accent`; a new setup, see below. The normal, inherited, empty and read-only states have no footer. No OK, Apply, Create or Cancel in the tab, and no create dialog. Empty state (no setup): a map glyph on an info-tint tile, "No Map Studio setup" in `{typography.designer-heading}`, one line of explanation, one primary button "Create setup" in `designer-accent` with white text, one `{typography.designer-note}` line below. New setup: the same form with the defaults, and under the title a small marker "New setup - saves with the project" (accent dot, info-tint fill, accent-tint edge); the footer shows the reasons left (or "New setup - not saved yet.") and a "Discard new setup" link at its right in `designer-accent`. See [-empty](mockups/designer-setup-form-empty.png), [-new](mockups/designer-setup-form-new.png), [-normal](mockups/designer-setup-form-normal.png), [-reasons](mockups/designer-setup-form-reasons.png), [-unreachable](mockups/designer-setup-form-unreachable.png), [-inherited](mockups/designer-setup-form-inherited.png), [-newer](mockups/designer-setup-form-newer.png), [-picker](mockups/designer-setup-form-picker.png).
+
 ## Do's and Don'ts
 
 | Do | Don't |
@@ -429,3 +513,6 @@ Visual specs. Behaviour lives in EXPERIENCE.md, Component Patterns.
 | Keep one minimalist icon style, 24 px grid, 2 px stroke | Mix icon styles or take icons from OpenBridge |
 | Show "All OK" in neutral when nothing needs attention | Hide the Needs you bar or show a green "0" |
 | Keep the map still | Blink or pulse anything, including an unacknowledged alarm (engineering review item) |
+| Give the Designer setup form the Designer's own look (UIManager keys, Project Properties layout) | Use the web component's tokens, or stretch fields across the tab's width |
+| Keep the Designer setup form quiet: help in label tooltips, a mark only on a problem, one Refresh lists link, a footer only when it has something to say | Put a help line under every field, a green check beside valid fields, a refresh button per field, or a footer that only says all is well |
+| Show the schema version as small read-only text in the header | Show it as a field that looks editable |

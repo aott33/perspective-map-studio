@@ -49,6 +49,20 @@ if [[ -z "${MAPSTUDIO_CONTAINER:-}" ]]; then
 fi
 export MAPSTUDIO_CONTAINER
 CONTAINER_NAME="${MAPSTUDIO_CONTAINER}"
+# The Gateway runs as the developer's uid and gid (IGNITION_UID / IGNITION_GID in
+# .env, recorded from `id` on first run): the dev project is bind-mounted from
+# ops/project, whose files belong to the developer, and the image's own user
+# (ignition, 2003:2003) cannot write there, so every Designer save failed with
+# "PushException: I/O error during prepare ... .tmp" [live 8.3.10]. The image's
+# entrypoint remaps its user and steps down with gosu when started as root
+# (docker-compose.yml). A root checkout (uid 0) runs the Gateway as root.
+if [[ -z "${IGNITION_UID:-}" || -z "${IGNITION_GID:-}" ]]; then
+  IGNITION_UID="$(id -u)"
+  IGNITION_GID="$(id -g)"
+  ( umask 077; printf 'IGNITION_UID=%s\nIGNITION_GID=%s\n' "${IGNITION_UID}" "${IGNITION_GID}" >> "${PROJECT_ROOT}/.env" )
+  chmod 600 "${PROJECT_ROOT}/.env"
+fi
+export IGNITION_UID IGNITION_GID
 # The dev users' passwords (ops/users.py), generated the same way: the map editor
 # (user mapeditor, role MapEditor) and the phone editor (user mapoperator, role MapOperator).
 ensure_dev_password() {
@@ -139,7 +153,7 @@ ensure_dev_security() {
   python3 -I "${OPS_DIR}/dev_security.py" "${tmp}" || [[ $? -eq 3 ]]
   "${COMPOSE[@]}" cp "${tmp}" "gateway:${SECPROPS_PATH}/config.json"
   rm -f "${tmp}"
-  "${COMPOSE[@]}" exec -T -u root gateway chown -R ignition:ignition "${SECPROPS_PATH}"
+  "${COMPOSE[@]}" exec -T -u root gateway chown -R "${IGNITION_UID}:${IGNITION_GID}" "${SECPROPS_PATH}"
   "${COMPOSE[@]}" restart gateway
   wait_for_commissioned 60
   wait_for_bundle 24

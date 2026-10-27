@@ -1,7 +1,8 @@
 # Epic 2 stories in build order. Table order is build order; ids are permanent.
 # Parallel groups (epic Notes, Decision 2026-10-26): 1 alone; group A = 2 to 7 after 1;
 # group B = 8, 9, 10 and 15 (added 2026-10-27, tag browse); group C = 11 and 14 (added 2026-10-27,
-# instruments on lines); then 12 (sweep) and 13 (closing release check). Stories 2 to 7 are being built now: do not disturb them.
+# instruments on lines); then 12 (sweep) with 16 beside it (added 2026-10-27, Designer setup form; the sweep does not wait on it),
+# and 13 (closing release check) after both. Stories 2 to 7 are being built now: do not disturb them.
 
 [[entry]]
 id = 1
@@ -159,12 +160,23 @@ hitl = false
 risk = "low"
 
 [[entry]]
+id = 16
+type = "story"
+title = "Setup form in the Designer: pickers and layout"
+description = "Owner-approved 2026-10-27 after testing entry 7's form live (architecture AD-5): the setup stays a project resource edited in the Designer, not a Gateway page, so it belongs to the project, moves with export and git and is inherited. First a short live check on the dev 8.3 Gateway of how a Designer module asks the Gateway for lists (its RPC from the designer scope to the gateway scope, under whose rights, how fast), recorded in docs/platform-checks.md; entry 7 left these lookups out on purpose and they are unverified until then. Then entry 7's form gains: a dropdown of the Gateway's database connections (as Project Properties > Default Database lists them); role pickers from the project's identity provider for the full-editing and phone-editing roles; dropdowns of the project library's functions for kindsFunction and assetsFunction; a dropdown of the project's Perspective pages for alarmPage; checkboxes for the known basemaps none, osm, satellite and mapbox; a dropdown of the Gateway's secret providers plus a typed secret name for tokenSecret, stored as one string <provider>/<name> within setup schema 1 (owner, 2026-10-27; names only: the Designer never reads, shows or logs a secret's value; the Gateway's existing setup check needs no change). A typed value stays allowed in every field, and a value not in a list (a connection or role not found, a list that fails to load) is kept and shown with a plain-words note, never cleared. Fields are grouped under the section headings \"Map store\", \"Who can edit\", \"Kinds and assets\" and \"Map\" in one form with no left-hand section list and no horizontal scroll bar, at a sensible width, each field with short help text, and the schema version is small read-only text. Follows Sally's approved mockup (ux-map-studio/mockups/designer-setup-form.html and its PNGs) with the owner's changes (2026-10-27): double-clicking the Map Studio Setup node is the only way in (one setup per project, no node right-click menu); this replaces story 7's create dialog, so create and edit happen in the same Setup tab: a project with no setup shows an empty state with one Create setup button, which opens the same form marked \"New setup - saves with the project\"; a field's reason shows only beside the field, never repeated in a dialog, and the footer's \"N reasons left\" scrolls to the first reason. Validation stays the Gateway's setup reader (entry 7). docs/setup-editor.md is updated with a screenshot and no longer describes the create dialog or a save refusal whose dialog names the fields; docs/setup.md documents the form and the <provider>/<name> form of tokenSecret. Designer scope and a read-only Gateway lookup only; no setup schema change. Group D: beside the sweep (12), after 7."
+verify = "docs/platform-checks.md records the live 8.3 Designer-to-Gateway lookup check; in a Designer on a project with no setup the owner double-clicks the Map Studio Setup node, sees the empty state with one Create setup button and no dialog, creates the setup in the same tab marked New setup - saves with the project, and sees each field's reason only beside the field and the footer's N reasons left scroll to the first reason; on the dev project the owner sees the four section headings with no left-hand list and no horizontal scroll bar, the read-only schema version, picks the MapStudio connection, MapEditor and MapOperator from the identity provider's roles, the dev kind and asset functions, an alarm page, basemaps by checkbox and a secret provider with a typed secret name, also types a role that is not in the list and keeps it, saves, and map.load reflects the change; setup.json holds tokenSecret as one <provider>/<name> string and the Gateway's setup check accepts it unchanged; no secret value appears in the form, the Designer log or setup.json; docs/setup-editor.md and docs/setup.md describe the form with no create dialog; Designer unit tests cover the lists, typed values, the <provider>/<name> split and join, and a lookup that fails."
+covers = ["R12", "R18"]
+after = [7]
+hitl = true
+risk = "medium"
+
+[[entry]]
 id = 13
 type = "story"
 title = "Release 0.2.0 on the template's test stack"
 description = "Tags and releases 0.2.0 (the public contract changed), checks the docs carry every contract with its version, updates the template's module lock (a template pull request the owner merges), and runs the template's test stack with a never-committed scratch project whose setup names a PostgreSQL connection: an edit saved in one browser shows in a second and survives a restart. Closing integrated check of the epic's Done when."
 verify = "scripts/test/stack.sh passes in the template with 0.2.0 installed, and on the scratch project an edit from one browser shows in another and is in the map store after a Gateway restart."
 covers = ["R14"]
-after = [12, "1.5", "1.6"]
+after = [12, 16, "1.5", "1.6"]
 hitl = true
 risk = "medium"
