@@ -2,9 +2,9 @@
 type: epic
 title: "Map editors build and keep the map in the browser"
 parent: initiative-flowmap
-covers: ["R10", "R11", "R14", "R15", "R16", "R17", "R18", "R19", "R20", "R21", "R22", "R23", "R24", "R38", "R40", "R41"]
+covers: ["R10", "R11", "R14", "R15", "R16", "R17", "R18", "R19", "R20", "R21", "R22", "R23", "R24", "R38", "R40", "R41", "R44", "R45", "R46", "R47"]
 sources: []
-companions: []
+companions: [_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md, _bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md]
 after: []
 refined: false
 risk: high
@@ -14,7 +14,7 @@ risk: high
 
 ## Description
 
-The Map Studio tools: one clear mode, a first-run path, drawing and changing points, lines and areas with snapping, validation and undo, fast entry, item forms with the place check, linking map items to assets, and writing kind setups and overrides with a tag browser.
+The Map Studio tools: Edit mode entered by an Edit switch or a prop, the docked studio (mode rail, item list grouped by place, properties panel, floating draw toolbar), one clear mode, a first-run checklist, drawing and changing points, lines and areas with snapping (off by default), validation, Undo and Recent changes, fast entry, item forms with the place check, linking map items to assets, and writing kind setups and overrides on the Kinds screen with a tag browser.
 
 ## Outcome
 
@@ -32,7 +32,7 @@ A map editor new to the Mesa demo field lays it out with the tools alone in unde
 ## Boundaries
 
 - Hands on: forms, linking and undo that epic-import-export and epic-phone reuse.
-- Where the tools sit on the page is decided in a UX workshop before this epic is refined.
+- Where the tools sit on the page was decided in the UX workshop (ux-map-studio, 2026-10-27): Edit mode in the docked layout, direction A (R44, R47; EXPERIENCE.md).
 - Not here: imports, exports, bulk edit or phone editing.
 
 ## References
@@ -41,6 +41,8 @@ A map editor new to the Mesa demo field lays it out with the tools alone in unde
 - prd - _bmad-output/initiative-flowmap/prd-map-studio/prd-map-studio.md
 - prd - section 4.3 to 4.6, NFR-2, NFR-3
 - research - _bmad-output/initiative-flowmap/brief-flowmap/addendum.md, ranked practices for the first version
+- design - _bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md, the visual identity (adopted companion)
+- experience - _bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md, the behaviour (adopted companion)
 
 ## Notes
 
@@ -49,3 +51,4 @@ A map editor new to the Mesa demo field lays it out with the tools alone in unde
 - Waits on epic-viewing because: the map view to draw on.
 - Decision: 2026-10-26 The owner approved value-driven styles and area category tints (initiative R40; prd FR-38, FR-39; architecture AD-11, AD-16); this epic covers writing a kind's style rule, area tints and per-item overrides in the kind setup screen, which embeds epic-viewing's preview of every state before saving.
 - Decision: 2026-10-27 The owner approved instruments on lines (initiative R41; prd FR-16, FR-40; architecture AD-16, AD-19). This epic owns the "add instrument on this line" tool: with a line selected, a map editor picks an instrument kind (tap, meter, line valve) and places it by clicking the line or typing its distance along the line, then moves it along the line, never off it, by dragging or by typing a new distance (WCAG 2.5.7); instruments snap onto a line, not to its vertices; moving, reshaping or splitting a line keeps its instruments on it through the shared geometry module and epic-map-store-and-data entry 14's checks; and the kind setup screen offers the instruments as a line's style source, each segment drawn from the worst of the instruments at the segment's ends; deleting a line deletes its instruments in the same save, one undo restoring both (owner, 2026-10-27). A story for it is planned when this epic is refined; it waits on epic-map-store-and-data entry 14 and on epic-viewing entry 2.
+- Decision: 2026-10-27 UX workshop (ux-map-studio, 2026-10-27): DESIGN.md and EXPERIENCE.md are this epic's companions; Edit mode follows EXPERIENCE.md (Component Patterns, Interaction Primitives, Save and store states, UJ-1 to UJ-3). This epic gains R44 (Edit switch for full editing roles, edit-mode prop), R45 (Recent changes with Revert per change, read from the edit record epic-map-store-and-data writes), R46 (item list grouped by place, needs attention first, Sort by) and R47 (docked layout, list collapsing below about 1280 px, filter chips behind a Filter button, Details and Style tabs). Amended here: R11 first run is the checklist only, the tour is dropped; R15 the Kinds screen sets up only existing kinds, sections Icon, Key values, Comms, Alarms, Popup, Style rule, a tag browser over one example asset's tags producing asset-relative paths (Gateway tag browse unverified, an open question for refinement) and a chosen preview item; R17 kind buttons plus generic point, line and area tools; R19 snapping off by default; R20 Undo and Redo always visible, naming the step, a bulk change and an import each one step; R24 click then drag placement with typed coordinates as backup. No Publish step. Stories are planned when this epic is refined.

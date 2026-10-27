@@ -8,7 +8,7 @@ scope: 'the Map Studio module and its contract with host projects, for the seven
 status: final
 created: '2026-10-26'
 updated: '2026-10-27'
-binds: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19, R20, R21, R22, R23, R24, R25, R26, R27, R28, R29, R30, R31, R32, R33, R34, R35, R36, R37, R38, R39, R40, R41]
+binds: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19, R20, R21, R22, R23, R24, R25, R26, R27, R28, R29, R30, R31, R32, R33, R34, R35, R36, R37, R38, R39, R40, R41, R42, R43, R44, R45, R46, R47]
 sources:
   - _bmad-output/initiative-flowmap/initiative-flowmap.md
   - _bmad-output/initiative-flowmap/prd-map-studio/prd-map-studio.md
@@ -126,7 +126,7 @@ Dependencies point inward to `common/`. `web/` never reaches the database, tags 
 
 - **Binds:** R36
 - **Prevents:** tokens in views or git, and styles MapLibre cannot render.
-- **Rule:** Basemaps are none, OpenStreetMap, satellite and Mapbox. Satellite imagery comes from a provider the project chooses, in this order (owner, 2026-10-26): 1. Esri World Imagery where the client already holds ArcGIS (Esri supports MapLibre through its ArcGIS plugin; "Powered by Esri" plus data attribution); 2. Mapbox `mapbox.satellite` through the Raster Tiles API, per site with its own account, once Mapbox confirms whether client sites need the additional Licensed Application licence; 3. MapTiler only after confirming that tracing imagery for a commercial product is allowed (its General Terms 4.3 and 4.4). The provider is a setting, never code. The Gateway reads the token from the project's secret store and sends it to the browser; only public, URL-restricted tokens are used. Every basemap shows its provider's attribution.
+- **Rule:** Basemaps are none, OpenStreetMap, satellite and Mapbox; the first version builds none, OpenStreetMap and satellite, and the Mapbox vector style option is deferred, not dropped (owner, UX workshop, ux-map-studio, 2026-10-27; prd FR-32). Satellite imagery comes from a provider the project chooses, in this order (owner, 2026-10-26): 1. Esri World Imagery where the client already holds ArcGIS (Esri supports MapLibre through its ArcGIS plugin; "Powered by Esri" plus data attribution); 2. Mapbox `mapbox.satellite` through the Raster Tiles API, per site with its own account, once Mapbox confirms whether client sites need the additional Licensed Application licence; 3. MapTiler only after confirming that tracing imagery for a commercial product is allowed (its General Terms 4.3 and 4.4). The provider is a setting, never code. The Gateway reads the token from the project's secret store and sends it to the browser; only public, URL-restricted tokens are used. Every basemap shows its provider's attribution.
 
 ### AD-13 - Build, release and upgrade gate [ADOPTED]
 
@@ -288,12 +288,15 @@ erDiagram
 | --- | --- | --- |
 | R1, R3, R4, R5, R36, R37 map view, labels, search, parity, basemaps, speed | `web/` | AD-1, AD-6, AD-11, AD-12 |
 | R2, R6, R7, R8, R39 icons, popups, alarm summary, links, custom popup view | `web/`, `gateway/` live values | AD-6, AD-7, AD-11 |
+| R42, R43 legend and Needs you summary | `web/` from the icon batch, no extra subscription | AD-6, AD-11 |
+| R44, R46, R47 Edit switch and edit-mode prop, item list, docked layout | `web/`; the edit-mode prop in the closed prop list in `common/` | AD-1, AD-9 |
+| R45 Recent changes with Revert per change | `web/`, reading the edit record from `gateway/`; a revert is an ordinary batch | AD-2, AD-3, AD-8, AD-10 |
 | R40 value-driven styles and area category tints | `common/` presets and palette, `gateway/` store and live values, `web/` drawing and preview | AD-6, AD-11, AD-16 |
 | R41 instruments on lines: attachment, line segments, ordered line popup, aggregate line style | `common/` record and kind list, `gateway/` write service validation and popup values, `web/` shared geometry module, drawing and popup | AD-2, AD-7, AD-11, AD-16, AD-19, AD-20 |
 | R9, R32, R33, R34 roles, saving, map store, conflicts, live updates | `gateway/` write service, store, change events | AD-2, AD-3, AD-5, AD-10, AD-17, AD-18 |
 | R12, R13, R14, R15, R16, R27 kinds, assets, linking, kind setup, overrides, import matching | `gateway/` adapters and store, `web/` | AD-4, AD-5, AD-16, AD-20 |
 | R10, R11, R17 to R24, R38 tools, drawing, snapping, forms | `web/`, saved through `gateway/` | AD-2, AD-10, AD-11, AD-19 |
-| R25, R26, R28, R29, R35 CSV templates, import, bulk edit, reference layer, export | `web/`, `gateway/` | AD-2, AD-9, AD-20 |
+| R25, R26, R28, R35 CSV templates, guided import, bulk edit, export (R29 reference layer deferred) | `web/`, `gateway/` | AD-2, AD-9, AD-20 |
 | R30, R31 phone | `web/` | AD-2, AD-10, AD-19 |
 | Releases, upgrades, signing, docs | build, CI, `e2e/`, `docs/` | AD-13, AD-14, AD-15 |
 | Template cut-over | `ign-scada-template` | AD-2, AD-4, AD-5, AD-11, AD-18, AD-22 |
@@ -307,13 +310,16 @@ erDiagram
 - **Setup as a custom project resource or a script:** the spike decides; AD-5 fixes the schema either way.
 - **Internal structure of `gateway/` and `web/`:** owned by the code once it exists.
 - **Parsers for CSV, KML and GeoJSON, and the place-check data package:** chosen in epic-import-export and epic-editing, within the licence convention.
-- **Saving reference layers between sessions:** a reference layer lasts for the session in the first version.
+- **Reference layers and land grids (prd FR-26, initiative R29):** deferred, not dropped, by the owner in the UX workshop (ux-map-studio, 2026-10-27); when they return, a reference layer lasts for the session.
+- **Mapbox vector style basemap (prd FR-32, initiative R36):** deferred, not dropped (ux-map-studio, 2026-10-27); AD-12's token rule applies when it returns.
 - **Clustering, offline tiles, map version history:** out of scope for the first version.
 
 Open questions, each with its revisit point:
 
 - Do Java tag subscriptions reach Alarm Metrics on folders and UDT instances? The spike checks it; if not, the fallback is a reference or expression tag per asset.
 - Where is a style rule's expression evaluated (Gateway or browser) and in which expression language? Unverified; settled when epic-viewing is refined, with a live 8.3 check if it is an Ignition expression.
+- How does the Kinds screen's tag browser list one example asset's tags (initiative R15; prd FR-12)? It needs a Gateway tag-browse lookup the module can call, which no message type in AD-8 carries yet; unverified, settled when epic-editing is refined, with a live 8.3 check (UX workshop, ux-map-studio, 2026-10-27).
+- How does Recent changes (initiative R45; prd FR-44) read the edit record AD-3 keeps? No message type in AD-8 reads it yet; settled when epic-editing is refined, as an addition to `common/` (a revert itself is an ordinary AD-2 batch, refused on a newer version).
 - Can a third-party component open a project view as a custom popup view in 8.3? The spike checks it (Embr Periscope embeds views, so it is likely).
 - Can module code call project script functions and register `system.mapstudio.*` functions? The spike checks it; the adapter fallback is a named query.
 - Does the Perspective toolchain (React 16.14, TypeScript 4.9) build MapLibre 6 and Terra Draw? The spike checks it; if not, pin an older MapLibre.
