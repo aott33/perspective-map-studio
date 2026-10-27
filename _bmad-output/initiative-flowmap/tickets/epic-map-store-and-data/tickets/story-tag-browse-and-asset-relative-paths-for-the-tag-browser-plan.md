@@ -3,14 +3,14 @@ title: 'Tag browse and asset-relative paths for the tag browser'
 type: 'feature'
 ticket: '15'
 created: '2026-10-27'
-status: 'in-review'
+status: 'built'
 baseline_revision: '8f042cd2c8088a8bfdd857975751975377dc5cd6'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-kind-list-and-asset-list-from-the-project-plan.md'
@@ -104,9 +104,9 @@ context:
 ## Implementation Notes
 
 - The live check ran first, with a throwaway `TagCheck` class in the module (logged `TAGCHECK` lines 40 s after start, removed before the commit); its findings are in `docs/platform-checks.md`, "Epic 2 story 15".
-- Existence (N) is one browse per distinct parent folder, all fired at once and joined within one 5 s deadline, under the session user's roles; `getTagConfigsAsync` was as fast but takes no `SecurityContext`, so it would not follow the owner's permission decision.
-- `tags.resolve` checks the map store readable after the body and names, for every resolve (also a `relative: false` one), so the order is one order.
-- `tags.browse` asks Ignition for 1001 children (it reports no total, live) and sorts the first 1000 by name.
+- Existence (N) is one browse per distinct parent folder, at most 50 running at once (batches), joined within one 5 s deadline (every browse still running is cancelled on a timeout or failure), under the session user's roles; `getTagConfigsAsync` was as fast but takes no `SecurityContext`, so it would not follow the owner's permission decision.
+- `tags.resolve` checks the map store readable after the body and names, for every resolve (also a `relative: false` one), so the order is one order; the level is checked again on the setup that read returns, so the role and the items come from one setup.
+- `tags.browse` asks Ignition for 1001 + 64 nodes (it reports no total, live; the 64 leave room for property and `Parameters` nodes), counts only listed children toward the 1000, and sorts the page it got; a truncated page is not the first 1000 by name.
 - The anonymous viewer e2e test runs at `/` without a sign-in; the phone editor in its own context at 390 px.
 - Shared files touched, all additive: `Messages.java` (four types, one code), `MapStudioDelegate.java` (`isStoreType`, `tagsReply`, routing line), `MapStudioServices.java` (one field), `contract.ts` (`TAGS_UNAVAILABLE`), `messages.ts` (four names), `testHook.ts` (two names), `docs/contract.md` (rows and one section).
 
@@ -116,6 +116,15 @@ context:
 - 2026-10-27, live check (the code follows what it finds, per the Tasks): Ignition compares path segments without letter case, so `tags.resolve` compares the provider and the base path's segments without case, the suffix keeping the pick's case (the frozen rule left this to the check). A UDT instance's browse holds a `Parameters` node with no full path: left out with the property nodes. Folders and instances report data type `String`: sent as null. A tag's read permissions do not hide it from a browse under any context, so the session-roles browse filters nothing more than the system context today; kept per the decision and documented, no owner fallback needed.
 
 ## Review Triage Log
+
+- 2026-10-27, lens quick (context-free), 7 findings, 7 patched, 0 rejected:
+  - **1 (medium) patched:** `IgnitionTagSource.existing` fired one browse per distinct parent all at once, unbounded, and a timeout cancelled only the one future. Now at most `MAX_IN_FLIGHT` (50) browses run at once (batches under the one 5 s deadline), and on a timeout or any failure every started browse of the batch is cancelled (`theFanOutIsBounded`, `aTimeoutCancelsEveryBrowseStillRunning`). One `getTagConfigsAsync` per provider was not taken: it takes no `SecurityContext` (Implementation Notes).
+  - **2 (low) patched:** `browse` counted property and `Parameters` nodes toward the cap. Only listed children count now; Ignition is asked for 1001 + 64 nodes, and an answer of exactly that many is still `truncated` (more may exist). contract.md states a truncated page is sorted but is not the first 1000 names (`aFullUdtInstanceWithItsParametersNodeIsNotTruncated`, `oneListedChildOverTheCapIsTruncated`, `anAnswerAsLargeAsAskedMayHaveLeftOutChildrenSoItIsTruncated`).
+  - **3 (low) patched:** a base path the adapter check lets through (`[~]Mesa/P12`, `[default]/Mesa/P12`) made a full-path resolve blame the editor's path. The picked path is parsed first, then the base path, refused `invalid` "The asset P12's basePath ... cannot be used for tag paths; ..."; a linked item on such an asset counts in `m`, never in `n`, and no candidate is built from it. No normalising of a leading `/`: whether Ignition reads `[default]/Mesa/P12` as `[default]Mesa/P12` is not checked live (`anAssetWhoseBasePathIsNotAFullPathIsBlamedNotThePickedPath`, `anItemOnAnUnusableBasePathCountsInMButNeverInN`).
+  - **4 (low) patched:** `existing` now treats a bad quality other than `Bad_NotFound` as `tags-unavailable`, as `browse` does, so a low `n` never hides a tag-system error (`aParentWithABadQualityIsTagsUnavailableNotMissing`).
+  - **5 (medium) patched:** new `IgnitionTagSourceTest` over a stub `GatewayTagManager` and `TagProvider` (Proxy): a never-completing future with a 50 ms deadline (package-private constructor) is `tags-unavailable` and cancelled, the cap and `truncated` with property and `Parameters` nodes, `Bad_NotFound`, `Bad_AccessDenied` and `Bad_Stale`, a failed future, case-insensitive grouping by parent, an unknown provider, the bounded fan-out. The delegate's routing and pool hand-off are now the static `job` and `submitWork`; `MapStudioDelegateTest` checks that `tags.*` goes to the tag lookups and `map.load` to the store, and that a `tags.browse` on a saturated pool is answered busy at once and never runs.
+  - **6 (low) patched:** contract.md's `tags-unavailable` row lists the three messages; the `store-unreachable` row names `tags.browse` and `tags.resolve` among the busy replies.
+  - **7 (low) patched:** `resolveReply` decides the level again on the setup `gate.requireReadable` returns, the one the items are read under; the first check stays before the body is read, so the documented order holds (`theLevelIsDecidedOnTheSetupTheItemsAreReadUnder`).
 
 ## Design Notes
 

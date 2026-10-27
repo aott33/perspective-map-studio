@@ -47,6 +47,7 @@ class TagLookupsTest {
     FakeTagSource tags;
     WriteService writes;
     TagLookups lookups;
+    AdapterSnapshot lists;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -57,14 +58,16 @@ class TagLookupsTest {
         state = StoreState.ready();
         StoreGate gate = new StoreGate(setups, c -> state);
         writes = new WriteService(gate, store, new NoChangeHook());
-        AdapterSnapshot lists = new AdapterSnapshot(
+        lists = new AdapterSnapshot(
             List.of(new Kind("pad", "Well pad", "point", "well-pad", 10, List.of()),
                 new Kind("line", "Line", "line", "pipeline", 5, List.of())),
             List.of(new Asset("P12", "Pad 12", "pad", "[default]Mesa/P12"),
                 new Asset("P14", "Pad 14", "pad", "[default]Mesa/P14"),
                 new Asset("P15", "Pad 15", "pad", "[default]Mesa/P15"),
                 new Asset("P1", "Pad 1", "pad", "[default]Mesa/P1"),
-                new Asset("L3", "Line 3", "line", "[default]Mesa/Lines/L3")),
+                new Asset("L3", "Line 3", "line", "[default]Mesa/Lines/L3"),
+                new Asset("PX", "Pad X", "pad", "[default]/Mesa/P12"),
+                new Asset("PR", "Pad R", "pad", "[~]Mesa/P12")),
             OK, OK);
         tags = new FakeTagSource();
         for (String pad : List.of("P12", "P14")) {
@@ -317,6 +320,51 @@ class TagLookupsTest {
         assertEquals(1, resolve("{asset.path}/Pressure").get("m").getAsInt());
         state = StoreState.unavailable("The map store is unavailable.");
         assertEquals("store-unreachable", refused(() -> resolve("{asset.path}/Pressure")).code());
+    }
+
+    @Test
+    void anAssetWhoseBasePathIsNotAFullPathIsBlamedNotThePickedPath() {
+        // Story 3's adapter check lets [default]/Mesa/P12 and [~]Mesa/P12 through.
+        for (String id : List.of("PX", "PR")) {
+            MapStudioException ex = refused(() -> lookups.resolveReply(P, FULL,
+                json("{\"kindId\":\"pad\",\"assetId\":\"" + id + "\",\"path\":\"[default]Mesa/P12/Pressure\"}")));
+            assertEquals("invalid", ex.code());
+            assertTrue(ex.plainMessage().startsWith("The asset " + id + "'s basePath "), ex.plainMessage());
+        }
+        assertTrue(tags.existingCalls.isEmpty());
+    }
+
+    @Test
+    void anItemOnAnUnusableBasePathCountsInMButNeverInN() {
+        pad("P12");
+        pad("PX");
+        JsonObject r = resolve("{asset.path}/Pressure");
+        assertEquals(1, r.get("n").getAsInt());
+        assertEquals(2, r.get("m").getAsInt());
+        assertEquals(List.of("[default]Mesa/P12/Pressure"), tags.existingCalls.get(0));
+    }
+
+    @Test
+    void theLevelIsDecidedOnTheSetupTheItemsAreReadUnder() throws Exception {
+        pad("P12");
+        // The setup changes between the role check and the store read (the adapter lists are read in between):
+        // the session's role is now a phone editor's.
+        StoreGate gate = new StoreGate(setups, c -> state);
+        TagLookups l = new TagLookups(setups, gate, store, p -> {
+            setups.put(P, phoneOnly());
+            return lists;
+        }, tags);
+        assertEquals("role", refused(() -> l.resolveReply(P, FULL,
+            json("{\"kindId\":\"pad\",\"assetId\":\"P12\",\"path\":\"{asset.path}/Pressure\"}"))).code());
+        assertTrue(tags.existingCalls.isEmpty());
+    }
+
+    static Setup phoneOnly() {
+        try {
+            return Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\",\"roles\":{\"phone\":[\"MapEditor\"]}}");
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 
     static List<String> names(JsonObject reply) {

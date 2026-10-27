@@ -37,9 +37,11 @@ import com.aoindustrial.perspective.mapstudio.common.contract.TagChild;
  * {@code TagProvider.browseAsync(path, filter, SecurityContext)} one level deep, with the
  * session user's roles through {@code SecurityContext.fromRolesAndZones} and no security zones
  * (the session's zones are not read, [unverified] whether a zone-scoped tag permission then hides
- * a tag). A folder that does not exist answers {@code Bad_NotFound}. Existence is checked by
- * browsing each distinct parent folder once, all at once, within one 5 s deadline: 300 distinct
- * parents took 55 ms on the dev Gateway. Structure only: no value is read.
+ * a tag). A folder that does not exist answers {@code Bad_NotFound}; any other bad quality is
+ * {@code tags-unavailable}. Existence is checked by browsing each distinct parent folder once, at
+ * most {@link #MAX_IN_FLIGHT} at a time, within one 5 s deadline: 300 distinct parents took 55 ms
+ * on the dev Gateway, one after another. On a timeout or a failure every browse still running is
+ * cancelled. Structure only: no value is read.
  */
 public final class IgnitionTagSource implements TagSource {
 
@@ -48,12 +50,28 @@ public final class IgnitionTagSource implements TagSource {
     /** Every tag call answers within this, or the lookup is {@code tags-unavailable}. */
     static final long TIMEOUT_MS = 5_000;
 
+    /** The most parent-folder browses one existence check has running at once. */
+    static final int MAX_IN_FLIGHT = 50;
+
+    /**
+     * Nodes asked for beyond the cap, for the ones that are never listed (tag properties, a UDT
+     * instance's {@code Parameters}), so a folder whose listed children fit is not reported truncated.
+     */
+    static final int UNLISTED_SLACK = 64;
+
     private final GatewayTagManager tags;
     private final ProjectManager projects;
+    private final long timeoutMs;
 
     public IgnitionTagSource(GatewayTagManager tags, ProjectManager projects) {
+        this(tags, projects, TIMEOUT_MS);
+    }
+
+    /** With another deadline (tests). */
+    IgnitionTagSource(GatewayTagManager tags, ProjectManager projects, long timeoutMs) {
         this.tags = tags;
         this.projects = projects;
+        this.timeoutMs = timeoutMs;
     }
 
     @Override
@@ -81,39 +99,43 @@ public final class IgnitionTagSource implements TagSource {
         if (p == null) {
             return new Browse(false, List.of(), false);
         }
-        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(TIMEOUT_MS);
-        // One more than the cap, so a full folder shows as truncated (the browse reports no total, live).
-        BrowseFilter filter = new BrowseFilter().setMaxResults(max + 1);
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
+        // More than the cap, so a full folder shows as truncated (the browse reports no total, live),
+        // with room for the nodes that are never listed.
+        int asked = max + 1 + UNLISTED_SLACK;
+        BrowseFilter filter = new BrowseFilter().setMaxResults(asked);
         Results<NodeDescription> r = await(p.browseAsync(path(provider, folder), filter, context(roles)), deadline,
             "browse a folder");
         if (isNotFound(r.getResultQuality())) {
             return new Browse(false, List.of(), false);
         }
-        if (r.getResultQuality() != null && r.getResultQuality().isNotGood()) {
-            throw unavailable("browse a folder (quality " + r.getResultQuality().getName() + ")", null);
-        }
+        requireGood(r, "browse a folder");
         List<TagChild> children = new ArrayList<>();
-        int seen = 0;
+        int returned = 0;
+        boolean truncated = false;
         if (r.getResults() != null) {
             for (NodeDescription d : r.getResults()) {
-                seen++;
-                if (seen > max) {
-                    break;
-                }
+                returned++;
                 String type = d.getObjectType() == null ? null : d.getObjectType().name();
                 String full = d.getFullPath() == null ? null : d.getFullPath().toStringFull();
-                if (TagChild.listed(type, full)) {
-                    children.add(TagChild.of(d.getName(), full, type,
-                        d.getDataType() == null ? null : d.getDataType().name(), d.hasChildren()));
+                if (!TagChild.listed(type, full)) {
+                    continue;
                 }
+                if (children.size() == max) {
+                    truncated = true;
+                    break;
+                }
+                children.add(TagChild.of(d.getName(), full, type,
+                    d.getDataType() == null ? null : d.getDataType().name(), d.hasChildren()));
             }
         }
-        return new Browse(true, children, seen > max);
+        // A full answer may have left out listed nodes beyond it.
+        return new Browse(true, children, truncated || returned >= asked);
     }
 
     @Override
     public Set<String> existing(Collection<String> fullPaths, Collection<String> roles) {
-        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(TIMEOUT_MS);
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
         SecurityContext context = context(roles);
         Map<String, List<String>> byParent = new LinkedHashMap<>();
         Map<String, TagPath> parents = new LinkedHashMap<>();
@@ -127,31 +149,46 @@ public final class IgnitionTagSource implements TagSource {
             parents.putIfAbsent(key, parent);
             byParent.computeIfAbsent(key, k -> new ArrayList<>()).add(full);
         }
-        Map<String, CompletableFuture<Results<NodeDescription>>> calls = new LinkedHashMap<>();
-        for (Map.Entry<String, TagPath> e : parents.entrySet()) {
-            TagProvider p = provider(e.getValue().getSource());
-            if (p != null) {
-                calls.put(e.getKey(), p.browseAsync(e.getValue(), new BrowseFilter(), context));
-            }
-        }
+        List<Map.Entry<String, TagPath>> pending = new ArrayList<>(parents.entrySet());
         Set<String> found = new HashSet<>();
-        for (Map.Entry<String, CompletableFuture<Results<NodeDescription>>> e : calls.entrySet()) {
-            Results<NodeDescription> r = await(e.getValue(), deadline, "check that tags exist");
-            if (r.getResults() == null || isNotFound(r.getResultQuality())) {
-                continue;
-            }
-            Set<String> names = new HashSet<>();
-            for (NodeDescription d : r.getResults()) {
-                String type = d.getObjectType() == null ? null : d.getObjectType().name();
-                if (!"Property".equals(type) && d.getName() != null) {
-                    names.add(d.getName().toLowerCase(Locale.ROOT));
+        for (int start = 0; start < pending.size(); start += MAX_IN_FLIGHT) {
+            List<Map.Entry<String, TagPath>> batch = pending.subList(start, Math.min(pending.size(), start + MAX_IN_FLIGHT));
+            Map<String, CompletableFuture<Results<NodeDescription>>> calls = new LinkedHashMap<>();
+            try {
+                for (Map.Entry<String, TagPath> e : batch) {
+                    TagProvider p = provider(e.getValue().getSource());
+                    if (p != null) {
+                        calls.put(e.getKey(), p.browseAsync(e.getValue(), new BrowseFilter(), context));
+                    }
                 }
-            }
-            for (String full : byParent.get(e.getKey())) {
-                TagPath path = parse(full);
-                if (path != null && names.contains(path.getItemName().toLowerCase(Locale.ROOT))) {
-                    found.add(full);
+                for (Map.Entry<String, CompletableFuture<Results<NodeDescription>>> e : calls.entrySet()) {
+                    Results<NodeDescription> r = await(e.getValue(), deadline, "check that tags exist");
+                    if (isNotFound(r.getResultQuality())) {
+                        continue;
+                    }
+                    requireGood(r, "check that tags exist");
+                    if (r.getResults() == null) {
+                        continue;
+                    }
+                    Set<String> names = new HashSet<>();
+                    for (NodeDescription d : r.getResults()) {
+                        String type = d.getObjectType() == null ? null : d.getObjectType().name();
+                        String full = d.getFullPath() == null ? null : d.getFullPath().toStringFull();
+                        if (TagChild.listed(type, full) && d.getName() != null) {
+                            names.add(d.getName().toLowerCase(Locale.ROOT));
+                        }
+                    }
+                    for (String full : byParent.get(e.getKey())) {
+                        TagPath path = parse(full);
+                        if (path != null && names.contains(path.getItemName().toLowerCase(Locale.ROOT))) {
+                            found.add(full);
+                        }
+                    }
                 }
+            } catch (RuntimeException ex) {
+                // A timeout or a failure answers now: nothing of this check may keep running.
+                calls.values().forEach(f -> f.cancel(true));
+                throw ex;
             }
         }
         return found;
@@ -185,17 +222,24 @@ public final class IgnitionTagSource implements TagSource {
         }
     }
 
+    /** A bad quality other than {@code Bad_NotFound} means the tag system could not answer: {@code tags-unavailable}. */
+    private static void requireGood(Results<NodeDescription> r, String what) {
+        if (r.getResultQuality() != null && r.getResultQuality().isNotGood()) {
+            throw unavailable(what + " (quality " + r.getResultQuality().getName() + ")", null);
+        }
+    }
+
     private static boolean isNotFound(QualityCode q) {
         return q != null && q.is(QualityCode.Bad_NotFound);
     }
 
-    private static <T> T await(CompletableFuture<T> future, long deadline, String what) {
+    private <T> T await(CompletableFuture<T> future, long deadline, String what) {
         long left = deadline - System.nanoTime();
         try {
             return future.get(Math.max(0L, left), TimeUnit.NANOSECONDS);
         } catch (TimeoutException ex) {
             future.cancel(true);
-            log.warnf("The tag system did not answer within %d s when asked to %s.", TIMEOUT_MS / 1000, what);
+            log.warnf("The tag system did not answer within %d ms when asked to %s.", timeoutMs, what);
             throw new MapStudioException(Messages.CODE_TAGS_UNAVAILABLE,
                 "The tag system did not answer within " + TIMEOUT_MS / 1000 + " s.");
         } catch (InterruptedException ex) {

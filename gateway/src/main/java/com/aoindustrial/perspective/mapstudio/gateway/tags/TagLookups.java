@@ -38,7 +38,9 @@ import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
  * for. Checks, in order: the project's setup ({@code store-unreachable}), the session's level
  * (anything but {@code full} is {@code role}, before the body is read), the body and the names
  * ({@code invalid}), the map store for {@code tags.resolve} ({@code store-unreachable}), then the
- * tag calls ({@code tags-unavailable}). Reads tag structure only; writes nothing.
+ * tag calls ({@code tags-unavailable}). For {@code tags.resolve} the level is decided again on the
+ * setup the map items are read under, so the role and the read always come from one setup.
+ * Reads tag structure only; writes nothing.
  */
 public final class TagLookups {
 
@@ -133,18 +135,34 @@ public final class TagLookups {
             throw new MapStudioException(Messages.CODE_INVALID,
                 "The asset " + echo(assetId) + " is a " + asset.kind() + ", not a " + kindId + ".");
         }
+        if (!path.startsWith("{")) {
+            TagPaths.parseFull(path);
+            if (!usable(asset.basePath())) {
+                throw new MapStudioException(Messages.CODE_INVALID, "The asset " + echo(assetId) + "'s basePath "
+                    + echo(asset.basePath()) + " cannot be used for tag paths; the host adapter must give a full path"
+                    + " such as [default]Mesa/P12.");
+            }
+        }
         TagPaths.Resolved resolved = TagPaths.resolve(path, asset.basePath());
         StoreGate.Readable readable = gate.requireReadable(project);
+        // The setup the items are read under decides the level too (a setup change may land in between).
+        requireFull(readable.setup(), roles);
         JsonObject reply = new JsonObject();
         reply.addProperty("path", resolved.path());
         reply.addProperty("relative", resolved.relative());
         if (!resolved.relative()) {
             return reply;
         }
+        // An item whose asset's basePath is not a usable full path counts in m but never in n.
+        int m = 0;
         List<String> candidates = new ArrayList<>();
         for (MapItemRecord item : liveItems(project, readable.setup())) {
             if (kindId.equals(item.kind()) && item.assetId() != null && assets.containsKey(item.assetId())) {
-                candidates.add(TagPaths.under(assets.get(item.assetId()).basePath(), resolved.suffix()));
+                m++;
+                String base = assets.get(item.assetId()).basePath();
+                if (usable(base)) {
+                    candidates.add(TagPaths.under(base, resolved.suffix()));
+                }
             }
         }
         Set<String> existing = candidates.isEmpty()
@@ -157,7 +175,7 @@ public final class TagLookups {
             }
         }
         reply.addProperty("n", n);
-        reply.addProperty("m", candidates.size());
+        reply.addProperty("m", m);
         return reply;
     }
 
@@ -186,7 +204,10 @@ public final class TagLookups {
     }
 
     private void requireFull(String project, Collection<String> roles) {
-        Setup setup = setups.require(project);
+        requireFull(setups.require(project), roles);
+    }
+
+    private static void requireFull(Setup setup, Collection<String> roles) {
         if (!Messages.LEVEL_FULL.equals(RoleMatrix.level(setup, roles))) {
             throw new MapStudioException(Messages.CODE_ROLE, ROLE_MESSAGE);
         }
@@ -200,6 +221,19 @@ public final class TagLookups {
                 project, setup.connection(), ex.getSQLState(), ex.getClass().getSimpleName());
             throw new MapStudioException(Messages.CODE_STORE_UNREACHABLE,
                 "The map store could not be read (SQLState " + ex.getSQLState() + ").");
+        }
+    }
+
+    /**
+     * Whether an asset's basePath is a full path the lookups can build on: story 3's adapter check
+     * is looser ({@code [~]Mesa/P12} and {@code [default]/Mesa/P12} pass it).
+     */
+    private static boolean usable(String basePath) {
+        try {
+            TagPaths.parseFull(basePath);
+            return true;
+        } catch (MapStudioException ex) {
+            return false;
         }
     }
 
