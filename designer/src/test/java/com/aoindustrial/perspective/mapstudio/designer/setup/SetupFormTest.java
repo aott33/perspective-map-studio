@@ -3,6 +3,7 @@ package com.aoindustrial.perspective.mapstudio.designer.setup;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -362,24 +363,20 @@ class SetupFormTest {
         throw new AssertionError("the Gateway reads " + json);
     }
 
-    // Row: invalid field, the refusal the save shows.
+    // Row: invalid field, the refusal the save shows (the log line; never a dialog, owner 2026-10-27).
 
     @Test
-    void aRefusalNamesEveryFieldForTheDialogAndTheLog() {
+    void aRefusalNamesEveryFieldForTheLog() {
         Map<String, List<String>> reasons = SetupForm.defaults()
             .setText(SetupForm.REFRESH, "0").setText(SetupForm.KINDS_FUNCTION, "kinds").reasons();
         SetupRefusedException refused = new SetupRefusedException(reasons);
         assertEquals(reasons, refused.reasons());
-        String dialog = refused.describe();
-        assertTrue(dialog.startsWith(SetupForm.msg("setup.refused.message") + "\n- "), dialog);
-        assertTrue(dialog.contains("\n- " + SetupForm.msg("setup.label.connection") + ": Name the database connection"),
-            dialog);
-        assertTrue(dialog.contains("\n- " + SetupForm.msg("setup.label.refreshIntervalSeconds") + ": "), dialog);
-        assertTrue(dialog.contains("\n- " + SetupForm.msg("setup.label.kindsFunction") + ": "), dialog);
-        assertEquals(3, dialog.split("\n- ", -1).length - 1, dialog);
         String log = refused.getMessage();
         assertTrue(log.startsWith("connection: Name the database connection"), log);
         assertTrue(log.contains("; kindsFunction: ") && log.contains("; refreshIntervalSeconds: "), log);
+        SetupRefusedException.NotSaved notSaved = new SetupRefusedException.NotSaved("mapstudio-dev", refused);
+        assertEquals("Map Studio setup of project mapstudio-dev not saved: " + log, notSaved.getMessage());
+        assertSame(refused, notSaved.getCause());
     }
 
     @Test
@@ -387,6 +384,5 @@ class SetupFormTest {
         Map<String, List<String>> reasons = Map.of(SetupForm.GENERAL, List.of("Something."));
         SetupRefusedException refused = new SetupRefusedException(reasons);
         assertEquals("setup: Something.", refused.getMessage());
-        assertEquals(SetupForm.msg("setup.refused.message") + "\n- Something.", refused.describe());
     }
 }

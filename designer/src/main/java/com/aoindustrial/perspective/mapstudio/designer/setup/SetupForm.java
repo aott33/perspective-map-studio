@@ -20,6 +20,7 @@ import com.inductiveautomation.ignition.common.gson.JsonParser;
 import com.inductiveautomation.ignition.common.gson.JsonPrimitive;
 
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
+import com.aoindustrial.perspective.mapstudio.common.contract.SetupLists;
 import com.aoindustrial.perspective.mapstudio.common.contract.SetupProblem;
 
 /**
@@ -397,6 +398,117 @@ public final class SetupForm {
             }
         }
         return orderedByField(out);
+    }
+
+    /**
+     * What the form shows beside a field that the Gateway would accept but that will not work
+     * yet (epic 2 story 16): a name not in its loaded list, a connection that is not PostgreSQL,
+     * Mapbox without a token, a token naming no provider. Never stops a save. A list that is not
+     * loaded gives no warning. A read-only form has none.
+     */
+    public Map<String, List<String>> warnings(FormLists lists) {
+        LinkedHashMap<String, List<String>> out = new LinkedHashMap<>();
+        if (state != State.OK) {
+            return out;
+        }
+        SetupLists.Part connections = lists.connections();
+        if (connections != null && !connection.isEmpty()) {
+            String vendor = null;
+            for (var e : connections.entries()) {
+                if (e.name().equalsIgnoreCase(connection)) {
+                    vendor = e.detail();
+                    break;
+                }
+            }
+            if (vendor == null) {
+                add(out, CONNECTION, msg("setup.warning.connection.missing", connection));
+            } else if (!vendor.isEmpty() && !vendor.equalsIgnoreCase("POSTGRES") && !vendor.equalsIgnoreCase("GENERIC")) {
+                add(out, CONNECTION, msg("setup.warning.connection.vendor", connection, FormLists.vendorWords(vendor)));
+            }
+        }
+        for (String f : List.of(FULL_ROLES, PHONE_ROLES)) {
+            for (String role : unknownRoles(f, lists)) {
+                add(out, f, msg("setup.warning.role.missing", role, lists.project().identityProvider()));
+            }
+        }
+        List<String> functions = lists.project().functions();
+        if (functions != null) {
+            for (String f : List.of(KINDS_FUNCTION, ASSETS_FUNCTION)) {
+                String v = text(f);
+                if (!v.isEmpty() && FUNCTION_PATH.matcher(v).matches() && !functions.contains(v)) {
+                    add(out, f, msg("setup.warning.function.missing", v));
+                }
+            }
+        }
+        List<String> pages = lists.project().pages();
+        if (pages != null && !alarmPage.isEmpty() && alarmPage.startsWith("/")
+            && !ProjectLists.isPage(alarmPage, pages)) {
+            add(out, ALARM_PAGE, msg("setup.warning.page.missing", alarmPage));
+        }
+        String[] token = splitToken(tokenSecret);
+        // A provider with no secret name names no token either.
+        if (basemaps.contains("mapbox") && token[1].isEmpty()) {
+            add(out, BASEMAPS, msg("setup.warning.basemaps.mapboxToken"));
+        }
+        if (!tokenSecret.isEmpty()) {
+            if (token[0].isEmpty()) {
+                add(out, TOKEN_SECRET, msg("setup.warning.token.noProvider"));
+            } else {
+                if (token[1].isEmpty()) {
+                    add(out, TOKEN_SECRET, msg("setup.warning.token.noName"));
+                }
+                var providers = lists.secretProviders();
+                if (providers != null && !providers.names().contains(token[0])) {
+                    add(out, TOKEN_SECRET, msg("setup.warning.token.provider", token[0]));
+                }
+                var names = lists.secretNamesOf(token[0]);
+                if (names != null && !token[1].isEmpty() && !names.names().contains(token[1])) {
+                    add(out, TOKEN_SECRET, msg("setup.warning.token.name", token[1], token[0]));
+                }
+            }
+        }
+        return orderedByField(out);
+    }
+
+    /** The roles of a role field that the loaded role list does not have, each once, in order. */
+    public List<String> unknownRoles(String field, FormLists lists) {
+        var roles = lists.roles();
+        List<String> out = new ArrayList<>();
+        if (roles == null || state != State.OK) {
+            return out;
+        }
+        List<String> known = roles.names();
+        for (String r : list(field)) {
+            if (!known.contains(r) && !out.contains(r)) {
+                out.add(r);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * {@code tokenSecret} as the form shows it: {@code [provider, secret name]}, split at the first
+     * {@code /} (setup schema 1 writes {@code <provider>/<name>}); a value with no {@code /} is a
+     * secret name with no provider (story 7 wrote a single name).
+     */
+    public static String[] splitToken(String tokenSecret) {
+        String t = tokenSecret == null ? "" : tokenSecret;
+        int slash = t.indexOf('/');
+        return slash < 0 ? new String[] {"", t} : new String[] {t.substring(0, slash), t.substring(slash + 1)};
+    }
+
+    /**
+     * The {@code tokenSecret} of a provider and a secret name: {@code <provider>/<name>}, or the
+     * name alone with no provider. A name with a {@code /} and no provider is written
+     * {@code /<name>}, so {@link #splitToken} reads it back as that name and not as a provider.
+     */
+    public static String joinToken(String provider, String name) {
+        String p = provider == null ? "" : provider.trim();
+        String n = name == null ? "" : name.trim();
+        if (p.isEmpty()) {
+            return n.indexOf('/') >= 0 ? "/" + n : n;
+        }
+        return p + "/" + n;
     }
 
     /** True when {@link #reasons()} is empty. */
