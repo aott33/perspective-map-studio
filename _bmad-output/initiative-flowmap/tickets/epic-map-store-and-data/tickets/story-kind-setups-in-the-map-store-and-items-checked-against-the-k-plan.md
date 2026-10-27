@@ -138,6 +138,9 @@ Placeholder fill is published twice on purpose: Java in `common/` (the contract 
 ## Plan Change Log
 
 - 2026-10-27: Open Questions resolved by the owner to every recommended option (Decisions block, frozen); status in-progress.
+- 2026-10-27, Decision (owner, "agree with all recommendations"): an item still carrying a property outside its kind's fields cannot be updated until that property is cleared (accepted for 0.2.0; the message names the property).
+- 2026-10-27, Decision (owner, "agree with all recommendations"): a kind setup conflict names the kind by id (accepted; polish in the sweep, entry 12).
+
 
 ## Review Triage Log
 

@@ -114,6 +114,8 @@ context:
 
 - 2026-10-27, approval (not a review loopback): the owner approved the plan with every recommended Open Question answer ("agree with all recommendations, start building"); the answers are the Decisions in the frozen block. Branch `ccr-3c8b84b9-f1vbsm` merged first (only the deterministic adapter deadlock test was new).
 - 2026-10-27, live check (the code follows what it finds, per the Tasks): Ignition compares path segments without letter case, so `tags.resolve` compares the provider and the base path's segments without case, the suffix keeping the pick's case (the frozen rule left this to the check). A UDT instance's browse holds a `Parameters` node with no full path: left out with the property nodes. Folders and instances report data type `String`: sent as null. A tag's read permissions do not hide it from a browse under any context, so the session-roles browse filters nothing more than the system context today; kept per the decision and documented, no owner fallback needed.
+- 2026-10-27, Decision (owner, "agree with all recommendations"): browsing lists tags whatever their read permissions (accepted; the list is not a permission check, and no value is read).
+
 
 ## Review Triage Log
 
