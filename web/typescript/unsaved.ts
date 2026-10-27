@@ -93,7 +93,9 @@ function readBatch(value: unknown): EditBatch | null {
     for (const op of value.ops) {
         if (!isRecord(op) || (op.op !== 'create' && op.op !== 'update' && op.op !== 'delete')
             || (op.entity !== 'item' && op.entity !== 'kindSetup') || typeof op.id !== 'string'
-            || typeof op.baseVersion !== 'number' || !isRecord(op.data)) {
+            || typeof op.baseVersion !== 'number'
+            || !(isRecord(op.data) || (op.op === 'delete' && op.data === undefined))) {
+            // A delete carries no `data` (docs/contract.md); every other op carries an object.
             return null;
         }
     }
@@ -169,17 +171,24 @@ export function reasonFromError(error: ErrorBody): UnsavedReason {
 
 /**
  * The ordered queue of one project and user. Every change re-reads storage first
- * (another tab may have changed it); a storage that throws (quota, private window)
- * leaves the queue in memory and calls `onStorageFailure` once.
+ * (another tab may have changed it) and writes the whole list back. A storage call
+ * that throws (quota, private window) calls `onStorageFailure` once, and from then on
+ * this tab's memory decides until a write succeeds again: the key is cleared at once
+ * (so an entry stored before the failure, later discarded or saved here, cannot come
+ * back on the next page open), storage is not re-read, and every change and every
+ * `refresh` tries the write again.
  */
 export class UnsavedQueue {
     private key: string | null = null;
     private entries: UnsavedEntry[] = [];
-    private storageFailed = false;
+    /** True once a storage call has thrown (or there is no storage); the warning has been given. */
+    private failedOnce = false;
+    /** True while memory may hold changes storage lacks (the last storage call threw). */
+    private memoryAhead = false;
 
     constructor(private readonly storage: KeyValueStore | null, private readonly onStorageFailure: () => void) {
         if (!storage) {
-            this.storageFailed = true;
+            this.failedOnce = true;
         }
     }
 
@@ -188,9 +197,9 @@ export class UnsavedQueue {
         return this.key;
     }
 
-    /** True once storage has failed (or there is none). */
+    /** True once storage has failed (or there is none); a later write may still succeed. */
     get storageUnavailable(): boolean {
-        return this.storageFailed;
+        return this.failedOnce;
     }
 
     /**
@@ -204,6 +213,7 @@ export class UnsavedQueue {
         }
         const held = this.key === null ? this.entries : [];
         this.key = key;
+        this.memoryAhead = false;
         this.entries = this.read();
         if (held.length > 0) {
             this.change((list) => {
@@ -216,9 +226,16 @@ export class UnsavedQueue {
         }
     }
 
-    /** Re-read storage (a `storage` event from another tab); true when the list changed. */
+    /**
+     * Re-read storage (a `storage` event from another tab, the replay timer); true when the
+     * list changed. While memory is ahead of a failed storage it tries the write instead.
+     */
     refresh(): boolean {
         if (this.key === null) {
+            return false;
+        }
+        if (this.memoryAhead) {
+            this.write();
             return false;
         }
         const before = JSON.stringify(this.entries);
@@ -296,7 +313,7 @@ export class UnsavedQueue {
     }
 
     private read(): UnsavedEntry[] {
-        if (this.key === null || this.storageFailed || !this.storage) {
+        if (this.key === null || !this.storage || this.memoryAhead) {
             return this.entries;
         }
         try {
@@ -311,23 +328,35 @@ export class UnsavedQueue {
         const list = this.read().map((e) => ({ ...e }));
         fn(list);
         this.entries = list;
-        if (this.key === null || this.storageFailed || !this.storage) {
+        this.write();
+    }
+
+    /** Write the whole list (remove the key when it is empty); on a throw, clear the key. */
+    private write(): void {
+        if (this.key === null || !this.storage) {
             return;
         }
         try {
-            if (list.length === 0) {
+            if (this.entries.length === 0) {
                 this.storage.removeItem(this.key);
             } else {
-                this.storage.setItem(this.key, JSON.stringify(list));
+                this.storage.setItem(this.key, JSON.stringify(this.entries));
             }
+            this.memoryAhead = false;
         } catch (err) {
             this.fail();
+            try {
+                this.storage.removeItem(this.key);
+            } catch (ignored) {
+                // Storage refuses everything; memory is all there is.
+            }
         }
     }
 
     private fail(): void {
-        if (!this.storageFailed) {
-            this.storageFailed = true;
+        this.memoryAhead = true;
+        if (!this.failedOnce) {
+            this.failedOnce = true;
             this.onStorageFailure();
         }
     }
@@ -346,7 +375,7 @@ export function unsavedItems(entries: UnsavedEntry[]): MapItemRecord[] {
     for (const e of entries) {
         for (const op of e.batch.ops) {
             const d = op.data;
-            if (op.op !== 'create' || op.entity !== 'item' || !d.geometry) {
+            if (op.op !== 'create' || op.entity !== 'item' || !d || !d.geometry) {
                 continue;
             }
             out.push({

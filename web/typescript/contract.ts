@@ -58,7 +58,8 @@ export interface EditOp {
     id: string;
     /** 0 on create, the stored version otherwise. */
     baseVersion: number;
-    data: MapItemData;
+    /** The record's fields (all of a create's, the changed ones of an update); a delete carries none. */
+    data?: MapItemData;
 }
 
 export interface EditBatch {

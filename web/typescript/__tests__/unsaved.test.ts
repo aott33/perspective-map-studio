@@ -190,6 +190,44 @@ describe('the unsaved edits queue', () => {
         expect(q.list().map((e) => e.batchId)).toEqual(['batch-1']);
     });
 
+    test('a write that fails clears the key, so a discard after it cannot bring an old entry back', () => {
+        const store = new FakeStore();
+        const warn = jest.fn();
+        const q = queue(store, warn);
+        q.enqueue(line(1), T0);
+        q.failed('batch-1', { code: LocalReasons.TIMEOUT, message: 'No answer.' });
+        expect(stored(store).map((e) => e.batchId)).toEqual(['batch-1']);
+        const setItem = store.setItem.bind(store);
+        store.setItem = () => { throw new Error('QuotaExceededError'); };
+        q.enqueue(line(2), T0);
+        expect(warn).toHaveBeenCalledTimes(1);
+        // Entry 1, stored before the failure, is not left behind with its old state.
+        expect(store.data.has(KEY)).toBe(false);
+        q.discard('batch-1');
+        expect(q.list().map((e) => e.batchId)).toEqual(['batch-2']);
+        expect(queue(store).list()).toEqual([]);
+        // Storage works again: the next change (or refresh) writes what memory holds.
+        store.setItem = setItem;
+        expect(q.refresh()).toBe(false);
+        expect(stored(store).map((e) => e.batchId)).toEqual(['batch-2']);
+        q.failed('batch-2', reasonFromError({ code: 'conflict', message: 'Changed.' }));
+        expect(queue(store).list().map((e) => [e.batchId, e.state])).toEqual([['batch-2', 'refused']]);
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    test('a read that fails keeps memory, and later saves and refusals still reach storage', () => {
+        const store = new FakeStore();
+        const q = queue(store, jest.fn());
+        q.enqueue(line(1), T0);
+        q.enqueue(line(2), T0);
+        const getItem = store.getItem.bind(store);
+        store.getItem = () => { throw new Error('denied'); };
+        q.saved('batch-1');
+        q.failed('batch-2', reasonFromError({ code: 'role', message: 'No.' }));
+        store.getItem = getItem;
+        expect(queue(store).list().map((e) => [e.batchId, e.state])).toEqual([['batch-2', 'refused']]);
+    });
+
     test('two tabs: every change re-reads storage, and a second reply finds nothing to remove', () => {
         const store = new FakeStore();
         const a = queue(store);
@@ -213,6 +251,16 @@ describe('the unsaved edits queue', () => {
         expect(readEntries('{not json')).toEqual([]);
         expect(readEntries('{"a":1}')).toEqual([]);
         expect(readEntries(null)).toEqual([]);
+        // A delete carries no data (docs/contract.md); any other op without an object data is malformed.
+        const del: EditBatch = { batchId: 'del', ops: [{ op: 'delete', entity: 'item', id: 'x', baseVersion: 2 }] };
+        const noData = { batchId: 'nd', ops: [{ op: 'update', entity: 'item', id: 'x', baseVersion: 2 }] };
+        const delData = { batchId: 'dd', ops: [{ op: 'delete', entity: 'item', id: 'x', baseVersion: 2, data: 'x' }] };
+        const raw2 = JSON.stringify([del, noData, delData].map((b) => ({
+            batchId: b.batchId, batch: b, queuedAt: T0.toISOString(), state: 'unsent' })));
+        const kept = readEntries(raw2);
+        expect(kept.map((e) => e.batchId)).toEqual(['del']);
+        expect(JSON.stringify(kept[0].batch)).toBe(JSON.stringify(del));
+        expect(unsavedItems(kept)).toEqual([]);
         const store = new FakeStore();
         store.data.set(KEY, '{broken');
         const q = queue(store);

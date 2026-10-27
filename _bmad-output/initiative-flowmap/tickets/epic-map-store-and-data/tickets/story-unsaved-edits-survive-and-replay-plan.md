@@ -3,7 +3,7 @@ title: 'Unsaved edits survive and replay'
 type: 'feature'
 ticket: '8'
 created: '2026-10-27'
-status: 'in-review'
+status: 'built'
 baseline_revision: '0759b1b47326e2a5140eaacf8be441bc8ee22171'
 route: 'full'
 route_source: 'pinned'
@@ -98,7 +98,8 @@ Owner, 2026-10-27: "agree with all recommendations, start building" - every Open
 
 - Built 2026-10-27 directly in this session (no implementation subagent available). Verification: Jest 92 passed (`unsaved.test.ts` 18 of them), `tsc --noEmit` clean; `./gradlew clean build` green (gateway 165 tests; the known timing-sensitive `AdapterServiceTest.aKindCallSettlingWhileAnAssetCallAnswersDoesNotDeadlock` failed once and passed on the rerun, unchanged); e2e on `ms-e2s8`: 29 passed, 5 skipped (store-ops, run by `ops/store-checks.sh`, and the gated stopped-Gateway test); `unsaved.spec.mjs` 4 passed; the stopped-Gateway test passed with `MAPSTUDIO_GATEWAY_STOP=1`; `ops/store-checks.sh` all four scenarios passed with the new `unavailable` assertions.
 - Matrix audit: Saved, Gateway gone, Page reopened, Conflict: unit and e2e; Busy, Role, Storage fails, Two tabs: unit (`unsaved.test.ts`); Role also by story 1's viewer e2e; Store unreachable at load: `store-ops.spec.mjs` under `ops/store-checks.sh`.
-- Quick review: no subagents in this session, so the Quick lens prompt is written beside this plan (`story-unsaved-edits-survive-and-replay-plan-quick.md`, not committed) for a separate session; triage waits for its findings.
+- Quick review: no subagents in this session, so the Quick lens prompt was written beside this plan (`story-unsaved-edits-survive-and-replay-plan-quick.md`, not committed) for a separate session; its findings are triaged below and the prompt file is deleted.
+- After the review (2026-10-27): the send, reply timer and replay rules moved from the delegate into `web/typescript/unsavedSender.ts` (`UnsavedSender`, Jest with fake timers in `unsavedSender.test.ts`); `MapChanges.retryFailedLoad` re-sends a failed `map.load` every 15 s. Verification: Jest 109 passed (13 suites); `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew clean build` green (234 JVM tests); e2e on `ms-e2s8` after `ops/up.sh --fresh`: 30 passed, 6 skipped (store-ops, run by `ops/store-checks.sh`, and the gated stopped-Gateway test), `unsaved.spec.mjs` 5 passed with the new load-failure test; `ops/store-checks.sh` all four scenarios passed.
 
 ## Plan Change Log
 
@@ -106,13 +107,28 @@ Owner, 2026-10-27: "agree with all recommendations, start building" - every Open
 - Per-user key, consequence: a stored queue is shown and replayed only once a `map.load.reply` names the key, not at mount; entries made before that (or with no project name) stay in memory and move into storage then. "Store unreachable at load" draws this page's queued items only.
 - A new batch is always sent at once, at any level (keeps story 1's viewer refusal test); only replays of stored entries wait for level `phone` or `full`. Error replies keep the compat save status `refused` with `data-code` (store-unreachable and read-only included); the new save state `unsent` is for no reply and a disconnected client only.
 - DOM names: the list is `.mapstudio-unsaved`, one `.mapstudio-unsaved-row` per entry (with `data-batch-id`, `data-unsaved-state`, `data-code`); Try again shows once an entry has a reason.
+- Review pass 1 (2026-10-27): `UnsavedQueue` keeps memory as the truth after a storage failure and clears the key (Boundaries "every queue change re-reads storage first" holds while storage works); the busy answer to `map.load` keeps the items, level and editing; a failed `map.load` is re-sent every 15 s; Discard is off while the batch is in flight; replay runs from memory when no project name is known; a stored `delete` op may carry no `data`; `.mapstudio-map` gains `data-unsaved-drawn`. The e2e routing takes edits.apply events out of Perspective's numbered `sync:` frames instead of dropping the frame (a dropped frame stalls the client's later frames, observed live).
 - e2e "Gateway gone": instead of `context.setOffline(true)` (whether it closes an open websocket is [unverified]), the spec routes the page's websockets (`routeWebSocket`) and drops frames carrying `edits.apply`, so the reply timer runs out deterministically; the stopped-Gateway run is a gated test in the same spec (`MAPSTUDIO_GATEWAY_STOP=1`), recorded in `docs/platform-checks.md`.
 
 ## Review Triage Log
 
+Pass 1 (lens: quick, context-free, on commit 0d32b00, 2026-10-27; the reviewer read the code and ran only `unsaved.test.ts` and `contract.test.ts`, the findings were checked again here against the code): high 0, medium 2, low 7, false 0, maybe-false 0. All nine patched (finding 6 by correcting the Design Note, as the reviewer offered); no loopback (each fix is local; the frozen intent, the Decisions and the contract's shape stand).
+
+| # | Finding | Verdict | Route | Evidence and action |
+|---|---|---|---|---|
+| 1 | After one storage throw `storageFailed` stuck: later discards, saves and refusals never reached storage, so a discarded entry came back and was replayed on the next page open | medium | patch | Real: `change()` returned before writing once `storageFailed` was set. Patched in `UnsavedQueue`: every change still tries to write; on a throw the key is removed at once (so nothing stored before the failure can come back), memory decides while a write has failed, and every change and each 15 s `refresh` tries again; the warning is still given once. Unit tests: discard after a quota error then reopen (nothing comes back), storage recovering writes memory, a failing `getItem` with later save and refusal reaching storage. `docs/contract.md` (Storage failure) says so. |
+| 2 | A busy answer to `map.load` blanked the map and turned editing off; nothing re-sent `map.load` on a quiet project | medium | patch | Real: `storeStateFromError` made any `store-unreachable` `unavailable`, and only a `map.changed` retried. Patched: the busy answer (`isBusy`) keeps the level, store state, items drawn and editing; after any failed `map.load` the delegate re-sends it every 15 s (`MapChanges.retryFailedLoad`, unit tested). e2e `unsaved.spec.mjs` "a map.load that fails after the map loaded" covers busy, then unreachable, then the retry turning editing back on. |
+| 3 | `store-ops.spec.mjs`'s `data-items-loaded` 0 proved nothing (that map never had items) | low | patch | Real. The new e2e above loads the editor's map with items, forces a gap reload (one `map.changed` dropped in the websocket route), rewrites its reply to `store-unreachable`, and asserts items 0, the draw tool disabled and the queued line still drawn (`data-unsaved-drawn` 1). The store-ops line stays with a comment saying what it checks. |
+| 4 | The conflict e2e used one user, did not assert the Gateway's sentence, and had nothing drawn to discard | low | patch | Real. The second save is now `mapoperator`'s (phone editor, a properties update); the row is asserted to name `mapoperator` and to contain the Gateway's own message (asked once through the hook, a refused batch writes nothing); the stale batch also creates a line, drawn as unsaved (`data-unsaved-drawn` 1) and gone after Discard (0). |
+| 5 | Discard worked while a batch was in flight, so the Gateway could still commit it, and a late error marked a discarded line refused | low | patch | Real. `UnsavedSender.discard` refuses while the batch is in flight and the button is disabled then (`sending` in the delegate state); a discard forgets every message id of the batch, and an error for a batch no longer queued is ignored. Unit tested. |
+| 6 | The Design Note said only the tab holding the in-flight id replays a transient entry; the code (and the contract) let two tabs replay one entry | low | patch (doc) | Real mismatch. The matrix and `docs/contract.md` already allow it and the Gateway's retry rule makes it harmless, so the Design Note is corrected; no stored in-flight marker. |
+| 7 | With no project name (no storage key) nothing was ever replayed in that page | low | patch | Real: `canReplay` required the key. Replay now needs only level `phone` or `full`; with no key it replays the entries this page holds in memory. Unit tested. |
+| 8 | A stored delete op (no `data`, as the contract says) was dropped as malformed | low | patch | Real trap for epic-editing. `readBatch` accepts a `delete` with no `data`, `EditOp.data` is optional in `contract.ts`, and the malformed-storage test covers a kept delete and a dropped update without data. |
+| 9 | The delegate's timer, late-reply, replay-chain, level-gate, storage-event and storage-failure rules had no unit test | low | patch | Real. Those rules moved into `UnsavedSender` (pure, like `MapChanges`) with 14 Jest tests on fake timers; the delegate keeps the save status, store state and items. |
+
 ## Design Notes
 
-Status line rule: one `.mapstudio-save-status` for the latest save stays (compat); the `.mapstudio-unsaved` list below it holds every queued entry. A transient entry is only ever replayed by the tab that holds its in-flight message id, so one tab never sends one batch twice at once.
+Status line rule: one `.mapstudio-save-status` for the latest save stays (compat); the `.mapstudio-unsaved` list below it holds every queued entry. One tab never sends one batch twice at once (its own in-flight set), but nothing in storage marks an entry in flight, so two tabs may both replay one entry at the same time; the Gateway's retry rule makes the second send return the first reply (matrix row "Two tabs", `docs/contract.md`).
 
 ## Verification
 

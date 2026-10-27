@@ -77,7 +77,9 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             await expect(status).toContainText('store-unreachable: The map store is unavailable');
             await expect(status).toContainText('MapStudioCheck');
             await expect(status).toContainText('Ask an administrator (see the Gateway log).');
-            // Epic 2 story 8: no map item drawn as current, and the draw tool is off.
+            // Epic 2 story 8: the draw tool is off. This map never loaded items, so items 0 only
+            // checks the attribute; a store that fails after items were drawn, with a queued line
+            // kept, is unsaved.spec.mjs ("a map.load that fails after the map loaded").
             await expect(map).toHaveAttribute('data-items-loaded', '0');
             await expect(map).toHaveAttribute('data-editing', 'off');
             await expect(page.locator('.mapstudio-draw-button')).toBeDisabled();

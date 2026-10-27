@@ -192,8 +192,13 @@
     cursor: pointer;
 }
 
-.mapstudio-unsaved-row button:hover {
+.mapstudio-unsaved-row button:hover:not(:disabled) {
     background: var(--neutral-30);
+}
+
+.mapstudio-unsaved-row button:disabled {
+    color: var(--label--disabled);
+    cursor: not-allowed;
 }
 
 .mapstudio .mapstudio-draw-button:disabled {

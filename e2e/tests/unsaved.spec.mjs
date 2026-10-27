@@ -4,8 +4,10 @@
 // phone or full.
 //
 // "Gateway gone" is made deterministic by routing the page's websockets through the test
-// (Playwright routeWebSocket) and dropping every frame that carries an edits.apply, so the
-// Gateway never sees the save and the 15 s reply timer runs out. Whether Chromium's offline
+// (Playwright routeWebSocket) and taking every edits.apply out of the browser's frames, so
+// the Gateway never sees the save and the 15 s reply timer runs out. The same routing drops a
+// map.changed (a gap) and turns a map.load.reply into a store-unreachable error, to show what
+// a failed load after the map loaded does. Whether Chromium's offline
 // emulation closes an open Perspective websocket is not relied on ([unverified]). A stopped
 // Gateway is the manual check in docs/platform-checks.md.
 // Screenshots at 1440 and 390 px (AD-15).
@@ -17,7 +19,7 @@ import path from 'node:path';
 import { envFileValue, gatewayUrl, screenshotDir } from '../lib/env.mjs';
 import { TRACER } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, editorTest, expect, mapLoaded, nextFrames, openMap, signedInContext, test
+    EDITOR_USER, OPERATOR_USER, editorTest, expect, mapLoaded, nextFrames, openMap, signedInContext, test
 } from './fixtures.mjs';
 
 // As in store.spec.mjs: the pause only keeps two vertex clicks from reading as a double click.
@@ -61,21 +63,85 @@ async function storedQueue(page) {
     return page.evaluate((key) => JSON.parse(window.localStorage.getItem(key) || '[]'), KEY);
 }
 
+const EVENT_FIRED = 'event-fired:';
+const BUSY_MESSAGE = 'Map Studio is busy with other map requests; nothing was saved. Try again in a moment.';
+
 /**
- * Route every websocket of the context through the test; while `gate.drop` is true, a
- * browser frame that carries an edits.apply is dropped (the Gateway never sees it).
+ * The Gateway's reply as Perspective delivers it ([observed in the 8.3.10 client]: a text
+ * frame `event-fired:` and JSON whose `event` is the Map Studio envelope), or null.
+ */
+function firedEvent(message) {
+    if (typeof message !== 'string' || !message.startsWith(EVENT_FIRED)) return null;
+    try {
+        const frame = JSON.parse(message.slice(EVENT_FIRED.length));
+        return frame && frame.event && typeof frame.event.type === 'string' ? frame : null;
+    } catch (err) {
+        return null;
+    }
+}
+
+const SYNC = 'sync:';
+
+/**
+ * A browser frame without the edits.apply events the gate drops. Perspective sends component
+ * events inside numbered `sync:` frames and waits for each one to be answered
+ * ([observed in the 8.3.10 client]: a dropped frame stalls every later one), so the frame is
+ * passed on with those events taken out rather than dropped.
+ */
+function withoutDroppedSaves(message, gate) {
+    if (typeof message !== 'string' || !message.startsWith(SYNC) || !message.includes('edits.apply')) return message;
+    let frame;
+    try {
+        frame = JSON.parse(message.slice(SYNC.length));
+    } catch (err) {
+        return message;
+    }
+    if (!frame || !Array.isArray(frame.events)) return message;
+    const kept = frame.events.filter((e) => {
+        const ev = e && e.event;
+        const save = ev && ev.type === 'edits.apply';
+        const drop = save && (gate.drop || (gate.dropBatch && ev.body && ev.body.batchId === gate.dropBatch));
+        if (drop) gate.dropped++;
+        return !drop;
+    });
+    if (kept.length === frame.events.length) return message;
+    frame.events = kept;
+    return SYNC + JSON.stringify(frame);
+}
+
+/**
+ * Route every websocket of the context through the test. While `gate.drop` is true, every
+ * edits.apply the browser sends is taken out (the Gateway never sees it), and while
+ * `gate.dropBatch` is set, every edits.apply of that batch. While
+ * `gate.dropChanged` is above 0, that many map.changed frames are dropped (a gap). While
+ * `gate.failLoad` is 'busy' or 'down', a map.load.reply becomes that store-unreachable error.
  */
 async function routeSockets(context, gate) {
     await context.routeWebSocket(/.*/, (ws) => {
         const server = ws.connectToServer();
         ws.onMessage((message) => {
-            if (gate.drop && typeof message === 'string' && message.includes('edits.apply')) {
-                gate.dropped++;
+            server.send(withoutDroppedSaves(message, gate));
+        });
+        server.onMessage((message) => {
+            const frame = firedEvent(message);
+            if (frame && frame.event.type === 'map.changed' && gate.dropChanged > 0) {
+                gate.dropChanged--;
                 return;
             }
-            server.send(message);
+            if (frame && frame.event.type === 'map.load.reply' && gate.failLoad) {
+                gate.failedLoads++;
+                frame.event = {
+                    v: frame.event.v, type: 'error', id: frame.event.id,
+                    body: {
+                        code: 'store-unreachable',
+                        message: gate.failLoad === 'busy' ? BUSY_MESSAGE : 'The map store is unavailable (test).'
+                    }
+                };
+                ws.send(EVENT_FIRED + JSON.stringify(frame));
+                return;
+            }
+            ws.send(message);
         });
-        server.onMessage((message) => ws.send(message));
     });
 }
 
@@ -85,7 +151,7 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
 
         editorTest('a line the Gateway never answers is kept, survives the page and saves on reopen',
             async ({ page, context }) => {
-                const gate = { drop: false, dropped: 0 };
+                const gate = { drop: false, dropped: 0, dropChanged: 0, failLoad: null, failedLoads: 0 };
                 await routeSockets(context, gate);
                 let map = await openMap(page, '/edit');
                 const before = await mapLoaded(map);
@@ -125,26 +191,47 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
                 await shot(reopened, `mapstudio-unsaved-replayed-${width}.png`);
             });
 
-        editorTest('a queued batch refused for a conflict names the other change and Discard removes it',
-            async ({ page }) => {
+        editorTest('a queued batch refused for a conflict names the other editor\'s change and Discard removes it',
+            async ({ page, browser }) => {
                 let map = await openMap(page, '/edit');
                 await mapLoaded(map);
                 const id = randomUUID();
-                const create = {
-                    batchId: randomUUID(),
-                    ops: [{
-                        op: 'create', entity: 'item', id, baseVersion: 0,
-                        data: { kind: 'line', name: 'Conflict line', geometry: { type: 'LineString', coordinates: [TRACER.points.p1.lngLat, TRACER.points.p2.lngLat] } }
-                    }]
-                };
-                expect((await send(page, 'edits.apply', create)).type).toBe('edits.apply.reply');
-                const rename = (name) => ({
-                    batchId: randomUUID(),
-                    ops: [{ op: 'update', entity: 'item', id, baseVersion: 1, data: { name } }]
+                const lineData = (name, dy) => ({
+                    kind: 'line', name,
+                    geometry: { type: 'LineString', coordinates: [TRACER.points.p1.lngLat, TRACER.points.p2.lngLat]
+                        .map(([lng, lat]) => [lng, lat + dy]) }
                 });
-                expect((await send(page, 'edits.apply', rename('Saved second'))).type).toBe('edits.apply.reply');
-                // A stale edit left in the queue by an earlier page: baseVersion 1, the item is at 2.
-                const stale = rename('Stale edit');
+                const create = { batchId: randomUUID(), ops: [{ op: 'create', entity: 'item', id, baseVersion: 0, data: lineData('Conflict line', 0) }] };
+                expect((await send(page, 'edits.apply', create)).type).toBe('edits.apply.reply');
+                // The phone editor changes the line's properties: version 2, changed by mapoperator.
+                const operator = await signedInContext(browser, OPERATOR_USER, { viewport: { width: 390, height: 844 } });
+                try {
+                    const opPage = await operator.newPage();
+                    const opMap = await openMap(opPage, '/edit');
+                    await mapLoaded(opMap);
+                    await expect(opMap).toHaveAttribute('data-edit-level', 'phone');
+                    const opSave = await send(opPage, 'edits.apply', {
+                        batchId: randomUUID(),
+                        ops: [{ op: 'update', entity: 'item', id, baseVersion: 1, data: { properties: { note: 'checked on site' } } }]
+                    });
+                    expect(opSave.type, JSON.stringify(opSave.body)).toBe('edits.apply.reply');
+                } finally {
+                    await operator.close();
+                }
+                // A stale batch left in the queue by an earlier page: an update at baseVersion 1 (the
+                // line is at 2) and a new line, so the whole batch is refused and the new line is
+                // drawn as unsaved until it is discarded.
+                const stale = {
+                    batchId: randomUUID(),
+                    ops: [
+                        { op: 'update', entity: 'item', id, baseVersion: 1, data: { name: 'Stale edit' } },
+                        { op: 'create', entity: 'item', id: randomUUID(), baseVersion: 0, data: lineData('Unsaved line', 0.002) }
+                    ]
+                };
+                // The Gateway's sentence for this batch (a refused batch is not saved, so asking is harmless).
+                const refusal = await send(page, 'edits.apply', stale);
+                expect(refusal.type).toBe('error');
+                expect(refusal.body.code).toBe('conflict');
                 await page.evaluate(([key, b]) => window.localStorage.setItem(key, JSON.stringify([{
                     batchId: b.batchId, batch: b, queuedAt: new Date().toISOString(), state: 'unsent'
                 }])), [KEY, stale]);
@@ -154,17 +241,91 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
                 const row = page.locator(`.mapstudio-unsaved-row[data-batch-id="${stale.batchId}"]`);
                 await expect(row).toHaveAttribute('data-unsaved-state', 'refused', { timeout: 30_000 });
                 await expect(row).toHaveAttribute('data-code', 'conflict');
-                await expect(row).toContainText(`Not saved - conflict with ${EDITOR_USER}'s change.`);
+                await expect(row).toContainText(`Not saved - conflict with ${OPERATOR_USER}'s change.`);
+                await expect(row).toContainText(refusal.body.message);
+                expect(refusal.body.message).toContain(OPERATOR_USER);
                 await expect(map).toHaveAttribute('data-unsaved-count', '1');
+                await expect(map).toHaveAttribute('data-unsaved-drawn', '1');
                 await shot(page, `mapstudio-unsaved-conflict-${width}.png`);
 
                 await row.locator('.mapstudio-unsaved-discard').click();
                 await expect(map).toHaveAttribute('data-unsaved-count', '0');
+                await expect(map).toHaveAttribute('data-unsaved-drawn', '0');
                 await expect(page.locator('.mapstudio-unsaved')).toHaveCount(0);
                 expect(await storedQueue(page)).toEqual([]);
             });
     });
 }
+
+editorTest.describe('a map.load that fails after the map loaded', () => {
+    editorTest.use({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+
+    editorTest('busy keeps the items and editing; store unreachable draws no store item but keeps the queued line; both retry',
+        async ({ page, context }) => {
+            editorTest.setTimeout(180_000);
+            const gate = { drop: false, dropBatch: null, dropped: 0, dropChanged: 0, failLoad: null, failedLoads: 0 };
+            await routeSockets(context, gate);
+            const map = await openMap(page, '/edit');
+            await mapLoaded(map);
+            const lineBatch = (name, dy) => ({
+                batchId: randomUUID(),
+                ops: [{
+                    op: 'create', entity: 'item', id: randomUUID(), baseVersion: 0,
+                    data: { kind: 'line', name, geometry: { type: 'LineString', coordinates: [TRACER.points.p1.lngLat, TRACER.points.p3.lngLat]
+                        .map(([lng, lat]) => [lng, lat + dy]) } }
+                }]
+            });
+            // At least one store item drawn, saved by the hook and drawn from its map.changed.
+            const before = Number(await map.getAttribute('data-items-loaded'));
+            expect((await send(page, 'edits.apply', lineBatch('Loaded line', -0.002))).type).toBe('edits.apply.reply');
+            await expect(map).toHaveAttribute('data-items-loaded', String(before + 1));
+
+            // A line the Gateway never sees: queued and drawn as unsaved.
+            gate.drop = true;
+            await drawLine(page, map);
+            await expect(map).toHaveAttribute('data-unsaved-count', '1');
+            await expect(map).toHaveAttribute('data-unsaved-drawn', '1');
+            // From here only that batch is dropped, so the hook's saves below reach the Gateway.
+            gate.dropBatch = (await storedQueue(page))[0].batchId;
+            gate.drop = false;
+
+            // A gap: the first of two saves' map.changed is dropped, so the map sends map.load,
+            // and the bounded pool's busy answer comes back.
+            gate.failLoad = 'busy';
+            gate.dropChanged = 1;
+            expect((await send(page, 'edits.apply', lineBatch('Gap line 1', -0.003))).type).toBe('edits.apply.reply');
+            expect((await send(page, 'edits.apply', lineBatch('Gap line 2', -0.004))).type).toBe('edits.apply.reply');
+            await expect(map).toHaveAttribute('data-load-state', 'failed', { timeout: 30_000 });
+            expect(gate.failedLoads).toBe(1);
+            await expect(map).toHaveAttribute('data-editing', 'on');
+            await expect(map).toHaveAttribute('data-items-loaded', String(before + 1));
+            await expect(map).toHaveAttribute('data-edit-level', 'full');
+            await expect(page.locator('.mapstudio-draw-button')).toBeEnabled();
+
+            // The timed retry (15 s) loads again, now answered store-unreachable: no store item is
+            // drawn as current, the draw tool is off, and the queued line is still drawn as unsaved.
+            gate.failLoad = 'down';
+            await expect.poll(() => gate.failedLoads, { timeout: 30_000 }).toBe(2);
+            await expect(map).toHaveAttribute('data-store-state', 'unavailable');
+            await expect(map).toHaveAttribute('data-items-loaded', '0');
+            await expect(map).toHaveAttribute('data-editing', 'off');
+            await expect(page.locator('.mapstudio-draw-button')).toBeDisabled();
+            await expect(map).toHaveAttribute('data-unsaved-count', '1');
+            await expect(map).toHaveAttribute('data-unsaved-drawn', '1');
+            await expect(page.locator('.mapstudio-load-status')).toContainText('store-unreachable: The map store is unavailable (test).');
+            await shot(page, 'mapstudio-unsaved-store-down-1440.png');
+
+            // The store is back: the next timed retry loads the map, editing comes back on and the
+            // queued line is replayed and saved.
+            gate.failLoad = null;
+            gate.dropBatch = null;
+            await expect(map).toHaveAttribute('data-load-state', 'loaded', { timeout: 30_000 });
+            await expect(map).toHaveAttribute('data-editing', 'on');
+            await expect(map).toHaveAttribute('data-unsaved-count', '0', { timeout: 30_000 });
+            await expect(map).toHaveAttribute('data-items-loaded', String(before + 4));
+            await expect(page.locator('.mapstudio-draw-button')).toBeEnabled();
+        });
+});
 
 // The plan's manual check, scripted: stops and starts this checkout's dev Gateway container
 // (MAPSTUDIO_CONTAINER in .env), so it runs only when asked: MAPSTUDIO_GATEWAY_STOP=1.

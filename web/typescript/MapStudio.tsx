@@ -29,7 +29,7 @@ import {
 import { MapChanges, MapChangedBody } from './changes';
 import { EditLevel, MapItemRecord } from './contract';
 import { AdapterStatus, HostLists, NO_HOST_LISTS } from './adapters';
-import { MESSAGE_EVENT, Reply, editsApply, mapLoad, pointClick, readReply, replyText } from './messages';
+import { MESSAGE_EVENT, Reply, mapLoad, pointClick, readReply, replyText } from './messages';
 import {
     STORE_UNKNOWN, StoreState, storeStateAttribute, storeStateFromError, storeStateFromLoad, storeStateFromSaveError,
     storeStatusText
@@ -37,9 +37,10 @@ import {
 import { PointPopup } from './PointPopup';
 import { SAVE_IDLE, SaveState, itemsToGeoJson, lineCreateBatch, newId, refusedSave, saveStatusText } from './save';
 import {
-    KeyValueStore, LocalReasons, REPLAY_INTERVAL_MS, REPLY_TIMEOUT_MS, STORAGE_WARNING, UnsavedEntry, UnsavedQueue,
-    UnsavedReason, entryText, isTransient, reasonFromError, savedRecords, storageKey, summaryText, unsavedItems
+    KeyValueStore, REPLAY_INTERVAL_MS, STORAGE_WARNING, UnsavedEntry, UnsavedQueue, UnsavedReason, entryText, isBusy,
+    reasonFromError, savedRecords, storageKey, summaryText, unsavedItems
 } from './unsaved';
+import { UnsavedSender } from './unsavedSender';
 import { AuthorParams, PopupPoint, popupMountPath } from './popupParams';
 import { TestData, selectTestData } from './testSet';
 import { registerTestHook, takeTestReply } from './testHook';
@@ -116,7 +117,12 @@ export interface MapStudioDelegateState {
     unsaved: UnsavedEntry[];
     /** Bumped whenever the queue changes, so the component knows to redraw the unsaved items. */
     unsavedRevision: number;
-    /** 'off' while map.load says the map store is unreachable: the draw tool is disabled. */
+    /** The queued batches this tab waits on a reply for: their Discard is off meanwhile. */
+    sending: string[];
+    /**
+     * 'off' while map.load says the map store is unreachable (not the busy answer): the draw
+     * tool is disabled and no store item is drawn; map.load is re-sent every 15 s meanwhile.
+     */
     editing: 'on' | 'off';
     /** The one warning when this browser cannot keep unsaved edits, or ''. */
     storageWarning: string;
@@ -171,13 +177,12 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private mapLoadId: string | null = null;
     /** The queue of unsent and refused batches (unsaved.ts), in localStorage per project and user. */
     private unsaved: UnsavedQueue;
+    /** Sends the queue: reply timer, replay chain and level gate (unsavedSender.ts). */
+    private sender: UnsavedSender;
     private unsavedRevision = 0;
     private storageWarning = '';
-    /** batchId -> the edits.apply message this tab is waiting on for it, and its reply timer. */
-    private inFlight = new Map<string, { messageId: string; timer: ReturnType<typeof setTimeout> }>();
-    /** edits.apply message id -> its batchId, kept after a timeout so a late reply still counts. */
-    private sentMessages = new Map<string, string>();
-    private replayTimer: ReturnType<typeof setTimeout> | null = null;
+    /** Re-sends map.load every 15 s while the last one failed (store unreachable, busy). */
+    private loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
     /** The batch whose save the save status shows (the last line drawn here), or null. */
     private saveBatchId: string | null = null;
 
@@ -186,6 +191,16 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         registerTestHook((message) => this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject));
         const storage = browserStorage();
         this.unsaved = new UnsavedQueue(storage, () => this.warnStorage());
+        this.sender = new UnsavedSender(this.unsaved, {
+            level: () => this.level,
+            connected: () => this.connected(),
+            fire: (message) => this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject),
+            changed: () => {
+                this.unsavedRevision++;
+                this.notify();
+            },
+            unsent: (batchId, reason) => this.onUnsent(batchId, reason)
+        });
         if (!storage) {
             this.warnStorage();
         }
@@ -214,6 +229,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             store: this.store,
             unsaved: this.unsaved.list(),
             unsavedRevision: this.unsavedRevision,
+            sending: this.sender.sending(),
             editing: this.store.status === 'unavailable' ? 'off' : 'on',
             storageWarning: this.storageWarning
         };
@@ -248,58 +264,35 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         const itemId = newId();
         const now = new Date();
         const batch = lineCreateBatch(itemId, newId(), coordinates, now);
-        this.unsaved.enqueue(batch, now);
-        this.unsavedRevision++;
         this.save = { state: 'saving', itemId };
         this.saveBatchId = batch.batchId;
-        this.sendBatch(batch.batchId);
+        this.sender.enqueueAndSend(batch, now);
         return itemId;
     }
 
     /** Try again: a refused entry becomes unsent and the queue replays now. */
     retryUnsaved(batchId: string): void {
-        this.unsaved.retry(batchId);
-        this.unsavedRevision++;
-        this.notify();
-        this.replayNext();
-        this.scheduleReplay();
+        this.sender.retry(batchId);
     }
 
-    /** Discard: the entry leaves storage and the map, and is never sent again. */
+    /** Discard: the entry leaves storage and the map, and is never sent again (not while in flight). */
     discardUnsaved(batchId: string): void {
-        const flight = this.inFlight.get(batchId);
-        if (flight) {
-            clearTimeout(flight.timer);
-            this.inFlight.delete(batchId);
+        if (!this.sender.discard(batchId)) {
+            console.info('[MapStudio] Batch ' + batchId + ' is being sent; Discard waits for its answer.');
         }
-        this.unsaved.discard(batchId);
-        this.unsavedRevision++;
-        this.notify();
-        this.replayNext();
     }
 
     /** A `storage` event: another tab may have changed this queue. */
     onStorage(key: string | null): void {
-        if (key !== null && key !== this.unsaved.storageKey) {
-            return;
-        }
-        if (this.unsaved.refresh()) {
-            for (const [batchId, flight] of Array.from(this.inFlight.entries())) {
-                if (!this.unsaved.get(batchId)) {
-                    clearTimeout(flight.timer);
-                    this.inFlight.delete(batchId);
-                }
-            }
-            this.unsavedRevision++;
-            this.notify();
-        }
+        this.sender.storage(key);
     }
 
-    /** Stop the replay timer (the component unmounted). */
+    /** Stop the replay and load retry timers (the component unmounted). */
     stopReplay(): void {
-        if (this.replayTimer !== null) {
-            clearTimeout(this.replayTimer);
-            this.replayTimer = null;
+        this.sender.stop();
+        if (this.loadRetryTimer !== null) {
+            clearTimeout(this.loadRetryTimer);
+            this.loadRetryTimer = null;
         }
     }
 
@@ -316,86 +309,24 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         return client && typeof client.projectName === 'string' && client.projectName !== '' ? client.projectName : null;
     }
 
-    /** Send one queued batch exactly as stored (same batchId, ops and baseVersions). */
-    private sendBatch(batchId: string): void {
-        const entry = this.unsaved.get(batchId);
-        if (!entry) {
-            this.notify();
-            return;
-        }
-        if (!this.connected()) {
-            this.onUnsent(entry, { code: LocalReasons.DISCONNECTED, message: 'The browser is not connected to the Gateway.' });
-            return;
-        }
-        const message = editsApply(entry.batch);
-        const timer = setTimeout(() => this.onReplyTimeout(batchId, message.id), REPLY_TIMEOUT_MS);
-        this.inFlight.set(batchId, { messageId: message.id, timer });
-        this.sentMessages.set(message.id, batchId);
-        this.notify();
-        try {
-            this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject);
-        } catch (err) {
-            clearTimeout(timer);
-            this.inFlight.delete(batchId);
-            this.sentMessages.delete(message.id);
-            this.onUnsent(entry, { code: LocalReasons.DISCONNECTED, message: 'The message could not be sent.' });
-        }
-    }
-
-    private onReplyTimeout(batchId: string, messageId: string): void {
-        const flight = this.inFlight.get(batchId);
-        if (!flight || flight.messageId !== messageId) {
-            return;
-        }
-        this.inFlight.delete(batchId);
-        const entry = this.unsaved.get(batchId);
-        if (entry) {
-            this.onUnsent(entry, {
-                code: LocalReasons.TIMEOUT,
-                message: 'No answer from the Gateway within ' + REPLY_TIMEOUT_MS / 1000 + ' s.'
-            });
-        }
-    }
-
-    /** No answer, or not connected: the entry stays unsent and the timer replays it. */
-    private onUnsent(entry: UnsavedEntry, reason: UnsavedReason): void {
-        this.unsaved.failed(entry.batchId, reason);
-        this.unsavedRevision++;
-        if (this.save.state !== 'idle' && entry.batchId === this.saveBatchId) {
+    /** No answer, or not connected: the save status says unsent; the sender replays it. */
+    private onUnsent(batchId: string, reason: UnsavedReason): void {
+        if (this.save.state !== 'idle' && batchId === this.saveBatchId) {
             this.save = { state: 'unsent', itemId: this.save.itemId, code: reason.code };
         }
-        console.info('[MapStudio] Batch ' + entry.batchId + ' not saved yet (' + reason.code + '); kept to replay.');
-        this.notify();
-        this.scheduleReplay();
+        console.info('[MapStudio] Batch ' + batchId + ' not saved yet (' + reason.code + '); kept to replay.');
     }
 
-    /** Replays run only at level phone or full, after map.load answered (docs/contract.md). */
-    private canReplay(): boolean {
-        return (this.level === 'phone' || this.level === 'full') && this.unsaved.storageKey !== null;
-    }
-
-    /** Replay the oldest unsent entry, one batch at a time. */
-    private replayNext(): void {
-        if (!this.canReplay() || this.inFlight.size > 0) {
+    /** While the last map.load failed, send it again in 15 s (MapChanges.retryFailedLoad). */
+    private scheduleLoadRetry(): void {
+        if (this.loadRetryTimer !== null) {
             return;
         }
-        const next = this.unsaved.nextToReplay(new Set(this.inFlight.keys()));
-        if (next) {
-            console.info('[MapStudio] Replaying unsaved batch ' + next.batchId + '.');
-            this.sendBatch(next.batchId);
-        }
-    }
-
-    /** Re-arm the 15 s replay timer while unsent entries remain. */
-    private scheduleReplay(): void {
-        if (this.replayTimer !== null || !this.unsaved.hasUnsent()) {
-            return;
-        }
-        this.replayTimer = setTimeout(() => {
-            this.replayTimer = null;
-            this.unsaved.refresh();
-            this.replayNext();
-            this.scheduleReplay();
+        this.loadRetryTimer = setTimeout(() => {
+            this.loadRetryTimer = null;
+            if (this.changes.retryFailedLoad()) {
+                console.info('[MapStudio] Sending map.load again after a failed load.');
+            }
         }, REPLAY_INTERVAL_MS);
     }
 
@@ -416,7 +347,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.onMapLoad(reply);
             return;
         }
-        if (reply.kind === 'edits.apply.reply' || (reply.kind === 'error' && this.sentMessages.has(reply.id))) {
+        if (reply.kind === 'edits.apply.reply' || (reply.kind === 'error' && this.sender.owns(reply.id))) {
             this.onSave(reply);
             return;
         }
@@ -451,17 +382,21 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             }
             this.unsavedRevision++;
         } else if (reply.kind === 'error') {
-            this.level = null;
-            this.refreshIntervalSeconds = null;
             this.load = { state: 'failed', message: reply.body.code + ': ' + reply.body.message };
-            this.store = storeStateFromError(this.store, reply.body);
             this.changes.loadFailed();
-            // No store item is drawn as current while the store is unreachable.
-            this.itemsRevision++;
+            this.scheduleLoadRetry();
+            if (!isBusy(reply.body)) {
+                this.level = null;
+                this.refreshIntervalSeconds = null;
+                this.store = storeStateFromError(this.store, reply.body);
+                // No store item is drawn as current while the store is unreachable.
+                this.itemsRevision++;
+            }
+            // The busy answer of the bounded pool is a short spell: the level, the store
+            // state and the items drawn stay, editing stays on, and the retry loads again.
         }
         this.notify();
-        this.replayNext();
-        this.scheduleReplay();
+        this.sender.replay();
     }
 
     /** A map.changed from the Gateway; `body` is null when it could not be read (a gap). */
@@ -471,61 +406,42 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             console.debug('[MapStudio] Map changed: seq ' + this.changes.seq);
             this.notify();
         }
-        this.replayNext();
+        this.sender.replay();
     }
 
     private onSave(reply: Reply): void {
         if (reply.kind !== 'edits.apply.reply' && reply.kind !== 'error') {
             return;
         }
-        const batchId = reply.kind === 'edits.apply.reply' ? reply.body.batchId : this.sentMessages.get(reply.id);
-        this.sentMessages.delete(reply.id);
-        if (batchId === undefined) {
-            console.info('[MapStudio] A save reply ' + reply.id + ' matches no pending save.');
+        const outcome = reply.kind === 'edits.apply.reply'
+            ? this.sender.onSaved(reply.id, reply.body.batchId)
+            : this.sender.onError(reply.id, reasonFromError(reply.body));
+        console.info('[MapStudio] ' + replyText(reply));
+        if (outcome.kind === 'ignored') {
+            console.info('[MapStudio] The save reply ' + reply.id + ' changes nothing (an earlier send, or discarded).');
             return;
         }
-        const flight = this.inFlight.get(batchId);
-        if (reply.kind === 'error' && flight && flight.messageId !== reply.id) {
-            // A late refusal of an earlier send; the newer send of the same batch decides.
-            return;
-        }
-        if (flight) {
-            clearTimeout(flight.timer);
-            this.inFlight.delete(batchId);
-        }
-        this.unsaved.refresh();
-        const entry = this.unsaved.get(batchId);
-        const shown = batchId === this.saveBatchId;
-        if (reply.kind === 'edits.apply.reply') {
-            if (entry) {
-                for (const record of savedRecords(entry.batch, reply.body.results)) {
+        const shown = outcome.batchId === this.saveBatchId && this.save.state !== 'idle';
+        if (reply.kind === 'edits.apply.reply' && outcome.kind === 'saved') {
+            if (outcome.entry) {
+                for (const record of savedRecords(outcome.entry.batch, reply.body.results)) {
                     if (this.changes.saved(record)) {
                         this.itemsRevision++;
                     }
                 }
             }
-            this.unsaved.saved(batchId);
             if (shown && this.save.state !== 'idle') {
                 const itemId = this.save.itemId;
                 const result = reply.body.results.find((r) => r.id === itemId);
                 this.save = { state: 'saved', itemId, version: result ? result.version : 1 };
             }
-        } else {
-            const reason = reasonFromError(reply.body);
-            this.unsaved.failed(batchId, reason);
+        } else if (reply.kind === 'error') {
             if (shown && this.save.state !== 'idle') {
                 this.save = refusedSave(this.save.itemId, reply.body);
             }
             this.store = storeStateFromSaveError(this.store, reply.body);
         }
-        this.unsavedRevision++;
-        console.info('[MapStudio] ' + replyText(reply));
         this.notify();
-        if (reply.kind === 'error' && isTransient(reply.body.code)) {
-            this.scheduleReplay();
-        } else {
-            this.replayNext();
-        }
     }
 }
 
@@ -757,6 +673,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
             lines.setData(data.lines);
             points.setData(data.points);
             this.drawnUnsaved = delegate.unsavedRevision + ':' + delegate.itemsRevision;
+            if (this.mapContainer) {
+                // For tests: the features put into the unsaved sources (dashed lines and points).
+                this.mapContainer.setAttribute('data-unsaved-drawn',
+                    String(data.lines.features.length + data.points.features.length));
+            }
         }
     }
 
@@ -1042,7 +963,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     }
 
     /** The queued edits, each with its reason, Try again and Discard (epic 2 story 8). */
-    private renderUnsaved(unsaved: UnsavedEntry[], level: EditLevel | null, warning: string): React.ReactNode {
+    private renderUnsaved(unsaved: UnsavedEntry[], level: EditLevel | null, warning: string, sending: string[]):
+        React.ReactNode {
         if (unsaved.length === 0 && warning === '') {
             return null;
         }
@@ -1063,6 +985,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                                     onClick={() => delegate && delegate.retryUnsaved(entry.batchId)}>Try again</button>
                         ) : null}
                         <button type="button" className="mapstudio-unsaved-discard"
+                                disabled={sending.indexOf(entry.batchId) >= 0}
+                                title={sending.indexOf(entry.batchId) >= 0 ? 'Being sent; wait for the answer.' : undefined}
                                 onClick={() => delegate && delegate.discardUnsaved(entry.batchId)}>Discard</button>
                     </div>
                 ))}
@@ -1119,7 +1043,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                         ? <div className="mapstudio-store-status" data-store-state="read-only">{storeStatusText(store)}</div>
                         : null}
                     {this.renderUnsaved(unsaved, delegate ? delegate.level : null,
-                        delegate ? delegate.storageWarning : '')}
+                        delegate ? delegate.storageWarning : '', delegate ? delegate.sending : [])}
                 </div>
                 {this.renderAdapterStatus(delegate ? delegate.lists : NO_HOST_LISTS)}
                 {this.renderPopup()}

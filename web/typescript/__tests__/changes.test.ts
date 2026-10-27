@@ -194,4 +194,24 @@ describe('the store delegate\'s change handling (MapChanges)', () => {
         expect(changes.seq).toBe(8);
         expect(changes.state.loaded).toBe(true);
     });
+
+    test('the timed retry of a failed load sends map.load on a quiet project, once per failure', () => {
+        const sent: number[] = [];
+        const changes = new MapChanges(() => sent.push(1));
+        changes.load();
+        // Nothing failed yet: the retry does nothing.
+        expect(changes.retryFailedLoad()).toBe(false);
+        changes.loaded(loadReply(5));
+        expect(changes.retryFailedLoad()).toBe(false);
+        changes.changed(changed(7, item('L7')));
+        changes.loadFailed();
+        expect(changes.retryFailedLoad()).toBe(true);
+        expect(sent.length).toBe(3);
+        // Pending: no second load.
+        expect(changes.retryFailedLoad()).toBe(false);
+        expect(changes.reloads).toBe(1);
+        changes.loaded(loadReply(7, [item('L7')]));
+        expect(changes.retryFailedLoad()).toBe(false);
+        expect(changes.state.loaded).toBe(true);
+    });
 });
