@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Designer Setup Form</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Mono&display=swap">
+<style>
+/* Map Studio Setup form in the Ignition 8.3 Designer (light theme).
+   Swing stand-ins: every colour below maps to a UIManager key named in DESIGN.md
+   (designer-* tokens). The Swing form reads the keys; these hex values are only the
+   mock's stand-ins for the Designer's light theme. Render one state with ?v=STATE:
+   normal, reasons, unreachable, inherited, newer, picker. */
+:root {
+  --d-panel: #f2f3f5;          /* Panel.background */
+  --d-surface: #ffffff;        /* TextField.background, Tree.background */
+  --d-border: #c4c7cc;         /* Component.borderColor */
+  --d-divider: #dcdfe3;        /* Separator.foreground */
+  --d-text: #1f2328;           /* Label.foreground */
+  --d-text-2: #6a7078;         /* Label.disabledForeground: help text */
+  --d-accent: #2675bf;         /* Component.accentColor: focus, checkbox, selection */
+  --d-accent-tint: #dce9f7;    /* List.selectionBackground (inactive) */
+  --d-error: #c62a36;          /* Component.error.focusedBorderColor */
+  --d-warning: #a86400;        /* Component.warning.focusedBorderColor, darkened for text */
+  --d-warning-edge: #e2a53a;   /* Component.warning.borderColor */
+  --d-success: #3f8f4a;        /* Actions.Green */
+  --d-info-tint: #e8f1fb;      /* banner background: accent at about 10 % */
+  --d-warning-tint: #fdf3e2;   /* banner background: warning at about 12 % */
+  --d-chip: #e7e9ec;           /* chip fill: Button.background */
+  --d-disabled: #f7f8f9;       /* TextField.disabledBackground */
+  --font: 'Noto Sans', 'DejaVu Sans', sans-serif;
+  --mono: 'Noto Sans Mono', 'DejaVu Sans Mono', monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--d-panel); color: var(--d-text); font: 13px/1.35 var(--font); overflow: hidden; }
+.app { width: 1440px; height: 900px; display: grid; grid-template-rows: 26px 34px 1fr 24px; }
+.menubar { display: flex; gap: 2px; align-items: center; padding: 0 6px; background: var(--d-surface); border-bottom: 1px solid var(--d-divider); }
+.menubar span { padding: 3px 9px; }
+.toolbar { display: flex; gap: 4px; align-items: center; padding: 0 8px; border-bottom: 1px solid var(--d-divider); }
+.tb { width: 26px; height: 26px; border-radius: 4px; display: grid; place-items: center; color: var(--d-text-2); }
+.tb.sep { width: 1px; height: 18px; background: var(--d-divider); margin: 0 4px; border-radius: 0; }
+.main { display: grid; grid-template-columns: 264px 1fr; min-height: 0; }
+.browser { background: var(--d-surface); border-right: 1px solid var(--d-divider); display: flex; flex-direction: column; min-height: 0; }
+.dock-title { height: 28px; display: flex; align-items: center; padding: 0 10px; font-weight: 600; border-bottom: 1px solid var(--d-divider); background: var(--d-panel); }
+.tree { padding: 6px 0; }
+.tree div { height: 22px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.tree .sel { background: var(--d-accent); color: #fff; }
+.tree .sel svg { color: #fff; }
+.tree .inh { color: var(--d-text-2); font-style: italic; font-size: 12px; }
+.tree .sel .inh { color: #e6eefa; }
+.workspace { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.tabs { height: 30px; display: flex; align-items: flex-end; padding-left: 6px; border-bottom: 1px solid var(--d-divider); }
+.tab { height: 30px; padding: 0 12px; display: flex; align-items: center; gap: 8px; background: var(--d-surface); border: 1px solid var(--d-divider); border-bottom: 2px solid var(--d-accent); border-top-left-radius: 3px; border-top-right-radius: 3px; }
+.tab .x { color: var(--d-text-2); }
+.tabbody { flex: 1; display: grid; grid-template-columns: 196px 1fr; min-height: 0; background: var(--d-surface); }
+.cats { border-right: 1px solid var(--d-divider); padding: 10px 0; background: var(--d-surface); }
+.cats div { height: 26px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; }
+.cats .on { background: var(--d-accent-tint); }
+.cats .count { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; }
+.cats .count.err { color: var(--d-error); } .cats .count.warn { color: var(--d-warning); }
+.cats.off div { color: var(--d-text-2); }
+.formwrap { display: flex; flex-direction: column; min-height: 0; }
+.scroll { flex: 1; overflow: hidden; position: relative; padding: 14px 24px 0 24px; }
+.scrollbar { position: absolute; right: 2px; top: 4px; width: 8px; height: 82%; border-radius: 4px; background: #cfd3d8; display: none; }
+.hdr { display: flex; align-items: baseline; justify-content: space-between; max-width: 760px; }
+.hdr h1 { font-size: 15px; font-weight: 700; margin: 0; }
+.hdr .sub { color: var(--d-text-2); font-size: 12px; margin-top: 2px; }
+.schema { color: var(--d-text-2); font-size: 11.5px; }
+.banner { max-width: 760px; margin-top: 10px; display: flex; gap: 8px; align-items: flex-start; padding: 7px 10px; border: 1px solid; border-radius: 4px; }
+.banner.info { background: var(--d-info-tint); border-color: #a9c7ea; }
+.banner.warn { background: var(--d-warning-tint); border-color: var(--d-warning-edge); }
+.banner b { font-weight: 600; }
+.banner .act { margin-left: auto; color: var(--d-accent); white-space: nowrap; }
+section { max-width: 760px; margin-top: 14px; }
+section h2 { font-size: 13px; font-weight: 700; margin: 0 0 8px; display: flex; align-items: center; gap: 10px; }
+section h2::after { content: ''; flex: 1; height: 1px; background: var(--d-divider); }
+.row { display: grid; grid-template-columns: 184px auto; column-gap: 14px; margin-bottom: 10px; }
+.row > label { padding-top: 5px; }
+.ctl { display: flex; align-items: center; gap: 6px; }
+.help { color: var(--d-text-2); font-size: 11.5px; margin-top: 3px; max-width: 560px; }
+.msg { display: flex; gap: 5px; align-items: flex-start; font-size: 12px; margin-top: 4px; max-width: 560px; }
+.msg svg { flex: none; margin-top: 1px; }
+.msg.err { color: var(--d-error); } .msg.warn { color: var(--d-warning); } .msg.note { color: var(--d-text-2); }
+.field { height: 28px; border: 1px solid var(--d-border); border-radius: 4px; background: var(--d-surface); display: flex; align-items: center; padding: 0 0 0 8px; }
+.field.err { border-color: var(--d-error); } .field.warn { border-color: var(--d-warning-edge); }
+.field.focus { border-color: var(--d-accent); box-shadow: 0 0 0 2px #bcd5f0; }
+.field.ro { background: var(--d-disabled); color: var(--d-text-2); }
+.field .val { flex: 1; white-space: nowrap; overflow: hidden; }
+.field .ph { color: var(--d-text-2); flex: 1; }
+.field .arrow { width: 26px; height: 26px; display: grid; place-items: center; border-left: 1px solid var(--d-divider); color: var(--d-text-2); }
+.mono { font-family: var(--mono); font-size: 12px; }
+.btn { height: 28px; min-width: 28px; border: 1px solid var(--d-border); border-radius: 4px; background: #f7f8f9; display: grid; place-items: center; color: var(--d-text-2); padding: 0 8px; }
+.btn.icon { padding: 0; width: 28px; }
+.status { width: 18px; display: grid; place-items: center; }
+.chips { min-height: 30px; width: 420px; border: 1px solid var(--d-border); border-radius: 4px; background: var(--d-surface); display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 3px 0 3px 4px; position: relative; }
+.chips.err { border-color: var(--d-error); } .chips.focus { border-color: var(--d-accent); box-shadow: 0 0 0 2px #bcd5f0; }
+.chip { height: 22px; display: inline-flex; align-items: center; gap: 4px; padding: 0 4px 0 7px; background: var(--d-chip); border: 1px solid transparent; border-radius: 3px; font-size: 12px; }
+.chip .rm { color: var(--d-text-2); width: 14px; text-align: center; }
+.chip.warn { background: var(--d-warning-tint); border-color: var(--d-warning-edge); color: #5c3a00; }
+.chip.err { background: #fbe9ea; border-color: var(--d-error); color: #7a1520; }
+.chips .add { flex: 1; min-width: 110px; color: var(--d-text-2); font-size: 12px; padding-left: 4px; }
+.chips .add.typed { color: var(--d-text); }
+.chips .arrow { width: 26px; align-self: stretch; display: grid; place-items: center; border-left: 1px solid var(--d-divider); color: var(--d-text-2); margin: -3px 0; }
+.checks { display: flex; gap: 18px; padding-top: 5px; }
+.cb { display: inline-flex; gap: 6px; align-items: center; }
+.box { width: 15px; height: 15px; border: 1px solid var(--d-border); border-radius: 3px; background: var(--d-surface); display: grid; place-items: center; }
+.box.on { background: var(--d-accent); border-color: var(--d-accent); }
+.pair { display: flex; gap: 8px; align-items: center; }
+.popup { position: absolute; background: var(--d-surface); border: 1px solid var(--d-border); border-radius: 4px; box-shadow: 0 4px 14px rgba(0,0,0,.16); z-index: 5; font-size: 12.5px; }
+.popup .ph2 { padding: 6px 10px; color: var(--d-text-2); font-size: 11.5px; border-bottom: 1px solid var(--d-divider); }
+.popup .it { height: 26px; padding: 0 10px; display: flex; align-items: center; gap: 8px; }
+.popup .it.hi { background: var(--d-accent); color: #fff; }
+.popup .it.dim { color: var(--d-text-2); }
+.popup .ft { padding: 6px 10px; color: var(--d-text-2); font-size: 11.5px; border-top: 1px solid var(--d-divider); }
+.footer { height: 34px; border-top: 1px solid var(--d-divider); display: flex; align-items: center; gap: 8px; padding: 0 24px; background: var(--d-panel); font-size: 12px; }
+.footer.err { color: var(--d-error); }
+.statusbar { display: flex; align-items: center; gap: 16px; padding: 0 10px; border-top: 1px solid var(--d-divider); font-size: 12px; color: var(--d-text-2); background: var(--d-surface); }
+.statusbar .gw { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
+.statusbar .gw.down { color: var(--d-error); }
+.raw { max-width: 760px; margin-top: 14px; }
+.raw .lbl { font-weight: 700; margin-bottom: 6px; display: flex; gap: 10px; align-items: center; }
+.raw .lbl::after { content: ''; flex: 1; height: 1px; background: var(--d-divider); }
+.raw pre { margin: 0; padding: 10px 12px; background: var(--d-disabled); border: 1px solid var(--d-border); border-radius: 4px; font: 12px/1.5 var(--mono); color: #3a3f45; }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script>
+const I = {
+  chev: '<svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
+  right: '<svg width="10" height="10" viewBox="0 0 10 10"><path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
+  refresh: '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 1.5v3.4H8.6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
+  check: '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="var(--d-success)" stroke-width="2"/></svg>',
+  tick: '<svg width="11" height="11" viewBox="0 0 12 12"><path d="M2 6.2l2.6 2.6L10 3.4" fill="none" stroke="#fff" stroke-width="2"/></svg>',
+  err: '<svg width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="var(--d-error)"/><path d="M5.3 5.3l5.4 5.4M10.7 5.3l-5.4 5.4" stroke="#fff" stroke-width="1.6"/></svg>',
+  warn: '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M8 1.5l7 12.5H1z" fill="var(--d-warning-edge)"/><path d="M8 6v4" stroke="#fff" stroke-width="1.6"/><circle cx="8" cy="12" r=".9" fill="#fff"/></svg>',
+  info: '<svg width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="var(--d-accent)"/><path d="M8 7v4.5" stroke="#fff" stroke-width="1.6"/><circle cx="8" cy="4.8" r=".95" fill="#fff"/></svg>',
+  lock: '<svg width="14" height="14" viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7.5" rx="1.5" fill="var(--d-warning-edge)"/><path d="M5.2 7V5a2.8 2.8 0 0 1 5.6 0v2" fill="none" stroke="var(--d-warning-edge)" stroke-width="1.6"/></svg>',
+  cloud: '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M4.5 12.5h7a3 3 0 0 0 .4-6 4 4 0 0 0-7.6 1A2.5 2.5 0 0 0 4.5 12.5z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2 2l12 12" stroke="currentColor" stroke-width="1.4"/></svg>',
+  folder: '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M1.5 4h5l1.5 1.5h6.5v8h-13z" fill="#e8c56a" stroke="#c9a240"/></svg>',
+  doc: '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M3.5 1.5h6l3 3v10h-9z" fill="#fff" stroke="#8a9099"/></svg>',
+  map: '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M1.5 3.5l4-1.5 5 2 4-1.5v10l-4 1.5-5-2-4 1.5z" fill="#d7e6f6" stroke="#2675bf"/><path d="M5.5 2v10M10.5 4v10" stroke="#2675bf"/></svg>',
+  x: '<svg width="9" height="9" viewBox="0 0 10 10"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.4"/></svg>',
+  gw: '<svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="currentColor"/></svg>',
+};
+
+const base = {
+  inherited: false, readonly: false, gwDown: false, picker: false,
+  connection: { v: 'MapStudio', state: 'ok' },
+  full: [{ n: 'MapEditor' }, { n: 'Administrator' }],
+  phone: [{ n: 'MapOperator' }],
+  kinds: { v: 'mapstudio_adapter.kinds', state: 'ok' },
+  assets: { v: 'mapstudio_adapter.assets', state: 'ok' },
+  refresh: '10',
+  basemaps: { none: true, osm: true, satellite: false, mapbox: false },
+  alarm: { v: '/alarms/{item.name}', state: 'ok' },
+  secretProvider: '', secretName: '',
+  msgs: {}, counts: {},
+};
+const states = {
+  normal: {},
+  picker: { picker: true },
+  inherited: { inherited: true },
+  reasons: {
+    connection: { v: 'MapStore', state: 'warn' },
+    full: [{ n: 'MapEditor' }, { n: 'MapEdtor', warn: true }],
+    phone: [{ n: 'MapOperator' }, { n: 'MapOperator', err: true }],
+    refresh: '0',
+    msgs: {
+      connection: [['warn', 'MapStore is not a database connection of this Gateway yet. Map Studio waits for it; add it on the Gateway under Connections &gt; Databases.']],
+      full: [['warn', 'MapEdtor is not a role of the identity provider default. It is saved as typed; nobody holds it until the provider has it.']],
+      phone: [['err', 'MapOperator is listed twice.']],
+      refresh: [['err', 'refreshIntervalSeconds must be a whole number from 1 to 3600, not 0.']],
+    },
+    counts: { store: ['warn', 1], who: ['err', 1, 1], kinds: ['err', 1] },
+  },
+  unreachable: { gwDown: true, connection: { v: 'MapStudio', state: 'down' } },
+  newer: { readonly: true },
+};
+const v = new URLSearchParams(location.search).get('v') || 'normal';
+const S = Object.assign({}, base, states[v] || {});
+if (S.gwDown) { S.secretProvider = ''; }
+
+function status(state) {
+  if (state === 'ok') return `<span class="status" title="Found">${I.check}</span>`;
+  if (state === 'warn') return `<span class="status">${I.warn}</span>`;
+  if (state === 'down') return `<span class="status" style="color:var(--d-text-2)" title="List unavailable">${I.cloud}</span>`;
+  return '<span class="status"></span>';
+}
+function msgs(key) {
+  return (S.msgs[key] || []).map(([k, t]) => `<div class="msg ${k}">${k === 'err' ? I.err : I.warn}<span>${t}</span></div>`).join('');
+}
+function combo(val, width, opts = {}) {
+  const cls = ['field', opts.cls || ''].join(' ');
+  const inner = val ? `<span class="val ${opts.mono ? 'mono' : ''}">${val}</span>` : `<span class="ph">${opts.ph || 'Select one...'}</span>`;
+  return `<div class="${cls}" style="width:${width}px">${inner}<span class="arrow">${I.chev}</span></div>`;
+}
+function refreshBtn(title) { return `<span class="btn icon" title="${title}">${I.refresh}</span>`; }
+function chips(list, key, opts = {}) {
+  const hasErr = list.some(c => c.err);
+  const cs = list.map(c => `<span class="chip ${c.warn ? 'warn' : ''} ${c.err ? 'err' : ''}">${c.warn ? I.warn : ''}${c.err ? I.err : ''}${c.n}<span class="rm">${I.x}</span></span>`).join('');
+  const add = opts.typed ? `<span class="add typed">${opts.typed}<span style="border-left:1px solid var(--d-text);margin-left:1px"></span></span>` : `<span class="add">Add a role...</span>`;
+  return `<div class="chips ${hasErr ? 'err' : ''} ${opts.focus ? 'focus' : ''}" id="chips-${key}">${cs}${add}<span class="arrow">${I.chev}</span></div>`;
+}
+function row(label, ctl, help, key, top) {
+  return `<div class="row"><label>${label}</label><div><div class="ctl">${ctl}</div>${msgs(key)}${help ? `<div class="help">${help}</div>` : ''}</div></div>`;
+}
+function catCount(k) {
+  const c = S.counts[k];
+  if (!c) return '';
+  if (c.length === 3) return `<span class="count err">${I.err}${c[1]}</span><span class="count warn" style="margin-left:6px">${I.warn}${c[2]}</span>`;
+  return `<span class="count ${c[0]}">${c[0] === 'err' ? I.err : I.warn}${c[1]}</span>`;
+}
+function wrapCount(k) { const h = catCount(k); return h ? `<span style="display:inline-flex">${h}</span>` : ''; }
+
+const reasonsLeft = Object.values(S.msgs).flat().filter(m => m[0] === 'err').length;
+const warningsLeft = Object.values(S.msgs).flat().filter(m => m[0] === 'warn').length;
+
+let form;
+if (S.readonly) {
+  form = `
+  <div class="banner warn">${I.lock}<div><b>Read only.</b> This setup was written by a newer Map Studio (schema 2). This Designer edits schema 1. It is shown as written and never rewritten here.</div></div>
+  <div class="raw"><div class="lbl">setup.json as written</div><pre>{
+  "schemaVersion": 2,
+  "connection": "MapStudio",
+  "roles": {
+    "full": ["MapEditor", "Administrator"],
+    "phone": ["MapOperator"]
+  },
+  "kindsFunction": "mapstudio_adapter.kinds",
+  "assetsFunction": "mapstudio_adapter.assets",
+  "refreshIntervalSeconds": 10,
+  "alarmPage": "/alarms/{item.name}",
+  "basemaps": ["none", "osm"],
+  "tokenSecret": "",
+  "labelZoom": 14
+}</pre><div class="help" style="margin-top:6px">To edit it, open the project in a Designer with the newer Map Studio module, or edit setup.json and scan the project.</div></div>`;
+} else {
+  const unreach = S.gwDown ? `<div class="banner warn">${I.cloud}<div><b>Gateway not reachable - lists unavailable, typing still works.</b> Connections, roles and secret providers come back with the Gateway; functions and pages are still listed.</div><span class="act">Try again</span></div>` : '';
+  const inh = S.inherited ? `<div class="banner info">${I.info}<div><b>Inherited from template-base.</b> Saving makes this project's own copy.</div></div>` : '';
+  const conn = S.connection;
+  const connCls = conn.state === 'warn' ? 'warn' : '';
+  const secretRow = `<div class="pair">${combo(S.secretProvider, 170, { ph: S.gwDown ? 'Type a provider' : 'Select one...' })}${combo(S.secretName, 202, { ph: 'Secret name', mono: true })}${refreshBtn('Refresh the secret providers')}<span class="status"></span></div>`;
+  form = `${inh}${unreach}
+  <section id="s-store"><h2>Map store</h2>
+    ${row('Database connection', combo(conn.v, 340, { cls: connCls }) + refreshBtn('Refresh the Gateway\'s database connections') + status(conn.state),
+      'The Gateway database connection (PostgreSQL) the map is stored in. Pick one or type a name.', 'connection')}
+  </section>
+  <section id="s-who"><h2>Who can edit</h2>
+    ${row('Full-editing roles', chips(S.full, 'full', S.picker ? { typed: 'Ma', focus: true } : {}) + refreshBtn('Refresh the roles'),
+      'Edit everything: drawing, kinds, import. Roles of the identity provider default, compared exactly.', 'full')}
+    ${row('Phone-editing roles', chips(S.phone, 'phone') + refreshBtn('Refresh the roles'),
+      'Move points and edit properties from a phone. A role in both lists gets full editing.', 'phone')}
+  </section>
+  <section id="s-kinds"><h2>Kinds and assets</h2>
+    ${row('Kinds function', combo(S.kinds.v, 340, { mono: true, ph: 'Select one...' }) + status(S.kinds.state),
+      'The project library function that returns the kind list, as package.function.', 'kinds')}
+    ${row('Assets function', combo(S.assets.v, 340, { mono: true }) + status(S.assets.state),
+      'The project library function that returns the asset list, as package.function.', 'assets')}
+    ${row('Refresh interval', `<div class="field ${S.refresh === '0' ? 'err' : ''}" style="width:96px;padding-right:0"><span class="val">${S.refresh}</span><span class="arrow" style="display:flex;flex-direction:column;justify-content:center;gap:0"><span style="transform:rotate(180deg);line-height:8px">${I.chev}</span><span style="line-height:8px">${I.chev}</span></span></div><span style="color:var(--d-text-2)">seconds</span>`,
+      'How often kinds and assets are read again. 1 to 3600.', 'refresh')}
+  </section>
+  <section id="s-map"><h2>Map</h2>
+    ${row('Basemaps', `<div class="checks">${[['none', 'None'], ['osm', 'OpenStreetMap'], ['satellite', 'Satellite'], ['mapbox', 'Mapbox']].map(([k, l]) => `<span class="cb"><span class="box ${S.basemaps[k] ? 'on' : ''}">${S.basemaps[k] ? I.tick : ''}</span>${l}</span>`).join('')}</div>`,
+      'The basemaps the map offers. At least one. Mapbox needs the map token below.', 'basemaps')}
+    ${row('Alarm page', combo(S.alarm.v, 340, { mono: true }) + `<span class="btn" title="Insert a placeholder" style="font-family:var(--mono);font-size:12px">{ }</span>` + status(S.alarm.state),
+      'The Perspective page View alarms opens. Add a placeholder such as {item.name} to filter it to the item.', 'alarm')}
+    ${row('Map token', secretRow,
+      'The secret that holds the basemap token: a provider and a secret name. Names only - the Designer never reads, shows or logs the token.', 'secret')}
+  </section>`;
+}
+
+const footer = S.readonly
+  ? `<div class="footer">${I.lock}<span>Read only - this Designer does not save this setup.</span></div>`
+  : reasonsLeft
+    ? `<div class="footer err">${I.err}<span>${reasonsLeft} reasons left - this setup is not saved until they are fixed.</span><span style="color:var(--d-text-2);margin-left:6px">${warningsLeft} warnings do not stop a save.</span></div>`
+    : `<div class="footer">${I.check}<span>Saves with the project (File &gt; Save).</span></div>`;
+
+const cats = S.readonly ? '' : [['store', 'Map store'], ['who', 'Who can edit'], ['kinds', 'Kinds and assets'], ['map', 'Map']]
+  .map(([k, l], i) => `<div class="${i === 0 ? 'on' : ''}"><span>${l}</span>${wrapCount(k)}</div>`).join('');
+
+document.getElementById('app').innerHTML = `
+<div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Tools</span><span>Window</span><span>Help</span></div>
+<div class="toolbar">${['M3 3h10v10H3z', 'M3 8h10', 'M8 3v10'].map(() => `<span class="tb">${I.doc}</span>`).join('')}<span class="tb sep"></span><span class="tb">${I.refresh}</span><span class="tb sep"></span><span style="color:var(--d-text-2);font-size:12px">mapstudio-dev</span></div>
+<div class="main">
+  <div class="browser">
+    <div class="dock-title">Project Browser</div>
+    <div class="tree">
+      <div style="padding-left:8px">${I.chev}${I.folder}Perspective</div>
+      <div style="padding-left:26px">${I.right}${I.folder}Views</div>
+      <div style="padding-left:40px">${I.doc}Page Configuration</div>
+      <div style="padding-left:40px">${I.doc}Session Events</div>
+      <div style="padding-left:8px">${I.chev}${I.folder}Scripting</div>
+      <div style="padding-left:26px">${I.right}${I.folder}Project Library</div>
+      <div style="padding-left:40px">${I.doc}Gateway Events</div>
+      <div style="padding-left:8px">${I.right}${I.folder}Named Queries</div>
+      <div style="padding-left:8px">${I.right}${I.folder}Reports</div>
+      <div class="sel" style="padding-left:22px">${I.map}Map Studio Setup${S.inherited ? '<span class="inh">(inherited)</span>' : ''}</div>
+    </div>
+  </div>
+  <div class="workspace">
+    <div class="tabs"><div class="tab">${I.map}<span>Map Studio Setup</span><span class="x">${I.x}</span></div></div>
+    <div class="tabbody">
+      <div class="cats ${S.readonly ? 'off' : ''}">${cats}</div>
+      <div class="formwrap">
+        <div class="scroll" id="scroll">
+          <div class="hdr"><div><h1>Map Studio Setup</h1><div class="sub">Project mapstudio-dev - how Map Studio stores, guards and draws this project's map.</div></div><span class="schema">${S.readonly ? 'Schema 2 - read only' : 'Schema version 1'}</span></div>
+          ${form}
+          <div class="scrollbar" id="sb"></div>
+        </div>
+        ${footer}
+      </div>
+    </div>
+  </div>
+</div>
+<div class="statusbar"><span>${S.readonly ? 'Read only' : 'Ready'}</span><span class="gw ${S.gwDown ? 'down' : ''}">${I.gw}${S.gwDown ? 'Gateway localhost:8088 - not reachable' : 'Gateway localhost:8088 - connected'}</span></div>`;
+
+const sc = document.getElementById('scroll');
+if (sc.scrollHeight > sc.clientHeight + 4) document.getElementById('sb').style.display = 'block';
+
+if (S.picker) {
+  const ch = document.getElementById('chips-full').getBoundingClientRect();
+  const p = document.createElement('div');
+  p.className = 'popup';
+  p.style.left = ch.left + 'px'; p.style.top = (ch.bottom + 3) + 'px'; p.style.width = '300px';
+  p.innerHTML = `<div class="ph2">Roles of identity provider default matching "Ma"</div>
+    <div class="it dim">${I.check}MapEditor <span style="margin-left:auto;font-size:11.5px">added</span></div>
+    <div class="it hi"><span style="width:14px"></span>MapOperator</div>
+    <div class="it"><span style="width:14px"></span>Maintenance</div>
+    <div class="ft">Enter adds the highlighted role. A name the provider does not have can be typed and added; it is marked with a warning.</div>`;
+  document.body.appendChild(p);
+}
+</script>
+</body>
+</html>
