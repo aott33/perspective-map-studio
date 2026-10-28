@@ -284,8 +284,8 @@ test.describe('390 px', () => {
         const counts = await loadedCounts(map);
         expect(counts.points).toBeGreaterThanOrEqual(1);
         // Nothing of Map Studio's sits in the bottom-right corner the App Bar toggle uses.
-        const fit = await page.locator('.mapstudio-fit-group').boundingBox();
-        expect(fit.y + fit.height).toBeLessThan(844 - 64);
+        const zoom = await page.locator('.mapstudio-zoom').boundingBox();
+        expect(zoom.y + zoom.height).toBeLessThan(844 - 64);
         await shot(page, 'mapstudio-scale-390.png');
     });
 });

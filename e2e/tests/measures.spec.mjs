@@ -359,23 +359,30 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
     });
 
     await probe('line-tool-finishes-by-touch-alone', async () => {
-        const cx = box.x + box.width / 2;
-        const cy = box.y + box.height / 2;
+        // The spike's line tool is Edit mode's (epic 3 entry 14): a second page on the dev editing page /edit.
+        const edit = await context.newPage();
+        const editMap = await openMap(edit, '/edit');
+        await mapLoaded(editMap);
+        const editBox = await editMap.boundingBox();
+        const editReply = edit.locator('.mapstudio-reply');
+        const cx = editBox.x + editBox.width / 2;
+        const cy = editBox.y + editBox.height / 2;
         const [a, b] = TRACER.drawOffsets.map(([dx, dy]) => [cx + dx, cy + dy + 140]);
-        await page.touchscreen.tap(...(await page.locator('.mapstudio-draw-button').evaluate((el) => {
+        await edit.touchscreen.tap(...(await edit.locator('.mapstudio-draw-button').evaluate((el) => {
             const r = el.getBoundingClientRect();
             return [r.x + r.width / 2, r.y + r.height / 2];
         })));
-        await expect(reply).toHaveAttribute('data-drawing', 'true', { timeout: 5_000 });
+        await expect(editReply).toHaveAttribute('data-drawing', 'true', { timeout: 5_000 });
         // Terra Draw shows no state between vertex taps; the pause only keeps two taps from reading as a double tap.
-        await page.touchscreen.tap(a[0], a[1]);
-        await page.waitForTimeout(300);
-        await page.touchscreen.tap(b[0], b[1]);
-        await page.waitForTimeout(300);
+        await edit.touchscreen.tap(a[0], a[1]);
+        await edit.waitForTimeout(300);
+        await edit.touchscreen.tap(b[0], b[1]);
+        await edit.waitForTimeout(300);
         // No Enter key on a phone: tapping the last vertex again is the touch way to finish.
-        await page.touchscreen.tap(b[0], b[1]);
-        const points = await until(() => reply.getAttribute('data-line-points'), (p) => p === '2', 3000);
-        return { ok: points === '2', detail: `data-line-points after two vertex taps and a repeat tap on the last: '${points}' (whether Terra Draw finishes this way on touch is the thing probed)` };
+        await edit.touchscreen.tap(b[0], b[1]);
+        const points = await until(() => editReply.getAttribute('data-line-points'), (p) => p === '2', 3000);
+        await edit.close();
+        return { ok: points === '2', detail: `data-line-points after two vertex taps and a repeat tap on the last, on /edit: '${points}' (whether Terra Draw finishes this way on touch is the thing probed)` };
     });
 
     await probe('no-console-or-page-errors', async () => ({
@@ -386,7 +393,7 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
     await context.close();
     m.phone = {
         label: 'measured',
-        method: 'Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the dev map at / with the seeded items; each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device\'s touch handling is unverified. Pan and pinch are read from the open popup\'s tip position (a DOM stand-in for the point\'s map position), not from the map\'s centre or zoom, which the suite cannot reach by design.',
+        method: 'Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the dev map at / with the seeded items (the line-tool probe on /edit, where Edit mode holds the tool); each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device\'s touch handling is unverified. Pan and pinch are read from the open popup\'s tip position (a DOM stand-in for the point\'s map position), not from the map\'s centre or zoom, which the suite cannot reach by design.',
         env: envFor('390x844'),
         deviceScaleFactor: 2,
         findings,

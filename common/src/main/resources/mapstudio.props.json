@@ -111,6 +111,11 @@
       "description": "Draw the style preview panel over the map (epic 3 entry 1, docs/styles.md): every kind's style rule and area tints, each case in its preset, and the preset and tint palettes. The kind setup screen's preview, shown here for review; off by default.",
       "default": false
     },
+    "editMode": {
+      "type": "boolean",
+      "description": "Open the component in Edit mode (epic 3 entry 14, docs/contract.md). Today Edit mode holds the spike's Draw a line tool alone, which View mode never shows; epic-editing builds the studio behind it. The dev project's /edit page sets it; off by default.",
+      "default": false
+    },
     "style": {
       "$ref": "urn:ignition-schema:schemas/style-properties.schema.json",
       "default": {

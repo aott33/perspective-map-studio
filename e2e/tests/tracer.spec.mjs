@@ -1,11 +1,13 @@
 // The tracer view at 1440 and 390 px: the seeded map items (epic 2 story 11), the round
 // trip, the popup view and a drawn line; one screenshot per width for the docs (AD-15).
+// On the dev editing page /edit as the map editor (epic 3 entry 14): the spike's Draw a line
+// tool is Edit mode's (the editMode prop) and View mode never shows it.
 
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
 import { TRACER, pagePixel } from '../lib/geo.mjs';
-import { VERTEX_PAUSE_MS, ensureSeeded, expect, loadedCounts, nextFrames, openMap, test } from './fixtures.mjs';
+import { EDITOR_USER, VERTEX_PAUSE_MS, editorTest, ensureSeeded, expect, loadedCounts, nextFrames, openMap, test } from './fixtures.mjs';
 
 let seed;
 test.beforeAll(async ({ browser }) => {
@@ -16,8 +18,9 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
     test.describe(`${width} px`, () => {
         test.use({ viewport: { width, height }, deviceScaleFactor: 1 });
 
-        test('map, round trip, popup view and a drawn line', async ({ page }) => {
-            const map = await openMap(page, '/');
+        editorTest('map, round trip, popup view and a drawn line', async ({ page }) => {
+            const map = await openMap(page, '/edit');
+            await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
             // Read back from MapLibre's own item sources by the component, not from its input: at least
             // the tracer's three points and its line (the phone's tiles hold only part of the 30-pad set).
             const counts = await loadedCounts(map);
@@ -43,7 +46,9 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             const cx = box.x + box.width / 2;
             const cy = box.y + box.height / 2;
             const [a, b] = TRACER.drawOffsets.map(([dx, dy]) => [cx + dx, cy + dy]);
+            // Edit mode's tool (the editMode prop on /edit); View mode's pages have none (basemaps.spec.mjs).
             const toggle = page.locator('.mapstudio-draw-button');
+            await expect(toggle).toBeVisible();
             await toggle.click();
             await expect(reply).toHaveAttribute('data-drawing', 'true');
             await page.mouse.click(a[0], a[1]);
