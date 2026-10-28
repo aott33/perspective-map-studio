@@ -11,8 +11,9 @@
  * keys move the active row (wrapping), Home and End jump, Enter chooses the active row (the first
  * when none is active), Esc clears the text and closes the list, Tab or a click elsewhere closes it
  * (a press on a row keeps the focus in the input, so the click reaches the row). After a choice the
- * text is cleared, a polite live region says "<name> selected", and at phone width the input gives
- * the focus up so the keyboard goes away. The component owns the choice (zoom and select); this
+ * text is cleared, a polite live region says "<name> selected", the focus goes where the choice
+ * leads (into a chosen point's popup, as MapLibre opens it; it stays here for a line), and at phone
+ * width the input gives the focus up so the keyboard goes away. The component owns the choice; this
  * control reports it through `onChoose` and takes the entries through `setEntries`. Token colours
  * only, in mapstudio.css; 44 px targets at phone width.
  */

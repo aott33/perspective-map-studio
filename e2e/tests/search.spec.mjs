@@ -150,10 +150,13 @@ test.describe('1440 px', () => {
         await expect(map).toHaveAttribute('data-center', '-104.95500,39.74300');
         await expect(popup(page)).toHaveAttribute('data-point-id', ids.p3, { timeout: DRAW_MS });
         await expect(input(page)).toHaveValue('');
-        await expect(input(page)).toBeFocused();
         await expect(page.locator('.mapstudio-search-status')).toHaveText('Point 3 selected');
+        // The focus moved into the popup, as MapLibre opens it (focusAfterOpen): Esc there is the popup's.
+        await expect.poll(() => page.evaluate(() => Boolean(document.activeElement && document.activeElement.closest('.maplibregl-popup'))),
+            'the focus in the popup').toBe(true);
 
         // No matches is said in words; Esc clears the text and closes the list, the focus staying in the field.
+        await input(page).focus();
         await page.keyboard.type('zzz');
         await expect(panel(page)).toBeVisible();
         await expect(page.locator('.mapstudio-search-empty')).toHaveText('No matches');
@@ -178,17 +181,21 @@ test.describe('1440 px', () => {
         await expect(map).toHaveAttribute('data-fit', 'off');
         await expect(popup(page)).toHaveCount(0);
         await expect(page.locator('.mapstudio-search-status')).toHaveText('Tracer line selected');
+        // No popup took the focus: it stays in the field.
+        await expect(input(page)).toBeFocused();
     });
 
     test('a viewer finds a map item by its linked asset\'s name, whatever the letter case or accents', async ({ page }) => {
         const map = await openLive(page);
         // The viewer got the asset names (ids and names only) and no asset rows.
         await expect(page.locator('.mapstudio-adapter-status')).toHaveAttribute('data-assets-rows', '');
-        // "Pad 14" is a pad's name and the name of the asset Point 2 is linked to: the name first, then the asset.
+        // "Pad 14" is a pad's name and the name of the asset Point 2 is linked to: the name prefix first, then the
+        // asset prefix, then the line whose name holds it.
+        const expected = ['Pad 14|Well pad|name', 'Point 2|Well pad - Pad 14|asset', 'Line to Pad 14|Gathering line|name'];
         await input(page).fill('Pad 14');
-        expect(await rows(page)).toEqual(['Pad 14|Well pad|name', 'Point 2|Well pad - Pad 14|asset']);
+        expect(await rows(page)).toEqual(expected);
         await input(page).fill('pÁd 14');
-        expect(await rows(page)).toEqual(['Pad 14|Well pad|name', 'Point 2|Well pad - Pad 14|asset']);
+        expect(await rows(page)).toEqual(expected);
         await options(page).nth(1).click();
         await expect(map).toHaveAttribute('data-selected', ids.p2, { timeout: DRAW_MS });
         await expect(popup(page)).toHaveAttribute('data-point-id', ids.p2, { timeout: DRAW_MS });
