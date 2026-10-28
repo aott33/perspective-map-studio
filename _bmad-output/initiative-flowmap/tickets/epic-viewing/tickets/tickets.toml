@@ -132,7 +132,7 @@ title = "Refactor sweep"
 description = "Cleanup only, its scope set at its start from the plans and review findings this epic deferred; scope pushed out of another story is a new story."
 verify = "The full check set in the hand-off passes with no behaviour change; deferred-work.md entries it closes carry a resolved: line."
 covers = []
-after = [5, 6, 7, 1, 2, 8, 9, 3, 10]
+after = [5, 6, 7, 1, 14, 2, 8, 9, 3, 10]
 hitl = false
 risk = "low"
 
