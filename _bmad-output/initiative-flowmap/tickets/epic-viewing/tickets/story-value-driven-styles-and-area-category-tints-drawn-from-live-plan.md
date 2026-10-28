@@ -1,0 +1,133 @@
+---
+title: 'Value-driven styles and area category tints drawn from live values'
+type: 'feature'
+ticket: '1'
+created: '2026-10-28'
+status: 'built'
+baseline_revision: '769f3c7'
+route: 'full'
+route_source: 'auto'
+risk: 'medium'
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
+review_loop_iteration: 0
+context:
+  - '{project-root}/_bmad-output/handoff-epic-3.md'
+  - '{project-root}/docs/contract.md'
+  - '{project-root}/docs/kind-setup.md'
+  - '{project-root}/_bmad-output/backlog/spike-style-rule-expression-language.md'
+---
+
+<frozen-after-approval reason="human-owned intent - do not modify unless human renegotiates">
+
+## Intent
+
+**Problem:** A kind setup's `styleRule` and `areaTints` are stored and checked (epic 2 story 9) but nothing reads them: the rule's source is never subscribed, no preset reaches the browser, points and lines draw state from comms and alarms alone, and an area draws as a plain line. The expression type's language and where it runs were open until the refinement (owner, 2026-10-28: Ignition's expressions, on the Gateway, checked live first).
+
+**Approach:** Check live on 8.3 whether module code can evaluate an Ignition expression against a value (the SDK's `StringParser` with a parse context that binds `{value}`), record it, then work every map item's rule out on the Gateway in the shared live-value cache: the rule's source is one more slot of the shared subscription, States, Bands and the expression pick a preset, a stale source gives `normal` marked stale, and the preset name travels in `values.batch` as a `style` slot. The browser draws the preset on points (ring, word), lines (hue, dash, weight, word) and areas (the category tint from the kind display), alarm over value style over tint, from theme tokens that stand in until entry 12. A `StylePreview` component draws every case of a rule in its preset, exported for the kind setup screen, shown on the dev page `/styles` in both themes, and `docs/styles.md` lists every preset and tint for ER-27.
+
+## Decisions (recorded for the owner, 2026-10-28; the session is unattended)
+
+1. **Expression.** Parsed once per rule by `StringParser.newStandardParser_NonLocalized()` with an `ExpressionParseContext` whose function factory is `DefaultFunctionFactory.getSharedInstance()` and whose only bound reference is `{value}` (the source's value as a `ConstantExpression`); any other `{reference}` is a parse error. An expression that does not parse is refused by the write path (`invalid`, the parser's reason), so a stored rule always parses; an expression that throws at run time or gives anything but a preset name of the kind draws `normal` and the item reports a `style` problem in words. The result is read as text; `dimmed` and the line presets count. Evaluated per source delivery on the batch build (the live thread), never on the tag thread. The live measure (cost per evaluation, errors) goes to `docs/platform-checks.md`.
+2. **Style slot.** Each planned item with a rule carries `style: {preset, stale, reason}` in the batch: the preset the rule gives, or `normal` with `stale: true` and the reason (the source's quality name, `no value yet`, `comms lost`) when the source is stale; a value in no band and a state with no case give `normal`, not stale. The source slot is `style` in the plan; a `{kpi}` source shares the KPI's path (one subscription) and is still subscribed when that KPI is off; an item's `overrides.styleRule` replaces the kind's whole rule. A `{instruments: "worst"}` source makes no slot (entry 2).
+3. **KindDisplay** gains the path-free `styleRule {type, source, cases}` (source `kpi:<key>`, `tag` or `instruments`; a case is `{label, preset}`: a state's value, a band's "min to max", or for an expression each preset name quoted in its text) and `areaTints {property, tints}`, so viewers draw an area's tint from its property and the preview and the legend (entry 3) have the cases without a path.
+4. **The look.** Points: `attention` a 3 px ring in `--mapstudio-attention` (fallback `--neutral-90`) and the chip word "Attention"; `warning` a 2.5 px ring in `--mapstudio-warning` (`--warning`) and "Warning"; `fault` the same in `--mapstudio-fault` (`--error`) and "Fault"; `dimmed` the disc and glyph at 45 % with a dashed neutral ring and "Out of service". The alarm badge draws over any of them; comms lost and stale replace the look (the Gateway already dropped the style) and keep their words. Lines: the three hues and words the same (an alarm's hue wins, the badge at the midpoint), `dimmed` at 45 %, `solid`, `dashed` (8 6) and `dotted` (1 3, round caps) patterns, weight by pipe size as entry 7; a stale source draws dashed. Areas (a line kind with `area: true`): a closed fill at 22 % in the tint token and a 1.5 px outline at 80 %; `--mapstudio-tint-1` to `-6` fall back to `--qual-3`, `--qual-7`, `--qual-2`, `--qual-9`, `--qual-10`, `--qual-8` (none the comms-lost purple `--qual-1` or the error red); a category with no tint, or no `areaTints`, draws the neutral area look. Every token is a stand-in for entry 12.
+5. **Preview.** `web/typescript/StylePreview.tsx`, exported from the bundle (`MapStudio.StylePreview`), takes a kind display's `styleRule` with the kind's geometry and icon and draws one tile per case: the marker image's own SVG (`markerSvg`) or a line sample, the case label and the preset word; the tints the same for `areaTints`. The component draws it in a panel when the prop `previewStyles` is true (a closed-list prop, documented), which the dev page `/styles` sets; the page has a theme button (light and dark) so the e2e takes both screenshots for `docs/styles.md`.
+6. **Dev stack.** The Pad UDT gains `Status` (Int4, memory, 0; a fresh volume once), the seed's pad setup a States rule on `{asset.path}/Status` (1 attention, 2 warning, 3 fault, 4 dimmed), the line kind setup a Flow KPI and a Bands rule on it (below 50 normal, 50 to 200 attention, 200 and above fault) with the tracer line linked to asset `L3`, Point 2 (P14) an override expression rule `if({value} > 600, 'warning', 'normal')` on `[default]Mesa/P14/Pressure`, and two geofences (North, South) with the geofence setup's `areaTints`. The `/live` buttons gain Status 0 to 4, L3 flow and P14 pressure.
+7. **No subagents.** The session has no subagent tool: this agent implements from the plan and runs the quick review lens by reading the diff.
+
+## Boundaries & Constraints
+
+**Always:** the rule is worked out on the Gateway, once per item per batch build, never per session; one subscription per path (a `{kpi}` source adds none); a stale source draws only as stale; alarm over value style over tint; every colour a theme token read from the component root with a Perspective variable fallback, no literal in code, CSS or stored data; every preset said with a word or glyph, never colour alone; no tint on a point or a line; no tag path and no expression text in a batch; contract 0.3.0 with `docs/contract.md` and `docs/kind-setup.md` updated and `check-contract-versions.sh` green; Jython 2.7 rules in the seed and `mapstudio_live`; no em dash.
+
+**Never:** the instruments source (entry 2), the legend (entry 3), the kind setup screen and rule editing (epic-editing), the hue review (entry 12), a change to `ign-scada-template`, a write to any Gateway but the local dev stack, a `.modl` or scratch file committed.
+
+## I/O & Edge-Case Matrix
+
+| Scenario | Input / State | Expected Output / Behavior | Error Handling |
+|----------|--------------|---------------------------|----------------|
+| States rule | pad rule on `{asset.path}/Status`, Status 2 delivered Good | `style {preset: warning, stale: false}`; the marker's warning ring and the chip "Warning" | a value with no case: `normal` |
+| Bands rule on a KPI | line rule on KPI `flow`, Flow 120 | `style {preset: attention}`; one subscription for the KPI and the rule | a value in no band: `normal`; a non-number value: `normal` with a `style` problem |
+| Expression rule | override `if({value} > 600, 'warning', 'normal')`, Pressure 700 | `style {preset: warning}` | an expression that errors or gives a non-preset: `normal` and a `style` problem; one that does not parse is refused at save |
+| Stale source | Status quality Bad, or the item's comms false | `style {preset: normal, stale: true, reason}`; the map draws the stale or comms-lost look alone | none |
+| Alarm over style | Pressure 950 (alarm) and Status 2 | the alarm badge and digit over the warning ring and word | none |
+| Area tint | geofence with `operator: North`, tints North tint-1 | the fill in `--mapstudio-tint-1`; a point or line of any kind never takes one | an unknown category: the neutral area look |
+| Override | an item's `overrides.styleRule` | that item's rule replaces the kind's; the kind's other items keep theirs | an override whose source path is not full: ignored, the kind's rule applies |
+| Switched off | a kind setup with no rule | no `style` slot, no extra subscription | none |
+| Preview | the pad's display rule | four tiles, one per case, each with its preset look and word | an expression rule: a tile per preset named in it |
+
+</frozen-after-approval>
+
+## Code Map
+
+- `common/.../contract/StyleRule.java` (new) -- the parsed rule (states, bands, expression) and the pure `preset(value)` for states and bands; the display projection.
+- `common/.../contract/KindDisplay.java`, `KindDisplayTest` -- `styleRule` and `areaTints` projections.
+- `common/.../contract/StylePresets.java` -- unchanged lists; `isPreset`.
+- `gateway/.../live/StyleExpressions.java` (new) -- the Ignition expression parse and run (`StringParser`, `ConstantExpression`), the parse check the write path calls.
+- `gateway/.../live/ValuePlan.java`, `LiveValueCache.java` -- the `style` slot, the rule per item, the slot in `itemJson`.
+- `gateway/.../write/WriteService.java` -- the expression parse check on a kind setup and an override.
+- `web/typescript/live.ts` -- `StyleSlot`, `ItemState.preset`, the display's rule and tints; `markers.ts` -- the preset in the marker spec and image, the words, the line look; `features.ts` -- areas; `theme.ts`/`MapStudio.tsx` -- the tokens, the area layers, the dotted layer, the preview panel, the `previewStyles` prop; `StylePreview.tsx` (new); `mapstudio.css`; `index.ts` export; `mapstudio.props.json`.
+- `ops/` -- the UDT, the seed (line and geofence setups, the override, the geofences, L3 link), `mapstudio_live`, the `/live` buttons, the `/styles` page.
+- `e2e/tests/styles.spec.mjs` (new), `docs/styles.md` (new), `docs/contract.md`, `docs/kind-setup.md`, `docs/platform-checks.md`, `CHANGELOG.md`, architecture AD-16, the spike's Notes.
+
+## Tasks & Acceptance
+
+**Execution:**
+- [x] `common/` -- `StyleRule`, the display projections, tests.
+- [x] `gateway/` -- `StyleExpressions`, the plan's style slot, the cache's style evaluation, the write path's parse check, tests.
+- [x] `web/` -- the slot, the looks, the areas, the preview, the prop, tests.
+- [x] `ops/` -- the UDT, the seed, the buttons, the `/styles` page.
+- [x] `e2e/tests/styles.spec.mjs` -- the verify line, screenshots in both themes.
+- [x] docs, CHANGELOG, architecture, the spike, platform checks, this plan.
+
+**Acceptance Criteria:**
+- Given the dev Gateway with the seeded setups, when P12's Status and L3's Flow change, then Point 1's marker and the tracer line change their look within one refresh interval.
+- Given Pressure of P12 above 900 with Status 2, then the alarm badge draws over the warning look.
+- Given Comms of P12 false, then Point 1 shows comms lost alone, and the warning look returns when comms are back.
+- Given the two geofences, then each draws its tint and no point or line does.
+- Given `/styles`, then every case of every rule and every tint draws in its preset, in light and dark.
+- Given the hand-off's checks, then every one passes.
+
+## Implementation Notes
+
+- **Commits on the worktree branch** (`worktree-agent-ad2211a00b3765ef7`, baseline `769f3c7`): the plan; 18ef67f (the Gateway: `StyleRule`, `KindDisplay`'s rule and tint projections, `StyleExpressions`, the plan's `style` slot, the cache's style slot, the write path's expression check, tests); 78eea03 (the browser: the slot in `live.ts`, the preset ring and words in `markers.ts`, areas in `features.ts`, the layers, the `previewStyles` prop, `StylePreview.tsx`, Jest over `.tsx`); afc14d7 (the dev stack: the `Status` tag, the three seeded setups, the override, the geofences, the `/live` buttons, `/styles`); 880e9d2 (the e2e spec, the docs, AD-16 and the spike); then the evidence commit (platform checks, screenshots, this plan).
+- **The expression check (step 1).** Run first against the SDK's `ignition-common` 8.3.0 jar on this box (a scratch `java` program, never committed), then in `StyleExpressionsTest` and live through Point 2's override. `ELParserHarness` is the expression parser; `StringParser` is not (it reads text with embedded references). A syntax error, another reference and a denied function all surface at parse as `RuntimeException`s with the parser's words; run-time failures as `ExpressionException` or a value (`/ 0` gives `Infinity`); 344 ns per run, 35 microseconds per parse. So the expression type ships (decision 1); nothing goes to the backlog. The function names reach the factory in lower case, so the deny map carries the canonical spelling for the message.
+- **Decision 2 as built:** the `style` slot is `{preset, stale, reason}` with no value; the source's LiveValue itself is not sent (a `{kpi}` source's value is already in `kpis` when the KPI is on). A `{kpi}` source keeps the KPI's path subscribed even when the KPI is off (the plan reads every KPI's path first).
+- **Decision 4 as built:** `attention` is a 3 px ring in `--mapstudio-attention` (`--neutral-90`, then `--label`), `warning` and `fault` 2.5 px rings, `dimmed` the disc and glyph in a group at 45 % with a 2 2 dashed neutral ring; the marker image id gained the preset as its seventh element (a 6-element id is refused). Dotted lines are a layer of their own (`line-dasharray` is not data-driven) with round caps and `[0.01, 2.2]`; the basemap now inserts under the area fill layer. Areas leave the `lines` collection (no pipeline look, no selection casing) and `data-items-loaded` counts them.
+- **Decision 5 as built:** the panel is a card over the map's left edge (`.mapstudio-style-panel`), scrolling, 420 px or the phone's width; the preview tiles inline the marker SVG through `dangerouslySetInnerHTML` (the module's own generated text, never data). Jest's transform now covers `.tsx` so the component renders with `react-dom/server`.
+- **Tests touched by the shape change:** `MarkerColors` gained `attention`, `warning`, `fault` and `tints` (the two test fixtures), `lineLook` gained `dotted` and `dimmed`, `ItemState` gained an optional `preset`; the designer's `ProjectListsTest` and `ProjectResourcesTest` list the dev pages and gained `/styles`; the seed harness counts 68 items and three kind setups.
+
+## Plan Change Log
+
+## Review Triage Log
+
+Review pass 1 (quick lens, read by this agent from the diff of the five commits; no subagent tool in this session): 0 high, 2 medium, 3 low, 0 false.
+
+| Finding | Verdict | Route | Evidence |
+| --- | --- | --- | --- |
+| The expression's default function factory reaches tags and scripts (`tag()`, `runScript()`), so a kind setup editor could read any tag through a style rule | medium | patched | `StyleExpressions.DENIED` refuses them (and the stateful `hasChanged()`) at parse; `StyleExpressionsTest`, `WriteServiceKindCheckTest` |
+| The first live run's preview test counted `svg` elements in a point tile and found two (the marker image nests the kind glyph's own svg) | medium | patched | the test counts the sample's root svg; the component is right |
+| `renderStylePanel` chains a `forceUpdate` on the shared sprite promise on every render until the sprite arrives: a handful of extra renders at mount | low | rejected | the promise is one per component and the panel is a dev and review surface; no loop (the sprite settles once) |
+| `fault` and `warning` fall back to the same Perspective variables as alarm priorities 1 and 2 | low (by plan) | recorded | docs/styles.md names it for ER-27; the ring and word tell them from the badge and digit |
+| A `{kpi}` source keeps a switched-off KPI's path subscribed | low (by design) | rejected | the rule names it; docs/kind-setup.md says so |
+
+## Design Notes
+
+**Why the Gateway, not the browser.** One evaluation per item per batch serves every open map and the popup agrees with the icon (AD-6); the expression parser is the SDK's and lives on the Gateway anyway; a viewer never sees a path or the expression text.
+
+**Why the preset name travels, not the rule.** The browser needs no rule engine and cannot disagree with the Gateway; the kind display's path-free rule is for the preview and the legend only.
+
+## Verification
+
+**Commands:**
+- `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew clean build --offline` (with the scratch init script that keeps the node plugin from downloading Node) -- expected: BUILD SUCCESSFUL.
+- `cd web && npx tsc --noEmit && npx jest` -- expected: no type error, all tests pass.
+- `ops/up.sh --fresh --no-build` with the module staged by hand, then `cd e2e && npm ci && E2E_DOCS=1 PW_CHROMIUM_PATH=/opt/pw-browsers/chromium npm test` -- expected: every spec passes, `styles.spec.mjs` included.
+- `bash scripts/ci/check-contract-versions.sh` and `bash scripts/ci/test-contract-versions.sh` -- expected: OK.
+- `grep -rnP '\xE2\x80\x94'` on every changed file -- expected: no match.
+
+**Manual checks:**
+- The screenshots in `docs/screenshots/` show the warning ring and chip on Point 1, the attention line with its chip, the two tinted fences, and the preview panel in both themes.
+
+**Results (2026-10-28, 4-CPU agent box, Ignition 8.3.10, container `ms-68194f0d`, fresh volumes):** the final chain 20:41 to 20:59 UTC: `./gradlew clean build --offline` BUILD SUCCESSFUL with every common, Gateway, designer and Jest test; `tsc --noEmit` clean and `jest` 24 suites, 204 tests; `ops/up.sh --fresh --no-build` up; e2e with `E2E_DOCS=1` 71 passed, 2 failed, 7 skipped (15.1 min), `styles.spec.mjs` 3/3; the two failures were expectations of the dev data (`scale.spec.mjs` counts the seed's items, 66 to 68; `tags.spec.mjs` lists P12's children, which gained `Status`), fixed and re-run green on the same stack with `live.spec.mjs` and `styles.spec.mjs` (6/6 and 3/3); `check-contract-versions.sh` and `test-contract-versions.sh` OK; no em dash and no model id in a changed file. The first live run of `styles.spec.mjs` found a point tile holds two `svg` elements (the marker image nests the kind glyph); the test now counts the sample's root. Screenshots refreshed by the docs run; new for this entry: `mapstudio-styles-1440.png`, `mapstudio-styles-390.png`, `mapstudio-styles-preview-light-1440.png`, `mapstudio-styles-preview-dark-1440.png`; the files the docs run wrote that no doc references were left out. Not verified: a real tag system under the expression (memory tags), another tag provider, a date-valued source, the hues against a basemap and the 3:1 contrast (entry 12), a host theme that defines the tokens itself, the owner's Designer and laptop.

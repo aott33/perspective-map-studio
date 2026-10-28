@@ -60,6 +60,17 @@ hitl = false
 risk = "medium"
 
 [[entry]]
+id = 14
+type = "story"
+title = "View-mode controls as designed"
+description = "Owner, 2026-10-28, after entry 7's renders: entries 5 to 7 each added a control on the right with its own look (zoom, a Fit and Return pill, the basemap switch, the spike's Draw a line). View mode is arranged as DESIGN.md (View mode, Phone, zoom-control) and the mockups (key-screen-1-view-desktop-popup.png, key-screen-2-phone-sheet.png) show it: one zoom card top-right with plus, the zoom level (\"z 15\"), minus, Fit and Return (an icon, disabled with nothing selected), one rounded card with the soft floating shadow, 44 px targets at 390 px; a Legend button bottom-left with the scale bar beside it, opening a panel that holds the basemap choice (None, OpenStreetMap, Satellite from the setup; owner 2026-10-28: viewers never reach Edit mode's Layers rail, which keeps its own switch when epic-editing builds it); entry 3 fills the same panel with the glyph key and the Lines and Names toggles; the spike's Draw a line leaves View mode and stays only on the dev editing page until epic-editing replaces it; nothing in the bottom-right corner; theme tokens only. Updates the screenshots and EXPERIENCE.md-facing docs (docs/basemaps.md) for the new place of the basemap choice."
+verify = "On the dev stack at 1440 and 390 px: the top-right holds one zoom card (plus, zoom level, minus, Fit, Return) and nothing else; Return is disabled with nothing selected and recentres on a selection; the Legend button bottom-left opens a panel whose basemap choice switches None, OpenStreetMap and Satellite with attribution still shown; no Draw a line control in View mode; the bottom-right corner is clear; e2e (an updated basemaps and labels spec) and unit tests pass."
+covers = ["R5", "R10"]
+after = [1]
+hitl = false
+risk = "low"
+
+[[entry]]
 id = 2
 type = "story"
 title = "Instruments drawn on lines, the ordered line popup, segment click and the aggregate line style"
@@ -96,10 +107,10 @@ risk = "low"
 id = 3
 type = "story"
 title = "Needs you summary and legend in View mode"
-description = "Initiative R42 and R43 (UX workshop, ux-map-studio, 2026-10-27; prd FR-41, FR-42; architecture AD-6, AD-11; EXPERIENCE.md Needs you bar, Legend, Responsive). View mode shows a Needs you summary counting map items in alarm, comms lost and stale, each with its glyph and word (for example Needs you 3: 1 alarm, 1 comms lost, 1 stale), from the same icon batch (AD-6, no extra subscription); a click or tap opens a list ranked alarms by priority, then comms lost, then stale, and choosing a row zooms to and selects the map item; with nothing to attend to it reads All OK in neutral and stays visible. A legend, collapsed to a button bottom-left and opened on request, names every glyph and line look the map draws in the map's own words and holds the Lines and Names toggles (FR-34). At 390 px Needs you and search share one top bar that expands on tap, and nothing sits in the bottom-right corner the App Bar toggle uses. The Needs you counts and the legend's glyph key go to entry 12's engineering review (ER-27)."
+description = "Initiative R42 and R43 (UX workshop, ux-map-studio, 2026-10-27; prd FR-41, FR-42; architecture AD-6, AD-11; EXPERIENCE.md Needs you bar, Legend, Responsive). View mode shows a Needs you summary counting map items in alarm, comms lost and stale, each with its glyph and word (for example Needs you 3: 1 alarm, 1 comms lost, 1 stale), from the same icon batch (AD-6, no extra subscription); a click or tap opens a list ranked alarms by priority, then comms lost, then stale, and choosing a row zooms to and selects the map item; with nothing to attend to it reads All OK in neutral and stays visible. A legend, the bottom-left button and panel entry 14 adds (holding the basemap choice), names every glyph and line look the map draws in the map's own words and holds the Lines and Names toggles (FR-34). At 390 px Needs you and search share one top bar that expands on tap, and nothing sits in the bottom-right corner the App Bar toggle uses. The Needs you counts and the legend's glyph key go to entry 12's engineering review (ER-27)."
 verify = "On the dev Gateway with seeded kind setups and the field simulator: one alarm, one comms-lost and one stale item read Needs you 3: 1 alarm, 1 comms lost, 1 stale within one refresh interval; the list ranks them in that order and a row zooms to and selects its item; clearing all three reads All OK in neutral; the legend opens and closes by click and keyboard and its Lines and Names toggles work; at 390 px the top bar holds search and Needs you and the bottom-right corner is clear."
 covers = ["R14", "R15"]
-after = [5, 9]
+after = [9, 14]
 hitl = true
 risk = "low"
 
@@ -121,7 +132,7 @@ title = "Refactor sweep"
 description = "Cleanup only, its scope set at its start from the plans and review findings this epic deferred; scope pushed out of another story is a new story."
 verify = "The full check set in the hand-off passes with no behaviour change; deferred-work.md entries it closes carry a resolved: line."
 covers = []
-after = [5, 6, 7, 1, 2, 8, 9, 3, 10]
+after = [5, 6, 7, 1, 14, 2, 8, 9, 3, 10]
 hitl = false
 risk = "low"
 

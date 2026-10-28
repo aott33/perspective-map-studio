@@ -36,7 +36,7 @@ class ProjectListsTest {
         assertTrue(s.functions().contains("mapstudio_dev._globals"));
         assertTrue(s.offeredFunctions().contains("mapstudio_dev.kinds"));
         assertFalse(s.offeredFunctions().contains("mapstudio_dev._globals"));
-        assertEquals(List.of("/", "/adapters", "/edit", "/fallback-empty", "/fallback-missing", "/live", "/two"), s.pages());
+        assertEquals(List.of("/", "/adapters", "/edit", "/fallback-empty", "/fallback-missing", "/live", "/styles", "/two"), s.pages());
         assertEquals("default", s.identityProvider());
     }
 

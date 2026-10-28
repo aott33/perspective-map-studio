@@ -63,6 +63,7 @@ Projects that install modules through a lock file (such as `ign-scada-template`)
 | Kinds and assets from your project | [docs/kinds-and-assets.md](docs/kinds-and-assets.md), example adapters in [docs/examples/adapters](docs/examples/adapters) |
 | Kind setups (tags, key values, alarms, popups, styles) | [docs/kind-setup.md](docs/kind-setup.md) |
 | Icons | [docs/icons.md](docs/icons.md) |
+| Value styles and area tints, in both themes | [docs/styles.md](docs/styles.md) |
 | Messages, the map store and the scripting API | [docs/contract.md](docs/contract.md) |
 | Running the map store | [docs/operations.md](docs/operations.md) |
 | Releases and the checks behind them | [RELEASING.md](RELEASING.md), [CHANGELOG.md](CHANGELOG.md) |

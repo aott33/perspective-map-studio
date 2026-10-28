@@ -27,6 +27,10 @@
   "/two": {
    "viewPath": "MapStudioTwo",
    "viewParams": {}
+  },
+  "/styles": {
+   "viewPath": "MapStudioStyles",
+   "viewParams": {}
   }
  },
  "shared": {},

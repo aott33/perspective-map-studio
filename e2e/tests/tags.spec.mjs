@@ -62,7 +62,9 @@ editorTest.describe('tag browse and resolve', () => {
         expect(p12.children).toEqual([
             { name: 'Comms', path: '[default]Mesa/P12/Comms', type: 'tag', dataType: 'Boolean', hasChildren: false },
             { name: 'Flow', path: '[default]Mesa/P12/Flow', type: 'tag', dataType: 'Float8', hasChildren: false },
-            { name: 'Pressure', path: '[default]Mesa/P12/Pressure', type: 'tag', dataType: 'Float8', hasChildren: false }
+            { name: 'Pressure', path: '[default]Mesa/P12/Pressure', type: 'tag', dataType: 'Float8', hasChildren: false },
+            // The dev Status tag the pad kind's States rule reads (epic 3 entry 1).
+            { name: 'Status', path: '[default]Mesa/P12/Status', type: 'tag', dataType: 'Int4', hasChildren: false }
         ]);
         const mesa = expectReply(await send(page, 'tags.browse', { folder: 'Mesa' }), 'tags.browse.reply');
         expect(mesa.children.map((c) => [c.name, c.type, c.dataType])).toEqual([

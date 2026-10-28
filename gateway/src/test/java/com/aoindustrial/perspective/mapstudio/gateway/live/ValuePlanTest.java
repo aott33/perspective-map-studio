@@ -11,6 +11,9 @@ import static com.aoindustrial.perspective.mapstudio.gateway.live.LiveFixtures.p
 import static com.aoindustrial.perspective.mapstudio.gateway.live.LiveFixtures.padSetup;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -21,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import com.aoindustrial.perspective.mapstudio.common.contract.Asset;
 import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
+import com.aoindustrial.perspective.mapstudio.gateway.adapter.TestKinds;
 
 /** Epic 3 entry 5: the plan rows of the I/O matrix (pure). */
 class ValuePlanTest {
@@ -100,6 +104,72 @@ class ValuePlanTest {
         assertTrue(plan.items().isEmpty(), "nothing on: no item in the plan");
         MapItemRecord tomb = pad(P1, "Point 1", "P12", null).at(2, true);
         assertTrue(ValuePlan.build(List.of(padSetup()), List.of(tomb), ASSETS).items().isEmpty());
+    }
+
+    @Test
+    void aStyleRulesSourceIsOneMoreSlotAndAKpiSourceSharesTheKpisPath() {
+        // A States rule on a tag of the asset: one more path per linked item.
+        KindSetupRecord states = new KindSetupRecord("pad", json("{\"kpis\":[{\"key\":\"pressure\","
+            + "\"path\":\"{asset.path}/Pressure\"}],\"styleRule\":{\"source\":{\"path\":\"{asset.path}/Status\"},"
+            + "\"type\":\"states\",\"cases\":[{\"value\":1,\"preset\":\"attention\"}]}}"), 1, false);
+        ValuePlan.Plan plan = ValuePlan.build(List.of(states), items(), ASSETS, TestKinds.KINDS);
+        ValuePlan.ItemPlan p1 = plan.items().get(P1);
+        assertEquals("[default]Mesa/P12/Status", p1.slots().get(ValuePlan.STYLE));
+        assertEquals("states", p1.style().rule().type());
+        assertNull(p1.style().expression());
+        assertTrue(plan.paths().contains("[default]Mesa/P12/Status"));
+        assertEquals(List.of(new ValuePlan.Problem("kpi:pressure", ValuePlan.NO_ASSET),
+            new ValuePlan.Problem(ValuePlan.STYLE, ValuePlan.NO_ASSET)), plan.items().get(UNLINKED).problems());
+        assertNull(plan.items().get(UNLINKED).style());
+        assertTrue(plan.display().get(0).toJson().has("styleRule"));
+        assertFalse(plan.display().get(0).toJson().toString().contains("Status"));
+
+        // A Bands rule on a KPI that is off: the KPI's path is subscribed for the rule alone.
+        KindSetupRecord bands = new KindSetupRecord("pad", json("{\"kpis\":[{\"key\":\"pressure\","
+            + "\"path\":\"{asset.path}/Pressure\",\"on\":false}],\"styleRule\":{\"source\":{\"kpi\":\"pressure\"},"
+            + "\"type\":\"bands\",\"cases\":[{\"min\":900,\"max\":null,\"preset\":\"warning\"}]}}"), 1, false);
+        plan = ValuePlan.build(List.of(bands), items(), ASSETS, TestKinds.KINDS);
+        p1 = plan.items().get(P1);
+        assertEquals("[default]Mesa/P12/Pressure", p1.slots().get(ValuePlan.STYLE));
+        assertFalse(p1.slots().containsKey("kpi:pressure"), "the KPI itself is off");
+        assertEquals(Set.of("[default]Mesa/P12/Pressure", "[default]Mesa/P14/Pressure", "[default]Mesa/P15/Pressure"), plan.paths());
+        // A rule naming a KPI the setup does not have, and the instruments source: no slot.
+        KindSetupRecord noKpi = new KindSetupRecord("pad", json("{\"styleRule\":{\"source\":{\"kpi\":\"nope\"},"
+            + "\"type\":\"bands\",\"cases\":[{\"min\":900,\"max\":null,\"preset\":\"warning\"}]}}"), 1, false);
+        plan = ValuePlan.build(List.of(noKpi), items(), ASSETS, TestKinds.KINDS);
+        assertEquals(List.of(new ValuePlan.Problem(ValuePlan.STYLE, ValuePlan.NO_SUCH_KPI)), plan.items().get(P1).problems());
+        KindSetupRecord instruments = new KindSetupRecord("line", json("{\"styleRule\":{\"source\":{\"instruments\":\"worst\"}}}"),
+            1, false);
+        assertTrue(ValuePlan.build(List.of(instruments), items(), ASSETS, TestKinds.KINDS).items().isEmpty());
+    }
+
+    @Test
+    void anOverrideRuleReplacesTheKindsAndAnExpressionIsCompiledOncePerText() {
+        KindSetupRecord setup = new KindSetupRecord("pad", json("{\"styleRule\":{\"source\":{\"path\":\"{asset.path}/Status\"},"
+            + "\"type\":\"states\",\"cases\":[{\"value\":1,\"preset\":\"attention\"}]}}"), 1, false);
+        String expression = "{\"styleRule\":{\"source\":{\"path\":\"[default]Mesa/P14/Pressure\"},\"type\":\"expression\","
+            + "\"expression\":\"if({value} > 600, 'warning', 'normal')\"}}";
+        MapItemRecord p2 = pad(LiveFixtures.P2, "Point 2", "P14", expression);
+        MapItemRecord p3 = pad(P3, "Point 3", "P15", expression);
+        MapItemRecord relative = pad(OVERRIDDEN, "Relative", "P12",
+            "{\"styleRule\":{\"source\":{\"path\":\"{asset.path}/Other\"},\"type\":\"states\",\"cases\":[{\"value\":1,\"preset\":\"fault\"}]}}");
+        ValuePlan.Plan plan = ValuePlan.build(List.of(setup), List.of(pad(P1, "Point 1", "P12", null), p2, p3, relative),
+            ASSETS, TestKinds.KINDS);
+        assertEquals("[default]Mesa/P12/Status", plan.items().get(P1).slots().get(ValuePlan.STYLE));
+        ValuePlan.ItemPlan o2 = plan.items().get(LiveFixtures.P2);
+        assertEquals("[default]Mesa/P14/Pressure", o2.slots().get(ValuePlan.STYLE));
+        assertEquals("expression", o2.style().rule().type());
+        assertNotNull(o2.style().expression());
+        assertSame(o2.style().expression(), plan.items().get(P3).style().expression(), "one compiled expression per text");
+        assertEquals("[default]Mesa/P12/Status", plan.items().get(OVERRIDDEN).slots().get(ValuePlan.STYLE),
+            "an override whose path is not full is ignored: the kind's rule applies");
+        // An expression that does not parse (a hand-written row): a problem, no slot, the rest of the plan intact.
+        MapItemRecord broken = pad(P1, "Point 1", "P12", "{\"styleRule\":{\"source\":{\"path\":\"[default]Mesa/P12/Pressure\"},"
+            + "\"type\":\"expression\",\"expression\":\"{nope} + 1\"}}");
+        plan = ValuePlan.build(List.of(setup), List.of(broken), ASSETS, TestKinds.KINDS);
+        assertFalse(plan.items().get(P1).slots().containsKey(ValuePlan.STYLE));
+        assertEquals(ValuePlan.STYLE, plan.items().get(P1).problems().get(0).slot());
+        assertTrue(plan.items().get(P1).problems().get(0).reason().contains("{value} only"));
     }
 
     @Test
