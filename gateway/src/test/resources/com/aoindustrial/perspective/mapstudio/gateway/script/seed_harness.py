@@ -43,16 +43,26 @@ class _Batches(object):
         return {'batchId': 'batch-%d' % self.n, 'ops': ops}
 
 
+class _MapList(list):
+    """getMap's list with its kindSetups attribute (the live kind setup records), as MapList gives it."""
+
+    def __init__(self, items, kind_setups):
+        list.__init__(self, items)
+        self.kindSetups = kind_setups
+
+
 class FakeApi(object):
     def __init__(self):
         self.records = {}
+        self.kind_setups = {}
         self.seq = 0
         self.batches = []
         self.kinds_down = False
         self.after_get = None
 
     def getMap(self, project):
-        live = [dict(r) for r in self.records.values() if not r['deleted']]
+        live = _MapList([dict(r) for r in self.records.values() if not r['deleted']],
+                        [dict(r) for r in self.kind_setups.values() if not r['deleted']])
         if self.after_get is not None:
             hook = self.after_get
             self.after_get = None
@@ -65,6 +75,8 @@ class FakeApi(object):
             raise MapStudioException('invalid', 'The kind list is not available (the kind function failed).')
         conflicts = JsonArray()
         for i, op in enumerate(batch['ops']):
+            if op['entity'] != 'item':
+                continue
             r = self.records.get(op['id'])
             if op['op'] == 'create':
                 ok = (r is None and op['baseVersion'] == 0) or (
@@ -90,6 +102,15 @@ class FakeApi(object):
                                      java.lang.Integer(0), batch['ops'][0]['id'], conflicts)
         results = []
         for op in batch['ops']:
+            if op['entity'] == 'kindSetup':
+                k = self.kind_setups.get(op['id'])
+                if (k is None) != (op['op'] == 'create') or (k is not None and k['version'] != op['baseVersion']):
+                    raise MapStudioException('conflict', 'The %s kind setup was changed.' % op['id'])
+                record = {'kindId': op['id'], 'setup': op['data']['setup'], 'version': (k['version'] if k else 0) + 1,
+                          'deleted': False}
+                self.kind_setups[op['id']] = record
+                results.append({'entity': 'kindSetup', 'id': op['id'], 'version': record['version']})
+                continue
             r = self.records.get(op['id'])
             record = dict(r) if (r is not None and op['op'] == 'update') else {}
             record.update(op['data'])
@@ -115,8 +136,14 @@ def row_first_run():
     api, r = seeded()
     check('error' not in r, 'error %s' % r.get('error'))
     check((r['created'], r['updated'], r['restored'], r['unchanged'], r['seq']) == (64, 0, 0, 0, 1), str(r))
-    check(len(api.batches) == 1 and len(api.batches[0]['ops']) == 64, 'one batch of 64 ops')
+    check(len(api.batches) == 1 and len(api.batches[0]['ops']) == 65, 'one batch of 64 item ops and the pad kind setup')
     check(all([op['op'] == 'create' and op['baseVersion'] == 0 for op in api.batches[0]['ops']]), 'creates at 0')
+    check(api.batches[0]['ops'][64] == {'op': 'create', 'entity': 'kindSetup', 'id': 'pad', 'baseVersion': 0,
+                                        'data': {'setup': PAD_SETUP}}, 'the kind setup op is last')
+    check(r['kindSetup'] == 'created' and api.kind_setups['pad']['setup'] == PAD_SETUP, 'the pad kind setup is seeded')
+    # The tracer's points are linked to the dev assets; the scale set's pads are not.
+    check(api.records['tracer/p1']['assetId'] == 'P12' and api.records['tracer/p3']['assetId'] == 'P15', 'asset links')
+    check('assetId' not in api.records['scale/pad-7'], 'the scale set stays unlinked')
     check(r['scale'] == {'pads': 30, 'lines': 30}, 'scale %s' % r['scale'])
     check(r['ids']['tracer/p1'] == 'tracer/p1' and len(r['ids']) == 64, 'ids')
     pad = api.records['scale/pad-7']
@@ -130,6 +157,17 @@ def row_rerun_unchanged():
     r = run(api=api, make_id=make_id, new_batch=_Batches())
     check((r['unchanged'], r['seq'], r['created'], r['updated']) == (64, None, 0, 0), str(r))
     check(len(api.batches) == 1, 'no batch sent')
+    check(r['kindSetup'] == 'unchanged', 'the kind setup compares equal: %s' % r['kindSetup'])
+    # An editor's change to the pad kind setup is put back at its stored version; a tracer point
+    # linked elsewhere is relinked.
+    api.kind_setups['pad'] = {'kindId': 'pad', 'setup': {'link': '/x'}, 'version': 5, 'deleted': False}
+    api.records['tracer/p2'].update({'assetId': 'P99', 'version': 3})
+    again = run(api=api, make_id=make_id, new_batch=_Batches())
+    ops = api.batches[-1]['ops']
+    check(len(ops) == 2 and ops[0]['id'] == 'tracer/p2' and ops[0]['data']['assetId'] == 'P14', str(ops))
+    check(ops[1] == {'op': 'update', 'entity': 'kindSetup', 'id': 'pad', 'baseVersion': 5, 'data': {'setup': PAD_SETUP}},
+          str(ops[1]))
+    check(again['kindSetup'] == 'updated' and again['updated'] == 1 and again['unchanged'] == 63, str(again))
     check(r['scale'] == {'pads': 30, 'lines': 30}, 'scale %s' % r['scale'])
     return 'ok'
 

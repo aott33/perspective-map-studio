@@ -7,13 +7,19 @@
 #   scale   30 pads (Pad 1 .. Pad 30) and 30 lines (Line to Pad N), the frame rate set
 #           that the spike's seeded stand-in drew (story 7), frozen here as literals;
 #   tracer  three pads (Point 1 .. Point 3) and the line between the first two
-#           (Tracer line), at the tracer's old coordinates.
+#           (Tracer line), at the tracer's old coordinates; the points are linked to the dev
+#           assets P12, P14 and P15 (epic 3 entry 5), so their live values resolve (P15 has no
+#           Comms or Pressure tag, so those report unresolved).
+#   setup   the pad kind setup (epic 3 entry 5): comms {asset.path}/Comms, the KPIs Pressure
+#           (the icon value) and Flow, alarms {asset.path}, the link /pad/{item.name}.
 # Every id is a UUIDv5 of a stable name (mapstudio-dev/seed/<set>/<key>), so a re-run
-# finds its items: unchanged ones are left alone, edited ones are put back on the four
-# seed fields, kind, name, geometry and properties (an update at the stored version; an
-# assetId, overrides, ends or attachment an editor added stays), and deleted ones are restored (a create at the tombstone's
+# finds its items: unchanged ones are left alone, edited ones are put back on the seed
+# fields, kind, name, geometry and properties, plus assetId where the seed sets one (an
+# update at the stored version; an assetId the seed does not set, overrides, ends or
+# attachment an editor added stays), and deleted ones are restored (a create at the tombstone's
 # version, read from the conflict the first save returns). One batch, all or none,
-# under the actor seed-script; the only second batch is that restore.
+# under the actor seed-script; the only second batch is that restore. The kind setup is
+# one more op of the same batch when it is absent or differs.
 #
 # The scripting API trusts its caller, so the view that calls run() checks the role.
 
@@ -92,13 +98,24 @@ SCALE_LINES = (
     (30, ((-104.874308, 39.781299), (-104.877154, 39.777224), (-104.880000, 39.765000))),
 )
 
-# The tracer's three points and its line between the first two (web/typescript/testData.ts).
+# The tracer's three points and its line between the first two (web/typescript/testData.ts),
+# each point linked to a dev asset (ops/project/ignition/script-python/mapstudio_dev ASSETS).
 TRACER_POINTS = (
-    (1, -104.990300, 39.739200),
-    (2, -104.975000, 39.750000),
-    (3, -104.955000, 39.743000),
+    (1, -104.990300, 39.739200, 'P12'),
+    (2, -104.975000, 39.750000, 'P14'),
+    (3, -104.955000, 39.743000, 'P15'),
 )
 TRACER_LINE = ((-104.990300, 39.739200), (-104.975000, 39.750000))
+
+# The pad kind setup the dev map seeds (docs/kind-setup.md): the live values the tracer draws.
+PAD_SETUP = {
+    'comms': {'path': '{asset.path}/Comms', 'on': True},
+    'kpis': [
+        {'key': 'pressure', 'label': 'Pressure', 'path': '{asset.path}/Pressure', 'unit': 'psi', 'on': True, 'icon': True},
+        {'key': 'flow', 'label': 'Flow', 'path': '{asset.path}/Flow', 'unit': 'bbl/d', 'on': True, 'icon': False}],
+    'alarms': {'path': '{asset.path}', 'count': True, 'summary': True},
+    'link': '/pad/{item.name}',
+}
 
 
 def _logger():
@@ -119,9 +136,12 @@ def _line(coords):
     return {'type': 'LineString', 'coordinates': [[c[0], c[1]] for c in coords]}
 
 
-def _item(make_id, set_name, key, kind, name, geometry, properties):
-    return {'key': set_name + '/' + key, 'id': make_id(set_name, key), 'kind': kind, 'name': name,
+def _item(make_id, set_name, key, kind, name, geometry, properties, asset_id=None):
+    item = {'key': set_name + '/' + key, 'id': make_id(set_name, key), 'kind': kind, 'name': name,
             'geometry': geometry, 'properties': dict(properties)}
+    if asset_id is not None:
+        item['assetId'] = asset_id
+    return item
 
 
 def seed_items(make_id=seed_id):
@@ -131,15 +151,19 @@ def seed_items(make_id=seed_id):
         items.append(_item(make_id, 'scale', 'pad-%d' % n, 'pad', 'Pad %d' % n, _point(lng, lat), PAD_PROPERTIES))
     for n, coords in SCALE_LINES:
         items.append(_item(make_id, 'scale', 'line-%d' % n, 'line', 'Line to Pad %d' % n, _line(coords), {}))
-    for n, lng, lat in TRACER_POINTS:
-        items.append(_item(make_id, 'tracer', 'p%d' % n, 'pad', 'Point %d' % n, _point(lng, lat), PAD_PROPERTIES))
+    for n, lng, lat, asset_id in TRACER_POINTS:
+        items.append(_item(make_id, 'tracer', 'p%d' % n, 'pad', 'Point %d' % n, _point(lng, lat), PAD_PROPERTIES,
+                           asset_id))
     items.append(_item(make_id, 'tracer', 'l1', 'line', 'Tracer line', _line(TRACER_LINE), {}))
     return items
 
 
 def _data(item):
-    return {'kind': item['kind'], 'name': item['name'], 'geometry': item['geometry'],
+    data = {'kind': item['kind'], 'name': item['name'], 'geometry': item['geometry'],
             'properties': dict(item['properties'])}
+    if 'assetId' in item:
+        data['assetId'] = item['assetId']
+    return data
 
 
 def _coords(geometry):
@@ -161,7 +185,41 @@ def _same(stored, item):
         return False
     if _coords(geometry) != _coords(item['geometry']):
         return False
+    if 'assetId' in item and stored.get('assetId') != item['assetId']:
+        return False
     return dict(stored.get('properties') or {}) == item['properties']
+
+
+def _plain(value):
+    """A stored JSON value as plain Python (dicts, lists, numbers, text, bools), so setups compare."""
+    if isinstance(value, dict):
+        return dict([(str(k), _plain(v)) for k, v in value.items()])
+    if isinstance(value, (list, tuple)):
+        return [_plain(v) for v in value]
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, (int, long, float)):
+        return value
+    if hasattr(value, 'items') and hasattr(value, 'keys'):
+        return dict([(str(k), _plain(value[k])) for k in value.keys()])
+    if hasattr(value, '__iter__') and not isinstance(value, basestring):
+        return [_plain(v) for v in value]
+    return unicode(value)
+
+
+def plan_setup_ops(kind_setups, kind_id, setup):
+    """
+    Pure: the kind setup op that makes the store hold `setup` for `kind_id`, given the live kind
+    setup records (getMap's kindSetups): absent gives a create at 0, present and equal nothing,
+    present and different an update at its stored version. Returns a list of 0 or 1 ops.
+    """
+    for record in kind_setups or []:
+        if str(record['kindId']) == kind_id:
+            if _plain(record['setup']) == _plain(setup):
+                return []
+            return [{'op': 'update', 'entity': 'kindSetup', 'id': kind_id, 'baseVersion': int(record['version']),
+                     'data': {'setup': setup}}]
+    return [{'op': 'create', 'entity': 'kindSetup', 'id': kind_id, 'baseVersion': 0, 'data': {'setup': setup}}]
 
 
 def plan_ops(current, seed):
@@ -169,7 +227,7 @@ def plan_ops(current, seed):
     Pure: the ops that make the store hold the seed, given the live records `current`
     (getMap's list, tombstones left out). Absent gives a create at 0, present and equal
     gives nothing, present and different gives an update at its stored version carrying
-    the four seed fields. Returns {'ops': [...], 'unchanged': n}.
+    the seed fields. Returns {'ops': [...], 'unchanged': n}.
     """
     stored = {}
     for record in current:
@@ -261,10 +319,11 @@ def _count_scale(records, seed):
 
 def run(project=PROJECT, actor=ACTOR, api=None, make_id=seed_id, new_batch=_new_batch):
     """
-    Seed the project's map. Returns {created, updated, restored, unchanged, seq, ids, scale},
-    plus error (the refusal's text, code first) when nothing was written; scale counts the
-    live map items whose ids are the scale set's seed ids, by kind ({pads, lines}), read
-    back after the save. `api` is system.mapstudio unless a test passes a stand-in.
+    Seed the project's map. Returns {created, updated, restored, unchanged, seq, ids, scale,
+    kindSetup}, plus error (the refusal's text, code first) when nothing was written; scale
+    counts the live map items whose ids are the scale set's seed ids, by kind ({pads, lines}),
+    read back after the save; kindSetup says what happened to the pad kind setup (created,
+    updated, unchanged). `api` is system.mapstudio unless a test passes a stand-in.
     """
     if api is None:
         api = system.mapstudio
@@ -286,6 +345,11 @@ def run(project=PROJECT, actor=ACTOR, api=None, make_id=seed_id, new_batch=_new_
     plan = plan_ops(current, seed)
     ops = plan['ops']
     result['unchanged'] = plan['unchanged']
+    # The pad kind setup (epic 3 entry 5), one more op of the same batch.
+    setup_ops = plan_setup_ops(getattr(current, 'kindSetups', None), 'pad', PAD_SETUP)
+    ops = ops + setup_ops
+    result['kindSetup'] = 'created' if setup_ops and setup_ops[0]['op'] == 'create' else (
+        'updated' if setup_ops else 'unchanged')
     restored = 0
     if ops:
         answer = None
@@ -309,10 +373,11 @@ def run(project=PROJECT, actor=ACTOR, api=None, make_id=seed_id, new_batch=_new_
             logger.warn('Seed not saved, nothing written: %s' % result['error'])
             return result
         result['seq'] = answer['seq']
-        creates = len([op for op in ops if op['op'] == 'create'])
+        item_ops = [op for op in ops if op['entity'] == 'item']
+        creates = len([op for op in item_ops if op['op'] == 'create'])
         result['created'] = creates - restored
         result['restored'] = restored
-        result['updated'] = len(ops) - creates
+        result['updated'] = len(item_ops) - creates
     try:
         result['scale'] = _count_scale(api.getMap(project), seed)
     except java.lang.Throwable as ex:

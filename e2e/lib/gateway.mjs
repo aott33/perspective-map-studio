@@ -70,6 +70,18 @@ export async function setupWarnings(sinceMs) {
         .map((e) => e.message);
 }
 
+/**
+ * The messages of one logger at or after `sinceMs` (every level), oldest first
+ * (GET /data/api/v1/logs?logger=..., [live 8.3.10]); epic 3 entry 5 reads MapStudio.live's.
+ */
+export async function logLines(logger, sinceMs) {
+    const page = await getJson(`/data/api/v1/logs?logger=${encodeURIComponent(logger)}&limit=1000`);
+    return (page.items ?? [])
+        .filter((e) => Number(e.timestamp) >= sinceMs)
+        .sort((x, y) => Number(x.timestamp) - Number(y.timestamp))
+        .map((e) => e.message);
+}
+
 /** Keep the committed setup in e2e/out/setup.json.bak before a spec changes it. */
 export function backUpSetup() {
     mkdirSync(outDir, { recursive: true });

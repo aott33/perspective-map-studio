@@ -18,8 +18,10 @@ import { measuresDocsFile, measuresOutFile, repoRoot } from '../lib/env.mjs';
 import { TRACER, pagePixel } from '../lib/geo.mjs';
 import { unavailable, validateMeasures, without, writeJson } from '../lib/measures.mjs';
 import { PAN_MOVES_PER_SECOND, ZOOM_EVENTS_PER_SECOND, measureView, webglRenderer } from '../lib/frameRate.mjs';
-import { batchSize, buildValuesBatch } from '../lib/valueBatch.mjs';
-import { ensureSeeded, expect, loadedCounts, mapLoaded, nextFrames, openMap, test, watch } from './fixtures.mjs';
+import { batchSize, frameText, parseBatchFrame } from '../lib/valueBatch.mjs';
+import {
+    EDITOR_USER, ensureSeeded, expect, loadedCounts, mapLoaded, nextFrames, openMap, signedInContext, test, watch
+} from './fixtures.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -173,51 +175,55 @@ test('frame rate on the 30-pad scale set', async ({ page }) => {
 
 // --- value batch ------------------------------------------------------------
 
-test('size of one value batch', async ({ page }) => {
-    // Real wire sizes of the one round trip that exists: point.click and its reply.
+test('size of one value batch', async ({ page, browser }) => {
+    // The real values.batch (epic 3 entry 5), read off the Perspective session socket of a viewer on /live:
+    // the full batch a map gets on open, and the changes-only batch after one dev tag changes.
     const frames = [];
     page.on('websocket', (ws) => {
-        ws.on('framesent', (f) => frames.push({ dir: 'sent', payload: f.payload }));
-        ws.on('framereceived', (f) => frames.push({ dir: 'received', payload: f.payload }));
+        ws.on('framereceived', (f) => frames.push(frameText(f.payload)));
     });
-    // Sized for the seed's 30-pad set (epic 2 story 11), counted by the seed from getMap.
     const pads = seed.scale.pads;
     expect(pads, 'pads of the seeded scale set').toBe(30);
 
-    const full = batchSize(buildValuesBatch({ pads, full: true }));
-    const changes = batchSize(buildValuesBatch({ pads, full: false, every: 10 }));
+    const liveMap = await openMap(page, '/live');
+    await mapLoaded(liveMap);
+    await expect(liveMap).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
+    const batches = () => frames.map(parseBatchFrame).map((b, i) => (b ? { ...b, text: frames[i] } : null)).filter(Boolean);
+    await expect.poll(() => batches().filter((b) => b.full).length, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
+    const fullBatch = batches().find((b) => b.full);
+    const full = { ...batchSize(fullBatch.text), items: fullBatch.items, kindDisplay: fullBatch.kindDisplay, seq: fullBatch.seq };
 
-    // The round trip on the tracer's point 1, with frames counted from just before the click.
-    const tracerMap = await openMap(page, '/');
-    await mapLoaded(tracerMap);
-    await loadedCounts(tracerMap);
-    const p1 = seed.ids[TRACER.points.p1.key];
-    const box = await tracerMap.boundingBox();
-    frames.length = 0;
-    const [x, y] = pagePixel(box, TRACER.points.p1.lngLat, TRACER.center, TRACER.zoom);
-    await page.mouse.click(x, y);
-    await expect(page.locator('.mapstudio-reply')).toContainText('Gateway received click on ' + p1, { timeout: 15_000 });
-    const readable = () => frames
-        .map((f) => ({ dir: f.dir, buf: Buffer.isBuffer(f.payload) ? f.payload : Buffer.from(String(f.payload), 'utf8') }))
-        .filter((f) => f.buf.includes('point.click'))
-        .map((f) => ({ direction: f.dir, bytes: f.buf.length, type: f.buf.includes('point.click.reply') ? 'point.click.reply' : 'point.click' }));
-    // Both frames are in once the reply text shows, but the socket event can trail the DOM: poll for them.
-    await expect.poll(() => readable().length, { timeout: 5_000 }).toBeGreaterThanOrEqual(2).catch(() => {});
-    const matching = readable();
-    const wire = matching.length
-        ? { label: 'measured', method: 'Playwright websocket frame sizes of the Perspective session socket, frames whose bytes contain "point.click", from the click to the reply', frames: matching }
-        : unavailable(`no websocket frame carried point.click in a readable form (${frames.length} frames seen since the click)`);
+    // One change from a map editor: Pressure of P12 toggled on the /live page's dev button.
+    const interval = Number(await liveMap.getAttribute('data-refresh-interval')) || 10;
+    const seen = batches().length;
+    let changes = unavailable('no changes-only batch arrived within two refresh intervals of the dev tag change');
+    const editorContext = await signedInContext(browser, EDITOR_USER, { viewport: { width: 1440, height: 900 } });
+    try {
+        const editor = await editorContext.newPage();
+        await mapLoaded(await openMap(editor, '/live'));
+        const out = editor.locator('#mapstudio-live-result');
+        const before = await out.innerText();
+        await editor.locator('#mapstudio-live-pressure-' + (Date.now() % 2 === 0 ? 'low' : 'high')).click();
+        await expect.poll(() => out.innerText(), { timeout: 30_000 }).not.toBe(before);
+        await expect.poll(() => batches().slice(seen).filter((b) => !b.full).length, { timeout: (2 * interval + 5) * 1000 })
+            .toBeGreaterThanOrEqual(1);
+        const delta = batches().slice(seen).find((b) => !b.full);
+        changes = { ...batchSize(delta.text), items: delta.items, seq: delta.seq, rule: 'the map items whose values changed since the last batch' };
+    } catch (err) {
+        changes = unavailable('the changes-only batch could not be measured: ' + String(err && err.message ? err.message : err).split('\n')[0]);
+    } finally {
+        await editorContext.close();
+    }
+    const items = Number(await liveMap.getAttribute('data-items-loaded'));
 
     m.valueBatch = {
-        label: 'stand-in',
-        method: 'values.batch does not exist yet. The AD-6 envelope {v, type, id, body: {seq, full, items}} is built for the scale set\'s pads with three LiveValue slots per pad (comms, icon KPI, alarm count) and its JSON size is measured (UTF-8 bytes, and gzip of the same text). The pad count is the seed\'s scale set as getMap counted it (epic 2 story 11).',
+        label: 'measured',
+        method: 'Playwright websocket frame sizes of the Perspective session socket on /live (an anonymous viewer): the frame that carries the full values.batch sent after map.load (every planned map item and the kind display), and the first changes-only values.batch after a map editor toggled one dev tag. Bytes are the frame\'s UTF-8 text as received (Perspective wraps the envelope in its own message); gzip of the same text is the best case, not the wire.',
         env: envFor('1440x900'),
-        assumption: 'AD-6 fixes only the LiveValue fields {value, quality, t, stale, reason}; the item layout (pad id plus three named slots) is this story\'s guess, unverified. Whether Perspective compresses websocket frames is unverified, so gzip is an upper bound on the saving, not the wire size.',
-        pads,
-        slotsPerPad: 3,
+        refreshIntervalSeconds: interval,
+        mapItems: items,
         full,
-        changesOnly: { ...changes, rule: 'every 10th pad changed' },
-        wireRoundTrip: wire
+        changesOnly: changes
     };
 });
 

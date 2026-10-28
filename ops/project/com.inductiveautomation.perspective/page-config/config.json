@@ -19,6 +19,10 @@
   "/adapters": {
    "viewPath": "MapStudioAdapters",
    "viewParams": {}
+  },
+  "/live": {
+   "viewPath": "MapStudioLive",
+   "viewParams": {}
   }
  },
  "shared": {},
