@@ -206,7 +206,8 @@ editorTest.describe('1440 px', () => {
             const tile = pad.locator('.mapstudio-style-tile[data-label="' + label + '"]');
             await expect(tile).toHaveAttribute('data-preset', preset);
             await expect(tile).toContainText(word);
-            await expect(tile.locator('svg')).toHaveCount(1);
+            // One sample per tile: the marker image's SVG (which nests the kind glyph's own svg inside it).
+            await expect(tile.locator('.mapstudio-style-sample > svg')).toHaveCount(1);
         }
         await expect(pad).toContainText('States on a tag');
         const line = panel.locator('.mapstudio-style-preview[data-kind="line"]');

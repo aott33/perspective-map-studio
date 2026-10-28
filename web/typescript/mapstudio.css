@@ -316,8 +316,9 @@
 
 .mapstudio-style-preset {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
-    gap: 6px;
+    gap: 4px 6px;
 }
 
 .mapstudio-style-preset-name {
