@@ -2187,8 +2187,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     const item = items.find((i) => i.id === id);
                     const kind = item ? kinds.find((k) => k.id === item.kind) : undefined;
                     const state = itemState(values, item ? live.display[item.kind] : undefined);
+                    // The row's marker is the map's own look: the selection ring (the selected point, or the two
+                    // instruments at an open segment's ends, entry 2) and the instrument disc included.
+                    const selected = this.state.selected;
+                    const ringed = selected !== null && ((selected.kind === 'point' && selected.id === id)
+                        || (selected.segment !== undefined && selected.segment !== null
+                            && (selected.segment.fromId === id || selected.segment.toId === id)));
                     const spec = markerProperties(id, item ? item.name : '', item ? item.kind : '', kind ? kind.icon : '', state,
-                        { labelRank: kind ? kind.labelRank : 0 });
+                        { labelRank: kind ? kind.labelRank : 0, selected: ringed, instrument: !!(kind && kind.instrument) });
                     return (
                         <div key={id} className="mapstudio-live-item" data-item-id={id} data-state={state.badge}
                              data-preset={itemPreset(state)}
