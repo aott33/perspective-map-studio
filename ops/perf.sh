@@ -8,6 +8,18 @@
 #   PERF_RECORD=0.2.0 ops/perf.sh        also write docs/perf/0.2.0-dev.json (only when no measure crashed)
 #   ops/perf.sh --target template        the owner's laptop: the template's kept 300-pad test stack
 #                                        (main phase only; see "Template target" below)
+#   ops/perf.sh --only edits.apply       only the named measures (comma separated; epic 3 entry 4), then
+#                                        the comparison with the last record of the target in docs/perf/
+#
+# --only. The measures are bundle, idle, map.load, open-to-drawn, frame-rate, map.changed, sessions,
+# edits.apply and list-refresh (e2e/perf/only.mjs). The phases follow the measures (idle and sessions
+# need nomodule too; --phase is not combined with --only), the runner skips every other measure's
+# block and every test with no wanted block (seeding still happens, so edits.apply alone seeds to
+# 5,000 items), and the result is e2e/out/perf.json as for a full run, with `only` naming the
+# selection. PERF_RECORD is refused with --only: a partial record never replaces a full one. After
+# the merge the headline rows of the wanted measures are printed against the newest
+# docs/perf/<version>-<target>.json (by version; PERF_COMPARE=<file> picks another), as
+# `node perf/compare.mjs <record> ../e2e/out/perf.json --only <measures>` would.
 #
 # Dev target. Phase nomodule recreates the Gateway with the scratch project mapstudio-perf and an
 # empty external modules folder (ops/docker-compose.perf*.yml): the Gateway without Map Studio. Phase
@@ -40,18 +52,35 @@
 # The trial needs at least 45 minutes left (GET /data/api/v1/trial).
 
 # The cleanup functions run from the EXIT trap, which shellcheck does not follow (SC2317).
-# shellcheck disable=SC2317
+# shellcheck disable=SC2317,SC2329
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
 TARGET="dev"
 PHASES=(nomodule main)
+PHASE_ARG=""
+ONLY=""
 for ((i = 1; i <= $#; i++)); do
   case "${!i}" in
     --target) i=$((i + 1)); TARGET="${!i:-}" ;;
-    --phase) i=$((i + 1)); PHASES=("${!i:-}") ;;
+    --phase) i=$((i + 1)); PHASES=("${!i:-}"); PHASE_ARG="yes" ;;
+    --only) i=$((i + 1)); ONLY="${!i:-}" ;;
     *) err "Unknown argument: ${!i}"; exit 2 ;;
   esac
 done
+if [[ -n "${ONLY}" ]]; then
+  if [[ -n "${PHASE_ARG}" ]]; then
+    err "--only sets the phases itself; do not combine it with --phase"
+    exit 2
+  fi
+  if [[ -n "${PERF_RECORD:-}" ]]; then
+    err "PERF_RECORD is refused with --only: a partial record never replaces a full docs/perf record"
+    exit 2
+  fi
+  # Validates the names (exit 2 with the list on an unknown one) and prints the phases they need.
+  phases_text="$(cd "${PROJECT_ROOT}/e2e" && node perf/only.mjs phases "${ONLY}")" || exit 2
+  read -r -a PHASES <<< "${phases_text}"
+  export PERF_ONLY="${ONLY}"
+fi
 case "${TARGET}" in dev|template) ;; *) err "--target is dev or template"; exit 2 ;; esac
 for p in "${PHASES[@]}"; do
   case "${p}" in nomodule|main) ;; *) err "--phase is nomodule or main"; exit 2 ;; esac
@@ -295,7 +324,9 @@ ROWS_BEFORE="$(row_counts | grep -v "|${PERF_PROJECT}|" || true)"
 if [[ "${TARGET}" == "template" ]]; then
   PROJECTS_BEFORE="$(docker exec "${GW_CONTAINER}" ls /usr/local/bin/ignition/data/projects | grep -vx "${PERF_PROJECT}" || true)"
 fi
-fetch_v010
+if [[ -z "${ONLY}" ]] || (cd "${E2E}" && node perf/only.mjs wants "${ONLY}" bundle); then
+  fetch_v010
+fi
 
 restored=0
 restore() {
@@ -390,5 +421,18 @@ code=$?
 set -e
 if (( runner_failed )) || (( code == 1 )); then
   exit 1
+fi
+
+# The comparison with the last record of this target (the newest version in docs/perf/), the rows of
+# the wanted measures only with --only.
+LAST_RECORD="${PERF_COMPARE:-$(find "${PROJECT_ROOT}/docs/perf" -maxdepth 1 -name "*-${TARGET}.json" | sort -V | tail -1)}"
+if [[ -n "${LAST_RECORD}" && -f "${LAST_RECORD}" ]]; then
+  echo
+  info "Compared with ${LAST_RECORD#"${PROJECT_ROOT}"/} (record -> this run):"
+  compare_args=("${LAST_RECORD}" "${E2E}/out/perf.json")
+  [[ -n "${ONLY}" ]] && compare_args+=(--only "${ONLY}")
+  (cd "${E2E}" && node perf/compare.mjs "${compare_args[@]}") || true
+else
+  warn "No docs/perf/*-${TARGET}.json record to compare with."
 fi
 exit "${code}"

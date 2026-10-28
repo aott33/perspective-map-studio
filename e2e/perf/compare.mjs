@@ -1,14 +1,16 @@
 // Compare two perf results (epic 2 story 17): every judged or recorded number with its value in each,
 // the delta and the verdict of the second.
 //
-//   node perf/compare.mjs a.json b.json
+//   node perf/compare.mjs a.json b.json [--only <measures>]
 //
 // The numbers compared are the measures' headline statistics: p95 and median of each timed measure,
 // the slowest map.changed session, the added CPU and heap, the bundle bytes, the median frame rates.
+// --only (the names of perf/only.mjs, as ops/perf.sh --only) keeps the rows of those measures only.
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { measureOfHeadline, parseOnly, wants } from './only.mjs';
 
 /** [{name, value, unit, verdict}] of a result's headline numbers. */
 export function headlines(result) {
@@ -46,11 +48,15 @@ export function headlines(result) {
     return out;
 }
 
-/** Rows of the comparison: [{name, a, b, delta, unit, verdict}]. */
-export function compare(a, b) {
+/**
+ * Rows of the comparison: [{name, a, b, delta, unit, verdict}]. `only` (a selection of
+ * perf/only.mjs, null for every measure) keeps the rows of the wanted measures.
+ */
+export function compare(a, b, only = null) {
     const ha = new Map(headlines(a).map((h) => [h.name, h]));
     const hb = new Map(headlines(b).map((h) => [h.name, h]));
-    const names = [...new Set([...ha.keys(), ...hb.keys()])];
+    const names = [...new Set([...ha.keys(), ...hb.keys()])]
+        .filter((name) => only === null || (measureOfHeadline(name) !== null && wants(only, measureOfHeadline(name))));
     return names.map((name) => {
         const x = ha.get(name);
         const y = hb.get(name);
@@ -66,12 +72,25 @@ export function compare(a, b) {
 }
 
 function cli(argv) {
+    const i = argv.indexOf('--only');
+    let only = null;
+    if (i >= 0) {
+        try {
+            only = parseOnly(argv[i + 1]);
+        } catch (err) {
+            console.error('perf: ' + err.message);
+            return 2;
+        }
+        argv = argv.filter((_, j) => j !== i && j !== i + 1);
+    }
     if (argv.length !== 2) {
-        console.error('usage: node perf/compare.mjs a.json b.json');
+        console.error('usage: node perf/compare.mjs a.json b.json [--only <measures>]');
         return 2;
     }
     const [a, b] = argv.map((f) => JSON.parse(readFileSync(f, 'utf8')));
-    for (const r of compare(a, b)) {
+    const rows = compare(a, b, only);
+    if (rows.length === 0) console.log('(no headline row of the wanted measures in either record)');
+    for (const r of rows) {
         const d = r.delta === null ? 'n/a' : (r.delta > 0 ? '+' : '') + r.delta;
         console.log(`${r.name}: ${r.a ?? 'n/a'} -> ${r.b ?? 'n/a'} ${r.unit} (delta ${d}) ${r.verdict}`);
     }

@@ -24,6 +24,7 @@ import { EDITOR_USER, mapLoaded, signedInContext } from '../tests/fixtures.mjs';
 import { CHANGED_PAD, PROJECT, createBatches, editorPads, itemId } from './items.mjs';
 import { LIMITS, PERCENTILE_METHOD, PLANNED, bundleVerdict, classifyReply, countOutcomes, hostBusyPct, inWindow,
     latencyVerdict, procStatCpu, resourceStats, summarize } from './result.mjs';
+import { parseOnly, wants, wantsAny } from './only.mjs';
 
 const require = createRequire(import.meta.url);
 const PHASE = process.env.PERF_PHASE || 'main';
@@ -36,10 +37,15 @@ const LOAD_ALL_MS = 5 * 60_000; // decision 6: every viewer loaded within 5 min,
 const CHANGED_WAIT_MS = 10_000; // a session that has not seen a save's seq after 10 s did not get it
 const EDITORS = Number(process.env.PERF_EDITORS || 10);
 const VIEWER = { width: 320, height: 240 };
+// PERF_ONLY (ops/perf.sh --only, epic 3 entry 4): the measures to take; empty takes every one. A
+// measure's block runs when it is wanted and a test with no wanted block is skipped; seeding still runs.
+const ONLY = parseOnly(process.env.PERF_ONLY);
+const want = (name) => wants(ONLY, name);
+const skipUnless = (names) => test.skip(!wantsAny(ONLY, names), `no measure of this test is in PERF_ONLY (${names.join(', ')})`);
 
 test.describe.configure({ mode: 'serial' });
 
-const R = { schema: 1, phase: PHASE, project: PROJECT, percentileMethod: PERCENTILE_METHOD, env: {}, measures: {} };
+const R = { schema: 1, phase: PHASE, project: PROJECT, percentileMethod: PERCENTILE_METHOD, only: ONLY, env: {}, measures: {} };
 const save = () => {
     mkdirSync(perfOutDir, { recursive: true });
     writeFileSync(perfPhaseFile(PHASE), JSON.stringify(R, null, 2) + '\n');
@@ -454,15 +460,19 @@ test.afterAll(() => {
 
 test('nomodule: idle and 20 sessions on /plain', async ({ browser }) => {
     test.skip(PHASE !== 'nomodule', 'nomodule phase only');
+    skipUnless(['idle', 'sessions']);
     test.setTimeout(IDLE_MS + SESSIONS_MS + LOAD_ALL_MS + 180_000);
-    try {
-        const t0 = Date.now();
-        await sleep(IDLE_MS);
-        R.measures.idle = { label: 'measured', method: 'No browser session open; the Gateway without Map Studio.', ...windowResources(t0, Date.now()) };
-    } catch (err) {
-        R.measures.idle = crashed(err);
+    if (want('idle')) {
+        try {
+            const t0 = Date.now();
+            await sleep(IDLE_MS);
+            R.measures.idle = { label: 'measured', method: 'No browser session open; the Gateway without Map Studio.', ...windowResources(t0, Date.now()) };
+        } catch (err) {
+            R.measures.idle = crashed(err);
+        }
+        save();
     }
-    save();
+    if (!want('sessions')) return;
     const viewers = [];
     try {
         viewers.push(...(await openViewers(browser, 20, '/plain', plainReady)));
@@ -490,8 +500,9 @@ const S = { editor: null, viewers: [] };
 
 test('main: bundle and idle', async ({ browser }) => {
     test.skip(PHASE !== 'main', 'main phase only');
+    skipUnless(['bundle', 'idle']);
     test.setTimeout(IDLE_MS + 180_000);
-    try {
+    if (want('bundle')) try {
         const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
         const page = await context.newPage();
         const wire = new Map();
@@ -528,7 +539,7 @@ test('main: bundle and idle', async ({ browser }) => {
         R.measures.bundle = crashed(err);
     }
     save();
-    try {
+    if (want('idle')) try {
         const t0 = Date.now();
         await sleep(IDLE_MS);
         R.measures.idle = { label: 'measured', method: 'No browser session open; the Gateway with Map Studio and the empty mapstudio-perf map.', ...windowResources(t0, Date.now()) };
@@ -540,6 +551,7 @@ test('main: bundle and idle', async ({ browser }) => {
 
 test('main: 30 items', async ({ browser }) => {
     test.skip(PHASE !== 'main', 'main phase only');
+    skipUnless(['map.load', 'open-to-drawn', 'frame-rate']);
     test.setTimeout(600_000);
     R.measures.mapLoad = R.measures.mapLoad || {};
     R.measures.frameRate = R.measures.frameRate || {};
@@ -549,14 +561,14 @@ test('main: 30 items', async ({ browser }) => {
         const before = await loadReply(S.editor.page);
         if (before.items !== 0) throw new Error(`the perf map is not empty before the run (${before.items} items); ops/perf.sh wipes it`);
         await seed(S.editor.page, 0, 30);
-        R.measures.mapLoad['30'] = await measureMapLoad(S.editor.page, S.editor.frames, 30, false);
+        if (want('map.load')) R.measures.mapLoad['30'] = await measureMapLoad(S.editor.page, S.editor.frames, 30, false);
     } catch (err) {
         R.measures.mapLoad['30'] = crashed(err);
     }
     save();
     try {
-        R.measures.openToDrawn['30'] = await openToDrawn(browser, 30);
-        R.measures.frameRate['30'] = await frameRate(browser, 30);
+        if (want('open-to-drawn')) R.measures.openToDrawn['30'] = await openToDrawn(browser, 30);
+        if (want('frame-rate')) R.measures.frameRate['30'] = await frameRate(browser, 30);
     } catch (err) {
         R.measures.frameRate['30'] = crashed(err);
     }
@@ -565,6 +577,7 @@ test('main: 30 items', async ({ browser }) => {
 
 test('main: 1,000 items, map.changed and 20 sessions', async ({ browser }) => {
     test.skip(PHASE !== 'main', 'main phase only');
+    skipUnless(['map.load', 'open-to-drawn', 'frame-rate', 'map.changed', 'sessions']);
     test.setTimeout(3 * LOAD_ALL_MS + SESSIONS_MS + 600_000);
     R.measures.mapChanged = {};
     R.measures.mapLoad = R.measures.mapLoad || {};
@@ -573,18 +586,18 @@ test('main: 1,000 items, map.changed and 20 sessions', async ({ browser }) => {
     try {
         if (!S.editor) S.editor = await openEditor(browser);
         await seed(S.editor.page, (await loadReply(S.editor.page)).items, 1000);
-        R.measures.mapLoad['1000'] = await measureMapLoad(S.editor.page, S.editor.frames, 1000, false);
-        R.measures.openToDrawn['1000'] = await openToDrawn(browser, 1000);
+        if (want('map.load')) R.measures.mapLoad['1000'] = await measureMapLoad(S.editor.page, S.editor.frames, 1000, false);
+        if (want('open-to-drawn')) R.measures.openToDrawn['1000'] = await openToDrawn(browser, 1000);
     } catch (err) {
         R.measures.mapLoad['1000'] = crashed(err);
     }
-    try {
+    if (want('frame-rate')) try {
         R.measures.frameRate['1000'] = await frameRate(browser, 1000);
     } catch (err) {
         R.measures.frameRate['1000'] = crashed(err);
     }
     save();
-    for (const n of [10, 50]) {
+    if (want('map.changed')) for (const n of [10, 50]) {
         try {
             const t0 = Date.now();
             S.viewers.push(...(await openViewers(browser, n - S.viewers.length, '/', mapReady(1000))));
@@ -595,7 +608,7 @@ test('main: 1,000 items, map.changed and 20 sessions', async ({ browser }) => {
         }
         save();
     }
-    try {
+    if (want('sessions')) try {
         // Keep 20 loaded viewers, close the rest; fill up to 20 when fewer loaded.
         const keep = S.viewers.filter((v) => v.loaded).slice(0, 20);
         for (const v of S.viewers) if (!keep.includes(v)) await v.context.close().catch(() => {});
@@ -618,11 +631,13 @@ test('main: 1,000 items, map.changed and 20 sessions', async ({ browser }) => {
     } finally {
         await closeAll(S.viewers);
     }
+    await closeAll(S.viewers);
     save();
 });
 
 test('main: 5,000 items, edits.apply and frame rate', async ({ browser }) => {
     test.skip(PHASE !== 'main', 'main phase only');
+    skipUnless(['map.load', 'open-to-drawn', 'edits.apply', 'frame-rate']);
     test.setTimeout(1_800_000);
     R.measures.editsApply = {};
     R.measures.mapLoad = R.measures.mapLoad || {};
@@ -633,13 +648,13 @@ test('main: 5,000 items, edits.apply and frame rate', async ({ browser }) => {
     try {
         if (!S.editor) S.editor = await openEditor(browser);
         await seed(S.editor.page, (await loadReply(S.editor.page)).items, 5000);
-        R.measures.mapLoad['5000'] = await measureMapLoad(S.editor.page, S.editor.frames, 5000, true);
-        R.measures.openToDrawn['5000'] = await openToDrawn(browser, 5000);
+        if (want('map.load')) R.measures.mapLoad['5000'] = await measureMapLoad(S.editor.page, S.editor.frames, 5000, true);
+        if (want('open-to-drawn')) R.measures.openToDrawn['5000'] = await openToDrawn(browser, 5000);
     } catch (err) {
         R.measures.mapLoad['5000'] = crashed(err);
     }
     save();
-    try {
+    if (want('edits.apply')) try {
         editors.push(S.editor);
         // One sign-in at a time, each page opened at once so its session stays signed in.
         for (let e = 1; e < EDITORS; e++) editors.push(await openEditor(browser));
@@ -673,7 +688,7 @@ test('main: 5,000 items, edits.apply and frame rate', async ({ browser }) => {
     // the one editor page left open, so 9 fewer browser renderers share the box. Set beside
     // 50op-10editors it separates what the Gateway's write path costs (the project's batches are
     // serialised by design) from what 10 browsers redrawing the 5,000-item map cost the box.
-    try {
+    if (want('edits.apply')) try {
         if (state.length === EDITORS && S.editor) {
             const h0 = hostCpu();
             const t0 = Date.now();
@@ -694,7 +709,7 @@ test('main: 5,000 items, edits.apply and frame rate', async ({ browser }) => {
         R.measures.editsApply[`50op-${EDITORS}streams-1page`] = crashed(err);
     }
     save();
-    try {
+    if (want('frame-rate')) try {
         R.measures.frameRate['5000'] = await frameRate(browser, 5000);
     } catch (err) {
         R.measures.frameRate['5000'] = crashed(err);
@@ -704,6 +719,7 @@ test('main: 5,000 items, edits.apply and frame rate', async ({ browser }) => {
 
 test('main: list refresh', async ({ browser }) => {
     test.skip(PHASE !== 'main', 'main phase only');
+    skipUnless(['list-refresh']);
     test.setTimeout(600_000);
     try {
         if (!S.editor) S.editor = await openEditor(browser);

@@ -17,7 +17,10 @@ ops/up.sh                                  # the dev stack (ops/README in the to
 PERF_RECORD=0.2.0 ops/perf.sh              # both phases, about 30 min; writes docs/perf/0.2.0-dev.json
 PERF_RECORD=0.2.0 ops/perf.sh --phase main # only the phase with the module (the idle and 20-session deltas then have no baseline; it replaces the committed docs/perf/0.2.0-dev.json)
 ops/perf.sh --target template              # the template's kept 300-pad test stack (settings in ops/perf.sh)
+ops/perf.sh --only edits.apply             # only the named measures (epic 3 entry 4), then the comparison with the last record
 ```
+
+`--only` takes a comma-separated list of `bundle`, `idle`, `map.load`, `open-to-drawn`, `frame-rate`, `map.changed`, `sessions`, `edits.apply` and `list-refresh` (`e2e/perf/only.mjs`). The phases follow the measures (`idle` and `sessions` need `nomodule` too), every other measure's block is skipped and seeding still happens, so `edits.apply` alone seeds to 5,000 items first. `PERF_RECORD` is refused with `--only`: a partial record never replaces a full one. RELEASING.md, "Checks by release type", says when a minor release runs the whole thing and when `--only` is enough.
 
 A run needs at least 45 minutes left on the Gateway's trial. Exit code 0 means every limit passed, 3 a limit missed (the record is still written), 2 refused before anything started, 1 a crash (no record). Every number in a record carries its method and label, and the record's `env` names the Gateway version, the module list of each phase, the renderer, the CPU count and the load averages, so two records from different machines are read side by side, never as one series.
 
@@ -27,4 +30,4 @@ A run needs at least 45 minutes left on the Gateway's trial. Exit code 0 means e
 cd e2e && node perf/compare.mjs ../docs/perf/0.2.0-dev.json ../docs/perf/0.3.0-dev.json
 ```
 
-prints each headline number (p95 and median of the timed measures, the slowest `map.changed` session, the added CPU and heap, the bundle bytes, the median frame rates) with its value in each record, the delta and the second record's verdict. To compare a re-run on another machine with the committed record, save the committed one first: `git show HEAD:docs/perf/0.2.0-dev.json > /tmp/perf-box.json`.
+prints each headline number (p95 and median of the timed measures, the slowest `map.changed` session, the added CPU and heap, the bundle bytes, the median frame rates) with its value in each record, the delta and the second record's verdict; `--only <measures>` keeps the rows of those measures. `ops/perf.sh` prints this itself after every run, against the newest `docs/perf/<version>-<target>.json` (`PERF_COMPARE=<file>` picks another). To compare a re-run on another machine with the committed record, save the committed one first: `git show HEAD:docs/perf/0.2.0-dev.json > /tmp/perf-box.json`.
