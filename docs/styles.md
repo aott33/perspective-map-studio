@@ -25,6 +25,8 @@ The closed list is `common/.../contract/StylePresets.java` (`normal`, `attention
 
 The word sits in the state chip beside the name (a point) or in the line's name chip at its midpoint, in the map's text, as "Stale" and "Comms lost" do; the alarm badge and digit draw over any ring. A line's weight is not a preset: 2 px with no instrument on it, else 3, 4 or 6 px by its `diameter` ([contract.md](contract.md), "What the map draws").
 
+**Per segment (epic 3 entry 2).** A line whose rule is the instruments source (`{"instruments": "worst"}`) draws each segment between its measuring instruments in the look the Gateway graded for it: the worse of the two end instruments' presets in the hue and pattern above, `dashed` with the stale look when either end is stale, and the alarm hue with the segment's worse end alarm over both; the line's chip at the midpoint says the worst word over the segments ("L-SWD Stale"). The line's own alarm still colours the whole line. Lines without instruments, and lines with another rule, draw as one line ([instruments.md](instruments.md)).
+
 Stand-in hues to review **[ER-27]**: `fault` falls back to the same `--error` as alarm priority 1 and `warning` to the same `--warning` as priority 2; the ring and the word tell them from the alarm badge and its digit, but the review may want the presets on hues of their own. `attention` is no hue at all (DESIGN.md: a heavier outline plus the word).
 
 ## Area tints
