@@ -3,7 +3,7 @@ title: 'Performance check before 0.2.0'
 type: 'chore'
 ticket: '17'
 created: '2026-10-27'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '273dccd7dfd61e3bc1bbcf90d128988b3ffb1f8c'
 route: 'full'
 route_source: 'auto'
@@ -73,17 +73,17 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `ops/perf/project/` -- scratch project `mapstudio-perf`: setup (connection from a flag, default `MapStudio`; roles as dev; `mapstudio_perf.kinds`/`assets`; 30 s refresh), page `/` with the map at 100% size, `/plain` (a label, no component), `/tools` (button running `mapstudio_perf.timeRefresh()`), script `mapstudio_perf` (dev kinds, 300 deterministic assets, `timeRefresh` returns `{ms, statuses}` after a MapEditor check).
-- [ ] `ops/docker-compose.perf.yml`, `ops/docker-compose.perf-nomodule.yml` -- mount the perf project; the second also mounts an empty folder over `/external-modules`.
-- [ ] `ops/perf.sh` -- phases `nomodule` and `main` (default both), `--target dev|template`, trial check, SQL wipe of `project = 'mapstudio-perf'` rows only while the project is unmounted, starts and stops the sampler, runs `npx playwright test -c perf/playwright.perf.config.mjs`, EXIT trap recreates the plain stack.
-- [ ] `e2e/lib/frameRate.mjs` + `e2e/tests/measures.spec.mjs` -- move the frame-rate helpers; the spec imports them.
-- [ ] `e2e/lib/env.mjs` -- `sessionUrl(path, project)`, perf output paths.
-- [ ] `e2e/perf/items.mjs` -- deterministic pads and lines (UUIDv5 of `mapstudio-perf/<n>`, half points, half lines on a grid), batches of 500 ops.
-- [ ] `e2e/perf/sampler.mjs` -- `docker stats` stream (1 s CPU, memory) plus `currentGauges` and sessions every 5 s, written after every sample.
-- [ ] `e2e/perf/result.mjs`, `e2e/perf/compare.mjs` -- result schema, limits, verdicts; compare two results and print deltas.
-- [ ] `e2e/perf/perf.spec.mjs`, `e2e/perf/playwright.perf.config.mjs` -- the measures in the order of Design Notes.
-- [ ] `e2e/perf/perf.test.mjs`, `e2e/package.json` -- unit tests (items, verdicts, percentile, compare, busy counting) in `test:unit`; script `perf`.
-- [ ] `docs/platform-checks.md`, `docs/perf/0.2.0-dev.json`, `.gitignore` -- the story section (method, dev numbers, template numbers from the laptop run, misses and their outcome); write-back noise of `ops/perf/project` ignored.
+- [x] `ops/perf/project/` -- scratch project `mapstudio-perf`: setup (connection from a flag, default `MapStudio`; roles as dev; `mapstudio_perf.kinds`/`assets`; 30 s refresh), page `/` with the map at 100% size, `/plain` (a label, no component), `/tools` (button running `mapstudio_perf.timeRefresh()`), script `mapstudio_perf` (dev kinds, 300 deterministic assets, `timeRefresh` returns `{ms, statuses}` after a MapEditor check).
+- [x] `ops/docker-compose.perf.yml`, `ops/docker-compose.perf-nomodule.yml` -- mount the perf project; the second also mounts an empty folder over `/external-modules`.
+- [x] `ops/perf.sh` -- phases `nomodule` and `main` (default both), `--target dev|template`, trial check, SQL wipe of `project = 'mapstudio-perf'` rows only while the project is unmounted, starts and stops the sampler, runs `npx playwright test -c perf/playwright.perf.config.mjs`, EXIT trap recreates the plain stack.
+- [x] `e2e/lib/frameRate.mjs` + `e2e/tests/measures.spec.mjs` -- move the frame-rate helpers; the spec imports them.
+- [x] `e2e/lib/env.mjs` -- `sessionUrl(path, project)`, perf output paths.
+- [x] `e2e/perf/items.mjs` -- deterministic pads and lines (UUIDv5 of `mapstudio-perf/<n>`, half points, half lines on a grid), batches of 500 ops.
+- [x] `e2e/perf/sampler.mjs` -- `docker stats` stream (1 s CPU, memory) plus `currentGauges` and sessions every 5 s, written after every sample.
+- [x] `e2e/perf/result.mjs`, `e2e/perf/compare.mjs` -- result schema, limits, verdicts; compare two results and print deltas.
+- [x] `e2e/perf/perf.spec.mjs`, `e2e/perf/playwright.perf.config.mjs` -- the measures in the order of Design Notes.
+- [x] `e2e/perf/perf.test.mjs`, `e2e/package.json` -- unit tests (items, verdicts, percentile, compare, busy counting) in `test:unit`; script `perf`.
+- [x] `docs/platform-checks.md`, `docs/perf/0.2.0-dev.json`, `docs/perf/README.md`, `.gitignore` -- the story section (method, dev numbers, template numbers from the laptop run, misses and their outcome); write-back noise of `ops/perf/project` ignored. Done for the dev run; the template numbers wait on the laptop run after the 0.2.0 tag (decision 3), so that row of the table is `unavailable`.
 
 **Acceptance Criteria:**
 - Given the dev stack, when `ops/perf.sh` runs twice, then both runs finish, the dev project's item count and the plain stack are unchanged, and each result holds every measure with a verdict.
@@ -109,6 +109,13 @@ None: all six were answered by the owner on 2026-10-27 (Decision above).
 
 ## Implementation Notes
 
+- Built as planned, with the Plan Change Log's eight gap fixes. One complete dev run (`PERF_RECORD=0.2.0 ops/perf.sh`, both phases, 2026-10-27 23:55 to 2026-10-28 00:17 UTC, container `ms-e2s17`, exit 3) is committed as `docs/perf/0.2.0-dev.json`; the first attempt was lost to a container restart before it finished (saved as a WIP commit), so only one complete run exists on this box.
+- Results: every limit passed except `edits.apply` with 50-op batches from 10 editors at once (p95 1,791.9 ms, median 303.4, max 2,952.7, n 200, no busy refusal, no timeout; limit p95 under 300 ms). The 1-op 10-editor case passed (p95 276.6 ms). The table, the cause and the method are in docs/platform-checks.md, "Epic 2 story 17".
+- Cause analysis (after the first run, commit 7c1fcb1): each `edits.apply` measure now records the open editor pages, the whole box's CPU busy share over the measure (`/proc/stat`, `procStatCpu` and `hostBusyPct` in `e2e/perf/result.mjs`, unit tested) and the Gateway container's window, and the 10 editors' 50-op streams are also sent from one page (`50op-10streams-1page`, recorded, not judged on p95; a busy refusal, timeout, error or missing sample is still a miss). The host was 99.7 to 99.8% busy over 4 CPUs during every judged `edits.apply` measure while the Gateway used under one core; from one page the Gateway's share rose to 81% of one core and p95 fell to 314.3 ms (median 200, max 394.7). So the miss is this 4-CPU box running 10 Chromium pages (5,000-item map, software WebGL) beside the Gateway and PostgreSQL, not the write path; the residual ~314 ms with 10 concurrent 50-op streams is the per-project serialisation of batches (story 2's design) and is near the limit. The verdict in the record stays `miss`; the docs mark it "miss on this box". No Gateway or component code changed.
+- Open for the owner (decision 4): accept the miss for 0.2.0 with the cause recorded (a dated Decision line in the epic's Notes), or re-run the dev target on a laptop first (`PERF_RECORD=0.2.0 ops/perf.sh`, the exact command is in docs/platform-checks.md and docs/perf/README.md). Recorded in the epic's Notes and in `_bmad-output/deferred-work.md`.
+- Template target: not run (decision 3; the kept stack refuses unsigned modules [unverified live]); `ops/perf.sh --target template` refuses with exit 2 until the test Gateway runs Map Studio 0.2.x, and its code path is [unverified] until the laptop run after the tag.
+- Not changed: `e2e/tests/measures.spec.mjs` still writes its frame-rate section through `e2e/lib/frameRate.mjs` (moved helpers, no behaviour change); `npm test` does not run the perf suite (its own config, `npm run perf`).
+
 ## Plan Change Log
 
 - 2026-10-27, approval: the owner approved with all six recommended answers; Decision recorded, Open Questions resolved, status in-progress. A context-free review of the plan alone (before any code) found eight gaps; each is addressed in the build as below.
@@ -127,8 +134,17 @@ None: all six were answered by the owner on 2026-10-27 (Decision above).
 
 ## Verification
 
-**Commands:**
-- `cd e2e && npm run test:unit` -- expected: passes, perf tests included.
-- `cd e2e && npm test` -- expected: unchanged suite passes, measures.spec still writes its frame-rate section.
-- `bash -n ops/perf.sh && shellcheck -x ops/perf.sh` -- expected: clean.
-- `ops/perf.sh` -- expected: exit 0 or 3 with a complete `e2e/out/perf.json`; then `ops/psql.sh` shows no `mapstudio-perf` rows and the dev item count is as before.
+**Commands run (what was actually run; Docker was not available while the record was written up, so nothing was re-measured):**
+- `cd e2e && npm run test:unit` -- passed (lib, secret scan and the perf unit tests: items, verdicts, percentile, compare, busy counting, `/proc/stat` CPU, the every-sample-timed-out case).
+- `bash -n ops/perf.sh` and `cd ops && shellcheck -x perf.sh` -- clean (from the repository root shellcheck only reports SC1091, info, that it does not follow `lib.sh`).
+- `node --check` on every `e2e/perf/*.mjs` -- clean.
+- `PERF_RECORD=0.2.0 ops/perf.sh` on the dev stack (`ms-e2s17`, 2026-10-27 23:55 to 2026-10-28 00:17 UTC) -- exit 3 (one limit missed), a complete `e2e/out/perf.json` with every measure and a verdict, written to `docs/perf/0.2.0-dev.json` (commit 2a3b500). The trap's own checks (the plain stack recreated, no `mapstudio-perf` rows left, the dev item count unchanged) ran in that session but their outcome is not written into the record: [not verified] here.
+- `cd e2e && node perf/compare.mjs docs/perf/0.2.0-dev.json docs/perf/0.2.0-dev.json` (the record against itself) -- prints every headline number with a zero delta and its verdict.
+- `grep -rnP '\xE2\x80\x94'` over the files this story touched (`docs/`, `ops/perf.sh`, `ops/perf/`, `e2e/perf/`, `e2e/lib/`, this plan, the epic and `_bmad-output/deferred-work.md`) -- no match (the installed `_bmad/` tooling has its own, outside this story).
+- Not run: `cd e2e && npm test` (needs the dev stack); a second `ops/perf.sh` run on this box for the "runs twice" criterion (the first attempt was lost to a container restart); `ops/perf.sh --target template` (decision 3, after the tag).
+
+**Acceptance criteria:**
+- Runs twice, stack unchanged, every measure with a verdict: one complete run with every measure and a verdict; the second run and the unchanged-stack check are [not verified] on this box (above).
+- `compare.mjs` prints value, delta and verdict: yes.
+- Template run writes `docs/perf/0.2.0-template.json`: not yet (decision 3, after the 0.2.0 tag; the table row is `unavailable`).
+- Any miss named with its outcome before story 13: named in docs/platform-checks.md ("miss on this box", cause and both options); the owner's decision is open (epic Notes, deferred-work).
