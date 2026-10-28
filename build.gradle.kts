@@ -17,7 +17,7 @@ extra["sdk_version"] = sdk_version
 
 allprojects {
     // Release builds pass -PreleaseVersion=<tag>; local builds carry a SNAPSHOT.
-    version = (project.findProperty("releaseVersion") as String?)?.removePrefix("v") ?: "0.1.0-SNAPSHOT"
+    version = (project.findProperty("releaseVersion") as String?)?.removePrefix("v") ?: "0.3.0-SNAPSHOT"
 
     // Every module jar names the build's version in its manifest: the gateway
     // reads Implementation-Version (ModuleVersion) for the map store's audit

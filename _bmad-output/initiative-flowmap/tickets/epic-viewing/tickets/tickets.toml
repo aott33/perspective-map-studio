@@ -4,6 +4,19 @@
 # it cites initiative R40 until the epic has its own Requirements.
 # Entry 2 (owner-approved 2026-10-27, initiative R41) is held the same way and cites initiative R41.
 # Entry 3 (UX workshop, ux-map-studio, 2026-10-27, initiative R42 and R43) is held the same way and cites them.
+# Entry 4 (owner-approved 2026-10-28, after release 0.2.0) is release tooling, not a viewing requirement; it is first in build order so
+# this epic's release uses it, and it cites no requirement.
+
+[[entry]]
+id = 4
+type = "story"
+title = "Shorter release checks: a smoke script, perf by measure and checks matched to the release type"
+description = "Owner-approved 2026-10-28, after release 0.2.0, whose rehearsal repeated what CI already does (the template's whole local.sh and full test stack) and ran twice (throwaway-signed before the tag, published after). Matches the checks to the release type, written into RELEASING.md: every pull request runs Map Studio CI as now; before a minor release's tag, one rehearsal on the template's test stack with a throwaway-signed build, and the performance run only when the write path, the map store or the bundle changed; after every tag (and for a patch release) a short smoke; the template pull request relies on the template's own CI (local.sh, stack.yml) instead of repeating it. Adds ops/release-smoke.sh <version>: the template's module lock entry checked (SHA-256 against the release, certificate against the README fingerprint, modl-verify.sh), the template's Gateway image with a database only (no field simulator, broker or feedback stub), the module ACTIVE at that version, one save seen in a second browser, and mapstudio_schema_version.module_version equal to the version, from committed browser checks in e2e/rehearsal/ (no scratch scripts rewritten per release). Adds ops/perf.sh --only <measures> to run the named measures and compare them with the last record (docs/perf/). Never: edits ign-scada-template, commits a .modl, password, token or scratch project, or weakens a check CI runs."
+verify = "ops/release-smoke.sh 0.2.0 passes against the published v0.2.0 in about 15 minutes and fails on a wrong SHA-256, a wrong certificate fingerprint and a module_version that does not match; ops/perf.sh --only edits.apply runs only those measures and prints the comparison with docs/perf/0.2.0-dev.json; RELEASING.md holds the table of checks by release type; Map Studio CI is unchanged and green."
+covers = []
+after = []
+hitl = false
+risk = "low"
 
 [[entry]]
 id = 1

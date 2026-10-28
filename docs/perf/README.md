@@ -5,7 +5,7 @@ One JSON file per release and target, written by `ops/perf.sh` (epic 2 story 17)
 | File | Target | Run |
 | --- | --- | --- |
 | `0.2.0-dev.json` | the `ops/` dev stack, a 4-CPU agent box with software WebGL | 2026-10-28 UTC; every limit met except `edits.apply` with 50-op batches from 10 editors at once, a miss on that box (the cause and the owner's open decision are in platform-checks.md) |
-| `0.2.0-template.json` | the template's 300-pad test stack, the owner's laptop | not yet: runs right after the 0.2.0 tag (story 13) |
+| `0.2.0-template.json` | the template's kept 300-pad test stack (8.3.9, the published 0.2.0 through the lock), on the same 4-CPU agent box with software WebGL, phase `main` only | 2026-10-28 UTC, story 13; every limit met except `edits.apply` from 10 editors at once (50-op p95 1,905.7 ms, 1-op p95 384.0 ms), a miss on that box; the idle and 20-session deltas are unavailable (no `nomodule` phase on this target); platform-checks.md "Results (template stack)" |
 
 ## Running it
 
