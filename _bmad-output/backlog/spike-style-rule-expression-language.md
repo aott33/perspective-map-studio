@@ -31,3 +31,4 @@ A kind setup's style rule may be an Expression that returns one preset name (R40
 - Open question: Evaluated on the Gateway (one place, the live-value batch already there, AD-6) or in the browser (no round trip, preview without the Gateway).
 - Open question: Can module code evaluate an Ignition expression against a map item's values, and what does an expression that errors draw (AD-16 says `normal`, reported for that item).
 - Open question: Whether the instruments aggregate source (AD-16) is computed in the same place.
+- Decision: 2026-10-28 Settled when epic-viewing was refined (owner): on the Gateway, in Ignition's expression language, checked live as the first step of epic-viewing entry 1. This spike is closed as moved there.

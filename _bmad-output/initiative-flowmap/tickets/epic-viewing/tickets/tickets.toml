@@ -1,11 +1,8 @@
-# Epic 3 entries. Table order is build order; ids are permanent.
-# The epic is not refined yet (refined: false); its stories are planned when it is.
-# Entry 1 (owner-approved 2026-10-26, initiative R40) is held here ahead of refinement;
-# it cites initiative R40 until the epic has its own Requirements.
-# Entry 2 (owner-approved 2026-10-27, initiative R41) is held the same way and cites initiative R41.
-# Entry 3 (UX workshop, ux-map-studio, 2026-10-27, initiative R42 and R43) is held the same way and cites them.
-# Entry 4 (owner-approved 2026-10-28, after release 0.2.0) is release tooling, not a viewing requirement; it is first in build order so
-# this epic's release uses it, and it cites no requirement.
+# Epic 3 stories in build order. Table order is build order; ids are permanent.
+# Refined 2026-10-28 (owner, "agree with all"); covers now cite this epic's Requirements.
+# Entry 4 (release tooling, built) stays first. Entry 5 is the tracer bullet. One lane through the browser map
+# (5, 6, 7, then 1, 2, 8, 9, 3); entry 1's Gateway part and entry 6 can run beside each other, as can 8 and 9.
+# ER-27 steps of entries 1 to 3 moved to entry 12, one review before the release (owner, 2026-10-28).
 
 [[entry]]
 id = 4
@@ -19,34 +16,133 @@ hitl = false
 risk = "low"
 
 [[entry]]
+id = 5
+type = "story"
+title = "Tracer: live values reach an icon and its default popup"
+description = "The thinnest path through every layer viewing touches (AD-6, AD-7, AD-16). On the Gateway, one subscription per project to the comms, KPI and Alarm Metrics paths that seeded kind setups turn on, asset-relative {asset.path}/... paths resolved from each map item's base path and full paths taken as one tag for every item, LiveValue {value, quality, t, stale, reason} slots with stale computed from quality and comms, unresolved paths reported per map item; values.batch {seq, full, items} to each open map once per refresh interval (changes only, full on open and reconnect); popup.open and popup.close with the item's values pushed on change while open. In the browser, a point draws its kind's glyph, comms state (the comms-lost glyph and word in the new comms-lost theme token, owner 2026-10-28), the icon KPI and the alarm glyph with digit, solid or hollow by acknowledgement, normal neutral grey; a click opens the default popup in order header, comms with data age, 2 to 3 KPIs, alarms, stale values marked. Seeds dev kind setups and simulator tags on the dev stack (a hitl step if the owner's tags are wanted). Replaces e2e/lib/valueBatch.mjs's stand-in with the real message and adds both to the contract docs."
+verify = "On the dev Gateway with seeded kind setups: toggling a dev tag changes an icon's KPI within one refresh interval; raising an alarm under the asset's Alarm Metrics draws the priority glyph and digit, acknowledging it turns it hollow; breaking comms draws the comms-lost glyph, word and token; a click opens the popup in the stated order and its KPI updates while open; Gateway logs show one subscription per path whatever the number of open sessions; e2e and unit tests pass."
+covers = ["R2", "R6"]
+after = ["2.9", "2.3", "2.11"]
+hitl = true
+risk = "high"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Basemaps and the starting area"
+description = "None, OpenStreetMap and Satellite from the setup's basemaps (AD-12), switched in View mode, each with its provider's attribution always shown; with none, items draw on a blank background; the Satellite token read only from the secret the setup names, refused when it is not a public restricted token, never logged; docs/setup.md notes OpenStreetMap's tile usage policy for client sites. The component's starting area prop (centre and zoom, or bounds) replaces START_VIEW; two components with different starting areas show the same map items."
+verify = "On the dev Gateway: each basemap draws with its attribution, None draws a blank background; a component given another starting area opens there and shows the same items as the first; no token appears in the browser's storage or the Gateway log; e2e at 1440 and 390 px pass."
+covers = ["R1", "R10"]
+after = [5]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Labels, lines and the template's map parity"
+description = "The template's docs/map.md section 5 list, item by item: labels ranked by the kind list that give way as the user zooms out and never overlap at the starting zoom, names from zoom 14, normal items as dots below zoom 12 with abnormal glyphs kept; line weight by pipe size, line hue only from alarms with the glyph at the midpoint, dashed for no data or comms lost, thin neutral with no instruments; the flow arrow on the selected line only; items within 20 m as one shared marker opening a pick list; Fit and Return (Return disabled with nothing selected); a tap on the ground clears the selection; Fit keeps until the bounds change. A checklist in docs/ maps each section 5 item to met or listed for ER-27 (the template's chip row and top sheets are the listed departure)."
+verify = "On the dev 30-pad set: zooming out thins labels with no overlap at the starting zoom; two items 15 m apart show one marker whose pick list opens both; Fit, Return and the ground tap behave as listed; the flow arrow shows only on the selected line; the checklist has every section 5 item marked met or for ER-27; e2e passes."
+covers = ["R3", "R5"]
+after = [6]
+hitl = false
+risk = "medium"
+
+[[entry]]
 id = 1
 type = "story"
 title = "Value-driven styles and area category tints drawn from live values"
-description = "Initiative R40 (owner, 2026-10-26; prd FR-38, FR-39; architecture AD-11, AD-16). Draws each map item's style rule from live values: the rule's source value arrives in the icon batch (AD-6), States, Bands or the expression pick a preset, and points, lines and areas draw it from the closed preset list in common/ (theme token plus glyph or word for attention, warning and fault; dimmed; solid, dashed, dotted and weight by pipe size for lines); alarm state draws over a value style, both over an area's category tint from the low-saturation palette; a stale source value draws only as stale, dropping the last value style until a fresh value arrives; per-item overrides apply. Ships the preview component the kind setup screen embeds, drawing every state or band in its preset before saving (the screen and its rule editing are epic-editing's, R15, R16), and the docs page of every preset and tint in both themes for the engineering review (ER-27), which is a hitl step."
-verify = "On the dev Gateway with seeded kind setups: a States rule and a Bands rule change an icon's and a line's look as the source tag changes, within one refresh interval; an active alarm draws over the value style; a stale source value drops the style and shows stale until a fresh value arrives; an area takes its category tint and a point never does; the preview shows every state in its preset; no colour literal is in the stored rules or the module's styles; the owner's engineering review of the presets and tints (ER-27) is recorded."
-covers = ["R40"]
-after = ["2.9"]
-hitl = true
+description = "Initiative R40 (owner, 2026-10-26; prd FR-38, FR-39; architecture AD-11, AD-16). First a live 8.3 check: can module code evaluate an Ignition expression against a map item's values (recorded in docs/platform-checks.md and architecture AD-16; if not, the expression type goes to the backlog and States and Bands ship, owner 2026-10-28). Works out each map item's style rule on the Gateway in the shared live-value cache (owner, 2026-10-28): the rule's source value is one more slot of the shared subscription, States, Bands or the expression pick a preset, and values.batch carries the preset name; and points, lines and areas draw it from the closed preset list in common/ (theme token plus glyph or word for attention, warning and fault; dimmed; solid, dashed, dotted and weight by pipe size for lines); alarm state draws over a value style, both over an area's category tint from the low-saturation palette; a stale source value draws only as stale, dropping the last value style until a fresh value arrives; per-item overrides apply. Ships the preview component the kind setup screen embeds, drawing every state or band in its preset before saving (the screen and its rule editing are epic-editing's, R15, R16), and the docs page of every preset and tint in both themes, which entry 12 takes to the engineering review (ER-27)."
+verify = "On the dev Gateway with seeded kind setups: a States rule and a Bands rule change an icon's and a line's look as the source tag changes, within one refresh interval; an active alarm draws over the value style; a stale source value drops the style and shows stale until a fresh value arrives; an area takes its category tint and a point never does; the preview shows every state in its preset; no colour literal is in the stored rules or the module's styles; the expression check is recorded in docs/platform-checks.md."
+covers = ["R12"]
+after = ["2.9", 5]
+hitl = false
 risk = "medium"
 
 [[entry]]
 id = 2
 type = "story"
 title = "Instruments drawn on lines, the ordered line popup, segment click and the aggregate line style"
-description = "Initiative R41 (owner, 2026-10-27; prd FR-4, FR-5, FR-34, FR-38, FR-40; architecture AD-7, AD-11, AD-16, AD-19). Draws each instrument (tap, meter, line valve) as its kind's icon at its place on its line, from the stored attachment, and splits the line into line segments for display; a line's default popup lists its instruments in order along the line, between the map items its ends snap to, each with its live values and distance (for example CTB1 outlet, PT-1 at 1.1 km, PT-2 at 2.8 km, SWD1 inlet), plus the line's own KPIs and alarm summary, with the Gateway pushing every listed instrument's values while it is open; a click or tap on a line opens the popup at that segment (for example PT-1 to PT-2) with the instruments at its ends highlighted on the map and in the list, on desktop and as a bottom sheet at 390 px; an instrument's alarm glyph draws at its place on the line, the line's own alarms keeping the midpoint glyph; a line style rule with the instruments source draws each line segment from the worst of the instruments at the segment's ends (owner, 2026-10-27, as the template's map does): dashed when either end instrument is stale, otherwise the worse of their presets, alarm state still winning; the map item object of a line carries its ordered instruments and the open segment for custom popup views. The engineering review of instrument alarms and the aggregate look (ER-27) is a hitl step."
-verify = "On the dev Gateway with a seeded L-SWD-like line (PT-1 at 1,143 m, PT-2 at 2,841 m of 2,922 m, ends snapped to CTB1 and SWD1): the instruments draw at their places; the line popup lists CTB1 outlet, PT-1, PT-2, SWD1 inlet in order with live values that update while open; a click between PT-1 and PT-2 opens it at \"PT-1 to PT-2\" with both highlighted; an alarm on PT-2 draws at PT-2's place on the line; with the instruments style source, making PT-1 stale dashes the segments CTB1 to PT-1 and PT-1 to PT-2 only, and pushing PT-2 outside its band shows attention on PT-1 to PT-2 and PT-2 to SWD1 only, an active alarm drawing over both; the same at 390 px; the owner's engineering review (ER-27) is recorded."
-covers = ["R41"]
+description = "Initiative R41 (owner, 2026-10-27; prd FR-4, FR-5, FR-34, FR-38, FR-40; architecture AD-7, AD-11, AD-16, AD-19). Draws each instrument (tap, meter, line valve) as its kind's icon at its place on its line, from the stored attachment, and splits the line into line segments for display; a line's default popup lists its instruments in order along the line, between the map items its ends snap to, each with its live values and distance (for example CTB1 outlet, PT-1 at 1.1 km, PT-2 at 2.8 km, SWD1 inlet), plus the line's own KPIs and alarm summary, with the Gateway pushing every listed instrument's values while it is open; a click or tap on a line opens the popup at that segment (for example PT-1 to PT-2) with the instruments at its ends highlighted on the map and in the list, on desktop and as a bottom sheet at 390 px; an instrument's alarm glyph draws at its place on the line, the line's own alarms keeping the midpoint glyph; a line style rule with the instruments source draws each line segment from the worst of the instruments at the segment's ends (owner, 2026-10-27, as the template's map does): dashed when either end instrument is stale, otherwise the worse of their presets, alarm state still winning; the map item object of a line carries its ordered instruments and the open segment for custom popup views. The segment look is worked out on the Gateway where style rules are (R12). Instrument alarms and the aggregate look go to entry 12's engineering review (ER-27)."
+verify = "On the dev Gateway with a seeded L-SWD-like line (PT-1 at 1,143 m, PT-2 at 2,841 m of 2,922 m, ends snapped to CTB1 and SWD1): the instruments draw at their places; the line popup lists CTB1 outlet, PT-1, PT-2, SWD1 inlet in order with live values that update while open; a click between PT-1 and PT-2 opens it at \"PT-1 to PT-2\" with both highlighted; an alarm on PT-2 draws at PT-2's place on the line; with the instruments style source, making PT-1 stale dashes the segments CTB1 to PT-1 and PT-1 to PT-2 only, and pushing PT-2 outside its band shows attention on PT-1 to PT-2 and PT-2 to SWD1 only, an active alarm drawing over both; the same at 390 px."
+covers = ["R13"]
 after = ["2.14", 1]
-hitl = true
+hitl = false
 risk = "medium"
+
+[[entry]]
+id = 8
+type = "story"
+title = "The whole default popup, its link, a custom popup view and the phone bottom sheet"
+description = "Completes the popup (AD-7): the alarm summary for the item's alarms path (counts by priority, the most important alarms in words, from Ignition's alarm status; Map Studio acknowledges nothing) with View alarms to the setup's alarm page; the page link icon in the header with placeholders filled in the browser from the closed list, hidden when a placeholder has no value; a kind setup's popupView {path, params} opening instead of the default popup with mapItem kept live and each param filled (literal, one placeholder, or {asset.path}/<suffix>), a missing or failing view falling back to the default popup; the spike's popupView prop retired with an upgrade note; at 390 px every popup is a bottom sheet. The example view embeds the built-in alarm table."
+verify = "On the dev Gateway: an alarmed item's popup shows its counts and alarms in words and View alarms opens the alarm page; the link icon opens /pad/<name> and hides for an item with no asset; a kind with popupView opens the project view with mapItem and a padName param, and a wrong path falls back; at 390 px the popup is a bottom sheet; e2e and unit tests pass."
+covers = ["R6", "R7", "R8", "R9"]
+after = [5]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 9
+type = "story"
+title = "Search"
+description = "A search field finds map items by name or asset name as the user types; choosing a result by click, tap or keyboard zooms to the item and selects it; at 390 px it sits in the top bar entry 3 shares with Needs you."
+verify = "On the dev 30-pad set: typing part of a name or an asset name lists the matches; Enter or a tap on one zooms to and selects it; the whole flow works by keyboard alone and at 390 px; e2e passes."
+covers = ["R4"]
+after = [7]
+hitl = false
+risk = "low"
 
 [[entry]]
 id = 3
 type = "story"
 title = "Needs you summary and legend in View mode"
-description = "Initiative R42 and R43 (UX workshop, ux-map-studio, 2026-10-27; prd FR-41, FR-42; architecture AD-6, AD-11; EXPERIENCE.md Needs you bar, Legend, Responsive). View mode shows a Needs you summary counting map items in alarm, comms lost and stale, each with its glyph and word (for example Needs you 3: 1 alarm, 1 comms lost, 1 stale), from the same icon batch (AD-6, no extra subscription); a click or tap opens a list ranked alarms by priority, then comms lost, then stale, and choosing a row zooms to and selects the map item; with nothing to attend to it reads All OK in neutral and stays visible. A legend, collapsed to a button bottom-left and opened on request, names every glyph and line look the map draws in the map's own words and holds the Lines and Names toggles (FR-34). At 390 px Needs you and search share one top bar that expands on tap, and nothing sits in the bottom-right corner the App Bar toggle uses. The engineering review of the Needs you counts and the legend's glyph key (ER-27) is a hitl step."
-verify = "On the dev Gateway with seeded kind setups and the field simulator: one alarm, one comms-lost and one stale item read Needs you 3: 1 alarm, 1 comms lost, 1 stale within one refresh interval; the list ranks them in that order and a row zooms to and selects its item; clearing all three reads All OK in neutral; the legend opens and closes by click and keyboard and its Lines and Names toggles work; at 390 px the top bar holds search and Needs you and the bottom-right corner is clear; the owner's engineering review (ER-27) is recorded."
-covers = ["R42", "R43"]
-after = ["2.9"]
+description = "Initiative R42 and R43 (UX workshop, ux-map-studio, 2026-10-27; prd FR-41, FR-42; architecture AD-6, AD-11; EXPERIENCE.md Needs you bar, Legend, Responsive). View mode shows a Needs you summary counting map items in alarm, comms lost and stale, each with its glyph and word (for example Needs you 3: 1 alarm, 1 comms lost, 1 stale), from the same icon batch (AD-6, no extra subscription); a click or tap opens a list ranked alarms by priority, then comms lost, then stale, and choosing a row zooms to and selects the map item; with nothing to attend to it reads All OK in neutral and stays visible. A legend, collapsed to a button bottom-left and opened on request, names every glyph and line look the map draws in the map's own words and holds the Lines and Names toggles (FR-34). At 390 px Needs you and search share one top bar that expands on tap, and nothing sits in the bottom-right corner the App Bar toggle uses. The Needs you counts and the legend's glyph key go to entry 12's engineering review (ER-27)."
+verify = "On the dev Gateway with seeded kind setups and the field simulator: one alarm, one comms-lost and one stale item read Needs you 3: 1 alarm, 1 comms lost, 1 stale within one refresh interval; the list ranks them in that order and a row zooms to and selects its item; clearing all three reads All OK in neutral; the legend opens and closes by click and keyboard and its Lines and Names toggles work; at 390 px the top bar holds search and Needs you and the bottom-right corner is clear."
+covers = ["R14", "R15"]
+after = [5, 9]
 hitl = true
 risk = "low"
+
+[[entry]]
+id = 10
+type = "story"
+title = "Frame rate and batch cost with live values"
+description = "Repeats the frame-rate measure (epic-module-foundation story 7) and the values.batch size and time on the 30-pad set with live values, styles, instruments and labels drawn, through ops/perf.sh measures added for them (run with --only), recorded in docs/perf/ and docs/platform-checks.md; the owner's laptop reading decides NFR-1, the agent box's is recorded, not pass or fail."
+verify = "ops/perf.sh --only frame-rate,values.batch runs on the dev stack and prints the comparison with the last record; the owner's laptop reading of 60 frames per second on pan and zoom is recorded."
+covers = ["R11"]
+after = [1, 2, 7]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 11
+type = "story"
+title = "Refactor sweep"
+description = "Cleanup only, its scope set at its start from the plans and review findings this epic deferred; scope pushed out of another story is a new story."
+verify = "The full check set in the hand-off passes with no behaviour change; deferred-work.md entries it closes carry a resolved: line."
+covers = []
+after = [5, 6, 7, 1, 2, 8, 9, 3, 10]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 12
+type = "story"
+title = "Hue tokens and the engineering review pack"
+description = "One review before the release (owner, 2026-10-28): the comms-lost token in the magenta or purple family, the alarm priority 1 to 3 tokens, the presets and the area tints mapped to the host project's theme variables, shown on one docs page in both themes with every glyph, line look, instrument alarm, Needs you count, the legend and the bottom sheets, and the template's docs/map.md section 5 checklist; the owner's engineering review (ER-27) is a hitl step and its findings are fixed or recorded."
+verify = "The docs page renders every token in light and dark from the dev stack's screenshots; a contrast check shows 3:1 for each against the basemaps and surfaces; no colour literal is in the module's styles; the owner's ER-27 verdict is recorded in docs/platform-checks.md and the epic's Notes."
+covers = ["R5", "R16"]
+after = [11]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 13
+type = "story"
+title = "Release 0.3.0 on the template's test stack"
+description = "The epic's release by RELEASING.md's checks for a minor release: one rehearsal on the template's test stack with a throwaway-signed build and the field simulator's live tags (scratch clone, never pushed; the template stays on 0.1.0), the perf run where the write path or the bundle changed, the owner's Mapbox terms confirmation recorded, then the tag, the owner's approval and publish, and ops/release-smoke.sh 0.3.0 after it."
+verify = "On the template's test stack with the field simulator: a pad's alarm draws on the map and its popup reaches the pad's page in two clicks; a normal field shows no hue; ops/release-smoke.sh 0.3.0 passes against the published release."
+covers = ["R1", "R2", "R5", "R16"]
+after = [12]
+hitl = true
+risk = "medium"
