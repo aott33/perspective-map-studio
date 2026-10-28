@@ -129,6 +129,8 @@ export interface MarkerSpec {
     selected: boolean;
     /** The value style's preset on the ring (entry 1); normal while the look is comms lost or stale. */
     preset: PointPreset;
+    /** An instrument on a line (entry 2, DESIGN.md instrument-marker): a 24 px disc in the same image box. */
+    instrument: boolean;
 }
 
 /** The properties of a point feature that the marker and label layers read. */
@@ -176,6 +178,8 @@ export const MARKER_IMAGE = { width: 56, height: 46 };
 /** The disc's centre in the marker image (the point the marker is anchored at) and its radius. */
 export const DISC_CENTER: [number, number] = [20, 23];
 export const DISC_RADIUS = 17;
+/** An instrument's disc (DESIGN.md instrument-marker: 24 px), at the same centre. */
+export const INSTRUMENT_DISC_RADIUS = 12;
 /** The dot images: the dot centred in a 44 px square, the template's hit area. */
 export const DOT_IMAGE = 44;
 export const DOT_MID = 11;
@@ -251,8 +255,8 @@ export function labelRank(state: ItemState, kindLabelRank: number, selected: boo
     return RANK_NORMAL + (LABEL_RANK_MAX - rank);
 }
 
-/** The marker spec for one point from its icon id, its live state and whether it is selected. */
-export function markerSpec(icon: string, state: ItemState, selected = false): MarkerSpec {
+/** The marker spec for one point from its icon id, its live state, whether it is selected and whether it is an instrument. */
+export function markerSpec(icon: string, state: ItemState, selected = false, instrument = false): MarkerSpec {
     const look: MarkerLook = state.commsLost ? 'comms-lost' : state.stale ? 'stale' : 'normal';
     let badge = '';
     let priority = 0;
@@ -268,11 +272,16 @@ export function markerSpec(icon: string, state: ItemState, selected = false): Ma
     }
     // The value style draws only on a fresh item: comms lost and stale replace it (the Gateway drops it too).
     const preset = look === 'normal' ? pointPreset(itemPreset(state)) : 'normal';
-    return { icon: icon || 'point', look, badge, priority, solid, selected, preset };
+    return { icon: icon || 'point', look, badge, priority, solid, selected, preset, instrument };
 }
 
+/** The image id: the seven elements of entries 5 to 1 and, for an instrument, an eighth (a 7-element id is a point's). */
 export function markerImageId(spec: MarkerSpec): string {
-    return IMAGE_PREFIX + JSON.stringify([spec.icon, spec.look, spec.badge, spec.priority, spec.solid, spec.selected, spec.preset]);
+    const parts: unknown[] = [spec.icon, spec.look, spec.badge, spec.priority, spec.solid, spec.selected, spec.preset];
+    if (spec.instrument) {
+        parts.push(true);
+    }
+    return IMAGE_PREFIX + JSON.stringify(parts);
 }
 
 export function dotImageId(size: number, selected: boolean): string {
@@ -318,9 +327,9 @@ export function chipOffsetEm(name: string): number {
 
 /** The feature properties for one point (or a shared marker, `members` 2 or more). */
 export function markerProperties(id: string, name: string, kind: string, icon: string, state: ItemState,
-                                 options: { labelRank?: number; selected?: boolean; members?: string[] } = {}): MarkerProperties {
+                                 options: { labelRank?: number; selected?: boolean; members?: string[]; instrument?: boolean } = {}): MarkerProperties {
     const selected = options.selected === true;
-    const spec = markerSpec(icon, state, selected);
+    const spec = markerSpec(icon, state, selected, options.instrument === true);
     const marker = markerImageId(spec);
     const abnormal = state.badge !== 'normal';
     const members = options.members && options.members.length > 1 ? options.members : [];
@@ -398,8 +407,9 @@ export function lineLook(state: ItemState, sizeIn: unknown, hasInstruments: bool
     };
 }
 
-/** The properties of a line feature the line layers read. */
+/** The properties of a line feature the line layers read (one feature per segment of a line with instruments, entry 2). */
 export interface LineProperties {
+    /** The line map item's id (every segment feature of a line carries it). */
     id: string;
     name: string;
     kind: string;
@@ -411,6 +421,11 @@ export interface LineProperties {
     dotted: boolean;
     dimmed: boolean;
     selected: boolean;
+    /** The segment's two nodes: instrument ids, the ids of the items the ends snap to, or `start` and `end`. */
+    from?: string;
+    to?: string;
+    /** The open segment of the selected line (its popup is open at it). */
+    segmentSelected?: boolean;
 }
 
 export function lineProperties(id: string, name: string, kind: string, look: LineLook, colors: MarkerColors, selected: boolean): LineProperties {
@@ -466,7 +481,10 @@ export function parseImageId(id: string): ImageSpec | null {
     };
     const marker = parts(IMAGE_PREFIX);
     if (marker) {
-        if (marker.length !== 7 || typeof marker[0] !== 'string') {
+        if ((marker.length !== 7 && marker.length !== 8) || typeof marker[0] !== 'string') {
+            return null;
+        }
+        if (marker.length === 8 && marker[7] !== true) {
             return null;
         }
         const look = marker[1];
@@ -480,7 +498,7 @@ export function parseImageId(id: string): ImageSpec | null {
         return {
             kind: 'marker',
             spec: { icon: marker[0], look, badge: String(marker[2]), priority: Number(marker[3]) || 0, solid: marker[4] === true,
-                selected: marker[5] === true, preset }
+                selected: marker[5] === true, preset, instrument: marker.length === 8 }
         };
     }
     const dot = parts(DOT_PREFIX);
@@ -554,7 +572,9 @@ function svg(width: number, height: number, body: string): string {
  */
 export function markerSvg(spec: MarkerSpec, symbols: Record<string, SpriteSymbol>, colors: MarkerColors): string {
     const [cx, cy] = DISC_CENTER;
-    const r = DISC_RADIUS;
+    // An instrument's disc is the 24 px one (DESIGN.md instrument-marker), its glyph 14 px; the badge keeps its place.
+    const r = spec.instrument ? INSTRUMENT_DISC_RADIUS : DISC_RADIUS;
+    const glyphSize = spec.instrument ? 14 : 20;
     const hue = spec.look === 'comms-lost' ? colors.commsLost : colors.glyph;
     const preset = spec.look === 'normal' ? spec.preset : 'normal';
     let body = '';
@@ -574,7 +594,7 @@ export function markerSvg(spec: MarkerSpec, symbols: Record<string, SpriteSymbol
     } else {
         disc += `<circle cx="${cx}" cy="${cy}" r="${r - 1}" fill="none" stroke="${esc(colors.line)}" stroke-width="1.5"/>`;
     }
-    disc += glyphAt(symbols[spec.icon] || symbols.point, cx - 10, cy - 10, 20, hue);
+    disc += glyphAt(symbols[spec.icon] || symbols.point, cx - glyphSize / 2, cy - glyphSize / 2, glyphSize, hue);
     body += preset === 'dimmed' ? `<g opacity="${DIMMED_OPACITY}">${disc}</g>` : disc;
     body += badgeAt(spec.badge, spec.priority, spec.solid, cx + 13, cy - 13, symbols, colors);
     return svg(MARKER_IMAGE.width, MARKER_IMAGE.height, body);

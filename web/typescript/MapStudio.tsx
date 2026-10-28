@@ -47,7 +47,10 @@ import {
     imageFor, markerProperties, parseSprite, stateWord, textWidthPx
 } from './markers';
 import { PresetPalette, StylePreview, TintPalette } from './StylePreview';
-import { MapFeatures, Selection, buildFeatures } from './features';
+import { MapFeatures, SegmentRef, Selection, buildFeatures } from './features';
+import { LinePopup } from './LinePopup';
+import { popupInstruments, popupNodes } from './linePopup';
+import { instrumentsOn, lengthM } from './geometry';
 import { ZoomControl } from './ZoomControl';
 import { PickList, PickRow } from './PickList';
 import { DefaultPopup } from './DefaultPopup';
@@ -62,7 +65,7 @@ import {
     reasonFromError, savedRecords, storageKey, summaryText, unsavedItems
 } from './unsaved';
 import { UnsavedSender } from './unsavedSender';
-import { AuthorParams, PopupPoint, popupMaxWidth, popupMountPath } from './popupParams';
+import { AuthorParams, LINE_POPUP_PX, POPUP_MAX_PX, PopupPoint, popupMaxWidth, popupMountPath } from './popupParams';
 import { registerTestHook, registerTestView, takeTestReply } from './testHook';
 import { drawColor, themeColor } from './theme';
 import { Kind } from './adapters';
@@ -106,10 +109,13 @@ export interface MapStudioProps {
     editMode: boolean;
 }
 
-/** The popup that is open: the clicked point with its map coordinates. */
+/** The popup that is open: the clicked point (or line, entry 2) with its map coordinates and, for a line, the clicked segment. */
 interface OpenPopup {
     point: PopupPoint;
     lngLat: [number, number];
+    /** A line's popup (entry 2): the line popup at the clicked segment. */
+    line: boolean;
+    segment: SegmentRef | null;
 }
 
 /** The pick list a shared marker opened (epic 3 entry 7): its rows at the marker's place. */
@@ -397,9 +403,12 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         }
     }
 
-    /** The popup of a map item opened: the Gateway pushes its values on change until popup.close (AD-7). */
-    sendPopupOpen(itemId: string): void {
-        this.fireEvent(MESSAGE_EVENT, popupOpen(itemId) as unknown as JsObject);
+    /**
+     * The popup of a map item opened: the Gateway pushes its values on change until popup.close
+     * (AD-7); for a line (entry 2) the segment it opened at, and every instrument on it is pushed too.
+     */
+    sendPopupOpen(itemId: string, segment: SegmentRef | null = null): void {
+        this.fireEvent(MESSAGE_EVENT, popupOpen(itemId, segment) as unknown as JsObject);
     }
 
     sendPopupClose(itemId: string): void {
@@ -910,7 +919,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 source: SOURCE_ITEM_LINES,
                 filter: ['==', ['get', 'selected'], true],
                 layout: { 'line-cap': 'round', 'line-join': 'round' },
-                paint: { 'line-color': mc.selection, 'line-width': ['+', ['get', 'weight'], 4], 'line-opacity': 0.5 }
+                paint: {
+                    'line-color': mc.selection, 'line-width': ['+', ['get', 'weight'], 4],
+                    // The open segment of a line (its popup, entry 2) firmer than the rest of the selected line.
+                    'line-opacity': ['case', ['==', ['get', 'segmentSelected'], true], 0.85, 0.5]
+                }
             });
             map.addLayer({
                 id: LAYER_ITEM_LINES_DASHED,
@@ -1387,6 +1400,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (this.mapContainer) {
             this.mapContainer.setAttribute('data-selected', selected ? selected.id : '');
             this.mapContainer.setAttribute('data-selected-kind', selected ? selected.kind : '');
+            // The open segment of a selected line and the instruments highlighted at its ends (entry 2).
+            const segment = selected && selected.kind === 'line' && selected.segment ? selected.segment : null;
+            this.mapContainer.setAttribute('data-segment', segment ? segment.fromId + '|' + segment.toId : '');
+            this.mapContainer.setAttribute('data-highlighted', segment ? segment.fromId + ',' + segment.toId : '');
         }
     }
 
@@ -1455,7 +1472,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.itemBoundsKey = data.boundsKey;
             if (this.mapContainer) {
                 // The map items drawn (a shared marker counts its members), as the suite has always read it.
-                this.mapContainer.setAttribute('data-items-loaded', String(data.lines.features.length + data.areas.features.length
+                this.mapContainer.setAttribute('data-items-loaded', String(data.lineItems + data.areas.features.length
                     + data.points.features.reduce((n, f) => n + f.properties.members, 0)));
                 this.mapContainer.setAttribute('data-shared-markers', String(data.shared));
                 this.mapContainer.setAttribute('data-arrow', String(data.arrow.features.length));
@@ -1829,21 +1846,63 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const onLine = map.queryRenderedFeatures(
             [[ev.point.x - pad, ev.point.y - pad], [ev.point.x + pad, ev.point.y + pad]],
             { layers: [LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED] });
-        const lineId = onLine.length > 0 && onLine[0].properties ? onLine[0].properties.id : undefined;
+        const lineProps = onLine.length > 0 && onLine[0].properties ? onLine[0].properties : null;
+        const lineId = lineProps ? lineProps.id : undefined;
         if (typeof lineId === 'string') {
-            this.selectLine(lineId);
+            // The clicked feature is one segment of the line (features.ts): its from and to name the popup's segment.
+            const segment: SegmentRef | null = lineProps && typeof lineProps.from === 'string' && typeof lineProps.to === 'string'
+                ? { fromId: lineProps.from, toId: lineProps.to } : null;
+            this.openLinePopup(lineId, segment, [ev.lngLat.lng, ev.lngLat.lat]);
             return;
         }
         this.clearSelection();
     };
 
     /** A line clicked: selected (casing, flow arrow, Return), the popup closed. */
-    private selectLine(id: string): void {
+    private selectLine(id: string, segment: SegmentRef | null = null): void {
         if (this.popup && this.popup.isOpen()) {
             this.popup.remove();
         }
-        this.setState({ selected: { id, kind: 'line' }, pick: null });
+        this.setState({ selected: { id, kind: 'line', segment }, pick: null });
         console.info('[MapStudio] Line ' + id + ' selected.');
+    }
+
+    /**
+     * A line clicked (entry 2, AD-7): its default popup at the clicked segment, the line selected with
+     * that segment (the instruments at its ends highlighted), the Gateway told with popup.open
+     * {itemId, segment}. A line whose kind shows nothing and that carries no instrument is only
+     * selected, as before.
+     */
+    private openLinePopup(id: string, segment: SegmentRef | null, lngLat: [number, number]): void {
+        const delegate = this.props.delegate;
+        const item = delegate ? delegate.items.find((i) => i.id === id && !i.deleted) : undefined;
+        if (!this.map || !delegate || !item || item.geometry.type !== 'LineString') {
+            this.selectLine(id, segment);
+            return;
+        }
+        const display = delegate.live.display[item.kind];
+        const shows = (display && (display.comms || display.alarms.on || display.kpis.some((k) => k.on)))
+            || instrumentsOn(delegate.items, id).length > 0;
+        if (!shows) {
+            this.selectLine(id, segment);
+            return;
+        }
+        const store = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        const before = this.state.popup;
+        if (before && before.point.id !== id && store) {
+            store.sendPopupClose(before.point.id);
+        }
+        if (store) {
+            // A new segment of the same line is a new popup.open too: the Gateway keeps the latest.
+            store.sendPopupOpen(id, segment);
+        }
+        this.startPopupClock();
+        const kind = delegate.lists.kinds.find((k) => k.id === item.kind);
+        this.setState({
+            popup: { point: { id, name: item.name, kind: kind ? kind.id : item.kind }, lngLat, line: true, segment },
+            pick: null, selected: { id, kind: 'line', segment }, clock: Date.now()
+        }, () => this.showPopupAt(lngLat, LINE_POPUP_PX));
+        console.info('[MapStudio] Line ' + id + ' selected' + (segment ? ' at ' + segment.fromId + ' to ' + segment.toId : '') + '.');
     }
 
     /** The ground tapped: the selection and the popup go. */
@@ -1918,7 +1977,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
             delegate.sendPopupOpen(point.id);
         }
         this.startPopupClock();
-        this.setState({ popup: { point, lngLat }, pick: null, selected: { id: point.id, kind: 'point' }, clock: Date.now() },
+        this.setState({ popup: { point, lngLat, line: false, segment: null }, pick: null, selected: { id: point.id, kind: 'point' }, clock: Date.now() },
             () => this.showPopupAt(lngLat));
     }
 
@@ -1945,11 +2004,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
     }
 
     /** Move the popup to the point (after the state that fills its portal has rendered) and open it. */
-    private showPopupAt(lngLat: [number, number]): void {
+    private showPopupAt(lngLat: [number, number], maxPx: number = POPUP_MAX_PX): void {
         if (!this.map || !this.popup) {
             return;
         }
-        this.popup.setMaxWidth(popupMaxWidth(this.map.project(lngLat).x, this.map.getContainer().clientWidth));
+        this.popup.setMaxWidth(popupMaxWidth(this.map.project(lngLat).x, this.map.getContainer().clientWidth, maxPx));
         this.popup.setLngLat(lngLat);
         if (!this.popup.isOpen()) {
             this.popup.addTo(this.map);
@@ -1969,7 +2028,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     }
 
-    /** MapLibre closed the popup (close button, map click): unmount the view, tell the Gateway, clear a point's selection. */
+    /**
+     * MapLibre closed the popup (close button, map click): unmount the view, tell the Gateway, clear the
+     * selection (a point's, and from entry 2 a line's, whose popup the selection opened with).
+     */
     private onPopupClosed = (): void => {
         this.stopPopupClock();
         const open = this.state.popup;
@@ -1980,8 +2042,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
             }
         }
         if (open !== null || this.state.pick !== null) {
-            const selected = this.state.selected;
-            this.setState({ popup: null, pick: null, selected: selected && selected.kind === 'point' ? null : selected });
+            this.setState({ popup: null, pick: null, selected: null });
+        }
+    };
+
+    /** The line popup's own close button (entry 2): MapLibre's close, which onPopupClosed answers. */
+    private closePopup = (): void => {
+        if (this.popup && this.popup.isOpen()) {
+            this.popup.remove();
         }
     };
 
@@ -2003,6 +2071,33 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const { path, params } = this.props.props.popupView;
         const delegate = this.props.delegate;
         const kindId = open.point.kind || '';
+        let point = open.point;
+        if (open.line && delegate) {
+            // A line (entry 2): its default popup with the instruments in order, or the spike's view
+            // with the map item object carrying them and the open segment (AD-7).
+            const item = delegate.items.find((i) => i.id === open.point.id && !i.deleted);
+            const kind = delegate.lists.kinds.find((k) => k.id === kindId);
+            const nodes = item ? popupNodes(item, delegate.items, delegate.lists.kinds, delegate.live, open.segment) : [];
+            if (!path && item && item.geometry.type === 'LineString') {
+                const coords = item.geometry.coordinates;
+                return ReactDOM.createPortal(
+                    <LinePopup
+                        key={'line|' + open.point.id}
+                        line={{ id: item.id, name: item.name, kind: item.kind, kindName: kind ? kind.name : item.kind,
+                            icon: kind ? kind.icon : 'pipeline', diameter: item.properties ? item.properties.diameter : undefined,
+                            lengthM: coords.length >= 2 ? lengthM(coords) : 0 }}
+                        display={delegate.live.display[item.kind]}
+                        values={delegate.live.items[item.id]}
+                        nodes={nodes}
+                        segment={open.segment}
+                        now={this.state.clock}
+                        onClose={this.closePopup}
+                    />,
+                    this.popupContent
+                );
+            }
+            point = { ...open.point, instruments: popupInstruments(nodes), segment: open.segment };
+        }
         if (!path && delegate) {
             const display = delegate.live.display[kindId];
             const kind = delegate.lists.kinds.find((k) => k.id === kindId);
@@ -2029,7 +2124,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 path={path}
                 params={params}
                 mountPath={mountPath}
-                point={open.point}
+                point={point}
             />,
             this.popupContent
         );
@@ -2087,6 +2182,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              data-marker={spec.marker}
                              data-word={stateWord(state)}
                              data-rank={String(spec.rank)}
+                             data-segments={values.segments ? JSON.stringify(values.segments.map((g) => ({
+                                 from: g.from, to: g.to, preset: g.preset, stale: g.stale, reason: g.reason,
+                                 alarm: g.alarm ? g.alarm.priority + ':' + (g.alarm.unacked > 0 ? 'unacked' : 'acked') : ''
+                             }))) : ''}
                              data-problems={values.problems.map((p) => p.slot + ': ' + p.reason).join('; ')} />
                     );
                 })}
@@ -2189,6 +2288,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                      data-live-seq={delegate ? String(delegate.live.seq) : ''}
                      data-live-full={delegate ? String(delegate.live.fulls) : ''}
                      data-pick-open={this.state.pick ? 'true' : 'false'}
+                     data-segment=""
+                     data-highlighted=""
                      data-legend-open="false" />
                 <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '')}
                      data-pending={pending ? 'true' : 'false'}
