@@ -15,7 +15,7 @@ On a laptop with Docker, in this repository:
 ops/up.sh                                  # the dev stack (ops/README in the top-level README)
 (cd e2e && npm install && npx playwright install chromium)
 PERF_RECORD=0.2.0 ops/perf.sh              # both phases, about 30 min; writes docs/perf/0.2.0-dev.json
-PERF_RECORD=0.2.0 ops/perf.sh --phase main # only the phase with the module (the idle and 20-session deltas then have no baseline)
+PERF_RECORD=0.2.0 ops/perf.sh --phase main # only the phase with the module (the idle and 20-session deltas then have no baseline; it replaces the committed docs/perf/0.2.0-dev.json)
 ops/perf.sh --target template              # the template's kept 300-pad test stack (settings in ops/perf.sh)
 ```
 

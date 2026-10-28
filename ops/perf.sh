@@ -4,7 +4,7 @@
 #
 # Usage:
 #   ops/perf.sh                          both phases on this checkout's dev stack (ops/up.sh first)
-#   ops/perf.sh --phase main             one phase (nomodule or main)
+#   ops/perf.sh --phase main             only phase main (nomodule alone is refused)
 #   PERF_RECORD=0.2.0 ops/perf.sh        also write docs/perf/0.2.0-dev.json (only when no measure crashed)
 #   ops/perf.sh --target template        the owner's laptop: the template's kept 300-pad test stack
 #                                        (main phase only; see "Template target" below)
@@ -58,6 +58,16 @@ for p in "${PHASES[@]}"; do
 done
 if [[ "${TARGET}" == "template" ]]; then
   PHASES=(main)
+fi
+if [[ "${PHASES[*]}" == "nomodule" ]]; then
+  # The record is built on phase main; nomodule is only its baseline.
+  err "--phase nomodule alone is not supported: run both phases, or --phase main"
+  exit 2
+fi
+if [[ "${TARGET}" == "dev" && "${MAPSTUDIO_STORE_CHECKS:-}" == "1" ]]; then
+  # The plain stack this run restores is docker-compose.yml alone, without the store-checks overlay.
+  err "unset MAPSTUDIO_STORE_CHECKS before a perf run (the run restores the stack without that overlay)"
+  exit 2
 fi
 if [[ -n "${PERF_RECORD:-}" && ! "${PERF_RECORD}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   err "PERF_RECORD is a version such as 0.2.0"
