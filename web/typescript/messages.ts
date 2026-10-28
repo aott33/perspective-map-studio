@@ -11,6 +11,7 @@ import {
     Conflict, EditBatch, EditsApplyReplyBody, MapLoadReplyBody, readConflicts, readEditsApplyReply, readMapLoadReply
 } from './contract';
 import { ValuesBatchBody, readValuesBatch } from './live';
+import { BasemapId, BasemapSourceReplyBody, readBasemapSource } from './basemaps';
 
 /** Contract version carried in `v`. */
 export const MESSAGE_VERSION = 1;
@@ -36,7 +37,10 @@ export const MessageTypes = {
     /** Live values (epic 3 entry 5, AD-6, AD-7): the Gateway's batches, and the popup's open and close. */
     VALUES_BATCH: 'values.batch',
     POPUP_OPEN: 'popup.open',
-    POPUP_CLOSE: 'popup.close'
+    POPUP_CLOSE: 'popup.close',
+    /** A basemap's tile source (epic 3 entry 6, AD-12): the satellite source with its token, read on the Gateway. */
+    BASEMAP_SOURCE: 'basemap.source',
+    BASEMAP_SOURCE_REPLY: 'basemap.source.reply'
 } as const;
 
 export interface Envelope<B = Record<string, unknown>> {
@@ -75,6 +79,8 @@ export type Reply =
     | { kind: 'map.changed'; id: string; body: MapChangedBody | null }
     /** `body` is null when the values.batch could not be read: it is ignored (the next full batch heals). */
     | { kind: 'values.batch'; id: string; body: ValuesBatchBody | null }
+    /** `body` is null when the basemap.source.reply could not be read: the basemap stays as it was. */
+    | { kind: 'basemap.source.reply'; id: string; body: BasemapSourceReplyBody | null }
     | { kind: 'error'; id: string; body: ErrorBody }
     | { kind: 'invalid'; reason: string };
 
@@ -91,6 +97,11 @@ export function popupOpen(itemId: string, id?: string): Envelope<{ itemId: strin
 /** The `popup.close` message. */
 export function popupClose(itemId: string, id?: string): Envelope<{ itemId: string }> {
     return envelope(MessageTypes.POPUP_CLOSE, { itemId }, id);
+}
+
+/** The `basemap.source` message: the browser asks for a basemap's tile source (satellite only). */
+export function basemapSource(basemap: BasemapId, id?: string): Envelope<{ basemap: BasemapId }> {
+    return envelope(MessageTypes.BASEMAP_SOURCE, { basemap }, id);
 }
 
 /** The `edits.apply` message for one batch. */
@@ -157,6 +168,8 @@ export function readReply(raw: unknown): Reply {
             return { kind: 'map.changed', id: raw.id, body: readMapChanged(raw.body) };
         case MessageTypes.VALUES_BATCH:
             return { kind: 'values.batch', id: raw.id, body: readValuesBatch(raw.body) };
+        case MessageTypes.BASEMAP_SOURCE_REPLY:
+            return { kind: 'basemap.source.reply', id: raw.id, body: readBasemapSource(raw.body) };
         case MessageTypes.ERROR: {
             const error: ErrorBody = {
                 code: typeof body.code === 'string' ? body.code : 'unknown',
@@ -194,6 +207,10 @@ export function replyText(reply: Reply): string {
         case 'values.batch':
             return reply.body ? 'Live values: ' + (reply.body.full ? 'full batch, ' : '') + reply.body.items.length
                 + ' map item(s) at seq ' + reply.body.seq : 'Live values: unreadable batch';
+        case 'basemap.source.reply':
+            // Never the tile URL: it carries the token.
+            return reply.body ? 'Basemap source: ' + reply.body.basemap + ' from ' + reply.body.provider
+                : 'Basemap source: unreadable reply';
         case 'error':
             return 'Error (' + reply.body.code + '): ' + reply.body.message;
         default:

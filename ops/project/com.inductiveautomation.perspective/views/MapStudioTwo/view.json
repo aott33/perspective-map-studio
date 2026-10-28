@@ -1,0 +1,115 @@
+{
+ "custom": {},
+ "params": {},
+ "props": {
+  "defaultSize": {
+   "width": 1440,
+   "height": 900
+  }
+ },
+ "root": {
+  "type": "ia.container.flex",
+  "version": 0,
+  "props": {
+   "direction": "column"
+  },
+  "meta": {
+   "name": "root"
+  },
+  "position": {},
+  "custom": {},
+  "children": [
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {
+     "text": "Map Studio: two components with different starting areas show the same map items (epic 3 entry 6). Left: the dev view (centre and zoom). Right: bounds round the tracer's points.",
+     "style": {
+      "padding": "8px 12px"
+     }
+    },
+    "meta": {
+     "name": "title"
+    },
+    "position": {
+     "basis": "40px",
+     "shrink": 0
+    },
+    "custom": {}
+   },
+   {
+    "type": "ia.container.flex",
+    "version": 0,
+    "props": {
+     "direction": "row"
+    },
+    "meta": {
+     "name": "maps"
+    },
+    "position": {
+     "basis": "0px",
+     "grow": 1
+    },
+    "custom": {},
+    "children": [
+     {
+      "type": "ao.mapstudio",
+      "version": 0,
+      "props": {
+       "startingArea": {
+        "center": {
+         "lng": -104.9725,
+         "lat": 39.7445
+        },
+        "zoom": 12,
+        "bounds": {
+         "west": null,
+         "south": null,
+         "east": null,
+         "north": null
+        }
+       }
+      },
+      "meta": {
+       "name": "left",
+       "domId": "mapstudio-two-left"
+      },
+      "position": {
+       "basis": "0px",
+       "grow": 1
+      },
+      "custom": {}
+     },
+     {
+      "type": "ao.mapstudio",
+      "version": 0,
+      "props": {
+       "startingArea": {
+        "center": {
+         "lng": 0,
+         "lat": 0
+        },
+        "zoom": 1,
+        "bounds": {
+         "west": -104.995,
+         "south": 39.735,
+         "east": -104.95,
+         "north": 39.754
+        }
+       }
+      },
+      "meta": {
+       "name": "right",
+       "domId": "mapstudio-two-right"
+      },
+      "position": {
+       "basis": "0px",
+       "grow": 1
+      },
+      "custom": {}
+     }
+    ]
+   }
+  ]
+ }
+}

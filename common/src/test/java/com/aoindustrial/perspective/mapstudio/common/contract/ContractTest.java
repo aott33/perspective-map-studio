@@ -28,12 +28,12 @@ class ContractTest {
     @Test
     void theErrorCodesAndTypesAreTheContractsOnes() {
         assertEquals(Set.of("conflict", "role", "invalid", "stale", "store-unreachable", "read-only",
-            "tags-unavailable"), Messages.CODES);
+            "tags-unavailable", "token-unavailable"), Messages.CODES);
         assertEquals(Set.of("point.click", "map.load", "edits.apply", "tags.browse", "tags.resolve", "popup.open",
-            "popup.close"), Messages.INBOUND_TYPES);
+            "popup.close", "basemap.source"), Messages.INBOUND_TYPES);
         assertTrue(Messages.OUTBOUND_TYPES.containsAll(
             Set.of("map.load.reply", "edits.apply.reply", "map.changed", "error", "tags.browse.reply",
-                "tags.resolve.reply", "values.batch")));
+                "tags.resolve.reply", "values.batch", "basemap.source.reply")));
         assertEquals("0.3.0", Messages.CONTRACT_VERSION);
         assertEquals(1, Messages.VERSION);
     }

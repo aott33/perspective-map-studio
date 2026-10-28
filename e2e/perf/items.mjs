@@ -1,7 +1,7 @@
 // The perf run's map items (epic 2 story 17): deterministic, so two runs build the same map.
 // Item n has the id UUIDv5(URL namespace, 'mapstudio-perf/<n>'); even n is a pad (a point), odd n a
-// short line beside it, on a 50 x 50 grid of cells inside the component's start view (START_VIEW in
-// web/typescript/MapStudio.tsx: centre -104.9725, 39.7445, zoom 12), so 5,000 items fill the grid.
+// short line beside it, on a 50 x 50 grid of cells inside the perf views' starting area (the startingArea prop in
+// ops/perf/project views, centre -104.9725, 39.7445, zoom 12), so 5,000 items fill the grid.
 // Every item is made through edits.apply (the real write path), in batches of BATCH_OPS ops.
 
 import { createHash, randomUUID } from 'node:crypto';

@@ -87,7 +87,21 @@
    {
     "type": "ao.mapstudio",
     "version": 0,
-    "props": {},
+    "props": {
+     "startingArea": {
+      "center": {
+       "lng": -104.9725,
+       "lat": 39.7445
+      },
+      "zoom": 12,
+      "bounds": {
+       "west": null,
+       "south": null,
+       "east": null,
+       "north": null
+      }
+     }
+    },
     "meta": {
      "name": "map"
     },

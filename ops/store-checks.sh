@@ -29,6 +29,8 @@ failures=0
 since=""
 
 require_docker
+# The compose secrets the Gateway mounts (pg_password, map_token) must exist; generated when missing.
+ensure_secrets
 
 # psql as the owner role on the check database.
 check_sql() {

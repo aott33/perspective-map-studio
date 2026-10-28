@@ -116,6 +116,8 @@ NOMODULE=("${PERF[@]}" -f "${OPS_DIR}/docker-compose.perf-nomodule.yml")
 TABLES=(mapstudio_item mapstudio_edit mapstudio_batch mapstudio_kind_setup mapstudio_project)
 
 require_docker
+# The compose secrets the Gateway mounts (pg_password, map_token) must exist; generated when missing.
+ensure_secrets
 
 if [[ "${TARGET}" == "dev" ]]; then
   GW="${GATEWAY_URL}"

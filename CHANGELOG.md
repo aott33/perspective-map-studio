@@ -11,14 +11,18 @@ Unreleased: everyone reads live state from the map (epic-viewing). Contract 0.3.
 - New message types (epic 3 entry 5): `values.batch` (Gateway to browser: the live values of the open map's items, full after `map.load` and changes only per refresh interval, with `kindDisplay`, the path-free projection of every kind setup, on a full batch), `popup.open` and `popup.close` (browser to Gateway: the map item whose popup is open gets its values pushed on change). The LiveValue slot `{value, quality, t, stale, reason}` and the alarms slot's `{active, unacked, priority}` are in [docs/contract.md](docs/contract.md), "values.batch".
 - The map draws live state (entry 5): the kind glyph, comms lost in its own theme token `--mapstudio-comms-lost` (falling back to `--qual-1`) with the glyph and the word, the icon KPI, the alarm glyph with its digit on a solid badge when unacknowledged and a hollow one when acknowledged (`--mapstudio-alarm-1` to `-3`, falling back to `--error`, `--warning`, `--info`); the default popup opens on a click (header, comms with data age, KPIs, alarms) and stays live while open. The hue tokens go to the engineering review (ER-27) in entry 12.
 - The Gateway holds one subscription per project and tag path the kind setups turn on (AD-6), Alarm Metrics by Java subscription; the dev stack's Pad UDT carries a dev-only alarm for it (`ops/config/core`, a fresh volume is needed once: `ops/up.sh --fresh`).
+- Basemaps (entry 6, AD-12): the setup's `basemaps` are offered in a control on the map, None (the blank background), OpenStreetMap (its public tiles) and Satellite (Mapbox satellite imagery), each with its provider's attribution always shown; `mapbox` (the vector style) stays deferred. New message types `basemap.source` and `basemap.source.reply`: the Gateway reads the Satellite token from the secret the setup's `tokenSecret` names, only when a browser asks, refuses anything but a public `pk.` token, and sends it only inside the tile URL; new error code `token-unavailable` ([docs/contract.md](docs/contract.md), "basemap.source"; [docs/basemaps.md](docs/basemaps.md)). OpenStreetMap's tile usage policy is in [docs/setup.md](docs/setup.md).
+- New component prop `startingArea` (entry 6, R1): `{center: {lng, lat}, zoom, bounds: {west, south, east, north}}`, a centre and zoom or bounds to fit; the default is the whole world. It replaces the component's hard-coded start view of 0.2.0; two components on one page may open on different areas and show the same map items ([docs/contract.md](docs/contract.md), "The component's props").
 
 ### Stories
 
 5. Tracer: live values reach an icon and its default popup.
+6. Basemaps and the starting area.
 
 ### Development
 
 - The dev project gains the `/live` page (the default popup, MapEditor-only buttons that toggle the dev tags and the dev alarm through `mapstudio_live`), the seed links the tracer's points to the dev assets and seeds the pad kind setup, and the dev setup's refresh interval is the default 10 s. The e2e measures record a real `values.batch` from the wire; the stand-in is gone.
+- The dev stack's setup offers all three basemaps and names the secret `MapStudioFiles/map_token`, a generated placeholder (`ops/secrets/map_token`, git-ignored) the `MapStudioFiles` provider reads from a compose secret (a fresh volume is needed once); every dev view sets `startingArea` to the old start view, and the `/two` page shows two components on different areas. The Designer's setup form warns when Satellite (as Mapbox) is ticked without a token.
 
 ## 0.2.0
 
