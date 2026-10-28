@@ -53,3 +53,22 @@ export function isFailedViewState(state: string): boolean {
 export function fallbackText(point: PopupPoint): string {
     return point.name ? point.id + ' - ' + point.name : point.id;
 }
+
+/** The default popup's widest (its stylesheet max-width) and narrowest (min-width) in px. */
+export const POPUP_MAX_PX = 320;
+export const POPUP_MIN_PX = 220;
+/** Margin kept between the popup and the map's edge, in px. */
+const POPUP_EDGE_PX = 16;
+
+/**
+ * The popup's max-width (a CSS length) for a point at `x` px in a map `width` px wide, so a popup
+ * opened near a phone's edge stays inside the map: the width that fits centred on the point, or the
+ * narrowest the popup gets (MapLibre then anchors it beside the point), never wider than the
+ * stylesheet's widest or the map less a margin each side.
+ */
+export function popupMaxWidth(x: number, width: number): string {
+    const room = Math.max(0, width - 2 * POPUP_EDGE_PX);
+    const centred = 2 * Math.min(x, width - x) - POPUP_EDGE_PX;
+    const px = Math.min(POPUP_MAX_PX, room, Math.max(POPUP_MIN_PX, Math.floor(centred)));
+    return Math.max(px, Math.min(POPUP_MIN_PX, room)) + 'px';
+}

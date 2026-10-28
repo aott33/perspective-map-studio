@@ -172,8 +172,8 @@ class LiveValueCacheTest {
     void theAlarmsSlotCombinesTheThreeMetricsAndMapsThePriority() {
         cache.batch(P, -1);
         tags.deliver(P12_COMMS, true);
-        tags.deliver("[default]Mesa/P12/Alarm Metrics.ActiveAckedCount", 0);
-        tags.deliver("[default]Mesa/P12/Alarm Metrics.ActiveUnackedCount", 1);
+        tags.deliver("[default]Mesa/P12/Alarm Metrics.ActiveAckCount", 0);
+        tags.deliver("[default]Mesa/P12/Alarm Metrics.ActiveUnackCount", 1);
         tags.deliver("[default]Mesa/P12/Alarm Metrics.HighestActivePriority", 3);
         JsonObject alarms = cache.itemBatch(P, P1).body().getAsJsonArray("items").get(0).getAsJsonObject()
             .getAsJsonObject("alarms");
@@ -183,8 +183,8 @@ class LiveValueCacheTest {
         assertEquals("Good", alarms.get("quality").getAsString());
         assertFalse(alarms.get("stale").getAsBoolean());
         // Acknowledged: the unacked count drops, the priority stays.
-        tags.deliver("[default]Mesa/P12/Alarm Metrics.ActiveAckedCount", 1);
-        tags.deliver("[default]Mesa/P12/Alarm Metrics.ActiveUnackedCount", 0);
+        tags.deliver("[default]Mesa/P12/Alarm Metrics.ActiveAckCount", 1);
+        tags.deliver("[default]Mesa/P12/Alarm Metrics.ActiveUnackCount", 0);
         alarms = cache.itemBatch(P, P1).body().getAsJsonArray("items").get(0).getAsJsonObject().getAsJsonObject("alarms");
         assertEquals(1, alarms.getAsJsonObject("value").get("active").getAsInt());
         assertEquals(0, alarms.getAsJsonObject("value").get("unacked").getAsInt());
@@ -223,7 +223,7 @@ class LiveValueCacheTest {
         snapshot = new MapLoader.Snapshot(4, items(), List.of(changed));
         cache.rebuild(P);
         assertTrue(tags.cancelled.containsAll(List.of("[default]Mesa/P12/Flow", "[default]Mesa/P14/Flow",
-            "[default]Mesa/P12/Alarm Metrics.ActiveAckedCount")));
+            "[default]Mesa/P12/Alarm Metrics.ActiveAckCount")));
         assertTrue(tags.subscribed.contains("[default]Plant/Header/Pressure"));
         assertEquals(1, tags.subscribed.stream().filter("[default]Plant/Header/Pressure"::equals).count());
         assertEquals(1, tags.subscribed.stream().filter(P12_PRESSURE::equals).count(), "a kept path is not subscribed again");

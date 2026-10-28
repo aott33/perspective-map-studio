@@ -194,12 +194,12 @@ editorTest.describe('1440 px', () => {
                 expect(problems).not.toContain('[default]');
             }
             // The Gateway log since the module started: one subscribe line per path, none per session.
-            const lines = await logLines('MapStudio.live', Number(run.moduleStartupTime) - 1000);
+            const lines = await logLines('MapStudio.live', Date.parse(run.moduleStartupTime) - 1000);
             const pressure = lines.filter((l) => l.includes('subscribed [default]Mesa/P12/Pressure'));
             expect(pressure, lines.join('\n')).toHaveLength(1);
             const metrics = lines.filter((l) => l.includes('subscribed [default]Mesa/P12/Alarm Metrics.'));
             expect(metrics.map((l) => l.replace(/.*Alarm Metrics\./, '')).sort())
-                .toEqual(['ActiveAckedCount', 'ActiveUnackedCount', 'HighestActivePriority']);
+                .toEqual(['ActiveAckCount', 'ActiveUnackCount', 'HighestActivePriority']);
             expect(lines.some((l) => /live plan rebuilt: \d+ map items, \d+ tag paths/.test(l))).toBe(true);
         } finally {
             for (const v of viewers) await v.close();

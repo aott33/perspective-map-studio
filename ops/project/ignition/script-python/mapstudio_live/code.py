@@ -55,7 +55,9 @@ def acknowledge(pad):
         results = system.alarm.queryStatus(source=['*Mesa/%s/*' % pad], state=['ActiveUnacked'])
         ids = [str(event.getId()) for event in results]
         if ids:
-            system.alarm.acknowledge(ids, 'dev acknowledgement (epic 3 entry 5)')
+            # 8.3.10 takes all three arguments (alarm ids, notes, username): two raise
+            # "acknowledge(): expected 3 args; got 2" (docs/platform-checks.md).
+            system.alarm.acknowledge(ids, 'dev acknowledgement (epic 3 entry 5)', 'mapstudio-dev')
         logger.info('Dev acknowledgement of %s: %d alarm(s)' % (pad, len(ids)))
         return {'pad': pad, 'acknowledged': len(ids)}
     except java.lang.Throwable as ex:

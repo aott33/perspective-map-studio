@@ -32,8 +32,8 @@ class ValuePlanTest {
         // Comms or Pressure, but that is the tag system's finding, not the plan's); nothing for gas.
         Set<String> expected = new java.util.HashSet<>();
         for (String pad : List.of("P12", "P14", "P15")) {
-            for (String suffix : List.of("Comms", "Pressure", "Flow", "Alarm Metrics.ActiveAckedCount",
-                    "Alarm Metrics.ActiveUnackedCount", "Alarm Metrics.HighestActivePriority")) {
+            for (String suffix : List.of("Comms", "Pressure", "Flow", "Alarm Metrics.ActiveAckCount",
+                    "Alarm Metrics.ActiveUnackCount", "Alarm Metrics.HighestActivePriority")) {
                 expected.add("[default]Mesa/" + pad + "/" + suffix);
             }
         }

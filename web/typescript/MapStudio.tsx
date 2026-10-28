@@ -47,7 +47,7 @@ import {
     reasonFromError, savedRecords, storageKey, summaryText, unsavedItems
 } from './unsaved';
 import { UnsavedSender } from './unsavedSender';
-import { AuthorParams, PopupPoint, popupMountPath } from './popupParams';
+import { AuthorParams, PopupPoint, popupMaxWidth, popupMountPath } from './popupParams';
 import { registerTestHook, takeTestReply } from './testHook';
 import { drawColor, themeColor } from './theme';
 import { Kind } from './adapters';
@@ -1054,8 +1054,25 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         const onPoint = this.map.queryRenderedFeatures(ev.point, { layers: [LAYER_ITEM_MARKERS, LAYER_ITEM_POINTS] });
         if (onPoint.length > 0) {
-            // A click on a marker or its dot: the point click round trip and the popup, once.
-            this.onPointClick({ ...ev, features: [onPoint[0]] } as MapLayerMouseEvent);
+            // A click on a marker or its dot: the point click round trip and the popup, once. A
+            // marker image is wider than its dot, so when two points' markers overlap the click goes
+            // to the point whose position is nearest to it, not to whichever MapLibre lists first.
+            const map = this.map;
+            let nearest = onPoint[0];
+            let best = Number.POSITIVE_INFINITY;
+            for (const f of onPoint) {
+                const g = f.geometry;
+                if (!g || g.type !== 'Point') {
+                    continue;
+                }
+                const p = map.project([g.coordinates[0], g.coordinates[1]]);
+                const d = (p.x - ev.point.x) * (p.x - ev.point.x) + (p.y - ev.point.y) * (p.y - ev.point.y);
+                if (d < best) {
+                    best = d;
+                    nearest = f;
+                }
+            }
+            this.onPointClick({ ...ev, features: [nearest] } as MapLayerMouseEvent);
             return;
         }
         if (this.popup && this.popup.isOpen()) {
@@ -1098,6 +1115,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.startPopupClock();
         this.setState({ popup: { point, lngLat }, clock: Date.now() }, () => {
             if (this.popup && this.map) {
+                this.popup.setMaxWidth(popupMaxWidth(this.map.project(lngLat).x, this.map.getContainer().clientWidth));
                 this.popup.setLngLat(lngLat);
                 if (!this.popup.isOpen()) {
                     this.popup.addTo(this.map);

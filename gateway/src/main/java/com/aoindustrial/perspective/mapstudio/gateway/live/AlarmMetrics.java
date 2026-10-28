@@ -17,9 +17,9 @@ public final class AlarmMetrics {
 
     public static final String NODE = "Alarm Metrics";
     /** The number of active, acknowledged alarms below the path. */
-    public static final String ACTIVE_ACKED = "ActiveAckedCount";
+    public static final String ACTIVE_ACKED = "ActiveAckCount";
     /** The number of active, unacknowledged alarms below the path. */
-    public static final String ACTIVE_UNACKED = "ActiveUnackedCount";
+    public static final String ACTIVE_UNACKED = "ActiveUnackCount";
     /** The highest priority among the active alarms, as Ignition's priority. */
     public static final String HIGHEST_ACTIVE = "HighestActivePriority";
 

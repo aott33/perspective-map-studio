@@ -186,7 +186,7 @@ public final class LiveValueCache implements AutoCloseable {
         if (state == null) {
             return;
         }
-        if (adapters.apply(project).assets() != state.plannedAssets) {
+        if (!adapters.apply(project).assets().equals(state.plannedAssets)) {
             rebuild(project);
         }
     }
