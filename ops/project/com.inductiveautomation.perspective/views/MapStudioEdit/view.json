@@ -168,12 +168,6 @@
     "version": 0,
     "props": {
      "editMode": true,
-     "popupView": {
-      "path": "Popups/PointDetails",
-      "params": {
-       "source": "dev"
-      }
-     },
      "startingArea": {
       "center": {
        "lng": -104.9725,

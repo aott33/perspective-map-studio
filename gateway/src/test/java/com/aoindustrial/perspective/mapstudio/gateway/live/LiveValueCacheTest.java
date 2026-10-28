@@ -208,6 +208,8 @@ class LiveValueCacheTest {
         assertEquals("comms", problems.get(0).getAsJsonObject().get("slot").getAsString());
         assertEquals("the tag was not found", problems.get(0).getAsJsonObject().get("reason").getAsString());
         assertEquals("kpi:pressure", problems.get(1).getAsJsonObject().get("slot").getAsString());
+        // The popup detail (entry 8) is the one part that carries the paths, for the open popup's session alone.
+        p3.remove("popup");
         assertFalse(p3.toString().contains("[default]"), "no path reaches the browser");
         assertEquals("Bad_NotFound", p3.getAsJsonObject("comms").get("quality").getAsString());
     }
@@ -388,6 +390,7 @@ class LiveValueCacheTest {
         p1 = cache.itemBatch(P, P1).body().getAsJsonArray("items").get(0).getAsJsonObject();
         assertEquals("style", p1.getAsJsonArray("problems").get(0).getAsJsonObject().get("slot").getAsString());
         assertEquals("the tag was not found", p1.getAsJsonArray("problems").get(0).getAsJsonObject().get("reason").getAsString());
+        p1.remove("popup");
         assertFalse(p1.toString().contains("[default]"));
         assertFalse(p1.toString().contains("{value}"));
     }

@@ -544,10 +544,6 @@
     "type": "ao.mapstudio",
     "version": 0,
     "props": {
-     "popupView": {
-      "path": "",
-      "params": {}
-     },
      "startingArea": {
       "center": {
        "lng": -104.9725,

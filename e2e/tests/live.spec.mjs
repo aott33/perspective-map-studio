@@ -1,5 +1,5 @@
 // The tracer of epic 3 entry 5: live values reach an icon and its default popup (AD-6, AD-7).
-// On /live (the dev page with no popupView prop) the seeded pad kind setup resolves the tracer's
+// On /live the seeded pad kind setup resolves the tracer's
 // points against the dev assets P12, P14 and P15 (ops/config/core tags, ops/project seed), and the
 // page's MapEditor-only buttons drive the dev tags and the dev-only alarm through the project
 // library mapstudio_live: a toggled tag changes the icon's KPI within one refresh interval, an
@@ -13,6 +13,7 @@ import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
 import { gatewayRun, logLines } from '../lib/gateway.mjs';
 import { TRACER, pagePixel } from '../lib/geo.mjs';
+import { decodePng, firstOddPixel } from '../lib/png.mjs';
 import {
     EDITOR_USER, editorTest, expect, loadedCounts, mapLoaded, nextFrames, openMap, runSeed, signedInContext, test
 } from './fixtures.mjs';
@@ -125,7 +126,28 @@ editorTest.describe('1440 px', () => {
             await expect(kpis.nth(1)).toHaveAttribute('data-kpi', 'flow');
             await expect(popup.locator('[data-part="alarms"]')).toHaveAttribute('data-alarm', '1:unacked');
             await expect(popup.locator('[data-part="alarms"]')).toContainText('1 alarm - Priority 1, unacknowledged');
+            // The alarm summary (entry 8, R7): the counts by priority and the alarm in words with its source
+            // below the alarms path and its age, read from the Gateway's alarm status; View alarms opens
+            // the setup's alarm page with {asset.id} filled. Map Studio acknowledges nothing.
+            const alarms = popup.locator('[data-part="alarms"]');
+            await expect(alarms).toHaveAttribute('data-alarm-counts', '1,0,0', { timeout: PUSH_MS });
+            await expect(alarms).toHaveAttribute('data-alarm-listed', '1');
+            await expect(alarms.locator('.mapstudio-popup-alarm-line')).toHaveText(/^High pressure - Pressure, \d+ (s|min) ago$/);
+            expect(await alarms.innerText()).not.toContain('[default]');
+            await expect(popup.locator('.mapstudio-popup-link')).toHaveAttribute('data-link', '/pad/Point 1');
+            await expect(page.locator('.maplibregl-popup-close-button')).toHaveCount(0);
             await shot(page, 'mapstudio-live-1440.png');
+            await alarms.locator('.mapstudio-popup-view-alarms').click();
+            await expect(page).toHaveURL(/\/alarms\/P12$/, { timeout: 30_000 });
+            await expect(page.locator('#mapstudio-alarms-title')).toHaveText('Alarms of P12', { timeout: 30_000 });
+            await expect(page.locator('#mapstudio-alarms-table')).toBeVisible();
+            await shot(page, 'mapstudio-alarm-page-1440.png');
+            // Back on the map, the popup open again for the rest.
+            await mapLoaded(await openMap(page, '/live'));
+            await expect(map).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
+            await clickPoint(page, map, 'p1');
+            await expect(popup).toBeVisible({ timeout: 30_000 });
+            await expect(popup.locator('[data-part="alarms"]')).toHaveAttribute('data-alarm', '1:unacked', { timeout: INTERVAL_MS });
 
             // Acknowledged: the badge turns hollow, the popup says so, while it stays open.
             await press(page, 'ack');
@@ -168,7 +190,7 @@ editorTest.describe('1440 px', () => {
             await expect(p1).toHaveAttribute('data-state', 'normal', { timeout: INTERVAL_MS });
             await expect(popup.locator('[data-part="alarms"]')).toContainText('No active alarms', { timeout: PUSH_MS });
 
-            await page.locator('.maplibregl-popup-close-button').click();
+            await popup.locator('.mapstudio-popup-close').click();
             await expect(page.locator('.mapstudio-popup--default')).toHaveCount(0);
             expect(watched.warnings, 'Map Studio warnings').toEqual([]);
         });
@@ -231,13 +253,54 @@ editorTest.describe('390 px', () => {
         const p1 = liveItem(page, ids.p1);
         await expect(p1).toHaveAttribute('data-alarm', '1:unacked:1', { timeout: INTERVAL_MS });
         await clickPoint(page, map, 'p1');
-        const popup = page.locator('.maplibregl-popup .mapstudio-popup--default');
-        await expect(popup).toBeVisible({ timeout: 30_000 });
-        await expect(popup.locator('[data-part="alarms"]')).toContainText('Priority 1, unacknowledged');
-        const box = await popup.boundingBox();
-        expect(box.x).toBeGreaterThanOrEqual(0);
-        expect(box.x + box.width).toBeLessThanOrEqual(390);
+        // At 390 px every point popup is a bottom sheet (entry 8; DESIGN.md bottom-sheet): 8 px from the
+        // sides, above the App Bar toggle, a handle, 44 px pop-out and close, the alarm block with its
+        // line under the glyph, a footer with View alarms, no pointer, and no map label through it.
+        const sheet = page.locator('.mapstudio-sheet .mapstudio-popup--default');
+        await expect(sheet).toBeVisible({ timeout: 30_000 });
+        await expect(map).toHaveAttribute('data-popup-mode', 'sheet');
+        await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
+        await expect(sheet.locator('[data-part="alarms"]')).toContainText('Priority 1, unacknowledged');
+        await expect(sheet.locator('.mapstudio-popup-alarm-line')).toHaveText(/^High pressure - Pressure, /, { timeout: PUSH_MS });
+        const geometry = await page.evaluate(() => {
+            const r = (s) => { const b = document.querySelector(s).getBoundingClientRect(); return { x: b.x, y: b.y, w: b.width, h: b.height, r: b.right, b: b.bottom }; };
+            const block = document.querySelector('.mapstudio-popup-alarms');
+            const glyph = block.querySelector('.mapstudio-popup-alarm-glyph').getBoundingClientRect();
+            const words = block.querySelector('.mapstudio-popup-alarm-words').getBoundingClientRect();
+            const line = block.querySelector('.mapstudio-popup-alarm-line').getBoundingClientRect();
+            const body = r('.mapstudio-popup-body');
+            return { sheet: r('.mapstudio-sheet'), handle: r('.mapstudio-popup-handle'), close: r('.mapstudio-popup-close'),
+                link: r('.mapstudio-popup-link'), view: r('.mapstudio-popup-view-alarms'), footer: r('.mapstudio-popup-footer'),
+                body, glyphRight: glyph.right, wordsLeft: words.left, lineLeft: line.left, blockLeft: block.getBoundingClientRect().left,
+                padding: getComputedStyle(document.querySelector('.mapstudio-popup-row')).paddingLeft,
+                background: getComputedStyle(document.querySelector('.mapstudio-sheet')).backgroundColor,
+                vw: window.innerWidth, vh: window.innerHeight };
+        });
+        expect(Math.round(geometry.sheet.x)).toBe(8);
+        expect(Math.round(geometry.vw - geometry.sheet.r)).toBe(8);
+        expect(geometry.vh - geometry.sheet.b, 'above the App Bar toggle').toBeGreaterThanOrEqual(56);
+        expect(geometry.sheet.h).toBeLessThanOrEqual(geometry.vh * 0.6 + 1);
+        expect(geometry.handle.w).toBe(36);
+        expect(Math.min(geometry.close.w, geometry.close.h)).toBeGreaterThanOrEqual(44);
+        expect(Math.min(geometry.link.w, geometry.link.h)).toBeGreaterThanOrEqual(44);
+        expect(geometry.view.h).toBeGreaterThanOrEqual(44);
+        expect(geometry.footer.b).toBeLessThanOrEqual(geometry.sheet.b);
+        expect(geometry.padding).toBe('16px');
+        expect(geometry.wordsLeft - geometry.glyphRight, 'the heading starts right after its glyph').toBeLessThan(10);
+        expect(geometry.lineLeft - geometry.blockLeft, 'the alarm line wraps under the glyph, no gap beside it').toBeLessThan(20);
+        expect(geometry.background).not.toMatch(/rgba\(.*, 0\)$|transparent/);
+        // The render check (P8): the body's left gutter, 2 to 12 px in, is one flat colour top to bottom:
+        // nothing of the map (a marker label, a neighbour's chip) shows through the sheet.
+        const clip = { x: Math.round(geometry.body.x) + 2, y: Math.round(geometry.body.y) + 2, width: 10, height: Math.round(geometry.body.h) - 4 };
+        const odd = firstOddPixel(decodePng(await page.screenshot({ clip })), 0, 0, clip.width, clip.height, 3);
+        expect(odd, 'a pixel of the sheet gutter that is not the surface').toBeNull();
         await shot(page, 'mapstudio-live-390.png');
+        // The marker stays above the sheet (the map panned if it had to).
+        const marker = await map.evaluate((el) => el.getAttribute('data-center'));
+        expect(marker).toBeTruthy();
+        await sheet.locator('.mapstudio-popup-close').click();
+        await expect(page.locator('.mapstudio-sheet')).toHaveCount(0);
+        await expect(map).toHaveAttribute('data-popup-mode', '');
         await quiet(page);
     });
 });

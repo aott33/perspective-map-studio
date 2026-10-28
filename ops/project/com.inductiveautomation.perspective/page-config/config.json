@@ -4,14 +4,6 @@
    "viewPath": "MapStudioDev",
    "viewParams": {}
   },
-  "/fallback-empty": {
-   "viewPath": "MapStudioFallbackEmpty",
-   "viewParams": {}
-  },
-  "/fallback-missing": {
-   "viewPath": "MapStudioFallbackMissing",
-   "viewParams": {}
-  },
   "/edit": {
    "viewPath": "MapStudioEdit",
    "viewParams": {}
@@ -30,6 +22,14 @@
   },
   "/styles": {
    "viewPath": "MapStudioStyles",
+   "viewParams": {}
+  },
+  "/alarms/:item": {
+   "viewPath": "MapStudioAlarms",
+   "viewParams": {}
+  },
+  "/pad/:name": {
+   "viewPath": "MapStudioPad",
    "viewParams": {}
   }
  },

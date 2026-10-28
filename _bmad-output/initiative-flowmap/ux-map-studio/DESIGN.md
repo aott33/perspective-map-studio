@@ -129,7 +129,10 @@ spacing:
   list-panel-1440: 280px
   properties-panel-1366: 320px
   properties-panel-1440: 340px
-  popup-width: 290px
+  popup-width: 320px        # D1 (owner, 2026-10-28): was 290; 3 KPIs, a 2-line alarm and a button at 13 px
+  popup-max-height: 480px   # D1: the card's tallest, or the map less 64 px; the body scrolls under the header
+  popup-offset: 22px        # D3: the pointer's distance from the marker (the 34 px disc's radius and ring, plus 5)
+  popup-tip: 10px           # D3: the pointer, in the card's own surface
   line-popup-width: 350px
   target-mouse: 32px       # buttons and tool buttons with a mouse
   target-marker-mouse: 24px
@@ -275,6 +278,10 @@ components:
   popup-card:
     background: '{colors.surface-panel}'
     width: '{spacing.popup-width}'
+    max-height: '{spacing.popup-max-height}'
+    offset: '{spacing.popup-offset}'
+    tip: '{spacing.popup-tip}'
+    side-padding: '{spacing.4}'   # D2: one 16 px side padding in every region, icon buttons 32 px (44 on the phone)
     radius: '{rounded.lg}'
     title: '{typography.title}'
     alarm-block-background: '{colors.alarm-1-tint}'
