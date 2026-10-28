@@ -12,8 +12,14 @@
 #           Comms or Pressure tag, so those report unresolved).
 #   shared  two pads 15 m apart (Shared A, Shared B; epic 3 entry 7), so the map draws one shared
 #           marker whose pick list opens either.
-#   setup   the pad kind setup (epic 3 entry 5): comms {asset.path}/Comms, the KPIs Pressure
-#           (the icon value) and Flow, alarms {asset.path}, the link /pad/{item.name}.
+#   areas   two geofences (North, South; epic 3 entry 1) whose operator property picks a category
+#           tint from the geofence kind setup.
+#   setup   the kind setups (epic 3 entries 5 and 1): the pad setup with comms {asset.path}/Comms,
+#           the KPIs Pressure (the icon value) and Flow, alarms {asset.path}, the link
+#           /pad/{item.name} and a States rule on {asset.path}/Status; the line setup with the
+#           KPI Flow and a Bands rule on it (the tracer line is linked to the asset L3 for it);
+#           the geofence setup with the area tints. Point 2 carries an override expression rule
+#           on [default]Mesa/P14/Pressure (an Ignition expression, evaluated on the Gateway).
 # Every id is a UUIDv5 of a stable name (mapstudio-dev/seed/<set>/<key>), so a re-run
 # finds its items: unchanged ones are left alone, edited ones are put back on the seed
 # fields, kind, name, geometry and properties, plus assetId where the seed sets one (an
@@ -116,7 +122,15 @@ SHARED_PADS = (
     ('b', -104.964825, 39.757000, 'Shared B'),
 )
 
-# The pad kind setup the dev map seeds (docs/kind-setup.md): the live values the tracer draws.
+# Two geofences (epic 3 entry 1): closed rings south of the tracer, one per operator, so the map
+# draws each in the tint its category picks (North tint-1, South tint-4) and a point never does.
+GEOFENCES = (
+    ('north', 'North fence', 'North', ((-104.9960, 39.7340), (-104.9880, 39.7340), (-104.9880, 39.7300), (-104.9960, 39.7300))),
+    ('south', 'South fence', 'South', ((-104.9860, 39.7340), (-104.9780, 39.7340), (-104.9780, 39.7300), (-104.9860, 39.7300))),
+)
+
+# The pad kind setup the dev map seeds (docs/kind-setup.md): the live values the tracer draws, and
+# a States rule on the dev Status tag (epic 3 entry 1): 1 attention, 2 warning, 3 fault, 4 dimmed.
 PAD_SETUP = {
     'comms': {'path': '{asset.path}/Comms', 'on': True},
     'kpis': [
@@ -124,6 +138,33 @@ PAD_SETUP = {
         {'key': 'flow', 'label': 'Flow', 'path': '{asset.path}/Flow', 'unit': 'bbl/d', 'on': True, 'icon': False}],
     'alarms': {'path': '{asset.path}', 'count': True, 'summary': True},
     'link': '/pad/{item.name}',
+    'styleRule': {'source': {'path': '{asset.path}/Status'}, 'type': 'states', 'cases': [
+        {'value': 1, 'preset': 'attention'}, {'value': 2, 'preset': 'warning'},
+        {'value': 3, 'preset': 'fault'}, {'value': 4, 'preset': 'dimmed'}]},
+}
+
+# The line kind setup (epic 3 entry 1): the KPI Flow and a Bands rule on it.
+LINE_SETUP = {
+    'kpis': [{'key': 'flow', 'label': 'Flow', 'path': '{asset.path}/Flow', 'unit': 'bbl/d', 'on': True, 'icon': True}],
+    'styleRule': {'source': {'kpi': 'flow'}, 'type': 'bands', 'cases': [
+        {'min': None, 'max': 50, 'preset': 'normal'}, {'min': 50, 'max': 200, 'preset': 'attention'},
+        {'min': 200, 'max': None, 'preset': 'fault'}]},
+}
+
+# The geofence kind setup (epic 3 entry 1): the category tints by the operator property.
+GEOFENCE_SETUP = {
+    'areaTints': {'property': 'operator', 'tints': [
+        {'category': 'North', 'tint': 'tint-1'}, {'category': 'South', 'tint': 'tint-4'}]},
+}
+
+# The kind setups the seed keeps, in the order they are saved.
+KIND_SETUPS = (('pad', PAD_SETUP), ('line', LINE_SETUP), ('geofence', GEOFENCE_SETUP))
+
+# Point 2's override (epic 3 entry 1): an expression rule on a full path replaces the pad kind's
+# States rule for that one item; Ignition's expression language, {value} its one reference.
+P2_OVERRIDES = {
+    'styleRule': {'source': {'path': '[default]Mesa/P14/Pressure'}, 'type': 'expression',
+                  'expression': "if({value} > 600, 'warning', 'normal')"},
 }
 
 
@@ -145,16 +186,18 @@ def _line(coords):
     return {'type': 'LineString', 'coordinates': [[c[0], c[1]] for c in coords]}
 
 
-def _item(make_id, set_name, key, kind, name, geometry, properties, asset_id=None):
+def _item(make_id, set_name, key, kind, name, geometry, properties, asset_id=None, overrides=None):
     item = {'key': set_name + '/' + key, 'id': make_id(set_name, key), 'kind': kind, 'name': name,
             'geometry': geometry, 'properties': dict(properties)}
     if asset_id is not None:
         item['assetId'] = asset_id
+    if overrides is not None:
+        item['overrides'] = overrides
     return item
 
 
 def seed_items(make_id=seed_id):
-    """The 66 seed items: {key, id, kind, name, geometry, properties}, scale set first."""
+    """The 68 seed items: {key, id, kind, name, geometry, properties}, scale set first."""
     items = []
     for n, lng, lat in SCALE_PADS:
         items.append(_item(make_id, 'scale', 'pad-%d' % n, 'pad', 'Pad %d' % n, _point(lng, lat), PAD_PROPERTIES))
@@ -162,10 +205,12 @@ def seed_items(make_id=seed_id):
         items.append(_item(make_id, 'scale', 'line-%d' % n, 'line', 'Line to Pad %d' % n, _line(coords), {}))
     for n, lng, lat, asset_id in TRACER_POINTS:
         items.append(_item(make_id, 'tracer', 'p%d' % n, 'pad', 'Point %d' % n, _point(lng, lat), PAD_PROPERTIES,
-                           asset_id))
-    items.append(_item(make_id, 'tracer', 'l1', 'line', 'Tracer line', _line(TRACER_LINE), {}))
+                           asset_id, P2_OVERRIDES if n == 2 else None))
+    items.append(_item(make_id, 'tracer', 'l1', 'line', 'Tracer line', _line(TRACER_LINE), {}, 'L3'))
     for key, lng, lat, name in SHARED_PADS:
         items.append(_item(make_id, 'shared', key, 'pad', name, _point(lng, lat), PAD_PROPERTIES))
+    for key, name, operator, coords in GEOFENCES:
+        items.append(_item(make_id, 'areas', key, 'geofence', name, _line(coords), {'operator': operator}))
     return items
 
 
@@ -174,6 +219,8 @@ def _data(item):
             'properties': dict(item['properties'])}
     if 'assetId' in item:
         data['assetId'] = item['assetId']
+    if 'overrides' in item:
+        data['overrides'] = item['overrides']
     return data
 
 
@@ -197,6 +244,8 @@ def _same(stored, item):
     if _coords(geometry) != _coords(item['geometry']):
         return False
     if 'assetId' in item and stored.get('assetId') != item['assetId']:
+        return False
+    if 'overrides' in item and _plain(stored.get('overrides') or {}) != _plain(item['overrides']):
         return False
     return dict(stored.get('properties') or {}) == item['properties']
 
@@ -356,11 +405,15 @@ def run(project=PROJECT, actor=ACTOR, api=None, make_id=seed_id, new_batch=_new_
     plan = plan_ops(current, seed)
     ops = plan['ops']
     result['unchanged'] = plan['unchanged']
-    # The pad kind setup (epic 3 entry 5), one more op of the same batch.
-    setup_ops = plan_setup_ops(getattr(current, 'kindSetups', None), 'pad', PAD_SETUP)
-    ops = ops + setup_ops
-    result['kindSetup'] = 'created' if setup_ops and setup_ops[0]['op'] == 'create' else (
-        'updated' if setup_ops else 'unchanged')
+    # The kind setups (epic 3 entries 5 and 1), more ops of the same batch; kindSetup says what
+    # happened to the pad's (as before), kindSetups to each.
+    result['kindSetups'] = {}
+    for kind_id, setup in KIND_SETUPS:
+        setup_ops = plan_setup_ops(getattr(current, 'kindSetups', None), kind_id, setup)
+        ops = ops + setup_ops
+        result['kindSetups'][kind_id] = 'created' if setup_ops and setup_ops[0]['op'] == 'create' else (
+            'updated' if setup_ops else 'unchanged')
+    result['kindSetup'] = result['kindSetups']['pad']
     restored = 0
     if ops:
         answer = None

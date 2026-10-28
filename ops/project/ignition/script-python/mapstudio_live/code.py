@@ -47,6 +47,19 @@ def set_comms(pad, on):
     return {'path': _path(pad, 'Comms'), 'value': bool(on), 'quality': write(_path(pad, 'Comms'), bool(on))}
 
 
+def set_status(pad, value):
+    """Status of a dev pad (epic 3 entry 1): the pad kind's States rule reads it (1 attention, 2 warning, 3 fault, 4 dimmed)."""
+    return {'path': _path(pad, 'Status'), 'value': int(value), 'quality': write(_path(pad, 'Status'), int(value))}
+
+
+LINE_FLOW = PREFIX + 'Lines/L3/Flow'
+
+
+def set_line_flow(value):
+    """Flow of the dev line L3 (epic 3 entry 1): the line kind's Bands rule reads it (below 50 normal, 50 to 200 attention, 200 and above fault)."""
+    return {'path': LINE_FLOW, 'value': float(value), 'quality': write(LINE_FLOW, float(value))}
+
+
 def acknowledge(pad):
     """Acknowledge every active unacknowledged alarm below a dev pad; returns how many."""
     if pad not in PADS:
@@ -70,11 +83,12 @@ def acknowledge(pad):
 
 def status(pad):
     """What the dev pad's tags and alarms read now (for the result label)."""
-    paths = [_path(pad, 'Pressure'), _path(pad, 'Comms')]
+    paths = [_path(pad, 'Pressure'), _path(pad, 'Comms'), _path(pad, 'Status'), LINE_FLOW]
     try:
         values = system.tag.readBlocking(paths)
         active = system.alarm.queryStatus(source=['*Mesa/%s/*' % pad], state=['ActiveUnacked', 'ActiveAcked'])
-        return {'pad': pad, 'pressure': values[0].value, 'comms': values[1].value,
+        return {'pad': pad, 'pressure': values[0].value, 'comms': values[1].value, 'status': values[2].value,
+                'lineFlow': values[3].value,
                 'alarms': [{'name': str(e.getName()), 'state': str(e.getState())} for e in active]}
     except java.lang.Throwable as ex:
         logger.warn('Dev status read failed: %s' % ex.getClass().getSimpleName())
