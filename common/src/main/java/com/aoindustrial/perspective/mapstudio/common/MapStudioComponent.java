@@ -46,9 +46,10 @@ public final class MapStudioComponent {
 
     /**
      * A 16 by 16 palette icon drawn with Java2D (a map pin over a path), so no
-     * binary asset needs bundling. Headless safe.
+     * binary asset needs bundling. Headless safe. Also the Map Studio Setup node's icon
+     * in the project browser.
      */
-    static BufferedImage paletteIcon() {
+    public static BufferedImage paletteIcon() {
         int s = 16;
         BufferedImage img = new BufferedImage(s, s, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();

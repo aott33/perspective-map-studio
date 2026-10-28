@@ -7,6 +7,7 @@ Status: built and unit tested; the Gateway half of the lists is checked live; th
 ## Opening and creating
 
 - Double-click **Map Studio Setup** in the project browser. That is the only way in: the node has no Map Studio menu. The node reads "Map Studio Setup", "Map Studio Setup (none)" when the project has no setup, "Map Studio Setup (new, unsaved)" while a new one waits for File > Save, "Map Studio Setup (unsaved)" while the open tab holds changes the project does not have (the tab's title says the same), or "Map Studio Setup (inherited)".
+- The node carries the Map Studio map-pin icon. When the Designer reopens a project on the Map Studio Setup workspace (it reopens the one it was last left on) with no tab open, the setup opens on its own, so the Designer never shows an empty area there.
 - A project with no setup opens the tab in its empty state: "No Map Studio setup" and one **Create setup** button. There is no create dialog. Create setup fills the same form with the defaults (full-editing role `MapEditor`, phone-editing role `MapOperator`, refresh every 10 seconds, basemaps `none` and `osm`, everything else empty), marked "New setup - saves with the project", and puts the cursor in Database connection. Nothing is written until File > Save; **Discard new setup** in the footer returns to the empty state.
 - A project that inherits its setup shows "Inherited from <project>"; saving makes this project's own copy. When the parent does not allow overriding it, the form is read only.
 

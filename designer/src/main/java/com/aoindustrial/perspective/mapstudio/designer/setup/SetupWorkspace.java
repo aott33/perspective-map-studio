@@ -5,6 +5,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import javax.swing.AbstractAction;
+import javax.swing.Icon;
+import javax.swing.ImageIcon;
 import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
@@ -20,6 +22,7 @@ import com.inductiveautomation.ignition.designer.tabbedworkspace.ResourceEditor;
 import com.inductiveautomation.ignition.designer.tabbedworkspace.ResourceFolderNode;
 import com.inductiveautomation.ignition.designer.tabbedworkspace.TabbedResourceWorkspace;
 
+import com.aoindustrial.perspective.mapstudio.common.MapStudioComponent;
 import com.aoindustrial.perspective.mapstudio.common.MapStudioModule;
 
 /**
@@ -52,6 +55,9 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
     /** The one setup per project, at the type folder. */
     public static final ResourcePath SETUP_PATH = MapStudioModule.SETUP_RESOURCE_TYPE.rootPath();
 
+    /** The component's palette icon, on the node and the setup tab like the Designer's own nodes. */
+    private static final Icon ICON = new ImageIcon(MapStudioComponent.paletteIcon());
+
     private SetupPanel draft;
     private boolean draftNew;
     /** True while {@link #commitAll()} runs (a project save), so only a save logs a held-back setup. */
@@ -63,6 +69,9 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
             .nounKey("MapStudioDesigner.setup.noun")
             .rootFolderText(SetupForm.msg("setup.root"))
             .scope(ApplicationScope.GATEWAY)
+            .icon(ICON)
+            .openIcon(ICON)
+            .rootIcon(ICON)
             .build());
         setCloseAction(new AbstractAction() {
             @Override
@@ -317,9 +326,17 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
         }
     }
 
+    /**
+     * The Designer reopens a project on the workspace it was last left on, and this workspace has
+     * no home page: with no tab open it was an empty area (owner, 2026-10-28). Opening it with no
+     * tab shows the setup (or the empty state), as double-clicking the node would.
+     */
     @Override
     public void onActivation() {
         super.onActivation();
+        if (getTabCount() == 0) {
+            openSetup();
+        }
         refreshNode();
     }
 
@@ -330,6 +347,7 @@ public final class SetupWorkspace extends TabbedResourceWorkspace {
         SetupNode(SetupWorkspace workspace) {
             this.workspace = workspace;
             setText(SetupForm.msg("setup.root"));
+            setIcon(ICON);
         }
 
         void update(String text) {
