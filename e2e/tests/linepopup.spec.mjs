@@ -289,11 +289,12 @@ editorTest.describe('1440 px', () => {
             await expect(map).toHaveAttribute('data-highlighted', '');
             await expect(map).toHaveAttribute('data-selected', '');
 
-            // popup.open's segment is checked: two non-empty strings, else invalid.
+            // popup.open's segment is checked: two non-empty strings, else invalid (a refused open leaves
+            // nothing open, so there is nothing to close).
             const refused = await send(page, 'popup.open', { itemId: ids.line, segment: { fromId: ids.pt1, toId: 7 } });
             expect(refused.type, JSON.stringify(refused.body)).toBe('error');
             expect(refused.body.code).toBe('invalid');
-            await send(page, 'popup.close', { itemId: ids.line });
+            expect(refused.body.message).toBe("popup.open's segment needs fromId and toId.");
             expect(watched.warnings, 'Map Studio warnings').toEqual([]);
         });
 });

@@ -1,6 +1,7 @@
 /**
  * A test hook for the e2e suite (epic 2 story 2): `window.__mapStudioTest.send(type, body)`
- * sends one `map.load` or `edits.apply` through this component's real session path and
+ * sends one `map.load`, `edits.apply`, `tags.browse`, `tags.resolve` or `popup.open` (epic 3 entry 2:
+ * a reply comes only when the body is refused) through this component's real session path and
  * resolves with the Gateway's reply envelope. It adds no right: the Gateway decides
  * every save from the session user's roles, exactly as for the component's own messages,
  * so it is always registered (owner decision, 2026-10-26). Not part of the public contract.
@@ -13,7 +14,8 @@ export const TEST_REPLY_TIMEOUT_MS = 30_000;
 
 /** The message types the hook may send. */
 export const TEST_HOOK_TYPES: readonly string[] = [
-    MessageTypes.MAP_LOAD, MessageTypes.EDITS_APPLY, MessageTypes.TAGS_BROWSE, MessageTypes.TAGS_RESOLVE
+    MessageTypes.MAP_LOAD, MessageTypes.EDITS_APPLY, MessageTypes.TAGS_BROWSE, MessageTypes.TAGS_RESOLVE,
+    MessageTypes.POPUP_OPEN
 ];
 
 export interface MapStudioTestHook {
