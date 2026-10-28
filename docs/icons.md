@@ -66,6 +66,8 @@ The priority digit is a text label beside the glyph, never part of it. Diagnosti
 - **Triangles in kind icons are not checked by the build.** The build refuses kind icons with a circle or square outline; a triangular kind outline (priority 1's shape) is not detected and stays a review item. Two to look at: `line-valve` is the ISA gate valve bowtie (two triangles on their sides, on a pipe with a stem) and `compressor-station` is a trapezoid; neither is an upright triangle.
 - No other difference is known. Hue tokens (`--st-alarm-n-edge` in the template) are epic-viewing's call; the contact sheet uses stand-ins.
 
+**Engineering review (ER-27), 0.2.0: passed.** Reviewer Andy Ott, 2026-10-28. Reviewed: the alarm glyphs and state glyphs on the contact sheet, the differences above, and the `line-valve` and `compressor-station` outlines. No change to the glyph files was asked for. One change for epic-viewing was asked for: comms lost gets a colour when the map draws it (the glyphs are `currentColor`, so no file here changes). That is a deliberate change from the template's reviewed rule ("comms-lost ... never a colour", template `docs/ux.md`) and goes to engineering review again with epic-viewing's hue tokens.
+
 ![Contact sheet at 1440 px](screenshots/icons-contact-sheet-1440.png)
 
 On a 390 px phone: [icons-contact-sheet-390.png](screenshots/icons-contact-sheet-390.png).
