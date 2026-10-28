@@ -76,4 +76,19 @@ public record Asset(String id, String name, String kind, String basePath) {
         assets.forEach(x -> a.add(x.toJson()));
         return a;
     }
+
+    /**
+     * The path-free projection {@code [{id, name}]} every session gets (epic 3 entry 9: the
+     * search matches map items by their linked asset's name at every level), never a base path.
+     */
+    public static JsonArray namesJson(List<Asset> assets) {
+        JsonArray a = new JsonArray();
+        for (Asset x : assets) {
+            JsonObject o = new JsonObject();
+            o.addProperty("id", x.id());
+            o.addProperty("name", x.name());
+            a.add(o);
+        }
+        return a;
+    }
 }
