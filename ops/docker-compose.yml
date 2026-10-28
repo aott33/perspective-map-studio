@@ -93,6 +93,9 @@ services:
         condition: service_healthy
     secrets:
       - pg_password
+      # The dev map's basemap token (epic 3 entry 6): a generated placeholder, read by the Gateway's
+      # MapStudioFiles secret provider when a browser picks the Satellite basemap; never a real token in git.
+      - map_token
     ports:
       # Host port from .env (GATEWAY_HTTP_PORT); the Gateway listens on 8088 inside.
       # Bound to 127.0.0.1 only: the dev Gateway is never reachable from outside this machine.
@@ -144,6 +147,8 @@ services:
 secrets:
   pg_password:
     file: ./secrets/pg_password
+  map_token:
+    file: ./secrets/map_token
 
 volumes:
   gateway-data:

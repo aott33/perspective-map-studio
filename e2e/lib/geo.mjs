@@ -16,7 +16,8 @@ export function pagePixel(box, lngLat, center, zoom) {
     return [box.x + box.width / 2 + (px - cx), box.y + box.height / 2 + (py - cy)];
 }
 
-// The tracer's view and points: the dev map's start view (web/typescript/MapStudio.tsx START_VIEW)
+// The tracer's view and points: the dev views' startingArea prop (ops/project/.../views/*/view.json,
+// centre -104.9725, 39.7445 at zoom 12; epic 3 entry 6 replaced the component's START_VIEW with the prop)
 // and the seed's tracer set (ops/project/ignition/script-python/mapstudio_seed, epic 2 story 11),
 // whose map item ids are in the seed result's ids under tracer/p1 .. tracer/p3.
 export const TRACER = {

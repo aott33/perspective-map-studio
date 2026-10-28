@@ -8,6 +8,12 @@ Writes, each only when it is missing (so a kept PostgreSQL volume keeps matching
   story 3, facts learned).
 - ops/secrets/api-token (mode 0600): the client token "dev:<key>" ops/users.py sends as
   X-Ignition-API-Token. Never printed.
+- ops/secrets/map_token (mode 0644, read by the Gateway as uid IGNITION_UID): the dev map's basemap token
+  (epic 3 entry 6), a Docker secret the MapStudioFiles secret provider reads when a browser picks the
+  Satellite basemap. Written as the placeholder MAP_TOKEN_PLACEHOLDER, which starts with "pk." so the
+  Gateway accepts it and the browser's tile request is seen (the e2e suite stubs the tiles), but is not
+  a token Mapbox knows. Replace its content with your own public (pk.) Mapbox token to see real tiles;
+  the file is git-ignored and must never be committed.
 - ops/secrets/core/ignition/api-token/dev/{config.json,resource.json}: the Gateway's API key resource,
   holding only the SHA-256 hash of the key; the init container copies it into the core collection.
   Format from ign-scada-template scripts/gw/make_api_key.py [live 8.3.9 there]. Its security level is
@@ -33,6 +39,9 @@ import uuid
 OPS = os.path.dirname(os.path.abspath(__file__))
 SECRETS = os.path.join(OPS, 'secrets')
 ALPHABET = string.ascii_letters + string.digits
+# Not a Mapbox token: a public-token prefix on words, so the dev stack's Satellite path runs end to end
+# against stubbed tiles without a real token anywhere in the repository.
+MAP_TOKEN_PLACEHOLDER = 'pk.placeholder-dev-not-a-mapbox-token'
 
 
 def password(length=24):
@@ -61,6 +70,12 @@ def main():
         write(pg, password(), 0o644)
         print('generated ops/secrets/pg_password')
     os.chmod(pg, 0o644)
+
+    token = os.path.join(SECRETS, 'map_token')
+    if not os.path.exists(token):
+        write(token, MAP_TOKEN_PLACEHOLDER + '\n', 0o644)
+        print('generated ops/secrets/map_token (a placeholder, not a real token)')
+    os.chmod(token, 0o644)
 
     client = os.path.join(SECRETS, 'api-token')
     folder = os.path.join(SECRETS, 'core', 'ignition', 'api-token', 'dev')

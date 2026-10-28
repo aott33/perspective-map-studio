@@ -6,7 +6,7 @@
 // cookies, never the password, and lives in the system temp folder, not e2e/out
 // (which CI uploads); the global teardown deletes it.
 
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
@@ -43,9 +43,20 @@ export function editorPassword() {
     return userPassword(EDITOR_USER);
 }
 
-/** Every dev user's password that is set, for the teardown's scan. */
+/**
+ * The dev map's basemap token (ops/secrets/map_token, epic 3 entry 6) when a developer put a real one
+ * there; the generated placeholder is not a secret (it is in every satellite tile URL a trace records).
+ */
+function mapToken() {
+    const file = path.join(repoRoot, 'ops', 'secrets', 'map_token');
+    if (!existsSync(file)) return undefined;
+    const value = readFileSync(file, 'utf8').trim();
+    return value && !value.startsWith('pk.placeholder') ? value : undefined;
+}
+
+/** Every dev user's password that is set, and a real map token, for the teardown's scan. */
 export function allPasswords() {
-    return Object.keys(PASSWORD_KEYS).map(userPassword).filter(Boolean);
+    return [...Object.keys(PASSWORD_KEYS).map(userPassword), mapToken()].filter(Boolean);
 }
 
 /** The browser launch options the suite uses (playwright.config.mjs). */

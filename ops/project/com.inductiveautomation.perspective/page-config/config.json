@@ -23,6 +23,10 @@
   "/live": {
    "viewPath": "MapStudioLive",
    "viewParams": {}
+  },
+  "/two": {
+   "viewPath": "MapStudioTwo",
+   "viewParams": {}
   }
  },
  "shared": {},
