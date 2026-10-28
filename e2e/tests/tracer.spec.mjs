@@ -44,6 +44,9 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             await expect(popup).toBeVisible({ timeout: 30_000 });
             await expect(popup).toHaveAttribute('data-point-id', p1);
             await expect(popup.locator('.mapstudio-popup-name')).toHaveText('Point 1');
+            // Closed before drawing: at 390 px the sheet covers the middle of the map, where the vertices go.
+            await popup.locator('.mapstudio-popup-close').click();
+            await expect(page.locator('.mapstudio-popup--default')).toHaveCount(0);
 
             // Escape cancels a drawing: one vertex, then nothing is drawn.
             const cx = box.x + box.width / 2;
