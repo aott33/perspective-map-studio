@@ -7,6 +7,8 @@
 export interface PopupPoint {
     id: string;
     name: string;
+    /** The map item's kind id (epic 3 entry 5: the default popup reads its display); '' when unknown. */
+    kind?: string;
 }
 
 /** Author-set parameters from the `popupView.params` prop. */
