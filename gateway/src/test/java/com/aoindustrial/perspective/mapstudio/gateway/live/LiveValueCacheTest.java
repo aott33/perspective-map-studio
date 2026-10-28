@@ -30,6 +30,7 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
 import com.aoindustrial.perspective.mapstudio.common.Messages;
 import com.aoindustrial.perspective.mapstudio.common.contract.Asset;
 import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
+import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
 import com.aoindustrial.perspective.mapstudio.gateway.adapter.AdapterSnapshot;
 import com.aoindustrial.perspective.mapstudio.gateway.load.MapLoader;
@@ -270,6 +271,66 @@ class LiveValueCacheTest {
         assertEquals(1, told.get());
         assertEquals(List.of(P1), ids(cache.itemBatch(P, P1).body()));
         assertNull(cache.itemBatch(P, "nope"));
+    }
+
+    @Test
+    void theStyleSlotCarriesThePresetAndAStaleSourceDrawsNormalMarkedStale() {
+        // The pad setup with a States rule on Status and the KPI flow kept; Point 2 overrides with an expression.
+        KindSetupRecord styled = new KindSetupRecord("pad", json("{\"comms\":{\"path\":\"{asset.path}/Comms\"},"
+            + "\"kpis\":[{\"key\":\"pressure\",\"path\":\"{asset.path}/Pressure\",\"icon\":true}],"
+            + "\"styleRule\":{\"source\":{\"path\":\"{asset.path}/Status\"},\"type\":\"states\","
+            + "\"cases\":[{\"value\":1,\"preset\":\"attention\"},{\"value\":2,\"preset\":\"warning\"}]}}"), 2, false);
+        MapItemRecord p2 = LiveFixtures.pad(P2, "Point 2", "P14", "{\"styleRule\":{\"source\":{\"path\":\"[default]Mesa/P14/Pressure\"},"
+            + "\"type\":\"expression\",\"expression\":\"if({value} > 600, 'warning', 'normal')\"}}");
+        snapshot = new MapLoader.Snapshot(5, List.of(LiveFixtures.pad(P1, "Point 1", "P12", null), p2), List.of(styled));
+        adapters = new AdapterSnapshot(com.aoindustrial.perspective.mapstudio.gateway.adapter.TestKinds.KINDS, ASSETS,
+            adapters.kindsStatus(), adapters.assetsStatus());
+        cache.rebuild(P);
+        assertTrue(tags.subscribed.contains("[default]Mesa/P12/Status"));
+        assertEquals(1, tags.subscribed.stream().filter("[default]Mesa/P14/Pressure"::equals).count(),
+            "the override's source shares the KPI's subscription");
+        cache.batch(P, -1);
+        // Comms up but the source not delivered yet: normal, stale, "no value yet".
+        tags.deliver(P12_COMMS, true);
+        JsonObject style = cache.itemBatch(P, P1).body().getAsJsonArray("items").get(0).getAsJsonObject().getAsJsonObject("style");
+        assertEquals("normal", style.get("preset").getAsString());
+        assertTrue(style.get("stale").getAsBoolean());
+        assertEquals("no value yet", style.get("reason").getAsString());
+        // A value: the preset, not stale.
+        tags.deliver("[default]Mesa/P12/Status", 2);
+        JsonObject p1 = cache.itemBatch(P, P1).body().getAsJsonArray("items").get(0).getAsJsonObject();
+        style = p1.getAsJsonObject("style");
+        assertEquals("warning", style.get("preset").getAsString());
+        assertFalse(style.get("stale").getAsBoolean());
+        assertEquals("", style.get("reason").getAsString());
+        assertEquals(0, p1.getAsJsonArray("problems").size());
+        // Comms lost: the style is dropped, stale for comms lost.
+        tags.deliver(P12_COMMS, false);
+        style = cache.itemBatch(P, P1).body().getAsJsonArray("items").get(0).getAsJsonObject().getAsJsonObject("style");
+        assertEquals("normal", style.get("preset").getAsString());
+        assertEquals("comms lost", style.get("reason").getAsString());
+        tags.deliver(P12_COMMS, true);
+        // A bad quality on the source: stale with the quality name.
+        tags.deliver("[default]Mesa/P12/Status", 2, "Bad_Stale", false, false);
+        style = cache.itemBatch(P, P1).body().getAsJsonArray("items").get(0).getAsJsonObject().getAsJsonObject("style");
+        assertEquals("normal", style.get("preset").getAsString());
+        assertEquals("Bad_Stale", style.get("reason").getAsString());
+        // The expression override on Point 2, run on the KPI's value.
+        tags.deliver("[default]Mesa/P14/Comms", true);
+        tags.deliver("[default]Mesa/P14/Pressure", 700);
+        JsonObject point2 = cache.itemBatch(P, P2).body().getAsJsonArray("items").get(0).getAsJsonObject();
+        assertEquals("warning", point2.getAsJsonObject("style").get("preset").getAsString());
+        assertEquals(700, point2.getAsJsonObject("kpis").getAsJsonObject("pressure").get("value").getAsInt());
+        tags.deliver("[default]Mesa/P14/Pressure", 100);
+        assertEquals("normal", cache.itemBatch(P, P2).body().getAsJsonArray("items").get(0).getAsJsonObject()
+            .getAsJsonObject("style").get("preset").getAsString());
+        // The source tag the system does not have: a style problem, no path.
+        tags.notFound("[default]Mesa/P12/Status");
+        p1 = cache.itemBatch(P, P1).body().getAsJsonArray("items").get(0).getAsJsonObject();
+        assertEquals("style", p1.getAsJsonArray("problems").get(0).getAsJsonObject().get("slot").getAsString());
+        assertEquals("the tag was not found", p1.getAsJsonArray("problems").get(0).getAsJsonObject().get("reason").getAsString());
+        assertFalse(p1.toString().contains("[default]"));
+        assertFalse(p1.toString().contains("{value}"));
     }
 
     @Test

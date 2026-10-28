@@ -25,7 +25,9 @@ import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException
 import com.aoindustrial.perspective.mapstudio.common.contract.Rows;
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 import com.aoindustrial.perspective.mapstudio.common.contract.StoredRecord;
+import com.aoindustrial.perspective.mapstudio.common.contract.StyleRule;
 import com.aoindustrial.perspective.mapstudio.gateway.adapter.AdapterSnapshot;
+import com.aoindustrial.perspective.mapstudio.gateway.live.StyleExpressions;
 import com.aoindustrial.perspective.mapstudio.gateway.store.MapStore;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
 
@@ -303,6 +305,7 @@ public final class WriteService {
         JsonObject setup;
         try {
             setup = KindSetup.parse(data.get(KindSetupRecord.SETUP), kind, false);
+            checkExpression(setup, kind, "styleRule");
         } catch (InvalidValue ex) {
             throw invalid(op, ex.getMessage());
         }
@@ -325,7 +328,9 @@ public final class WriteService {
                 kinds.keySet()) + ").");
         }
         try {
-            return ItemCheck.check(item, kind);
+            MapItemRecord checked = ItemCheck.check(item, kind);
+            checkExpression(checked.overrides(), kind, "overrides.styleRule");
+            return checked;
         } catch (InvalidValue ex) {
             throw invalid(op, ex.getMessage());
         }
@@ -360,6 +365,27 @@ public final class WriteService {
     /** "map item <id>" or "the kind setup of <kind>", for a message. */
     private static String what(EditOp op) {
         return isItem(op) ? "map item " + op.id() : "the kind setup of " + Rows.echo(op.id());
+    }
+
+    /**
+     * A style rule's expression must parse (epic 3 entry 1): Ignition's expression language with
+     * {@code {value}} as its one reference ({@link StyleExpressions}); the schema check is pure and
+     * cannot run the parser, so the write path does, here.
+     *
+     * @throws InvalidValue naming {@code where}.expression and the parser's reason
+     */
+    static void checkExpression(JsonObject holder, Kind kind, String where) {
+        if (holder == null) {
+            return;
+        }
+        StyleRule rule = StyleRule.read(holder.get("styleRule"));
+        if (rule == null || rule.expression() == null) {
+            return;
+        }
+        String reason = StyleExpressions.check(rule.expression(), kind);
+        if (reason != null) {
+            throw new InvalidValue(where + ".expression: " + reason);
+        }
     }
 
     private static MapStudioException invalid(EditOp op, String message) {

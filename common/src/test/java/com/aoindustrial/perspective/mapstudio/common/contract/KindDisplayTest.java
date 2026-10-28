@@ -4,6 +4,7 @@ import static com.aoindustrial.perspective.mapstudio.common.contract.KindFixture
 import static com.aoindustrial.perspective.mapstudio.common.contract.KindFixtures.json;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -54,5 +55,25 @@ class KindDisplayTest {
         assertFalse(odd.comms());
         assertEquals(0, odd.kpis().size());
         assertFalse(odd.alarmsOn());
+    }
+
+    @Test
+    void theStyleRuleAndTheAreaTintsProjectWithoutAPath() {
+        // The fixture's States rule names {asset.path}/State: the display says "tag" and lists the cases.
+        KindDisplay d = KindDisplay.of("pad", json(PAD_SETUP), KindFixtures.PAD);
+        assertEquals("{\"type\":\"states\",\"source\":\"tag\",\"cases\":[{\"label\":\"running\",\"preset\":\"normal\"},"
+            + "{\"label\":\"stopped\",\"preset\":\"fault\"}]}", d.styleRule().toString());
+        String wire = d.toJson().toString();
+        assertTrue(wire.contains("\"styleRule\""));
+        assertFalse(wire.contains("State"), wire);
+        assertFalse(wire.contains("asset.path"), wire);
+        assertFalse(d.toJson().has("areaTints"));
+        KindDisplay tints = KindDisplay.of("geofence", json("{\"areaTints\":{\"property\":\"operator\",\"tints\":["
+            + "{\"category\":\"North\",\"tint\":\"tint-1\"}]}}"), KindFixtures.GEOFENCE);
+        assertEquals("{\"property\":\"operator\",\"tints\":[{\"category\":\"North\",\"tint\":\"tint-1\"}]}",
+            tints.toJson().getAsJsonObject("areaTints").toString());
+        assertFalse(tints.toJson().has("styleRule"));
+        assertFalse(tints.showsAnything(), "tints alone draw no popup part");
+        assertNull(KindDisplay.of("pad", json("{\"styleRule\":7}")).styleRule());
     }
 }

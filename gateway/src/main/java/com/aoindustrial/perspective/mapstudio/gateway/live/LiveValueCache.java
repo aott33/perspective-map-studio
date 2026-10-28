@@ -23,6 +23,7 @@ import com.aoindustrial.perspective.mapstudio.common.contract.Asset;
 import com.aoindustrial.perspective.mapstudio.common.contract.KindDisplay;
 import com.aoindustrial.perspective.mapstudio.common.contract.LiveValue;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
+import com.aoindustrial.perspective.mapstudio.common.contract.StyleRule;
 import com.aoindustrial.perspective.mapstudio.gateway.adapter.AdapterSnapshot;
 import com.aoindustrial.perspective.mapstudio.gateway.change.ChangeBus;
 import com.aoindustrial.perspective.mapstudio.gateway.load.MapLoader;
@@ -143,7 +144,7 @@ public final class LiveValueCache implements AutoCloseable {
             return;
         }
         AdapterSnapshot lists = adapters.apply(project);
-        ValuePlan.Plan plan = ValuePlan.build(snapshot.kindSetups(), snapshot.items(), lists.assets());
+        ValuePlan.Plan plan = ValuePlan.build(snapshot.kindSetups(), snapshot.items(), lists.assets(), lists.kinds());
         int added = 0;
         int removed = 0;
         for (String path : plan.paths()) {
@@ -335,7 +336,46 @@ public final class LiveValueCache implements AutoCloseable {
             }
             o.add("alarms", alarms.toJson());
         }
+        if (item.style() != null && slots.containsKey(ValuePlan.STYLE)) {
+            TagSubscriber.Delivery d = state.values.get(slots.get(ValuePlan.STYLE));
+            if (d != null && d.notFound()) {
+                problems.add(new ValuePlan.Problem(ValuePlan.STYLE, NOT_FOUND));
+            }
+            o.add("style", style(item.style(), commsLost ? slot(d).staleFor(LiveValue.COMMS_LOST) : slot(d), d, problems));
+        }
         o.add("problems", ValuePlan.problemsJson(problems));
+        return o;
+    }
+
+    /**
+     * The style slot (epic 3 entry 1): {@code {preset, stale, reason}}. A stale source (no value yet,
+     * a bad quality, comms lost) gives {@code normal} marked stale with the reason, so the map draws
+     * the stale look alone; else the rule's preset for the value, a value the rule cannot read
+     * drawing {@code normal} with a {@code style} problem.
+     */
+    static JsonObject style(ValuePlan.Style style, LiveValue source, TagSubscriber.Delivery d, List<ValuePlan.Problem> problems) {
+        JsonObject o = new JsonObject();
+        String preset = StyleRule.NORMAL;
+        String problem = null;
+        if (!source.stale()) {
+            if (style.expression() != null) {
+                StyleExpressions.Result result = style.expression().run(d == null ? null : d.value());
+                preset = result.preset();
+                problem = result.problem();
+            } else {
+                StyleRule.Outcome outcome = style.rule().preset(source.value());
+                if (outcome != null) {
+                    preset = outcome.preset();
+                    problem = outcome.problem();
+                }
+            }
+        }
+        if (problem != null) {
+            problems.add(new ValuePlan.Problem(ValuePlan.STYLE, problem));
+        }
+        o.addProperty("preset", preset);
+        o.addProperty("stale", source.stale());
+        o.addProperty("reason", source.stale() ? source.reason() : "");
         return o;
     }
 
