@@ -3,14 +3,14 @@ title: 'View-mode controls as designed'
 type: 'feature'
 ticket: '14'
 created: '2026-10-28'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '857102447d218abfbcb21ba1c2b1059fab059731'
 route: 'full'
 route_source: 'pinned'
 risk: 'low'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/handoff-epic-3.md'
@@ -91,7 +91,7 @@ context:
 
 ## Implementation Notes
 
-- **Commits on the worktree branch** (`worktree-agent-ae6f21a193005b8ce`, baseline `8571024`): 78b598f (the controls, the prop, the views, the specs, this plan), f0b1994 (the docs and the changelog), the row fix (what the first live run taught: a percentage `max-width` on the floated control bounded the row to nothing, so the attribution wrapped above the button at 1440 px; the corner's container is bounded instead, and the reply box clears the wrapped row on a phone), then the closing commit (evidence, screenshots, this plan).
+- **Commits on the worktree branch** (`worktree-agent-ae6f21a193005b8ce`, baseline `8571024`): 78b598f (the controls, the prop, the views, the specs, this plan), f0b1994 (the docs and the changelog), the row fix (what the first live run taught: a percentage `max-width` on the floated control bounded the row to nothing, so the attribution wrapped above the button at 1440 px; the corner's container is bounded instead, and the reply box clears the wrapped row on a phone), 49cbc83 (the viewer's refused-save test, the one more spec that drew on `/`, moved to `/edit`), then the closing commit (evidence, screenshots, this plan).
 - **Decision 4 refined:** the panel is inserted before the row inside the control's own element, so it sits above the button in the corner's flow and no absolute placement is needed; the first basemap button takes the focus on open.
 - **The tracer spec** draws its line on `/edit` as the map editor (`editorTest`), so the `mapstudio-dev-1440.png` and `-390.png` screenshots now show the dev editing page with Edit mode's tool; the phone measure's line-tool probe opens `/edit` in a second page of its mobile context.
 - **Not done, by scope:** the glyph key and the Lines and Names toggles (entry 3, the panel's sections take them), the Edit switch and the rail (epic-editing), the surface token review (entry 12: the controls keep `--container`), a live change of `editMode` (read once at mount; `docs/contract.md` says so).
@@ -123,3 +123,12 @@ Review pass 1 (quick lens, read by this agent from the diff against the baseline
 
 **Manual checks:**
 - The 1440 and 390 screenshots in `docs/screenshots/` compared with `ux-map-studio/mockups/view-mode-1440.png` and `key-screen-2-phone-sheet.png`: the zoom card top-right, the Legend button and scale bar bottom-left, nothing bottom-right.
+
+**Results (2026-10-28, 4-CPU agent box, Ignition 8.3.10, container `ms-2ac581b3`, fresh volumes):**
+- `./gradlew clean build --offline` (JDK 17, the scratch init script, the box's Node 22): BUILD SUCCESSFUL with every Java and Jest test.
+- `cd web && npx tsc --noEmit && npx jest`: no type error; 25 suites, 206 tests pass (`controls.test.ts` added).
+- The first full e2e run on a fresh stack: 72 passed, 2 failed (`store.spec.mjs`, the viewer's refused save, which still drew on `/` where the tool is gone; moved to `/edit` in 49cbc83), 7 skipped. The second full run on a fresh stack with `E2E_DOCS=1`: 74 passed, 0 failed, 7 skipped (15.0 min); `basemaps.spec.mjs` 7 of 7, `tracer.spec.mjs` on `/edit` 2 of 2, the phone measure's probes all ok.
+- `check-contract-versions.sh`: `OK (contract 0.3.0, setup schema 1, map store schema 2)`; `test-contract-versions.sh`: OK.
+- Em dashes: none in any changed file; no model id outside the commit trailers.
+- Manual: `mapstudio-controls-1440.png` against `view-mode-1440.png`: the zoom card top-right with plus, "z 12", minus, Fit and Return (the mockup has no Return; the ticket adds it), the Legend button bottom-left with the scale bar beside it and the attribution after it (the mockup shows None, so no attribution), the bottom-right corner holding only Perspective's own App Bar toggle; `mapstudio-controls-390.png` against `key-screen-2-phone-sheet.png`: the 44 px card top-right, the Legend button bottom-left, the attribution wrapped above it. What the mockups have and this entry does not: the search field, the Needs you bar and the Edit switch (entries 9, 3 and epic-editing). The screenshots refreshed by the docs run are the ones the docs reference; the new ones are `mapstudio-controls-1440.png` and `-390.png`.
+- Not verified: a host theme without `--boxShadow1`; a real touch device; a screen reader; the owner's eye on the mockup match.
