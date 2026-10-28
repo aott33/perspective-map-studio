@@ -3,14 +3,14 @@ title: 'Basemaps and the starting area'
 type: 'feature'
 ticket: '6'
 created: '2026-10-28'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '722c1c4ff55202823988252d7b55555a33aeeda5'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/handoff-epic-3.md'
@@ -88,12 +88,12 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `common/` -- the message types, the code, the props schema; `ContractTest` updated.
-- [ ] `gateway/.../basemap/` and the delegate wiring; unit tests for every matrix row that is pure, the no-token-in-log test.
-- [ ] `web/typescript/{basemaps,startingArea,BasemapControl}.ts`, `messages.ts`, `MapStudio.tsx`, `mapstudio.css`; Jest tests.
-- [ ] `ops/` -- the dev secret, compose, provider config, setup, the views and the `/two` page.
-- [ ] `e2e/` -- `basemaps.spec.mjs`, the teardown's token scan, the geo comment.
-- [ ] `docs/`, `CHANGELOG.md`, the Designer warning.
+- [x] `common/` -- the message types, the code, the props schema; `ContractTest` updated.
+- [x] `gateway/.../basemap/` and the delegate wiring; unit tests for every matrix row that is pure, the no-token-in-log test.
+- [x] `web/typescript/{basemaps,startingArea,BasemapControl}.ts`, `messages.ts`, `MapStudio.tsx`, `mapstudio.css`; Jest tests.
+- [x] `ops/` -- the dev secret, compose, provider config, setup, the views and the `/two` page.
+- [x] `e2e/` -- `basemaps.spec.mjs`, the teardown's token scan, the geo comment.
+- [x] `docs/`, `CHANGELOG.md`, the Designer warning.
 
 **Acceptance Criteria:**
 - Given the dev Gateway, when each basemap is chosen in the control, then it draws with its attribution and None draws the blank background.
@@ -103,9 +103,22 @@ context:
 
 ## Implementation Notes
 
+- **Commits on the worktree branch** (`worktree-agent-adbddc14f5f05770b`, baseline `722c1c4`): be020ec (common and the Gateway: `Messages` types and `token-unavailable`, `TokenSource`, `IgnitionTokenSource`, `BasemapSources`, the delegate's work-pool job, `BasemapSourcesTest`, `BasemapReplyTest`, the props schema), 51b6795 (the browser: `basemaps.ts`, `startingArea.ts`, `BasemapControl`, the delegate's basemap state and `basemap.source` round trip, the raster layer, the attribution control, `startingArea` in place of `START_VIEW`, Jest tests), e7df0b8 (the dev stack, docs, e2e, the Designer warning), then the closing commits (what the live run taught, evidence, screenshots, this plan).
+- **Perf and store-checks projects.** Their views (`ops/perf/project`, `ops/store-checks/project`) also use the component, so they carry `startingArea` too (the perf grid is built inside that view: `e2e/perf/items.mjs`); `ops/perf.sh` and `ops/store-checks.sh` call `ensure_secrets` so the compose file's `map_token` secret exists on a checkout that ran `ops/up.sh` before this entry.
+- **The first live run taught:** a status-only change (a refusal while OpenStreetMap is drawn) removed and re-added the raster layer, since `applyBasemap` redrew on every revision; it now touches the map only when the source object changed. A routed abort or a 404 for a tile makes Chromium log its own "Failed to load resource" console error for every tile, which the suite's error watch counts whatever the component does, so the tile-failure test serves bytes that are not an image (MapLibre's own error event, no console line). `locator.tap()` needs `hasTouch`; the 390 px test clicks as the other specs do. The `/two` page needs the seed (a fresh stack has no items), so the spec seeds in `beforeAll`. The Designer's `ProjectListsTest` and `ProjectResourcesTest` list the dev project's pages, so `/two` was added there.
+- **The stub tile** is a 1 by 1 blue PNG, which is why the OSM and Satellite screenshots show a flat blue map: the tiles are drawn, they are just the stub.
+- **Not done, by scope:** the Mapbox vector style (deferred), Esri and MapTiler (settings for later, AD-12), Fit and Return and the labels (entry 7), a `basemap` prop, offline tiles.
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+Review pass 1 (quick lens, read by this agent from the staged diff; no subagent tool in this session): 0 high, 1 medium, 1 low, 0 false, 0 maybe-false.
+
+| Finding | Verdict | Route | Evidence |
+| --- | --- | --- | --- |
+| `applyBasemap` removed and re-added the raster source and layer on every basemap revision, a status-only change included, so a refused Satellite click while OpenStreetMap was drawn reloaded every OSM tile | medium | patch | `MapStudio.tsx`: the map is touched only when `b.source` is not the source drawn (`drawnSource`, compared by identity); seen in the first live run and in the diff; patched before the final verification |
+| `Reply` kinds: an `error` whose id is the pending `basemap.source` is handled before the `map.load` error check, so a refusal never reaches the reply line; a late reply to a superseded ask is ignored with one console info line | low (a note, nothing wrong) | rejected | by inspection of `handleEvent`; no harm found |
 
 ## Design Notes
 

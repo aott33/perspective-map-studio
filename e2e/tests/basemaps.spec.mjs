@@ -14,9 +14,9 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { repoRoot, screenshotDir, sessionUrl } from '../lib/env.mjs';
 import { backUpSetup, committedSetup, gatewayRun, logLines, putBackSetup, scanProject, writeSetup } from '../lib/gateway.mjs';
-import { expect, mapLoaded, nextFrames, openMap, test } from './fixtures.mjs';
+import { ensureSeeded, expect, mapLoaded, nextFrames, openMap, test } from './fixtures.mjs';
 
-/** A 1 by 1 transparent PNG, served for every tile the specs route. */
+/** A 1 by 1 PNG (one blue pixel, so a screenshot shows the tiles drawn), served for every tile the specs route. */
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 const OSM_TILES = /^https:\/\/tile\.openstreetmap\.org\//;
 const MAPBOX_TILES = /^https:\/\/api\.mapbox\.com\/v4\/mapbox\.satellite\//;
@@ -29,12 +29,17 @@ function secretFile(name) {
     return existsSync(file) ? readFileSync(file, 'utf8').trim() : '';
 }
 
-/** Serve the stub tile for both providers; returns the tile URLs asked for (query strings included). */
-async function stubTiles(page, { abortOsm = false } = {}) {
+/**
+ * Serve the stub tile for both providers; returns the tile URLs asked for (query strings included). With
+ * `brokenOsm` the OSM tiles come back as bytes that are not an image: the tile fails inside MapLibre (its
+ * error event) with no network error of the browser's own, which a routed abort or a 404 would log as a
+ * console error of its own, whatever the component does.
+ */
+async function stubTiles(page, { brokenOsm = false } = {}) {
     const asked = [];
     await page.route(OSM_TILES, (route) => {
         asked.push(route.request().url());
-        return abortOsm ? route.abort('failed') : route.fulfill({ status: 200, contentType: 'image/png', body: PNG });
+        return route.fulfill({ status: 200, contentType: 'image/png', body: brokenOsm ? Buffer.from('not a png') : PNG });
     });
     await page.route(MAPBOX_TILES, (route) => {
         asked.push(route.request().url());
@@ -65,6 +70,11 @@ async function shot(page, name) {
     mkdirSync(screenshotDir, { recursive: true });
     await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
 }
+
+test.beforeAll(async ({ browser }) => {
+    // The /two page compares item counts, so the dev map must be seeded (a fresh stack has none).
+    await ensureSeeded(browser);
+});
 
 test.describe('1440 px', () => {
     test.use({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
@@ -195,7 +205,7 @@ test.describe('1440 px', () => {
         });
 
     test('tiles that do not load are said in words, not as a browser error', async ({ page, watched }) => {
-        await stubTiles(page, { abortOsm: true });
+        await stubTiles(page, { brokenOsm: true });
         const map = await openMap(page, '/');
         await mapLoaded(map);
         await button(page, 'osm').click();
@@ -243,7 +253,7 @@ test.describe('390 px', () => {
         await stubTiles(page);
         const map = await openMap(page, '/');
         await mapLoaded(map);
-        await button(page, 'osm').tap();
+        await button(page, 'osm').click();
         await expect(map).toHaveAttribute('data-basemap', 'osm');
         await expect(attribution(page)).toContainText('OpenStreetMap contributors');
         await expect(map).toHaveAttribute('data-basemap-tiles', 'loaded', { timeout: CHANGE_MS });

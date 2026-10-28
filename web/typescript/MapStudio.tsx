@@ -719,6 +719,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /** The basemap switch (epic 3 entry 6) and the basemap revision last drawn. */
     private basemapControl: BasemapControl | null = null;
     private drawnBasemap = -1;
+    /** The raster source the map holds now (by identity), or null for none. */
+    private drawnSource: RasterSource | null = null;
     /** The drawn basemap's tiles: none (no source), loading, loaded (the map went idle) or failed (a tile error). */
     private tiles: 'none' | 'loading' | 'loaded' | 'failed' = 'none';
     /** The starting area last applied (startingAreaKey), so a changed prop moves the map once. */
@@ -906,25 +908,29 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.basemapControl.setOffered(b.offered);
             this.basemapControl.setSelected(b.selected);
         }
-        if (map.getLayer(LAYER_BASEMAP)) {
-            map.removeLayer(LAYER_BASEMAP);
-        }
-        if (map.getSource(SOURCE_BASEMAP)) {
-            map.removeSource(SOURCE_BASEMAP);
-        }
-        if (b.source) {
-            map.addSource(SOURCE_BASEMAP, {
-                type: 'raster',
-                tiles: b.source.tiles,
-                tileSize: b.source.tileSize,
-                maxzoom: b.source.maxzoom,
-                attribution: b.source.attribution
-            });
-            map.addLayer({ id: LAYER_BASEMAP, type: 'raster', source: SOURCE_BASEMAP },
-                map.getLayer(LAYER_ITEM_LINES) ? LAYER_ITEM_LINES : undefined);
-            this.tiles = 'loading';
-        } else {
-            this.tiles = 'none';
+        if (b.source !== this.drawnSource) {
+            // Only a changed source touches the map: a status-only change (a refusal) keeps the tiles.
+            this.drawnSource = b.source;
+            if (map.getLayer(LAYER_BASEMAP)) {
+                map.removeLayer(LAYER_BASEMAP);
+            }
+            if (map.getSource(SOURCE_BASEMAP)) {
+                map.removeSource(SOURCE_BASEMAP);
+            }
+            if (b.source) {
+                map.addSource(SOURCE_BASEMAP, {
+                    type: 'raster',
+                    tiles: b.source.tiles,
+                    tileSize: b.source.tileSize,
+                    maxzoom: b.source.maxzoom,
+                    attribution: b.source.attribution
+                });
+                map.addLayer({ id: LAYER_BASEMAP, type: 'raster', source: SOURCE_BASEMAP },
+                    map.getLayer(LAYER_ITEM_LINES) ? LAYER_ITEM_LINES : undefined);
+                this.tiles = 'loading';
+            } else {
+                this.tiles = 'none';
+            }
         }
         this.publishBasemap();
     }
