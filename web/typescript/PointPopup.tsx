@@ -48,8 +48,15 @@ interface PointPopupState {
 export class PointPopup extends React.Component<PointPopupProps, PointPopupState> {
     state: PointPopupState = { failed: false };
 
+    /**
+     * Set the moment the view first reports a failed state: the View can report it more than once
+     * before the state update lands, and the warning is given once.
+     */
+    private warned = false;
+
     private onViewStateChange = (state: ViewStateType): void => {
-        if (isFailedViewState(state) && !this.state.failed) {
+        if (isFailedViewState(state) && !this.warned) {
+            this.warned = true;
             console.warn('[MapStudio] Popup view "' + this.props.path + '" cannot be shown (' + state
                 + '); showing the default popup instead.');
             this.setState({ failed: true });
