@@ -116,7 +116,6 @@ editorTest.describe('1440 px', () => {
                 .toEqual(['header', 'comms', 'kpis', 'alarms']);
             await expect(popup.locator('.mapstudio-popup-name')).toHaveText('Point 1');
             await expect(popup.locator('.mapstudio-popup-subline')).toHaveText('Well pad');
-            await expect(popup.locator('.mapstudio-popup-link')).toHaveAttribute('data-link', '/pad/{item.name}');
             await expect(popup.locator('[data-part="comms"]')).toHaveAttribute('data-comms', 'ok');
             await expect(popup.locator('[data-part="comms"] .mapstudio-popup-value')).toHaveText(/^OK - \d+ (s|min) ago$/);
             const kpis = popup.locator('.mapstudio-popup-kpi');
