@@ -11,17 +11,20 @@ Written 2026-10-28 at the end of the session that built epic 2 (epic-map-store-a
 
 ## Next
 
-1. **The template pull request (left for this session).** Add v0.2.0 to `ign-scada-template`'s module lock and open a **draft** pull request on the owner's go. Never edit `/home/user/ign-scada-template` itself: clone it, branch `map-studio-0.2.0`, then `python3 -I scripts/modules/modl.py check --write`, `fetch`, `inspect`, `verify-lock`; check the lock's `sha256` equals the release's `.sha256` and `certSha256` equals the README's `Signing certificate SHA-256` line (`scripts/ci/modl-verify.sh <file> <fingerprint> 0.2.0`); add the template's `docs/modules.md` row and history line and the Tabler Icons (MIT) entry in `THIRD_PARTY_NOTICES.md`. The template's own CI runs `local.sh` and the stack; do not repeat them. The session needs `aott33/ign-scada-template` added with push access. The previous session's scratch clone is gone with its container; its entry, made by `modl.py check --write` and verified (`verify-lock` ok, 6 signatures, none bad):
+1. **Epic 3, epic-viewing** (`_bmad-output/initiative-flowmap/tickets/epic-viewing/`): not refined yet. Refine it, then plan and build in its `tickets/tickets.toml` order. **Entry 4, "Shorter release checks", is first** (owner, 2026-10-28): `ops/release-smoke.sh`, `ops/perf.sh --only`, checks by release type in `RELEASING.md`.
+2. Decisions already taken for epic 3, in `epic-viewing.md` Notes: **comms lost gets a colour on the map** (owner, 2026-10-28; its own theme token, never an alarm hue, badge and words kept; settle whether stale follows and whether the template's cards change to match; back to engineering review ER-27 with the epic's hue tokens); the popup, tag path and bottom sheet decisions of 2026-10-27. The open question on the style rule expression language is settled at refinement (`_bmad-output/backlog/spike-style-rule-expression-language.md`).
 
-   ```
-   id com.aoindustrial.perspective.mapstudio, name Map Studio, version 0.2.0, requiredIgnitionVersion 8.3.0,
-   file Map-Studio-0.2.0.modl, url https://github.com/aott33/perspective-map-studio/releases/download/v0.2.0/Map-Studio-0.2.0.modl,
-   sha256 0cfa5c26190e04e84751ef825d020fbc006556748d1d4a1bbb66b2f25e0730ba,
-   certSha256 8F:93:FD:5C:B8:D9:C7:9B:E4:14:FD:EC:84:CF:21:26:A2:AC:39:F3:DA:3F:C9:0D:F8:08:0E:EA:5C:4D:38:3D,
-   licence Apache-2.0, upstream github aott33/perspective-map-studio, asset Map-Studio-.*\.modl, tag v0.2.0
-   ```
-2. **Epic 3, epic-viewing** (`_bmad-output/initiative-flowmap/tickets/epic-viewing/`): not refined yet. Refine it, then plan and build in its `tickets/tickets.toml` order. **Entry 4, "Shorter release checks", is first** (owner, 2026-10-28): `ops/release-smoke.sh`, `ops/perf.sh --only`, checks by release type in `RELEASING.md`.
-3. Decisions already taken for epic 3, in `epic-viewing.md` Notes: **comms lost gets a colour on the map** (owner, 2026-10-28; its own theme token, never an alarm hue, badge and words kept; settle whether stale follows and whether the template's cards change to match; back to engineering review ER-27 with the epic's hue tokens); the popup, tag path and bottom sheet decisions of 2026-10-27. The open question on the style rule expression language is settled at refinement (`_bmad-output/backlog/spike-style-rule-expression-language.md`).
+## The template stays on 0.1.0 until the map is ready to deploy
+
+Owner, 2026-10-28: `ign-scada-template` is not updated per Map Studio release. The owner updates its module lock when the map is ready for deployment (the cutover, epic-template-cutover). Releases until then are proven on the dev stack and, where a release needs it, rehearsed on the template's test stack from a scratch clone that is never pushed. For that later update, the verified 0.2.0 entry (made by `modl.py check --write`; `verify-lock` ok, 6 signatures, none bad) was:
+
+```
+id com.aoindustrial.perspective.mapstudio, name Map Studio, version 0.2.0, requiredIgnitionVersion 8.3.0,
+file Map-Studio-0.2.0.modl, url https://github.com/aott33/perspective-map-studio/releases/download/v0.2.0/Map-Studio-0.2.0.modl,
+sha256 0cfa5c26190e04e84751ef825d020fbc006556748d1d4a1bbb66b2f25e0730ba,
+certSha256 8F:93:FD:5C:B8:D9:C7:9B:E4:14:FD:EC:84:CF:21:26:A2:AC:39:F3:DA:3F:C9:0D:F8:08:0E:EA:5C:4D:38:3D,
+licence Apache-2.0, upstream github aott33/perspective-map-studio, asset Map-Studio-.*\.modl, tag v0.2.0
+```
 
 ## Open items to know
 
@@ -37,7 +40,7 @@ All in `_bmad-output/deferred-work.md` (entries without a `resolved:` line). The
 
 - Andy Ott (aott33). Usually answers "agree with all recommendations, start building". Give a recommendation, not a survey. Short answers; plain words; tables for results.
 - Wants: a professional UI that matches the Ignition Designer in the Designer (plain Swing controls, the Designer theme, no custom-looking widgets) and the project theme in Perspective; speed through parallel agents but with care about credits; undecided ideas go to the backlog.
-- Steps that are always the owner's: merging, tagging, approving the `release` environment, publishing a release, engineering review (ER-27) of anything that changes alarm presentation, a template pull request's go.
+- Steps that are always the owner's: merging, tagging, approving the `release` environment, publishing a release, engineering review (ER-27) of anything that changes alarm presentation, the template's module lock update (at the cutover).
 - One pull request per story (or per release), CI green before asking to merge.
 
 ## Rules (also in CLAUDE.md files)
@@ -63,4 +66,4 @@ All in `_bmad-output/deferred-work.md` (entries without a `resolved:` line). The
 
 ## Start the new session with
 
-> Read `_bmad-output/handoff-epic-3.md`, then open the template's 0.2.0 module-lock pull request as a draft, and refine epic 3 (epic-viewing) starting with entry 4.
+> Read `_bmad-output/handoff-epic-3.md`, then refine epic 3 (epic-viewing) and start with entry 4.
