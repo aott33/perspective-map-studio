@@ -76,15 +76,22 @@ public final class Messages {
     public static final String POPUP_OPEN = "popup.open";
     /** The browser closed the popup: body {itemId}. */
     public static final String POPUP_CLOSE = "popup.close";
+    /**
+     * The browser asks for a basemap's tile source (epic 3 entry 6, AD-12): body {basemap}; only
+     * {@code satellite} is asked for, its token read on the Gateway from the setup's secret.
+     */
+    public static final String BASEMAP_SOURCE = "basemap.source";
+    /** Body {basemap, provider, tiles: [url template], tileSize, maxzoom, attribution}: a raster tile source. */
+    public static final String BASEMAP_SOURCE_REPLY = "basemap.source.reply";
 
     /** Every type the Gateway accepts from the browser. */
     public static final Set<String> INBOUND_TYPES =
-        Set.of(POINT_CLICK, MAP_LOAD, EDITS_APPLY, TAGS_BROWSE, TAGS_RESOLVE, POPUP_OPEN, POPUP_CLOSE);
+        Set.of(POINT_CLICK, MAP_LOAD, EDITS_APPLY, TAGS_BROWSE, TAGS_RESOLVE, POPUP_OPEN, POPUP_CLOSE, BASEMAP_SOURCE);
 
     /** Every type the Gateway sends to the browser. */
     public static final Set<String> OUTBOUND_TYPES =
         Set.of(POINT_CLICK_REPLY, MAP_LOAD_REPLY, EDITS_APPLY_REPLY, MAP_CHANGED, ERROR, TAGS_BROWSE_REPLY,
-            TAGS_RESOLVE_REPLY, VALUES_BATCH);
+            TAGS_RESOLVE_REPLY, VALUES_BATCH, BASEMAP_SOURCE_REPLY);
 
     // Error codes: stable kebab-case words.
     /** A batch's baseVersion is not the stored version. */
@@ -109,9 +116,16 @@ public final class Messages {
     /** The tag system did not answer a tag lookup within 5 s, or failed (entry 15, added in 0.2.0). */
     public static final String CODE_TAGS_UNAVAILABLE = "tags-unavailable";
 
+    /**
+     * The basemap token cannot be used (epic 3 entry 6, added in 0.3.0): the setup names no secret, the
+     * provider or the secret is missing, it cannot be read, it is empty, or it is not a public token.
+     * The message names the secret, never its value.
+     */
+    public static final String CODE_TOKEN_UNAVAILABLE = "token-unavailable";
+
     /** Every error code of this contract version. */
     public static final Set<String> CODES = Set.of(CODE_CONFLICT, CODE_ROLE, CODE_INVALID, CODE_STALE,
-        CODE_STORE_UNREACHABLE, CODE_READ_ONLY, CODE_TAGS_UNAVAILABLE);
+        CODE_STORE_UNREACHABLE, CODE_READ_ONLY, CODE_TAGS_UNAVAILABLE, CODE_TOKEN_UNAVAILABLE);
 
     // Editing levels reported by map.load (AD-2).
     public static final String LEVEL_NONE = "none";
