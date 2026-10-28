@@ -3,7 +3,7 @@ title: 'Basemaps and the starting area'
 type: 'feature'
 ticket: '6'
 created: '2026-10-28'
-status: 'in-review'
+status: 'built'
 baseline_revision: '722c1c4ff55202823988252d7b55555a33aeeda5'
 route: 'full'
 route_source: 'auto'
@@ -138,3 +138,12 @@ Review pass 1 (quick lens, read by this agent from the staged diff; no subagent 
 **Manual checks:**
 - The Gateway log of `MapStudio.basemap` after the e2e run holds the secret names only (asserted by the spec).
 - Screenshots in `docs/screenshots/` show the control, the attribution and the two-map page.
+
+**Results (2026-10-28, the dev stack `ms-b4f7fd52`, 8.3.10, fresh volumes twice):**
+- `./gradlew clean build --offline` (with `JAVA_HOME` set, the box's Node 22 on the path and the scratch init script that keeps the node plugin from downloading Node, never committed): BUILD SUCCESSFUL, every common, Gateway, designer and Jest test green (the Designer's two page-list tests gained `/two`).
+- `cd web && npx tsc --noEmit && npx jest`: no type error; 21 suites, 181 tests pass.
+- `bash scripts/ci/check-contract-versions.sh`: `OK (contract 0.3.0, setup schema 1, map store schema 2)`; `test-contract-versions.sh`: OK; web and e2e package versions 0.3.0 equal CHANGELOG's top section.
+- `e2e` on a fresh stack (`ops/up.sh --fresh`, the module staged by hand from the same build): `basemaps.spec.mjs` 5 of 5; the full suite 63 passed, 7 skipped, 0 failed (11.4 min on the first build, 11.2 min on the final build after the review patch, each on fresh volumes).
+- Em dashes: none in any changed file; no model id outside the commit trailers.
+- Manual: the Gateway log of `MapStudio.basemap` names the secrets only (read through the log API after the run; a search of the whole log and the container's stdout for the placeholder token found nothing); the screenshots are in `docs/screenshots/`.
+- Not verified: real Mapbox imagery from a real public token (none on this box; the tile URL and the token's place in it are seen); real OpenStreetMap tiles from this box (stubbed); the Mapbox terms for client sites (the owner's, before the release); a secret provider other than the File provider; the exception type a File provider throws for a missing name.
