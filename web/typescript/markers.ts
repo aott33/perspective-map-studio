@@ -16,10 +16,18 @@
  * Colours are theme tokens read from the component root (theme.ts), never literals: the comms-lost
  * hue is `--mapstudio-comms-lost`, the alarm hues `--mapstudio-alarm-1` to `-3`, the selection
  * `--callToAction`; the disc, the glyph, the text, the halo, the dot and the lines are neutral tokens.
+ *
+ * Value styles (epic 3 entry 1, AD-11): a style rule's preset draws on the marker as its ring
+ * (`attention` a heavier neutral ring, `warning` and `fault` a ring in their tokens, `dimmed` the
+ * disc faded with a dashed neutral ring) with the preset's word in the chip, never colour alone;
+ * comms lost and stale replace the ring (the Gateway drops the style meanwhile) and the alarm badge
+ * draws over any of them. A line takes the hue, the word, the `dashed` and `dotted` patterns and the
+ * `dimmed` fade; an area its category tint (`--mapstudio-tint-1` to `-6`); every token stands in
+ * until entry 12 reviews the hues (docs/styles.md).
  */
 
 import advances from '../fonts/advances.json';
-import { ItemState } from './live';
+import { ItemState, PointPreset, Preset, Tint, itemPreset } from './live';
 
 /** The theme colours the images and the text layers need, read once from the component root. */
 export interface MarkerColors {
@@ -43,7 +51,43 @@ export interface MarkerColors {
     alarm: [string, string, string];
     /** The host theme's font family (the digit in the badge image). */
     font: string;
+    /** The attention preset's ring (`--mapstudio-attention`, no hue: a heavier neutral). */
+    attention: string;
+    /** The warning preset's token. */
+    warning: string;
+    /** The fault preset's token. */
+    fault: string;
+    /** The six area tints, `tint-1` to `tint-6`. */
+    tints: [string, string, string, string, string, string];
 }
+
+/** The presets a point draws on its marker, each with its word (said beside the name, never colour alone). */
+export const PRESET_WORDS: Record<Preset, string> = {
+    'normal': '', 'attention': 'Attention', 'warning': 'Warning', 'fault': 'Fault', 'dimmed': 'Out of service',
+    'solid': '', 'dashed': '', 'dotted': ''
+};
+
+/** The preset a point draws: a line preset on a point reads as normal. */
+export function pointPreset(preset: Preset): PointPreset {
+    return preset === 'attention' || preset === 'warning' || preset === 'fault' || preset === 'dimmed' ? preset : 'normal';
+}
+
+/** The token value of a preset's hue, or '' for the neutral ones (normal, dimmed and the line patterns). */
+export function presetColor(preset: Preset, colors: MarkerColors): string {
+    return preset === 'attention' ? colors.attention : preset === 'warning' ? colors.warning : preset === 'fault' ? colors.fault : '';
+}
+
+/** The token value of a tint. */
+export function tintColor(tint: Tint, colors: MarkerColors): string {
+    return colors.tints[Number(tint.substring('tint-'.length)) - 1] || '';
+}
+
+/** The dimmed preset's opacity (DESIGN.md: faded and dashed). */
+export const DIMMED_OPACITY = 0.45;
+/** The area fill's and outline's opacity: a low-saturation wash of the tint token, the outline firmer. */
+export const AREA_FILL_OPACITY = 0.22;
+export const AREA_LINE_OPACITY = 0.8;
+export const AREA_LINE_WIDTH = 1.5;
 
 /** The CSS custom properties the colours come from, in the order tried (the first that resolves wins). */
 export const MARKER_TOKENS = {
@@ -57,7 +101,16 @@ export const MARKER_TOKENS = {
     commsLost: ['--mapstudio-comms-lost', '--qual-1'],
     alarm1: ['--mapstudio-alarm-1', '--error'],
     alarm2: ['--mapstudio-alarm-2', '--warning'],
-    alarm3: ['--mapstudio-alarm-3', '--info']
+    alarm3: ['--mapstudio-alarm-3', '--info'],
+    attention: ['--mapstudio-attention', '--neutral-90', '--label'],
+    warning: ['--mapstudio-warning', '--warning'],
+    fault: ['--mapstudio-fault', '--error'],
+    tint1: ['--mapstudio-tint-1', '--qual-3'],
+    tint2: ['--mapstudio-tint-2', '--qual-7'],
+    tint3: ['--mapstudio-tint-3', '--qual-2'],
+    tint4: ['--mapstudio-tint-4', '--qual-9'],
+    tint5: ['--mapstudio-tint-5', '--qual-10'],
+    tint6: ['--mapstudio-tint-6', '--qual-8']
 } as const;
 
 export type MarkerLook = 'normal' | 'comms-lost' | 'stale';
@@ -74,6 +127,8 @@ export interface MarkerSpec {
     solid: boolean;
     /** The selection ring outside a gap. */
     selected: boolean;
+    /** The value style's preset on the ring (entry 1); normal while the look is comms lost or stale. */
+    preset: PointPreset;
 }
 
 /** The properties of a point feature that the marker and label layers read. */
@@ -170,6 +225,8 @@ export const RANK_SELECTED = -1;
 export const RANK_ALARM = 0;
 export const RANK_COMMS_LOST = 3;
 export const RANK_STALE = 4;
+/** A value style other than normal (fault, warning, attention) keeps its label ahead of normal items. */
+export const RANK_STYLE = 5;
 export const RANK_NORMAL = 5;
 export const LABEL_RANK_MAX = 99;
 
@@ -185,6 +242,10 @@ export function labelRank(state: ItemState, kindLabelRank: number, selected: boo
     }
     if (state.stale) {
         return RANK_STALE;
+    }
+    const preset = itemPreset(state);
+    if (preset === 'fault' || preset === 'warning' || preset === 'attention') {
+        return RANK_STYLE;
     }
     const rank = Math.max(0, Math.min(LABEL_RANK_MAX, Math.round(kindLabelRank) || 0));
     return RANK_NORMAL + (LABEL_RANK_MAX - rank);
@@ -205,11 +266,13 @@ export function markerSpec(icon: string, state: ItemState, selected = false): Ma
     } else if (state.stale) {
         badge = 'stale';
     }
-    return { icon: icon || 'point', look, badge, priority, solid, selected };
+    // The value style draws only on a fresh item: comms lost and stale replace it (the Gateway drops it too).
+    const preset = look === 'normal' ? pointPreset(itemPreset(state)) : 'normal';
+    return { icon: icon || 'point', look, badge, priority, solid, selected, preset };
 }
 
 export function markerImageId(spec: MarkerSpec): string {
-    return IMAGE_PREFIX + JSON.stringify([spec.icon, spec.look, spec.badge, spec.priority, spec.solid, spec.selected]);
+    return IMAGE_PREFIX + JSON.stringify([spec.icon, spec.look, spec.badge, spec.priority, spec.solid, spec.selected, spec.preset]);
 }
 
 export function dotImageId(size: number, selected: boolean): string {
@@ -220,9 +283,12 @@ export function badgeImageId(badge: string, priority: number, solid: boolean): s
     return BADGE_PREFIX + JSON.stringify([badge, priority, solid]);
 }
 
-/** The state word the chip shows beside the name (decision D5: the short form; the popup says the rest). */
+/**
+ * The state word the chip shows beside the name (decision D5: the short form; the popup says the
+ * rest): comms lost, stale, else the value style's word (entry 1; the style is dropped while stale).
+ */
 export function stateWord(state: ItemState): string {
-    return state.commsLost ? 'Comms lost' : state.stale ? 'Stale' : '';
+    return state.commsLost ? 'Comms lost' : state.stale ? 'Stale' : PRESET_WORDS[itemPreset(state)];
 }
 
 /** The bundled fonts' ASCII advances at 24 px (web/fonts/advances.json, kept in step with the fonts by glyphs.mjs --check). */
@@ -275,13 +341,21 @@ export function markerProperties(id: string, name: string, kind: string, icon: s
     };
 }
 
-/** The line's look (DESIGN.md map-line; plan decision 4): weight by pipe size, hue only from alarms, dashed for no data or comms lost. */
+/**
+ * The line's look (DESIGN.md map-line; entry 7 decision 4, entry 1): weight by pipe size, hue from
+ * the line's alarm, else from its value style (`attention`, `warning`, `fault`); dashed for no data,
+ * comms lost or the `dashed` preset; dotted for the `dotted` preset; faded for `dimmed`.
+ */
 export interface LineLook {
     /** 3, 4 or 6 px by pipe size with an instrument on the line; 2 px (untapped) without. */
     weight: number;
-    /** 'alarm-1' to 'alarm-3', or '' for the pipeline grey. */
+    /** 'alarm-1' to 'alarm-3', 'attention', 'warning', 'fault', or '' for the pipeline grey. */
     hue: string;
     dashed: boolean;
+    /** The `dotted` preset (never with dashed: a stale line dashes). */
+    dotted: boolean;
+    /** The `dimmed` preset: the line at DIMMED_OPACITY. */
+    dimmed: boolean;
     /** The badge at the midpoint (an alarm), or ''. */
     badge: string;
     priority: number;
@@ -307,12 +381,17 @@ export function lineWeight(sizeIn: unknown): number {
 export function lineLook(state: ItemState, sizeIn: unknown, hasInstruments: boolean): LineLook {
     const weight = hasInstruments ? lineWeight(sizeIn) : LINE_UNTAPPED;
     const spec = markerSpec('', state);
-    // No data is a comms or value slot with no value yet, which the Gateway reports stale.
-    const dashed = state.commsLost || state.stale;
+    // No data is a comms or value slot with no value yet, which the Gateway reports stale; a stale
+    // line drops its value style (the Gateway sends normal then).
+    const stale = state.commsLost || state.stale;
+    const preset: Preset = stale ? 'normal' : itemPreset(state);
+    const styleHue = preset === 'attention' || preset === 'warning' || preset === 'fault' ? preset : '';
     return {
         weight,
-        hue: state.alarm ? 'alarm-' + state.alarm.priority : '',
-        dashed,
+        hue: state.alarm ? 'alarm-' + state.alarm.priority : styleHue,
+        dashed: stale || preset === 'dashed',
+        dotted: !stale && preset === 'dotted',
+        dimmed: preset === 'dimmed',
         badge: state.alarm ? spec.badge : '',
         priority: spec.priority,
         solid: spec.solid
@@ -329,13 +408,33 @@ export interface LineProperties {
     color: string;
     hue: string;
     dashed: boolean;
+    dotted: boolean;
+    dimmed: boolean;
     selected: boolean;
 }
 
 export function lineProperties(id: string, name: string, kind: string, look: LineLook, colors: MarkerColors, selected: boolean): LineProperties {
     const color = look.hue === 'alarm-1' ? colors.alarm[0] : look.hue === 'alarm-2' ? colors.alarm[1]
-        : look.hue === 'alarm-3' ? colors.alarm[2] : colors.line;
-    return { id, name, kind, weight: look.weight, color, hue: look.hue, dashed: look.dashed, selected };
+        : look.hue === 'alarm-3' ? colors.alarm[2] : look.hue === 'attention' ? colors.attention
+        : look.hue === 'warning' ? colors.warning : look.hue === 'fault' ? colors.fault : colors.line;
+    return { id, name, kind, weight: look.weight, color, hue: look.hue, dashed: look.dashed, dotted: look.dotted,
+        dimmed: look.dimmed, selected };
+}
+
+/** The properties of an area feature (a line kind with `area: true`), its fill and outline from its tint. */
+export interface AreaProperties {
+    id: string;
+    name: string;
+    kind: string;
+    /** The tint name, or '' for the neutral area look. */
+    tint: string;
+    /** The resolved fill and outline colour: the tint's token value, or the neutral line token. */
+    color: string;
+    selected: boolean;
+}
+
+export function areaProperties(id: string, name: string, kind: string, tint: Tint | null, colors: MarkerColors, selected: boolean): AreaProperties {
+    return { id, name, kind, tint: tint || '', color: tint ? tintColor(tint, colors) || colors.line : colors.line, selected };
 }
 
 /** What an image id names. */
@@ -367,17 +466,21 @@ export function parseImageId(id: string): ImageSpec | null {
     };
     const marker = parts(IMAGE_PREFIX);
     if (marker) {
-        if (marker.length !== 6 || typeof marker[0] !== 'string') {
+        if (marker.length !== 7 || typeof marker[0] !== 'string') {
             return null;
         }
         const look = marker[1];
         if (look !== 'normal' && look !== 'comms-lost' && look !== 'stale') {
             return null;
         }
+        const preset = marker[6];
+        if (preset !== 'normal' && preset !== 'attention' && preset !== 'warning' && preset !== 'fault' && preset !== 'dimmed') {
+            return null;
+        }
         return {
             kind: 'marker',
             spec: { icon: marker[0], look, badge: String(marker[2]), priority: Number(marker[3]) || 0, solid: marker[4] === true,
-                selected: marker[5] === true }
+                selected: marker[5] === true, preset }
         };
     }
     const dot = parts(DOT_PREFIX);
@@ -453,19 +556,54 @@ export function markerSvg(spec: MarkerSpec, symbols: Record<string, SpriteSymbol
     const [cx, cy] = DISC_CENTER;
     const r = DISC_RADIUS;
     const hue = spec.look === 'comms-lost' ? colors.commsLost : colors.glyph;
+    const preset = spec.look === 'normal' ? spec.preset : 'normal';
     let body = '';
     if (spec.selected) {
         body += `<circle cx="${cx}" cy="${cy}" r="${r + 5}" fill="none" stroke="${esc(colors.selection)}" stroke-width="2"/>`;
     }
-    body += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${esc(colors.disc)}" stroke="${esc(colors.halo)}" stroke-width="${HALO_WIDTH}"/>`;
+    // The dimmed preset fades the disc and its glyph (DESIGN.md: faded and dashed); the badge stays full.
+    let disc = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${esc(colors.disc)}" stroke="${esc(colors.halo)}" stroke-width="${HALO_WIDTH}"/>`;
     if (spec.look !== 'normal') {
-        body += `<circle cx="${cx}" cy="${cy}" r="${r - 1}" fill="none" stroke="${esc(hue)}" stroke-width="2" stroke-dasharray="3 3"/>`;
+        disc += `<circle cx="${cx}" cy="${cy}" r="${r - 1}" fill="none" stroke="${esc(hue)}" stroke-width="2" stroke-dasharray="3 3"/>`;
+    } else if (preset === 'attention') {
+        disc += `<circle cx="${cx}" cy="${cy}" r="${r - 1.5}" fill="none" stroke="${esc(colors.attention)}" stroke-width="3"/>`;
+    } else if (preset === 'warning' || preset === 'fault') {
+        disc += `<circle cx="${cx}" cy="${cy}" r="${r - 1.25}" fill="none" stroke="${esc(presetColor(preset, colors))}" stroke-width="2.5"/>`;
+    } else if (preset === 'dimmed') {
+        disc += `<circle cx="${cx}" cy="${cy}" r="${r - 1}" fill="none" stroke="${esc(colors.line)}" stroke-width="1.5" stroke-dasharray="2 2"/>`;
     } else {
-        body += `<circle cx="${cx}" cy="${cy}" r="${r - 1}" fill="none" stroke="${esc(colors.line)}" stroke-width="1.5"/>`;
+        disc += `<circle cx="${cx}" cy="${cy}" r="${r - 1}" fill="none" stroke="${esc(colors.line)}" stroke-width="1.5"/>`;
     }
-    body += glyphAt(symbols[spec.icon] || symbols.point, cx - 10, cy - 10, 20, hue);
+    disc += glyphAt(symbols[spec.icon] || symbols.point, cx - 10, cy - 10, 20, hue);
+    body += preset === 'dimmed' ? `<g opacity="${DIMMED_OPACITY}">${disc}</g>` : disc;
     body += badgeAt(spec.badge, spec.priority, spec.solid, cx + 13, cy - 13, symbols, colors);
     return svg(MARKER_IMAGE.width, MARKER_IMAGE.height, body);
+}
+
+/** The line patterns the layers use, in units of the line width: dashed 8 6 (DESIGN.md) at the untapped weight, dotted round dots. */
+export const LINE_DASH: [number, number] = [2.5, 2];
+export const LINE_DOT: [number, number] = [0.01, 2.2];
+
+/**
+ * A line sample for the preview (StylePreview): a 64 by 16 px line in the preset's look, the hue
+ * (an alarm never draws here), the dash or dots, the fade. Only token values.
+ */
+export function lineSampleSvg(preset: Preset, colors: MarkerColors): string {
+    const look = lineLook({ commsLost: false, stale: false, alarm: null, iconKpi: null, badge: 'normal', preset }, 6, true);
+    const color = look.hue === 'attention' ? colors.attention : look.hue === 'warning' ? colors.warning
+        : look.hue === 'fault' ? colors.fault : colors.line;
+    const w = look.weight;
+    const dash = look.dashed ? ` stroke-dasharray="${LINE_DASH[0] * w} ${LINE_DASH[1] * w}"`
+        : look.dotted ? ` stroke-dasharray="${LINE_DOT[0] * w} ${LINE_DOT[1] * w}" stroke-linecap="round"` : '';
+    const opacity = look.dimmed ? ` opacity="${DIMMED_OPACITY}"` : '';
+    return svg(64, 16, `<path d="M4 8 L60 8" fill="none" stroke="${esc(color)}" stroke-width="${w}"${dash}${opacity}/>`);
+}
+
+/** A tint swatch for the preview: the area fill and outline look in a 64 by 32 px box. */
+export function tintSampleSvg(tint: Tint | null, colors: MarkerColors): string {
+    const color = tint ? tintColor(tint, colors) || colors.line : colors.line;
+    return svg(64, 32, `<rect x="2" y="2" width="60" height="28" rx="3" fill="${esc(color)}" fill-opacity="${AREA_FILL_OPACITY}"`
+        + ` stroke="${esc(color)}" stroke-opacity="${AREA_LINE_OPACITY}" stroke-width="${AREA_LINE_WIDTH}"/>`);
 }
 
 /** A normal item below zoom 14: a dot of `size` px in the DOT_IMAGE square, with the halo and the selection ring. */

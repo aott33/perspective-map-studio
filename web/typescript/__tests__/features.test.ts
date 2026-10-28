@@ -6,7 +6,8 @@ import { MarkerColors, RANK_SELECTED, badgeImageId } from '../markers';
 
 const COLORS: MarkerColors = {
     disc: 'd', glyph: 'g', halo: 'h', textSecondary: 's', line: 'l', chipEdge: 'c', selection: 'sel',
-    commsLost: 'cl', alarm: ['a1', 'a2', 'a3'], font: 'f'
+    commsLost: 'cl', alarm: ['a1', 'a2', 'a3'], font: 'f', attention: 'att', warning: 'warn', fault: 'flt',
+    tints: ['t1', 't2', 't3', 't4', 't5', 't6']
 };
 
 const KINDS: Kind[] = [
@@ -87,9 +88,49 @@ describe('the map features (epic 3 entry 7)', () => {
         const out = buildFeatures([A, B, FAR], KINDS, LIVE_INITIAL, { id: 'b', kind: 'point' }, COLORS);
         const shared = out.points.features.find((f) => f.properties.members === 2)!;
         expect(shared.properties).toMatchObject({ selected: true, rank: RANK_SELECTED });
-        expect(shared.properties.marker).toContain('true]');
+        expect(shared.properties.marker).toContain('true,"normal"]');
         expect(out.points.features.find((f) => f.properties.id === 'far')!.properties.selected).toBe(false);
         expect(buildFeatures([], KINDS, LIVE_INITIAL, null, COLORS)).toMatchObject({ bounds: null, boundsKey: '', shared: 0 });
+    });
+
+    test('a value style draws on a point and a line; a stale source drops it; an area takes its tint and nothing else does (entry 1)', () => {
+        const AREA_KIND: Kind = { id: 'geofence', name: 'Geofence', geometry: 'line', icon: 'geofence', labelRank: 0, fields: [], area: true };
+        const G = item('g', 'geofence', 'North fence', { type: 'LineString', coordinates: [[-104.99, 39.74], [-104.98, 39.74], [-104.98, 39.75]] },
+            { properties: { operator: 'North' } });
+        const live: LiveState = {
+            ...LIVE_INITIAL,
+            display: {
+                pad: { ...display, styleRule: { type: 'states', source: 'tag', cases: [{ label: '2', preset: 'warning' }] } },
+                line: { ...display, kindId: 'line', kpis: [], styleRule: { type: 'bands', source: 'kpi:flow', cases: [{ label: '50 to 200', preset: 'attention' }] } },
+                geofence: { kindId: 'geofence', comms: false, kpis: [], alarms: { on: false, count: true, summary: true }, link: '',
+                    areaTints: { property: 'operator', tints: [{ category: 'North', tint: 'tint-1' }] } }
+            },
+            items: {
+                a: { id: 'a', comms: value(true), kpis: { p: value(400) }, style: { preset: 'warning', stale: false, reason: '' }, problems: [] },
+                far: { id: 'far', comms: value(true), kpis: { p: value(400) }, style: { preset: 'normal', stale: true, reason: 'Bad_Stale' }, problems: [] },
+                l: { id: 'l', comms: value(true), kpis: {}, style: { preset: 'dotted', stale: false, reason: '' }, problems: [] }
+            }
+        };
+        const out = buildFeatures([A, FAR, L, G], [...KINDS, AREA_KIND], live, null, COLORS);
+        const a = out.points.features.find((f) => f.properties.id === 'a')!.properties;
+        expect(a).toMatchObject({ state: 'normal', word: 'Warning', rank: 5 });
+        expect(a.marker).toContain('"warning"]');
+        // A stale source: the item is stale, the style gone until a fresh value.
+        const far = out.points.features.find((f) => f.properties.id === 'far')!.properties;
+        expect(far).toMatchObject({ state: 'stale', word: 'Stale' });
+        expect(far.marker).toContain('"normal"]');
+        expect(out.lines.features[0].properties).toMatchObject({ id: 'l', dotted: true, dashed: false, dimmed: false, color: 'l' });
+        // The area: a closed ring in its tint, no line feature, counted in the bounds.
+        expect(out.lines.features).toHaveLength(1);
+        expect(out.areas.features).toHaveLength(1);
+        const g = out.areas.features[0];
+        expect(g.properties).toEqual({ id: 'g', name: 'North fence', kind: 'geofence', tint: 'tint-1', color: 't1', selected: false });
+        expect(g.geometry.coordinates[0]).toHaveLength(4);
+        expect(g.geometry.coordinates[0][3]).toEqual([-104.99, 39.74]);
+        expect(a.marker).not.toContain('t1');
+        // A category with no tint, and a point kind with tints by mistake: the neutral look, no tint.
+        const south = buildFeatures([{ ...G, properties: { operator: 'South' } }], [...KINDS, AREA_KIND], live, null, COLORS);
+        expect(south.areas.features[0].properties).toMatchObject({ tint: '', color: 'l' });
     });
 
     test('bearings: north 0, east 90, along a line', () => {

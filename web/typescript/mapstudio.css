@@ -219,6 +219,124 @@
     --mapstudio-alarm-3: var(--info);
 }
 
+/* Value style presets and area tints (epic 3 entry 1, AD-11; docs/styles.md). Stand-ins until
+   entry 12 reviews the hues (ER-27): attention is a heavier neutral (no hue), warning and fault
+   take the theme's warning and error, and the six tints take qualitative palette entries that are
+   neither the comms-lost purple (--qual-1) nor the error red; the map draws a tint at low opacity
+   (a wash), never on a point or a line. A host theme redefines any of these on .mapstudio. */
+.mapstudio {
+    --mapstudio-attention: var(--neutral-90);
+    --mapstudio-warning: var(--warning);
+    --mapstudio-fault: var(--error);
+    --mapstudio-tint-1: var(--qual-3);
+    --mapstudio-tint-2: var(--qual-7);
+    --mapstudio-tint-3: var(--qual-2);
+    --mapstudio-tint-4: var(--qual-9);
+    --mapstudio-tint-5: var(--qual-10);
+    --mapstudio-tint-6: var(--qual-8);
+}
+
+/* The style preview panel (the previewStyles prop) and the preview tiles the kind setup screen
+   embeds: a scrolling card over the map's left edge, under the controls' row; token colours only. */
+.mapstudio-style-panel {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    bottom: 72px;
+    width: 420px;
+    max-width: calc(100% - 16px);
+    overflow-y: auto;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--borderRadius);
+    background: var(--container);
+    color: var(--label);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.mapstudio-style-preview + .mapstudio-style-preview {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+.mapstudio-style-preview-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    margin-bottom: 6px;
+}
+
+.mapstudio-style-preview-kind {
+    font-weight: 600;
+}
+
+.mapstudio-style-preview-rule,
+.mapstudio-style-preview-note,
+.mapstudio-style-case {
+    color: var(--label--disabled);
+    font-size: 12px;
+}
+
+.mapstudio-style-preview-tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+}
+
+.mapstudio-style-tile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 180px;
+    flex: 1 1 180px;
+    padding: 4px 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--borderRadius);
+    background: var(--containerRoot);
+}
+
+.mapstudio-style-sample {
+    flex: 0 0 auto;
+    display: inline-flex;
+    line-height: 0;
+}
+
+.mapstudio-style-sample--point svg {
+    width: 56px;
+    height: 46px;
+}
+
+.mapstudio-style-tile-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.mapstudio-style-preset {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.mapstudio-style-preset-name {
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.mapstudio-style-word {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 0 5px;
+    border: 1px solid var(--neutral-50);
+    border-radius: 3px;
+}
+
+.mapstudio-style-preview-tints {
+    margin-top: 6px;
+}
+
 /* The default popup (AD-7): header, comms with its data age, KPIs, alarms, in that order. */
 .mapstudio-popup--default {
     min-width: 220px;

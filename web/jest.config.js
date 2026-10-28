@@ -4,6 +4,7 @@ module.exports = {
     roots: ['<rootDir>/typescript'],
     testMatch: ['**/__tests__/**/*.test.ts'],
     transform: {
-        '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }]
+        // .tsx too: the style preview (a React component) is unit tested with react-dom/server (epic 3 entry 1).
+        '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }]
     }
 };

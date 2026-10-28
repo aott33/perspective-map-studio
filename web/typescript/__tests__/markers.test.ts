@@ -3,14 +3,17 @@ import path from 'node:path';
 import { ItemState } from '../live';
 import {
     ARROW_IMAGE, CHIP_IMAGE, DISC_CENTER, DOT_IMAGE, MARKER_IMAGE, MARKER_TOKENS, MarkerColors, RANK_ALARM, RANK_COMMS_LOST, RANK_NORMAL,
-    RANK_SELECTED, RANK_STALE, badgeImageId, chipOffsetEm, dotImageId, imageFor, labelRank, lineLook, lineProperties, lineWeight,
-    markerImageId, markerProperties, markerSpec, markerSvg, parseImageId, parseSprite, stateWord, textWidthPx
+    RANK_SELECTED, RANK_STALE, RANK_STYLE, areaProperties, badgeImageId, chipOffsetEm, dotImageId, imageFor, labelRank, lineLook,
+    lineProperties, lineSampleSvg, lineWeight, markerImageId, markerProperties, markerSpec, markerSvg, parseImageId, parseSprite, stateWord,
+    textWidthPx, tintSampleSvg
 } from '../markers';
 
 const COLORS: MarkerColors = {
     disc: 'rgb(255, 255, 255)', glyph: 'rgb(30, 30, 30)', halo: 'rgb(250, 250, 250)', textSecondary: 'rgb(120, 120, 120)',
     line: 'rgb(90, 90, 90)', chipEdge: 'rgb(150, 150, 150)', selection: 'rgb(20, 80, 200)',
-    commsLost: 'rgb(125, 60, 189)', alarm: ['rgb(200, 0, 0)', 'rgb(173, 95, 0)', 'rgb(50, 114, 217)'], font: 'Inter, sans-serif'
+    commsLost: 'rgb(125, 60, 189)', alarm: ['rgb(200, 0, 0)', 'rgb(173, 95, 0)', 'rgb(50, 114, 217)'], font: 'Inter, sans-serif',
+    attention: 'rgb(50, 50, 50)', warning: 'rgb(173, 95, 1)', fault: 'rgb(200, 0, 1)',
+    tints: ['rgb(8, 105, 98)', 'rgb(3, 133, 55)', 'rgb(34, 154, 214)', 'rgb(237, 83, 147)', 'rgb(207, 121, 17)', 'rgb(17, 69, 153)']
 };
 
 const NORMAL: ItemState = { commsLost: false, stale: false, alarm: null, iconKpi: { key: 'pressure', text: '412 psi', stale: false, hasValue: true }, badge: 'normal' };
@@ -33,7 +36,7 @@ function sprite(): Record<string, ReturnType<typeof parseSprite>[string]> {
 const allowedPaints = (svg: string): void => {
     const paints = svg.match(/(?:fill|stroke)="([^"]*)"/g) || [];
     const allowed = new Set(['none', 'currentColor', COLORS.disc, COLORS.glyph, COLORS.halo, COLORS.line, COLORS.chipEdge, COLORS.selection,
-        COLORS.commsLost, ...COLORS.alarm]);
+        COLORS.commsLost, ...COLORS.alarm, COLORS.attention, COLORS.warning, COLORS.fault, ...COLORS.tints]);
     for (const p of paints) {
         expect(allowed.has(p.replace(/^(?:fill|stroke)="/, '').replace(/"$/, ''))).toBe(true);
     }
@@ -44,7 +47,7 @@ describe('marker properties and image ids (epic 3 entries 5 and 7)', () => {
         const props = markerProperties('p1', 'Point 1', 'pad', 'well-pad', NORMAL, { labelRank: 10 });
         expect(props).toMatchObject({ id: 'p1', name: 'Point 1', kind: 'pad', state: 'normal', word: '', kpi: '412 psi', kpiStale: false,
             members: 1, memberIds: '', selected: false });
-        expect(parseImageId(props.marker)).toEqual({ kind: 'marker', spec: { icon: 'well-pad', look: 'normal', badge: '', priority: 0, solid: false, selected: false } });
+        expect(parseImageId(props.marker)).toEqual({ kind: 'marker', spec: { icon: 'well-pad', look: 'normal', badge: '', priority: 0, solid: false, selected: false, preset: 'normal' } });
         expect(props.marker).not.toContain('psi');
         expect(props.dotMid).toBe(dotImageId(11, false));
         expect(props.dotSmall).toBe(dotImageId(7, false));
@@ -57,7 +60,7 @@ describe('marker properties and image ids (epic 3 entries 5 and 7)', () => {
 
     test('comms lost: the comms-lost badge, the word Comms lost, the stale KPI, the marker at every zoom', () => {
         const spec = markerSpec('well-pad', LOST);
-        expect(spec).toEqual({ icon: 'well-pad', look: 'comms-lost', badge: 'comms-lost', priority: 0, solid: false, selected: false });
+        expect(spec).toEqual({ icon: 'well-pad', look: 'comms-lost', badge: 'comms-lost', priority: 0, solid: false, selected: false, preset: 'normal' });
         expect(parseImageId(markerImageId(spec))).toEqual({ kind: 'marker', spec });
         const props = markerProperties('p1', 'Point 1', 'pad', 'well-pad', LOST);
         expect(props).toMatchObject({ word: 'Comms lost', kpi: '412 psi', kpiStale: true, state: 'comms-lost', rank: RANK_COMMS_LOST });
@@ -112,7 +115,10 @@ describe('marker properties and image ids (epic 3 entries 5 and 7)', () => {
         expect(parseImageId('ms:marker:["x"]')).toBeNull();
         expect(parseImageId('ms:marker:nope')).toBeNull();
         expect(parseImageId('other')).toBeNull();
-        expect(parseImageId('ms:marker:["well-pad","odd","",0,false,false]')).toBeNull();
+        expect(parseImageId('ms:marker:["well-pad","odd","",0,false,false,"normal"]')).toBeNull();
+        expect(parseImageId('ms:marker:["well-pad","normal","",0,false,false]')).toBeNull();
+        expect(parseImageId('ms:marker:["well-pad","normal","",0,false,false,"dashed"]')).toBeNull();
+        expect(parseImageId(markerImageId(markerSpec('well-pad', { ...NORMAL, preset: 'fault' })))).toMatchObject({ kind: 'marker', spec: { preset: 'fault' } });
         expect(parseImageId('ms:dot:[0,false]')).toBeNull();
         expect(parseImageId(dotImageId(11, true))).toEqual({ kind: 'dot', size: 11, selected: true });
         expect(parseImageId(badgeImageId('alarm-2-acknowledged', 2, false))).toEqual({ kind: 'badge', badge: 'alarm-2-acknowledged', priority: 2, solid: false });
@@ -132,17 +138,42 @@ describe('line looks (DESIGN.md map-line)', () => {
         expect(lineWeight('12')).toBe(6);
         expect(lineWeight(undefined)).toBe(3);
         expect(lineWeight('x')).toBe(3);
-        expect(lineLook(NORMAL, 6, true)).toEqual({ weight: 4, hue: '', dashed: false, badge: '', priority: 0, solid: false });
+        expect(lineLook(NORMAL, 6, true)).toEqual({ weight: 4, hue: '', dashed: false, dotted: false, dimmed: false, badge: '', priority: 0, solid: false });
         expect(lineLook(NORMAL, 6, false)).toMatchObject({ weight: 2, hue: '', dashed: false });
+    });
+
+    test('a value style on a line: the hue and word, the dashed and dotted patterns, the dimmed fade; an alarm wins; stale drops it (entry 1)', () => {
+        expect(lineLook({ ...NORMAL, preset: 'attention' }, 6, true)).toMatchObject({ hue: 'attention', dashed: false, dotted: false, dimmed: false });
+        expect(lineLook({ ...NORMAL, preset: 'fault' }, 6, true)).toMatchObject({ hue: 'fault' });
+        expect(lineLook({ ...NORMAL, preset: 'dashed' }, 6, true)).toMatchObject({ hue: '', dashed: true, dotted: false });
+        expect(lineLook({ ...NORMAL, preset: 'dotted' }, 6, true)).toMatchObject({ hue: '', dashed: false, dotted: true });
+        expect(lineLook({ ...NORMAL, preset: 'dimmed' }, 6, true)).toMatchObject({ hue: '', dimmed: true });
+        expect(lineLook({ ...NORMAL, preset: 'solid' }, 6, true)).toMatchObject({ hue: '', dashed: false, dotted: false, dimmed: false });
+        const alarmed = lineLook({ ...ALARM, preset: 'warning' }, 6, true);
+        expect(alarmed).toMatchObject({ hue: 'alarm-1', badge: 'alarm-1-unacknowledged' });
+        // Stale or comms lost: dashed in the pipeline grey, the style gone.
+        expect(lineLook({ ...STALE, preset: 'fault' }, 6, true)).toMatchObject({ hue: '', dashed: true, dotted: false });
+        expect(lineLook({ ...LOST, preset: 'dotted' }, 6, true)).toMatchObject({ hue: '', dashed: true, dotted: false });
+        const props = lineProperties('l', 'L', 'line', lineLook({ ...NORMAL, preset: 'warning' }, 6, true), COLORS, false);
+        expect(props).toMatchObject({ color: COLORS.warning, hue: 'warning', dotted: false, dimmed: false });
+        expect(lineProperties('l', 'L', 'line', lineLook({ ...NORMAL, preset: 'attention' }, 6, true), COLORS, false).color).toBe(COLORS.attention);
+        expect(stateWord({ ...NORMAL, preset: 'fault' })).toBe('Fault');
+        expect(stateWord({ ...NORMAL, preset: 'dimmed' })).toBe('Out of service');
+        expect(stateWord({ ...NORMAL, preset: 'dotted' })).toBe('');
+        expect(stateWord({ ...STALE, preset: 'fault' })).toBe('Stale');
+        expect(labelRank({ ...NORMAL, preset: 'fault' }, 0, false)).toBe(RANK_STYLE);
+        expect(labelRank({ ...NORMAL, preset: 'dimmed' }, 0, false)).toBe(104);
+        expect(areaProperties('g', 'G', 'geofence', 'tint-3', COLORS, false)).toEqual({ id: 'g', name: 'G', kind: 'geofence', tint: 'tint-3', color: COLORS.tints[2], selected: false });
+        expect(areaProperties('g', 'G', 'geofence', null, COLORS, true)).toMatchObject({ tint: '', color: COLORS.line });
     });
 
     test('hue only from alarms with the badge at the midpoint; dashed for comms lost or stale', () => {
         const alarm2: ItemState = { ...ALARM, alarm: { priority: 2, unacked: true, active: 2, stale: false } };
-        expect(lineLook(alarm2, 10, true)).toEqual({ weight: 6, hue: 'alarm-2', dashed: false, badge: 'alarm-2-unacknowledged', priority: 2, solid: true });
+        expect(lineLook(alarm2, 10, true)).toEqual({ weight: 6, hue: 'alarm-2', dashed: false, dotted: false, dimmed: false, badge: 'alarm-2-unacknowledged', priority: 2, solid: true });
         expect(lineLook(LOST, 10, true)).toMatchObject({ hue: '', dashed: true, badge: '' });
         expect(lineLook(STALE, 10, true)).toMatchObject({ hue: '', dashed: true });
         const props = lineProperties('l', 'L', 'line', lineLook(alarm2, 10, true), COLORS, true);
-        expect(props).toEqual({ id: 'l', name: 'L', kind: 'line', weight: 6, color: COLORS.alarm[1], hue: 'alarm-2', dashed: false, selected: true });
+        expect(props).toEqual({ id: 'l', name: 'L', kind: 'line', weight: 6, color: COLORS.alarm[1], hue: 'alarm-2', dashed: false, dotted: false, dimmed: false, selected: true });
         expect(lineProperties('l', 'L', 'line', lineLook(LOST, 10, true), COLORS, false).color).toBe(COLORS.line);
     });
 });
@@ -186,11 +217,46 @@ describe('marker images', () => {
         const selected = markerSvg(markerSpec('well-pad', NORMAL, true), symbols, COLORS);
         expect(selected).toContain('stroke="' + COLORS.selection + '"');
 
+        // The value style presets (entry 1): the ring in the preset's token, the dimmed fade; comms lost replaces them.
+        const attention = markerSvg(markerSpec('well-pad', { ...NORMAL, preset: 'attention' }), symbols, COLORS);
+        expect(attention).toContain('stroke="' + COLORS.attention + '" stroke-width="3"');
+        expect(attention).not.toContain('<text');
+        allowedPaints(attention);
+        const warning = markerSvg(markerSpec('well-pad', { ...NORMAL, preset: 'warning' }), symbols, COLORS);
+        expect(warning).toContain('stroke="' + COLORS.warning + '" stroke-width="2.5"');
+        expect(warning).not.toContain(COLORS.alarm[1]);
+        const fault = markerSvg(markerSpec('well-pad', { ...NORMAL, preset: 'fault' }), symbols, COLORS);
+        expect(fault).toContain('stroke="' + COLORS.fault + '"');
+        const dimmed = markerSvg(markerSpec('well-pad', { ...NORMAL, preset: 'dimmed' }), symbols, COLORS);
+        expect(dimmed).toContain('opacity="0.45"');
+        expect(dimmed).toContain('stroke-dasharray="2 2"');
+        expect(dimmed).not.toContain(COLORS.warning);
+        // An alarm over the style: the badge in the alarm hue over the warning ring.
+        const over = markerSvg(markerSpec('well-pad', { ...ALARM, preset: 'warning' }), symbols, COLORS);
+        expect(over).toContain('stroke="' + COLORS.warning + '" stroke-width="2.5"');
+        expect(over).toContain('fill="' + COLORS.alarm[0] + '"');
+        // Comms lost or stale: no preset ring (the spec reads normal).
+        expect(markerSpec('well-pad', { ...LOST, preset: 'fault' }).preset).toBe('normal');
+        expect(markerSvg(markerSpec('well-pad', { ...LOST, preset: 'fault' }), symbols, COLORS)).not.toContain(COLORS.fault);
+        expect(markerSvg(markerSpec('well-pad', { ...NORMAL, preset: 'dashed' }), symbols, COLORS)).toBe(normal);
+
         // An unknown kind glyph falls back to the point glyph; a missing badge glyph draws the disc alone.
         const unknown = markerSvg(markerSpec('nope', NORMAL), symbols, COLORS);
         expect(unknown).toContain(symbols.point.inner.slice(0, 20));
         expect(markerSvg(markerSpec('well-pad', LOST), {}, COLORS)).toContain('stroke-dasharray');
         expect(DISC_CENTER).toEqual([20, 23]);
+    });
+
+    test('the line and tint samples of the preview draw the preset looks from token values only', () => {
+        expect(lineSampleSvg('normal', COLORS)).toContain('stroke="' + COLORS.line + '" stroke-width="4"');
+        expect(lineSampleSvg('warning', COLORS)).toContain('stroke="' + COLORS.warning + '"');
+        expect(lineSampleSvg('dashed', COLORS)).toContain('stroke-dasharray="10 8"');
+        expect(lineSampleSvg('dotted', COLORS)).toContain('stroke-linecap="round"');
+        expect(lineSampleSvg('dimmed', COLORS)).toContain('opacity="0.45"');
+        allowedPaints(lineSampleSvg('fault', COLORS));
+        expect(tintSampleSvg('tint-4', COLORS)).toContain('fill="' + COLORS.tints[3] + '" fill-opacity="0.22"');
+        expect(tintSampleSvg(null, COLORS)).toContain('fill="' + COLORS.line + '"');
+        allowedPaints(tintSampleSvg('tint-1', COLORS));
     });
 
     test('the dot, the badge, the chip and the arrow images', () => {

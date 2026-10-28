@@ -5,13 +5,14 @@
  * result to the sources.
  */
 
-import type { Feature, FeatureCollection, LineString, Point } from 'geojson';
+import type { Feature, FeatureCollection, LineString, Point, Polygon } from 'geojson';
 import { Kind } from './adapters';
 import { MapItemRecord } from './contract';
 import { Position, instrumentsOn, lengthM, pointAt } from './geometry';
-import { ItemState, LiveState, itemState } from './live';
+import { ItemState, LiveState, areaTint, itemState } from './live';
 import {
-    LineProperties, MarkerColors, MarkerProperties, badgeImageId, labelRank, lineLook, lineProperties, markerProperties, stateWord
+    AreaProperties, LineProperties, MarkerColors, MarkerProperties, areaProperties, badgeImageId, labelRank, lineLook, lineProperties,
+    markerProperties, stateWord
 } from './markers';
 import { groupShared, sharedName, sharedState } from './shared';
 
@@ -37,6 +38,8 @@ export interface ArrowProperties {
 export interface MapFeatures {
     points: FeatureCollection<Point, MarkerProperties>;
     lines: FeatureCollection<LineString, LineProperties>;
+    /** The items of area kinds (a line kind with `area: true`), closed, with their category tint (entry 1). */
+    areas: FeatureCollection<Polygon, AreaProperties>;
     marks: FeatureCollection<Point, LineMarkProperties>;
     arrow: FeatureCollection<Point, ArrowProperties>;
     /** The items' bounds as "west,south,east,north" (6 decimals), or '' with no item. */
@@ -89,6 +92,7 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
     kinds.forEach((k) => kindById.set(k.id, k));
     const points: Array<Feature<Point, MarkerProperties>> = [];
     const lines: Array<Feature<LineString, LineProperties>> = [];
+    const areas: Array<Feature<Polygon, AreaProperties>> = [];
     const marks: Array<Feature<Point, LineMarkProperties>> = [];
     const arrow: Array<Feature<Point, ArrowProperties>> = [];
     let west = Infinity;
@@ -141,6 +145,23 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
         const kind = kindById.get(item.kind);
         const state = stateOf(item);
         const isSelected = selected !== null && selected.kind === 'line' && selected.id === item.id;
+        if (kind && kind.area) {
+            // An area: a closed fill in its category tint (areas only, AD-11) and its outline; no pipeline look.
+            if (coords.length >= 3) {
+                const ring = coords.slice();
+                const first = ring[0];
+                const last = ring[ring.length - 1];
+                if (first[0] !== last[0] || first[1] !== last[1]) {
+                    ring.push(first);
+                }
+                areas.push({
+                    type: 'Feature',
+                    properties: areaProperties(item.id, item.name, item.kind, areaTint(live.display[item.kind], item.properties), colors, isSelected),
+                    geometry: { type: 'Polygon', coordinates: [ring] }
+                });
+            }
+            continue;
+        }
         const look = lineLook(state, item.properties ? item.properties.diameter : undefined, instrumentsOn(live_, item.id).length > 0);
         lines.push({
             type: 'Feature',
@@ -168,6 +189,7 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
     return {
         points: { type: 'FeatureCollection', features: points },
         lines: { type: 'FeatureCollection', features: lines },
+        areas: { type: 'FeatureCollection', features: areas },
         marks: { type: 'FeatureCollection', features: marks },
         arrow: { type: 'FeatureCollection', features: arrow },
         boundsKey: bounds ? bounds.map((n) => n.toFixed(6)).join(',') : '',

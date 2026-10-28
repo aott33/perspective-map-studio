@@ -32,13 +32,55 @@ export interface SlotProblem {
     reason: string;
 }
 
+/** The closed preset list (common/.../StylePresets.java): the first five for every kind, the last three for lines. */
+export const PRESETS = ['normal', 'attention', 'warning', 'fault', 'dimmed', 'solid', 'dashed', 'dotted'] as const;
+export type Preset = typeof PRESETS[number];
+/** The presets a point takes (a line preset on a point is read as normal). */
+export type PointPreset = 'normal' | 'attention' | 'warning' | 'fault' | 'dimmed';
+/** The closed tint palette (common/.../StylePresets.java). */
+export const TINTS = ['tint-1', 'tint-2', 'tint-3', 'tint-4', 'tint-5', 'tint-6'] as const;
+export type Tint = typeof TINTS[number];
+
+/**
+ * The style slot (epic 3 entry 1, docs/contract.md): the preset the kind's (or the item's own)
+ * style rule gives, worked out on the Gateway; `normal` marked stale with the reason while the
+ * rule's source is stale, so the map draws the stale look alone.
+ */
+export interface StyleSlot {
+    preset: Preset;
+    stale: boolean;
+    reason: string;
+}
+
 /** One map item's values as a batch carries them. */
 export interface ItemValues {
     id: string;
     comms?: LiveValue;
     kpis: Record<string, LiveValue>;
     alarms?: LiveValue;
+    /** Present only for an item with a style rule. */
+    style?: StyleSlot;
     problems: SlotProblem[];
+}
+
+/** One case of a style rule as the display lists it: the words of the case and its preset. */
+export interface RuleCase {
+    label: string;
+    preset: Preset;
+}
+
+/** The path-free projection of a style rule (common/.../StyleRule.java, `display`). */
+export interface RuleDisplay {
+    type: 'states' | 'bands' | 'expression' | 'instruments';
+    /** `kpi:<key>`, `tag` or `instruments`; never a path. */
+    source: string;
+    cases: RuleCase[];
+}
+
+/** An area kind's category tints: the property read and the tint of each category. */
+export interface AreaTints {
+    property: string;
+    tints: Array<{ category: string; tint: Tint }>;
 }
 
 /** The path-free projection of a kind setup (common/.../KindDisplay.java). */
@@ -48,6 +90,79 @@ export interface KindDisplay {
     kpis: Array<{ key: string; label: string; unit: string; icon: boolean; on: boolean }>;
     alarms: { on: boolean; count: boolean; summary: boolean };
     link: string;
+    /** The kind's style rule, when it has one (epic 3 entry 1). */
+    styleRule?: RuleDisplay;
+    /** An area kind's category tints, when it has them. */
+    areaTints?: AreaTints;
+}
+
+export function isPreset(value: unknown): value is Preset {
+    return typeof value === 'string' && (PRESETS as readonly string[]).indexOf(value) >= 0;
+}
+
+export function isTint(value: unknown): value is Tint {
+    return typeof value === 'string' && (TINTS as readonly string[]).indexOf(value) >= 0;
+}
+
+/** The style slot of a batch item, or null when it is not one. */
+export function readStyleSlot(value: unknown): StyleSlot | null {
+    if (!isRecord(value) || !isPreset(value.preset) || typeof value.stale !== 'boolean') {
+        return null;
+    }
+    return { preset: value.preset, stale: value.stale, reason: typeof value.reason === 'string' ? value.reason : '' };
+}
+
+/** A rule's display, or null when it is not one; a case with an unknown preset is left out. */
+export function readRuleDisplay(value: unknown): RuleDisplay | null {
+    if (!isRecord(value) || typeof value.type !== 'string' || !Array.isArray(value.cases)) {
+        return null;
+    }
+    if (value.type !== 'states' && value.type !== 'bands' && value.type !== 'expression' && value.type !== 'instruments') {
+        return null;
+    }
+    const cases: RuleCase[] = [];
+    for (const c of value.cases) {
+        if (isRecord(c) && typeof c.label === 'string' && isPreset(c.preset)) {
+            cases.push({ label: c.label, preset: c.preset });
+        }
+    }
+    return { type: value.type, source: typeof value.source === 'string' ? value.source : 'tag', cases };
+}
+
+/** An area kind's tints, or null; a category with an unknown tint is left out. */
+export function readAreaTints(value: unknown): AreaTints | null {
+    if (!isRecord(value) || typeof value.property !== 'string' || !Array.isArray(value.tints)) {
+        return null;
+    }
+    const tints: AreaTints['tints'] = [];
+    for (const t of value.tints) {
+        if (isRecord(t) && typeof t.category === 'string' && isTint(t.tint)) {
+            tints.push({ category: t.category, tint: t.tint });
+        }
+    }
+    return { property: value.property, tints };
+}
+
+/**
+ * The tint of an area from its properties and its kind's tints (AD-11: areas only; points and
+ * lines never take one): the tint of the category the property holds, or null (no tints, the
+ * property not set, or a category with no tint: the neutral area look).
+ */
+export function areaTint(display: KindDisplay | undefined, properties: Record<string, unknown> | undefined): Tint | null {
+    if (!display || !display.areaTints || !properties) {
+        return null;
+    }
+    const raw = properties[display.areaTints.property];
+    if (raw === null || raw === undefined) {
+        return null;
+    }
+    const category = String(raw);
+    for (const t of display.areaTints.tints) {
+        if (t.category === category) {
+            return t.tint;
+        }
+    }
+    return null;
 }
 
 export interface ValuesBatchBody {
@@ -105,6 +220,10 @@ function readItem(value: unknown): ItemValues | null {
     if (alarms) {
         item.alarms = alarms;
     }
+    const style = readStyleSlot(value.style);
+    if (style) {
+        item.style = style;
+    }
     if (Array.isArray(value.problems)) {
         for (const p of value.problems) {
             if (isRecord(p) && typeof p.slot === 'string' && typeof p.reason === 'string') {
@@ -134,13 +253,22 @@ export function readKindDisplay(value: unknown): KindDisplay | null {
         }
     }
     const alarms = isRecord(value.alarms) ? value.alarms : {};
-    return {
+    const display: KindDisplay = {
         kindId: value.kindId,
         comms: value.comms === true,
         kpis,
         alarms: { on: alarms.on === true, count: alarms.count !== false, summary: alarms.summary !== false },
         link: typeof value.link === 'string' ? value.link : ''
     };
+    const rule = readRuleDisplay(value.styleRule);
+    if (rule) {
+        display.styleRule = rule;
+    }
+    const tints = readAreaTints(value.areaTints);
+    if (tints) {
+        display.areaTints = tints;
+    }
+    return display;
 }
 
 /** The body of a values.batch, or null when it is malformed (no seq, full or items). Bad items are left out. */
@@ -193,6 +321,16 @@ export interface ItemState {
     iconKpi: { key: string; text: string; stale: boolean; hasValue: boolean } | null;
     /** `comms-lost`, `alarm` or `normal`: what the badge draws (an alarm draws over comms lost). */
     badge: 'alarm' | 'comms-lost' | 'stale' | 'normal';
+    /**
+     * The value style (epic 3 entry 1): the style rule's preset, `normal` without a rule, while the
+     * rule's source is stale (the item then draws only as stale), or when the slot is absent.
+     */
+    preset?: Preset;
+}
+
+/** The preset an item draws: `normal` unless its style slot carries a fresh one. */
+export function itemPreset(state: ItemState): Preset {
+    return state.preset || 'normal';
 }
 
 export function alarmSummary(value: unknown): AlarmSummary | null {
@@ -205,7 +343,7 @@ export function alarmSummary(value: unknown): AlarmSummary | null {
 
 /** The state of an item from its values and its kind's display (null display: nothing shows). */
 export function itemState(values: ItemValues | undefined, display: KindDisplay | undefined): ItemState {
-    const none: ItemState = { commsLost: false, stale: false, alarm: null, iconKpi: null, badge: 'normal' };
+    const none: ItemState = { commsLost: false, stale: false, alarm: null, iconKpi: null, badge: 'normal', preset: 'normal' };
     if (!values || !display) {
         return none;
     }
@@ -240,8 +378,18 @@ export function itemState(values: ItemValues | undefined, display: KindDisplay |
             };
         }
     }
+    // The value style: the Gateway sends normal while the rule's source is stale (the style drops
+    // until a fresh value arrives); a stale source makes the item stale like any other slot.
+    let preset: Preset = 'normal';
+    if (values.style) {
+        if (values.style.stale) {
+            stale = true;
+        } else {
+            preset = values.style.preset;
+        }
+    }
     const badge: ItemState['badge'] = alarm ? 'alarm' : commsLost ? 'comms-lost' : stale ? 'stale' : 'normal';
-    return { commsLost, stale, alarm, iconKpi, badge };
+    return { commsLost, stale, alarm, iconKpi, badge, preset };
 }
 
 /** A value with its unit as the popup and the icon show it: numbers at most one decimal, booleans On and Off. */
