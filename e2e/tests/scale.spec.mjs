@@ -57,13 +57,13 @@ editorTest('the seed is safe to re-run and restores a deleted seed item', async 
 
     const first = await runSeed(page);
     expect(first.error).toBeUndefined();
-    expect(first.created + first.updated + first.restored + first.unchanged).toBe(64);
+    expect(first.created + first.updated + first.restored + first.unchanged).toBe(66);
     expect(first.scale).toEqual({ pads: 30, lines: 30 });
-    expect(Object.keys(first.ids)).toHaveLength(64);
+    expect(Object.keys(first.ids)).toHaveLength(66);
     for (const id of Object.values(first.ids)) expect(id).toMatch(UUID5);
 
     const second = await runSeed(page);
-    expect(second).toMatchObject({ created: 0, updated: 0, restored: 0, unchanged: 64, seq: null,
+    expect(second).toMatchObject({ created: 0, updated: 0, restored: 0, unchanged: 66, seq: null,
         scale: { pads: 30, lines: 30 } });
     expect(second.ids).toEqual(first.ids);
 
@@ -78,20 +78,20 @@ editorTest('the seed is safe to re-run and restores a deleted seed item', async 
     expect(deleted.type, JSON.stringify(deleted.body)).toBe('edits.apply.reply');
 
     const third = await runSeed(page);
-    expect(third).toMatchObject({ created: 0, updated: 0, restored: 1, unchanged: 63, scale: { pads: 30, lines: 30 } });
+    expect(third).toMatchObject({ created: 0, updated: 0, restored: 1, unchanged: 65, scale: { pads: 30, lines: 30 } });
     expect(third.seq).toBeGreaterThan(0);
     const fourth = await runSeed(page);
-    expect(fourth).toMatchObject({ restored: 0, unchanged: 64, seq: null, scale: { pads: 30, lines: 30 } });
+    expect(fourth).toMatchObject({ restored: 0, unchanged: 66, seq: null, scale: { pads: 30, lines: 30 } });
 });
 
 test('/ draws the seeded 30-pad set and the tracer from the map store', async ({ page, browser }) => {
     await ensureSeeded(browser);
     const map = await openMap(page, '/');
     await mapLoaded(map);
-    // Read back from MapLibre's own item sources by the component: the 33 seeded pads and 31 lines,
-    // plus any other spec's items inside the view.
+    // Read back from MapLibre's own item sources by the component: the 33 seeded pads, the shared pair as
+    // one marker (epic 3 entry 7) and 31 lines, plus any other spec's items inside the view.
     const counts = await loadedCounts(map);
-    expect(counts.points).toBeGreaterThanOrEqual(33);
+    expect(counts.points).toBeGreaterThanOrEqual(34);
     expect(counts.lines).toBeGreaterThanOrEqual(31);
     await nextFrames(page);
     mkdirSync(screenshotDir, { recursive: true });

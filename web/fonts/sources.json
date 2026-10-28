@@ -1,0 +1,23 @@
+{
+    "licence": "OFL-1.1",
+    "licenceFile": "OFL.txt",
+    "copyright": "Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic)",
+    "family": "Noto Sans",
+    "why": "The face the Perspective default theme names, so the map's text matches the host's (epic 3 entry 7, plan decision 1).",
+    "fonts": [
+        {
+            "file": "NotoSans-SemiBold.ttf",
+            "stack": "NotoSans-SemiBold",
+            "weight": 600,
+            "uses": "item names (map-label 12/600) and the icon KPI (11/600)",
+            "from": "Google Fonts, the static wght 600 instance of Noto Sans v42 (fonts.googleapis.com/css2?family=Noto+Sans:wght@600)"
+        },
+        {
+            "file": "NotoSans-Medium.ttf",
+            "stack": "NotoSans-Medium",
+            "weight": 500,
+            "uses": "the state word chip (state-word 11/500)",
+            "from": "Google Fonts, the static wght 500 instance of Noto Sans v42 (fonts.googleapis.com/css2?family=Noto+Sans:wght@500)"
+        }
+    ]
+}

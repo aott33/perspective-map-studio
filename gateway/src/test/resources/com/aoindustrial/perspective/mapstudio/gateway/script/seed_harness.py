@@ -135,17 +135,18 @@ def check(condition, text):
 def row_first_run():
     api, r = seeded()
     check('error' not in r, 'error %s' % r.get('error'))
-    check((r['created'], r['updated'], r['restored'], r['unchanged'], r['seq']) == (64, 0, 0, 0, 1), str(r))
-    check(len(api.batches) == 1 and len(api.batches[0]['ops']) == 65, 'one batch of 64 item ops and the pad kind setup')
+    check((r['created'], r['updated'], r['restored'], r['unchanged'], r['seq']) == (66, 0, 0, 0, 1), str(r))
+    check(len(api.batches) == 1 and len(api.batches[0]['ops']) == 67, 'one batch of 66 item ops and the pad kind setup')
     check(all([op['op'] == 'create' and op['baseVersion'] == 0 for op in api.batches[0]['ops']]), 'creates at 0')
-    check(api.batches[0]['ops'][64] == {'op': 'create', 'entity': 'kindSetup', 'id': 'pad', 'baseVersion': 0,
+    check(api.batches[0]['ops'][66] == {'op': 'create', 'entity': 'kindSetup', 'id': 'pad', 'baseVersion': 0,
                                         'data': {'setup': PAD_SETUP}}, 'the kind setup op is last')
     check(r['kindSetup'] == 'created' and api.kind_setups['pad']['setup'] == PAD_SETUP, 'the pad kind setup is seeded')
     # The tracer's points are linked to the dev assets; the scale set's pads are not.
     check(api.records['tracer/p1']['assetId'] == 'P12' and api.records['tracer/p3']['assetId'] == 'P15', 'asset links')
     check('assetId' not in api.records['scale/pad-7'], 'the scale set stays unlinked')
     check(r['scale'] == {'pads': 30, 'lines': 30}, 'scale %s' % r['scale'])
-    check(r['ids']['tracer/p1'] == 'tracer/p1' and len(r['ids']) == 64, 'ids')
+    check(r['ids']['tracer/p1'] == 'tracer/p1' and len(r['ids']) == 66, 'ids')
+    check(api.records['shared/a']['name'] == 'Shared A' and api.records['shared/b']['kind'] == 'pad', 'the shared pair')
     pad = api.records['scale/pad-7']
     check(pad['kind'] == 'pad' and pad['name'] == 'Pad 7' and pad['properties'] == {'status': 'producing'}, str(pad))
     check(api.records['tracer/l1']['geometry']['type'] == 'LineString', 'tracer line')
@@ -155,7 +156,7 @@ def row_first_run():
 def row_rerun_unchanged():
     api, first = seeded()
     r = run(api=api, make_id=make_id, new_batch=_Batches())
-    check((r['unchanged'], r['seq'], r['created'], r['updated']) == (64, None, 0, 0), str(r))
+    check((r['unchanged'], r['seq'], r['created'], r['updated']) == (66, None, 0, 0), str(r))
     check(len(api.batches) == 1, 'no batch sent')
     check(r['kindSetup'] == 'unchanged', 'the kind setup compares equal: %s' % r['kindSetup'])
     # An editor's change to the pad kind setup is put back at its stored version; a tracer point
@@ -167,7 +168,7 @@ def row_rerun_unchanged():
     check(len(ops) == 2 and ops[0]['id'] == 'tracer/p2' and ops[0]['data']['assetId'] == 'P14', str(ops))
     check(ops[1] == {'op': 'update', 'entity': 'kindSetup', 'id': 'pad', 'baseVersion': 5, 'data': {'setup': PAD_SETUP}},
           str(ops[1]))
-    check(again['kindSetup'] == 'updated' and again['updated'] == 1 and again['unchanged'] == 63, str(again))
+    check(again['kindSetup'] == 'updated' and again['updated'] == 1 and again['unchanged'] == 65, str(again))
     check(r['scale'] == {'pads': 30, 'lines': 30}, 'scale %s' % r['scale'])
     return 'ok'
 
@@ -180,7 +181,7 @@ def row_rerun_edited():
     ops = api.batches[-1]['ops']
     check(len(ops) == 1 and ops[0]['op'] == 'update' and ops[0]['baseVersion'] == 3, str(ops))
     check(sorted(ops[0]['data'].keys()) == ['geometry', 'kind', 'name', 'properties'], str(ops[0]['data']))
-    check((r['updated'], r['unchanged'], r['created'], r['seq']) == (1, 63, 0, 2), str(r))
+    check((r['updated'], r['unchanged'], r['created'], r['seq']) == (1, 65, 0, 2), str(r))
     pad = api.records['scale/pad-7']
     check(pad['name'] == 'Pad 7' and pad['properties'] == {'status': 'producing'} and pad['version'] == 4, str(pad))
     return 'ok'
@@ -196,7 +197,7 @@ def row_rerun_deleted():
     check(refused['op'] == 'create' and refused['baseVersion'] == 0, str(refused))
     check(restore['op'] == 'create' and restore['baseVersion'] == 4 and restore['id'] == 'scale/pad-7', str(restore))
     check(api.batches[1]['batchId'] != api.batches[2]['batchId'], 'a new batchId for the restore')
-    check((r['restored'], r['created'], r['updated'], r['unchanged'], r['seq']) == (1, 0, 0, 63, 2), str(r))
+    check((r['restored'], r['created'], r['updated'], r['unchanged'], r['seq']) == (1, 0, 0, 65, 2), str(r))
     pad = api.records['scale/pad-7']
     check(not pad['deleted'] and pad['version'] == 5 and pad['name'] == 'Pad 7', str(pad))
     check(r['scale'] == {'pads': 30, 'lines': 30}, 'scale %s' % r['scale'])
@@ -233,16 +234,16 @@ def row_kind_list_down():
 def plan_is_pure():
     seed = seed_items(make_id)
     plan = plan_ops([], seed)
-    check(len(plan['ops']) == 64 and plan['unchanged'] == 0, 'all creates')
+    check(len(plan['ops']) == 66 and plan['unchanged'] == 0, 'all creates')
     stored = [dict(op['data'], id=op['id'].upper(), version=1, deleted=False) for op in plan['ops']]
     # Letter case of ids does not matter (the Gateway answers lower case), and coordinates compare at 6 decimals.
     stored[0]['geometry'] = {'type': 'Point', 'coordinates': [stored[0]['geometry']['coordinates'][0] + 0.0000001,
                                                              stored[0]['geometry']['coordinates'][1]]}
     again = plan_ops(stored, [dict(i, id=i['id'].upper()) for i in seed])
-    check(again['ops'] == [] and again['unchanged'] == 64, str(again['ops'][:1]))
+    check(again['ops'] == [] and again['unchanged'] == 66, str(again['ops'][:1]))
     names = [i['name'] for i in seed]
     check(names.count('Pad 1') == 1 and 'Line to Pad 30' in names and 'Tracer line' in names, 'names')
-    check(len([i for i in seed if i['kind'] == 'pad']) == 33 and len([i for i in seed if i['kind'] == 'line']) == 31,
+    check(len([i for i in seed if i['kind'] == 'pad']) == 35 and len([i for i in seed if i['kind'] == 'line']) == 31,
           'kinds')
     return 'ok'
 

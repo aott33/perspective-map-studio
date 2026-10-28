@@ -405,3 +405,99 @@
 .mapstudio .maplibregl-ctrl-attrib a {
     color: var(--label);
 }
+
+/* Fit and Return (epic 3 entry 7, R5): a control group under the zoom buttons, top-right, with the
+   two names in words; Fit stays pressed while it keeps, Return is disabled with nothing selected.
+   Token colours only (AD-11); nothing in the bottom-right corner (DESIGN.md). */
+.mapstudio .mapstudio-fit-group {
+    display: flex;
+    flex-direction: row;
+}
+
+.mapstudio .mapstudio-fit-control {
+    width: auto;
+    height: 29px;
+    padding: 0 10px;
+    border: none;
+    background: var(--container);
+    color: var(--label);
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.mapstudio .mapstudio-fit-control + .mapstudio-fit-control {
+    border-left: 1px solid var(--border);
+}
+
+.mapstudio .mapstudio-fit-control:hover:not(:disabled) {
+    background: var(--neutral-30);
+}
+
+.mapstudio .mapstudio-fit-control--on {
+    background: var(--callToActionHighlight);
+    color: var(--callToAction);
+    box-shadow: inset 0 0 0 1px var(--callToAction);
+}
+
+.mapstudio .mapstudio-fit-control:disabled {
+    color: var(--label--disabled);
+    cursor: not-allowed;
+}
+
+/* The pick list of a shared marker (entry 7): one row per map item, each a button. */
+.mapstudio-popup--pick {
+    min-width: 200px;
+    max-width: 320px;
+    padding: 8px 0 4px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.mapstudio-pick-title {
+    padding: 0 28px 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--label--disabled);
+    border-bottom: 1px solid var(--border);
+}
+
+.mapstudio-pick-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 32px;
+    padding: 4px 12px;
+    border: none;
+    background: var(--container);
+    color: var(--label);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.mapstudio-pick-row:hover {
+    background: var(--neutral-30);
+}
+
+.mapstudio-pick-name {
+    flex: 1 1 auto;
+    font-weight: 600;
+}
+
+.mapstudio-pick-kind,
+.mapstudio-pick-state {
+    flex: 0 0 auto;
+    font-size: 12px;
+    color: var(--label--disabled);
+}
+
+.mapstudio-pick-row[data-state="comms-lost"] .mapstudio-pick-state {
+    color: var(--mapstudio-comms-lost);
+}
+
+.mapstudio-pick-row[data-state="alarm"] .mapstudio-pick-state {
+    color: var(--mapstudio-alarm-1);
+}
