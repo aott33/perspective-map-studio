@@ -169,7 +169,8 @@ editorTest.describe('1440 px', () => {
             await expect(kpis.nth(0)).toHaveAttribute('data-stale', 'true');
             await expect(kpis.nth(0).locator('.mapstudio-popup-value')).toHaveText('Stale - 950 psi (comms lost)');
             await expect(popup.locator('[data-part="alarms"]')).toHaveAttribute('data-stale', 'true');
-            const token = await popup.locator('[data-part="comms"]').evaluate((el) => {
+            // The token sits on the value (the word), the label keeping the secondary colour (entry 8, P4).
+            const token = await popup.locator('[data-part="comms"] .mapstudio-popup-value').evaluate((el) => {
                 const lost = getComputedStyle(el).color;
                 const expected = getComputedStyle(el.closest('.mapstudio')).getPropertyValue('--mapstudio-comms-lost').trim();
                 return { lost, expected };
