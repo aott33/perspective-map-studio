@@ -238,6 +238,8 @@ export function merge(nomodule, main) {
         percentileMethod: PERCENTILE_METHOD,
         limits: LIMITS,
         planned: PLANNED,
+        // The measures taken (ops/perf.sh --only, epic 3 entry 4): null for every measure.
+        only: main && Array.isArray(main.only) ? main.only : null,
         env: { main: main ? main.env : null, nomodule: nomodule ? nomodule.env : null },
         measures: { ...m }
     };

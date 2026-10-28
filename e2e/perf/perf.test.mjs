@@ -222,3 +222,10 @@ test('compare --only keeps the rows of the wanted measures', () => {
     assert.equal(compare(a, b).length, 5);
     assert.equal(compare(a, b, null).length, 5);
 });
+
+test('merge carries the --only selection of the main phase into the result', () => {
+    const main = { phase: 'main', only: ['edits.apply'], env: {}, measures: {} };
+    assert.deepEqual(merge(null, main).only, ['edits.apply']);
+    assert.equal(merge(null, { phase: 'main', env: {}, measures: {} }).only, null);
+    assert.equal(merge(null, { phase: 'main', only: null, env: {}, measures: {} }).only, null);
+});
