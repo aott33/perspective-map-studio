@@ -43,7 +43,8 @@ import { FIT_PADDING_PX, StartingArea, readStartingArea, startingAreaKey } from 
 import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, itemState } from './live';
 import {
     ARROW_IMAGE, CHIP_IMAGE, CHIP_PADDING, CHIP_SIZE, DISC_CENTER, FONT_CHIP, FONT_NAME, HALO_WIDTH, KPI_SIZE, KPI_TOP_PX,
-    MARKER_IMAGE, MARKER_TOKENS, MarkerColors, NAME_SIZE, NAME_TOP_PX, SpriteSymbol, ZOOM_DOT, ZOOM_KPI, ZOOM_NAME, imageFor,
+    LINE_CHIP_OFFSET_BADGE_EM, LINE_CHIP_OFFSET_EM, MARKER_IMAGE, MARKER_TOKENS, MarkerColors, NAME_SIZE, NAME_TOP_PX, SpriteSymbol,
+    TEXT_PADDING, ZOOM_DOT, ZOOM_KPI, ZOOM_NAME, imageFor,
     markerProperties, parseSprite, stateWord, textWidthPx
 } from './markers';
 import { MapFeatures, Selection, buildFeatures } from './features';
@@ -62,7 +63,7 @@ import {
 } from './unsaved';
 import { UnsavedSender } from './unsavedSender';
 import { AuthorParams, PopupPoint, popupMaxWidth, popupMountPath } from './popupParams';
-import { registerTestHook, takeTestReply } from './testHook';
+import { registerTestHook, registerTestView, takeTestReply } from './testHook';
 import { drawColor, themeColor } from './theme';
 import { Kind } from './adapters';
 
@@ -763,11 +764,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private queuedFeatures: Array<string | number> = [];
     /** The theme colours the marker images are drawn with, read once at mount. */
     private markerColors: MarkerColors | null = null;
-    /** The sprite's symbols once fetched; null before, so images wait in pendingImages. */
+    /** The sprite's symbols once fetched (empty when the fetch failed); null before. */
     private symbols: Record<string, SpriteSymbol> | null = null;
-    private spriteFailed = false;
-    private pendingImages = new Set<string>();
-    private madeImages = new Set<string>();
+    /** The sprite's fetch, shared by every image asked for before it arrived. */
+    private sprite: Promise<Record<string, SpriteSymbol>> | null = null;
+    /** The images made or being made, by id, so an id is drawn once. */
+    private madeImages = new Map<string, Promise<void>>();
     /** The live revision last drawn into the markers. */
     private drawnLive = -1;
     /** The selection last drawn (its id and kind), so a changed selection redraws the sources once. */
@@ -883,7 +885,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 layout: { 'line-cap': 'round', 'line-join': 'round' },
                 paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'weight'] }
             });
-            map.on('styleimagemissing', (ev: { id: string }) => this.makeImage(ev.id));
+            // MapLibre awaits the resolver's promise before it treats an image as missing, so the
+            // images drawn from the sprite are in place when the symbols are laid out.
+            map.setMissingStyleImageResolver((id) => this.makeImage(id));
             this.loadSprite();
             map.addSource(SOURCE_UNSAVED_LINES, { type: 'geojson', data: empty.lines });
             map.addSource(SOURCE_UNSAVED_POINTS, { type: 'geojson', data: empty.points });
@@ -926,6 +930,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.drawControl = new DrawControl(this.toggleDrawing);
         map.addControl(this.drawControl, 'top-right');
         this.map = map;
+        registerTestView((view) => {
+            if (this.map === map) {
+                map.jumpTo({ center: view.center, zoom: view.zoom });
+            }
+        });
         this.applyEditing();
         if (typeof window !== 'undefined') {
             window.addEventListener('storage', this.onStorage);
@@ -971,6 +980,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 'text-anchor': 'top',
                 'text-offset': [0, KPI_TOP_PX / KPI_SIZE],
                 'text-max-width': 14,
+                'text-padding': TEXT_PADDING,
                 'text-allow-overlap': false,
                 'text-ignore-placement': false,
                 'symbol-sort-key': ['get', 'rank']
@@ -992,6 +1002,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 'icon-image': CHIP_IMAGE,
                 'icon-text-fit': 'both',
                 'icon-text-fit-padding': CHIP_PADDING,
+                'text-padding': TEXT_PADDING,
+                // The chip's box is the stretched image (the text plus CHIP_PADDING); no more padding round it.
+                'icon-padding': 0,
                 'text-allow-overlap': false,
                 'icon-allow-overlap': false,
                 'text-optional': false,
@@ -1012,6 +1025,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 'text-anchor': 'top',
                 'text-offset': [0, NAME_TOP_PX / NAME_SIZE],
                 'text-max-width': 14,
+                'text-padding': TEXT_PADDING,
                 'text-allow-overlap': false,
                 'text-ignore-placement': false,
                 'symbol-sort-key': ['get', 'rank']
@@ -1028,11 +1042,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 'text-font': [FONT_CHIP],
                 'text-size': CHIP_SIZE,
                 'text-anchor': 'center',
-                // Under the badge when the line has one.
-                'text-offset': ['case', ['!=', ['get', 'badge'], ''], ['literal', [0, 1.6]], ['literal', [0, 0]]],
+                // Under the line, and under the badge when the line has one (the arrow sits at the midpoint).
+                'text-offset': ['case', ['!=', ['get', 'badge'], ''], ['literal', [0, LINE_CHIP_OFFSET_BADGE_EM]],
+                    ['literal', [0, LINE_CHIP_OFFSET_EM]]],
                 'icon-image': CHIP_IMAGE,
                 'icon-text-fit': 'both',
                 'icon-text-fit-padding': CHIP_PADDING,
+                'text-padding': TEXT_PADDING,
+                'icon-padding': 0,
                 'text-allow-overlap': false,
                 'icon-allow-overlap': false,
                 'text-optional': false,
@@ -1070,6 +1087,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 'icon-offset': iconOffset,
                 'icon-allow-overlap': true,
                 'icon-ignore-placement': false,
+                // The image's own box is what the text keeps clear of; no padding round it.
+                'icon-padding': 0,
                 // Drawn in rank order with the abnormal ones on top (lower keys draw first).
                 'symbol-sort-key': ['-', 1000, ['get', 'rank']]
             }
@@ -1239,7 +1258,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         add(LAYER_ITEM_NAMES, (p) => str(p.name), (_p, x, y, w) => [x - w / 2, y + NAME_TOP_PX]);
         add(LAYER_ITEM_CHIPS, (p) => str(p.word), (p, x, y) => [x + Number(p.chipOffset) * CHIP_SIZE - CHIP_PADDING[3], y + NAME_TOP_PX]);
         add(LAYER_ITEM_KPI, (p) => str(p.kpi), (_p, x, y, w) => [x - w / 2, y + KPI_TOP_PX]);
-        add(LAYER_LINE_CHIPS, (p) => str(p.label), (p, x, y, w) => [x - w / 2 - CHIP_PADDING[3], y - 8 + (str(p.badge) ? 1.6 * CHIP_SIZE : 0)]);
+        add(LAYER_LINE_CHIPS, (p) => str(p.label), (p, x, y, w) => [x - w / 2 - CHIP_PADDING[3],
+            y - 8 + (str(p.badge) ? LINE_CHIP_OFFSET_BADGE_EM : LINE_CHIP_OFFSET_EM) * CHIP_SIZE]);
         // The chip's box takes its padding.
         for (const b of boxes) {
             if (b.layer === LAYER_ITEM_CHIPS || b.layer === LAYER_LINE_CHIPS) {
@@ -1438,79 +1458,86 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     }
 
-    /** Fetch the sprite once; the images asked for meanwhile are made when it arrives. */
-    private loadSprite(): void {
-        if (typeof fetch !== 'function') {
-            this.spriteFailed = true;
-            return;
+    /** Fetch the sprite once; an image asked for meanwhile waits for it (a failed fetch draws the markers without glyphs). */
+    private loadSprite(): Promise<Record<string, SpriteSymbol>> {
+        if (this.sprite) {
+            return this.sprite;
         }
-        fetch(SPRITE_URL).then((res) => {
+        if (typeof fetch !== 'function') {
+            this.sprite = Promise.resolve({});
+            return this.sprite;
+        }
+        this.sprite = fetch(SPRITE_URL).then((res) => {
             if (!res.ok) {
                 throw new Error('HTTP ' + res.status);
             }
             return res.text();
         }).then((text) => {
             this.symbols = parseSprite(text);
-            const pending = Array.from(this.pendingImages);
-            this.pendingImages.clear();
-            pending.forEach((id) => this.makeImage(id));
+            return this.symbols;
         }).catch((err) => {
-            this.spriteFailed = true;
             console.warn('[MapStudio] The icon sprite could not be loaded (' + String(err && err.message ? err.message : err)
                 + '); markers draw without glyphs.');
-            const pending = Array.from(this.pendingImages);
-            this.pendingImages.clear();
-            pending.forEach((id) => this.makeImage(id));
+            this.symbols = {};
+            return this.symbols;
         });
+        return this.sprite;
     }
 
     /**
-     * MapLibre asked for a marker image (styleimagemissing): draw it from the sprite and the theme
-     * tokens at the device pixel ratio and add it; a second ask for the same id is ignored.
+     * MapLibre asked for an image it does not have (the missing image resolver): draw it from the
+     * sprite and the theme tokens at the device pixel ratio and add it. The promise settles once the
+     * image is in the map (MapLibre waits for it before laying the symbols out); a second ask for the
+     * same id shares the first's promise.
      */
-    private makeImage(id: string): void {
+    private makeImage(id: string): Promise<void> {
         const map = this.map;
-        if (!map || !this.markerColors || this.madeImages.has(id)) {
-            return;
+        const colors = this.markerColors;
+        if (!map || !colors) {
+            return Promise.resolve();
         }
-        if (!this.symbols && !this.spriteFailed) {
-            this.pendingImages.add(id);
-            return;
+        const made = this.madeImages.get(id);
+        if (made) {
+            return made;
         }
-        const spec = imageFor(id, this.symbols || {}, this.markerColors);
-        if (!spec) {
-            return;
-        }
-        this.madeImages.add(id);
-        const ratio = typeof window !== 'undefined' && window.devicePixelRatio ? Math.min(3, window.devicePixelRatio) : 1;
-        const image = new Image();
-        image.onload = () => {
-            if (this.map !== map) {
+        const promise = this.loadSprite().then((symbols) => new Promise<void>((resolve) => {
+            const spec = imageFor(id, symbols, colors);
+            if (!spec || this.map !== map) {
+                resolve();
                 return;
             }
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.round(spec.width * ratio);
-            canvas.height = Math.round(spec.height * ratio);
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                return;
-            }
-            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-            const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            if (!map.hasImage(id)) {
-                const scale = (n: number): number => Math.round(n * ratio);
-                map.addImage(id, data, {
-                    pixelRatio: ratio,
-                    ...(spec.content ? { content: spec.content.map(scale) as [number, number, number, number] } : {}),
-                    ...(spec.stretchX ? { stretchX: spec.stretchX.map(([a, b]) => [scale(a), scale(b)] as [number, number]) } : {}),
-                    ...(spec.stretchY ? { stretchY: spec.stretchY.map(([a, b]) => [scale(a), scale(b)] as [number, number]) } : {})
-                });
-            }
-        };
-        image.onerror = () => {
-            console.warn('[MapStudio] A marker image could not be drawn.');
-        };
-        image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(spec.svg);
+            const ratio = typeof window !== 'undefined' && window.devicePixelRatio ? Math.min(3, window.devicePixelRatio) : 1;
+            const image = new Image();
+            image.onload = () => {
+                if (this.map === map) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.round(spec.width * ratio);
+                    canvas.height = Math.round(spec.height * ratio);
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+                        const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        if (!map.hasImage(id)) {
+                            const scale = (n: number): number => Math.round(n * ratio);
+                            map.addImage(id, data, {
+                                pixelRatio: ratio,
+                                ...(spec.content ? { content: spec.content.map(scale) as [number, number, number, number] } : {}),
+                                ...(spec.stretchX ? { stretchX: spec.stretchX.map(([a, b]) => [scale(a), scale(b)] as [number, number]) } : {}),
+                                ...(spec.stretchY ? { stretchY: spec.stretchY.map(([a, b]) => [scale(a), scale(b)] as [number, number]) } : {})
+                            });
+                        }
+                    }
+                }
+                resolve();
+            };
+            image.onerror = () => {
+                console.warn('[MapStudio] A marker image could not be drawn.');
+                resolve();
+            };
+            image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(spec.svg);
+        }));
+        this.madeImages.set(id, promise);
+        return promise;
     }
 
     componentWillUnmount(): void {

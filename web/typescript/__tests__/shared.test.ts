@@ -1,7 +1,7 @@
 import { ItemState } from '../live';
 import { SHARED_M, distanceM, groupShared, sharedName, sharedState } from '../shared';
 
-const NORMAL: ItemState = { commsLost: false, stale: false, alarm: null, iconKpi: { key: 'p', text: '1 psi', stale: false }, badge: 'normal' };
+const NORMAL: ItemState = { commsLost: false, stale: false, alarm: null, iconKpi: { key: 'p', text: '1 psi', stale: false, hasValue: true }, badge: 'normal' };
 const STALE: ItemState = { ...NORMAL, stale: true, badge: 'stale' };
 const LOST: ItemState = { ...NORMAL, commsLost: true, stale: true, badge: 'comms-lost' };
 const ALARM2: ItemState = { ...NORMAL, alarm: { priority: 2, unacked: false, active: 1, stale: false }, badge: 'alarm' };

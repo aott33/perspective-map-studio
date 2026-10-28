@@ -13,7 +13,8 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
  * One kind of the project's kind list (AD-4, docs/kinds-and-assets.md):
  * {@code {id, name, geometry, icon, labelRank, fields, area, instrument}}. {@code geometry} is
  * {@code point} or {@code line}; a higher {@code labelRank} keeps its label
- * longer when labels collide (default 0); {@code area: true} marks a line kind drawn
+ * longer when labels collide (default 0; the browser ranks the selected item first, then alarms by
+ * priority, comms lost and stale, then the kind's rank, 0 to 99, epic 3 entry 7); {@code area: true} marks a line kind drawn
  * as a closed area, the only kind whose setup may hold {@code areaTints} (owner,
  * 2026-10-27, epic 2 story 9); {@code instrument: true} marks a point kind whose map items
  * may be attached to a line (a tap, meter or line valve; AD-16, AD-19, epic 2 story 14).

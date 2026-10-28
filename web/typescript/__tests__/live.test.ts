@@ -75,7 +75,7 @@ describe('item state for the icon', () => {
     test('normal with the icon KPI', () => {
         const normal = itemState({ ...P1, alarms: good({ active: 0, unacked: 0, priority: 0 }) }, DISPLAY);
         expect(normal).toEqual({ commsLost: false, stale: false, alarm: null,
-            iconKpi: { key: 'pressure', text: '412.5 psi', stale: false }, badge: 'normal' });
+            iconKpi: { key: 'pressure', text: '412.5 psi', stale: false, hasValue: true }, badge: 'normal' });
     });
 
     test('an alarm: priority, acknowledgement and count; it draws over comms lost', () => {
@@ -97,7 +97,7 @@ describe('item state for the icon', () => {
         expect(lost.commsLost).toBe(true);
         expect(lost.stale).toBe(true);
         expect(lost.badge).toBe('comms-lost');
-        expect(lost.iconKpi).toEqual({ key: 'pressure', text: '412 psi', stale: true });
+        expect(lost.iconKpi).toEqual({ key: 'pressure', text: '412 psi', stale: true, hasValue: true });
         const noValue = itemState({ ...P1, comms: stale(null, 'no value yet', 'Uncertain_InitialValue') }, DISPLAY);
         expect(noValue.commsLost).toBe(true);
         // With comms off in the display the comms slot is not read.

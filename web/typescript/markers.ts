@@ -18,6 +18,7 @@
  * `--callToAction`; the disc, the glyph, the text, the halo, the dot and the lines are neutral tokens.
  */
 
+import advances from '../fonts/advances.json';
 import { ItemState } from './live';
 
 /** The theme colours the images and the text layers need, read once from the component root. */
@@ -111,10 +112,14 @@ export const BADGE_PREFIX = 'ms:badge:';
 export const CHIP_IMAGE = 'ms:chip';
 export const ARROW_IMAGE = 'ms:arrow';
 
-/** The marker image: the disc at DISC_CENTER, room for the badge top-right and the digit beside it. */
-export const MARKER_IMAGE = { width: 64, height: 56 };
+/**
+ * The marker image: the disc at DISC_CENTER with room for the badge top-right and the digit beside
+ * it, and no more: the image's box is what the labels keep clear of (icons are placed first), so
+ * it is kept tight, the disc 20 px from the left edge and the digit's room on the right.
+ */
+export const MARKER_IMAGE = { width: 56, height: 46 };
 /** The disc's centre in the marker image (the point the marker is anchored at) and its radius. */
-export const DISC_CENTER: [number, number] = [28, 30];
+export const DISC_CENTER: [number, number] = [20, 23];
 export const DISC_RADIUS = 17;
 /** The dot images: the dot centred in a 44 px square, the template's hit area. */
 export const DOT_IMAGE = 44;
@@ -122,9 +127,15 @@ export const DOT_MID = 11;
 export const DOT_SMALL = 7;
 /** The badge image (a line's midpoint glyph): the badge and the digit. */
 export const BADGE_IMAGE = { width: 40, height: 24 };
-/** The chip: a 9-slice box, stretched round the word (icon-text-fit). */
+/**
+ * The chip: a 9-slice box, stretched round the word (icon-text-fit). MapLibre grows a 9-slice
+ * icon's collision box by the image's border outside `content`, so the content area is the whole
+ * image but one pixel (the rounded corners stay in CHIP_PADDING's side room) and the box stays the
+ * word's box plus the padding.
+ */
 export const CHIP_IMAGE_SIZE = 20;
-export const CHIP_CONTENT: [number, number, number, number] = [6, 6, 14, 14];
+export const CHIP_CONTENT: [number, number, number, number] = [1, 1, 19, 19];
+export const CHIP_STRETCH: [number, number] = [6, 14];
 export const CHIP_PADDING: [number, number, number, number] = [2, 5, 2, 5];
 export const ARROW_IMAGE_SIZE = 22;
 
@@ -137,12 +148,19 @@ export const NAME_SIZE = 12;
 export const CHIP_SIZE = 11;
 export const KPI_SIZE = 11;
 export const HALO_WIDTH = 2;
-/** The name's top below the point: the disc radius, the halo and a gap. */
-export const NAME_TOP_PX = DISC_RADIUS + HALO_WIDTH + 3;
-/** The KPI's top below the point: under the name line. */
-export const KPI_TOP_PX = NAME_TOP_PX + 15;
-/** The gap between the name and the chip. */
-export const CHIP_GAP_PX = 4;
+/**
+ * The name's top below the point: clear of the marker image's bottom edge (MARKER_IMAGE.height -
+ * DISC_CENTER[1]), the text padding and one more pixel, since a touching box counts as a collision.
+ */
+export const TEXT_PADDING = 1;
+export const NAME_TOP_PX = MARKER_IMAGE.height - DISC_CENTER[1] + TEXT_PADDING + 3;
+/** A line's name chip below its midpoint, in ems of CHIP_SIZE: under the line, and under the badge when the line has one. */
+export const LINE_CHIP_OFFSET_EM = 1.4;
+export const LINE_CHIP_OFFSET_BADGE_EM = 2.1;
+/** The KPI's top below the point: under the name's box (its line height of 1.2 em at NAME_SIZE, the padding and a gap). */
+export const KPI_TOP_PX = NAME_TOP_PX + 18;
+/** The gap between the name's text and the chip's text: the name box's padding, the chip's left padding, its 1 px border and 2 px clear. */
+export const CHIP_GAP_PX = 9;
 /** The font stacks of the bundled glyphs (web/fonts/sources.json). */
 export const FONT_NAME = 'NotoSans-SemiBold';
 export const FONT_CHIP = 'NotoSans-Medium';
@@ -207,30 +225,24 @@ export function stateWord(state: ItemState): string {
     return state.commsLost ? 'Comms lost' : state.stale ? 'Stale' : '';
 }
 
+/** The bundled fonts' ASCII advances at 24 px (web/fonts/advances.json, kept in step with the fonts by glyphs.mjs --check). */
+const ADVANCES = advances as { size: number; stacks: Record<string, Record<string, number>> };
+/** The advance of a character outside ASCII, in ems. */
+const ADVANCE_OTHER_EM = 0.6;
+
 /**
- * An estimate of a text's width in px at a size, for the chip's place beside the name and the
- * e2e overlap check: Noto Sans advances by character class (wide, upper, lower, digit, narrow, space).
+ * A text's width in px at a size, as MapLibre shapes it from the bundled glyphs (the sum of the
+ * rounded advances, no letter spacing), for the chip's place beside the name and the e2e overlap
+ * check; a character outside ASCII counts ADVANCE_OTHER_EM.
  */
-export function textWidthPx(text: string, sizePx: number): number {
-    let em = 0;
+export function textWidthPx(text: string, sizePx: number, font: string = FONT_NAME): number {
+    const table = ADVANCES.stacks[font] || ADVANCES.stacks[FONT_NAME] || {};
+    let units = 0;
     for (const ch of text) {
-        if (ch === ' ') {
-            em += 0.26;
-        } else if ('mwMW'.indexOf(ch) >= 0) {
-            em += 0.92;
-        } else if ('iljtfrI.,:;\'|!'.indexOf(ch) >= 0) {
-            em += 0.3;
-        } else if (ch >= '0' && ch <= '9') {
-            em += 0.57;
-        } else if (ch >= 'A' && ch <= 'Z') {
-            em += 0.68;
-        } else if (ch >= 'a' && ch <= 'z') {
-            em += 0.56;
-        } else {
-            em += 0.6;
-        }
+        const advance = table[ch];
+        units += typeof advance === 'number' ? advance : ADVANCE_OTHER_EM * ADVANCES.size;
     }
-    return em * sizePx;
+    return (units * sizePx) / ADVANCES.size;
 }
 
 /** The chip text's offset in ems of CHIP_SIZE: half the name, the gap and the chip's left padding. */
@@ -253,7 +265,8 @@ export function markerProperties(id: string, name: string, kind: string, icon: s
         state: state.badge,
         rank: labelRank(state, options.labelRank || 0, selected),
         word: stateWord(state),
-        kpi: members.length > 0 || !state.iconKpi ? '' : state.iconKpi.text,
+        // The KPI line only for an item with a live value (UX review M4): a shared marker and a slot with no value show none.
+        kpi: members.length > 0 || !state.iconKpi || !state.iconKpi.hasValue ? '' : state.iconKpi.text,
         kpiStale: !!state.iconKpi && state.iconKpi.stale,
         chipOffset: chipOffsetEm(name),
         members: Math.max(1, members.length),
@@ -506,7 +519,7 @@ export function imageFor(id: string, symbols: Record<string, SpriteSymbol>, colo
         case 'chip':
             return {
                 svg: chipSvg(colors), width: CHIP_IMAGE_SIZE, height: CHIP_IMAGE_SIZE, content: CHIP_CONTENT,
-                stretchX: [[CHIP_CONTENT[0], CHIP_CONTENT[2]]], stretchY: [[CHIP_CONTENT[1], CHIP_CONTENT[3]]]
+                stretchX: [CHIP_STRETCH], stretchY: [CHIP_STRETCH]
             };
         case 'arrow':
             return { svg: arrowSvg(colors), width: ARROW_IMAGE_SIZE, height: ARROW_IMAGE_SIZE };

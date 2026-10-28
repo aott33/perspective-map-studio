@@ -4,8 +4,11 @@
 // into build/generated-resources/mounted/glyphs/<stack>/<start>-<end>.pbf, which the Gateway
 // serves beside the bundle at /res/mapstudio/glyphs/{fontstack}/{range}.pbf. No font CDN.
 //
-//   node scripts/glyphs.mjs            build every range of every font stack
-//   node scripts/glyphs.mjs --check    build one range into a temporary folder and read it back
+//   node scripts/glyphs.mjs                  build every range of every font stack
+//   node scripts/glyphs.mjs --check          build one range into a temporary folder and read it back, and
+//                                            compare web/fonts/advances.json with the fonts
+//   node scripts/glyphs.mjs --write-advances rewrite web/fonts/advances.json (the ASCII advances at 24 px
+//                                            per stack, which markers.ts estimates label widths from)
 //
 // Options for tests: --fonts <dir> --out <dir>.
 //
@@ -255,7 +258,11 @@ export function renderGlyph(font, codePoint, ascender) {
 /** The glyphs proto: glyphs { stacks: [fontstack { name, range, glyphs: [glyph] }] }. */
 function writeGlyph(glyph, pbf) {
     pbf.writeVarintField(1, glyph.id);
-    pbf.writeBytesField(2, glyph.bitmap);
+    if (glyph.bitmap.length > 0) {
+        // A glyph with no ink (a space) carries no bitmap: MapLibre makes the empty image itself, and
+        // refuses an empty bytes field as a size mismatch.
+        pbf.writeBytesField(2, glyph.bitmap);
+    }
     pbf.writeVarintField(3, glyph.width);
     pbf.writeVarintField(4, glyph.height);
     pbf.writeSVarintField(5, glyph.left);
@@ -324,6 +331,26 @@ export function loadFonts(fontsDir) {
     });
 }
 
+/** The ASCII advances (code points 32 to 126) of a font at FONT_SIZE, rounded as the glyphs carry them, by character. */
+export function asciiAdvances(font) {
+    const out = {};
+    for (let cp = 32; cp < 127; cp++) {
+        const ch = String.fromCharCode(cp);
+        const glyph = font.charToGlyph(ch);
+        out[ch] = Math.round((glyph && glyph.advanceWidth ? glyph.advanceWidth : 0) * FONT_SIZE / font.unitsPerEm);
+    }
+    return out;
+}
+
+/** The advances file's content: {size, stacks: {<stack>: {<char>: advance}}}. */
+export function advancesFile(fonts) {
+    const stacks = {};
+    for (const entry of fonts) {
+        stacks[entry.stack] = asciiAdvances(entry.font);
+    }
+    return { size: FONT_SIZE, stacks };
+}
+
 /** The code points a font maps, as a Set. */
 function codePoints(font) {
     const out = new Set();
@@ -383,11 +410,13 @@ export function build(fontsDir, outDir, onlyRange = null) {
 }
 
 function parseArgs(argv) {
-    const args = { check: false, fonts: DEFAULTS.fonts, out: DEFAULTS.out };
+    const args = { check: false, writeAdvances: false, fonts: DEFAULTS.fonts, out: DEFAULTS.out };
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
         if (a === '--check') {
             args.check = true;
+        } else if (a === '--write-advances') {
+            args.writeAdvances = true;
         } else if (a === '--fonts') {
             args.fonts = path.resolve(argv[++i]);
         } else if (a === '--out') {
@@ -401,7 +430,18 @@ function parseArgs(argv) {
 
 function main() {
     const args = parseArgs(process.argv.slice(2));
+    const advancesPath = path.join(args.fonts, 'advances.json');
+    if (args.writeAdvances) {
+        writeFileSync(advancesPath, JSON.stringify(advancesFile(loadFonts(args.fonts)), null, 4) + '\n');
+        console.log('glyphs: wrote ' + advancesPath);
+        return;
+    }
     if (args.check) {
+        const expected = JSON.stringify(advancesFile(loadFonts(args.fonts)));
+        const committed = existsSync(advancesPath) ? JSON.stringify(JSON.parse(readFileSync(advancesPath, 'utf8'))) : '';
+        if (committed !== expected) {
+            throw new Error(advancesPath + ' does not match the fonts; run node scripts/glyphs.mjs --write-advances');
+        }
         const tmp = mkdtempSync(path.join(tmpdir(), 'mapstudio-glyphs-'));
         try {
             const summary = build(args.fonts, tmp, [0, 255]);
@@ -413,6 +453,10 @@ function main() {
                 const p = stack.glyphs.find((g) => g.id === 80);
                 if (!p || p.bitmapLength !== (p.width + 2 * BORDER) * (p.height + 2 * BORDER) || p.top >= 0 || p.advance <= 0) {
                     throw new Error('The glyph P of ' + s.stack + ' read back wrong: ' + JSON.stringify(p));
+                }
+                const space = stack.glyphs.find((g) => g.id === 32);
+                if (!space || space.bitmapLength !== undefined || space.width !== 0 || space.advance <= 0) {
+                    throw new Error('The space of ' + s.stack + ' read back wrong: ' + JSON.stringify(space));
                 }
                 console.log('glyphs: ' + s.stack + ' 0-255 holds ' + stack.glyphs.length + ' glyphs (ascender ' + s.ascender + ' px); P is '
                     + p.width + 'x' + p.height + ' at left ' + p.left + ', top ' + p.top + ', advance ' + p.advance);

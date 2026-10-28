@@ -13,9 +13,9 @@ const COLORS: MarkerColors = {
     commsLost: 'rgb(125, 60, 189)', alarm: ['rgb(200, 0, 0)', 'rgb(173, 95, 0)', 'rgb(50, 114, 217)'], font: 'Inter, sans-serif'
 };
 
-const NORMAL: ItemState = { commsLost: false, stale: false, alarm: null, iconKpi: { key: 'pressure', text: '412 psi', stale: false }, badge: 'normal' };
-const LOST: ItemState = { commsLost: true, stale: true, alarm: null, iconKpi: { key: 'pressure', text: '412 psi', stale: true }, badge: 'comms-lost' };
-const STALE: ItemState = { commsLost: false, stale: true, alarm: null, iconKpi: { key: 'pressure', text: '412 psi', stale: true }, badge: 'stale' };
+const NORMAL: ItemState = { commsLost: false, stale: false, alarm: null, iconKpi: { key: 'pressure', text: '412 psi', stale: false, hasValue: true }, badge: 'normal' };
+const LOST: ItemState = { commsLost: true, stale: true, alarm: null, iconKpi: { key: 'pressure', text: '412 psi', stale: true, hasValue: true }, badge: 'comms-lost' };
+const STALE: ItemState = { commsLost: false, stale: true, alarm: null, iconKpi: { key: 'pressure', text: '412 psi', stale: true, hasValue: true }, badge: 'stale' };
 const ALARM: ItemState = { commsLost: false, stale: false, alarm: { priority: 1, unacked: true, active: 1, stale: false }, iconKpi: null, badge: 'alarm' };
 
 /** The sprite as the build writes it (web/scripts/icons.mjs), from the committed sources. */
@@ -50,6 +50,9 @@ describe('marker properties and image ids (epic 3 entries 5 and 7)', () => {
         expect(props.dotSmall).toBe(dotImageId(7, false));
         expect(props.rank).toBe(RANK_NORMAL + 89);
         expect(markerProperties('p1', 'Point 1', 'pad', '', NORMAL).marker).toContain('"point"');
+        // No value yet: no KPI line on the map (the popup says "No value").
+        const empty: ItemState = { ...NORMAL, iconKpi: { key: 'pressure', text: 'No value', stale: true, hasValue: false } };
+        expect(markerProperties('p1', 'Point 1', 'pad', 'well-pad', empty).kpi).toBe('');
     });
 
     test('comms lost: the comms-lost badge, the word Comms lost, the stale KPI, the marker at every zoom', () => {
@@ -95,10 +98,14 @@ describe('marker properties and image ids (epic 3 entries 5 and 7)', () => {
         expect(markerProperties('p', 'P', 'pad', 'well-pad', NORMAL, { selected: true }).dotMid).toBe(dotImageId(11, true));
     });
 
-    test('the chip sits right of the name by an estimate of its width', () => {
-        expect(textWidthPx('P21', 12)).toBeCloseTo((0.68 + 0.57 + 0.57) * 12, 5);
+    test('the chip sits right of the name by the name\'s width from the bundled font\'s advances', () => {
+        // P, 2 and 1 advance 15, 14 and 14 px at 24 px in Noto Sans SemiBold (web/fonts/advances.json).
+        expect(textWidthPx('P21', 12)).toBeCloseTo((15 + 14 + 14) / 2, 5);
+        expect(textWidthPx('P21', 24)).toBeCloseTo(43, 5);
         expect(textWidthPx('Mesa well', 12)).toBeGreaterThan(textWidthPx('P21', 12));
-        expect(chipOffsetEm('P21')).toBeCloseTo((textWidthPx('P21', 12) / 2 + 4 + 5) / 11, 5);
+        expect(textWidthPx('\u00e9', 24)).toBeCloseTo(14.4, 5);
+        expect(textWidthPx('Stale', 11, 'NotoSans-Medium')).toBeGreaterThan(20);
+        expect(chipOffsetEm('P21')).toBeCloseTo((textWidthPx('P21', 12) / 2 + 9 + 5) / 11, 5);
     });
 
     test('ids that are not ours are refused; the dot, badge, chip and arrow ids parse', () => {
@@ -183,7 +190,7 @@ describe('marker images', () => {
         const unknown = markerSvg(markerSpec('nope', NORMAL), symbols, COLORS);
         expect(unknown).toContain(symbols.point.inner.slice(0, 20));
         expect(markerSvg(markerSpec('well-pad', LOST), {}, COLORS)).toContain('stroke-dasharray');
-        expect(DISC_CENTER).toEqual([28, 30]);
+        expect(DISC_CENTER).toEqual([20, 23]);
     });
 
     test('the dot, the badge, the chip and the arrow images', () => {
@@ -200,7 +207,7 @@ describe('marker images', () => {
         expect(badge.svg).toContain(COLORS.alarm[2]);
 
         const chip = imageFor(CHIP_IMAGE, symbols, COLORS)!;
-        expect(chip).toMatchObject({ width: 20, height: 20, content: [6, 6, 14, 14], stretchX: [[6, 14]], stretchY: [[6, 14]] });
+        expect(chip).toMatchObject({ width: 20, height: 20, content: [1, 1, 19, 19], stretchX: [[6, 14]], stretchY: [[6, 14]] });
         expect(chip.svg).toContain(COLORS.chipEdge);
         allowedPaints(chip.svg);
 
