@@ -20,6 +20,8 @@ Unreleased: everyone reads live state from the map (epic-viewing). Contract 0.3.
 
 - Value-driven styles and area category tints (entry 1, R12; AD-11, AD-16): a kind setup's `styleRule` is worked out on the Gateway in the shared live-value cache and reaches every open map as the preset name in a `style` slot of `values.batch` (`{preset, stale, reason}`; `normal` marked stale while the rule's source is stale, so the item draws only as stale until a fresh value); the rule's source is one more slot of the shared subscription (a `{kpi}` source shares the KPI's path), an item's `overrides.styleRule` replaces the kind's rule. The `expression` type is Ignition's own expression language with `{value}` as its one reference, parsed by the SDK's parser on the Gateway: a text that does not parse, another reference, or `tag()`, `runScript()` and `hasChanged()` are refused at save; a run that gives anything but a preset name draws `normal` with a `style` problem ([docs/kind-setup.md](docs/kind-setup.md), "Style rules as the map evaluates them"; [docs/platform-checks.md](docs/platform-checks.md), "Epic 3 entry 1"). `kindDisplay` gains each kind's path-free `styleRule` display and an area kind's `areaTints`. The map draws the presets (a point's ring and chip word, a line's hue, word, `dashed`, `dotted` and `dimmed` looks), an alarm over a value style, and an area kind's items as a closed fill in the tint its category picks, never a tint on a point or a line; the tokens `--mapstudio-attention`, `--mapstudio-warning`, `--mapstudio-fault` and `--mapstudio-tint-1` to `-6` fall back to Perspective variables and stand in until entry 12's review ([docs/styles.md](docs/styles.md), every preset and tint in both themes). New prop `previewStyles` draws the style preview panel; the bundle exports `StylePreview`, `PresetPalette` and `TintPalette` for the kind setup screen ([docs/contract.md](docs/contract.md), "The component's props").
 
+- Search (entry 9, R4; DESIGN.md search-field, EXPERIENCE.md Search): a search field top-left (300 by 40 px, "Search sites, wells or lines") lists the map items whose name or linked asset's name holds what is typed, without regard to letter case or accents, a name that starts with the text first, then an asset name that does, then the names and asset names that hold it, at most eight rows with the kind glyph, the name and the kind (or kind and asset); an ARIA combobox chosen by click, tap or keyboard (arrows, Home, End, Enter; Esc clears and closes) that zooms to the item and selects it as a click does (a point at zoom 15 at least with its popup open, a line or area fitted); at phone width the field is the one top bar 8 px from the edges, expanding with the results, which entry 3 shares with Needs you, and the zoom card sits under it. `map.load.reply` gains `assetNames` (`[{id, name}]`, every level, no base path), so a viewer searches by asset name too ([docs/contract.md](docs/contract.md), "map.load.reply" and "Search").
+
 ### Stories
 
 5. Tracer: live values reach an icon and its default popup.
@@ -27,6 +29,7 @@ Unreleased: everyone reads live state from the map (epic-viewing). Contract 0.3.
 7. Labels, lines and the template's map parity.
 1. Value-driven styles and area category tints drawn from live values.
 14. View-mode controls as designed.
+9. Search.
 
 ### Development
 
