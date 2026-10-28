@@ -13,6 +13,7 @@ Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway (`inductiveautomation/i
 | `/res/mapstudio/icons/mapstudio-icons.svg` | the sprite: one `<symbol id="ms-<id>">` per icon, `currentColor` only |
 | `/res/mapstudio/icons/icons.json` | the catalogue: `{version, fallback, icons: [{id, label, group, geometry}]}` |
 | `/res/mapstudio/icons/contact-sheet.html` | the review page: every icon at 16, 24 and 44 px in a light and a dark panel, and the state examples |
+| `/res/mapstudio/glyphs/{fontstack}/{range}.pbf` | the glyph source of the map's text labels (epic 3 entry 7): signed distance field glyphs rendered at build time from the bundled Noto Sans SemiBold (names, the icon KPI) and Medium (the state chip) by `web/scripts/glyphs.mjs`, stacks `NotoSans-SemiBold` and `NotoSans-Medium`, every 256-code-point range of the Basic Multilingual Plane (an empty stack where the font has no glyph, so no range request fails); Noto Sans is the face the Perspective default theme names, OFL 1.1 (`web/fonts/OFL.txt`, NOTICE). No font CDN **[live 8.3.10]** |
 
 The Gateway serves them as `image/svg+xml`, `application/json` and `text/html` (with `X-Content-Type-Options: nosniff`) **[live 8.3.10]**, checked by `e2e/tests/icons.spec.mjs` on the dev Gateway, 2026-10-27 (`docs/platform-checks.md`, epic 2 story 10).
 

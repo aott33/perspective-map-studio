@@ -1,36 +1,47 @@
 /**
- * The point markers' look (DESIGN.md, map marker and alarm glyph usage; epic 3 entry 5), pure:
- * the feature properties the marker layer reads, the image id a marker state names, and the SVG
- * the image is drawn from. The rasterising (an Image, a canvas, `map.addImage`) is MapStudio.tsx's;
+ * The map markers' look (DESIGN.md: map marker, state word chip, alarm glyph usage, map line;
+ * epic 3 entries 5 and 7), pure: the feature properties the symbol layers read, the image ids a
+ * marker state names, the SVG each image is drawn from, the label text and its rank, and a line's
+ * weight, hue and dash. The rasterising (an Image, a canvas, `map.addImage`) is MapStudio.tsx's;
  * everything here runs in node for the tests.
  *
- * One image per distinct marker state: the neutral disc with the kind glyph (a dashed ring in the
- * comms-lost token or the neutral token for comms lost and stale), the state badge top-right
- * (the alarm glyph on a solid disc in the priority hue when unacknowledged, on a hollow disc when
- * acknowledged; the comms-lost or stale glyph), the priority digit beside the badge, and under the
- * disc the icon KPI's text and the state word. Text is drawn into the image because the blank
- * style has no glyph source for MapLibre's text layers (labels are entry 7's).
+ * Images hold no text (entry 7, UX review M1): the marker image is the neutral disc with the kind
+ * glyph, the ring look (dashed for comms lost and stale), the state badge top-right and the
+ * priority digit, one image per icon, look, badge and selection; a normal item below zoom 14 is a
+ * dot in a 44 px image, so its hit area stays; the chip is a 9-slice box the state word is set in;
+ * the arrow is the flow arrow of the selected line. The name, the state word ("Stale", "Comms
+ * lost", decision D5) and the icon KPI are symbol-layer text in the bundled glyphs (NotoSans-SemiBold,
+ * NotoSans-Medium; web/scripts/glyphs.mjs) with a halo, colliding and giving way by `rank`.
  *
  * Colours are theme tokens read from the component root (theme.ts), never literals: the comms-lost
- * hue is the token `--mapstudio-comms-lost` (plan decision 6), the alarm hues `--mapstudio-alarm-1`
- * to `-3`; the disc, the glyph, the text and the halo are the neutral tokens.
+ * hue is `--mapstudio-comms-lost`, the alarm hues `--mapstudio-alarm-1` to `-3`, the selection
+ * `--callToAction`; the disc, the glyph, the text, the halo, the dot and the lines are neutral tokens.
  */
 
+import advances from '../fonts/advances.json';
 import { ItemState } from './live';
 
-/** The theme colours a marker image needs, read once from the component root. */
+/** The theme colours the images and the text layers need, read once from the component root. */
 export interface MarkerColors {
-    /** The disc fill (`--container`). */
+    /** The disc and chip fill (`--container`). */
     disc: string;
     /** The glyph, the text and the neutral ring (`--label`). */
     glyph: string;
     /** The halo round the disc and the text (`--containerRoot`). */
     halo: string;
+    /** Secondary text: a stale KPI (`--label--disabled`). */
+    textSecondary: string;
+    /** The dot below zoom 14 and the pipeline grey (`--neutral-60`). */
+    line: string;
+    /** The chip's edge (`--neutral-50`). */
+    chipEdge: string;
+    /** The selection ring, casing and arrow (`--callToAction`). */
+    selection: string;
     /** The comms-lost token. */
     commsLost: string;
     /** The three alarm priority tokens. */
     alarm: [string, string, string];
-    /** The host theme's font family, for the text in the image. */
+    /** The host theme's font family (the digit in the badge image). */
     font: string;
 }
 
@@ -39,6 +50,10 @@ export const MARKER_TOKENS = {
     disc: ['--container'],
     glyph: ['--label', '--neutral-70'],
     halo: ['--containerRoot'],
+    textSecondary: ['--label--disabled', '--neutral-70'],
+    line: ['--neutral-60', '--label'],
+    chipEdge: ['--neutral-50', '--border'],
+    selection: ['--callToAction'],
     commsLost: ['--mapstudio-comms-lost', '--qual-1'],
     alarm1: ['--mapstudio-alarm-1', '--error'],
     alarm2: ['--mapstudio-alarm-2', '--warning'],
@@ -57,34 +72,126 @@ export interface MarkerSpec {
     priority: number;
     /** Unacknowledged draws the solid badge; acknowledged the hollow one. */
     solid: boolean;
-    /** The KPI line under the disc, or ''. */
-    kpi: string;
-    /** The state word under the KPI ('Comms lost', 'Stale'), or ''. */
-    word: string;
+    /** The selection ring outside a gap. */
+    selected: boolean;
 }
 
-/** The properties of a point feature that the marker layer reads. */
+/** The properties of a point feature that the marker and label layers read. */
 export interface MarkerProperties {
     id: string;
     name: string;
     kind: string;
-    /** The marker image id. */
+    /** The marker image id (the disc with the glyph and the badge). */
     marker: string;
+    /** The image from zoom 12 to 14: the 11 px dot for a normal item, the marker for an abnormal one. */
+    dotMid: string;
+    /** The image below zoom 12: the 7 px dot for a normal item, the marker for an abnormal one. */
+    dotSmall: string;
     /** 'alarm', 'comms-lost', 'stale' or 'normal' (tests read it). */
     state: string;
+    /** The label's rank: lower is placed first (alarm, comms lost, stale, then the kind list's label rank). */
+    rank: number;
+    /** The state chip's word ('Comms lost', 'Stale'), or ''. */
+    word: string;
+    /** The icon KPI's text with its unit, or ''. */
+    kpi: string;
+    kpiStale: boolean;
+    /** The chip text's offset right of the point, in ems of the chip's text size: half the name plus the gap and the chip's padding. */
+    chipOffset: number;
+    /** How many map items this marker stands for (2 or more for a shared marker). */
+    members: number;
+    /** The member ids of a shared marker, comma separated ('' for one item). */
+    memberIds: string;
+    selected: boolean;
 }
 
+/** The image ids' prefixes. */
 export const IMAGE_PREFIX = 'ms:marker:';
-/** The image: the disc area on top, then two text lines. */
-export const IMAGE_WIDTH = 160;
-export const DISC_AREA = 44;
-export const LINE_HEIGHT = 15;
-export const IMAGE_HEIGHT = DISC_AREA + 2 * LINE_HEIGHT;
-/** The disc's centre in the image (the point the marker is anchored at). */
-export const DISC_CENTER: [number, number] = [IMAGE_WIDTH / 2, DISC_AREA / 2];
+export const DOT_PREFIX = 'ms:dot:';
+export const BADGE_PREFIX = 'ms:badge:';
+export const CHIP_IMAGE = 'ms:chip';
+export const ARROW_IMAGE = 'ms:arrow';
 
-/** The marker spec for one point from its icon id and its live state. */
-export function markerSpec(icon: string, state: ItemState): MarkerSpec {
+/**
+ * The marker image: the disc at DISC_CENTER with room for the badge top-right and the digit beside
+ * it, and no more: the image's box is what the labels keep clear of (icons are placed first), so
+ * it is kept tight, the disc 20 px from the left edge and the digit's room on the right.
+ */
+export const MARKER_IMAGE = { width: 56, height: 46 };
+/** The disc's centre in the marker image (the point the marker is anchored at) and its radius. */
+export const DISC_CENTER: [number, number] = [20, 23];
+export const DISC_RADIUS = 17;
+/** The dot images: the dot centred in a 44 px square, the template's hit area. */
+export const DOT_IMAGE = 44;
+export const DOT_MID = 11;
+export const DOT_SMALL = 7;
+/** The badge image (a line's midpoint glyph): the badge and the digit. */
+export const BADGE_IMAGE = { width: 40, height: 24 };
+/**
+ * The chip: a 9-slice box, stretched round the word (icon-text-fit). MapLibre grows a 9-slice
+ * icon's collision box by the image's border outside `content`, so the content area is the whole
+ * image but one pixel (the rounded corners stay in CHIP_PADDING's side room) and the box stays the
+ * word's box plus the padding.
+ */
+export const CHIP_IMAGE_SIZE = 20;
+export const CHIP_CONTENT: [number, number, number, number] = [1, 1, 19, 19];
+export const CHIP_STRETCH: [number, number] = [6, 14];
+export const CHIP_PADDING: [number, number, number, number] = [2, 5, 2, 5];
+export const ARROW_IMAGE_SIZE = 22;
+
+/** The zoom bands (DESIGN.md map-marker, R3, decisions D4): the disc and name from 14, the KPI from 15, the mid dot from 12. */
+export const ZOOM_NAME = 14;
+export const ZOOM_KPI = 15;
+export const ZOOM_DOT = 12;
+/** The text sizes (DESIGN.md typography: map-label 12/600, state-word 11/500, the KPI at 90 %). */
+export const NAME_SIZE = 12;
+export const CHIP_SIZE = 11;
+export const KPI_SIZE = 11;
+export const HALO_WIDTH = 2;
+/**
+ * The name's top below the point: clear of the marker image's bottom edge (MARKER_IMAGE.height -
+ * DISC_CENTER[1]), the text padding and one more pixel, since a touching box counts as a collision.
+ */
+export const TEXT_PADDING = 1;
+export const NAME_TOP_PX = MARKER_IMAGE.height - DISC_CENTER[1] + TEXT_PADDING + 3;
+/** A line's name chip below its midpoint, in ems of CHIP_SIZE: under the line, and under the badge when the line has one. */
+export const LINE_CHIP_OFFSET_EM = 1.4;
+export const LINE_CHIP_OFFSET_BADGE_EM = 2.1;
+/** The KPI's top below the point: under the name's box (its line height of 1.2 em at NAME_SIZE, the padding and a gap). */
+export const KPI_TOP_PX = NAME_TOP_PX + 18;
+/** The gap between the name's text and the chip's text: the name box's padding, the chip's left padding, its 1 px border and 2 px clear. */
+export const CHIP_GAP_PX = 9;
+/** The font stacks of the bundled glyphs (web/fonts/sources.json). */
+export const FONT_NAME = 'NotoSans-SemiBold';
+export const FONT_CHIP = 'NotoSans-Medium';
+
+/** The rank of the label: the selected item first, then the states, then the kind list's label rank (higher keeps its label longer). */
+export const RANK_SELECTED = -1;
+export const RANK_ALARM = 0;
+export const RANK_COMMS_LOST = 3;
+export const RANK_STALE = 4;
+export const RANK_NORMAL = 5;
+export const LABEL_RANK_MAX = 99;
+
+export function labelRank(state: ItemState, kindLabelRank: number, selected: boolean): number {
+    if (selected) {
+        return RANK_SELECTED;
+    }
+    if (state.alarm) {
+        return RANK_ALARM + state.alarm.priority - 1;
+    }
+    if (state.commsLost) {
+        return RANK_COMMS_LOST;
+    }
+    if (state.stale) {
+        return RANK_STALE;
+    }
+    const rank = Math.max(0, Math.min(LABEL_RANK_MAX, Math.round(kindLabelRank) || 0));
+    return RANK_NORMAL + (LABEL_RANK_MAX - rank);
+}
+
+/** The marker spec for one point from its icon id, its live state and whether it is selected. */
+export function markerSpec(icon: string, state: ItemState, selected = false): MarkerSpec {
     const look: MarkerLook = state.commsLost ? 'comms-lost' : state.stale ? 'stale' : 'normal';
     let badge = '';
     let priority = 0;
@@ -98,41 +205,197 @@ export function markerSpec(icon: string, state: ItemState): MarkerSpec {
     } else if (state.stale) {
         badge = 'stale';
     }
-    const word = state.commsLost ? 'Comms lost' : state.stale ? 'Stale' : '';
-    const kpi = state.iconKpi ? (state.iconKpi.stale ? 'Stale - ' : '') + state.iconKpi.text : '';
-    return { icon: icon || 'point', look, badge, priority, solid, kpi, word };
+    return { icon: icon || 'point', look, badge, priority, solid, selected };
 }
 
 export function markerImageId(spec: MarkerSpec): string {
-    return IMAGE_PREFIX + JSON.stringify([spec.icon, spec.look, spec.badge, spec.priority, spec.solid, spec.kpi, spec.word]);
+    return IMAGE_PREFIX + JSON.stringify([spec.icon, spec.look, spec.badge, spec.priority, spec.solid, spec.selected]);
 }
 
-/** The feature properties for one point. */
-export function markerProperties(id: string, name: string, kind: string, icon: string, state: ItemState): MarkerProperties {
-    return { id, name, kind, marker: markerImageId(markerSpec(icon, state)), state: state.badge };
+export function dotImageId(size: number, selected: boolean): string {
+    return DOT_PREFIX + JSON.stringify([size, selected]);
 }
+
+export function badgeImageId(badge: string, priority: number, solid: boolean): string {
+    return BADGE_PREFIX + JSON.stringify([badge, priority, solid]);
+}
+
+/** The state word the chip shows beside the name (decision D5: the short form; the popup says the rest). */
+export function stateWord(state: ItemState): string {
+    return state.commsLost ? 'Comms lost' : state.stale ? 'Stale' : '';
+}
+
+/** The bundled fonts' ASCII advances at 24 px (web/fonts/advances.json, kept in step with the fonts by glyphs.mjs --check). */
+const ADVANCES = advances as { size: number; stacks: Record<string, Record<string, number>> };
+/** The advance of a character outside ASCII, in ems. */
+const ADVANCE_OTHER_EM = 0.6;
+
+/**
+ * A text's width in px at a size, as MapLibre shapes it from the bundled glyphs (the sum of the
+ * rounded advances, no letter spacing), for the chip's place beside the name and the e2e overlap
+ * check; a character outside ASCII counts ADVANCE_OTHER_EM.
+ */
+export function textWidthPx(text: string, sizePx: number, font: string = FONT_NAME): number {
+    const table = ADVANCES.stacks[font] || ADVANCES.stacks[FONT_NAME] || {};
+    let units = 0;
+    for (const ch of text) {
+        const advance = table[ch];
+        units += typeof advance === 'number' ? advance : ADVANCE_OTHER_EM * ADVANCES.size;
+    }
+    return (units * sizePx) / ADVANCES.size;
+}
+
+/** The chip text's offset in ems of CHIP_SIZE: half the name, the gap and the chip's left padding. */
+export function chipOffsetEm(name: string): number {
+    return (textWidthPx(name, NAME_SIZE) / 2 + CHIP_GAP_PX + CHIP_PADDING[1]) / CHIP_SIZE;
+}
+
+/** The feature properties for one point (or a shared marker, `members` 2 or more). */
+export function markerProperties(id: string, name: string, kind: string, icon: string, state: ItemState,
+                                 options: { labelRank?: number; selected?: boolean; members?: string[] } = {}): MarkerProperties {
+    const selected = options.selected === true;
+    const spec = markerSpec(icon, state, selected);
+    const marker = markerImageId(spec);
+    const abnormal = state.badge !== 'normal';
+    const members = options.members && options.members.length > 1 ? options.members : [];
+    return {
+        id, name, kind, marker,
+        dotMid: abnormal ? marker : dotImageId(DOT_MID, selected),
+        dotSmall: abnormal ? marker : dotImageId(DOT_SMALL, selected),
+        state: state.badge,
+        rank: labelRank(state, options.labelRank || 0, selected),
+        word: stateWord(state),
+        // The KPI line only for an item with a live value (UX review M4): a shared marker and a slot with no value show none.
+        kpi: members.length > 0 || !state.iconKpi || !state.iconKpi.hasValue ? '' : state.iconKpi.text,
+        kpiStale: !!state.iconKpi && state.iconKpi.stale,
+        chipOffset: chipOffsetEm(name),
+        members: Math.max(1, members.length),
+        memberIds: members.join(','),
+        selected
+    };
+}
+
+/** The line's look (DESIGN.md map-line; plan decision 4): weight by pipe size, hue only from alarms, dashed for no data or comms lost. */
+export interface LineLook {
+    /** 3, 4 or 6 px by pipe size with an instrument on the line; 2 px (untapped) without. */
+    weight: number;
+    /** 'alarm-1' to 'alarm-3', or '' for the pipeline grey. */
+    hue: string;
+    dashed: boolean;
+    /** The badge at the midpoint (an alarm), or ''. */
+    badge: string;
+    priority: number;
+    solid: boolean;
+}
+
+export const LINE_WEIGHTS: [number, number, number] = [3, 4, 6];
+export const LINE_UNTAPPED = 2;
+
+/** The weight for a pipe size in inches: 3 px up to 4 in, 4 px up to 8 in, 6 px above; 3 px when unknown. */
+export function lineWeight(sizeIn: unknown): number {
+    const n = typeof sizeIn === 'number' ? sizeIn : typeof sizeIn === 'string' ? Number(sizeIn) : NaN;
+    if (!isFinite(n) || n <= 0) {
+        return LINE_WEIGHTS[0];
+    }
+    return n <= 4 ? LINE_WEIGHTS[0] : n <= 8 ? LINE_WEIGHTS[1] : LINE_WEIGHTS[2];
+}
+
+/**
+ * A line's look from its state (its own kind setup's slots), its pipe size and whether an instrument
+ * sits on it. Without an instrument the whole line is one untapped segment (2 px); a state still draws.
+ */
+export function lineLook(state: ItemState, sizeIn: unknown, hasInstruments: boolean): LineLook {
+    const weight = hasInstruments ? lineWeight(sizeIn) : LINE_UNTAPPED;
+    const spec = markerSpec('', state);
+    // No data is a comms or value slot with no value yet, which the Gateway reports stale.
+    const dashed = state.commsLost || state.stale;
+    return {
+        weight,
+        hue: state.alarm ? 'alarm-' + state.alarm.priority : '',
+        dashed,
+        badge: state.alarm ? spec.badge : '',
+        priority: spec.priority,
+        solid: spec.solid
+    };
+}
+
+/** The properties of a line feature the line layers read. */
+export interface LineProperties {
+    id: string;
+    name: string;
+    kind: string;
+    weight: number;
+    /** The resolved colour (a token value), for the data-driven line-color. */
+    color: string;
+    hue: string;
+    dashed: boolean;
+    selected: boolean;
+}
+
+export function lineProperties(id: string, name: string, kind: string, look: LineLook, colors: MarkerColors, selected: boolean): LineProperties {
+    const color = look.hue === 'alarm-1' ? colors.alarm[0] : look.hue === 'alarm-2' ? colors.alarm[1]
+        : look.hue === 'alarm-3' ? colors.alarm[2] : colors.line;
+    return { id, name, kind, weight: look.weight, color, hue: look.hue, dashed: look.dashed, selected };
+}
+
+/** What an image id names. */
+export type ImageSpec =
+    | { kind: 'marker'; spec: MarkerSpec }
+    | { kind: 'dot'; size: number; selected: boolean }
+    | { kind: 'badge'; badge: string; priority: number; solid: boolean }
+    | { kind: 'chip' }
+    | { kind: 'arrow' };
 
 /** The spec an image id names, or null when it is not one of ours. */
-export function parseImageId(id: string): MarkerSpec | null {
-    if (!id.startsWith(IMAGE_PREFIX)) {
-        return null;
+export function parseImageId(id: string): ImageSpec | null {
+    if (id === CHIP_IMAGE) {
+        return { kind: 'chip' };
     }
-    try {
-        const parts = JSON.parse(id.substring(IMAGE_PREFIX.length));
-        if (!Array.isArray(parts) || parts.length !== 7 || typeof parts[0] !== 'string') {
+    if (id === ARROW_IMAGE) {
+        return { kind: 'arrow' };
+    }
+    const parts = (prefix: string): unknown[] | null => {
+        if (!id.startsWith(prefix)) {
             return null;
         }
-        const look = parts[1];
+        try {
+            const parsed = JSON.parse(id.substring(prefix.length));
+            return Array.isArray(parsed) ? parsed : null;
+        } catch (err) {
+            return null;
+        }
+    };
+    const marker = parts(IMAGE_PREFIX);
+    if (marker) {
+        if (marker.length !== 6 || typeof marker[0] !== 'string') {
+            return null;
+        }
+        const look = marker[1];
         if (look !== 'normal' && look !== 'comms-lost' && look !== 'stale') {
             return null;
         }
         return {
-            icon: parts[0], look, badge: String(parts[2]), priority: Number(parts[3]) || 0, solid: parts[4] === true,
-            kpi: String(parts[5]), word: String(parts[6])
+            kind: 'marker',
+            spec: { icon: marker[0], look, badge: String(marker[2]), priority: Number(marker[3]) || 0, solid: marker[4] === true,
+                selected: marker[5] === true }
         };
-    } catch (err) {
-        return null;
     }
+    const dot = parts(DOT_PREFIX);
+    if (dot) {
+        const size = Number(dot[0]);
+        if (dot.length !== 2 || !(size > 0)) {
+            return null;
+        }
+        return { kind: 'dot', size, selected: dot[1] === true };
+    }
+    const badge = parts(BADGE_PREFIX);
+    if (badge) {
+        if (badge.length !== 3 || typeof badge[0] !== 'string' || badge[0] === '') {
+            return null;
+        }
+        return { kind: 'badge', badge: badge[0], priority: Number(badge[1]) || 0, solid: badge[2] === true };
+    }
+    return null;
 }
 
 /** The symbol's inner markup and its root attributes, as the sprite holds them. */
@@ -154,44 +417,115 @@ function glyphAt(s: SpriteSymbol | undefined, x: number, y: number, size: number
     return `<g transform="translate(${x} ${y}) scale(${scale})" color="${esc(color)}"><svg ${s.attributes} width="24" height="24" viewBox="0 0 24 24">${s.inner}</svg></g>`;
 }
 
+/** The badge (the state glyph on its disc) and the digit, drawn with the badge's centre at (bx, by). */
+function badgeAt(badge: string, priority: number, solid: boolean, bx: number, by: number, symbols: Record<string, SpriteSymbol>,
+                 colors: MarkerColors): string {
+    if (!badge) {
+        return '';
+    }
+    const alarm = priority >= 1 && priority <= 3;
+    const hue = alarm ? colors.alarm[priority - 1] : badge === 'comms-lost' ? colors.commsLost : colors.glyph;
+    let out: string;
+    if (alarm && solid) {
+        out = `<circle cx="${bx}" cy="${by}" r="9" fill="${esc(hue)}" stroke="${esc(colors.halo)}" stroke-width="1.5"/>`
+            + glyphAt(symbols[badge], bx - 6, by - 6, 12, colors.disc);
+    } else {
+        out = `<circle cx="${bx}" cy="${by}" r="8.5" fill="${esc(colors.disc)}" stroke="${esc(hue)}" stroke-width="2"/>`
+            + glyphAt(symbols[badge], bx - 6, by - 6, 12, hue);
+    }
+    if (alarm) {
+        out += `<text x="${bx + 11}" y="${by + 4.5}" font-family="${esc(colors.font)}" font-size="12" font-weight="700" fill="${esc(hue)}" stroke="${esc(colors.halo)}" stroke-width="3" paint-order="stroke" text-anchor="start">${priority}</text>`;
+    }
+    return out;
+}
+
+function svg(width: number, height: number, body: string): string {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${body}</svg>`;
+}
+
 /**
- * The SVG text of one marker image (`IMAGE_WIDTH` by `IMAGE_HEIGHT` px): the disc centred at
- * `DISC_CENTER`, the badge at its top-right, the digit beside the badge, the KPI line and the word
- * below. A missing kind glyph falls back to `point`. Every colour is a token value passed in.
+ * The SVG text of one marker image (MARKER_IMAGE): the disc centred at DISC_CENTER with a 2 px halo,
+ * a dashed ring for comms lost (in the comms-lost token) and stale (neutral), the kind glyph, the
+ * badge at the top-right with the digit beside it, and the selection ring outside a gap. A missing
+ * kind glyph falls back to `point`. Every colour is a token value passed in; no text but the digit.
  */
 export function markerSvg(spec: MarkerSpec, symbols: Record<string, SpriteSymbol>, colors: MarkerColors): string {
     const [cx, cy] = DISC_CENTER;
-    const r = 14;
+    const r = DISC_RADIUS;
     const hue = spec.look === 'comms-lost' ? colors.commsLost : colors.glyph;
-    let disc = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${esc(colors.disc)}" stroke="${esc(colors.halo)}" stroke-width="2"/>`;
+    let body = '';
+    if (spec.selected) {
+        body += `<circle cx="${cx}" cy="${cy}" r="${r + 5}" fill="none" stroke="${esc(colors.selection)}" stroke-width="2"/>`;
+    }
+    body += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${esc(colors.disc)}" stroke="${esc(colors.halo)}" stroke-width="${HALO_WIDTH}"/>`;
     if (spec.look !== 'normal') {
-        disc += `<circle cx="${cx}" cy="${cy}" r="${r - 1}" fill="none" stroke="${esc(hue)}" stroke-width="2" stroke-dasharray="3 3"/>`;
+        body += `<circle cx="${cx}" cy="${cy}" r="${r - 1}" fill="none" stroke="${esc(hue)}" stroke-width="2" stroke-dasharray="3 3"/>`;
+    } else {
+        body += `<circle cx="${cx}" cy="${cy}" r="${r - 1}" fill="none" stroke="${esc(colors.line)}" stroke-width="1.5"/>`;
     }
-    const kind = glyphAt(symbols[spec.icon] || symbols.point, cx - 9, cy - 9, 18, hue);
-    let badge = '';
-    let digit = '';
-    if (spec.badge) {
-        const bx = cx + 11;
-        const by = cy - 11;
-        const alarm = spec.priority >= 1 && spec.priority <= 3;
-        const badgeHue = alarm ? colors.alarm[spec.priority - 1] : spec.badge === 'comms-lost' ? colors.commsLost : colors.glyph;
-        if (alarm && spec.solid) {
-            badge = `<circle cx="${bx}" cy="${by}" r="9" fill="${esc(badgeHue)}" stroke="${esc(colors.halo)}" stroke-width="1.5"/>`
-                + glyphAt(symbols[spec.badge], bx - 6, by - 6, 12, colors.disc);
-        } else {
-            badge = `<circle cx="${bx}" cy="${by}" r="8.5" fill="${esc(colors.disc)}" stroke="${esc(badgeHue)}" stroke-width="2"/>`
-                + glyphAt(symbols[spec.badge], bx - 6, by - 6, 12, badgeHue);
-        }
-        if (alarm) {
-            digit = `<text x="${bx + 11}" y="${by + 4.5}" font-family="${esc(colors.font)}" font-size="12" font-weight="700" fill="${esc(badgeHue)}" stroke="${esc(colors.halo)}" stroke-width="3" paint-order="stroke" text-anchor="start">${spec.priority}</text>`;
-        }
+    body += glyphAt(symbols[spec.icon] || symbols.point, cx - 10, cy - 10, 20, hue);
+    body += badgeAt(spec.badge, spec.priority, spec.solid, cx + 13, cy - 13, symbols, colors);
+    return svg(MARKER_IMAGE.width, MARKER_IMAGE.height, body);
+}
+
+/** A normal item below zoom 14: a dot of `size` px in the DOT_IMAGE square, with the halo and the selection ring. */
+export function dotSvg(size: number, selected: boolean, colors: MarkerColors): string {
+    const c = DOT_IMAGE / 2;
+    const r = size / 2;
+    let body = '';
+    if (selected) {
+        body += `<circle cx="${c}" cy="${c}" r="${r + 5}" fill="none" stroke="${esc(colors.selection)}" stroke-width="2"/>`;
     }
-    const line = (text: string, y: number, color: string, weight: string): string => text === '' ? ''
-        : `<text x="${cx}" y="${y}" font-family="${esc(colors.font)}" font-size="12" font-weight="${weight}" fill="${esc(color)}" stroke="${esc(colors.halo)}" stroke-width="3" paint-order="stroke" text-anchor="middle">${esc(text)}</text>`;
-    const kpi = line(spec.kpi, DISC_AREA + 11, colors.glyph, '600');
-    const word = line(spec.word, DISC_AREA + 11 + LINE_HEIGHT, spec.look === 'comms-lost' ? colors.commsLost : colors.glyph, '500');
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${IMAGE_WIDTH}" height="${IMAGE_HEIGHT}" viewBox="0 0 ${IMAGE_WIDTH} ${IMAGE_HEIGHT}">`
-        + disc + kind + badge + digit + kpi + word + '</svg>';
+    body += `<circle cx="${c}" cy="${c}" r="${r}" fill="${esc(colors.line)}" stroke="${esc(colors.halo)}" stroke-width="${HALO_WIDTH}"/>`;
+    return svg(DOT_IMAGE, DOT_IMAGE, body);
+}
+
+/** A line's midpoint badge with its digit (BADGE_IMAGE), the badge's centre at (12, 12). */
+export function badgeSvg(badge: string, priority: number, solid: boolean, symbols: Record<string, SpriteSymbol>, colors: MarkerColors): string {
+    return svg(BADGE_IMAGE.width, BADGE_IMAGE.height, badgeAt(badge, priority, solid, 12, 12, symbols, colors));
+}
+
+/** The chip box: the panel fill, a 1 px edge, 3 px corners, over a 1 px halo; sliced at CHIP_CONTENT. */
+export function chipSvg(colors: MarkerColors): string {
+    const s = CHIP_IMAGE_SIZE;
+    return svg(s, s,
+        `<rect x="1" y="1" width="${s - 2}" height="${s - 2}" rx="4" fill="none" stroke="${esc(colors.halo)}" stroke-width="2"/>`
+        + `<rect x="1.5" y="1.5" width="${s - 3}" height="${s - 3}" rx="3" fill="${esc(colors.disc)}" stroke="${esc(colors.chipEdge)}" stroke-width="1"/>`);
+}
+
+/** The flow arrow of the selected line: a chevron pointing up (rotated along the line's bearing), in the selection token with a halo. */
+export function arrowSvg(colors: MarkerColors): string {
+    const s = ARROW_IMAGE_SIZE;
+    const path = `M${s / 2} 3 L${s - 4} ${s - 6} L${s / 2} ${s - 10} L4 ${s - 6} Z`;
+    return svg(s, s,
+        `<path d="${path}" fill="${esc(colors.halo)}" stroke="${esc(colors.halo)}" stroke-width="4" stroke-linejoin="round"/>`
+        + `<path d="${path}" fill="${esc(colors.selection)}" stroke="none"/>`);
+}
+
+/** The SVG, size and (for the chip) the 9-slice metadata of any image id of ours; null for an id that is not. */
+export function imageFor(id: string, symbols: Record<string, SpriteSymbol>, colors: MarkerColors):
+    { svg: string; width: number; height: number; content?: [number, number, number, number]; stretchX?: Array<[number, number]>; stretchY?: Array<[number, number]> } | null {
+    const parsed = parseImageId(id);
+    if (!parsed) {
+        return null;
+    }
+    switch (parsed.kind) {
+        case 'marker':
+            return { svg: markerSvg(parsed.spec, symbols, colors), width: MARKER_IMAGE.width, height: MARKER_IMAGE.height };
+        case 'dot':
+            return { svg: dotSvg(parsed.size, parsed.selected, colors), width: DOT_IMAGE, height: DOT_IMAGE };
+        case 'badge':
+            return { svg: badgeSvg(parsed.badge, parsed.priority, parsed.solid, symbols, colors), width: BADGE_IMAGE.width, height: BADGE_IMAGE.height };
+        case 'chip':
+            return {
+                svg: chipSvg(colors), width: CHIP_IMAGE_SIZE, height: CHIP_IMAGE_SIZE, content: CHIP_CONTENT,
+                stretchX: [CHIP_STRETCH], stretchY: [CHIP_STRETCH]
+            };
+        case 'arrow':
+            return { svg: arrowSvg(colors), width: ARROW_IMAGE_SIZE, height: ARROW_IMAGE_SIZE };
+        default:
+            return null;
+    }
 }
 
 /** The symbols of the served sprite (`<symbol id="ms-<id>" ...>inner</symbol>`), by icon id. Pure. */
