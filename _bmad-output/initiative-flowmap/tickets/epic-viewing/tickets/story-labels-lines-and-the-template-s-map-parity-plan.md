@@ -3,7 +3,7 @@ title: 'Labels, lines and the template''s map parity'
 type: 'feature'
 ticket: '7'
 created: '2026-10-28'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '4845a016369549ffd4d37890192268b8e3aede5b'
 route: 'full'
 route_source: 'auto'
@@ -134,3 +134,5 @@ Review pass 1 (quick lens, read by this agent from the diff of both commits; no 
 
 **Manual checks:**
 - The screenshots in `docs/screenshots/` show names below the discs, the chip beside the name, the KPI under it, and no text over another marker's text.
+
+**Results (2026-10-28, 4-CPU agent box, Ignition 8.3.10, fresh stack):** the final chain 19:41 to 19:54 UTC: `./gradlew clean build --offline` BUILD SUCCESSFUL with every Java and Jest test; `tsc --noEmit` clean and `jest` 23 suites, 195 tests pass; `ops/up.sh --fresh --no-build` up; e2e with `E2E_DOCS=1` 70 passed, 0 failed (11.3 min), `labels.spec.mjs` 7/7; `check-contract-versions.sh` and `test-contract-versions.sh` OK; no em dash in a changed file. The first full run's four failures (item count with shared markers, the 390 test's bounds, the phone popup placed before its content) are fixed in f7999c8. Screenshots refreshed by the docs run; the new ones for this entry are `mapstudio-labels-1440.png`, `mapstudio-labels-390.png`, `mapstudio-shared-1440.png`, `mapstudio-line-selected-1440.png` and `mapstudio-scale-390.png`; other new files the docs run wrote that no doc references were left out.
