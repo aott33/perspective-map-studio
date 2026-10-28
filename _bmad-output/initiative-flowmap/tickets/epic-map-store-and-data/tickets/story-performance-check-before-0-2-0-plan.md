@@ -3,14 +3,14 @@ title: 'Performance check before 0.2.0'
 type: 'chore'
 ticket: '17'
 created: '2026-10-27'
-status: 'in-review'
+status: 'built'
 baseline_revision: '273dccd7dfd61e3bc1bbcf90d128988b3ffb1f8c'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'coordinator'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/docs/platform-checks.md'
@@ -113,6 +113,7 @@ None: all six were answered by the owner on 2026-10-27 (Decision above).
 - Results: every limit passed except `edits.apply` with 50-op batches from 10 editors at once (p95 1,791.9 ms, median 303.4, max 2,952.7, n 200, no busy refusal, no timeout; limit p95 under 300 ms). The 1-op 10-editor case passed (p95 276.6 ms). The table, the cause and the method are in docs/platform-checks.md, "Epic 2 story 17".
 - Cause analysis (after the first run, commit 7c1fcb1): each `edits.apply` measure now records the open editor pages, the whole box's CPU busy share over the measure (`/proc/stat`, `procStatCpu` and `hostBusyPct` in `e2e/perf/result.mjs`, unit tested) and the Gateway container's window, and the 10 editors' 50-op streams are also sent from one page (`50op-10streams-1page`, recorded, not judged on p95; a busy refusal, timeout, error or missing sample is still a miss). The host was 99.7 to 99.8% busy over 4 CPUs during every judged `edits.apply` measure while the Gateway used under one core; from one page the Gateway's share rose to 81% of one core and p95 fell to 314.3 ms (median 200, max 394.7). So the miss is this 4-CPU box running 10 Chromium pages (5,000-item map, software WebGL) beside the Gateway and PostgreSQL, not the write path; the residual ~314 ms with 10 concurrent 50-op streams is the per-project serialisation of batches (story 2's design) and is near the limit. The verdict in the record stays `miss`; the docs mark it "miss on this box". No Gateway or component code changed.
 - Open for the owner (decision 4): accept the miss for 0.2.0 with the cause recorded (a dated Decision line in the epic's Notes), or re-run the dev target on a laptop first (`PERF_RECORD=0.2.0 ops/perf.sh`, the exact command is in docs/platform-checks.md and docs/perf/README.md). Recorded in the epic's Notes and in `_bmad-output/deferred-work.md`.
+- Decided 2026-10-28 by the owner: the miss is accepted for 0.2.0 with the cause recorded (epic Notes); the template stack re-measures it after the tag.
 - Template target: not run (decision 3; the kept stack refuses unsigned modules [unverified live]); `ops/perf.sh --target template` refuses with exit 2 until the test Gateway runs Map Studio 0.2.x, and its code path is [unverified] until the laptop run after the tag.
 - Not changed: `e2e/tests/measures.spec.mjs` still writes its frame-rate section through `e2e/lib/frameRate.mjs` (moved helpers, no behaviour change); `npm test` does not run the perf suite (its own config, `npm run perf`).
 

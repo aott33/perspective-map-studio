@@ -49,6 +49,16 @@ jobs:
       - name: Dev stack helper tests
         run: python3 -I ops/tests/test_users.py
 
+      # Every public contract document names the version it describes, read from the
+      # code, and no released version is still called a draft (epic 2 R14). The test
+      # proves the check refuses a document stripped of its version, every draft wording
+      # this release removed (also in a git work tree) and a release version the CHANGELOG
+      # or a package does not name (check-release-version.sh, which release.yml runs).
+      - name: Contract documents name their versions
+        run: |
+          scripts/ci/check-contract-versions.sh
+          scripts/ci/test-contract-versions.sh
+
       - name: Upload the unsigned module
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

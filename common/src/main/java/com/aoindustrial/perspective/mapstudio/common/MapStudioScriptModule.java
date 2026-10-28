@@ -10,7 +10,7 @@ import com.inductiveautomation.ignition.common.script.hints.JythonElement;
 import com.inductiveautomation.ignition.common.script.hints.ScriptArg;
 
 /**
- * The {@code system.mapstudio} scripting module (AD-18), contract 0.2.0 (draft).
+ * The {@code system.mapstudio} scripting module (AD-18), contract 0.2.0.
  *
  * <p>Abstract in the common scope, as in IA's scripting-function example: the
  * Gateway hook registers a subclass that runs {@code getMap} and

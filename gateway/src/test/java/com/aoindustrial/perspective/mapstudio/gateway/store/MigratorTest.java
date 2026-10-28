@@ -34,6 +34,25 @@ class MigratorTest {
     }
 
     @Test
+    void everyAppliedMigrationRecordsTheModuleVersionItWasGiven() throws Exception {
+        // The audit column mapstudio_schema_version.module_version holds the build's version
+        // (the 0.2.0 rehearsal found "dev" there: no manifest carried one, fixed before the tag).
+        FakeJdbc db = new FakeJdbc();
+        Migrator.Result result = new Migrator(Migrations.all(), "0.2.0").migrate(db.connection());
+        assertEquals(List.of(1, 2), result.applied());
+        assertEquals(List.of("0.2.0", "0.2.0"), db.boundStrings,
+            "one module_version per migration, the version the migrator was given, never a placeholder");
+    }
+
+    @Test
+    void anUpgradeRecordsTheModuleVersionOnlyForWhatItApplied() throws Exception {
+        FakeJdbc db = new FakeJdbc();
+        db.version = 1;
+        new Migrator(Migrations.all(), "0.3.0-SNAPSHOT").migrate(db.connection());
+        assertEquals(List.of("0.3.0-SNAPSHOT"), db.boundStrings, "migration 1's row is not written again");
+    }
+
+    @Test
     void aMigratedDatabaseIsOnlyRead() throws Exception {
         FakeJdbc db = new FakeJdbc();
         db.version = 2;

@@ -1,4 +1,5 @@
 # Example Map Studio asset adapter: one asset per UDT instance in the tag tree.
+# Map Studio contract 0.2.0 (docs/contract.md, docs/kinds-and-assets.md).
 # Jython 2.7. Put it in a project library module (for example
 # my_map_adapters/code.py) and name it in the Map Studio setup:
 #   "assetsFunction": "my_map_adapters.assets"

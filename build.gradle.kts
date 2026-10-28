@@ -18,6 +18,24 @@ extra["sdk_version"] = sdk_version
 allprojects {
     // Release builds pass -PreleaseVersion=<tag>; local builds carry a SNAPSHOT.
     version = (project.findProperty("releaseVersion") as String?)?.removePrefix("v") ?: "0.1.0-SNAPSHOT"
+
+    // Every module jar names the build's version in its manifest: the gateway
+    // reads Implementation-Version (ModuleVersion) for the map store's audit
+    // column mapstudio_schema_version.module_version, so a release built from
+    // tag v0.2.0 records "0.2.0" and a local build its -SNAPSHOT version. The
+    // 0.2.0 rehearsal found every manifest empty and the column saying "dev"
+    // (owner decision 2026-10-27: fixed before the tag). GatewayJarManifestTest
+    // fails when the attribute is missing.
+    val buildVersion = version.toString()
+    val jarTitle = "Map Studio $name"
+    tasks.withType<Jar>().configureEach {
+        manifest {
+            attributes(
+                "Implementation-Title" to jarTitle,
+                "Implementation-Version" to buildVersion
+            )
+        }
+    }
 }
 
 ignitionModule {

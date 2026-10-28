@@ -15,7 +15,7 @@ import com.inductiveautomation.ignition.common.gson.JsonParser;
 
 import com.aoindustrial.perspective.mapstudio.common.Messages;
 
-/** The shared contracts of 0.2.0 (draft): codes, types, the batch and op shapes, the record and the setup. */
+/** The shared contracts of 0.2.0: codes, types, the batch and op shapes, the record and the setup. */
 class ContractTest {
 
     static final String ID = "6f1c2a8e-3b5d-4c7e-9f10-2a3b4c5d6e7f";
@@ -34,7 +34,7 @@ class ContractTest {
         assertTrue(Messages.OUTBOUND_TYPES.containsAll(
             Set.of("map.load.reply", "edits.apply.reply", "map.changed", "error", "tags.browse.reply",
                 "tags.resolve.reply")));
-        assertEquals("0.2.0-draft", Messages.CONTRACT_VERSION);
+        assertEquals("0.2.0", Messages.CONTRACT_VERSION);
         assertEquals(1, Messages.VERSION);
     }
 

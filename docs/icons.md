@@ -1,6 +1,6 @@
 # Map Studio icons
 
-Map Studio ships one icon set in one minimalist style (epic 2 R9, PRD FR-9, NFR-10, NFR-11): a glyph for each oil and gas kind a project's kind list may name, and the state glyphs the map uses for comms lost, stale values and alarms. A kind names an icon by its id in the kind list's `icon` field. Catalogue version **0.2.0** (draft, versioned with the public contract, NFR-8).
+Map Studio ships one icon set in one minimalist style (epic 2 R9, PRD FR-9, NFR-10, NFR-11): a glyph for each oil and gas kind a project's kind list may name, and the state glyphs the map uses for comms lost, stale values and alarms. A kind names an icon by its id in the kind list's `icon` field. Catalogue version **0.2.0** (versioned with the public contract, NFR-8).
 
 Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway (`inductiveautomation/ignition:8.3.10`); **[unverified]** written but not seen working.
 
@@ -65,6 +65,8 @@ The priority digit is a text label beside the glyph, never part of it. Diagnosti
 - **Fading and blinking are the map's job, not the glyph's.** The 55 % fade for an alarm that is not live (ER-5), the faded priority 3 square once acknowledged, the 35 % dim for a site out of scope and the blink of an unacknowledged Critical (ER-3, which the template's map never shows: "nothing blinks") are applied by epic-viewing at draw time; there is no separate glyph for them.
 - **Triangles in kind icons are not checked by the build.** The build refuses kind icons with a circle or square outline; a triangular kind outline (priority 1's shape) is not detected and stays a review item. Two to look at: `line-valve` is the ISA gate valve bowtie (two triangles on their sides, on a pipe with a stem) and `compressor-station` is a trapezoid; neither is an upright triangle.
 - No other difference is known. Hue tokens (`--st-alarm-n-edge` in the template) are epic-viewing's call; the contact sheet uses stand-ins.
+
+**Engineering review (ER-27), 0.2.0: passed.** Reviewer Andy Ott, 2026-10-28. Reviewed: the alarm glyphs and state glyphs on the contact sheet, the differences above, and the `line-valve` and `compressor-station` outlines. No change to the glyph files was asked for. One change for epic-viewing was asked for: comms lost gets a colour when the map draws it (the glyphs are `currentColor`, so no file here changes). That is a deliberate change from the template's reviewed rule ("comms-lost ... never a colour", template `docs/ux.md`) and goes to engineering review again with epic-viewing's hue tokens.
 
 ![Contact sheet at 1440 px](screenshots/icons-contact-sheet-1440.png)
 

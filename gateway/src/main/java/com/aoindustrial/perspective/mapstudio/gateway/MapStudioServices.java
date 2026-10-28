@@ -135,9 +135,9 @@ public final class MapStudioServices {
         stores.retryNow();
     }
 
+    /** The build's version from the gateway jar's manifest, recorded by the migrator (ModuleVersion). */
     private static String moduleVersion() {
-        String v = MapStudioServices.class.getPackage().getImplementationVersion();
-        return v == null ? "dev" : v;
+        return ModuleVersion.of(MapStudioServices.class);
     }
 
     private static ThreadFactory daemon(String name) {
