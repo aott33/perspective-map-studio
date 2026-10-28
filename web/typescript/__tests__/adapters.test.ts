@@ -26,7 +26,17 @@ describe('host lists in map.load', () => {
     test('a viewer gets no assets: null, not an empty list', () => {
         const lists = readHostLists({ kinds: [PAD], adapters: { kinds: OK, assets: OK } });
         expect(lists.assets).toBeNull();
+        expect(lists.assetNames).toEqual([]);
         expect(lists.adapters?.assets.count).toBe(3);
+    });
+
+    test('assetNames reach every level, id and name alone; an editor\'s asset list fills them from an older Gateway (entry 9)', () => {
+        const viewer = readHostLists({ kinds: [PAD], assetNames: [{ id: 'P12', name: 'Pad 12' }, { id: 'P13' }, 'x'] });
+        expect(viewer.assets).toBeNull();
+        expect(viewer.assetNames).toEqual([{ id: 'P12', name: 'Pad 12' }]);
+        const older = readHostLists({ kinds: [PAD], assets: [P12] });
+        expect(older.assetNames).toEqual([{ id: 'P12', name: 'Pad 12' }]);
+        expect(readHostLists({ kinds: [PAD], assets: [P12], assetNames: [] }).assetNames).toEqual([]);
     });
 
     test('a Gateway that sends none of them gives no lists', () => {

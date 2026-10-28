@@ -97,6 +97,11 @@ class MapLoaderTest {
             assertEquals("pad", body.getAsJsonArray("kinds").get(0).getAsJsonObject().get("id").getAsString());
             assertEquals("ok", body.getAsJsonObject("adapters").getAsJsonObject("kinds").get("status").getAsString());
             assertEquals(1, body.getAsJsonObject("adapters").getAsJsonObject("assets").get("count").getAsInt());
+            // Every level gets the asset names without a base path (epic 3 entry 9, the search by asset name).
+            JsonObject name = body.getAsJsonArray("assetNames").get(0).getAsJsonObject();
+            assertEquals("P12", name.get("id").getAsString(), level);
+            assertEquals("Pad 12", name.get("name").getAsString(), level);
+            assertTrue(!name.has("basePath") && !name.has("kind"), "assetNames carries the id and the name alone");
             if (Messages.LEVEL_NONE.equals(level)) {
                 assertTrue(!body.has("assets"), "a viewer gets no asset rows (no tag paths)");
             } else {

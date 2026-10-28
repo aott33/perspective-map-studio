@@ -49,6 +49,8 @@ import {
 import { PresetPalette, StylePreview, TintPalette } from './StylePreview';
 import { MapFeatures, Selection, buildFeatures } from './features';
 import { ZoomControl } from './ZoomControl';
+import { SearchControl } from './SearchControl';
+import { CHOSEN_POINT_ZOOM, SearchResult, buildEntries } from './search';
 import { PickList, PickRow } from './PickList';
 import { DefaultPopup } from './DefaultPopup';
 import {
@@ -797,6 +799,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private drawnSelection = '';
     /** The zoom card with Fit and Return (epic 3 entries 7 and 14). */
     private zoomControl: ZoomControl | null = null;
+    /** The search field top-left, the View-mode top bar (epic 3 entry 9). */
+    private searchControl: SearchControl | null = null;
     /** The items' bounds key Fit keeps by, or null while Fit is not in force. */
     private fitKey: string | null = null;
     /** The items' bounds last drawn, for Fit. */
@@ -863,6 +867,13 @@ export class MapStudio extends Component<Props, MapStudioState> {
         // for the Perspective App Bar toggle.
         this.zoomControl = new ZoomControl(this.onFit, this.onReturn);
         map.addControl(this.zoomControl, 'top-right');
+        // The search field top-left (entry 9, DESIGN.md search-field): the top bar entry 3 shares with Needs you.
+        this.searchControl = new SearchControl(this.onSearchChoose, (open) => {
+            if (this.mapContainer) {
+                this.mapContainer.setAttribute('data-search-open', open ? 'true' : 'false');
+            }
+        });
+        map.addControl(this.searchControl, 'top-left');
         this.legendControl = new LegendControl((id) => {
             const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
             if (delegate) {
@@ -1370,6 +1381,50 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     };
 
+    /**
+     * A search result chosen (entry 9, R4): the map zooms to the item and selects it as a click on it
+     * does. A point is shown at zoom 15 at least (its glyph, name and icon KPI all draw there), its
+     * popup opened and the point click sent; a line or an area is fitted and selected (no popup: a
+     * line's popup is entry 2's). The jump is this component's own move, so a kept Fit is ended here.
+     */
+    private onSearchChoose = (result: SearchResult): void => {
+        const map = this.map;
+        const delegate = this.props.delegate;
+        const store = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        if (!map || !delegate) {
+            return;
+        }
+        const item = delegate.items.find((i) => i.id === result.id && !i.deleted);
+        if (!item) {
+            console.info('[MapStudio] The search result ' + result.id + ' is no longer on the map.');
+            return;
+        }
+        this.fitKey = null;
+        if (item.geometry.type === 'Point') {
+            const lngLat: [number, number] = [item.geometry.coordinates[0], item.geometry.coordinates[1]];
+            map.jumpTo({ center: lngLat, zoom: Math.max(map.getZoom(), CHOSEN_POINT_ZOOM) });
+            this.openPopup({ id: item.id, name: item.name, kind: item.kind }, lngLat);
+            if (store) {
+                store.sendPointClick(item.id);
+            }
+        } else {
+            let west = Infinity;
+            let south = Infinity;
+            let east = -Infinity;
+            let north = -Infinity;
+            for (const [x, y] of item.geometry.coordinates) {
+                west = Math.min(west, x);
+                east = Math.max(east, x);
+                south = Math.min(south, y);
+                north = Math.max(north, y);
+            }
+            this.fitTo([west, south, east, north]);
+            this.selectLine(item.id);
+        }
+        this.publishFit();
+        console.info('[MapStudio] Search: ' + item.name + ' chosen (' + result.matched + ').');
+    };
+
     private publishFit(): void {
         if (this.zoomControl) {
             this.zoomControl.setFit(this.itemBounds !== null, this.fitKey !== null);
@@ -1448,6 +1503,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
             points.setData(data.points);
             marks.setData(data.marks);
             arrow.setData(data.arrow);
+            if (this.searchControl && delegate.itemsRevision !== this.drawnRevision) {
+                // The search's entries follow the items (entry 9): names, kinds and the linked assets' names.
+                this.searchControl.setEntries(buildEntries(items, delegate.lists.kinds, delegate.lists.assetNames));
+            }
             this.drawnRevision = delegate.itemsRevision;
             this.drawnLive = delegate.liveRevision;
             this.drawnSelection = selectionKey;
@@ -1633,6 +1692,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.drawControl = null;
         this.legendControl = null;
         this.zoomControl = null;
+        this.searchControl = null;
     }
 
     /**
@@ -2189,7 +2249,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                      data-live-seq={delegate ? String(delegate.live.seq) : ''}
                      data-live-full={delegate ? String(delegate.live.fulls) : ''}
                      data-pick-open={this.state.pick ? 'true' : 'false'}
-                     data-legend-open="false" />
+                     data-legend-open="false"
+                     data-search-open="false" />
                 <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '')}
                      data-pending={pending ? 'true' : 'false'}
                      data-drawing={this.state.drawing ? 'true' : 'false'}

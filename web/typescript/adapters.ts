@@ -50,10 +50,18 @@ export interface AdapterStatus {
     refreshedAt: string | null;
 }
 
+/** An asset's id and name alone (epic 3 entry 9): what every level gets, for the search by asset name. */
+export interface AssetName {
+    id: string;
+    name: string;
+}
+
 export interface HostLists {
     kinds: Kind[];
     /** null when map.load sent no assets (a viewer, or an older Gateway). */
     assets: Asset[] | null;
+    /** The assets' ids and names, sent at every level (0.3.0); empty from an older Gateway. */
+    assetNames: AssetName[];
     adapters: { kinds: AdapterStatus; assets: AdapterStatus } | null;
 }
 
@@ -109,6 +117,14 @@ export function readAsset(value: unknown): Asset | null {
     return { id: value.id, name: value.name, kind: value.kind, basePath: value.basePath };
 }
 
+/** One asset name row, or null when it is not one. */
+export function readAssetName(value: unknown): AssetName | null {
+    if (!isRecord(value) || typeof value.id !== 'string' || typeof value.name !== 'string') {
+        return null;
+    }
+    return { id: value.id, name: value.name };
+}
+
 /** One list's status, or null when it is not one. */
 export function readAdapterStatus(value: unknown): AdapterStatus | null {
     if (!isRecord(value) || typeof value.status !== 'string' || !STATUS_WORDS.has(value.status)
@@ -148,12 +164,18 @@ export function readHostLists(body: Record<string, unknown>): HostLists {
             adapters = { kinds: k, assets: a };
         }
     }
+    const assets = Array.isArray(body.assets) ? readRows(body.assets, readAsset) : null;
+    // An older Gateway sends no assetNames: an editor's asset list still gives the names.
+    const assetNames = Array.isArray(body.assetNames)
+        ? readRows(body.assetNames, readAssetName)
+        : (assets || []).map((a) => ({ id: a.id, name: a.name }));
     return {
         kinds: readRows(body.kinds, readKind),
-        assets: Array.isArray(body.assets) ? readRows(body.assets, readAsset) : null,
+        assets,
+        assetNames,
         adapters
     };
 }
 
 /** No lists yet (before map.load answered). */
-export const NO_HOST_LISTS: HostLists = { kinds: [], assets: null, adapters: null };
+export const NO_HOST_LISTS: HostLists = { kinds: [], assets: null, assetNames: [], adapters: null };
