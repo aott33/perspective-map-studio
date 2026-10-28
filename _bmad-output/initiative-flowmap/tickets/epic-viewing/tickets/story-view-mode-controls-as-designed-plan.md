@@ -76,11 +76,11 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `common/.../mapstudio.props.json` -- the `editMode` prop.
-- [ ] `web/typescript/{controls,ZoomControl,LegendControl}.ts`, `MapStudio.tsx`, `mapstudio.css`, the Jest test; `FitControl.ts` and `BasemapControl.ts` removed.
-- [ ] `ops/` -- `editMode` on the three editing views.
-- [ ] `e2e/` -- the four specs.
-- [ ] `docs/`, `CHANGELOG.md`, this plan.
+- [x] `common/.../mapstudio.props.json` -- the `editMode` prop.
+- [x] `web/typescript/{controls,ZoomControl,LegendControl}.ts`, `MapStudio.tsx`, `mapstudio.css`, the Jest test; `FitControl.ts` and `BasemapControl.ts` removed.
+- [x] `ops/` -- `editMode` on the three editing views.
+- [x] `e2e/` -- the four specs.
+- [x] `docs/`, `CHANGELOG.md`, this plan.
 
 **Acceptance Criteria:**
 - Given the dev stack at 1440 and 390 px, when `/` loads, then the top-right holds one zoom card (plus, the level, minus, Fit, Return) and nothing else, Return disabled until a selection and recentring on one.
@@ -91,9 +91,22 @@ context:
 
 ## Implementation Notes
 
+- **Commits on the worktree branch** (`worktree-agent-ae6f21a193005b8ce`, baseline `8571024`): 78b598f (the controls, the prop, the views, the specs, this plan), f0b1994 (the docs and the changelog), the row fix (what the first live run taught: a percentage `max-width` on the floated control bounded the row to nothing, so the attribution wrapped above the button at 1440 px; the corner's container is bounded instead, and the reply box clears the wrapped row on a phone), then the closing commit (evidence, screenshots, this plan).
+- **Decision 4 refined:** the panel is inserted before the row inside the control's own element, so it sits above the button in the corner's flow and no absolute placement is needed; the first basemap button takes the focus on open.
+- **The tracer spec** draws its line on `/edit` as the map editor (`editorTest`), so the `mapstudio-dev-1440.png` and `-390.png` screenshots now show the dev editing page with Edit mode's tool; the phone measure's line-tool probe opens `/edit` in a second page of its mobile context.
+- **Not done, by scope:** the glyph key and the Lines and Names toggles (entry 3, the panel's sections take them), the Edit switch and the rail (epic-editing), the surface token review (entry 12: the controls keep `--container`), a live change of `editMode` (read once at mount; `docs/contract.md` says so).
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+Review pass 1 (quick lens, read by this agent from the diff against the baseline; no subagent tool in this session): 0 high, 1 medium, 2 low, 0 false, 0 maybe-false.
+
+| Finding | Verdict | Route | Evidence |
+| --- | --- | --- | --- |
+| The legend row's `max-width` was a percentage of its own floated box, so the attribution wrapped above the Legend button even at 1440 px and the row's box spanned the viewport, which put it in the reserved corner | medium | patch | seen in the first live run's screenshots and the failing corner check; the corner's container is bounded instead (`calc(100% - 76px)`) and the checks read the row's parts; patched before the final verification |
+| `editMode` is read once at mount: a prop changed while the session is open adds or removes nothing | low (by design; the dev views set it statically) | rejected | `componentDidMount` adds the draw control; `docs/contract.md` and the platform checks say so; epic-editing's Edit switch owns the live transition |
+| A basemap click that makes the attribution appear can grow the row and move the open panel up under the pointer, so the hover tint lands on the next button | low | rejected | cosmetic; the choice and `aria-pressed` are right (seen at 390 px in the first run); the row stays one line at desktop widths |
 
 ## Design Notes
 
