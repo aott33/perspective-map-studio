@@ -29,7 +29,13 @@ import {
 import { MapChanges, MapChangedBody } from './changes';
 import { EditLevel, MapItemRecord } from './contract';
 import { AdapterStatus, HostLists, NO_HOST_LISTS } from './adapters';
-import { MESSAGE_EVENT, Reply, mapLoad, pointClick, readReply, replyText } from './messages';
+import { MESSAGE_EVENT, Reply, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText } from './messages';
+import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, itemState } from './live';
+import {
+    DISC_CENTER, IMAGE_HEIGHT, IMAGE_WIDTH, MARKER_TOKENS, MarkerColors, MarkerProperties, SpriteSymbol, markerProperties,
+    markerSvg, parseImageId, parseSprite
+} from './markers';
+import { DefaultPopup } from './DefaultPopup';
 import {
     STORE_UNKNOWN, StoreState, storeStateAttribute, storeStateFromError, storeStateFromLoad, storeStateFromSaveError,
     storeStatusText
@@ -41,9 +47,10 @@ import {
     reasonFromError, savedRecords, storageKey, summaryText, unsavedItems
 } from './unsaved';
 import { UnsavedSender } from './unsavedSender';
-import { AuthorParams, PopupPoint, popupMountPath } from './popupParams';
+import { AuthorParams, PopupPoint, popupMaxWidth, popupMountPath } from './popupParams';
 import { registerTestHook, takeTestReply } from './testHook';
 import { drawColor, themeColor } from './theme';
+import { Kind } from './adapters';
 
 /** Must match MapStudioComponent.COMPONENT_ID on the Java side. */
 export const COMPONENT_TYPE = 'ao.mapstudio';
@@ -77,6 +84,8 @@ interface OpenPopup {
 
 interface MapStudioState extends DrawState {
     popup: OpenPopup | null;
+    /** Bumped every few seconds while the popup is open, so its data ages move. */
+    clock: number;
 }
 
 /** The delegate state the component renders. */
@@ -118,6 +127,10 @@ export interface MapStudioDelegateState {
     editing: 'on' | 'off';
     /** The one warning when this browser cannot keep unsaved edits, or ''. */
     storageWarning: string;
+    /** The live values and kind display of the last batches (epic 3 entry 5, live.ts). */
+    live: LiveState;
+    /** Bumped whenever a batch is applied, so the component knows to redraw the markers. */
+    liveRevision: number;
 }
 
 /** `localStorage`, or null when the browser refuses it (a private window, blocked site data). */
@@ -177,6 +190,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
     /** The batch whose save the save status shows (the last line drawn here), or null. */
     private saveBatchId: string | null = null;
+    private live: LiveState = LIVE_INITIAL;
+    private liveRevision = 0;
 
     constructor(componentStore: AbstractUIElementStore) {
         super(componentStore);
@@ -223,8 +238,31 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             unsavedRevision: this.unsavedRevision,
             sending: this.sender.sending(),
             editing: this.store.status === 'unavailable' ? 'off' : 'on',
-            storageWarning: this.storageWarning
+            storageWarning: this.storageWarning,
+            live: this.live,
+            liveRevision: this.liveRevision
         };
+    }
+
+    /** The popup of a map item opened: the Gateway pushes its values on change until popup.close (AD-7). */
+    sendPopupOpen(itemId: string): void {
+        this.fireEvent(MESSAGE_EVENT, popupOpen(itemId) as unknown as JsObject);
+    }
+
+    sendPopupClose(itemId: string): void {
+        this.fireEvent(MESSAGE_EVENT, popupClose(itemId) as unknown as JsObject);
+    }
+
+    /** A values.batch: merged into the live state (a full one replaces it); an unreadable one is ignored. */
+    private onValuesBatch(body: ValuesBatchBody | null): void {
+        if (!body) {
+            console.warn('[MapStudio] An unreadable values.batch was ignored; the next full batch replaces the values.');
+            return;
+        }
+        this.live = applyBatch(this.live, body);
+        this.liveRevision++;
+        console.debug('[MapStudio] Live values: ' + (body.full ? 'full, ' : '') + body.items.length + ' item(s) at seq ' + body.seq);
+        this.notify();
     }
 
     /** Send `point.click` for one point; the reply arrives in handleEvent. */
@@ -333,6 +371,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         const reply = readReply(eventObject);
         if (reply.kind === 'map.changed') {
             this.onMapChanged(reply.body);
+            return;
+        }
+        if (reply.kind === 'values.batch') {
+            this.onValuesBatch(reply.body);
             return;
         }
         if (reply.kind === 'map.load.reply' || (reply.kind === 'error' && reply.id === this.mapLoadId)) {
@@ -452,11 +494,59 @@ const SOURCE_ITEM_LINES = 'mapstudio-items-line';
 const SOURCE_ITEM_POINTS = 'mapstudio-items-point';
 const LAYER_ITEM_LINES = 'mapstudio-items-line';
 const LAYER_ITEM_POINTS = 'mapstudio-items-point';
+/** The point markers: one image per marker state (markers.ts), over the point dots. */
+const LAYER_ITEM_MARKERS = 'mapstudio-items-marker';
+/** The served sprite the marker images are drawn from (docs/icons.md). */
+const SPRITE_URL = '/res/mapstudio/icons/mapstudio-icons.svg';
+/** How often an open popup's data ages are redrawn. */
+const POPUP_CLOCK_MS = 5000;
 /** The queued (unsaved) map items, drawn dashed (epic 2 story 8). */
 const SOURCE_UNSAVED_LINES = 'mapstudio-unsaved-line';
 const SOURCE_UNSAVED_POINTS = 'mapstudio-unsaved-point';
 const LAYER_UNSAVED_LINES = 'mapstudio-unsaved-line';
 const LAYER_UNSAVED_POINTS = 'mapstudio-unsaved-point';
+
+/** The first token of each list that resolves on the root (theme.ts), for the marker images. */
+function markerColors(root: HTMLElement | undefined): MarkerColors {
+    const first = (tokens: readonly string[]): string => {
+        for (const token of tokens) {
+            const value = themeColor(root, token);
+            if (value !== 'transparent') {
+                return value;
+            }
+        }
+        return 'transparent';
+    };
+    let font = 'sans-serif';
+    if (root && typeof getComputedStyle === 'function') {
+        const family = getComputedStyle(root).fontFamily;
+        if (family) {
+            font = family;
+        }
+    }
+    return {
+        disc: first(MARKER_TOKENS.disc),
+        glyph: first(MARKER_TOKENS.glyph),
+        halo: first(MARKER_TOKENS.halo),
+        commsLost: first(MARKER_TOKENS.commsLost),
+        alarm: [first(MARKER_TOKENS.alarm1), first(MARKER_TOKENS.alarm2), first(MARKER_TOKENS.alarm3)],
+        font
+    };
+}
+
+/** Give every point feature its marker properties (markers.ts) from its kind's icon and its live state. */
+function addMarkerProperties(features: Array<{ properties: { id: string; name: string; kind: string } }>, kinds: Kind[],
+                             live: LiveState): void {
+    const byId = new Map<string, Kind>();
+    kinds.forEach((k) => byId.set(k.id, k));
+    for (const f of features) {
+        const kind = byId.get(f.properties.kind);
+        const state = itemState(live.items[f.properties.id], live.display[f.properties.kind]);
+        const marker: MarkerProperties = markerProperties(f.properties.id, f.properties.name, f.properties.kind,
+            kind ? kind.icon : '', state);
+        Object.assign(f.properties, marker);
+    }
+}
 
 /**
  * The Map Studio component: a MapLibre map on a blank style that draws the
@@ -464,7 +554,7 @@ const LAYER_UNSAVED_POINTS = 'mapstudio-unsaved-point';
  * `point.click` through the delegate; the reply is shown as text over the map.
  */
 export class MapStudio extends Component<Props, MapStudioState> {
-    state: MapStudioState = { ...DRAW_IDLE, popup: null };
+    state: MapStudioState = { ...DRAW_IDLE, popup: null, clock: Date.now() };
 
     private mapContainer: HTMLDivElement | null = null;
     private map: MapLibreMap | null = null;
@@ -485,6 +575,16 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private drawnUnsaved = '';
     /** Terra Draw features of finished lines: removed once queued, as the unsaved layer draws them. */
     private queuedFeatures: Array<string | number> = [];
+    /** The theme colours the marker images are drawn with, read once at mount. */
+    private markerColors: MarkerColors | null = null;
+    /** The sprite's symbols once fetched; null before, so images wait in pendingImages. */
+    private symbols: Record<string, SpriteSymbol> | null = null;
+    private spriteFailed = false;
+    private pendingImages = new Set<string>();
+    private madeImages = new Set<string>();
+    /** The live revision last drawn into the markers. */
+    private drawnLive = -1;
+    private popupClock: ReturnType<typeof setInterval> | null = null;
 
     componentDidMount(): void {
         if (!this.mapContainer) {
@@ -497,6 +597,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
             point: themeColor(root, '--label'),
             pointStroke: themeColor(root, '--containerRoot')
         };
+        this.markerColors = markerColors(root);
         const map = new MapLibreMap({
             container: this.mapContainer,
             style: {
@@ -535,6 +636,21 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     'circle-stroke-width': 2
                 }
             });
+            map.addLayer({
+                id: LAYER_ITEM_MARKERS,
+                type: 'symbol',
+                source: SOURCE_ITEM_POINTS,
+                layout: {
+                    'icon-image': ['get', 'marker'],
+                    'icon-anchor': 'top',
+                    // The image's top edge sits at the point; the disc's centre is DISC_CENTER[1] px below it.
+                    'icon-offset': [0, -DISC_CENTER[1]],
+                    'icon-allow-overlap': true,
+                    'icon-ignore-placement': true
+                }
+            });
+            map.on('styleimagemissing', (ev: { id: string }) => this.makeImage(ev.id));
+            this.loadSprite();
             map.addSource(SOURCE_UNSAVED_LINES, { type: 'geojson', data: empty.lines });
             map.addSource(SOURCE_UNSAVED_POINTS, { type: 'geojson', data: empty.points });
             map.addLayer({
@@ -561,10 +677,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
             if (delegate) {
                 delegate.sendMapLoad();
             }
-            map.on('click', LAYER_ITEM_POINTS, this.onPointClick);
             map.on('click', this.onMapClick);
-            map.on('mouseenter', LAYER_ITEM_POINTS, () => { map.getCanvas().style.cursor = 'pointer'; });
-            map.on('mouseleave', LAYER_ITEM_POINTS, () => { map.getCanvas().style.cursor = ''; });
+            for (const layer of [LAYER_ITEM_POINTS, LAYER_ITEM_MARKERS]) {
+                map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
+                map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
+            }
             this.startTerraDraw(map, root);
             // Readiness for the e2e suite: set once the map has gone idle with
             // its sources and layers added.
@@ -616,16 +733,19 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private drawItems(): void {
         this.drawUnsaved();
         const delegate = this.props.delegate;
-        if (!this.map || !this.itemsReady || !delegate || delegate.itemsRevision === this.drawnRevision) {
+        if (!this.map || !this.itemsReady || !delegate
+            || (delegate.itemsRevision === this.drawnRevision && delegate.liveRevision === this.drawnLive)) {
             return;
         }
         const data = itemsToGeoJson(delegate.editing === 'off' ? [] : delegate.items);
+        addMarkerProperties(data.points.features, delegate.lists.kinds, delegate.live);
         const lines = this.map.getSource(SOURCE_ITEM_LINES) as GeoJSONSource | undefined;
         const points = this.map.getSource(SOURCE_ITEM_POINTS) as GeoJSONSource | undefined;
         if (lines && points) {
             lines.setData(data.lines);
             points.setData(data.points);
             this.drawnRevision = delegate.itemsRevision;
+            this.drawnLive = delegate.liveRevision;
             if (this.mapContainer) {
                 this.mapContainer.setAttribute('data-items-loaded',
                     String(data.lines.features.length + data.points.features.length));
@@ -678,7 +798,75 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     }
 
+    /** Fetch the sprite once; the images asked for meanwhile are made when it arrives. */
+    private loadSprite(): void {
+        if (typeof fetch !== 'function') {
+            this.spriteFailed = true;
+            return;
+        }
+        fetch(SPRITE_URL).then((res) => {
+            if (!res.ok) {
+                throw new Error('HTTP ' + res.status);
+            }
+            return res.text();
+        }).then((text) => {
+            this.symbols = parseSprite(text);
+            const pending = Array.from(this.pendingImages);
+            this.pendingImages.clear();
+            pending.forEach((id) => this.makeImage(id));
+        }).catch((err) => {
+            this.spriteFailed = true;
+            console.warn('[MapStudio] The icon sprite could not be loaded (' + String(err && err.message ? err.message : err)
+                + '); markers draw without glyphs.');
+            const pending = Array.from(this.pendingImages);
+            this.pendingImages.clear();
+            pending.forEach((id) => this.makeImage(id));
+        });
+    }
+
+    /**
+     * MapLibre asked for a marker image (styleimagemissing): draw it from the sprite and the theme
+     * tokens at the device pixel ratio and add it; a second ask for the same id is ignored.
+     */
+    private makeImage(id: string): void {
+        const spec = parseImageId(id);
+        const map = this.map;
+        if (!spec || !map || !this.markerColors || this.madeImages.has(id)) {
+            return;
+        }
+        if (!this.symbols && !this.spriteFailed) {
+            this.pendingImages.add(id);
+            return;
+        }
+        this.madeImages.add(id);
+        const svg = markerSvg(spec, this.symbols || {}, this.markerColors);
+        const ratio = typeof window !== 'undefined' && window.devicePixelRatio ? Math.min(3, window.devicePixelRatio) : 1;
+        const image = new Image();
+        image.onload = () => {
+            if (this.map !== map) {
+                return;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(IMAGE_WIDTH * ratio);
+            canvas.height = Math.round(IMAGE_HEIGHT * ratio);
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                return;
+            }
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            if (!map.hasImage(id)) {
+                map.addImage(id, data, { pixelRatio: ratio });
+            }
+        };
+        image.onerror = () => {
+            console.warn('[MapStudio] A marker image could not be drawn.');
+        };
+        image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }
+
     componentWillUnmount(): void {
+        this.stopPopupClock();
         if (typeof window !== 'undefined') {
             window.removeEventListener('storage', this.onStorage);
         }
@@ -838,13 +1026,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (typeof pointId !== 'string') {
             return;
         }
+        const kindId = feature && feature.properties && typeof feature.properties.kind === 'string' ? feature.properties.kind : '';
         const name = feature && feature.properties && typeof feature.properties.name === 'string'
             ? feature.properties.name : '';
         const geometry = feature ? feature.geometry : undefined;
         const lngLat: [number, number] = geometry && geometry.type === 'Point'
             ? [geometry.coordinates[0], geometry.coordinates[1]]
             : [ev.lngLat.lng, ev.lngLat.lat];
-        this.openPopup({ id: pointId, name }, lngLat);
+        this.openPopup({ id: pointId, name, kind: kindId }, lngLat);
 
         const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
         if (!delegate) {
@@ -860,11 +1049,33 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * would close the popup that a click on another point has just moved.
      */
     private onMapClick = (ev: MapMouseEvent): void => {
-        if (this.state.drawing || !this.map || !this.popup || !this.popup.isOpen()) {
+        if (this.state.drawing || !this.map) {
             return;
         }
-        const onPoint = this.map.queryRenderedFeatures(ev.point, { layers: [LAYER_ITEM_POINTS] });
-        if (onPoint.length === 0) {
+        const onPoint = this.map.queryRenderedFeatures(ev.point, { layers: [LAYER_ITEM_MARKERS, LAYER_ITEM_POINTS] });
+        if (onPoint.length > 0) {
+            // A click on a marker or its dot: the point click round trip and the popup, once. A
+            // marker image is wider than its dot, so when two points' markers overlap the click goes
+            // to the point whose position is nearest to it, not to whichever MapLibre lists first.
+            const map = this.map;
+            let nearest = onPoint[0];
+            let best = Number.POSITIVE_INFINITY;
+            for (const f of onPoint) {
+                const g = f.geometry;
+                if (!g || g.type !== 'Point') {
+                    continue;
+                }
+                const p = map.project([g.coordinates[0], g.coordinates[1]]);
+                const d = (p.x - ev.point.x) * (p.x - ev.point.x) + (p.y - ev.point.y) * (p.y - ev.point.y);
+                if (d < best) {
+                    best = d;
+                    nearest = f;
+                }
+            }
+            this.onPointClick({ ...ev, features: [nearest] } as MapLayerMouseEvent);
+            return;
+        }
+        if (this.popup && this.popup.isOpen()) {
             this.popup.remove();
         }
     };
@@ -893,8 +1104,18 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.popup.setDOMContent(this.popupContent);
             this.popup.on('close', this.onPopupClosed);
         }
-        this.setState({ popup: { point, lngLat } }, () => {
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        const before = this.state.popup;
+        if (before && before.point.id !== point.id && delegate) {
+            delegate.sendPopupClose(before.point.id);
+        }
+        if (delegate && (!before || before.point.id !== point.id)) {
+            delegate.sendPopupOpen(point.id);
+        }
+        this.startPopupClock();
+        this.setState({ popup: { point, lngLat }, clock: Date.now() }, () => {
             if (this.popup && this.map) {
+                this.popup.setMaxWidth(popupMaxWidth(this.map.project(lngLat).x, this.map.getContainer().clientWidth));
                 this.popup.setLngLat(lngLat);
                 if (!this.popup.isOpen()) {
                     this.popup.addTo(this.map);
@@ -903,13 +1124,37 @@ export class MapStudio extends Component<Props, MapStudioState> {
         });
     }
 
-    /** MapLibre closed the popup (close button, map click): unmount the view. */
+    private startPopupClock(): void {
+        if (this.popupClock === null) {
+            this.popupClock = setInterval(() => this.setState({ clock: Date.now() }), POPUP_CLOCK_MS);
+        }
+    }
+
+    private stopPopupClock(): void {
+        if (this.popupClock !== null) {
+            clearInterval(this.popupClock);
+            this.popupClock = null;
+        }
+    }
+
+    /** MapLibre closed the popup (close button, map click): unmount the view and tell the Gateway. */
     private onPopupClosed = (): void => {
-        if (this.state.popup !== null) {
+        this.stopPopupClock();
+        const open = this.state.popup;
+        if (open !== null) {
+            const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+            if (delegate) {
+                delegate.sendPopupClose(open.point.id);
+            }
             this.setState({ popup: null });
         }
     };
 
+    /**
+     * The popup's content: the spike's project view when the popupView prop names one (it keeps
+     * precedence until entry 8 retires it, plan decision 4); else Map Studio's default popup when
+     * the item's kind has a display that shows something; else the text fallback.
+     */
     private renderPopup(): React.ReactNode {
         const open = this.state.popup;
         if (!open || !this.popupContent) {
@@ -917,6 +1162,25 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         const store = this.props.store;
         const { path, params } = this.props.props.popupView;
+        const delegate = this.props.delegate;
+        const kindId = open.point.kind || '';
+        if (!path && delegate) {
+            const display = delegate.live.display[kindId];
+            const kind = delegate.lists.kinds.find((k) => k.id === kindId);
+            if (display && (display.comms || display.alarms.on || display.kpis.some((k) => k.on))) {
+                return ReactDOM.createPortal(
+                    <DefaultPopup
+                        key={'default|' + open.point.id}
+                        item={{ id: open.point.id, name: open.point.name, kind: kindId,
+                            kindName: kind ? kind.name : kindId, icon: kind ? kind.icon : '' }}
+                        display={display}
+                        values={delegate.live.items[open.point.id]}
+                        now={this.state.clock}
+                    />,
+                    this.popupContent
+                );
+            }
+        }
         const mountPath = popupMountPath(store.viewMountPath, store.addressPathString);
         return ReactDOM.createPortal(
             <PointPopup
@@ -948,6 +1212,41 @@ export class MapStudio extends Component<Props, MapStudioState> {
                  {...attrs('assets', lists.adapters ? lists.adapters.assets : null)}
                  data-kinds-rows={String(lists.kinds.length)}
                  data-assets-rows={lists.assets === null ? '' : String(lists.assets.length)} />
+        );
+    }
+
+    /**
+     * The live state of every map item that has values, as one hidden element per item, for tests
+     * and the dev pages (the markers are WebGL); a map item the plan does not cover has no row.
+     */
+    private renderLiveState(live: LiveState, kinds: Kind[]): React.ReactNode {
+        const ids = Object.keys(live.items);
+        if (ids.length === 0) {
+            return null;
+        }
+        const delegate = this.props.delegate;
+        const items = delegate ? delegate.items : [];
+        return (
+            <div className="mapstudio-live" hidden data-live-seq={String(live.seq)} data-live-batches={String(live.batches)}
+                 data-live-full={String(live.fulls)} data-live-items={String(ids.length)}>
+                {ids.map((id) => {
+                    const values = live.items[id];
+                    const item = items.find((i) => i.id === id);
+                    const kind = item ? kinds.find((k) => k.id === item.kind) : undefined;
+                    const state = itemState(values, item ? live.display[item.kind] : undefined);
+                    const spec = markerProperties(id, item ? item.name : '', item ? item.kind : '', kind ? kind.icon : '', state);
+                    return (
+                        <div key={id} className="mapstudio-live-item" data-item-id={id} data-state={state.badge}
+                             data-comms={state.commsLost ? 'lost' : values.comms ? (values.comms.stale ? 'stale' : 'ok') : ''}
+                             data-stale={state.stale ? 'true' : 'false'}
+                             data-alarm={state.alarm ? state.alarm.priority + ':' + (state.alarm.unacked ? 'unacked' : 'acked') + ':' + state.alarm.active : ''}
+                             data-kpi={state.iconKpi ? state.iconKpi.text : ''}
+                             data-kpi-stale={state.iconKpi && state.iconKpi.stale ? 'true' : 'false'}
+                             data-marker={spec.marker}
+                             data-problems={values.problems.map((p) => p.slot + ': ' + p.reason).join('; ')} />
+                    );
+                })}
+            </div>
         );
     }
 
@@ -1009,7 +1308,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                      data-refresh-interval={delegate && delegate.refreshIntervalSeconds !== null
                          ? String(delegate.refreshIntervalSeconds) : ''}
                      data-unsaved-count={String(unsaved.length)}
-                     data-editing={editing} />
+                     data-editing={editing}
+                     data-live-seq={delegate ? String(delegate.live.seq) : ''}
+                     data-live-full={delegate ? String(delegate.live.fulls) : ''} />
                 <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '')}
                      data-pending={pending ? 'true' : 'false'}
                      data-drawing={this.state.drawing ? 'true' : 'false'}
@@ -1034,6 +1335,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                         delegate ? delegate.storageWarning : '', delegate ? delegate.sending : [])}
                 </div>
                 {this.renderAdapterStatus(delegate ? delegate.lists : NO_HOST_LISTS)}
+                {delegate ? this.renderLiveState(delegate.live, delegate.lists.kinds) : null}
                 {this.renderPopup()}
             </div>
         );

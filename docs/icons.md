@@ -77,11 +77,11 @@ On a 390 px phone: [icons-contact-sheet-390.png](screenshots/icons-contact-sheet
 The owner's decision (2026-10-26): a point map item in its normal state is a **neutral dot** (`point`) below zoom 14 and its **kind glyph** from zoom 14 in, matching the template's reviewed map (PRD FR-34, template `docs/map.md` section 5). Every point keeps a 44 px touch target (24 px with a mouse, NFR-3), whatever the glyph's drawn size, and a 2 px halo in the theme's background token so it reads on light and dark tiles.
 
 - Normal: neutral token, no hue (AD-11).
-- Comms lost: glyph dimmed, the `comms-lost` badge, and "Comms lost" in its label or tip; its values show as stale.
+- Comms lost: a dashed ring and the glyph in the `comms-lost` token (owner, 2026-10-28; epic 3 entry 5: `--mapstudio-comms-lost`, falling back to Perspective's `--qual-1`, the purple family; ER-27 in entry 12), the `comms-lost` badge, and "Comms lost" under the icon; its values show as stale.
 - Stale value: the `stale` glyph beside the value and "stale" in the tip; never shown as current.
 - Alarm: the shape of the highest priority, in its state (unacknowledged, acknowledged, cleared and not yet acknowledged), in the theme's alarm hue, with the priority digit as a label and the count where enabled; priority 3 the outlined square, faded once acknowledged.
 
-The sprite is SVG, not a MapLibre SDF sprite: the map rasterises each glyph in the theme token colour it needs at the device pixel ratio (`map.addImage`); the tools and popups use `<svg><use href="#ms-<id>"/></svg>` directly.
+The sprite is SVG, not a MapLibre SDF sprite: the map rasterises each marker (the disc with the kind glyph, the state badge, the digit and the text lines) from the sprite's symbols in the theme token colours at the device pixel ratio and adds it as one image (`map.addImage` on `styleimagemissing`; `web/typescript/markers.ts`, epic 3 entry 5); the popup uses `<svg><use href="...mapstudio-icons.svg#ms-<id>"/></svg>` directly.
 
 ## Adding or changing an icon
 

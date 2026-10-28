@@ -206,3 +206,136 @@
     background: var(--container);
     cursor: not-allowed;
 }
+
+/* Live state tokens (epic 3 entry 5, AD-11, plan decision 6). Each is a theme token the host
+   project may define; the fallback maps it to a Perspective theme variable, never a literal.
+   comms-lost: the magenta or purple family, distinct from every alarm hue (owner, 2026-10-28;
+   ER-27 reviews it in entry 12 with the alarm priority tokens). */
+.mapstudio {
+    --mapstudio-comms-lost: var(--qual-1);
+    --mapstudio-alarm-1: var(--error);
+    --mapstudio-alarm-2: var(--warning);
+    --mapstudio-alarm-3: var(--info);
+}
+
+/* The default popup (AD-7): header, comms with its data age, KPIs, alarms, in that order. */
+.mapstudio-popup--default {
+    min-width: 220px;
+    max-width: 320px;
+    padding: 0 0 8px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.mapstudio-popup-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 28px 8px 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.mapstudio-popup-glyph {
+    flex: 0 0 auto;
+    color: var(--label);
+}
+
+.mapstudio-popup-title {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.mapstudio-popup-name {
+    font-size: 16px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-popup-subline {
+    font-size: 12px;
+    color: var(--label--disabled);
+}
+
+.mapstudio-popup-link {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+}
+
+.mapstudio-popup-comms,
+.mapstudio-popup-kpi,
+.mapstudio-popup-alarms {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+}
+
+.mapstudio-popup-comms {
+    border-bottom: 1px solid var(--border);
+}
+
+.mapstudio-popup-kpis {
+    padding: 4px 0;
+}
+
+.mapstudio-popup-label {
+    flex: 1 1 auto;
+    color: var(--label--disabled);
+}
+
+.mapstudio-popup-value {
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-popup-kpi--icon .mapstudio-popup-value {
+    font-weight: 600;
+}
+
+.mapstudio-popup-state-glyph,
+.mapstudio-popup-alarm-glyph {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+}
+
+/* Comms lost in its own token, with its glyph and the words (never colour alone). */
+.mapstudio-popup-comms--lost {
+    color: var(--mapstudio-comms-lost);
+}
+
+.mapstudio-popup-comms--lost .mapstudio-popup-label {
+    color: var(--mapstudio-comms-lost);
+}
+
+/* Stale values are marked in words ("Stale - ") and keep the neutral colour. */
+.mapstudio-popup-kpi[data-stale="true"] .mapstudio-popup-value {
+    color: var(--label--disabled);
+}
+
+.mapstudio-popup-alarms {
+    margin: 4px 12px 0;
+    padding: 6px 8px;
+    border-radius: var(--borderRadius);
+    border-left: 3px solid transparent;
+}
+
+.mapstudio-popup-alarms--active {
+    border-left-color: var(--mapstudio-alarm-1);
+}
+
+.mapstudio-popup-alarms--p1 {
+    border-left-color: var(--mapstudio-alarm-1);
+    color: var(--mapstudio-alarm-1);
+}
+
+.mapstudio-popup-alarms--p2 {
+    border-left-color: var(--mapstudio-alarm-2);
+    color: var(--mapstudio-alarm-2);
+}
+
+.mapstudio-popup-alarms--p3 {
+    border-left-color: var(--mapstudio-alarm-3);
+    color: var(--mapstudio-alarm-3);
+}

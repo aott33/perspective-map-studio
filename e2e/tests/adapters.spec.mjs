@@ -128,8 +128,19 @@ test.describe('1440 px', () => {
                 message: `The kind function ${KINDS_FN} did not answer within 5 s.` });
             expect(s.assets.status).toBe('slow');
 
-            // Recovers: back to ok without a Gateway restart.
+            // Recovers: back to ok without a Gateway restart. The dev setup's refresh interval is 10 s
+            // (epic 3 entry 5), so a periodic refresh begun in mode slow is usually still in flight
+            // when ok is pressed, and that press joins it (one call per function at a time) and
+            // reports slow once more; the next press is the recovery.
             r = await press(page, 'ok', 'ok');
+            for (let again = 0; again < 3 && (r.kinds.status !== 'ok' || r.assets.status !== 'ok'); again++) {
+                // The result already says mode ok, so wait for a new result, not for the mode.
+                const result = page.locator('#mapstudio-dev-adapter-result');
+                const before = await result.textContent();
+                await page.locator('#mapstudio-dev-adapter-ok').click();
+                await expect.poll(() => result.textContent(), { timeout: 60_000 }).not.toBe(before);
+                r = JSON.parse(await result.textContent());
+            }
             expect(r.kinds.status).toBe('ok');
             expect(r.assets.status).toBe('ok');
             s = await statusAfterReload(page);

@@ -22,8 +22,8 @@ public final class Messages {
     /** Envelope version carried in {@code v}. */
     public static final int VERSION = 1;
 
-    /** Public contract version these shapes belong to (AD-9); released in 0.2.0. */
-    public static final String CONTRACT_VERSION = "0.2.0";
+    /** Public contract version these shapes belong to (AD-9); 0.3.0 is epic-viewing's (unreleased). */
+    public static final String CONTRACT_VERSION = "0.3.0";
 
     /** Model event name the envelope travels under, browser to Gateway and back. */
     public static final String EVENT_NAME = "mapstudio.message";
@@ -66,14 +66,25 @@ public final class Messages {
     public static final String TAGS_RESOLVE = "tags.resolve";
     /** Body {path, relative, n?, m?}: {@code n} and {@code m} only when {@code relative} (entry 15). */
     public static final String TAGS_RESOLVE_REPLY = "tags.resolve.reply";
+    /**
+     * Live values to an open map (AD-6, epic 3 entry 5): body {seq, full, items: [{id, comms?, kpis: {key:
+     * LiveValue}, alarms?, problems: [{slot, reason}]}], kindDisplay?: [...]}; {@code full} carries every live
+     * map item and the kind display list, a changes-only batch the items that changed since the last one.
+     */
+    public static final String VALUES_BATCH = "values.batch";
+    /** The browser opened a map item's popup: body {itemId}; its values are pushed on change until closed (AD-7). */
+    public static final String POPUP_OPEN = "popup.open";
+    /** The browser closed the popup: body {itemId}. */
+    public static final String POPUP_CLOSE = "popup.close";
 
     /** Every type the Gateway accepts from the browser. */
-    public static final Set<String> INBOUND_TYPES = Set.of(POINT_CLICK, MAP_LOAD, EDITS_APPLY, TAGS_BROWSE, TAGS_RESOLVE);
+    public static final Set<String> INBOUND_TYPES =
+        Set.of(POINT_CLICK, MAP_LOAD, EDITS_APPLY, TAGS_BROWSE, TAGS_RESOLVE, POPUP_OPEN, POPUP_CLOSE);
 
     /** Every type the Gateway sends to the browser. */
     public static final Set<String> OUTBOUND_TYPES =
         Set.of(POINT_CLICK_REPLY, MAP_LOAD_REPLY, EDITS_APPLY_REPLY, MAP_CHANGED, ERROR, TAGS_BROWSE_REPLY,
-            TAGS_RESOLVE_REPLY);
+            TAGS_RESOLVE_REPLY, VALUES_BATCH);
 
     // Error codes: stable kebab-case words.
     /** A batch's baseVersion is not the stored version. */

@@ -2,6 +2,7 @@ import {
     MAP_ITEM_PARAM,
     fallbackText,
     isFailedViewState,
+    popupMaxWidth,
     popupMountPath,
     popupViewParams
 } from '../popupParams';
@@ -62,5 +63,26 @@ describe('fallbackText', () => {
 
     test('shows the id alone without a name', () => {
         expect(fallbackText({ id: 'p9', name: '' })).toBe('p9');
+    });
+});
+
+describe('popupMaxWidth', () => {
+    test('is the stylesheet widest on a desktop map', () => {
+        expect(popupMaxWidth(700, 1440)).toBe('320px');
+    });
+
+    test('fits centred on a point left of a phone map centre', () => {
+        // Point 1 at the tracer view on a 390 px phone: 2 * 143 - 16 = 270 px, centred, stays inside.
+        expect(popupMaxWidth(143, 390)).toBe('270px');
+    });
+
+    test('never narrower than the narrowest, so MapLibre anchors it beside a point at the edge', () => {
+        expect(popupMaxWidth(30, 390)).toBe('220px');
+        expect(popupMaxWidth(380, 390)).toBe('220px');
+    });
+
+    test('never wider than the map less a margin each side', () => {
+        expect(popupMaxWidth(150, 300)).toBe('268px');
+        expect(popupMaxWidth(100, 200)).toBe('168px');
     });
 });

@@ -42,11 +42,17 @@ test('custom view with author params, a second point, close', async ({ page, wat
     expect(watched.warnings, 'Map Studio warnings after close').toEqual([]);
 });
 
-test('empty view path falls back to a text popup with no warning', async ({ page, watched }) => {
+test('empty view path opens the default popup for a kind with a setup, with no warning', async ({ page, watched }) => {
+    // Epic 3 entry 5: with no popup view path, a point whose kind has a kind setup (the seed's pad
+    // setup) gets Map Studio's default popup; the text popup stays for a kind without one.
     const map = await openMap(page, '/fallback-empty');
     await clickPoint(page, map, 'p1');
-    await expect(page.locator('.mapstudio-popup--text')).toContainText(ids.p1, { timeout: 30_000 });
+    const popup = page.locator('.mapstudio-popup--default');
+    await expect(popup).toBeVisible({ timeout: 30_000 });
+    await expect(popup).toHaveAttribute('data-point-id', ids.p1);
+    await expect(popup.locator('.mapstudio-popup-name')).toHaveText('Point 1');
     await expect(page.locator('.mapstudio-popup--view')).toHaveCount(0);
+    await expect(page.locator('.mapstudio-popup--text')).toHaveCount(0);
     await page.waitForTimeout(WARNING_SETTLE_MS);
     expect(watched.warnings, 'Map Studio warnings').toEqual([]);
 });

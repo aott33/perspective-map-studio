@@ -33,9 +33,6 @@ export function validateMeasures(m) {
             if (!hasEnv(s.env)) problems.push(`${name}: env needs chromium and renderer`);
         }
     }
-    if (m.valueBatch && m.valueBatch.status !== 'unavailable' && m.valueBatch.label !== 'stand-in') {
-        problems.push('valueBatch: must be labelled stand-in until values.batch exists');
-    }
     return problems;
 }
 
