@@ -129,7 +129,7 @@ class SetupFormListsTest {
             .setList(SetupForm.BASEMAPS, List.of("osm", "mapbox"));
         Map<String, List<String>> w = form.warnings(loaded());
         assertEquals(List.of("Name the secret too."), w.get(SetupForm.TOKEN_SECRET));
-        assertEquals(List.of("Mapbox needs a map token. Name its secret below."), w.get(SetupForm.BASEMAPS));
+        assertEquals(List.of("Satellite and Mapbox need a map token. Name its secret below."), w.get(SetupForm.BASEMAPS));
         assertTrue(form.canSave());
     }
 
@@ -146,7 +146,7 @@ class SetupFormListsTest {
     @Test
     void mapboxWithoutATokenIsAWarning() throws Exception {
         SetupForm form = SetupForm.fromJson(VALID).setList(SetupForm.BASEMAPS, List.of("osm", "mapbox"));
-        assertEquals(List.of("Mapbox needs a map token. Name its secret below."),
+        assertEquals(List.of("Satellite and Mapbox need a map token. Name its secret below."),
             form.warnings(loaded()).get(SetupForm.BASEMAPS));
         assertTrue(form.canSave());
     }

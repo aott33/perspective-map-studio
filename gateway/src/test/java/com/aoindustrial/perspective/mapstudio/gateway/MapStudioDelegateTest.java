@@ -166,13 +166,13 @@ class MapStudioDelegateTest {
     void aTagMessageIsRoutedToTheTagLookupsAndAStoreMessageToTheStore() throws Exception {
         MapStudioDelegate.SessionView view = new MapStudioDelegate.SessionView(TagsReplyTest.P, "u", List.of("MapEditor"));
         TagLookups tags = brokenTags();
-        JsonObject browse = MapStudioDelegate.job(null, null, tags, view, "tags.browse", "b1", new JsonObject()).get();
+        JsonObject browse = MapStudioDelegate.job(null, null, tags, null, null, view, "tags.browse", "b1", new JsonObject()).get();
         assertEquals("b1", browse.get("id").getAsString());
         assertEquals("tags-unavailable", browse.getAsJsonObject("body").get("code").getAsString(), "the tag system was asked");
-        JsonObject resolve = MapStudioDelegate.job(null, null, tags, view, "tags.resolve", "r1", new JsonObject()).get();
+        JsonObject resolve = MapStudioDelegate.job(null, null, tags, null, null, view, "tags.resolve", "r1", new JsonObject()).get();
         assertEquals("invalid", resolve.getAsJsonObject("body").get("code").getAsString());
         // No loader: a map.load goes to the store side, whose failure is store-unreachable.
-        JsonObject load = MapStudioDelegate.job(null, null, tags, view, "map.load", "m1", new JsonObject()).get();
+        JsonObject load = MapStudioDelegate.job(null, null, tags, null, null, view, "map.load", "m1", new JsonObject()).get();
         assertEquals("store-unreachable", load.getAsJsonObject("body").get("code").getAsString());
     }
 

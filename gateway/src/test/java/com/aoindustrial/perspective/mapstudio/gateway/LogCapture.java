@@ -21,9 +21,14 @@ public final class LogCapture implements AutoCloseable {
     private final Level before;
 
     public LogCapture(String name) {
+        this(name, Level.INFO);
+    }
+
+    /** Capture from {@code level} up (DEBUG to see a logger's debug lines too). */
+    public LogCapture(String name, Level level) {
         logger = (Logger) LoggerFactory.getLogger(name);
         before = logger.getLevel();
-        logger.setLevel(Level.INFO);
+        logger.setLevel(level);
         appender.start();
         logger.addAppender(appender);
     }

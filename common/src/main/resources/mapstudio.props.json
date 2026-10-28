@@ -4,6 +4,81 @@
   "required": [],
   "description": "Map Studio component properties. The list is closed: later versions add properties here and in docs/.",
   "properties": {
+    "startingArea": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where this component opens the map (epic 3 entry 6, docs/contract.md): a centre and zoom, or bounds. When all four bounds are numbers with west < east and south < north, the map fits them; otherwise it opens on the centre at the zoom. Two components on one page may open on different areas; both show the same map items. An invalid value opens on the whole world.",
+      "default": {
+        "center": {
+          "lng": 0,
+          "lat": 0
+        },
+        "zoom": 1,
+        "bounds": {
+          "west": null,
+          "south": null,
+          "east": null,
+          "north": null
+        }
+      },
+      "properties": {
+        "center": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The centre of the starting view, WGS 84.",
+          "default": {
+            "lng": 0,
+            "lat": 0
+          },
+          "properties": {
+            "lng": {
+              "type": "number",
+              "description": "Longitude, -180 to 180.",
+              "default": 0
+            },
+            "lat": {
+              "type": "number",
+              "description": "Latitude, -85 to 85.",
+              "default": 0
+            }
+          }
+        },
+        "zoom": {
+          "type": "number",
+          "description": "The starting zoom, 0 (the world) to 24.",
+          "default": 1
+        },
+        "bounds": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Bounds to fit instead of the centre and zoom, WGS 84; leave any value null to use the centre and zoom.",
+          "default": {
+            "west": null,
+            "south": null,
+            "east": null,
+            "north": null
+          },
+          "properties": {
+            "west": {
+              "type": ["number", "null"],
+              "default": null
+            },
+            "south": {
+              "type": ["number", "null"],
+              "default": null
+            },
+            "east": {
+              "type": ["number", "null"],
+              "default": null
+            },
+            "north": {
+              "type": ["number", "null"],
+              "default": null
+            }
+          }
+        }
+      }
+    },
     "popupView": {
       "type": "object",
       "additionalProperties": false,

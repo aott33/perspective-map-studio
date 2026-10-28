@@ -12,7 +12,10 @@ import {
     PropertyTree,
     Size2d
 } from '@inductiveautomation/perspective-client';
-import { GeoJSONSource, Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent, NavigationControl, Popup, setWorkerUrl } from 'maplibre-gl';
+import {
+    AttributionControl, ErrorEvent, GeoJSONSource, Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent, NavigationControl,
+    Popup, setWorkerUrl
+} from 'maplibre-gl';
 import { TerraDraw, TerraDrawLineStringMode } from 'terra-draw';
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import { DrawControl } from './DrawControl';
@@ -29,7 +32,13 @@ import {
 import { MapChanges, MapChangedBody } from './changes';
 import { EditLevel, MapItemRecord } from './contract';
 import { AdapterStatus, HostLists, NO_HOST_LISTS } from './adapters';
-import { MESSAGE_EVENT, Reply, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText } from './messages';
+import { MESSAGE_EVENT, Reply, basemapSource, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText } from './messages';
+import {
+    BasemapId, OSM_SOURCE, RasterSource, fallbackBasemap, initialBasemap, offeredBasemaps, refusedText, rememberBasemap,
+    rememberedBasemap, tilesFailedText
+} from './basemaps';
+import { BasemapControl } from './BasemapControl';
+import { FIT_PADDING_PX, StartingArea, readStartingArea, startingAreaKey } from './startingArea';
 import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, itemState } from './live';
 import {
     DISC_CENTER, IMAGE_HEIGHT, IMAGE_WIDTH, MARKER_TOKENS, MarkerColors, MarkerProperties, SpriteSymbol, markerProperties,
@@ -66,6 +75,11 @@ setWorkerUrl(WORKER_URL);
 /** Component props read from the property tree (mapstudio.props.json). */
 export interface MapStudioProps {
     /**
+     * Where this component opens the map (epic 3 entry 6): `{center: {lng, lat}, zoom, bounds: {west, south,
+     * east, north}}`, read by startingArea.ts; the raw object, so an invalid value is reported in words.
+     */
+    startingArea: unknown;
+    /**
      * Spike-only (story 4): the project view opened as a popup on a point
      * click, with the author's params. A later version names it in the kind
      * setup (AD-7).
@@ -88,8 +102,26 @@ interface MapStudioState extends DrawState {
     clock: number;
 }
 
+/** The basemap the map draws (epic 3 entry 6, basemaps.ts): what the setup offers, the choice, its source. */
+export interface BasemapState {
+    /** The basemaps the setup offers that this version draws, in the setup's order. */
+    offered: BasemapId[];
+    /** The chosen basemap, or null before map.load answered (or when nothing is offered). */
+    selected: BasemapId | null;
+    /** The raster source drawn under the items: null for None, or while the satellite source is awaited. */
+    source: RasterSource | null;
+    /** A refusal in plain words (the Gateway's message after the basemap's name), or ''. */
+    status: string;
+    /** Bumped on every change, so the component knows to redraw the basemap. */
+    revision: number;
+}
+
+export const BASEMAP_INITIAL: BasemapState = { offered: [], selected: null, source: null, status: '', revision: 0 };
+
 /** The delegate state the component renders. */
 export interface MapStudioDelegateState {
+    /** The basemap: what the setup offers, the viewer's choice and its tile source (epic 3 entry 6). */
+    basemap: BasemapState;
     /** The last point-click reply from the Gateway as one line of text, or '' before the first. */
     lastReply: string;
     /** Id of the point.click message whose reply is awaited, or null. */
@@ -192,11 +224,18 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private saveBatchId: string | null = null;
     private live: LiveState = LIVE_INITIAL;
     private liveRevision = 0;
+    private basemap: BasemapState = BASEMAP_INITIAL;
+    /** The id of the basemap.source message whose reply is awaited, or null. */
+    private basemapPendingId: string | null = null;
+    /** The satellite source once the Gateway answered it (its tile URL holds the token): memory only. */
+    private satelliteSource: RasterSource | null = null;
+    private storage: KeyValueStore | null;
 
     constructor(componentStore: AbstractUIElementStore) {
         super(componentStore);
         registerTestHook((message) => this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject));
         const storage = browserStorage();
+        this.storage = storage;
         this.unsaved = new UnsavedQueue(storage, () => this.warnStorage());
         this.sender = new UnsavedSender(this.unsaved, {
             level: () => this.level,
@@ -222,6 +261,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
     mapStateToProps(): MapStudioDelegateState {
         return {
+            basemap: this.basemap,
             lastReply: this.lastReply,
             pendingId: this.pendingId,
             items: this.changes.state.items,
@@ -242,6 +282,93 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             live: this.live,
             liveRevision: this.liveRevision
         };
+    }
+
+    /**
+     * Choose a basemap (epic 3 entry 6): None and OpenStreetMap draw at once; Satellite asks the Gateway for
+     * its tile source (basemap.source) unless it was answered before, and draws when the reply comes. A
+     * choice the user made is remembered in this browser (the id only). A basemap the setup does not
+     * offer is ignored.
+     */
+    selectBasemap(id: BasemapId, options: { remember?: boolean; keepStatus?: boolean } = {}): void {
+        if (this.basemap.offered.indexOf(id) < 0) {
+            return;
+        }
+        if (options.remember !== false) {
+            rememberBasemap(this.storage, id);
+        }
+        const status = options.keepStatus ? this.basemap.status : '';
+        if (id === 'satellite' && !this.satelliteSource) {
+            const message = basemapSource('satellite');
+            this.basemapPendingId = message.id;
+            this.setBasemap({ ...this.basemap, status });
+            this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject);
+            return;
+        }
+        this.basemapPendingId = null;
+        this.setBasemap({
+            ...this.basemap,
+            selected: id,
+            source: id === 'none' ? null : id === 'osm' ? OSM_SOURCE : this.satelliteSource,
+            status
+        });
+    }
+
+    private setBasemap(next: Omit<BasemapState, 'revision'>): void {
+        this.basemap = { ...next, revision: this.basemap.revision + 1 };
+        this.notify();
+    }
+
+    /** map.load answered: the setup's basemaps are offered, and the first choice is made when none is drawn yet. */
+    private offerBasemaps(setupList: string[] | undefined): void {
+        const { offered, dropped } = offeredBasemaps(setupList === undefined ? ['none', 'osm'] : setupList);
+        if (dropped.length > 0 && dropped.join(',') !== this.basemap.offered.join(',')) {
+            console.info('[MapStudio] The setup lists basemaps this version does not draw: ' + dropped.join(', ')
+                + ' (the Mapbox vector style is deferred).');
+        }
+        const same = offered.join(',') === this.basemap.offered.join(',');
+        if (!same) {
+            this.setBasemap({ ...this.basemap, offered });
+        }
+        const selected = this.basemap.selected;
+        if (selected === null || offered.indexOf(selected) < 0) {
+            const initial = initialBasemap(offered, rememberedBasemap(this.storage));
+            if (initial !== null) {
+                this.selectBasemap(initial, { remember: false });
+            } else if (selected !== null) {
+                this.setBasemap({ ...this.basemap, selected: null, source: null, status: '' });
+            }
+        }
+    }
+
+    /** The satellite source arrived: kept in memory, drawn when it is the pending choice. */
+    private onBasemapSource(reply: Reply & { kind: 'basemap.source.reply' }): void {
+        if (reply.id !== this.basemapPendingId) {
+            console.info('[MapStudio] A basemap.source.reply that nothing waits for was ignored.');
+            return;
+        }
+        this.basemapPendingId = null;
+        if (!reply.body) {
+            this.refuseBasemap('satellite', 'the Gateway\'s reply could not be read.');
+            return;
+        }
+        this.satelliteSource = reply.body.source;
+        console.info('[MapStudio] ' + replyText(reply));
+        this.setBasemap({ ...this.basemap, selected: 'satellite', source: this.satelliteSource, status: '' });
+    }
+
+    /** The Gateway refused the basemap's source: the status says why, and a map with nothing drawn falls back. */
+    private refuseBasemap(id: BasemapId, message: string): void {
+        this.basemapPendingId = null;
+        const status = refusedText(id, message);
+        console.info('[MapStudio] ' + status);
+        this.setBasemap({ ...this.basemap, status });
+        if (this.basemap.selected === null) {
+            const fallback = fallbackBasemap(this.basemap.offered, id);
+            if (fallback !== null) {
+                this.selectBasemap(fallback, { remember: false, keepStatus: true });
+            }
+        }
     }
 
     /** The popup of a map item opened: the Gateway pushes its values on change until popup.close (AD-7). */
@@ -377,6 +504,14 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.onValuesBatch(reply.body);
             return;
         }
+        if (reply.kind === 'basemap.source.reply') {
+            this.onBasemapSource(reply);
+            return;
+        }
+        if (reply.kind === 'error' && this.basemapPendingId !== null && reply.id === this.basemapPendingId) {
+            this.refuseBasemap('satellite', reply.body.message);
+            return;
+        }
         if (reply.kind === 'map.load.reply' || (reply.kind === 'error' && reply.id === this.mapLoadId)) {
             this.onMapLoad(reply);
             return;
@@ -415,6 +550,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
                 this.warnStorage();
             }
             this.unsavedRevision++;
+            this.offerBasemaps(reply.body.setup ? reply.body.setup.basemaps : undefined);
         } else if (reply.kind === 'error') {
             this.load = { state: 'failed', message: reply.body.code + ': ' + reply.body.message };
             this.changes.loadFailed();
@@ -481,14 +617,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
 type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
 
-/**
- * Where the map starts until epic-viewing fits it to the items: the dev map's 30-pad set
- * fills a 1440 by 860 px map at this view (epic 2 story 11).
- */
-export const START_VIEW: { center: [number, number]; zoom: number } = {
-    center: [-104.9725, 39.7445],
-    zoom: 12
-};
+/** The basemap's raster source and layer (epic 3 entry 6), drawn under the item layers. */
+const SOURCE_BASEMAP = 'mapstudio-basemap';
+const LAYER_BASEMAP = 'mapstudio-basemap';
 /** The map store's items (map.load and this session's saves). */
 const SOURCE_ITEM_LINES = 'mapstudio-items-line';
 const SOURCE_ITEM_POINTS = 'mapstudio-items-point';
@@ -585,11 +716,32 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /** The live revision last drawn into the markers. */
     private drawnLive = -1;
     private popupClock: ReturnType<typeof setInterval> | null = null;
+    /** The basemap switch (epic 3 entry 6) and the basemap revision last drawn. */
+    private basemapControl: BasemapControl | null = null;
+    private drawnBasemap = -1;
+    /** The raster source the map holds now (by identity), or null for none. */
+    private drawnSource: RasterSource | null = null;
+    /** The drawn basemap's tiles: none (no source), loading, loaded (the map went idle) or failed (a tile error). */
+    private tiles: 'none' | 'loading' | 'loaded' | 'failed' = 'none';
+    /** The starting area last applied (startingAreaKey), so a changed prop moves the map once. */
+    private appliedArea = '';
+
+    /** The starting area the prop names; an invalid one is said once, in the console. */
+    private startingArea(): StartingArea {
+        const read = readStartingArea(this.props.props.startingArea);
+        const key = startingAreaKey(read.area) + (read.problem || '');
+        if (read.problem && key !== this.appliedArea) {
+            console.warn('[MapStudio] ' + read.problem);
+        }
+        return read.area;
+    }
 
     componentDidMount(): void {
         if (!this.mapContainer) {
             return;
         }
+        const area = this.startingArea();
+        this.appliedArea = startingAreaKey(area) + (readStartingArea(this.props.props.startingArea).problem || '');
         const root = this.props.store.element as HTMLElement | undefined;
         const colors = {
             background: themeColor(root, '--containerRoot'),
@@ -609,11 +761,25 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     paint: { 'background-color': colors.background }
                 }]
             },
-            center: START_VIEW.center,
-            zoom: START_VIEW.zoom,
+            ...(area.kind === 'bounds'
+                ? { bounds: area.bounds, fitBoundsOptions: { padding: FIT_PADDING_PX } }
+                : { center: area.center, zoom: area.zoom }),
             attributionControl: false
         });
         map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+        // The basemap switch under the zoom buttons (top-right), its attribution always shown bottom-left:
+        // the bottom-right corner stays clear for the Perspective App Bar toggle (DESIGN.md).
+        this.basemapControl = new BasemapControl((id) => {
+            const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+            if (delegate) {
+                delegate.selectBasemap(id);
+            }
+        });
+        map.addControl(this.basemapControl, 'top-right');
+        map.addControl(new AttributionControl({ compact: false }), 'bottom-left');
+        map.on('error', this.onMapError);
+        map.on('idle', this.onMapIdle);
+        map.on('moveend', () => this.publishView(map));
         map.on('load', () => {
             const empty = itemsToGeoJson([]);
             map.addSource(SOURCE_ITEM_LINES, { type: 'geojson', data: empty.lines });
@@ -672,6 +838,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 }
             });
             this.itemsReady = true;
+            this.applyBasemap();
             this.drawItems();
             const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
             if (delegate) {
@@ -702,9 +869,125 @@ export class MapStudio extends Component<Props, MapStudioState> {
     }
 
     componentDidUpdate(): void {
+        this.applyBasemap();
         this.drawItems();
         this.dropQueuedFeatures();
         this.applyEditing();
+        this.applyStartingArea();
+    }
+
+    /** A changed startingArea prop moves the map there (once per value). */
+    private applyStartingArea(): void {
+        const read = readStartingArea(this.props.props.startingArea);
+        const key = startingAreaKey(read.area) + (read.problem || '');
+        if (!this.map || key === this.appliedArea) {
+            return;
+        }
+        const area = this.startingArea();
+        this.appliedArea = key;
+        if (area.kind === 'bounds') {
+            this.map.fitBounds(area.bounds, { padding: FIT_PADDING_PX, animate: false });
+        } else {
+            this.map.jumpTo({ center: area.center, zoom: area.zoom });
+        }
+    }
+
+    /**
+     * Put the delegate's basemap under the items (epic 3 entry 6): the raster source and layer of the
+     * chosen basemap, none for None; the control's buttons and status; the attributes tests read.
+     */
+    private applyBasemap(): void {
+        const delegate = this.props.delegate;
+        const map = this.map;
+        if (!map || !this.itemsReady || !delegate || delegate.basemap.revision === this.drawnBasemap) {
+            return;
+        }
+        const b = delegate.basemap;
+        this.drawnBasemap = b.revision;
+        if (this.basemapControl) {
+            this.basemapControl.setOffered(b.offered);
+            this.basemapControl.setSelected(b.selected);
+        }
+        if (b.source !== this.drawnSource) {
+            // Only a changed source touches the map: a status-only change (a refusal) keeps the tiles.
+            this.drawnSource = b.source;
+            if (map.getLayer(LAYER_BASEMAP)) {
+                map.removeLayer(LAYER_BASEMAP);
+            }
+            if (map.getSource(SOURCE_BASEMAP)) {
+                map.removeSource(SOURCE_BASEMAP);
+            }
+            if (b.source) {
+                map.addSource(SOURCE_BASEMAP, {
+                    type: 'raster',
+                    tiles: b.source.tiles,
+                    tileSize: b.source.tileSize,
+                    maxzoom: b.source.maxzoom,
+                    attribution: b.source.attribution
+                });
+                map.addLayer({ id: LAYER_BASEMAP, type: 'raster', source: SOURCE_BASEMAP },
+                    map.getLayer(LAYER_ITEM_LINES) ? LAYER_ITEM_LINES : undefined);
+                this.tiles = 'loading';
+            } else {
+                this.tiles = 'none';
+            }
+        }
+        this.publishBasemap();
+    }
+
+    /** The basemap's state for the control's status line and the e2e suite. */
+    private publishBasemap(): void {
+        const delegate = this.props.delegate;
+        const el = this.mapContainer;
+        if (!delegate || !el) {
+            return;
+        }
+        const b = delegate.basemap;
+        const status = b.status !== '' ? b.status : this.tiles === 'failed' && b.selected ? tilesFailedText(b.selected) : '';
+        if (this.basemapControl) {
+            this.basemapControl.setStatus(status);
+        }
+        el.setAttribute('data-basemap', b.selected || '');
+        el.setAttribute('data-basemap-offered', b.offered.join(','));
+        el.setAttribute('data-basemap-status', status);
+        el.setAttribute('data-basemap-tiles', this.tiles);
+    }
+
+    /**
+     * A MapLibre error: a basemap tile that did not load (a blocked network, a site without internet)
+     * is said once in words and at info, never as a browser error; anything else is an error as before
+     * (with no listener MapLibre would write it to console.error itself).
+     */
+    private onMapError = (ev: ErrorEvent & { sourceId?: string }): void => {
+        if (ev.sourceId === SOURCE_BASEMAP) {
+            if (this.tiles !== 'failed') {
+                this.tiles = 'failed';
+                const selected = this.props.delegate ? this.props.delegate.basemap.selected : null;
+                console.info('[MapStudio] ' + (selected ? tilesFailedText(selected) : 'Basemap tiles are not loading.'));
+                this.publishBasemap();
+            }
+            return;
+        }
+        console.error(ev.error);
+    };
+
+    /** The map went idle with the basemap's tiles in: loaded, unless one failed. */
+    private onMapIdle = (): void => {
+        if (this.tiles === 'loading') {
+            this.tiles = 'loaded';
+            this.publishBasemap();
+        }
+    };
+
+    /** The view for the e2e suite: the centre and zoom the map is at. */
+    private publishView(map: MapLibreMap): void {
+        const el = this.mapContainer;
+        if (!el || this.map !== map) {
+            return;
+        }
+        const c = map.getCenter();
+        el.setAttribute('data-center', c.lng.toFixed(5) + ',' + c.lat.toFixed(5));
+        el.setAttribute('data-zoom', map.getZoom().toFixed(2));
     }
 
     private onStorage = (ev: StorageEvent): void => {
@@ -895,6 +1178,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.map = null;
         }
         this.drawControl = null;
+        this.basemapControl = null;
     }
 
     /**
@@ -940,6 +1224,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (!el || this.map !== map) {
             return;
         }
+        this.publishView(map);
         el.setAttribute('data-map-ready', 'true');
     }
 
@@ -1361,6 +1646,7 @@ export class MapStudioMeta implements ComponentMeta {
 
     getPropsReducer(tree: PropertyTree): MapStudioProps {
         return {
+            startingArea: tree.readObject('startingArea', {}),
             popupView: {
                 path: tree.readString('popupView.path', ''),
                 params: tree.readObject<AuthorParams>('popupView.params', {})

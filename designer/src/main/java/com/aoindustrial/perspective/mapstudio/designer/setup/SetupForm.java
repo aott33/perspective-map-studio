@@ -446,8 +446,8 @@ public final class SetupForm {
             add(out, ALARM_PAGE, msg("setup.warning.page.missing", alarmPage));
         }
         String[] token = splitToken(tokenSecret);
-        // A provider with no secret name names no token either.
-        if (basemaps.contains("mapbox") && token[1].isEmpty()) {
+        // A provider with no secret name names no token either. Satellite (epic 3 entry 6) and Mapbox need one.
+        if ((basemaps.contains("satellite") || basemaps.contains("mapbox")) && token[1].isEmpty()) {
             add(out, BASEMAPS, msg("setup.warning.basemaps.mapboxToken"));
         }
         if (!tokenSecret.isEmpty()) {

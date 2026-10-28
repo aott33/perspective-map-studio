@@ -17,6 +17,8 @@ import com.inductiveautomation.ignition.gateway.redundancy.types.RedundancyState
 
 import com.aoindustrial.perspective.mapstudio.gateway.adapter.AdapterService;
 import com.aoindustrial.perspective.mapstudio.gateway.adapter.ProjectFunctionCaller;
+import com.aoindustrial.perspective.mapstudio.gateway.basemap.BasemapSources;
+import com.aoindustrial.perspective.mapstudio.gateway.basemap.IgnitionTokenSource;
 import com.aoindustrial.perspective.mapstudio.gateway.change.ChangeBus;
 import com.aoindustrial.perspective.mapstudio.gateway.live.IgnitionTagSubscriber;
 import com.aoindustrial.perspective.mapstudio.gateway.live.LiveValueCache;
@@ -67,6 +69,8 @@ public final class MapStudioServices {
     final MapLoader loader;
     /** The tag browser's lookups (entry 15); nothing to start or stop. */
     final TagLookups tags;
+    /** The satellite basemap's tile source (epic 3 entry 6), its token read from the setup's secret; nothing to start. */
+    final BasemapSources basemaps;
     /** The shared live-value cache (AD-6, epic 3 entry 5) and the one thread its rebuilds and the maps' batch timers run on. */
     final LiveValueCache live;
     final ScheduledExecutorService liveThread;
@@ -101,6 +105,7 @@ public final class MapStudioServices {
         this.loader = new MapLoader(gate, store, adapters::snapshot);
         this.tags = new TagLookups(setups, gate, store, adapters::snapshot,
             new IgnitionTagSource(context.getTagManager(), context.getProjectManager()));
+        this.basemaps = new BasemapSources(new IgnitionTokenSource(context.getSecretProviderManager()));
         this.scriptModule = new GatewayScriptModule(writes, loader, adapters);
         this.liveThread = Executors.newSingleThreadScheduledExecutor(daemon("MapStudio-live"));
         this.live = new LiveValueCache(new IgnitionTagSubscriber(context.getTagManager()), loader::snapshot,

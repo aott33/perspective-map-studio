@@ -26,6 +26,7 @@ import com.inductiveautomation.perspective.gateway.messages.EventFiredMsg;
 import com.aoindustrial.perspective.mapstudio.common.Messages;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
+import com.aoindustrial.perspective.mapstudio.gateway.basemap.BasemapSources;
 import com.aoindustrial.perspective.mapstudio.gateway.change.ChangeBus;
 import com.aoindustrial.perspective.mapstudio.gateway.live.LiveSession;
 import com.aoindustrial.perspective.mapstudio.gateway.load.MapLoader;
@@ -45,7 +46,8 @@ import com.aoindustrial.perspective.mapstudio.gateway.write.WriteService;
  * (roles from {@code Session.getWebAuthStatus().getUser().getRoles()}, read on
  * every message, docs/platform-checks.md, epic 2 story 1), then run on the
  * module's bounded work pool and answer from there; so do {@code tags.browse} and
- * {@code tags.resolve} (entry 15).
+ * {@code tags.resolve} (entry 15) and {@code basemap.source} (epic 3 entry 6: the
+ * satellite tile source, its token read from the setup's secret on that pool).
  *
  * <p>From startup to shutdown the delegate is subscribed to the change bus for its
  * session's project and sends each committed batch to its browser as
@@ -313,7 +315,8 @@ public class MapStudioDelegate extends ComponentModelDelegate {
             send(error(id, Messages.CODE_INVALID, "The session could not be read."));
             return;
         }
-        submitWork(services.work, type, id, job(services.loader, services.writes, services.tags, view, type, id, body),
+        submitWork(services.work, type, id,
+            job(services.loader, services.writes, services.tags, setups, services.basemaps, view, type, id, body),
             reply -> {
                 send(reply);
                 if (Messages.MAP_LOAD_REPLY.equals(stringOrNull(reply.get(Messages.KEY_TYPE)))) {
@@ -339,12 +342,40 @@ public class MapStudioDelegate extends ComponentModelDelegate {
         s.loaded(interval);
     }
 
-    /** The work for a message that runs on the pool: a tag lookup for {@code tags.*}, else a store call. */
-    static Supplier<JsonObject> job(MapLoader loader, WriteService writes, TagLookups tags, SessionView view, String type,
-            String id, JsonObject body) {
-        return isTagType(type)
-            ? () -> tagsReply(tags, view, type, id, body)
-            : () -> storeReply(loader, writes, view, type, id, body);
+    /**
+     * The work for a message that runs on the pool: a tag lookup for {@code tags.*}, the tile source for
+     * {@code basemap.source}, else a store call.
+     */
+    static Supplier<JsonObject> job(MapLoader loader, WriteService writes, TagLookups tags, SetupRegistry setups,
+            BasemapSources basemaps, SessionView view, String type, String id, JsonObject body) {
+        if (isTagType(type)) {
+            return () -> tagsReply(tags, view, type, id, body);
+        }
+        if (Messages.BASEMAP_SOURCE.equals(type)) {
+            return () -> basemapReply(setups, basemaps, view, id, body);
+        }
+        return () -> storeReply(loader, writes, view, type, id, body);
+    }
+
+    /**
+     * The reply to {@code basemap.source} (epic 3 entry 6): the project's setup, then the satellite tile
+     * source with the token read from the secret it names. Every refusal is an {@code error} envelope
+     * ({@code store-unreachable} with no setup, {@code invalid}, {@code token-unavailable}); anything
+     * else is logged (class name only) and answered {@code token-unavailable}. No line names the token.
+     */
+    static JsonObject basemapReply(SetupRegistry setups, BasemapSources basemaps, SessionView view, String id,
+            JsonObject body) {
+        try {
+            Setup setup = setups.require(view.project());
+            return envelope(Messages.BASEMAP_SOURCE_REPLY, id, basemaps.reply(view.project(), setup, body));
+        } catch (MapStudioException ex) {
+            log.debugf("basemap.source %s refused for project %s: %s", id, view.project(), ex.getMessage());
+            return envelope(Messages.ERROR, id, ex.toErrorBody());
+        } catch (RuntimeException ex) {
+            log.error("Map Studio failed on basemap.source for project " + view.project() + ": "
+                + ex.getClass().getSimpleName(), ex);
+            return error(id, Messages.CODE_TOKEN_UNAVAILABLE, "The basemap could not be answered; see the Gateway log.");
+        }
     }
 
     /**
@@ -439,7 +470,8 @@ public class MapStudioDelegate extends ComponentModelDelegate {
     }
 
     private static boolean isStoreType(String type) {
-        return Messages.MAP_LOAD.equals(type) || Messages.EDITS_APPLY.equals(type) || isTagType(type);
+        return Messages.MAP_LOAD.equals(type) || Messages.EDITS_APPLY.equals(type) || isTagType(type)
+            || Messages.BASEMAP_SOURCE.equals(type);
     }
 
     static boolean isTagType(String type) {

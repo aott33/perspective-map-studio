@@ -9,6 +9,6 @@
   "assetsFunction": "mapstudio_dev.assets",
   "refreshIntervalSeconds": 10,
   "alarmPage": "",
-  "basemaps": ["none", "osm"],
-  "tokenSecret": ""
+  "basemaps": ["none", "osm", "satellite"],
+  "tokenSecret": "MapStudioFiles/map_token"
 }
