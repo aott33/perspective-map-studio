@@ -171,7 +171,7 @@ editorTest.describe('1440 px', () => {
             await expect(liveItem(page, ids.pt2)).toHaveAttribute('data-kpi', '371 psi', { timeout: INTERVAL_MS });
 
             // At zoom 14 over the line the names sit at their places along it, in order from CTB1 to SWD1.
-            await view(page, map, SWD.desktopCenter, 14);
+            await view(page, map, SWD.mid, 14);
             const labels = JSON.parse(await map.getAttribute('data-labels'));
             const xOf = (name) => {
                 const b = labels.find((l) => l.layer === 'mapstudio-items-name' && l.text === name);
@@ -185,6 +185,7 @@ editorTest.describe('1440 px', () => {
             // it): the header, the segment box, Comms over the instruments, the instruments in order between
             // the snapped ends with their distances and values, then the line's own KPI; PT-1 and PT-2
             // highlighted in the list and on the map.
+            await view(page, map, SWD.desktopCenter, 14);
             const popup = await clickBetween(page, map, SWD.desktopCenter, 14);
             // The card fits below the segment (the view put the click high), whole, inside the map.
             const mapBox = await map.boundingBox();
