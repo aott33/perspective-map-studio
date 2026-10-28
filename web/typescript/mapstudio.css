@@ -19,7 +19,8 @@
     position: absolute;
     left: 8px;
     right: 56px;
-    /* Above the legend row (bottom-left, epic 3 entry 14), which must stay visible. */
+    /* Above the legend row (bottom-left, epic 3 entry 14), which must stay visible; the row wraps to
+       two lines on a phone. */
     bottom: 56px;
     padding: 6px 10px;
     border: 1px solid var(--border);
@@ -30,6 +31,12 @@
     line-height: 1.4;
     overflow-wrap: anywhere;
     pointer-events: none;
+}
+
+@media (max-width: 767px) {
+    .mapstudio-reply {
+        bottom: 96px;
+    }
 }
 
 .mapstudio-reply--pending {
@@ -566,12 +573,17 @@
    a row of the Legend button, MapLibre's scale bar and the provider's attribution (always shown with a
    basemap), wrapping upward on a phone; the panel opens above the button, 208 px wide, built from
    sections so entry 3 adds the glyph key and the toggles. Token colours only (AD-11). */
+/* The corner's container is bounded so the row wraps on a phone and keeps clear of the App Bar
+   toggle's corner (app-bar-clearance 76 px); a percentage of the row's own float would resolve to nothing. */
+.mapstudio .maplibregl-ctrl-bottom-left {
+    max-width: calc(100% - 76px);
+}
+
 .mapstudio .mapstudio-legend {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
-    max-width: calc(100% - 2 * var(--mapstudio-map-inset));
     pointer-events: none;
 }
 

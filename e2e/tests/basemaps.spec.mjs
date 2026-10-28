@@ -290,7 +290,7 @@ test.describe('1440 px', () => {
             await expect(legendPanel(page)).toHaveCount(0);
             // The bottom-right corner is the Perspective App Bar toggle's at every width.
             const corner = { x: box.x + box.width - 64, y: box.y + box.height - 64 };
-            for (const b of [await zoom.boundingBox(), await row.boundingBox()]) {
+            for (const b of [await zoom.boundingBox(), await legendButton(page).boundingBox(), scaleBox, await attribution(page).boundingBox()]) {
                 expect(b.x + b.width > corner.x && b.y + b.height > corner.y, 'nothing in the bottom-right corner').toBe(false);
             }
             await expect(map).toHaveAttribute('data-basemap-tiles', 'loaded', { timeout: CHANGE_MS });
@@ -353,10 +353,11 @@ test.describe('390 px', () => {
         await shot(page, 'mapstudio-basemap-390.png');
         await page.keyboard.press('Escape');
         await expect(legendPanel(page)).toHaveCount(0);
-        const legend = await page.locator('.mapstudio-legend-row').boundingBox();
+        const legend = await legendButton(page).boundingBox();
+        const scale = await page.locator('.maplibregl-ctrl-scale').boundingBox();
         // The bottom-right 64 px corner is the Perspective App Bar toggle's (DESIGN.md).
         const corner = { x: 390 - 64, y: 844 - 64 };
-        for (const box of [zoom, legend, attrib]) {
+        for (const box of [zoom, legend, scale, attrib]) {
             const inCorner = box.x + box.width > corner.x && box.y + box.height > corner.y;
             expect(inCorner, 'nothing in the bottom-right corner').toBe(false);
         }
