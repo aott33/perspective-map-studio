@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { project, pagePixel } from './geo.mjs';
 import { unavailable, validateMeasures, without } from './measures.mjs';
 import { frameStats, median, percentile } from './stats.mjs';
-import { batchSize, buildValuesBatch } from './valueBatch.mjs';
+import { batchSize, isValuesBatchFrame, parseBatchFrame } from './valueBatch.mjs';
 
 test('median and percentile', () => {
     assert.equal(median([3, 1, 2]), 2);
@@ -32,21 +32,21 @@ test('frameStats with too few frames is unavailable, not a number', () => {
     assert.equal(frameStats([]).status, 'unavailable');
 });
 
-test('values.batch stand-in: full has every pad, changes-only a tenth, gzip is smaller', () => {
-    const full = buildValuesBatch({ pads: 30, full: true });
-    const delta = buildValuesBatch({ pads: 30, full: false, every: 10 });
-    assert.equal(full.type, 'values.batch');
-    assert.deepEqual(Object.keys(full), ['v', 'type', 'id', 'body']);
-    assert.equal(full.body.items.length, 30);
-    assert.equal(delta.body.items.length, 3);
-    const f = batchSize(full);
-    const d = batchSize(delta);
-    assert.ok(f.jsonBytes > d.jsonBytes && f.jsonBytes > 1000);
-    assert.ok(f.gzipBytes < f.jsonBytes);
-    assert.deepEqual(batchSize(buildValuesBatch({ pads: 30, full: true })), f);
-    for (const key of ['value', 'quality', 't', 'stale', 'reason']) {
-        assert.ok(key in full.body.items[0].comms);
-    }
+test('values.batch frames: read for full, items and seq, sized as they travelled', () => {
+    const batch = '{"v":1,"type":"values.batch","id":"x","body":{"seq":7,"full":true,"items":[{"id":"a","kpis":{},"problems":[]},'
+        + '{"id":"b","kpis":{},"problems":[]}],"kindDisplay":[]}}';
+    const plain = '{"event":' + batch + '}';
+    const escaped = '{"event":"' + batch.replace(/"/g, '\\"') + '"}';
+    assert.ok(isValuesBatchFrame(plain) && isValuesBatchFrame(escaped));
+    assert.ok(!isValuesBatchFrame('{"type":"map.changed"}'));
+    assert.deepEqual(parseBatchFrame(plain), { full: true, items: 2, seq: 7, kindDisplay: true });
+    assert.deepEqual(parseBatchFrame(escaped), { full: true, items: 2, seq: 7, kindDisplay: true });
+    assert.deepEqual(parseBatchFrame(plain.replace('"full":true', '"full":false').replace(',"kindDisplay":[]', '')),
+        { full: false, items: 2, seq: 7, kindDisplay: false });
+    assert.equal(parseBatchFrame('{"type":"map.changed"}'), null);
+    const size = batchSize(plain);
+    assert.equal(size.bytes, Buffer.byteLength(plain, 'utf8'));
+    assert.ok(size.gzipBytes > 0);
 });
 
 test('project: the map centre lands on the middle of the map', () => {
@@ -66,14 +66,14 @@ test('validateMeasures accepts a complete file and an unavailable section', () =
         env: goodEnv,
         bundle: section,
         frameRate: unavailable('no WebGL'),
-        valueBatch: { label: 'stand-in', method: 'm', env: goodEnv },
+        valueBatch: section,
         phone: section
     };
     assert.deepEqual(validateMeasures(ok), []);
 });
 
 test('validateMeasures requires label, method and env on every section', () => {
-    const base = { env: goodEnv, bundle: section, frameRate: section, valueBatch: { ...section, label: 'stand-in' }, phone: section };
+    const base = { env: goodEnv, bundle: section, frameRate: section, valueBatch: section, phone: section };
     for (const name of ['bundle', 'frameRate', 'valueBatch', 'phone']) {
         for (const field of ['label', 'method', 'env']) {
             const broken = { ...base, [name]: { ...base[name] } };
@@ -92,7 +92,7 @@ test('without drops the named fields and leaves the original alone', () => {
     assert.equal(m.generatedAt, 'x');
 });
 
-test('validateMeasures refuses an unlabelled number, a missing section and a measured values.batch', () => {
+test('validateMeasures refuses an unlabelled number, a missing section and a section without its env', () => {
     const bad = {
         env: goodEnv,
         bundle: { method: 'm' },
@@ -102,7 +102,7 @@ test('validateMeasures refuses an unlabelled number, a missing section and a mea
     const problems = validateMeasures(bad).join('|');
     assert.match(problems, /bundle: label/);
     assert.match(problems, /frameRate: unavailable without a reason/);
-    assert.match(problems, /valueBatch: must be labelled stand-in/);
+    assert.match(problems, /valueBatch: env needs/);
     assert.match(problems, /phone: missing/);
     assert.match(validateMeasures({}).join('|'), /env needs/);
 });

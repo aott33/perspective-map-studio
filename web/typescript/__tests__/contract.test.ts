@@ -19,9 +19,12 @@ const ITEM = {
     deleted: false
 };
 
-describe('the 0.2.0 contract', () => {
+describe('the 0.3.0 contract (0.2.0 plus epic 3 entry 5)', () => {
     test('version, codes and types match common/', () => {
-        expect(CONTRACT_VERSION).toBe('0.2.0');
+        expect(CONTRACT_VERSION).toBe('0.3.0');
+        expect(MessageTypes.VALUES_BATCH).toBe('values.batch');
+        expect(MessageTypes.POPUP_OPEN).toBe('popup.open');
+        expect(MessageTypes.POPUP_CLOSE).toBe('popup.close');
         expect(Object.values(ErrorCodes).sort()).toEqual(['conflict', 'invalid', 'read-only', 'role', 'stale', 'store-unreachable', 'tags-unavailable']);
         expect(MessageTypes.MAP_LOAD).toBe('map.load');
         expect(MessageTypes.EDITS_APPLY).toBe('edits.apply');

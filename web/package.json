@@ -1,6 +1,6 @@
 {
     "name": "@aoindustrial/perspective-map-studio",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "Browser side of Map Studio for Ignition Perspective: the ao.mapstudio component.",
     "private": true,
     "license": "Apache-2.0",

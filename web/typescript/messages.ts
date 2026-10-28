@@ -10,6 +10,7 @@ import { MapChangedBody, readMapChanged } from './changes';
 import {
     Conflict, EditBatch, EditsApplyReplyBody, MapLoadReplyBody, readConflicts, readEditsApplyReply, readMapLoadReply
 } from './contract';
+import { ValuesBatchBody, readValuesBatch } from './live';
 
 /** Contract version carried in `v`. */
 export const MESSAGE_VERSION = 1;
@@ -31,7 +32,11 @@ export const MessageTypes = {
     TAGS_BROWSE: 'tags.browse',
     TAGS_BROWSE_REPLY: 'tags.browse.reply',
     TAGS_RESOLVE: 'tags.resolve',
-    TAGS_RESOLVE_REPLY: 'tags.resolve.reply'
+    TAGS_RESOLVE_REPLY: 'tags.resolve.reply',
+    /** Live values (epic 3 entry 5, AD-6, AD-7): the Gateway's batches, and the popup's open and close. */
+    VALUES_BATCH: 'values.batch',
+    POPUP_OPEN: 'popup.open',
+    POPUP_CLOSE: 'popup.close'
 } as const;
 
 export interface Envelope<B = Record<string, unknown>> {
@@ -68,12 +73,24 @@ export type Reply =
     | { kind: 'edits.apply.reply'; id: string; body: EditsApplyReplyBody }
     /** `body` is null when the map.changed could not be read: the browser treats it as a gap. */
     | { kind: 'map.changed'; id: string; body: MapChangedBody | null }
+    /** `body` is null when the values.batch could not be read: it is ignored (the next full batch heals). */
+    | { kind: 'values.batch'; id: string; body: ValuesBatchBody | null }
     | { kind: 'error'; id: string; body: ErrorBody }
     | { kind: 'invalid'; reason: string };
 
 /** The `map.load` message: the browser asks for the map. */
 export function mapLoad(id?: string): Envelope<Record<string, never>> {
     return envelope(MessageTypes.MAP_LOAD, {}, id);
+}
+
+/** The `popup.open` message: the browser opened a map item's popup (its values are pushed on change). */
+export function popupOpen(itemId: string, id?: string): Envelope<{ itemId: string }> {
+    return envelope(MessageTypes.POPUP_OPEN, { itemId }, id);
+}
+
+/** The `popup.close` message. */
+export function popupClose(itemId: string, id?: string): Envelope<{ itemId: string }> {
+    return envelope(MessageTypes.POPUP_CLOSE, { itemId }, id);
 }
 
 /** The `edits.apply` message for one batch. */
@@ -138,6 +155,8 @@ export function readReply(raw: unknown): Reply {
         }
         case MessageTypes.MAP_CHANGED:
             return { kind: 'map.changed', id: raw.id, body: readMapChanged(raw.body) };
+        case MessageTypes.VALUES_BATCH:
+            return { kind: 'values.batch', id: raw.id, body: readValuesBatch(raw.body) };
         case MessageTypes.ERROR: {
             const error: ErrorBody = {
                 code: typeof body.code === 'string' ? body.code : 'unknown',
@@ -172,6 +191,9 @@ export function replyText(reply: Reply): string {
         case 'map.changed':
             return reply.body ? 'Map changed: seq ' + reply.body.seq + ', ' + reply.body.ops.length + ' op(s)'
                 : 'Map changed: unreadable change';
+        case 'values.batch':
+            return reply.body ? 'Live values: ' + (reply.body.full ? 'full batch, ' : '') + reply.body.items.length
+                + ' map item(s) at seq ' + reply.body.seq : 'Live values: unreadable batch';
         case 'error':
             return 'Error (' + reply.body.code + '): ' + reply.body.message;
         default:

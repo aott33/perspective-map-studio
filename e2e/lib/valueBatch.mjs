@@ -1,38 +1,35 @@
-// A STAND-IN for the size of one batch of icon values. `values.batch` does not
-// exist yet (epic-viewing); this builds the envelope AD-6 describes so its size
-// can be measured now: {v, type, id, body: {seq, full, items}}, each slot one
-// LiveValue {value, quality, t, stale, reason}. AD-6 fixes only the LiveValue
-// fields; the item layout here (pad id plus three slots: comms, icon KPI, alarm
-// count) is an assumption of the story 7 plan, NOT a verified contract.
+// The real `values.batch` on the wire (epic 3 entry 5 replaced story 7's stand-in): a
+// websocket frame of the Perspective session socket that carries one is read for what it
+// says and sized as it travelled. The frame wraps Map Studio's envelope in Perspective's own
+// message (sometimes as an escaped JSON string), so the batch's fields are found by pattern,
+// never by parsing the whole frame.
 
 import { gzipSync } from 'node:zlib';
 
-const padId = (n) => 'pad-' + String(n).padStart(2, '0');
+/** The frame text, whether the payload came as a string or bytes. */
+export function frameText(payload) {
+    return Buffer.isBuffer(payload) ? payload.toString('utf8') : String(payload);
+}
 
-/** Deterministic LiveValue for pad n and slot name, no randomness. */
-function liveValue(n, slot) {
-    const t = Date.UTC(2026, 0, 1, 0, 0, 0) + n * 1000;
-    const iso = new Date(t).toISOString();
-    if (slot === 'comms') return { value: n % 7 !== 0, quality: 'Good', t: iso, stale: false, reason: '' };
-    if (slot === 'kpi') return { value: Math.round((100 + n * 3.7) * 10) / 10, quality: 'Good', t: iso, stale: false, reason: '' };
-    return { value: n % 5 === 0 ? 2 : 0, quality: 'Good', t: iso, stale: false, reason: '' };
+/** True when a frame carries a values.batch envelope. */
+export function isValuesBatchFrame(text) {
+    return /\\*"type\\*"\s*:\s*\\*"values\.batch\\*"/.test(text);
 }
 
 /**
- * The envelope for `pads` pads. `full` carries every pad; otherwise only the
- * pads whose number is a multiple of `every` (a deterministic changes-only batch).
+ * What a values.batch frame says: whether it is full, how many map items it carries (one
+ * `problems` list per item), and the batch's seq; null for a frame that holds no batch.
  */
-export function buildValuesBatch({ pads, full, every = 10, seq = 1 }) {
-    const items = [];
-    for (let n = 1; n <= pads; n++) {
-        if (!full && n % every !== 0) continue;
-        items.push({ id: padId(n), comms: liveValue(n, 'comms'), kpi: liveValue(n, 'kpi'), alarms: liveValue(n, 'alarms') });
-    }
-    return { v: 1, type: 'values.batch', id: '00000000-0000-4000-8000-000000000001', body: { seq, full, items } };
+export function parseBatchFrame(text) {
+    if (!isValuesBatchFrame(text)) return null;
+    const full = /\\*"full\\*"\s*:\s*true/.test(text);
+    const items = (text.match(/\\*"problems\\*"\s*:/g) || []).length;
+    const seq = /\\*"seq\\*"\s*:\s*(\d+)/.exec(text);
+    const kindDisplay = /\\*"kindDisplay\\*"\s*:/.test(text);
+    return { full, items, seq: seq ? Number(seq[1]) : null, kindDisplay };
 }
 
-/** UTF-8 bytes of the JSON text, and gzip bytes of the same text. */
-export function batchSize(envelope) {
-    const text = JSON.stringify(envelope);
-    return { items: envelope.body.items.length, jsonBytes: Buffer.byteLength(text, 'utf8'), gzipBytes: gzipSync(text).length };
+/** UTF-8 bytes of a frame's text, and gzip bytes of the same text (a best case, not the wire). */
+export function batchSize(text) {
+    return { bytes: Buffer.byteLength(text, 'utf8'), gzipBytes: gzipSync(text).length };
 }

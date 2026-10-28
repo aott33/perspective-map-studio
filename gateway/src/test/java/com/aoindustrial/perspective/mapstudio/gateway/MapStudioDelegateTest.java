@@ -116,6 +116,32 @@ class MapStudioDelegateTest {
     }
 
     @Test
+    void thePopupMessagesPassTheEnvelopeCheckAndNeedAnItemId() {
+        // Epic 3 entry 5: popup.open and popup.close are handled on the event thread; values.batch is sent, never received.
+        assertEquals(null, MapStudioDelegate.check(envelope(1, "popup.open", "o", null)));
+        assertEquals(null, MapStudioDelegate.check(envelope(1, "popup.close", "c", null)));
+        assertTrue(MapStudioDelegate.isPopupType("popup.open"));
+        assertTrue(MapStudioDelegate.isPopupType("popup.close"));
+        assertEquals(false, MapStudioDelegate.isPopupType("map.load"));
+        assertEquals("invalid", MapStudioDelegate.check(envelope(1, "values.batch", "v", null))
+            .getAsJsonObject("body").get("code").getAsString());
+        // Without services (tests) a popup.open with no itemId is still refused invalid, and one with it is quiet.
+        FakeMap map = new FakeMap("P");
+        MapStudioDelegate delegate = new MapStudioDelegate(map.component, null, directBus(), new SetupRegistry(s -> { }));
+        delegate.handleEvent(new com.inductiveautomation.perspective.gateway.messages.EventFiredMsg(
+            "view", "root/map", "model", "mapstudio.message", envelope(1, "popup.open", "o1", null)));
+        assertEquals(1, map.fired.size());
+        assertEquals("error", map.fired.get(0).get("type").getAsString());
+        assertEquals("o1", map.fired.get(0).get("id").getAsString());
+        assertEquals("popup.open needs an itemId.", map.fired.get(0).getAsJsonObject("body").get("message").getAsString());
+        JsonObject body = new JsonObject();
+        body.addProperty("itemId", "11111111-1111-4111-8111-111111111111");
+        delegate.handleEvent(new com.inductiveautomation.perspective.gateway.messages.EventFiredMsg(
+            "view", "root/map", "model", "mapstudio.message", envelope(1, "popup.close", "c1", body)));
+        assertEquals(1, map.fired.size(), "nothing is answered on success");
+    }
+
+    @Test
     void theTagLookupsPassTheEnvelopeCheckAndGoToTheWorkPool() {
         // Epic 2 story 15: tags.browse and tags.resolve run on the work pool like the store messages.
         assertEquals(null, MapStudioDelegate.check(envelope(1, "tags.browse", "b", null)));

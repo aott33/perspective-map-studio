@@ -1,5 +1,5 @@
 /**
- * The shared contracts of Map Studio 0.2.0, browser side. Mirrors
+ * The shared contracts of Map Studio 0.3.0, browser side (0.2.0 plus epic 3 entry 5's live values, live.ts). Mirrors
  * common/.../Messages.java and common/.../contract/*.java; docs/contract.md is
  * the reference. Pure types and readers only, unit tested in node.
  */
@@ -8,7 +8,7 @@ import { isRecord } from './json';
 import { HostLists, readHostLists } from './adapters';
 
 /** Public contract version these shapes belong to (AD-9). */
-export const CONTRACT_VERSION = '0.2.0';
+export const CONTRACT_VERSION = '0.3.0';
 
 /** Error codes: stable kebab-case words. */
 export const ErrorCodes = {

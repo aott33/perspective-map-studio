@@ -18,6 +18,8 @@ import com.inductiveautomation.ignition.gateway.redundancy.types.RedundancyState
 import com.aoindustrial.perspective.mapstudio.gateway.adapter.AdapterService;
 import com.aoindustrial.perspective.mapstudio.gateway.adapter.ProjectFunctionCaller;
 import com.aoindustrial.perspective.mapstudio.gateway.change.ChangeBus;
+import com.aoindustrial.perspective.mapstudio.gateway.live.IgnitionTagSubscriber;
+import com.aoindustrial.perspective.mapstudio.gateway.live.LiveValueCache;
 import com.aoindustrial.perspective.mapstudio.gateway.load.MapLoader;
 import com.aoindustrial.perspective.mapstudio.gateway.redundancy.RedundancyGate;
 import com.aoindustrial.perspective.mapstudio.gateway.script.GatewayScriptModule;
@@ -65,6 +67,9 @@ public final class MapStudioServices {
     final MapLoader loader;
     /** The tag browser's lookups (entry 15); nothing to start or stop. */
     final TagLookups tags;
+    /** The shared live-value cache (AD-6, epic 3 entry 5) and the one thread its rebuilds and the maps' batch timers run on. */
+    final LiveValueCache live;
+    final ScheduledExecutorService liveThread;
     final GatewayScriptModule scriptModule;
     final RedundancyGate redundancy;
     private final SetupLifecycleFactory lifecycles;
@@ -97,6 +102,9 @@ public final class MapStudioServices {
         this.tags = new TagLookups(setups, gate, store, adapters::snapshot,
             new IgnitionTagSource(context.getTagManager(), context.getProjectManager()));
         this.scriptModule = new GatewayScriptModule(writes, loader, adapters);
+        this.liveThread = Executors.newSingleThreadScheduledExecutor(daemon("MapStudio-live"));
+        this.live = new LiveValueCache(new IgnitionTagSubscriber(context.getTagManager()), loader::snapshot,
+            adapters::snapshot, changes, liveThread);
         this.lifecycles = new SetupLifecycleFactory(context, setups);
     }
 
@@ -110,6 +118,8 @@ public final class MapStudioServices {
     }
 
     void stop() {
+        live.close();
+        liveThread.shutdownNow();
         adapters.stop();
 
         if (redundancyManager != null) {

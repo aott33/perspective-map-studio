@@ -8,7 +8,16 @@
         "tagType": "AtomicTag",
         "valueSource": "memory",
         "dataType": "Float8",
-        "value": 0.0
+        "value": 0.0,
+        "alarms": [
+          {
+            "name": "High pressure",
+            "mode": "AboveValue",
+            "setpointA": 900.0,
+            "priority": "High",
+            "ackMode": "Manual"
+          }
+        ]
       },
       {
         "name": "Flow",
@@ -22,7 +31,7 @@
         "tagType": "AtomicTag",
         "valueSource": "memory",
         "dataType": "Boolean",
-        "value": false
+        "value": true
       }
     ]
   }
