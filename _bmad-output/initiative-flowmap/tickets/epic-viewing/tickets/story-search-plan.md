@@ -3,7 +3,7 @@ title: 'Search'
 type: 'feature'
 ticket: '9'
 created: '2026-10-28'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '05a0921887101706a4e4617465a0cbebb8dc9612'
 route: 'full'
 route_source: 'pinned'
@@ -80,7 +80,7 @@ context:
 - [x] `common/`, `gateway/` -- `assetNames`.
 - [x] `web/typescript/search.ts`, `SearchControl.ts`, `adapters.ts`, `controls.ts`, `MapStudio.tsx`, `mapstudio.css`, the Jest tests.
 - [x] `e2e/tests/search.spec.mjs`.
-- [ ] `docs/`, `CHANGELOG.md`, this plan, the screenshots.
+- [x] `docs/`, `CHANGELOG.md`, this plan, the screenshots.
 
 **Acceptance Criteria:**
 - Given the dev 30-pad set, when part of a name or an asset name is typed, then the matches list ranked as decided, capped at eight, each with the kind glyph, the name and the kind or asset.
@@ -91,7 +91,10 @@ context:
 
 ## Implementation Notes
 
-(filled at the end)
+- **Commits on the worktree branch** (`worktree-agent-a311ea430a62859c7`, baseline `05a0921`): 37ab35a (the search field and control, the pure module, `assetNames` in `map.load.reply`, the Jest tests), 308e889 (the e2e spec, the docs, the changelog, this plan), 518edb5 (what the first live run taught), 2fd5fff (the platform checks section), then the closing commit (evidence, screenshots, the measures, this plan). A container restart stopped the agent during the first final chain; a second agent resumed from `git log`, this plan and the scratch scripts and ran the chain again from the start on a fresh stack.
+- **Decision 5 refined (518edb5):** MapLibre's popup takes the focus when it opens (`focusAfterOpen` defaults to true), so after a chosen point the focus is in its popup, not the field; the rule became "the focus goes where the choice leads" (the popup for a point, the field for a line). The same run showed "Pad 14" also lists "Line to Pad 14" (a name that holds the text), which the spec and the docs now say.
+- **Build and run on this box:** Gradle's node plugin cannot download Node through the proxy, so the build ran with a scratch init script pointing the plugin at the box's Node 22 (`download=false`) and the module was staged by hand into `ops/modules/` for `ops/up.sh --fresh --no-build`; none of it is committed.
+- **Not done, by scope:** the Needs you summary in the slot after the field and the hiding of it while the search is open on a phone (entry 3, through `SearchControl.slot()` and `data-search-open`), the line popup on a chosen line (entry 2), the bottom sheet (entry 8), the surface token review (entry 12).
 
 ## Plan Change Log
 
@@ -113,4 +116,11 @@ context:
 **Manual checks:**
 - `mapstudio-search-1440.png` and `-chosen-1440.png` against `view-mode-1440.png` and `key-screen-1-view-desktop-popup.png`; `mapstudio-search-390.png` and `-chosen-390.png` against `key-screen-2-phone-needs.png` and `key-screen-2-phone-sheet.png`.
 
-**Results:** (filled at the end)
+**Results (2026-10-28, 4-CPU agent box, Ignition 8.3.10, container `ms-46653f23` on port 9288, fresh volumes; the whole chain in one run after the resume):**
+- `./gradlew clean build --offline` (JDK 17, the scratch init script, the box's Node 22): BUILD SUCCESSFUL in 2m 35s with every Java and Jest test (`MapLoaderTest` with the `assetNames` case).
+- `cd web && npx tsc --noEmit && npx jest`: no type error; 26 suites, 215 tests pass (`search.test.ts` added, `adapters.test.ts`, `contract.test.ts` and `controls.test.ts` extended).
+- Full e2e on the fresh stack with `E2E_DOCS=1`: 78 passed, 0 failed, 7 skipped (22.4 min, one worker beside two other agents' stacks); `search.spec.mjs` 4 of 4 (9.9 s, 7.8 s, 6.5 s, 4.1 s). The skipped seven are the suite's own (the Gateway-stopped and the store-down cases that need the stack runs of `ops/store-checks.sh`). An earlier run of the four search tests alone on the stack of the first agent also passed 4 of 4 (`e2e9-search2.log`, scratch).
+- `check-contract-versions.sh`: `OK (contract 0.3.0, setup schema 1, map store schema 2)`; `test-contract-versions.sh`: OK.
+- Em dashes: none in any changed file; no model id outside the commit trailers.
+- Manual: `mapstudio-search-1440.png` against `view-mode-1440.png`: the field top-left, 300 by 40 px, with the search glyph, the typed "Pad 1", the Clear button, and the results card under it listing Pad 1, Pad 10 to Pad 16 (eight rows, the kind glyph, the name in bold, "Well pad"); the mockup's Needs you beside it and the Edit switch are entries 3 and epic-editing. `mapstudio-search-chosen-1440.png` against `key-screen-1-view-desktop-popup.png`: Point 2 at zoom 15 with its default popup open and the field back to its placeholder. `mapstudio-search-390.png` against `key-screen-2-phone-needs.png`: the one top bar 8 px from the edges, "Point" typed, three 44 px rows inside the bar, the zoom card under the bar; `mapstudio-search-chosen-390.png` against `key-screen-2-phone-sheet.png`: Point 1 at zoom 15 with its popup (the sheet is entry 8) and the field blurred. The screenshots refreshed by the docs run are the ones the docs reference (every view-mode one now shows the field); `docs/spike-measures.json` was rewritten by the bundle measure (`MapStudio.js` 1,278,426 bytes, `MapStudio.css` 85,480) as earlier entries did. The unreferenced screenshots of the run were deleted. `mapstudio-styles-preview-dark-1440.png` was kept at its earlier version: the run's copy came out with the map and the swatch drawings unpainted (the dark theme's canvases had not drawn when the shot was taken, under the load of three stacks; the spec's assertions passed), a render timing to watch, not a search regression (the light copy, taken the same way, is complete and shows the panel 64 px from the top).
+- Not verified: a real touch device; a screen reader's reading of the combobox; a name outside Latin script; a map with thousands of items; the owner's eye on the mockup match.
