@@ -5,13 +5,21 @@ Written 2026-10-28 at the end of the session that built epic 2 (epic-map-store-a
 ## State
 
 - **Released:** v0.2.0 (signed, published 2026-10-28): https://github.com/aott33/perspective-map-studio/releases/tag/v0.2.0. Epic 2 is built: stories 1 to 17 (story 13 is the release).
-- **Post-release rehearsal** on the template's test stack with the published module: results in `docs/template-install.md` ("0.2.0 release") and `docs/platform-checks.md` (story 13 and story 17 template rows), from the evidence pull request opened at the end of the session.
+- **Post-release rehearsal** on the template's test stack with the published module: results in `docs/template-install.md` ("0.2.0 release") and `docs/platform-checks.md` (story 13 and story 17 template rows), all passed: the lock entry verified, the template's `local.sh` and `stack.sh` passed with Map Studio 0.2.0 ACTIVE, a line saved in one browser showed in a second in 54 ms and survived a Gateway restart with its actor recorded, refused saves wrote nothing, and `module_version` reads `0.2.0`.
 - **Working version:** `0.3.0-SNAPSHOT` (`build.gradle.kts`).
 - **Repository:** renamed from `aott33/perspective-flowmap` to **`aott33/perspective-map-studio`**. Use the new name for every GitHub call (the old one only redirects git).
 
 ## Next
 
-1. **The template pull request (left for this session).** Add v0.2.0 to `ign-scada-template`'s module lock and open a **draft** pull request on the owner's go. Never edit `/home/user/ign-scada-template` itself: clone it, branch `map-studio-0.2.0`, then `python3 -I scripts/modules/modl.py check --write`, `fetch`, `inspect`, `verify-lock`; check the lock's `sha256` equals the release's `.sha256` and `certSha256` equals the README's `Signing certificate SHA-256` line (`scripts/ci/modl-verify.sh <file> <fingerprint> 0.2.0`); add the template's `docs/modules.md` row and history line and the Tabler Icons (MIT) entry in `THIRD_PARTY_NOTICES.md`. The template's own CI runs `local.sh` and the stack; do not repeat them. The session needs `aott33/ign-scada-template` added with push access. The previous session's scratch clone is gone with its container.
+1. **The template pull request (left for this session).** Add v0.2.0 to `ign-scada-template`'s module lock and open a **draft** pull request on the owner's go. Never edit `/home/user/ign-scada-template` itself: clone it, branch `map-studio-0.2.0`, then `python3 -I scripts/modules/modl.py check --write`, `fetch`, `inspect`, `verify-lock`; check the lock's `sha256` equals the release's `.sha256` and `certSha256` equals the README's `Signing certificate SHA-256` line (`scripts/ci/modl-verify.sh <file> <fingerprint> 0.2.0`); add the template's `docs/modules.md` row and history line and the Tabler Icons (MIT) entry in `THIRD_PARTY_NOTICES.md`. The template's own CI runs `local.sh` and the stack; do not repeat them. The session needs `aott33/ign-scada-template` added with push access. The previous session's scratch clone is gone with its container; its entry, made by `modl.py check --write` and verified (`verify-lock` ok, 6 signatures, none bad):
+
+   ```
+   id com.aoindustrial.perspective.mapstudio, name Map Studio, version 0.2.0, requiredIgnitionVersion 8.3.0,
+   file Map-Studio-0.2.0.modl, url https://github.com/aott33/perspective-map-studio/releases/download/v0.2.0/Map-Studio-0.2.0.modl,
+   sha256 0cfa5c26190e04e84751ef825d020fbc006556748d1d4a1bbb66b2f25e0730ba,
+   certSha256 8F:93:FD:5C:B8:D9:C7:9B:E4:14:FD:EC:84:CF:21:26:A2:AC:39:F3:DA:3F:C9:0D:F8:08:0E:EA:5C:4D:38:3D,
+   licence Apache-2.0, upstream github aott33/perspective-map-studio, asset Map-Studio-.*\.modl, tag v0.2.0
+   ```
 2. **Epic 3, epic-viewing** (`_bmad-output/initiative-flowmap/tickets/epic-viewing/`): not refined yet. Refine it, then plan and build in its `tickets/tickets.toml` order. **Entry 4, "Shorter release checks", is first** (owner, 2026-10-28): `ops/release-smoke.sh`, `ops/perf.sh --only`, checks by release type in `RELEASING.md`.
 3. Decisions already taken for epic 3, in `epic-viewing.md` Notes: **comms lost gets a colour on the map** (owner, 2026-10-28; its own theme token, never an alarm hue, badge and words kept; settle whether stale follows and whether the template's cards change to match; back to engineering review ER-27 with the epic's hue tokens); the popup, tag path and bottom sheet decisions of 2026-10-27. The open question on the style rule expression language is settled at refinement (`_bmad-output/backlog/spike-style-rule-expression-language.md`).
 
@@ -19,8 +27,8 @@ Written 2026-10-28 at the end of the session that built epic 2 (epic-map-store-a
 
 All in `_bmad-output/deferred-work.md` (entries without a `resolved:` line). The ones that touch epic 3 or the next release:
 
-- The template stack re-measures story 17's accepted miss (10 editors each saving 50 ops at once); a miss there is a 0.2.1 fix. The result is in `docs/perf/0.2.0-template.json` if the run completed.
-- A second browser tab does not resend another tab's queued edit on its own timer (goes to epic-editing). The post-release rehearsal saw the second tab not show the batch at once from the `storage` event, unlike the pre-tag rehearsal: look at `UnsavedSender.storage()` when epic-editing touches it.
+- **Performance, 0.2.1 entry.** The template-stack run (`docs/perf/0.2.0-template.json`, on the same 4-CPU agent box, not a laptop) missed `edits.apply` with 10 editors again: 50 ops p95 1,905.7 ms, and 1 op p95 384.0 ms (a pass on the dev run). The box was 99.5 to 99.8% busy; the same streams from one page gave p95 288.2 ms. Settle it with a run on a bigger machine before deciding whether 0.2.1 needs a write-path change. `ops/perf.sh --target template` needs a `mapeditor` user in role `MapEditor` on the test Gateway, which its header does not say.
+- A second browser tab does not resend another tab's queued edit on its own timer (goes to epic-editing). The post-release rehearsal confirmed it (shown in the second tab after 9 ms, replayed only after that tab's next `map.load`).
 - Live checks the sweep could not make (`onShutdown`, a redundant pair, a slow tag system, the least-privilege runtime role saving a kind setup).
 - The two tag path rules that disagree (`Placeholders.checkTagPath`).
 - Backlog: demos (oil and gas, solar, water; the `map-studio-examples` repo; solar and water need icon sets), reference layers, popup parameter overrides.
