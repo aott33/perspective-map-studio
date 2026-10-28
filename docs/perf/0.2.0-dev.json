@@ -203,9 +203,9 @@
       "cpus": 4,
       "memGiB": 16,
       "loadAvgAtStart": [
-        0.33,
-        1.08,
-        2.33
+        0.15,
+        0.82,
+        1.09
       ],
       "containersRunning": [
         "ms-e2s17",
@@ -213,9 +213,9 @@
       ],
       "sampler": "docker stats stream (CPU percent of one core, memory) and every 5 s currentGauges and the sessions route (perf/sampler.mjs)",
       "loadAvgAtEnd": [
-        5.23,
-        5.59,
-        4.01
+        4.67,
+        5.45,
+        3.49
       ]
     },
     "nomodule": {
@@ -399,9 +399,9 @@
       "cpus": 4,
       "memGiB": 16,
       "loadAvgAtStart": [
-        2.13,
-        3.72,
-        3.7
+        0.66,
+        1.71,
+        1.33
       ],
       "containersRunning": [
         "ms-e2s17",
@@ -409,9 +409,9 @@
       ],
       "sampler": "docker stats stream (CPU percent of one core, memory) and every 5 s currentGauges and the sessions route (perf/sampler.mjs)",
       "loadAvgAtEnd": [
-        0.24,
-        1.47,
-        2.67
+        0.45,
+        1.15,
+        1.22
       ]
     }
   },
@@ -458,19 +458,19 @@
       "label": "measured",
       "method": "No browser session open; the Gateway with Map Studio and the empty mapstudio-perf map.",
       "window": {
-        "t0": 1793143208136,
-        "t1": 1793143388234,
+        "t0": 1793145907717,
+        "t1": 1793146087720,
         "seconds": 180
       },
       "resources": {
-        "cpuSamples": 181,
+        "cpuSamples": 180,
         "cpuIntervalMs": 1000,
-        "cpuMeanPct": 3.38,
-        "cpuMaxPct": 31.82,
-        "containerMemMeanMiB": 1076.9,
+        "cpuMeanPct": 2.48,
+        "cpuMaxPct": 21.68,
+        "containerMemMeanMiB": 1135.2,
         "heapSamples": 36,
-        "heapMinMiB": 235.2,
-        "heapMeanMiB": 254.8
+        "heapMinMiB": 236.1,
+        "heapMeanMiB": 266
       }
     },
     "mapLoad": {
@@ -480,11 +480,11 @@
         "method": "In the signed-in editor page, performance.now() around window.__mapStudioTest.send(\"map.load\") (round trip plus JSON parse; the component ignores replies the hook takes); one warm-up then 10 timed, each reply checked to hold the target item count.",
         "stats": {
           "n": 10,
-          "min": 79.6,
-          "median": 95.1,
-          "p95": 98,
-          "max": 98,
-          "mean": 94.1
+          "min": 88.8,
+          "median": 96.9,
+          "p95": 98.1,
+          "max": 98.1,
+          "mean": 96.1
         },
         "counts": {
           "ok": 10,
@@ -521,11 +521,11 @@
         "method": "In the signed-in editor page, performance.now() around window.__mapStudioTest.send(\"map.load\") (round trip plus JSON parse; the component ignores replies the hook takes); one warm-up then 10 timed, each reply checked to hold the target item count.",
         "stats": {
           "n": 10,
-          "min": 33.8,
-          "median": 83.2,
-          "p95": 87.6,
-          "max": 87.6,
-          "mean": 69.6
+          "min": 30.4,
+          "median": 85.9,
+          "p95": 94,
+          "max": 94,
+          "mean": 76.9
         },
         "counts": {
           "ok": 10,
@@ -562,11 +562,11 @@
         "method": "In the signed-in editor page, performance.now() around window.__mapStudioTest.send(\"map.load\") (round trip plus JSON parse; the component ignores replies the hook takes); one warm-up then 10 timed, each reply checked to hold the target item count.",
         "stats": {
           "n": 10,
-          "min": 133,
-          "median": 144,
-          "p95": 167.1,
-          "max": 167.1,
-          "mean": 147.4
+          "min": 109.5,
+          "median": 117.4,
+          "p95": 153.5,
+          "max": 153.5,
+          "mean": 123.1
         },
         "counts": {
           "ok": 10,
@@ -611,94 +611,94 @@
         "runs": [
           {
             "pan": {
-              "frames": 92,
-              "spanMs": 4016,
-              "fps": 22.66,
-              "intervalMs": {
-                "p50": 49.9,
-                "p95": 66.7,
-                "max": 83.4
-              },
-              "shareOver20msPercent": 96.7,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            },
-            "zoom": {
-              "frames": 98,
-              "spanMs": 4016,
-              "fps": 24.15,
-              "intervalMs": {
-                "p50": 33.4,
-                "p95": 50.1,
-                "max": 66.6
-              },
-              "shareOver20msPercent": 96.9,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            }
-          },
-          {
-            "pan": {
-              "frames": 93,
-              "spanMs": 4017,
-              "fps": 22.9,
-              "intervalMs": {
-                "p50": 49.9,
-                "p95": 66.7,
-                "max": 83.5
-              },
-              "shareOver20msPercent": 96.7,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            },
-            "zoom": {
-              "frames": 102,
-              "spanMs": 4100,
-              "fps": 24.64,
-              "intervalMs": {
-                "p50": 33.4,
-                "p95": 50.1,
-                "max": 66.6
-              },
-              "shareOver20msPercent": 99,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            }
-          },
-          {
-            "pan": {
-              "frames": 95,
-              "spanMs": 4000,
-              "fps": 23.5,
-              "intervalMs": {
-                "p50": 33.4,
-                "p95": 66.7,
-                "max": 83.4
-              },
-              "shareOver20msPercent": 96.8,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            },
-            "zoom": {
-              "frames": 101,
+              "frames": 111,
               "spanMs": 4033,
-              "fps": 24.79,
+              "fps": 27.27,
+              "intervalMs": {
+                "p50": 33.3,
+                "p95": 50.1,
+                "max": 83.4
+              },
+              "shareOver20msPercent": 91.8,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 112,
+              "spanMs": 4017,
+              "fps": 27.64,
+              "intervalMs": {
+                "p50": 33.3,
+                "p95": 66.7,
+                "max": 83.4
+              },
+              "shareOver20msPercent": 80.2,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 108,
+              "spanMs": 4017,
+              "fps": 26.64,
               "intervalMs": {
                 "p50": 33.4,
-                "p95": 66.6,
-                "max": 83.3
+                "p95": 66.7,
+                "max": 83.4
               },
-              "shareOver20msPercent": 95,
+              "shareOver20msPercent": 84.1,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 115,
+              "spanMs": 4117,
+              "fps": 27.69,
+              "intervalMs": {
+                "p50": 33.3,
+                "p95": 50.1,
+                "max": 83.4
+              },
+              "shareOver20msPercent": 88.6,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 112,
+              "spanMs": 4033,
+              "fps": 27.52,
+              "intervalMs": {
+                "p50": 33.3,
+                "p95": 66.7,
+                "max": 100
+              },
+              "shareOver20msPercent": 87.4,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 115,
+              "spanMs": 4050,
+              "fps": 28.15,
+              "intervalMs": {
+                "p50": 33.3,
+                "p95": 50,
+                "max": 83.4
+              },
+              "shareOver20msPercent": 91.2,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
@@ -707,17 +707,17 @@
           }
         ],
         "medianFps": {
-          "pan": 22.9,
-          "zoom": 24.64
+          "pan": 27.27,
+          "zoom": 27.69
         },
         "fpsRange": {
           "pan": [
-            22.66,
-            23.5
+            26.64,
+            27.52
           ],
           "zoom": [
-            24.15,
-            24.79
+            27.64,
+            28.15
           ]
         }
       },
@@ -733,30 +733,30 @@
         "runs": [
           {
             "pan": {
-              "frames": 82,
-              "spanMs": 4050,
-              "fps": 20,
+              "frames": 98,
+              "spanMs": 4017,
+              "fps": 24.15,
               "intervalMs": {
-                "p50": 50,
+                "p50": 33.4,
                 "p95": 66.7,
                 "max": 83.3
               },
-              "shareOver20msPercent": 98.8,
+              "shareOver20msPercent": 89.7,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
               }
             },
             "zoom": {
-              "frames": 92,
-              "spanMs": 4133,
-              "fps": 22.02,
+              "frames": 105,
+              "spanMs": 3967,
+              "fps": 26.22,
               "intervalMs": {
-                "p50": 50,
-                "p95": 66.6,
-                "max": 83.3
+                "p50": 33.4,
+                "p95": 66.7,
+                "max": 66.7
               },
-              "shareOver20msPercent": 97.8,
+              "shareOver20msPercent": 86.5,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
@@ -765,62 +765,62 @@
           },
           {
             "pan": {
-              "frames": 82,
-              "spanMs": 4017,
-              "fps": 20.17,
+              "frames": 102,
+              "spanMs": 4000,
+              "fps": 25.25,
               "intervalMs": {
-                "p50": 50,
+                "p50": 33.4,
+                "p95": 50.1,
+                "max": 100
+              },
+              "shareOver20msPercent": 92.1,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 107,
+              "spanMs": 3983,
+              "fps": 26.61,
+              "intervalMs": {
+                "p50": 33.4,
+                "p95": 50.1,
+                "max": 66.8
+              },
+              "shareOver20msPercent": 95.3,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 95,
+              "spanMs": 4017,
+              "fps": 23.4,
+              "intervalMs": {
+                "p50": 33.4,
                 "p95": 66.7,
                 "max": 100
               },
-              "shareOver20msPercent": 98.8,
+              "shareOver20msPercent": 86.2,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
               }
             },
             "zoom": {
-              "frames": 86,
-              "spanMs": 4083,
-              "fps": 20.82,
+              "frames": 104,
+              "spanMs": 3983,
+              "fps": 25.86,
               "intervalMs": {
-                "p50": 50,
+                "p50": 33.4,
                 "p95": 66.7,
-                "max": 83.4
+                "max": 99.9
               },
-              "shareOver20msPercent": 96.5,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            }
-          },
-          {
-            "pan": {
-              "frames": 86,
-              "spanMs": 4017,
-              "fps": 21.16,
-              "intervalMs": {
-                "p50": 50,
-                "p95": 66.6,
-                "max": 83.3
-              },
-              "shareOver20msPercent": 98.8,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            },
-            "zoom": {
-              "frames": 88,
-              "spanMs": 4083,
-              "fps": 21.31,
-              "intervalMs": {
-                "p50": 50,
-                "p95": 66.6,
-                "max": 83.4
-              },
-              "shareOver20msPercent": 97.7,
+              "shareOver20msPercent": 90.3,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
@@ -829,17 +829,17 @@
           }
         ],
         "medianFps": {
-          "pan": 20.17,
-          "zoom": 21.31
+          "pan": 24.15,
+          "zoom": 26.22
         },
         "fpsRange": {
           "pan": [
-            20,
-            21.16
+            23.4,
+            25.25
           ],
           "zoom": [
-            20.82,
-            22.02
+            25.86,
+            26.61
           ]
         }
       },
@@ -855,28 +855,28 @@
         "runs": [
           {
             "pan": {
-              "frames": 60,
+              "frames": 73,
               "spanMs": 4050,
-              "fps": 14.57,
+              "fps": 17.78,
               "intervalMs": {
-                "p50": 66.7,
-                "p95": 116.7,
-                "max": 150
+                "p50": 50,
+                "p95": 100.1,
+                "max": 116.6
               },
-              "shareOver20msPercent": 100,
+              "shareOver20msPercent": 90.3,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
               }
             },
             "zoom": {
-              "frames": 64,
-              "spanMs": 4017,
-              "fps": 15.69,
+              "frames": 80,
+              "spanMs": 4100,
+              "fps": 19.27,
               "intervalMs": {
-                "p50": 66.7,
-                "p95": 100.1,
-                "max": 133.3
+                "p50": 50,
+                "p95": 83.4,
+                "max": 99.9
               },
               "shareOver20msPercent": 93.7,
               "longTasks": {
@@ -887,30 +887,30 @@
           },
           {
             "pan": {
-              "frames": 61,
+              "frames": 77,
               "spanMs": 4050,
-              "fps": 14.82,
+              "fps": 18.77,
               "intervalMs": {
-                "p50": 66.7,
+                "p50": 50,
                 "p95": 100,
-                "max": 116.7
+                "max": 116.6
               },
-              "shareOver20msPercent": 98.3,
+              "shareOver20msPercent": 93.4,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
               }
             },
             "zoom": {
-              "frames": 64,
-              "spanMs": 4033,
-              "fps": 15.62,
+              "frames": 80,
+              "spanMs": 4000,
+              "fps": 19.75,
               "intervalMs": {
-                "p50": 66.7,
-                "p95": 100,
-                "max": 166.7
+                "p50": 50,
+                "p95": 83.4,
+                "max": 116.8
               },
-              "shareOver20msPercent": 96.8,
+              "shareOver20msPercent": 91.1,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
@@ -919,30 +919,30 @@
           },
           {
             "pan": {
-              "frames": 60,
-              "spanMs": 4017,
-              "fps": 14.69,
+              "frames": 77,
+              "spanMs": 4016,
+              "fps": 18.92,
               "intervalMs": {
-                "p50": 66.7,
-                "p95": 133.3,
-                "max": 150
+                "p50": 50,
+                "p95": 66.7,
+                "max": 100
               },
-              "shareOver20msPercent": 100,
+              "shareOver20msPercent": 98.7,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
               }
             },
             "zoom": {
-              "frames": 67,
-              "spanMs": 4067,
-              "fps": 16.23,
+              "frames": 75,
+              "spanMs": 4117,
+              "fps": 17.98,
               "intervalMs": {
-                "p50": 66.6,
+                "p50": 50,
                 "p95": 116.6,
                 "max": 133.3
               },
-              "shareOver20msPercent": 95.5,
+              "shareOver20msPercent": 83.8,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
@@ -951,17 +951,17 @@
           }
         ],
         "medianFps": {
-          "pan": 14.69,
-          "zoom": 15.69
+          "pan": 18.77,
+          "zoom": 19.27
         },
         "fpsRange": {
           "pan": [
-            14.57,
-            14.82
+            17.78,
+            18.92
           ],
           "zoom": [
-            15.62,
-            16.23
+            17.98,
+            19.75
           ]
         }
       }
@@ -973,11 +973,11 @@
         "method": "Fresh anonymous context at 1440x900: Date.now() from page.goto(\"/\") to data-load-state=loaded with data-points-loaded set (map.load drawn); 3 runs.",
         "ms": {
           "n": 3,
-          "min": 1385,
-          "median": 1412,
-          "p95": 1423,
-          "max": 1423,
-          "mean": 1406.7
+          "min": 1403,
+          "median": 1418,
+          "p95": 1427,
+          "max": 1427,
+          "mean": 1416
         }
       },
       "1000": {
@@ -986,11 +986,11 @@
         "method": "Fresh anonymous context at 1440x900: Date.now() from page.goto(\"/\") to data-load-state=loaded with data-points-loaded set (map.load drawn); 3 runs.",
         "ms": {
           "n": 3,
-          "min": 1417,
-          "median": 1881,
-          "p95": 1899,
-          "max": 1899,
-          "mean": 1732.3
+          "min": 1316,
+          "median": 1391,
+          "p95": 1427,
+          "max": 1427,
+          "mean": 1378
         }
       },
       "5000": {
@@ -999,11 +999,11 @@
         "method": "Fresh anonymous context at 1440x900: Date.now() from page.goto(\"/\") to data-load-state=loaded with data-points-loaded set (map.load drawn); 3 runs.",
         "ms": {
           "n": 3,
-          "min": 1981,
-          "median": 2019,
-          "p95": 2322,
-          "max": 2322,
-          "mean": 2107.3
+          "min": 1518,
+          "median": 1579,
+          "p95": 1645,
+          "max": 1645,
+          "mean": 1580.7
         }
       }
     },
@@ -1013,82 +1013,82 @@
         "sessions": 10,
         "method": "10 anonymous contexts at 320x240 on / (1,000 items), a MutationObserver per page attached before the first save stamps Date.now() when data-store-seq changes; the editor page sends a 1-op edits.apply (Date.now() just before the send, the save included) 5 times, 1 s apart; latency = the first stamp at or above the save's seq minus the send time, the verdict on the slowest session over all saves; a session that did not see a seq within 10 s is a miss.",
         "sessionsRoute": {
-          "total": 17,
-          "ofProject": 17
+          "total": 19,
+          "ofProject": 19
         },
         "saves": [
           {
             "seq": 4,
             "sessionsSeen": 10,
             "sessions": 10,
-            "maxMs": 223,
+            "maxMs": 33,
             "latencies": {
               "n": 10,
-              "min": 29,
-              "median": 35,
-              "p95": 223,
-              "max": 223,
-              "mean": 52.7
+              "min": 12,
+              "median": 25,
+              "p95": 33,
+              "max": 33,
+              "mean": 24.8
             }
           },
           {
             "seq": 5,
             "sessionsSeen": 10,
             "sessions": 10,
-            "maxMs": 43,
+            "maxMs": 24,
             "latencies": {
               "n": 10,
-              "min": 15,
-              "median": 27,
-              "p95": 43,
-              "max": 43,
-              "mean": 29.4
+              "min": 14,
+              "median": 17,
+              "p95": 24,
+              "max": 24,
+              "mean": 18.3
             }
           },
           {
             "seq": 6,
             "sessionsSeen": 10,
             "sessions": 10,
-            "maxMs": 33,
+            "maxMs": 28,
             "latencies": {
               "n": 10,
-              "min": 17,
-              "median": 24,
-              "p95": 33,
-              "max": 33,
-              "mean": 24.5
+              "min": 11,
+              "median": 15,
+              "p95": 28,
+              "max": 28,
+              "mean": 17.6
             }
           },
           {
             "seq": 7,
             "sessionsSeen": 10,
             "sessions": 10,
-            "maxMs": 25,
+            "maxMs": 34,
             "latencies": {
               "n": 10,
-              "min": 13,
-              "median": 20,
-              "p95": 25,
-              "max": 25,
-              "mean": 19.9
+              "min": 9,
+              "median": 13,
+              "p95": 34,
+              "max": 34,
+              "mean": 16.4
             }
           },
           {
             "seq": 8,
             "sessionsSeen": 10,
             "sessions": 10,
-            "maxMs": 45,
+            "maxMs": 766,
             "latencies": {
               "n": 10,
-              "min": 13,
-              "median": 21,
-              "p95": 45,
-              "max": 45,
-              "mean": 24.2
+              "min": 730,
+              "median": 736,
+              "p95": 766,
+              "max": 766,
+              "mean": 745.7
             }
           }
         ],
-        "maxMs": 223,
+        "maxMs": 766,
         "counts": {
           "ok": 5,
           "busy": 0,
@@ -1098,89 +1098,89 @@
         "limit": "every session under 1000 ms",
         "verdict": "pass",
         "reasons": [],
-        "openSeconds": 8
+        "openSeconds": 7
       },
       "50": {
         "label": "measured",
         "sessions": 50,
         "method": "50 anonymous contexts at 320x240 on / (1,000 items), a MutationObserver per page attached before the first save stamps Date.now() when data-store-seq changes; the editor page sends a 1-op edits.apply (Date.now() just before the send, the save included) 5 times, 1 s apart; latency = the first stamp at or above the save's seq minus the send time, the verdict on the slowest session over all saves; a session that did not see a seq within 10 s is a miss.",
         "sessionsRoute": {
-          "total": 53,
-          "ofProject": 53
+          "total": 52,
+          "ofProject": 52
         },
         "saves": [
           {
             "seq": 9,
             "sessionsSeen": 50,
             "sessions": 50,
-            "maxMs": 356,
+            "maxMs": 544,
             "latencies": {
               "n": 50,
-              "min": 21,
-              "median": 103,
-              "p95": 251,
-              "max": 356,
-              "mean": 115.2
+              "min": 59,
+              "median": 137,
+              "p95": 460,
+              "max": 544,
+              "mean": 215.9
             }
           },
           {
             "seq": 10,
             "sessionsSeen": 50,
             "sessions": 50,
-            "maxMs": 242,
+            "maxMs": 455,
             "latencies": {
               "n": 50,
-              "min": 23,
-              "median": 90,
-              "p95": 181,
-              "max": 242,
-              "mean": 91.7
+              "min": 205,
+              "median": 247,
+              "p95": 447,
+              "max": 455,
+              "mean": 291.3
             }
           },
           {
             "seq": 11,
             "sessionsSeen": 50,
             "sessions": 50,
-            "maxMs": 145,
+            "maxMs": 217,
             "latencies": {
               "n": 50,
-              "min": 13,
-              "median": 48,
-              "p95": 136,
-              "max": 145,
-              "mean": 60.2
+              "min": 56,
+              "median": 97,
+              "p95": 198,
+              "max": 217,
+              "mean": 110.5
             }
           },
           {
             "seq": 12,
             "sessionsSeen": 50,
             "sessions": 50,
-            "maxMs": 162,
+            "maxMs": 307,
             "latencies": {
               "n": 50,
-              "min": 56,
-              "median": 92,
-              "p95": 140,
-              "max": 162,
-              "mean": 94.5
+              "min": 245,
+              "median": 279,
+              "p95": 301,
+              "max": 307,
+              "mean": 277.5
             }
           },
           {
             "seq": 13,
             "sessionsSeen": 50,
             "sessions": 50,
-            "maxMs": 164,
+            "maxMs": 721,
             "latencies": {
               "n": 50,
-              "min": 36,
-              "median": 68,
-              "p95": 140,
-              "max": 164,
-              "mean": 78.6
+              "min": 312,
+              "median": 337,
+              "p95": 673,
+              "max": 721,
+              "mean": 403.3
             }
           }
         ],
-        "maxMs": 356,
+        "maxMs": 721,
         "counts": {
           "ok": 5,
           "busy": 0,
@@ -1190,7 +1190,7 @@
         "limit": "every session under 1000 ms",
         "verdict": "pass",
         "reasons": [],
-        "openSeconds": 32
+        "openSeconds": 52
       }
     },
     "sessions20": {
@@ -1201,19 +1201,19 @@
         "ofProject": 51
       },
       "window": {
-        "t0": 1793143551263,
-        "t1": 1793143731270,
+        "t0": 1793146272471,
+        "t1": 1793146452472,
         "seconds": 180
       },
       "resources": {
         "cpuSamples": 181,
         "cpuIntervalMs": 1000,
-        "cpuMeanPct": 2.92,
-        "cpuMaxPct": 24.35,
-        "containerMemMeanMiB": 1149.8,
+        "cpuMeanPct": 1.99,
+        "cpuMaxPct": 22.42,
+        "containerMemMeanMiB": 1267.9,
         "heapSamples": 36,
-        "heapMinMiB": 268.2,
-        "heapMeanMiB": 337.6
+        "heapMinMiB": 270.4,
+        "heapMeanMiB": 320.4
       }
     },
     "editsApply": {
@@ -1224,11 +1224,11 @@
         "method": "1 signed-in editor page(s) at once, each updating the properties of its own 50 pads (disjoint), versions from map.load and then from each reply; per editor one discarded warm-up then 20 timed batches of 1 op(s), performance.now() around the test-hook send; median and p95 pooled over every editor's samples.",
         "stats": {
           "n": 20,
-          "min": 21,
-          "median": 96.7,
-          "p95": 212.7,
-          "max": 240,
-          "mean": 107.1
+          "min": 15.4,
+          "median": 96.2,
+          "p95": 192.3,
+          "max": 270.7,
+          "mean": 104.1
         },
         "counts": {
           "ok": 20,
@@ -1238,7 +1238,26 @@
         },
         "verdict": "pass",
         "reasons": [],
-        "limit": "p95 under 300 ms"
+        "limit": "p95 under 300 ms",
+        "openEditorPages": 10,
+        "hostCpuBusyPct": 99.8,
+        "gateway": {
+          "window": {
+            "t0": 1793146513740,
+            "t1": 1793146515860,
+            "seconds": 2
+          },
+          "resources": {
+            "cpuSamples": 2,
+            "cpuIntervalMs": 997,
+            "cpuMeanPct": 42.61,
+            "cpuMaxPct": 77.2,
+            "containerMemMeanMiB": 1403.9,
+            "heapSamples": 0,
+            "heapMinMiB": null,
+            "heapMeanMiB": null
+          }
+        }
       },
       "50op-1editor": {
         "label": "measured",
@@ -1247,11 +1266,11 @@
         "method": "1 signed-in editor page(s) at once, each updating the properties of its own 50 pads (disjoint), versions from map.load and then from each reply; per editor one discarded warm-up then 20 timed batches of 50 op(s), performance.now() around the test-hook send; median and p95 pooled over every editor's samples.",
         "stats": {
           "n": 20,
-          "min": 31.3,
-          "median": 132.3,
-          "p95": 281.7,
-          "max": 295.5,
-          "mean": 149.8
+          "min": 30.2,
+          "median": 115.3,
+          "p95": 200.9,
+          "max": 224.3,
+          "mean": 115.9
         },
         "counts": {
           "ok": 20,
@@ -1261,7 +1280,26 @@
         },
         "verdict": "pass",
         "reasons": [],
-        "limit": "p95 under 300 ms"
+        "limit": "p95 under 300 ms",
+        "openEditorPages": 10,
+        "hostCpuBusyPct": 99.7,
+        "gateway": {
+          "window": {
+            "t0": 1793146515863,
+            "t1": 1793146518301,
+            "seconds": 2
+          },
+          "resources": {
+            "cpuSamples": 2,
+            "cpuIntervalMs": 1000,
+            "cpuMeanPct": 24.17,
+            "cpuMaxPct": 37.69,
+            "containerMemMeanMiB": 1403.9,
+            "heapSamples": 1,
+            "heapMinMiB": 423.3,
+            "heapMeanMiB": 423.3
+          }
+        }
       },
       "1op-10editors": {
         "label": "measured",
@@ -1270,11 +1308,11 @@
         "method": "10 signed-in editor page(s) at once, each updating the properties of its own 50 pads (disjoint), versions from map.load and then from each reply; per editor one discarded warm-up then 20 timed batches of 1 op(s), performance.now() around the test-hook send; median and p95 pooled over every editor's samples.",
         "stats": {
           "n": 200,
-          "min": 9.9,
-          "median": 102.7,
-          "p95": 396.4,
-          "max": 879.7,
-          "mean": 139.7
+          "min": 10.4,
+          "median": 93.7,
+          "p95": 276.6,
+          "max": 562.2,
+          "mean": 120.1
         },
         "counts": {
           "ok": 200,
@@ -1282,11 +1320,28 @@
           "timeouts": 0,
           "errors": {}
         },
-        "verdict": "miss",
-        "reasons": [
-          "p95 396.4 ms is not under 300 ms"
-        ],
-        "limit": "p95 under 300 ms"
+        "verdict": "pass",
+        "reasons": [],
+        "limit": "p95 under 300 ms",
+        "openEditorPages": 10,
+        "hostCpuBusyPct": 99.7,
+        "gateway": {
+          "window": {
+            "t0": 1793146518303,
+            "t1": 1793146521718,
+            "seconds": 3
+          },
+          "resources": {
+            "cpuSamples": 4,
+            "cpuIntervalMs": 1000,
+            "cpuMeanPct": 33.88,
+            "cpuMaxPct": 41.09,
+            "containerMemMeanMiB": 1404.7,
+            "heapSamples": 1,
+            "heapMinMiB": 315.7,
+            "heapMeanMiB": 315.7
+          }
+        }
       },
       "50op-10editors": {
         "label": "measured",
@@ -1295,11 +1350,11 @@
         "method": "10 signed-in editor page(s) at once, each updating the properties of its own 50 pads (disjoint), versions from map.load and then from each reply; per editor one discarded warm-up then 20 timed batches of 50 op(s), performance.now() around the test-hook send; median and p95 pooled over every editor's samples.",
         "stats": {
           "n": 200,
-          "min": 29.4,
-          "median": 310.5,
-          "p95": 2108.8,
-          "max": 3300.9,
-          "mean": 607.4
+          "min": 29.6,
+          "median": 303.4,
+          "p95": 1791.9,
+          "max": 2952.7,
+          "mean": 536.2
         },
         "counts": {
           "ok": 200,
@@ -1309,9 +1364,70 @@
         },
         "verdict": "miss",
         "reasons": [
-          "p95 2108.8 ms is not under 300 ms"
+          "p95 1791.9 ms is not under 300 ms"
         ],
-        "limit": "p95 under 300 ms"
+        "limit": "p95 under 300 ms",
+        "openEditorPages": 10,
+        "hostCpuBusyPct": 99.8,
+        "gateway": {
+          "window": {
+            "t0": 1793146521722,
+            "t1": 1793146536476,
+            "seconds": 15
+          },
+          "resources": {
+            "cpuSamples": 14,
+            "cpuIntervalMs": 1000,
+            "cpuMeanPct": 40.74,
+            "cpuMaxPct": 75.44,
+            "containerMemMeanMiB": 1404,
+            "heapSamples": 2,
+            "heapMinMiB": 431.1,
+            "heapMeanMiB": 473.4
+          }
+        }
+      },
+      "50op-10streams-1page": {
+        "label": "measured",
+        "editors": 10,
+        "opsPerBatch": 50,
+        "method": "The 10 editors' pads and batches of 50op-10editors, as 10 concurrent streams from the one editor page left open (the other editor pages closed); per stream one discarded warm-up then 20 timed batches; recorded beside 50op-10editors to separate the box's browser load from the Gateway's write path, not judged.",
+        "stats": {
+          "n": 200,
+          "min": 52.6,
+          "median": 200,
+          "p95": 314.3,
+          "max": 394.7,
+          "mean": 208.6
+        },
+        "counts": {
+          "ok": 200,
+          "busy": 0,
+          "timeouts": 0,
+          "errors": {}
+        },
+        "verdict": "recorded",
+        "reasons": [],
+        "limit": "none (recorded)",
+        "openEditorPages": 1,
+        "hostCpuBusyPct": 95,
+        "gateway": {
+          "window": {
+            "t0": 1793146537672,
+            "t1": 1793146542140,
+            "seconds": 4
+          },
+          "resources": {
+            "cpuSamples": 4,
+            "cpuIntervalMs": 1000,
+            "cpuMeanPct": 81.27,
+            "cpuMaxPct": 116.75,
+            "containerMemMeanMiB": 1408.5,
+            "heapSamples": 1,
+            "heapMinMiB": 510.7,
+            "heapMeanMiB": 510.7
+          }
+        }
       }
     },
     "listRefresh": {
@@ -1362,11 +1478,11 @@
       ],
       "stats": {
         "n": 10,
-        "min": 5.4,
-        "median": 5.6,
-        "p95": 9.8,
-        "max": 9.8,
-        "mean": 6.3
+        "min": 3.8,
+        "median": 5.7,
+        "p95": 10,
+        "max": 10,
+        "mean": 5.9
       },
       "counts": {
         "ok": 10,
@@ -1378,59 +1494,59 @@
       "reasons": [],
       "limit": "max under 1000 ms",
       "window": {
-        "t0": 1793143907482,
-        "t1": 1793143911334,
+        "t0": 1793146616431,
+        "t1": 1793146620268,
         "seconds": 4
       },
       "resources": {
         "cpuSamples": 4,
         "cpuIntervalMs": 1000,
-        "cpuMeanPct": 4.93,
-        "cpuMaxPct": 8.13,
-        "containerMemMeanMiB": 1502.2,
-        "heapSamples": 0,
-        "heapMinMiB": null,
-        "heapMeanMiB": null
+        "cpuMeanPct": 4.12,
+        "cpuMaxPct": 7.48,
+        "containerMemMeanMiB": 1420.3,
+        "heapSamples": 1,
+        "heapMinMiB": 437.2,
+        "heapMeanMiB": 437.2
       },
       "control": {
         "method": "15 s just before the refreshes: the signed-in editor page open on the 5,000-item map, no refresh pressed.",
         "window": {
-          "t0": 1793143892466,
-          "t1": 1793143907481,
+          "t0": 1793146601422,
+          "t1": 1793146616430,
           "seconds": 15
         },
         "resources": {
           "cpuSamples": 15,
           "cpuIntervalMs": 1000,
-          "cpuMeanPct": 2.28,
-          "cpuMaxPct": 4.57,
-          "containerMemMeanMiB": 1502.1,
+          "cpuMeanPct": 1.72,
+          "cpuMaxPct": 4.42,
+          "containerMemMeanMiB": 1420.4,
           "heapSamples": 3,
-          "heapMinMiB": 378.7,
-          "heapMeanMiB": 380
+          "heapMinMiB": 424.2,
+          "heapMeanMiB": 428.9
         }
       },
       "spike": {
-        "ceilingPct": 53.38,
-        "maxPct": 8.13,
+        "ceilingPct": 52.48,
+        "maxPct": 7.48,
         "limit": "no 1 s CPU sample above the idle mean + 50% of one core",
         "verdict": "pass",
         "reasons": []
       }
     },
     "idleAdded": {
-      "cpuDeltaPct": 0.54,
-      "heapDeltaMiB": -2.2,
-      "containerMemDeltaMiB": 9.3,
+      "cpuDeltaPct": 0,
+      "heapDeltaMiB": -138.6,
+      "containerMemDeltaMiB": 92,
       "limit": "CPU mean at most +2% of one core and heap minimum at most +64 MiB",
       "verdict": "pass",
       "reasons": [],
       "method": "Main phase idle window minus the nomodule phase idle window (same settle, no browser open): docker stats CPU mean, and the minimum of the Gateway heapMemory gauge (a live-set estimate [unverified])."
     },
     "sessionsAdded": {
-      "cpuDeltaPct": -0.31,
-      "heapDeltaMiB": -66.8,
-      "containerMemDeltaMiB": 46.1,
+      "cpuDeltaPct": -0.43,
+      "heapDeltaMiB": -44.5,
+      "containerMemDeltaMiB": 182.2,
       "limit": "CPU mean at most +10% of one core and heap minimum at most +200 MiB",
       "verdict": "pass",
       "reasons": [],
@@ -1441,19 +1557,19 @@
         "label": "measured",
         "method": "No browser session open; the Gateway without Map Studio.",
         "window": {
-          "t0": 1793142649404,
-          "t1": 1793142829467,
+          "t0": 1793145352753,
+          "t1": 1793145532753,
           "seconds": 180
         },
         "resources": {
-          "cpuSamples": 181,
+          "cpuSamples": 180,
           "cpuIntervalMs": 1000,
-          "cpuMeanPct": 2.84,
-          "cpuMaxPct": 30.89,
-          "containerMemMeanMiB": 1067.6,
+          "cpuMeanPct": 2.48,
+          "cpuMaxPct": 33.39,
+          "containerMemMeanMiB": 1043.2,
           "heapSamples": 36,
-          "heapMinMiB": 237.4,
-          "heapMeanMiB": 382
+          "heapMinMiB": 374.7,
+          "heapMeanMiB": 393.8
         }
       },
       "sessions20Plain": {
@@ -1464,19 +1580,19 @@
           "ofProject": 20
         },
         "window": {
-          "t0": 1793142870987,
-          "t1": 1793143050988,
+          "t0": 1793145575532,
+          "t1": 1793145755534,
           "seconds": 180
         },
         "resources": {
           "cpuSamples": 180,
           "cpuIntervalMs": 1000,
-          "cpuMeanPct": 3.23,
+          "cpuMeanPct": 2.42,
           "cpuMaxPct": 21.11,
-          "containerMemMeanMiB": 1103.7,
+          "containerMemMeanMiB": 1085.7,
           "heapSamples": 36,
-          "heapMinMiB": 335,
-          "heapMeanMiB": 363.5
+          "heapMinMiB": 314.9,
+          "heapMeanMiB": 349.8
         }
       }
     }
