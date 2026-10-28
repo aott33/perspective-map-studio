@@ -27,6 +27,7 @@ import com.aoindustrial.perspective.mapstudio.common.Messages;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 import com.aoindustrial.perspective.mapstudio.gateway.change.ChangeBus;
+import com.aoindustrial.perspective.mapstudio.gateway.live.LiveSession;
 import com.aoindustrial.perspective.mapstudio.gateway.load.MapLoader;
 import com.aoindustrial.perspective.mapstudio.gateway.setup.SetupRegistry;
 import com.aoindustrial.perspective.mapstudio.gateway.tags.TagLookups;
@@ -55,6 +56,12 @@ import com.aoindustrial.perspective.mapstudio.gateway.write.WriteService;
  * subscribed. A map whose session is at level {@code none} gets the change with
  * {@code actor} blank: an anonymous viewer never learns the editors' user names.
  *
+ * <p>Live values (epic 3 entry 5, AD-6, AD-7): after each {@code map.load.reply} the
+ * delegate's {@link LiveSession} sends a full {@code values.batch}, then one changes-only
+ * batch per refresh interval; {@code popup.open} and {@code popup.close}, handled on the
+ * event thread, make it push that item's values on change. Batches reach the browser the
+ * way {@code map.changed} does, through the session's execution queue.
+ *
  * <p>No exception escapes {@code handleEvent}: a malformed or unknown message
  * is answered with an {@code error} envelope and logged at warn.
  */
@@ -69,6 +76,8 @@ public class MapStudioDelegate extends ComponentModelDelegate {
     private final SetupRegistry setups;
     /** The change bus subscription from onStartup, or null. */
     private volatile ChangeBus.Subscription changes;
+    /** This map's live values (null in tests that pass no services). */
+    private volatile LiveSession live;
 
     public MapStudioDelegate(Component component, MapStudioServices services) {
         this(component, services, services.changes, services.setups);
@@ -97,6 +106,65 @@ public class MapStudioDelegate extends ComponentModelDelegate {
     protected void onShutdown() {
         log.debugf("Delegate stopped for %s", component.getComponentAddressPath());
         leaveBus();
+        LiveSession s = this.live;
+        this.live = null;
+        if (s != null) {
+            s.stop();
+        }
+    }
+
+    /** This map's live session, made on first use with the session's project; null without services. */
+    private LiveSession liveSession() {
+        LiveSession s = this.live;
+        if (s != null || services == null) {
+            return s;
+        }
+        s = new LiveSession(services.live, services.liveThread, component.getSession().getProjectName(),
+            body -> queueSend(envelope(Messages.VALUES_BATCH, UUID.randomUUID().toString(), body)));
+        this.live = s;
+        return s;
+    }
+
+    /**
+     * Queue an envelope the browser did not ask for on the session's execution queue (as
+     * {@code map.changed}). A map that is no longer running, or whose queue refuses, stops its live
+     * session so no more batches are built for it.
+     */
+    private void queueSend(JsonObject envelope) {
+        if (!component.isRunning()) {
+            LiveSession s = this.live;
+            if (s != null) {
+                s.stop();
+            }
+            return;
+        }
+        try {
+            component.getSession().queue().submit(() -> send(envelope));
+        } catch (RuntimeException ex) {
+            log.debugf("Open map %s could not be sent live values (%s); stopping them.",
+                component.getComponentAddressPath(), ex.getClass().getSimpleName());
+            LiveSession s = this.live;
+            if (s != null) {
+                s.stop();
+            }
+        }
+    }
+
+    /** {@code popup.open} and {@code popup.close} (AD-7): the item id is required; nothing is answered on success. */
+    private JsonObject popupReply(String type, String id, JsonObject body) {
+        String itemId = stringOrNull(body.get("itemId"));
+        if (itemId == null || itemId.isBlank()) {
+            return error(id, Messages.CODE_INVALID, type + " needs an itemId.");
+        }
+        LiveSession s = liveSession();
+        if (s != null) {
+            if (Messages.POPUP_OPEN.equals(type)) {
+                s.popupOpen(itemId);
+            } else {
+                s.popupClose();
+            }
+        }
+        return null;
     }
 
     private void leaveBus() {
@@ -189,11 +257,19 @@ public class MapStudioDelegate extends ComponentModelDelegate {
         JsonObject reply;
         try {
             JsonObject problem = check(envelope);
-            if (problem == null && isStoreType(envelope.get(Messages.KEY_TYPE).getAsString())) {
+            String type = problem == null ? envelope.get(Messages.KEY_TYPE).getAsString() : null;
+            if (problem == null && isStoreType(type)) {
                 submitStoreWork(envelope);
                 return;
             }
-            reply = problem != null ? problem : reply(envelope);
+            if (problem == null && isPopupType(type)) {
+                reply = popupReply(type, envelope.get(Messages.KEY_ID).getAsString(), body(envelope));
+                if (reply == null) {
+                    return;
+                }
+            } else {
+                reply = problem != null ? problem : reply(envelope);
+            }
         } catch (RuntimeException ex) {
             log.warn("Failed to handle a message: " + ex.getClass().getSimpleName(), ex);
             reply = error("", Messages.CODE_INVALID, "The message could not be read.");
@@ -238,7 +314,29 @@ public class MapStudioDelegate extends ComponentModelDelegate {
             return;
         }
         submitWork(services.work, type, id, job(services.loader, services.writes, services.tags, view, type, id, body),
-            this::send);
+            reply -> {
+                send(reply);
+                if (Messages.MAP_LOAD_REPLY.equals(stringOrNull(reply.get(Messages.KEY_TYPE)))) {
+                    startLive(reply.getAsJsonObject(Messages.KEY_BODY));
+                }
+            });
+    }
+
+    /** A loaded map gets its live values: a full batch now, then every refresh interval of the setup. */
+    private void startLive(JsonObject loadReply) {
+        LiveSession s = liveSession();
+        if (s == null) {
+            return;
+        }
+        int interval = Setup.DEFAULT_REFRESH_SECONDS;
+        JsonElement setup = loadReply.get("setup");
+        if (setup != null && setup.isJsonObject()) {
+            JsonElement seconds = setup.getAsJsonObject().get("refreshIntervalSeconds");
+            if (seconds != null && seconds.isJsonPrimitive() && seconds.getAsJsonPrimitive().isNumber()) {
+                interval = seconds.getAsInt();
+            }
+        }
+        s.loaded(interval);
     }
 
     /** The work for a message that runs on the pool: a tag lookup for {@code tags.*}, else a store call. */
@@ -346,6 +444,10 @@ public class MapStudioDelegate extends ComponentModelDelegate {
 
     static boolean isTagType(String type) {
         return Messages.TAGS_BROWSE.equals(type) || Messages.TAGS_RESOLVE.equals(type);
+    }
+
+    static boolean isPopupType(String type) {
+        return Messages.POPUP_OPEN.equals(type) || Messages.POPUP_CLOSE.equals(type);
     }
 
     /**
