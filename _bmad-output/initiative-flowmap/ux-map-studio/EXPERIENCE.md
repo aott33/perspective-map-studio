@@ -397,7 +397,7 @@ Failure: CTB1's comms are lost: the icon has a dashed ring and "Comms lost", the
 1. **Alarm hue tokens.** Which host Perspective theme variables carry priority 1, 2 and 3 (epic-viewing's call; the mocks used `--error` for priority 1)?
 2. **Area tint palette.** Which theme tokens make the FR-39 palette?
 3. **Kinds tag browser.** The design is settled (owner, 2026-10-27); the Gateway's 8.3 tag browse of any provider (`tags.browse`, `tags.resolve`, AD-8) stays unverified until epic-map-store-and-data entry 15 checks it live. Open to the owner: where the browser opens on one item's override (assumed: that item's own asset folder), and whether the shared-tag note may use the `warning` token (assumed yes; DESIGN.md Colors).
-4. **Style rule Expression.** Where it is evaluated and in which language (PRD FR-38, AD-16).
+4. **Style rule Expression.** Resolved (owner, 2026-10-28; built in epic-viewing entry 1): on the Gateway, in Ignition's expression language with `{value}` as the one reference; the preview tiles of an expression rule show the presets its text names.
 5. **Legend.** Resolved: Sofia added it as PRD FR-41 (initiative R42, epic-viewing entry 3.3) on 2026-10-27.
 6. **Instrument tool placement** on the draw toolbar and the instrument marker look (the key-screens mock frames the line valve in a rounded square, which the reserved-shapes rule does not allow).
 7. **Toast timing** and Undo bar lifetime.

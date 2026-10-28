@@ -1,5 +1,5 @@
 import {
-    LIVE_INITIAL, LiveValue, ageText, alarmsText, applyBatch, commsText, itemState, readKindDisplay, readValuesBatch,
+    LIVE_INITIAL, LiveValue, ageText, alarmsText, applyBatch, areaTint, commsText, itemState, readKindDisplay, readValuesBatch,
     staleText, valueText
 } from '../live';
 import { readReply } from '../messages';
@@ -75,7 +75,54 @@ describe('item state for the icon', () => {
     test('normal with the icon KPI', () => {
         const normal = itemState({ ...P1, alarms: good({ active: 0, unacked: 0, priority: 0 }) }, DISPLAY);
         expect(normal).toEqual({ commsLost: false, stale: false, alarm: null,
-            iconKpi: { key: 'pressure', text: '412.5 psi', stale: false, hasValue: true }, badge: 'normal' });
+            iconKpi: { key: 'pressure', text: '412.5 psi', stale: false, hasValue: true }, badge: 'normal', preset: 'normal' });
+    });
+
+    test('the style slot gives the preset; a stale source makes the item stale with no style (entry 1)', () => {
+        const quiet = { ...P1, alarms: good({ active: 0, unacked: 0, priority: 0 }) };
+        const warning = itemState({ ...quiet, style: { preset: 'warning', stale: false, reason: '' } }, DISPLAY);
+        expect(warning.preset).toBe('warning');
+        expect(warning.badge).toBe('normal');
+        expect(warning.stale).toBe(false);
+        const dropped = itemState({ ...quiet, style: { preset: 'normal', stale: true, reason: 'Bad_Stale' } }, DISPLAY);
+        expect(dropped.preset).toBe('normal');
+        expect(dropped.stale).toBe(true);
+        expect(dropped.badge).toBe('stale');
+        // An alarm beside a style: both are there; the marker draws the badge over the ring.
+        const both = itemState({ ...P1, style: { preset: 'fault', stale: false, reason: '' } }, DISPLAY);
+        expect(both.badge).toBe('alarm');
+        expect(both.preset).toBe('fault');
+        expect(itemState(quiet, DISPLAY).preset).toBe('normal');
+    });
+
+    test('the style slot, the rule display and the area tints are read from a batch; bad ones left out', () => {
+        const reply = readReply({ v: 1, type: 'values.batch', id: 'b1', body: {
+            seq: 7, full: true,
+            items: [{ ...P1, style: { preset: 'attention', stale: false, reason: '' } }, { ...P1, id: 'p2', style: { preset: 'green', stale: false } },
+                { ...P1, id: 'p3', style: { preset: 'fault' } }],
+            kindDisplay: [{ ...DISPLAY, styleRule: { type: 'bands', source: 'kpi:pressure', cases: [{ label: 'below 900', preset: 'normal' },
+                { label: '900 and above', preset: 'warning' }, { label: 'x', preset: 'purple' }] } },
+            { kindId: 'geofence', areaTints: { property: 'operator', tints: [{ category: 'North', tint: 'tint-1' }, { category: 'South', tint: 'tint-9' }] } },
+            { kindId: 'line', styleRule: { type: 'other', source: 'tag', cases: [] } }] } });
+        if (reply.kind !== 'values.batch' || !reply.body) {
+            throw new Error('unreadable');
+        }
+        expect(reply.body.items[0].style).toEqual({ preset: 'attention', stale: false, reason: '' });
+        expect(reply.body.items[1].style).toBeUndefined();
+        expect(reply.body.items[2].style).toBeUndefined();
+        const pad = reply.body.kindDisplay!.find((d) => d.kindId === 'pad')!;
+        expect(pad.styleRule).toEqual({ type: 'bands', source: 'kpi:pressure',
+            cases: [{ label: 'below 900', preset: 'normal' }, { label: '900 and above', preset: 'warning' }] });
+        expect(pad.areaTints).toBeUndefined();
+        const geofence = reply.body.kindDisplay!.find((d) => d.kindId === 'geofence')!;
+        expect(geofence.areaTints).toEqual({ property: 'operator', tints: [{ category: 'North', tint: 'tint-1' }] });
+        expect(reply.body.kindDisplay!.find((d) => d.kindId === 'line')!.styleRule).toBeUndefined();
+        expect(areaTint(geofence, { operator: 'North' })).toBe('tint-1');
+        expect(areaTint(geofence, { operator: 'South' })).toBeNull();
+        expect(areaTint(geofence, { operator: 12 })).toBeNull();
+        expect(areaTint(geofence, {})).toBeNull();
+        expect(areaTint(pad, { operator: 'North' })).toBeNull();
+        expect(areaTint(undefined, { operator: 'North' })).toBeNull();
     });
 
     test('an alarm: priority, acknowledgement and count; it draws over comms lost', () => {

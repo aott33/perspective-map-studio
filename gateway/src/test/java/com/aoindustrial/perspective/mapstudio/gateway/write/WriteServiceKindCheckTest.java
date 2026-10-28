@@ -80,6 +80,30 @@ class WriteServiceKindCheckTest extends WriteFixture {
     }
 
     @Test
+    void anExpressionRuleMustParseInAnOverrideAndInAKindSetup() {
+        // Epic 3 entry 1: Ignition's expression language, {value} its one reference, checked at save.
+        String good = ",\"overrides\":{\"styleRule\":{\"source\":{\"path\":\"[default]Mesa/P14/Pressure\"},"
+            + "\"type\":\"expression\",\"expression\":\"if({value} > 600, 'warning', 'normal')\"}}";
+        save(batch(uuid(), createItem(uuid(), "pad", POINT, good)));
+        String reference = refusedWith(createItem("%s", "pad", POINT, ",\"overrides\":{\"styleRule\":{\"type\":\"expression\","
+            + "\"expression\":\"{pressure} > 1\"}}"));
+        assertEquals("Op 0 (%s): overrides.styleRule.expression: the expression could not be read: a style rule may"
+            + " reference {value} only, not {pressure}", reference);
+        assertTrue(refusedWith(createItem("%s", "pad", POINT, ",\"overrides\":{\"styleRule\":{\"type\":\"expression\","
+            + "\"expression\":\"if(\"}}")).contains("Syntax Error"));
+        assertTrue(refusedWith(createItem("%s", "pad", POINT, ",\"overrides\":{\"styleRule\":{\"type\":\"expression\","
+            + "\"expression\":\"tag('[default]x')\"}}")).contains("tag() may not be used"));
+        MapStudioException setup = refused(batch(uuid(), WriteServiceKindSetupTest.kindSetup("create", "pad", 0,
+            "{\"styleRule\":{\"type\":\"expression\",\"expression\":\"runScript('x')\"}}")), Messages.LEVEL_FULL);
+        assertEquals(Messages.CODE_INVALID, setup.code());
+        assertTrue(setup.getMessage().contains("styleRule.expression: the expression could not be read: the function"
+            + " runScript() may not be used in a style rule"), setup.getMessage());
+        save(batch(uuid(), WriteServiceKindSetupTest.kindSetup("create", "line", 0,
+            "{\"kpis\":[{\"key\":\"flow\",\"path\":\"{asset.path}/Flow\"}],\"styleRule\":{\"source\":{\"kpi\":\"flow\"},"
+            + "\"type\":\"expression\",\"expression\":\"if({value} < 0, 'dashed', 'solid')\"}}")));
+    }
+
+    @Test
     void withNoKindListInUseOnlyDeletesPass() {
         String pad = uuid();
         save(batch(uuid(), createItem(pad, "pad", POINT, "")));

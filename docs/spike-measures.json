@@ -30,21 +30,21 @@
     "files": [
       {
         "file": "MapStudio.css",
-        "bytes": 78036,
-        "gzipBytes": 11453,
-        "transferredBodyBytes": 11484,
+        "bytes": 79805,
+        "gzipBytes": 11780,
+        "transferredBodyBytes": 11804,
         "contentEncoding": "gzip",
         "story2Bytes": 70976,
-        "deltaBytes": 7060
+        "deltaBytes": 8829
       },
       {
         "file": "MapStudio.js",
-        "bytes": 1257528,
-        "gzipBytes": 338971,
-        "transferredBodyBytes": 337836,
+        "bytes": 1269227,
+        "gzipBytes": 341923,
+        "transferredBodyBytes": 340766,
         "contentEncoding": "gzip",
         "story2Bytes": 1167572,
-        "deltaBytes": 89956
+        "deltaBytes": 101655
       },
       {
         "file": "mapstudio-icons.svg",
@@ -65,8 +65,8 @@
     ],
     "modl": {
       "file": "Map-Studio.unsigned.modl",
-      "bytes": 1900743,
-      "sha256": "bbe159712ea9efe327bedd0c0b4724f3be81e7e272dadbfcc7130117c4befbd8"
+      "bytes": 1922916,
+      "sha256": "cdca1d66129c391dbda995f0d110013424094455aa3654f666db987da7a720b2"
     },
     "note": "transferredBodyBytes 0 on maplibre-gl-worker.js: Playwright reported no body transfer for the worker request (Chromium fetches a worker script outside the page; why is unverified). Use bytes and gzipBytes for that file.",
     "budget": "none defined; recorded only"
@@ -102,94 +102,94 @@
         "runs": [
           {
             "pan": {
-              "frames": 77,
+              "frames": 74,
               "spanMs": 4033,
-              "fps": 18.84,
-              "intervalMs": {
-                "p50": 50,
-                "p95": 83.3,
-                "max": 100
-              },
-              "shareOver20msPercent": 92.1,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            },
-            "zoom": {
-              "frames": 83,
-              "spanMs": 4050,
-              "fps": 20.25,
-              "intervalMs": {
-                "p50": 50,
-                "p95": 83.3,
-                "max": 100
-              },
-              "shareOver20msPercent": 92.7,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            }
-          },
-          {
-            "pan": {
-              "frames": 79,
-              "spanMs": 4050,
-              "fps": 19.26,
-              "intervalMs": {
-                "p50": 50,
-                "p95": 100,
-                "max": 116.7
-              },
-              "shareOver20msPercent": 98.7,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            },
-            "zoom": {
-              "frames": 84,
-              "spanMs": 4050,
-              "fps": 20.49,
-              "intervalMs": {
-                "p50": 50,
-                "p95": 83.3,
-                "max": 100
-              },
-              "shareOver20msPercent": 91.6,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            }
-          },
-          {
-            "pan": {
-              "frames": 80,
-              "spanMs": 4017,
-              "fps": 19.67,
+              "fps": 18.1,
               "intervalMs": {
                 "p50": 50,
                 "p95": 83.4,
-                "max": 116.6
+                "max": 116.7
               },
-              "shareOver20msPercent": 94.9,
+              "shareOver20msPercent": 93.2,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
               }
             },
             "zoom": {
-              "frames": 87,
-              "spanMs": 4067,
-              "fps": 21.15,
+              "frames": 73,
+              "spanMs": 4000,
+              "fps": 18,
               "intervalMs": {
                 "p50": 50,
-                "p95": 83.3,
-                "max": 83.4
+                "p95": 83.4,
+                "max": 116.7
               },
-              "shareOver20msPercent": 90.7,
+              "shareOver20msPercent": 97.2,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 70,
+              "spanMs": 4033,
+              "fps": 17.11,
+              "intervalMs": {
+                "p50": 50,
+                "p95": 83.4,
+                "max": 133.4
+              },
+              "shareOver20msPercent": 94.2,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 75,
+              "spanMs": 4017,
+              "fps": 18.42,
+              "intervalMs": {
+                "p50": 50,
+                "p95": 100,
+                "max": 100.1
+              },
+              "shareOver20msPercent": 89.2,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 71,
+              "spanMs": 4050,
+              "fps": 17.28,
+              "intervalMs": {
+                "p50": 50.1,
+                "p95": 83.4,
+                "max": 100
+              },
+              "shareOver20msPercent": 95.7,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 70,
+              "spanMs": 3950,
+              "fps": 17.47,
+              "intervalMs": {
+                "p50": 50.1,
+                "p95": 99.9,
+                "max": 116.7
+              },
+              "shareOver20msPercent": 94.2,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
@@ -198,17 +198,17 @@
           }
         ],
         "medianFps": {
-          "pan": 19.26,
-          "zoom": 20.49
+          "pan": 17.28,
+          "zoom": 18
         },
         "fpsRange": {
           "pan": [
-            18.84,
-            19.67
+            17.11,
+            18.1
           ],
           "zoom": [
-            20.25,
-            21.15
+            17.47,
+            18.42
           ]
         }
       }
@@ -237,19 +237,19 @@
       "attempt": 0
     },
     "refreshIntervalSeconds": 10,
-    "mapItems": 105,
+    "mapItems": 107,
     "full": {
-      "bytes": 28496,
-      "gzipBytes": 2118,
-      "items": 45,
+      "bytes": 50376,
+      "gzipBytes": 3711,
+      "items": 89,
       "kindDisplay": true,
-      "seq": 101
+      "seq": 111
     },
     "changesOnly": {
-      "bytes": 1335,
-      "gzipBytes": 442,
+      "bytes": 1454,
+      "gzipBytes": 458,
       "items": 1,
-      "seq": 109,
+      "seq": 119,
       "rule": "the map items whose values changed since the last batch"
     }
   },

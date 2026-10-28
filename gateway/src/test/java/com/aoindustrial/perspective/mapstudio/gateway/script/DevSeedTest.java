@@ -42,7 +42,7 @@ class DevSeedTest {
     }
 
     @Test
-    void firstRunCreatesAll66InOneBatch() {
+    void firstRunCreatesAll68InOneBatch() {
         row("row_first_run");
     }
 

@@ -32,6 +32,13 @@
         "valueSource": "memory",
         "dataType": "Boolean",
         "value": true
+      },
+      {
+        "name": "Status",
+        "tagType": "AtomicTag",
+        "valueSource": "memory",
+        "dataType": "Int4",
+        "value": 0
       }
     ]
   }

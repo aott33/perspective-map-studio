@@ -1,0 +1,181 @@
+{
+ "custom": {},
+ "params": {},
+ "props": {
+  "defaultSize": {
+   "width": 1440,
+   "height": 900
+  }
+ },
+ "root": {
+  "type": "ia.container.flex",
+  "version": 0,
+  "props": {
+   "direction": "column"
+  },
+  "meta": {
+   "name": "root"
+  },
+  "position": {},
+  "custom": {},
+  "children": [
+   {
+    "type": "ia.container.flex",
+    "version": 0,
+    "props": {
+     "direction": "row",
+     "alignItems": "center",
+     "wrap": "wrap"
+    },
+    "meta": {
+     "name": "toolbar"
+    },
+    "position": {
+     "shrink": 0
+    },
+    "custom": {},
+    "children": [
+     {
+      "type": "ia.display.label",
+      "version": 0,
+      "props": {
+       "text": "",
+       "style": {
+        "padding": "4px 12px"
+       }
+      },
+      "meta": {
+       "name": "user",
+       "domId": "mapstudio-dev-user"
+      },
+      "position": {
+       "basis": "auto",
+       "shrink": 0
+      },
+      "custom": {},
+      "propConfig": {
+       "props.text": {
+        "binding": {
+         "type": "expr",
+         "config": {
+          "expression": "if({session.props.auth.authenticated}, 'Signed in as ' + {session.props.auth.user.userName}, 'Not signed in (viewer)')"
+         }
+        }
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Log in"
+      },
+      "meta": {
+       "name": "login",
+       "domId": "mapstudio-dev-login"
+      },
+      "position": {
+       "basis": "120px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\tif self.session.props.auth.authenticated:\n\t\tsystem.perspective.logout()\n\telse:\n\t\tsystem.perspective.login()"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      },
+      "propConfig": {
+       "props.text": {
+        "binding": {
+         "type": "expr",
+         "config": {
+          "expression": "if({session.props.auth.authenticated}, 'Log out', 'Log in')"
+         }
+        }
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Dark theme"
+      },
+      "meta": {
+       "name": "theme",
+       "domId": "mapstudio-styles-theme"
+      },
+      "position": {
+       "basis": "140px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 3 entry 1): switch the session between the light and dark Perspective themes, so the\n\t# style preview is seen and screenshotted in both (docs/styles.md).\n\tself.session.props.theme = 'light' if self.session.props.theme == 'dark' else 'dark'"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      },
+      "propConfig": {
+       "props.text": {
+        "binding": {
+         "type": "expr",
+         "config": {
+          "expression": "if({session.props.theme} = 'dark', 'Light theme', 'Dark theme')"
+         }
+        }
+       }
+      }
+     }
+    ]
+   },
+   {
+    "type": "ao.mapstudio",
+    "version": 0,
+    "props": {
+     "popupView": {
+      "path": "",
+      "params": {}
+     },
+     "startingArea": {
+      "center": {
+       "lng": -104.987,
+       "lat": 39.737
+      },
+      "zoom": 14,
+      "bounds": {
+       "west": null,
+       "south": null,
+       "east": null,
+       "north": null
+      }
+     },
+     "previewStyles": true
+    },
+    "meta": {
+     "name": "map"
+    },
+    "position": {
+     "basis": "0px",
+     "grow": 1
+    },
+    "custom": {}
+   }
+  ]
+ }
+}

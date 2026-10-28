@@ -64,6 +64,11 @@ public final class StylePresets {
         }
     }
 
+    /** True when {@code name} is a preset of the kind (what a rule may give, epic 3 entry 1). */
+    public static boolean isPreset(String name, Kind kind) {
+        return name != null && presetsFor(kind).contains(name);
+    }
+
     /** True for text that reads as a colour: #rgb, #rrggbb, rgb(), hsl() or a colour word. */
     public static boolean looksLikeColour(String s) {
         String t = s.trim().toLowerCase(Locale.ROOT);

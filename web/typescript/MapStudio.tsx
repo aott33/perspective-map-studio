@@ -40,13 +40,14 @@ import {
 } from './basemaps';
 import { BasemapControl } from './BasemapControl';
 import { FIT_PADDING_PX, StartingArea, readStartingArea, startingAreaKey } from './startingArea';
-import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, itemState } from './live';
+import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, itemPreset, itemState } from './live';
 import {
-    ARROW_IMAGE, CHIP_IMAGE, CHIP_PADDING, CHIP_SIZE, DISC_CENTER, FONT_CHIP, FONT_NAME, HALO_WIDTH, KPI_SIZE, KPI_TOP_PX,
-    LINE_CHIP_OFFSET_BADGE_EM, LINE_CHIP_OFFSET_EM, MARKER_IMAGE, MARKER_TOKENS, MarkerColors, NAME_SIZE, NAME_TOP_PX, SpriteSymbol,
-    TEXT_PADDING, ZOOM_DOT, ZOOM_KPI, ZOOM_NAME, imageFor,
-    markerProperties, parseSprite, stateWord, textWidthPx
+    AREA_FILL_OPACITY, AREA_LINE_OPACITY, AREA_LINE_WIDTH, ARROW_IMAGE, CHIP_IMAGE, CHIP_PADDING, CHIP_SIZE, DIMMED_OPACITY, DISC_CENTER,
+    FONT_CHIP, FONT_NAME, HALO_WIDTH, KPI_SIZE, KPI_TOP_PX, LINE_CHIP_OFFSET_BADGE_EM, LINE_CHIP_OFFSET_EM, LINE_DASH, LINE_DOT,
+    MARKER_IMAGE, MARKER_TOKENS, MarkerColors, NAME_SIZE, NAME_TOP_PX, SpriteSymbol, TEXT_PADDING, ZOOM_DOT, ZOOM_KPI, ZOOM_NAME,
+    imageFor, markerProperties, parseSprite, stateWord, textWidthPx
 } from './markers';
+import { PresetPalette, StylePreview, TintPalette } from './StylePreview';
 import { MapFeatures, Selection, buildFeatures } from './features';
 import { FitControl } from './FitControl';
 import { PickList, PickRow } from './PickList';
@@ -94,6 +95,11 @@ export interface MapStudioProps {
         path: string;
         params: AuthorParams;
     };
+    /**
+     * Draw the style preview panel (epic 3 entry 1): every kind's style rule and area tints, each
+     * case in its preset, and the preset and tint palettes; the kind setup screen's preview, for review.
+     */
+    previewStyles: boolean;
 }
 
 /** The popup that is open: the clicked point with its map coordinates. */
@@ -639,6 +645,12 @@ const LAYER_BASEMAP = 'mapstudio-basemap';
 /** The map store's items (map.load and this session's saves). */
 const SOURCE_ITEM_LINES = 'mapstudio-items-line';
 const SOURCE_ITEM_POINTS = 'mapstudio-items-point';
+/** The areas (a line kind with `area: true`, epic 3 entry 1): a closed fill in the category tint and its outline, under the lines. */
+const SOURCE_ITEM_AREAS = 'mapstudio-items-area';
+const LAYER_AREA_FILL = 'mapstudio-items-area-fill';
+const LAYER_AREA_LINE = 'mapstudio-items-area-line';
+/** The `dotted` preset's lines (entry 1): round dots, a layer of their own since the dash pattern is not data-driven. */
+const LAYER_ITEM_LINES_DOTTED = 'mapstudio-items-line-dotted';
 /** Each line's midpoint mark (its name chip and alarm badge) and the selected line's flow arrow (features.ts). */
 const SOURCE_LINE_MARKS = 'mapstudio-line-marks';
 const SOURCE_ARROW = 'mapstudio-arrow';
@@ -704,7 +716,12 @@ function markerColors(root: HTMLElement | undefined): MarkerColors {
         selection: first(MARKER_TOKENS.selection),
         commsLost: first(MARKER_TOKENS.commsLost),
         alarm: [first(MARKER_TOKENS.alarm1), first(MARKER_TOKENS.alarm2), first(MARKER_TOKENS.alarm3)],
-        font
+        font,
+        attention: first(MARKER_TOKENS.attention),
+        warning: first(MARKER_TOKENS.warning),
+        fault: first(MARKER_TOKENS.fault),
+        tints: [first(MARKER_TOKENS.tint1), first(MARKER_TOKENS.tint2), first(MARKER_TOKENS.tint3), first(MARKER_TOKENS.tint4),
+            first(MARKER_TOKENS.tint5), first(MARKER_TOKENS.tint6)]
     };
 }
 
@@ -857,11 +874,29 @@ export class MapStudio extends Component<Props, MapStudioState> {
         map.on('load', () => {
             const empty = itemsToGeoJson([]);
             map.addSource(SOURCE_ITEM_LINES, { type: 'geojson', data: empty.lines });
+            map.addSource(SOURCE_ITEM_AREAS, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
             map.addSource(SOURCE_ITEM_POINTS, { type: 'geojson', data: empty.points });
             map.addSource(SOURCE_LINE_MARKS, { type: 'geojson', data: empty.points });
             map.addSource(SOURCE_ARROW, { type: 'geojson', data: empty.points });
-            // The lines (DESIGN.md map-line): the selection casing under the selected one, then dashed
-            // and solid lines with their weight and hue per feature (features.ts, markers.ts lineLook).
+            // The areas (entry 1, AD-11): a low-saturation fill in the category tint and a firmer
+            // outline, under every line and point; a tint is never on a point or a line.
+            map.addLayer({
+                id: LAYER_AREA_FILL,
+                type: 'fill',
+                source: SOURCE_ITEM_AREAS,
+                paint: { 'fill-color': ['get', 'color'], 'fill-opacity': AREA_FILL_OPACITY }
+            });
+            map.addLayer({
+                id: LAYER_AREA_LINE,
+                type: 'line',
+                source: SOURCE_ITEM_AREAS,
+                layout: { 'line-cap': 'round', 'line-join': 'round' },
+                paint: { 'line-color': ['get', 'color'], 'line-width': AREA_LINE_WIDTH, 'line-opacity': AREA_LINE_OPACITY }
+            });
+            // The lines (DESIGN.md map-line): the selection casing under the selected one, then dashed,
+            // dotted and solid lines with their weight and hue per feature (features.ts, markers.ts
+            // lineLook); the dimmed preset fades the line.
+            const dimmed: Expression = ['case', ['==', ['get', 'dimmed'], true], DIMMED_OPACITY, 1];
             map.addLayer({
                 id: LAYER_LINE_CASING,
                 type: 'line',
@@ -876,15 +911,23 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 source: SOURCE_ITEM_LINES,
                 filter: ['==', ['get', 'dashed'], true],
                 layout: { 'line-cap': 'butt', 'line-join': 'round' },
-                paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'weight'], 'line-dasharray': [2.5, 2] }
+                paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'weight'], 'line-dasharray': LINE_DASH, 'line-opacity': dimmed }
+            });
+            map.addLayer({
+                id: LAYER_ITEM_LINES_DOTTED,
+                type: 'line',
+                source: SOURCE_ITEM_LINES,
+                filter: ['==', ['get', 'dotted'], true],
+                layout: { 'line-cap': 'round', 'line-join': 'round' },
+                paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'weight'], 'line-dasharray': LINE_DOT, 'line-opacity': dimmed }
             });
             map.addLayer({
                 id: LAYER_ITEM_LINES,
                 type: 'line',
                 source: SOURCE_ITEM_LINES,
-                filter: ['!=', ['get', 'dashed'], true],
+                filter: ['all', ['!=', ['get', 'dashed'], true], ['!=', ['get', 'dotted'], true]],
                 layout: { 'line-cap': 'round', 'line-join': 'round' },
-                paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'weight'] }
+                paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'weight'], 'line-opacity': dimmed }
             });
             // MapLibre awaits the resolver's promise before it treats an image as missing, so the
             // images drawn from the sprite are in place when the symbols are laid out.
@@ -919,7 +962,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 delegate.sendMapLoad();
             }
             map.on('click', this.onMapClick);
-            for (const layer of [LAYER_ITEM_MARKERS, LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED]) {
+            for (const layer of [LAYER_ITEM_MARKERS, LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED]) {
                 map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
                 map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
             }
@@ -1158,7 +1201,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     attribution: b.source.attribution
                 });
                 map.addLayer({ id: LAYER_BASEMAP, type: 'raster', source: SOURCE_BASEMAP },
-                    map.getLayer(LAYER_LINE_CASING) ? LAYER_LINE_CASING : undefined);
+                    map.getLayer(LAYER_AREA_FILL) ? LAYER_AREA_FILL : undefined);
                 this.tiles = 'loading';
             } else {
                 this.tiles = 'none';
@@ -1385,11 +1428,13 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const data = buildFeatures(items, delegate.lists.kinds, delegate.live, selected, this.markerColors);
         const source = (id: string): GeoJSONSource | undefined => this.map!.getSource(id) as GeoJSONSource | undefined;
         const lines = source(SOURCE_ITEM_LINES);
+        const areas = source(SOURCE_ITEM_AREAS);
         const points = source(SOURCE_ITEM_POINTS);
         const marks = source(SOURCE_LINE_MARKS);
         const arrow = source(SOURCE_ARROW);
-        if (lines && points && marks && arrow) {
+        if (lines && areas && points && marks && arrow) {
             lines.setData(data.lines);
+            areas.setData(data.areas);
             points.setData(data.points);
             marks.setData(data.marks);
             arrow.setData(data.arrow);
@@ -1400,10 +1445,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.itemBoundsKey = data.boundsKey;
             if (this.mapContainer) {
                 // The map items drawn (a shared marker counts its members), as the suite has always read it.
-                this.mapContainer.setAttribute('data-items-loaded', String(data.lines.features.length
+                this.mapContainer.setAttribute('data-items-loaded', String(data.lines.features.length + data.areas.features.length
                     + data.points.features.reduce((n, f) => n + f.properties.members, 0)));
                 this.mapContainer.setAttribute('data-shared-markers', String(data.shared));
                 this.mapContainer.setAttribute('data-arrow', String(data.arrow.features.length));
+                // The areas and their tints (entry 1), for tests: id, tint name and the resolved colour.
+                this.mapContainer.setAttribute('data-areas', JSON.stringify(data.areas.features.map((f) => ({
+                    id: f.properties.id, tint: f.properties.tint, color: f.properties.color
+                }))));
             }
             this.publishSelection();
             // A kept Fit follows a change of the items' bounds (a new item outside them), nothing else.
@@ -1765,7 +1814,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const pad = 4;
         const onLine = map.queryRenderedFeatures(
             [[ev.point.x - pad, ev.point.y - pad], [ev.point.x + pad, ev.point.y + pad]],
-            { layers: [LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED] });
+            { layers: [LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED] });
         const lineId = onLine.length > 0 && onLine[0].properties ? onLine[0].properties.id : undefined;
         if (typeof lineId === 'string') {
             this.selectLine(lineId);
@@ -2014,6 +2063,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                         { labelRank: kind ? kind.labelRank : 0 });
                     return (
                         <div key={id} className="mapstudio-live-item" data-item-id={id} data-state={state.badge}
+                             data-preset={itemPreset(state)}
+                             data-style={values.style ? values.style.preset + (values.style.stale ? ':stale:' + values.style.reason : '') : ''}
                              data-comms={state.commsLost ? 'lost' : values.comms ? (values.comms.stale ? 'stale' : 'ok') : ''}
                              data-stale={state.stale ? 'true' : 'false'}
                              data-alarm={state.alarm ? state.alarm.priority + ':' + (state.alarm.unacked ? 'unacked' : 'acked') + ':' + state.alarm.active : ''}
@@ -2057,6 +2108,39 @@ export class MapStudio extends Component<Props, MapStudioState> {
                                 onClick={() => delegate && delegate.discardUnsaved(entry.batchId)}>Discard</button>
                     </div>
                 ))}
+            </div>
+        );
+    }
+
+    /**
+     * The style preview panel (entry 1, the `previewStyles` prop): every kind's style rule and area
+     * tints from the kind display, each case in its preset, then the preset and tint palettes; drawn
+     * with the same code as the markers (StylePreview), from the sprite once it is loaded.
+     */
+    private renderStylePanel(): React.ReactNode {
+        const delegate = this.props.delegate;
+        const colors = this.markerColors;
+        if (!this.props.props.previewStyles || !delegate || !colors) {
+            return null;
+        }
+        const symbols = this.symbols || {};
+        if (this.symbols === null) {
+            this.loadSprite().then(() => this.forceUpdate());
+        }
+        const kinds = delegate.lists.kinds;
+        const previews = kinds
+            .map((k) => ({ kind: k, display: delegate.live.display[k.id] }))
+            .filter((e) => e.display && (e.display.styleRule || e.display.areaTints));
+        return (
+            <div className="mapstudio-style-panel" data-previews={String(previews.length)} data-sprite={this.symbols ? 'loaded' : 'loading'}>
+                {previews.map((e) => (
+                    <StylePreview key={e.kind.id}
+                                  kind={{ id: e.kind.id, name: e.kind.name, geometry: e.kind.geometry, icon: e.kind.icon, area: e.kind.area }}
+                                  rule={e.display!.styleRule} tints={e.display!.areaTints} symbols={symbols} colors={colors} />
+                ))}
+                <PresetPalette geometry="point" icon="well-pad" symbols={symbols} colors={colors} />
+                <PresetPalette geometry="line" icon="pipeline" symbols={symbols} colors={colors} />
+                <TintPalette colors={colors} />
             </div>
         );
     }
@@ -2116,6 +2200,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 </div>
                 {this.renderAdapterStatus(delegate ? delegate.lists : NO_HOST_LISTS)}
                 {delegate ? this.renderLiveState(delegate.live, delegate.lists.kinds) : null}
+                {this.renderStylePanel()}
                 {this.renderPopup()}
             </div>
         );
@@ -2145,7 +2230,8 @@ export class MapStudioMeta implements ComponentMeta {
             popupView: {
                 path: tree.readString('popupView.path', ''),
                 params: tree.readObject<AuthorParams>('popupView.params', {})
-            }
+            },
+            previewStyles: tree.readBoolean('previewStyles', false)
         };
     }
 }
