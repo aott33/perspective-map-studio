@@ -76,18 +76,18 @@ export function decodePng(buffer) {
 }
 
 /**
- * Whether every pixel of the rectangle is within `tolerance` of its top-left pixel on each channel:
- * a region of one flat colour (a popup's surface with nothing showing through). Returns the first
- * pixel that is not, or null.
+ * Whether every pixel of the rectangle is within `tolerance` of its top-left pixel on each channel,
+ * or of one of the `allowed` colours ([r, g, b], the surface's own divider lines): a region of one
+ * flat colour (a popup's surface with nothing showing through). Returns the first pixel that is
+ * not, or null.
  */
-export function firstOddPixel(png, x0, y0, w, h, tolerance = 2) {
+export function firstOddPixel(png, x0, y0, w, h, tolerance = 2, allowed = []) {
     const ref = png.pixel(x0, y0);
+    const near = (p, q) => Math.abs(p[0] - q[0]) <= tolerance && Math.abs(p[1] - q[1]) <= tolerance && Math.abs(p[2] - q[2]) <= tolerance;
     for (let y = y0; y < y0 + h; y++) {
         for (let x = x0; x < x0 + w; x++) {
             const p = png.pixel(x, y);
-            for (let c = 0; c < 3; c++) {
-                if (Math.abs(p[c] - ref[c]) > tolerance) return { x, y, pixel: p, ref };
-            }
+            if (!near(p, ref) && !allowed.some((q) => near(p, q))) return { x, y, pixel: p, ref };
         }
     }
     return null;

@@ -273,6 +273,7 @@ editorTest.describe('390 px', () => {
                 body, glyphRight: glyph.right, wordsLeft: words.left, lineLeft: line.left, blockLeft: block.getBoundingClientRect().left,
                 padding: getComputedStyle(document.querySelector('.mapstudio-popup-row')).paddingLeft,
                 background: getComputedStyle(document.querySelector('.mapstudio-sheet')).backgroundColor,
+                divider: getComputedStyle(document.querySelector('.mapstudio-popup-comms')).borderBottomColor,
                 vw: window.innerWidth, vh: window.innerHeight };
         });
         expect(Math.round(geometry.sheet.x)).toBe(8);
@@ -288,10 +289,12 @@ editorTest.describe('390 px', () => {
         expect(geometry.wordsLeft - geometry.glyphRight, 'the heading starts right after its glyph').toBeLessThan(10);
         expect(geometry.lineLeft - geometry.blockLeft, 'the alarm line wraps under the glyph, no gap beside it').toBeLessThan(20);
         expect(geometry.background).not.toMatch(/rgba\(.*, 0\)$|transparent/);
-        // The render check (P8): the body's left gutter, 2 to 12 px in, is one flat colour top to bottom:
-        // nothing of the map (a marker label, a neighbour's chip) shows through the sheet.
+        // The render check (P8): the body's left gutter, 2 to 12 px in, is one flat colour top to bottom
+        // but for the sheet's own divider under the Comms row: nothing of the map (a marker label, a
+        // neighbour's chip) shows through the sheet.
         const clip = { x: Math.round(geometry.body.x) + 2, y: Math.round(geometry.body.y) + 2, width: 10, height: Math.round(geometry.body.h) - 4 };
-        const odd = firstOddPixel(decodePng(await page.screenshot({ clip })), 0, 0, clip.width, clip.height, 3);
+        const divider = (geometry.divider.match(/\d+/g) || []).slice(0, 3).map(Number);
+        const odd = firstOddPixel(decodePng(await page.screenshot({ clip })), 0, 0, clip.width, clip.height, 3, [divider]);
         expect(odd, 'a pixel of the sheet gutter that is not the surface').toBeNull();
         await shot(page, 'mapstudio-live-390.png');
         // The marker stays above the sheet (the map panned if it had to).
