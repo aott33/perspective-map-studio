@@ -46,7 +46,8 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
         });
 
         test('a viewer\'s save is refused on the Gateway and nothing is written', async ({ page }) => {
-            let map = await openMap(page, '/');
+            // On /edit, where Edit mode holds the spike's tool (epic 3 entry 14); the anonymous viewer is still a viewer there.
+            let map = await openMap(page, '/edit');
             const before = await mapLoaded(map);
             await expect(map).toHaveAttribute('data-edit-level', 'none');
 
@@ -61,7 +62,7 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             await shot(page, `mapstudio-store-viewer-${width}.png`);
 
             await page.reload({ waitUntil: 'load' });
-            map = await openMap(page, '/');
+            map = await openMap(page, '/edit');
             expect(await mapLoaded(map)).toBe(before);
         });
     });
