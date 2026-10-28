@@ -74,11 +74,20 @@ public final class ValuePlan {
     public record Style(StyleRule rule, StyleExpressions.Compiled expression) {
     }
 
-    /** One map item's slots (slot name to full path), problems, and its style rule (null without one). */
-    public record ItemPlan(String id, String kind, Map<String, String> slots, List<Problem> problems, Style style) {
+    /**
+     * One map item's slots (slot name to full path), problems, its style rule (null without one),
+     * and, for the open popup (epic 3 entry 8), the asset's base path and the resolved alarms path
+     * (each null when the item has none).
+     */
+    public record ItemPlan(String id, String kind, Map<String, String> slots, List<Problem> problems, Style style,
+                           String basePath, String alarmsPath) {
 
         public ItemPlan(String id, String kind, Map<String, String> slots, List<Problem> problems) {
-            this(id, kind, slots, problems, null);
+            this(id, kind, slots, problems, null, null, null);
+        }
+
+        public ItemPlan(String id, String kind, Map<String, String> slots, List<Problem> problems, Style style) {
+            this(id, kind, slots, problems, style, null, null);
         }
     }
 
@@ -143,7 +152,9 @@ public final class ValuePlan {
             Kind kind = kindById.get(item.kind());
             ItemPlan plan = plan(item, setup, assetById,
                 kind == null ? new Kind(item.kind(), item.kind(), "point", null, 0, List.of()) : kind, expressions);
-            if (plan.slots().isEmpty() && plan.problems().isEmpty()) {
+            // An item with nothing live stays planned when its kind opens a custom popup view or has a
+            // link (entry 8): popup.open then finds its base path for the view's params.
+            if (plan.slots().isEmpty() && plan.problems().isEmpty() && !setup.has("popupView") && !setup.has("link")) {
                 continue;
             }
             plans.put(item.id(), plan);
@@ -183,17 +194,20 @@ public final class ValuePlan {
         }
         Style style = style(item, setup, overrides, kpiPaths, asset, view, slots, problems, kind, expressions);
         JsonObject alarms = part(setup, overrides, "alarms");
+        String alarmsPath = null;
         if (alarms != null) {
             Map<String, String> folder = new LinkedHashMap<>();
             resolve(ALARMS, text(alarms, "path"), item, asset, view, folder, problems);
             String base = folder.get(ALARMS);
             if (base != null) {
+                alarmsPath = base;
                 slots.put(ALARM_ACKED, AlarmMetrics.path(base, AlarmMetrics.ACTIVE_ACKED));
                 slots.put(ALARM_UNACKED, AlarmMetrics.path(base, AlarmMetrics.ACTIVE_UNACKED));
                 slots.put(ALARM_PRIORITY, AlarmMetrics.path(base, AlarmMetrics.HIGHEST_ACTIVE));
             }
         }
-        return new ItemPlan(item.id(), item.kind(), Map.copyOf(slots), List.copyOf(problems), style);
+        return new ItemPlan(item.id(), item.kind(), Map.copyOf(slots), List.copyOf(problems), style,
+            asset == null ? null : asset.basePath(), alarmsPath);
     }
 
     /**

@@ -85,7 +85,14 @@ public final class LiveValueCache implements AutoCloseable {
     private final Function<String, AdapterSnapshot> adapters;
     private final ChangeBus changes;
     private final Executor live;
+    private final AlarmStatus alarms;
     private final ConcurrentHashMap<String, ProjectLive> projects = new ConcurrentHashMap<>();
+
+    /** The alarm status could not be read; said in the popup detail, never with a path. */
+    static final String ALARMS_UNREADABLE = "the alarm status could not be read";
+    static final String ALARMS_UNAVAILABLE = "the alarm status is not available";
+    /** How many alarms the popup detail lists, the most important first; the counts cover them all. */
+    static final int POPUP_ALARMS = 3;
 
     /**
      * @param store    the project's live items and kind setups ({@code MapLoader::snapshot}); may throw
@@ -96,11 +103,22 @@ public final class LiveValueCache implements AutoCloseable {
      */
     public LiveValueCache(TagSubscriber tags, Function<String, MapLoader.Snapshot> store,
                           Function<String, AdapterSnapshot> adapters, ChangeBus changes, Executor live) {
+        this(tags, store, adapters, changes, live, null);
+    }
+
+    /**
+     * @param alarms the alarm status the open popup's alarm summary is read from (epic 3 entry 8);
+     *               null when the Gateway has none (tests), which the summary says in words
+     */
+    public LiveValueCache(TagSubscriber tags, Function<String, MapLoader.Snapshot> store,
+                          Function<String, AdapterSnapshot> adapters, ChangeBus changes, Executor live,
+                          AlarmStatus alarms) {
         this.tags = tags;
         this.store = store;
         this.adapters = adapters;
         this.changes = changes;
         this.live = live;
+        this.alarms = alarms;
     }
 
     /** Start the project's cache if it is not running: a rebuild on the live thread and the change bus subscription. */
@@ -251,7 +269,13 @@ public final class LiveValueCache implements AutoCloseable {
         return new Batch(seq, full, body);
     }
 
-    /** One item's values as a changes-only batch (an open popup), or null when the item is not planned. */
+    /**
+     * One item's values as a changes-only batch (an open popup), or null when the item is not planned.
+     * The item carries the popup detail (epic 3 entry 8, AD-7): the asset's base path and the alarms
+     * path, so the browser fills a custom popup view's params and the link, and, when the kind shows
+     * alarms, the alarm summary read from the alarm status now. The detail goes to the one session
+     * whose popup is open; the batches every map gets stay path-free.
+     */
     public Batch itemBatch(String project, String itemId) {
         ProjectLive state = projects.get(project);
         if (state == null) {
@@ -262,13 +286,88 @@ public final class LiveValueCache implements AutoCloseable {
             return null;
         }
         JsonArray items = new JsonArray();
-        items.add(itemJson(state, item));
+        JsonObject json = itemJson(state, item);
+        json.add("popup", popupDetail(project, item));
+        items.add(json);
         JsonObject body = new JsonObject();
         long seq = state.seq.get();
         body.addProperty("seq", seq);
         body.addProperty("full", false);
         body.add("items", items);
         return new Batch(seq, false, body);
+    }
+
+    /**
+     * The popup detail of one item: {@code {basePath, alarmsPath, alarms?}}; {@code alarms} is
+     * {@code {counts: {"1", "2", "3"}, list: [{name, source, priority, unacked, activeTime}], reason}}
+     * when the item has an alarms path: the active alarms below it counted by the map's priority (a
+     * Diagnostic alarm counts in none), the {@link #POPUP_ALARMS} most important listed (priority 1
+     * first, unacknowledged before acknowledged, the newest first), and the reason in words when the
+     * status could not be read (the list then empty, the counts zero).
+     */
+    JsonObject popupDetail(String project, ValuePlan.ItemPlan item) {
+        JsonObject o = new JsonObject();
+        o.addProperty("basePath", item.basePath());
+        o.addProperty("alarmsPath", item.alarmsPath());
+        if (item.alarmsPath() == null) {
+            return o;
+        }
+        JsonObject summary = new JsonObject();
+        int[] counts = new int[4];
+        List<AlarmStatus.ActiveAlarm> active = new ArrayList<>();
+        String reason = "";
+        if (alarms == null) {
+            reason = ALARMS_UNAVAILABLE;
+        } else {
+            try {
+                active.addAll(alarms.active(item.alarmsPath()));
+            } catch (RuntimeException ex) {
+                log.warnf("Project %s: the alarm status of a popup could not be read: %s", project,
+                    ex.getClass().getSimpleName());
+                reason = ALARMS_UNREADABLE;
+            }
+        }
+        for (AlarmStatus.ActiveAlarm a : active) {
+            if (a.priority() >= 1 && a.priority() <= 3) {
+                counts[a.priority()]++;
+            }
+        }
+        active.sort((a, b) -> {
+            int pa = a.priority() >= 1 && a.priority() <= 3 ? a.priority() : 4;
+            int pb = b.priority() >= 1 && b.priority() <= 3 ? b.priority() : 4;
+            if (pa != pb) {
+                return Integer.compare(pa, pb);
+            }
+            if (a.unacked() != b.unacked()) {
+                return a.unacked() ? -1 : 1;
+            }
+            long ta = a.activeTime() == null ? Long.MIN_VALUE : a.activeTime().toEpochMilli();
+            long tb = b.activeTime() == null ? Long.MIN_VALUE : b.activeTime().toEpochMilli();
+            return Long.compare(tb, ta);
+        });
+        JsonObject byPriority = new JsonObject();
+        for (int p = 1; p <= 3; p++) {
+            byPriority.addProperty(String.valueOf(p), counts[p]);
+        }
+        summary.add("counts", byPriority);
+        JsonArray list = new JsonArray();
+        for (AlarmStatus.ActiveAlarm a : active) {
+            if (list.size() >= POPUP_ALARMS) {
+                break;
+            }
+            JsonObject row = new JsonObject();
+            row.addProperty("name", a.name() == null ? "" : a.name());
+            row.addProperty("source", a.source() == null ? "" : a.source());
+            row.addProperty("priority", a.priority());
+            row.addProperty("unacked", a.unacked());
+            row.addProperty("activeTime", a.activeTime() == null ? null
+                : ISO.format(a.activeTime().truncatedTo(ChronoUnit.MILLIS)));
+            list.add(row);
+        }
+        summary.add("list", list);
+        summary.addProperty("reason", reason);
+        o.add("alarms", summary);
+        return o;
     }
 
     /** Be told, on the tag system's thread, whenever a value of {@code itemId} is delivered. */

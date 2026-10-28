@@ -1,5 +1,7 @@
 import * as React from 'react';
-import { ItemValues, KindDisplay, alarmsText, commsText, itemState, staleText, valueText } from './live';
+import {
+    ItemValues, KindDisplay, PopupDetail, alarmCountsText, alarmLineText, alarmsText, commsText, itemState, staleText, valueText
+} from './live';
 
 /** What the default popup is opened for: the map item and its kind's icon. */
 export interface DefaultPopupItem {
@@ -16,75 +18,191 @@ export interface DefaultPopupProps {
     display: KindDisplay;
     /** The item's values from the last batch, or undefined before the first. */
     values: ItemValues | undefined;
+    /** The popup detail pushed for this item (the alarm summary), or null before it arrived. */
+    detail: PopupDetail | null;
     /** The clock, for data ages (tests pass a fixed one). */
     now: number;
+    /** The kind setup's link filled for this item, or null (no link, or a placeholder with no value: the icon hides, R8). */
+    link: string | null;
+    /** The setup's alarm page filled for this item, or null (the View alarms button then hides). */
+    alarmPage: string | null;
+    /** The card over the map with its pointer, or the phone's bottom sheet (DESIGN.md bottom-sheet). */
+    mode: 'card' | 'sheet';
+    /** Whether the sheet offers Edit (phone-editing roles, once epic-editing builds the edit sheet). */
+    canEdit: boolean;
+    onClose: () => void;
+    /** Open a Perspective page of the project (the pop-out link, View alarms). */
+    onNavigate: (path: string) => void;
 }
 
 /** The sprite's symbol for a glyph, inline (`<use>`), in `currentColor`. */
-function Glyph(props: { id: string; className: string }): React.ReactElement {
+function Glyph(props: { id: string; className: string; size?: number }): React.ReactElement {
+    const size = props.size || 24;
     return (
-        <svg className={props.className} width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+        <svg className={props.className} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
             <use href={'/res/mapstudio/icons/mapstudio-icons.svg#ms-' + props.id} />
         </svg>
     );
 }
 
+/** The chrome glyphs of the popup, on a 24 px grid with a 2 px stroke in `currentColor` (as the controls'). */
+const CHROME = {
+    /** Pop-out: an arrow leaving a box (the mockup's page link icon). */
+    popout: 'M14 4h6v6M20 4l-9 9M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6',
+    close: 'M6 6l12 12M18 6L6 18',
+    /** A check mark: "No active alarms". */
+    check: 'M5 12.5l4.5 4.5L19 7'
+} as const;
+
+function Chrome(props: { name: keyof typeof CHROME; className: string }): React.ReactElement {
+    return (
+        <svg className={props.className} viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+            <path d={CHROME[props.name]} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    );
+}
+
+/** The alarm glyph of a priority and its acknowledgement (priority 3 has one glyph). */
+function alarmGlyphId(priority: number, unacked: boolean): string {
+    return 'alarm-' + priority + (priority === 3 ? '' : unacked ? '-unacknowledged' : '-acknowledged');
+}
+
 /**
- * Map Studio's default popup (AD-7, EXPERIENCE.md "Popup card"; epic 3 entry 5): in order the
- * header (kind glyph, name, the page link icon slot, which entry 8 fills), comms with its data age,
- * two to three KPIs, then the alarms. Every state is said in words; a stale value is marked
- * "Stale - " with its reason; the comms-lost word takes the `comms-lost` token through its class.
- * The parts follow the kind's display: a part turned off is not drawn.
+ * Map Studio's default popup (AD-7, EXPERIENCE.md "Popup card" and "Bottom sheet"; epic 3 entries 5
+ * and 8): in order the header (the kind glyph in a disc, the name, the kind as subline, the pop-out
+ * page link when it has a value, close), comms with its data age, two to three KPIs, then the alarm
+ * block (the counts and the most important alarms in words with their age, from the Gateway's alarm
+ * status, and View alarms to the project's alarm page; Map Studio acknowledges nothing). Every state
+ * is said in words; a stale value is marked "Stale - " with its reason; the comms-lost word takes the
+ * `comms-lost` token through its class; the alarm hue sits on the glyph and the heading only. The
+ * parts follow the kind's display: a part turned off is not drawn. Below 768 px the same body is a
+ * bottom sheet with a handle, 44 px header buttons and a footer with View alarms (and Edit for
+ * phone-editing roles).
  */
 export class DefaultPopup extends React.Component<DefaultPopupProps> {
+    private onLink = (): void => {
+        if (this.props.link) {
+            this.props.onNavigate(this.props.link);
+        }
+    };
+
+    private onViewAlarms = (): void => {
+        if (this.props.alarmPage) {
+            this.props.onNavigate(this.props.alarmPage);
+        }
+    };
+
+    private renderAlarms(sheet: boolean): React.ReactNode {
+        const { display, values, detail, now, alarmPage } = this.props;
+        if (!display.alarms.on) {
+            return null;
+        }
+        const state = itemState(values, display);
+        const slot = values ? values.alarms : undefined;
+        const stale = !!(slot && slot.stale);
+        const summary = detail && detail.alarms ? detail.alarms : null;
+        const alarm = state.alarm;
+        const heading = (stale ? 'Stale - ' : '') + alarmsText(slot);
+        const first = summary && summary.list.length > 0 ? summary.list[0] : null;
+        const more = alarm ? alarm.active - 1 : 0;
+        const counts = summary ? alarmCountsText(summary) : '';
+        const viewAlarms = alarm !== null && alarmPage !== null;
+        return (
+            <div className={'mapstudio-popup-alarms' + (alarm ? ' mapstudio-popup-alarms--active mapstudio-popup-alarms--p' + alarm.priority : '')}
+                 data-part="alarms"
+                 data-alarm={alarm ? alarm.priority + ':' + (alarm.unacked ? 'unacked' : 'acked') : 'none'}
+                 data-alarm-counts={summary ? summary.counts[1] + ',' + summary.counts[2] + ',' + summary.counts[3] : ''}
+                 data-alarm-listed={summary ? String(summary.list.length) : ''}
+                 data-stale={stale ? 'true' : 'false'}>
+                <div className="mapstudio-popup-alarm-heading">
+                    {alarm
+                        ? <Glyph id={alarmGlyphId(alarm.priority, alarm.unacked)} className="mapstudio-popup-alarm-glyph" size={16} />
+                        : <Chrome name="check" className="mapstudio-popup-alarm-glyph mapstudio-popup-alarm-glyph--ok" />}
+                    <span className="mapstudio-popup-alarm-words">{heading}</span>
+                </div>
+                {alarm && counts !== '' ? <div className="mapstudio-popup-alarm-counts">{counts}</div> : null}
+                {alarm && first ? <div className="mapstudio-popup-alarm-line">{alarmLineText(first, now)}</div> : null}
+                {alarm && !first && summary && summary.reason !== '' ? (
+                    <div className="mapstudio-popup-alarm-line mapstudio-popup-alarm-line--reason">
+                        {'The alarms could not be listed: ' + summary.reason + '.'}
+                    </div>
+                ) : null}
+                {alarm && more > 0 ? <div className="mapstudio-popup-alarm-more">{'+ ' + more + ' more'}</div> : null}
+                {viewAlarms && !sheet ? (
+                    <button type="button" className="mapstudio-popup-button mapstudio-popup-button--primary mapstudio-popup-view-alarms"
+                            onClick={this.onViewAlarms}>View alarms</button>
+                ) : null}
+            </div>
+        );
+    }
+
     render(): React.ReactNode {
-        const { item, display, values, now } = this.props;
+        const { item, display, values, now, link, alarmPage, mode, canEdit } = this.props;
+        const sheet = mode === 'sheet';
         const state = itemState(values, display);
         const comms = commsText(values ? values.comms : undefined, now);
         const kpis = display.kpis.filter((k) => k.on).slice(0, 3);
+        const viewAlarms = state.alarm !== null && alarmPage !== null;
         return (
-            <div className="mapstudio-popup mapstudio-popup--default" data-point-id={item.id}
+            <div className={'mapstudio-popup mapstudio-popup--default' + (sheet ? ' mapstudio-popup--sheet' : ' mapstudio-popup--card')}
+                 data-point-id={item.id} data-popup-mode={mode}
                  data-state={state.badge} data-stale={state.stale ? 'true' : 'false'}>
+                {sheet ? <div className="mapstudio-popup-handle" aria-hidden="true" /> : null}
                 <div className="mapstudio-popup-header" data-part="header">
-                    <Glyph id={item.icon || 'point'} className="mapstudio-popup-glyph" />
+                    <span className="mapstudio-popup-disc"><Glyph id={item.icon || 'point'} className="mapstudio-popup-glyph" size={18} /></span>
                     <div className="mapstudio-popup-title">
                         <div className="mapstudio-popup-name">{item.name}</div>
                         <div className="mapstudio-popup-subline">{item.kindName}</div>
                     </div>
-                    <span className="mapstudio-popup-link" data-link={display.link} aria-hidden="true" />
+                    {link !== null ? (
+                        <button type="button" className="mapstudio-popup-icon mapstudio-popup-link" data-link={link}
+                                aria-label={'Open the page of ' + item.name} title="Open page" onClick={this.onLink}>
+                            <Chrome name="popout" className="mapstudio-popup-chrome" />
+                        </button>
+                    ) : null}
+                    <button type="button" className="mapstudio-popup-icon mapstudio-popup-close" aria-label="Close" title="Close"
+                            onClick={this.props.onClose}>
+                        <Chrome name="close" className="mapstudio-popup-chrome" />
+                    </button>
                 </div>
-                {display.comms ? (
-                    <div className={'mapstudio-popup-comms' + (comms.lost ? ' mapstudio-popup-comms--lost' : '')}
-                         data-part="comms" data-comms={comms.lost ? 'lost' : 'ok'}>
-                        {comms.lost ? <Glyph id="comms-lost" className="mapstudio-popup-state-glyph" /> : null}
-                        <span className="mapstudio-popup-label">Comms</span>
-                        <span className="mapstudio-popup-value">{comms.word}{comms.detail ? ' - ' + comms.detail : ''}</span>
-                    </div>
-                ) : null}
-                {kpis.length > 0 ? (
-                    <div className="mapstudio-popup-kpis" data-part="kpis">
-                        {kpis.map((kpi) => {
-                            const value = values ? values.kpis[kpi.key] : undefined;
-                            const text = value ? staleText(value, valueText(value, kpi.unit)) : 'No value yet';
-                            return (
-                                <div key={kpi.key} className={'mapstudio-popup-kpi' + (kpi.icon ? ' mapstudio-popup-kpi--icon' : '')}
-                                     data-kpi={kpi.key} data-stale={value && value.stale ? 'true' : 'false'}>
-                                    {value && value.stale ? <Glyph id="stale" className="mapstudio-popup-state-glyph" /> : null}
-                                    <span className="mapstudio-popup-label">{kpi.label}</span>
-                                    <span className="mapstudio-popup-value">{text}</span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                ) : null}
-                {display.alarms.on ? (
-                    <div className={'mapstudio-popup-alarms' + (state.alarm ? ' mapstudio-popup-alarms--active mapstudio-popup-alarms--p' + state.alarm.priority : '')}
-                         data-part="alarms" data-alarm={state.alarm ? state.alarm.priority + ':' + (state.alarm.unacked ? 'unacked' : 'acked') : 'none'}
-                         data-stale={values && values.alarms && values.alarms.stale ? 'true' : 'false'}>
-                        {state.alarm ? <Glyph id={'alarm-' + state.alarm.priority + (state.alarm.priority === 3 ? '' : state.alarm.unacked ? '-unacknowledged' : '-acknowledged')} className="mapstudio-popup-alarm-glyph" /> : null}
-                        <span className="mapstudio-popup-value">
-                            {values && values.alarms && values.alarms.stale ? 'Stale - ' : ''}{alarmsText(values ? values.alarms : undefined)}
-                        </span>
+                <div className="mapstudio-popup-body">
+                    {display.comms ? (
+                        <div className={'mapstudio-popup-row mapstudio-popup-comms' + (comms.lost ? ' mapstudio-popup-comms--lost' : '')}
+                             data-part="comms" data-comms={comms.lost ? 'lost' : 'ok'}>
+                            <span className="mapstudio-popup-label">Comms</span>
+                            <span className="mapstudio-popup-value">
+                                {comms.lost ? <Glyph id="comms-lost" className="mapstudio-popup-state-glyph" size={16} /> : null}
+                                {comms.word}{comms.detail ? ' - ' + comms.detail : ''}
+                            </span>
+                        </div>
+                    ) : null}
+                    {kpis.length > 0 ? (
+                        <div className="mapstudio-popup-kpis" data-part="kpis">
+                            {kpis.map((kpi) => {
+                                const value = values ? values.kpis[kpi.key] : undefined;
+                                const text = value ? staleText(value, valueText(value, kpi.unit)) : 'No value yet';
+                                return (
+                                    <div key={kpi.key} className={'mapstudio-popup-row mapstudio-popup-kpi' + (kpi.icon ? ' mapstudio-popup-kpi--icon' : '')}
+                                         data-kpi={kpi.key} data-stale={value && value.stale ? 'true' : 'false'}>
+                                        <span className="mapstudio-popup-label">{kpi.label}</span>
+                                        <span className="mapstudio-popup-value">
+                                            {value && value.stale ? <Glyph id="stale" className="mapstudio-popup-state-glyph" size={16} /> : null}
+                                            {text}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : null}
+                    {this.renderAlarms(sheet)}
+                </div>
+                {sheet && (viewAlarms || canEdit) ? (
+                    <div className="mapstudio-popup-footer" data-part="footer">
+                        {viewAlarms ? (
+                            <button type="button" className="mapstudio-popup-button mapstudio-popup-button--primary mapstudio-popup-view-alarms"
+                                    onClick={this.onViewAlarms}>View alarms</button>
+                        ) : null}
+                        {canEdit ? <button type="button" className="mapstudio-popup-button mapstudio-popup-edit">Edit</button> : null}
                     </div>
                 ) : null}
             </div>

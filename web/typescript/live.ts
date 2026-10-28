@@ -52,6 +52,39 @@ export interface StyleSlot {
     reason: string;
 }
 
+/** One active alarm of the open popup's item (epic 3 entry 8): its words, never a tag path. */
+export interface PopupAlarm {
+    name: string;
+    /** The source below the item's alarms path ("Pressure"), '' for an alarm on the path itself. */
+    source: string;
+    /** The map's priority 1 to 3; 0 for Diagnostic. */
+    priority: number;
+    unacked: boolean;
+    /** ISO 8601 UTC, or null when unknown. */
+    activeTime: string | null;
+}
+
+/** The alarm summary the Gateway reads from the alarm status for the open popup's item. */
+export interface PopupAlarms {
+    /** Active alarms by the map's priority. */
+    counts: { 1: number; 2: number; 3: number };
+    /** The most important first (priority, unacknowledged first, newest first), three at most. */
+    list: PopupAlarm[];
+    /** Why the status could not be read, in words; '' when it was. */
+    reason: string;
+}
+
+/**
+ * The popup detail (AD-7, epic 3 entry 8): sent only to the session whose popup is open, with that
+ * item's pushed values: the asset's base path (what `{asset.path}` fills from), the alarms path, and
+ * the alarm summary when the kind shows alarms.
+ */
+export interface PopupDetail {
+    basePath: string | null;
+    alarmsPath: string | null;
+    alarms?: PopupAlarms;
+}
+
 /** One map item's values as a batch carries them. */
 export interface ItemValues {
     id: string;
@@ -61,6 +94,8 @@ export interface ItemValues {
     /** Present only for an item with a style rule. */
     style?: StyleSlot;
     problems: SlotProblem[];
+    /** Present only on the open popup's item in a push to its session (entry 8). */
+    popup?: PopupDetail;
 }
 
 /** One case of a style rule as the display lists it: the words of the case and its preset. */
@@ -94,6 +129,62 @@ export interface KindDisplay {
     styleRule?: RuleDisplay;
     /** An area kind's category tints, when it has them. */
     areaTints?: AreaTints;
+    /**
+     * The kind's custom popup view (epic 3 entry 8, AD-7): opened instead of the default popup; each
+     * param is a template (a literal, one placeholder, or `{asset.path}/<suffix>`) filled when the popup opens.
+     */
+    popupView?: { path: string; params: Record<string, string> };
+}
+
+/** The popup view part of a kind display, or null when the setup has none (or no path). */
+export function readPopupView(value: unknown): { path: string; params: Record<string, string> } | null {
+    if (!isRecord(value) || typeof value.path !== 'string' || value.path === '') {
+        return null;
+    }
+    const params: Record<string, string> = {};
+    if (isRecord(value.params)) {
+        for (const name of Object.keys(value.params)) {
+            const v = value.params[name];
+            if (typeof v === 'string') {
+                params[name] = v;
+            }
+        }
+    }
+    return { path: value.path, params };
+}
+
+/** The popup detail of a pushed item, or null when it is not one. */
+export function readPopupDetail(value: unknown): PopupDetail | null {
+    if (!isRecord(value)) {
+        return null;
+    }
+    const detail: PopupDetail = {
+        basePath: typeof value.basePath === 'string' ? value.basePath : null,
+        alarmsPath: typeof value.alarmsPath === 'string' ? value.alarmsPath : null
+    };
+    if (isRecord(value.alarms)) {
+        const counts = isRecord(value.alarms.counts) ? value.alarms.counts : {};
+        const n = (k: string): number => (typeof counts[k] === 'number' ? Math.max(0, Math.floor(counts[k] as number)) : 0);
+        const list: PopupAlarm[] = [];
+        if (Array.isArray(value.alarms.list)) {
+            for (const a of value.alarms.list) {
+                if (isRecord(a) && typeof a.name === 'string') {
+                    list.push({
+                        name: a.name,
+                        source: typeof a.source === 'string' ? a.source : '',
+                        priority: typeof a.priority === 'number' ? a.priority : 0,
+                        unacked: a.unacked === true,
+                        activeTime: typeof a.activeTime === 'string' ? a.activeTime : null
+                    });
+                }
+            }
+        }
+        detail.alarms = {
+            counts: { 1: n('1'), 2: n('2'), 3: n('3') }, list,
+            reason: typeof value.alarms.reason === 'string' ? value.alarms.reason : ''
+        };
+    }
+    return detail;
 }
 
 export function isPreset(value: unknown): value is Preset {
@@ -182,9 +273,11 @@ export interface LiveState {
     fulls: number;
     items: Record<string, ItemValues>;
     display: Record<string, KindDisplay>;
+    /** The last popup detail pushed, with its item (entry 8); kept until the next one, whatever the batches in between. */
+    popup: { itemId: string; detail: PopupDetail } | null;
 }
 
-export const LIVE_INITIAL: LiveState = { seq: 0, batches: 0, fulls: 0, items: {}, display: {} };
+export const LIVE_INITIAL: LiveState = { seq: 0, batches: 0, fulls: 0, items: {}, display: {}, popup: null };
 
 export function readLiveValue(value: unknown): LiveValue | null {
     if (!isRecord(value) || typeof value.quality !== 'string' || typeof value.stale !== 'boolean') {
@@ -223,6 +316,10 @@ function readItem(value: unknown): ItemValues | null {
     const style = readStyleSlot(value.style);
     if (style) {
         item.style = style;
+    }
+    const popup = readPopupDetail(value.popup);
+    if (popup) {
+        item.popup = popup;
     }
     if (Array.isArray(value.problems)) {
         for (const p of value.problems) {
@@ -268,6 +365,10 @@ export function readKindDisplay(value: unknown): KindDisplay | null {
     if (tints) {
         display.areaTints = tints;
     }
+    const popupView = readPopupView(value.popupView);
+    if (popupView) {
+        display.popupView = popupView;
+    }
     return display;
 }
 
@@ -296,8 +397,12 @@ export function readValuesBatch(body: unknown): ValuesBatchBody | null {
  */
 export function applyBatch(state: LiveState, batch: ValuesBatchBody): LiveState {
     const items: Record<string, ItemValues> = batch.full ? {} : { ...state.items };
+    let popup = state.popup;
     for (const item of batch.items) {
         items[item.id] = item;
+        if (item.popup) {
+            popup = { itemId: item.id, detail: item.popup };
+        }
     }
     let display = state.display;
     if (batch.kindDisplay) {
@@ -306,7 +411,7 @@ export function applyBatch(state: LiveState, batch: ValuesBatchBody): LiveState 
             display[d.kindId] = d;
         }
     }
-    return { seq: batch.seq, batches: state.batches + 1, fulls: state.fulls + (batch.full ? 1 : 0), items, display };
+    return { seq: batch.seq, batches: state.batches + 1, fulls: state.fulls + (batch.full ? 1 : 0), items, display, popup };
 }
 
 /** The state of one map item for the icon: what the badge, the word and the KPI text say. */
@@ -466,4 +571,31 @@ export function alarmsText(alarms: LiveValue | undefined): string {
 /** "Stale - " before a stale value's text, and the reason after it, as the popup marks stale values. */
 export function staleText(value: LiveValue, text: string): string {
     return value.stale ? 'Stale - ' + text + (value.reason ? ' (' + value.reason + ')' : '') : text;
+}
+
+/**
+ * One alarm in words for the popup's alarm block (entry 8, the mockup's "Casing pressure high -
+ * P14-2H, 4 min ago"): the name, the source below the alarms path when there is one, and its age.
+ */
+export function alarmLineText(alarm: PopupAlarm, now: number): string {
+    const age = ageText(alarm.activeTime, now);
+    return alarm.name + (alarm.source ? ' - ' + alarm.source : '') + (age ? ', ' + age : '');
+}
+
+/**
+ * The active alarms by priority in words, for an item with more than one: "2 priority 1, 1 priority 3";
+ * '' with one alarm or none (the heading already says it).
+ */
+export function alarmCountsText(alarms: PopupAlarms): string {
+    const total = alarms.counts[1] + alarms.counts[2] + alarms.counts[3];
+    if (total < 2) {
+        return '';
+    }
+    const parts: string[] = [];
+    for (const p of [1, 2, 3] as const) {
+        if (alarms.counts[p] > 0) {
+            parts.push(alarms.counts[p] + ' priority ' + p);
+        }
+    }
+    return parts.join(', ');
 }

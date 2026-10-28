@@ -68,12 +68,15 @@ public final class LiveSession {
         }
     }
 
-    /** The browser opened the popup of {@code itemId}: push its values on change. */
+    /**
+     * The browser opened the popup of {@code itemId}: push its values now, with the popup detail
+     * (the base path, the alarms path and the alarm summary; epic 3 entry 8), then on every change.
+     */
     public void popupOpen(String itemId) {
         popupClose();
         popupItem = itemId;
         popup = cache.onItemChange(project, itemId, this::schedulePush);
-        // The popup opens with what the map already drew; the next change pushes.
+        schedulePush(0);
     }
 
     /** The browser closed the popup. */
@@ -92,11 +95,15 @@ public final class LiveSession {
     }
 
     private void schedulePush() {
+        schedulePush(PUSH_DELAY_MS);
+    }
+
+    private void schedulePush(long delayMs) {
         if (push != null && !push.isDone()) {
             return;
         }
         try {
-            push = live.schedule(this::pushPopup, PUSH_DELAY_MS, TimeUnit.MILLISECONDS);
+            push = live.schedule(this::pushPopup, delayMs, TimeUnit.MILLISECONDS);
         } catch (RejectedExecutionException ex) {
             log.debugf("Project %s: no popup push, the module is stopping.", project);
         }
