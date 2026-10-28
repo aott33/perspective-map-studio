@@ -817,6 +817,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         };
         const mc = markerColors(root);
         this.markerColors = mc;
+        this.makePopup();
         const map = new MapLibreMap({
             container: this.mapContainer,
             style: {
@@ -1398,8 +1399,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.itemBounds = data.bounds;
             this.itemBoundsKey = data.boundsKey;
             if (this.mapContainer) {
-                this.mapContainer.setAttribute('data-items-loaded',
-                    String(data.lines.features.length + data.points.features.length));
+                // The map items drawn (a shared marker counts its members), as the suite has always read it.
+                this.mapContainer.setAttribute('data-items-loaded', String(data.lines.features.length
+                    + data.points.features.reduce((n, f) => n + f.properties.members, 0)));
                 this.mapContainer.setAttribute('data-shared-markers', String(data.shared));
                 this.mapContainer.setAttribute('data-arrow', String(data.arrow.features.length));
             }
@@ -1857,27 +1859,32 @@ export class MapStudio extends Component<Props, MapStudioState> {
             () => this.showPopupAt(lngLat));
     }
 
-    /** Make the MapLibre popup once, then move it to the point; its content is whatever render() put in the portal. */
+    /**
+     * The MapLibre popup, made once at mount so render() has its portal target from the first popup
+     * state on: MapLibre picks the popup's anchor from its content's size when it is placed, so the
+     * content must be in the DOM before showPopupAt runs (a popup placed empty stayed centred on
+     * its point and ran off a phone's edge once the content came).
+     */
+    private makePopup(): void {
+        this.popupContent = document.createElement('div');
+        this.popupContent.className = 'mapstudio-popup-root';
+        this.popup = new Popup({
+            closeButton: true,
+            closeOnClick: false,
+            closeOnMove: false,
+            // MapLibre writes maxWidth as an inline style on the popup, so the
+            // phone cap lives here, not in the stylesheet.
+            maxWidth: 'calc(100vw - 32px)',
+            offset: POPUP_OFFSET_PX
+        });
+        this.popup.setDOMContent(this.popupContent);
+        this.popup.on('close', this.onPopupClosed);
+    }
+
+    /** Move the popup to the point (after the state that fills its portal has rendered) and open it. */
     private showPopupAt(lngLat: [number, number]): void {
-        if (!this.map) {
+        if (!this.map || !this.popup) {
             return;
-        }
-        if (!this.popup) {
-            this.popupContent = document.createElement('div');
-            this.popupContent.className = 'mapstudio-popup-root';
-            this.popup = new Popup({
-                closeButton: true,
-                closeOnClick: false,
-                closeOnMove: false,
-                // MapLibre writes maxWidth as an inline style on the popup, so the
-                // phone cap lives here, not in the stylesheet.
-                maxWidth: 'calc(100vw - 32px)',
-                offset: POPUP_OFFSET_PX
-            });
-            this.popup.setDOMContent(this.popupContent);
-            this.popup.on('close', this.onPopupClosed);
-            // The portal's target exists now: render into it.
-            this.forceUpdate();
         }
         this.popup.setMaxWidth(popupMaxWidth(this.map.project(lngLat).x, this.map.getContainer().clientWidth));
         this.popup.setLngLat(lngLat);

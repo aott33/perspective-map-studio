@@ -98,9 +98,24 @@ context:
 
 ## Implementation Notes
 
+- **Commits on the worktree branch** (`worktree-agent-afb33ca9495267228`, baseline `4845a01`): 98ef65e (the glyph source, `markers.ts` without text, `features.ts`, `shared.ts`, `FitControl`, `PickList`, the layers, selection, Fit and Return, the seed's shared pair, the Jest tests), 8fdeeaa (what the first live runs taught, the e2e suite, the docs), then the closing commit (evidence, screenshots, this plan).
+- **The glyph source, as built.** `web/scripts/glyphs.mjs` reads the two TTFs with opentype.js, flattens each glyph's path, rasterises it (exact coverage along a scanline, 4 sub-scanlines) and runs TinySDF's distance transform, then writes fontnik's protobuf with `pbf`; `--check` round-trips the Latin range and compares `web/fonts/advances.json` (the ASCII advances at 24 px, which `markers.ts` estimates label widths from) with the fonts; `--write-advances` rewrites that file. 1.5 s for 6,008 glyphs in 512 files, 2.8 MB uncompressed.
+- **What the live runs taught (8fdeeaa):** (1) a glyph with no ink must carry no bitmap field: MapLibre refused the empty one, dropped the whole range and rendered the labels with the browser's font at warning level, so the first run looked right for the wrong reason (the spec now fails on that warning); (2) an icon's collision box is its image's box and a touching text box collides, so the marker image is tight (56 by 46) and the name's top sits 4 px under its bottom edge, the KPI 18 px under the name's top; (3) a 9-slice icon's collision box grows by the image border outside `content`, which kept every chip off the map until the content area became the whole image but one pixel; (4) `setMissingStyleImageResolver` (MapLibre 6.16) replaces `styleimagemissing`, so the images are in place when the symbols are laid out and MapLibre stops warning; (5) MapLibre builds no array from a feature value, so the chip's `text-offset` is a `step` over `chipOffset` with literal pairs every 0.25 em; (6) a KPI slot with no value yet showed "No value" under the name, which the popup already says, so the KPI line needs a live value (`hasValue`); (7) the line's name chip sits under the line (1.4 em) so the flow arrow and the badge keep the midpoint.
+- **Decision 2 refined:** `MARKER_IMAGE` 56 by 46 with the disc centre at (20, 23); `NAME_TOP_PX` 27, `KPI_TOP_PX` 45, `CHIP_GAP_PX` 9, `TEXT_PADDING` 1. The popup's offset is 22 px (the disc radius and ring), ahead of entry 8's D3.
+- **Not done, by scope:** instruments drawn and the per-segment look (entry 2), search (9), the legend and the Lines and Names toggles (3), the popup's opaque surface and the bottom sheet (8), the hue tokens' review (12). A line with its own kind setup, a real instrument on a dev line and a basemap under the labels were not seen live (`docs/platform-checks.md`).
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+Review pass 1 (quick lens, read by this agent from the diff of both commits; no subagent tool in this session): 0 high, 2 medium, 2 low, 0 false, 0 maybe-false.
+
+| Finding | Verdict | Route | Evidence |
+| --- | --- | --- | --- |
+| The first live run drew every label through MapLibre's local TinySDF fallback because the glyph range was refused, and nothing failed: the suite watched only `[MapStudio]` warnings | medium | patch | `labels.spec.mjs` collects the console's glyph and image warnings and fails on one; `glyphs.mjs --check` reads the space glyph back and fails on a bitmap field |
+| The chip's `textWidthPx` estimate by character class could be 10 % off a real name, placing the chip over or far from it | medium | patch | the fonts' own advances (`web/fonts/advances.json`) at MapLibre's rounding, checked against the fonts by `--check` |
+| `onPopupClosed` clears a point's selection but keeps a line's; a line selected after a point's popup closes keeps its arrow until the ground tap | low (by design) | rejected | the line has no popup; its selection ends on the ground tap or another selection, as the plan says |
+| `publishLabels` runs on every `idle` and queries four symbol layers over the viewport | low | rejected | a few hundred features at most; `idle` fires after a move settles, not per frame |
 
 ## Design Notes
 
