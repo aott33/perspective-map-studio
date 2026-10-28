@@ -28,14 +28,15 @@ const DRAW_MS = 20_000;
 /**
  * The seed's L-SWD (mapstudio_seed, SWD_LINE): its midpoint, the point 1,500 m along it (between PT-1
  * and LV-1), and the view centres that put that point in the upper part of the map (about 300 px above
- * the centre at zoom 14 on the desktop, 115 px at zoom 15 on the phone), so the popup opens below it
- * with room for its whole card.
+ * the centre at zoom 14 on the desktop, 115 px at zoom 15 on the phone; MapLibre's 512 px tiles, so
+ * one degree of latitude is about 30,300 px at zoom 14 here), so the popup opens below it with room
+ * for its whole card.
  */
 const SWD = {
     mid: [-105.00017, 39.71888],
     between: [-104.999729, 39.718789],
-    desktopCenter: [-105.00017, 39.6991],
-    phoneCenter: [-104.999729, 39.714989],
+    desktopCenter: [-105.00017, 39.708889],
+    phoneCenter: [-104.999729, 39.716889],
     keys: { ctb1: 'swd/ctb1', swd1: 'swd/swd1', line: 'swd/line', pt1: 'swd/pt1', lv1: 'swd/lv1', pt2: 'swd/pt2' }
 };
 

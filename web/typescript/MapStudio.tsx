@@ -2010,11 +2010,17 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         const at = this.map.project(lngLat);
         this.popup.setMaxWidth(popupMaxWidth(at.x, this.map.getContainer().clientWidth, maxPx));
+        if (!this.popup.isOpen()) {
+            // The popup joins the map before it is placed: its content rendered already (the portal), but
+            // a card measures 0 px tall until the popup's element is in the document (the first line popup
+            // of a page opened above its segment and off the map's top with that 0).
+            this.popup.setLngLat(lngLat).addTo(this.map);
+        }
         if (maxPx === LINE_POPUP_PX && this.popupContent) {
             // The line popup (entry 2): above the segment where its card fits, else below, else the side
             // with more room with the card clamped to it (the body scrolls), so it never leaves the map.
-            // The card is in the DOM already (the portal rendered before this callback), so its natural
-            // height is measured with the clamp lifted, then the clamp is set as the card's own token.
+            // The card is in the document now, so its natural height is measured with the clamp lifted,
+            // then the clamp is set as the card's own token.
             const content = this.popupContent;
             content.style.setProperty('--mapstudio-popup-max-height', 'none');
             const card = content.firstElementChild as HTMLElement | null;
@@ -2027,11 +2033,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.popupContent.style.removeProperty('--mapstudio-popup-max-height');
             this.popup.options.anchor = undefined;
         }
-        // setLngLat runs MapLibre's placement again with the card at its real size.
+        // setLngLat runs MapLibre's placement again with the anchor chosen and the card at its real size.
         this.popup.setLngLat(lngLat);
-        if (!this.popup.isOpen()) {
-            this.popup.addTo(this.map);
-        }
     }
 
     private startPopupClock(): void {
