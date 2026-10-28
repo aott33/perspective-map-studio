@@ -1,7 +1,9 @@
-// Basemaps and the starting area (epic 3 entry 6, R1, R10, AD-12). On the dev Gateway: the setup
-// offers None, OpenStreetMap and Satellite in a control top-right; None draws the blank background;
-// OpenStreetMap and Satellite draw their tiles with the provider's attribution always shown
-// bottom-left; Satellite's tile source comes from the Gateway (basemap.source), its token read from the
+// Basemaps and the starting area (epic 3 entry 6, R1, R10, AD-12) and the View-mode controls as
+// designed (entry 14, R5). On the dev Gateway: the setup offers None, OpenStreetMap and Satellite in
+// the Legend panel bottom-left (the Legend button opens it by click or keyboard, Esc closes it); None
+// draws the blank background; OpenStreetMap and Satellite draw their tiles with the provider's
+// attribution always shown beside the Legend button; the top-right holds one zoom card (plus, the
+// level, minus, Fit, Return) and nothing else, and View mode has no Draw a line; Satellite's tile source comes from the Gateway (basemap.source), its token read from the
 // secret the setup names (ops/secrets/map_token, a generated placeholder that starts with pk.), refused
 // in plain words when the secret is not a public token, is missing or is not named; the token never
 // reaches the browser's storage or the Gateway log. Two components with different starting areas (the
@@ -50,6 +52,15 @@ async function stubTiles(page, { brokenOsm = false } = {}) {
 
 const button = (page, id) => page.locator('.mapstudio-basemap-button[data-basemap="' + id + '"]');
 const attribution = (page) => page.locator('.maplibregl-ctrl-attrib');
+const legendButton = (page) => page.locator('.mapstudio-legend-button');
+const legendPanel = (page) => page.locator('.mapstudio-legend-panel');
+
+/** Open the Legend panel (entry 14), where the basemap choice lives; it stays open until Esc, the button or a map click. */
+async function openLegend(page, map) {
+    await legendButton(page).click();
+    await expect(legendPanel(page)).toBeVisible();
+    await expect(map).toHaveAttribute('data-legend-open', 'true');
+}
 
 /** Everything in the page's localStorage and sessionStorage as one string. */
 async function storageText(page) {
@@ -87,6 +98,7 @@ test.describe('1440 px', () => {
             const asked = await stubTiles(page);
             const map = await openMap(page, '/');
             await mapLoaded(map);
+            await openLegend(page, map);
             // The setup offers all three; nothing remembered in a fresh browser: the first listed, None.
             await expect(map).toHaveAttribute('data-basemap-offered', 'none,osm,satellite');
             await expect(map).toHaveAttribute('data-basemap', 'none');
@@ -135,6 +147,7 @@ test.describe('1440 px', () => {
             await expect(again).toHaveAttribute('data-basemap', 'satellite', { timeout: CHANGE_MS });
 
             // Back to None: no tiles, no attribution.
+            await openLegend(page, again);
             await button(page, 'none').click();
             await expect(again).toHaveAttribute('data-basemap', 'none');
             await expect(again).toHaveAttribute('data-basemap-tiles', 'none');
@@ -157,6 +170,7 @@ test.describe('1440 px', () => {
                 await scanProject();
                 let map = await openMap(page, '/');
                 await mapLoaded(map);
+                await openLegend(page, map);
                 await button(page, 'satellite').click();
                 await expect(map).toHaveAttribute('data-basemap-status', /^Satellite is unavailable: The map token secret MapStudioFiles\/pg_password is not a public Mapbox token/, { timeout: CHANGE_MS });
                 await expect(map).toHaveAttribute('data-basemap', 'none');
@@ -189,6 +203,7 @@ test.describe('1440 px', () => {
                 map = await openMap(page, '/');
                 await mapLoaded(map);
                 await expect(map).toHaveAttribute('data-basemap-offered', 'osm,none');
+                await openLegend(page, map);
                 await expect(page.locator('.mapstudio-basemap-button')).toHaveCount(2);
                 // Remembered osm is still offered, so it stays the choice.
                 await expect(map).toHaveAttribute('data-basemap', 'osm');
@@ -208,6 +223,7 @@ test.describe('1440 px', () => {
         await stubTiles(page, { brokenOsm: true });
         const map = await openMap(page, '/');
         await mapLoaded(map);
+        await openLegend(page, map);
         await button(page, 'osm').click();
         await expect(map).toHaveAttribute('data-basemap', 'osm');
         await expect(map).toHaveAttribute('data-basemap-tiles', 'failed', { timeout: CHANGE_MS });
@@ -217,6 +233,69 @@ test.describe('1440 px', () => {
         await expect(attribution(page)).toContainText('OpenStreetMap contributors');
         expect(watched.warnings).toEqual([]);
     });
+
+    test('the View-mode controls as designed: one zoom card top-right, the Legend bottom-left by click and keyboard, no Draw a line',
+        async ({ page }) => {
+            await stubTiles(page);
+            const map = await openMap(page, '/');
+            await mapLoaded(map);
+            // Top-right: the zoom card alone (plus, the level, minus, Fit, Return), nothing else.
+            await expect(page.locator('.maplibregl-ctrl-top-right .maplibregl-ctrl')).toHaveCount(1);
+            const zoom = page.locator('.mapstudio-zoom');
+            await expect(zoom).toBeVisible();
+            await expect(zoom.locator('.mapstudio-zoom-in')).toHaveAttribute('aria-label', 'Zoom in');
+            await expect(zoom.locator('.mapstudio-zoom-level')).toHaveText('z 12');
+            await expect(zoom.locator('.mapstudio-zoom-out')).toHaveAttribute('aria-label', 'Zoom out');
+            await expect(zoom.locator('.mapstudio-fit-button')).toHaveAttribute('aria-label', 'Fit the map to every item');
+            await expect(zoom.locator('.mapstudio-return-button')).toBeDisabled();
+            await expect(page.locator('.mapstudio-draw-button'), 'View mode has no Draw a line').toHaveCount(0);
+            await zoom.locator('.mapstudio-zoom-in').click();
+            await expect(map).toHaveAttribute('data-zoom', '13.00', { timeout: CHANGE_MS });
+            await expect(zoom.locator('.mapstudio-zoom-level')).toHaveText('z 13');
+            await zoom.locator('.mapstudio-zoom-out').click();
+            await expect(map).toHaveAttribute('data-zoom', '12.00', { timeout: CHANGE_MS });
+            // Bottom-left: the Legend button with the scale bar beside it; the panel is closed.
+            const row = page.locator('.mapstudio-legend-row');
+            await expect(legendButton(page)).toContainText('Legend');
+            await expect(legendButton(page)).toHaveAttribute('aria-expanded', 'false');
+            await expect(row.locator('.maplibregl-ctrl-scale')).toBeVisible();
+            await expect(legendPanel(page)).toHaveCount(0);
+            await expect(map).toHaveAttribute('data-legend-open', 'false');
+            const buttonBox = await legendButton(page).boundingBox();
+            const scaleBox = await row.locator('.maplibregl-ctrl-scale').boundingBox();
+            expect(scaleBox.x, 'the scale bar beside the Legend button').toBeGreaterThan(buttonBox.x + buttonBox.width);
+            // By keyboard: Enter on the button opens the panel with focus inside; Esc closes it and returns the focus.
+            await legendButton(page).focus();
+            await page.keyboard.press('Enter');
+            await expect(legendPanel(page)).toBeVisible();
+            await expect(map).toHaveAttribute('data-legend-open', 'true');
+            await expect(legendButton(page)).toHaveAttribute('aria-expanded', 'true');
+            await expect(legendPanel(page).locator('.mapstudio-legend-heading').first()).toHaveText('Basemap');
+            await expect(page.locator('.mapstudio-basemap-button')).toHaveCount(3);
+            await expect(button(page, 'none')).toBeFocused();
+            const panelBox = await legendPanel(page).boundingBox();
+            expect(panelBox.y + panelBox.height, 'the panel opens above the button').toBeLessThanOrEqual(buttonBox.y + 1);
+            await page.keyboard.press('Escape');
+            await expect(legendPanel(page)).toHaveCount(0);
+            await expect(map).toHaveAttribute('data-legend-open', 'false');
+            await expect(legendButton(page)).toBeFocused();
+            // By click: the button opens it, the basemap choice works inside it, a click on the map closes it.
+            await openLegend(page, map);
+            await button(page, 'osm').click();
+            await expect(map).toHaveAttribute('data-basemap', 'osm');
+            await expect(legendPanel(page), 'a choice keeps the panel open').toBeVisible();
+            await expect(attribution(page)).toContainText('OpenStreetMap contributors');
+            const box = await map.boundingBox();
+            await page.mouse.click(box.x + box.width / 2, box.y + 80);
+            await expect(legendPanel(page)).toHaveCount(0);
+            // The bottom-right corner is the Perspective App Bar toggle's at every width.
+            const corner = { x: box.x + box.width - 64, y: box.y + box.height - 64 };
+            for (const b of [await zoom.boundingBox(), await row.boundingBox()]) {
+                expect(b.x + b.width > corner.x && b.y + b.height > corner.y, 'nothing in the bottom-right corner').toBe(false);
+            }
+            await expect(map).toHaveAttribute('data-basemap-tiles', 'loaded', { timeout: CHANGE_MS });
+            await shot(page, 'mapstudio-controls-1440.png');
+        });
 
     test('two components with different starting areas show the same map items', async ({ page }) => {
         await stubTiles(page);
@@ -249,26 +328,38 @@ test.describe('1440 px', () => {
 test.describe('390 px', () => {
     test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
 
-    test('the basemap switch and the attribution fit a phone and leave the bottom-right corner clear', async ({ page }) => {
+    test('the zoom card, the Legend panel and the attribution fit a phone at 44 px and leave the bottom-right corner clear', async ({ page }) => {
         await stubTiles(page);
         const map = await openMap(page, '/');
         await mapLoaded(map);
+        await expect(page.locator('.mapstudio-draw-button')).toHaveCount(0);
+        await openLegend(page, map);
         await button(page, 'osm').click();
         await expect(map).toHaveAttribute('data-basemap', 'osm');
         await expect(attribution(page)).toContainText('OpenStreetMap contributors');
         await expect(map).toHaveAttribute('data-basemap-tiles', 'loaded', { timeout: CHANGE_MS });
-        const control = await page.locator('.mapstudio-basemap').boundingBox();
+        // Every control button is a 44 px touch target (DESIGN.md target-touch), the panel's included.
+        for (const b of await page.locator('.mapstudio .maplibregl-ctrl button').all()) {
+            const r = await b.boundingBox();
+            expect(Math.min(r.width, r.height), (await b.getAttribute('aria-label')) || (await b.textContent())).toBeGreaterThanOrEqual(44);
+        }
+        const zoom = await page.locator('.mapstudio-zoom').boundingBox();
+        const panel = await legendPanel(page).boundingBox();
         const attrib = await attribution(page).boundingBox();
-        expect(control.x).toBeGreaterThanOrEqual(0);
-        expect(control.x + control.width).toBeLessThanOrEqual(390);
-        expect(attrib.x).toBeGreaterThanOrEqual(0);
-        expect(attrib.x + attrib.width).toBeLessThanOrEqual(390);
+        for (const box of [zoom, panel, attrib]) {
+            expect(box.x).toBeGreaterThanOrEqual(0);
+            expect(box.x + box.width).toBeLessThanOrEqual(390);
+        }
+        await shot(page, 'mapstudio-basemap-390.png');
+        await page.keyboard.press('Escape');
+        await expect(legendPanel(page)).toHaveCount(0);
+        const legend = await page.locator('.mapstudio-legend-row').boundingBox();
         // The bottom-right 64 px corner is the Perspective App Bar toggle's (DESIGN.md).
         const corner = { x: 390 - 64, y: 844 - 64 };
-        for (const box of [control, attrib]) {
+        for (const box of [zoom, legend, attrib]) {
             const inCorner = box.x + box.width > corner.x && box.y + box.height > corner.y;
             expect(inCorner, 'nothing in the bottom-right corner').toBe(false);
         }
-        await shot(page, 'mapstudio-basemap-390.png');
+        await shot(page, 'mapstudio-controls-390.png');
     });
 });

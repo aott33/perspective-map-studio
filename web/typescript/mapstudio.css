@@ -19,8 +19,8 @@
     position: absolute;
     left: 8px;
     right: 56px;
-    /* Above the attribution (bottom-left, epic 3 entry 6), which must stay visible. */
-    bottom: 34px;
+    /* Above the legend row (bottom-left, epic 3 entry 14), which must stay visible. */
+    bottom: 56px;
     padding: 6px 10px;
     border: 1px solid var(--border);
     border-radius: var(--borderRadius);
@@ -36,10 +36,39 @@
     color: var(--label--disabled);
 }
 
+/* Floating controls (epic 3 entry 14, DESIGN.md Elevation, Layout): one soft shadow, the host theme's
+   where it has one (Perspective's themes define --boxShadow1), else two layers of the attention token
+   at about 10 %; 12 px from the map edge, 8 px on a phone; 32 px targets with a mouse, 44 px below
+   768 px (target-touch). Token colours only (AD-11). */
+.mapstudio {
+    --mapstudio-float-shadow: var(--boxShadow1,
+        0 1px 3px color-mix(in srgb, var(--neutral-90) 10%, transparent),
+        0 4px 12px color-mix(in srgb, var(--neutral-90) 10%, transparent));
+    --mapstudio-target: 32px;
+    --mapstudio-map-inset: 12px;
+}
+
+@media (max-width: 767px) {
+    .mapstudio {
+        --mapstudio-target: 44px;
+        --mapstudio-map-inset: 8px;
+    }
+}
+
+.mapstudio .maplibregl-ctrl-top-right .maplibregl-ctrl {
+    margin: var(--mapstudio-map-inset) var(--mapstudio-map-inset) 0 0;
+}
+
+.mapstudio .maplibregl-ctrl-bottom-left .maplibregl-ctrl {
+    margin: 0 0 var(--mapstudio-map-inset) var(--mapstudio-map-inset);
+}
+
 .mapstudio .maplibregl-ctrl-group {
     background: var(--container);
-    border: 1px solid var(--border);
-    box-shadow: none;
+    border: none;
+    border-radius: 8px;
+    box-shadow: var(--mapstudio-float-shadow);
+    overflow: hidden;
 }
 
 .mapstudio .maplibregl-ctrl-group button + button {
@@ -50,17 +79,90 @@
     filter: none;
 }
 
-/* The line tool toggle: a glyph and the mode's name in words. */
+/* Every control button: the theme's text on the panel surface, a glyph in currentColor. */
+.mapstudio .mapstudio-ctrl-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-sizing: border-box;
+    min-width: var(--mapstudio-target);
+    height: var(--mapstudio-target);
+    padding: 0;
+    border: none;
+    background: var(--container);
+    color: var(--label);
+    font: inherit;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.mapstudio .mapstudio-ctrl-button:hover:not(:disabled) {
+    background: var(--neutral-30);
+}
+
+.mapstudio .mapstudio-ctrl-button:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -2px;
+}
+
+.mapstudio .mapstudio-ctrl-button:disabled {
+    color: var(--label--disabled);
+    cursor: not-allowed;
+}
+
+.mapstudio .mapstudio-ctrl-button--on {
+    background: var(--callToActionHighlight);
+    color: var(--callToAction);
+    box-shadow: inset 0 0 0 1px var(--callToAction);
+}
+
+.mapstudio .mapstudio-ctrl-glyph {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+}
+
+/* The zoom card (DESIGN.md zoom-control): plus, the level, minus, Fit, Return in one rounded card. */
+.mapstudio .mapstudio-zoom {
+    display: flex;
+    flex-direction: column;
+    width: var(--mapstudio-target);
+}
+
+.mapstudio .mapstudio-zoom .mapstudio-ctrl-button {
+    width: var(--mapstudio-target);
+}
+
+.mapstudio .mapstudio-zoom-level {
+    box-sizing: border-box;
+    padding: 2px 0 3px;
+    color: var(--label--disabled);
+    font-size: 11px;
+    line-height: 1.3;
+    text-align: center;
+    white-space: nowrap;
+    cursor: default;
+}
+
+.mapstudio .mapstudio-zoom .mapstudio-fit-button {
+    border-top: 1px solid var(--border);
+}
+
+/* The line tool toggle (Edit mode only, the editMode prop): a glyph and the mode's name in words. */
 .mapstudio .mapstudio-draw-button {
     display: flex;
     align-items: center;
     gap: 6px;
+    box-sizing: border-box;
     width: auto;
-    height: 29px;
+    height: var(--mapstudio-target);
     padding: 0 10px;
     border: none;
     background: var(--container);
     color: var(--label);
+    font: inherit;
     font-size: 12px;
     line-height: 1;
     cursor: pointer;
@@ -460,33 +562,120 @@
     color: var(--mapstudio-alarm-3);
 }
 
-/* The basemap switch (epic 3 entry 6, R10): a row of named buttons under the zoom control, the
-   chosen one pressed, and a plain-words status under it when a basemap is refused or its tiles do
-   not load. Token colours only (AD-11). */
+/* The legend (epic 3 entry 14, DESIGN.md legend; entry 6's basemap choice lives in it): bottom-left,
+   a row of the Legend button, MapLibre's scale bar and the provider's attribution (always shown with a
+   basemap), wrapping upward on a phone; the panel opens above the button, 208 px wide, built from
+   sections so entry 3 adds the glyph key and the toggles. Token colours only (AD-11). */
+.mapstudio .mapstudio-legend {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    max-width: calc(100% - 2 * var(--mapstudio-map-inset));
+    pointer-events: none;
+}
+
+.mapstudio .mapstudio-legend > * {
+    pointer-events: auto;
+}
+
+.mapstudio .mapstudio-legend-row {
+    display: flex;
+    flex-wrap: wrap-reverse;
+    align-items: flex-end;
+    gap: 8px 12px;
+}
+
+/* The scale bar and the attribution carry MapLibre's control class; in the row they take no corner margin. */
+.mapstudio .mapstudio-legend-row .maplibregl-ctrl {
+    float: none;
+    margin: 0;
+}
+
+.mapstudio .mapstudio-legend-button {
+    padding: 0 12px 0 10px;
+    border-radius: 10px;
+    box-shadow: var(--mapstudio-float-shadow);
+    font-size: 13px;
+}
+
+.mapstudio .mapstudio-legend-word {
+    white-space: nowrap;
+}
+
+/* MapLibre's scale bar on the theme's tokens instead of its white and #333. */
+.mapstudio .maplibregl-ctrl-scale {
+    margin-bottom: 4px;
+    padding: 0 4px;
+    border: 2px solid var(--neutral-70);
+    border-top: none;
+    background: color-mix(in srgb, var(--container) 70%, transparent);
+    color: var(--label);
+    font-size: 10px;
+    line-height: 1.4;
+}
+
+/* The provider's attribution: MapLibre's own control on the theme's tokens instead of its white. */
+.mapstudio .maplibregl-ctrl-attrib {
+    margin: 0;
+    padding: 0 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--borderRadius);
+    background: var(--container);
+    color: var(--label);
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.mapstudio .maplibregl-ctrl-attrib a {
+    color: var(--label);
+}
+
+.mapstudio .maplibregl-ctrl-attrib.maplibregl-attrib-empty {
+    display: none;
+}
+
+.mapstudio .mapstudio-legend-panel {
+    box-sizing: border-box;
+    width: 208px;
+    max-width: 100%;
+    padding: 10px 12px 12px;
+    border-radius: 10px;
+    background: var(--container);
+    color: var(--label);
+    box-shadow: var(--mapstudio-float-shadow);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.mapstudio .mapstudio-legend-section + .mapstudio-legend-section {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--neutral-30);
+}
+
+.mapstudio .mapstudio-legend-heading {
+    margin-bottom: 6px;
+    color: var(--label--disabled);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
 .mapstudio .mapstudio-basemap-group {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
+    gap: 2px;
 }
 
 .mapstudio .mapstudio-basemap-button {
-    width: auto;
-    height: 29px;
-    padding: 0 10px;
-    border: none;
-    background: var(--container);
-    color: var(--label);
-    font-size: 12px;
-    line-height: 1;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.mapstudio .mapstudio-basemap-button + .mapstudio-basemap-button {
-    border-left: 1px solid var(--border);
-}
-
-.mapstudio .mapstudio-basemap-button:hover {
-    background: var(--neutral-30);
+    justify-content: flex-start;
+    width: 100%;
+    padding: 0 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    text-align: left;
 }
 
 .mapstudio .mapstudio-basemap-button--on {
@@ -496,73 +685,11 @@
 }
 
 .mapstudio .mapstudio-basemap-status {
-    max-width: 240px;
-    margin-top: 4px;
-    padding: 4px 8px;
-    border: 1px solid var(--border);
-    border-radius: var(--borderRadius);
-    background: var(--container);
+    margin-top: 6px;
     color: var(--label);
     font-size: 12px;
     line-height: 1.4;
-    text-align: right;
     overflow-wrap: anywhere;
-}
-
-/* The provider's attribution (bottom-left, always shown with a basemap): MapLibre's own control on
-   the theme's tokens instead of its white. */
-.mapstudio .maplibregl-ctrl-attrib {
-    background: var(--container);
-    color: var(--label);
-    font-size: 11px;
-    line-height: 1.6;
-    padding: 0 6px;
-    border: 1px solid var(--border);
-    border-radius: var(--borderRadius);
-}
-
-.mapstudio .maplibregl-ctrl-attrib a {
-    color: var(--label);
-}
-
-/* Fit and Return (epic 3 entry 7, R5): a control group under the zoom buttons, top-right, with the
-   two names in words; Fit stays pressed while it keeps, Return is disabled with nothing selected.
-   Token colours only (AD-11); nothing in the bottom-right corner (DESIGN.md). */
-.mapstudio .mapstudio-fit-group {
-    display: flex;
-    flex-direction: row;
-}
-
-.mapstudio .mapstudio-fit-control {
-    width: auto;
-    height: 29px;
-    padding: 0 10px;
-    border: none;
-    background: var(--container);
-    color: var(--label);
-    font-size: 12px;
-    line-height: 1;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.mapstudio .mapstudio-fit-control + .mapstudio-fit-control {
-    border-left: 1px solid var(--border);
-}
-
-.mapstudio .mapstudio-fit-control:hover:not(:disabled) {
-    background: var(--neutral-30);
-}
-
-.mapstudio .mapstudio-fit-control--on {
-    background: var(--callToActionHighlight);
-    color: var(--callToAction);
-    box-shadow: inset 0 0 0 1px var(--callToAction);
-}
-
-.mapstudio .mapstudio-fit-control:disabled {
-    color: var(--label--disabled);
-    cursor: not-allowed;
 }
 
 /* The pick list of a shared marker (entry 7): one row per map item, each a button. */
