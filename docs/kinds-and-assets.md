@@ -1,6 +1,6 @@
-# Kinds and assets from the project, version 0.2.0 (draft)
+# Kinds and assets from the project, version 0.2.0
 
-Map Studio learns what can be drawn (the **kind list**) and what a map item can be linked to (the **asset list**) from two project library functions the project's setup names (AD-4). The module knows nothing of the project's data model: the functions read it however the project likes and return rows in the shapes below. **Draft:** part of contract 0.2.0 in draft ([contract.md](contract.md)); it may still change until release 0.2.0.
+Map Studio learns what can be drawn (the **kind list**) and what a map item can be linked to (the **asset list**) from two project library functions the project's setup names (AD-4). The module knows nothing of the project's data model: the functions read it however the project likes and return rows in the shapes below. Part of contract 0.2.0 ([contract.md](contract.md)).
 
 Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway by this repository's e2e suite (`e2e/tests/adapters.spec.mjs`); **[unverified]** written but not seen working.
 

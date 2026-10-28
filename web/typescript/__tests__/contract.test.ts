@@ -19,9 +19,9 @@ const ITEM = {
     deleted: false
 };
 
-describe('the 0.2.0 draft contract', () => {
+describe('the 0.2.0 contract', () => {
     test('version, codes and types match common/', () => {
-        expect(CONTRACT_VERSION).toBe('0.2.0-draft');
+        expect(CONTRACT_VERSION).toBe('0.2.0');
         expect(Object.values(ErrorCodes).sort()).toEqual(['conflict', 'invalid', 'read-only', 'role', 'stale', 'store-unreachable', 'tags-unavailable']);
         expect(MessageTypes.MAP_LOAD).toBe('map.load');
         expect(MessageTypes.EDITS_APPLY).toBe('edits.apply');

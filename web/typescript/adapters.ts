@@ -1,5 +1,5 @@
 /**
- * The host lists map.load carries (Map Studio 0.2.0 draft, docs/kinds-and-assets.md):
+ * The host lists map.load carries (Map Studio 0.2.0, docs/kinds-and-assets.md):
  * the project's kind list, its asset list (editors only) and the status of each.
  * Pure readers, tolerant of a Gateway that sends none of them; unit tested in node.
  */

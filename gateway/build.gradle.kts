@@ -35,3 +35,15 @@ tasks.test {
     // GatewayScriptModuleTest starts Jython; keep it from writing a package cache into the checkout.
     systemProperty("python.cachedir.skip", "true")
 }
+
+// GatewayJarManifestTest opens the built gateway jar and fails when its manifest
+// does not name this build's version (the map store's module_version column
+// comes from it, see the root build). Tests run against classes, not the jar,
+// so the jar is built first and its path handed over.
+val gatewayJar = tasks.jar.flatMap { it.archiveFile }
+tasks.test {
+    dependsOn(tasks.jar)
+    inputs.file(gatewayJar)
+    systemProperty("mapstudio.gatewayJar", gatewayJar.get().asFile.absolutePath)
+    systemProperty("mapstudio.version", project.version.toString())
+}

@@ -23,7 +23,7 @@ Turf 7.4.0 (https://github.com/Turfjs/turf): @turf/helpers, @turf/length,
 @turf/along and @turf/nearest-point-on-line, and the Turf packages they use
 (@turf/bearing, @turf/destination, @turf/distance, @turf/invariant,
 @turf/meta), pinned at exactly 7.4.0 in web/package.json for the shared
-geometry module (web/typescript/geometry.ts). In 0.2.0 draft nothing in the
+geometry module (web/typescript/geometry.ts). In 0.2.0 nothing in the
 component calls that module yet, so they are not in the browser bundle; they
 are bundled once the editing tools call it. The Gateway's LineMeasure
 (common/.../contract/LineMeasure.java) is a Java port of Turf's distance,

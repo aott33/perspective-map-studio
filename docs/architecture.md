@@ -94,7 +94,7 @@ erDiagram
 
 ## Contracts you must not break
 
-The component's props and events, the message contract, the map item record and object, the live value shape, the asset contract, the kind list, the setup schema, the scripting API and the CSV formats are public. They follow semantic versioning: a breaking change needs a new major version (AD-9). Messages always use the envelope `{v, type, id, body}`, and errors are `{code, message}` (AD-8). The contract as built so far (messages, error codes, ops, the map item record, the setup schema, the map store tables and the scripting API, version 0.2.0 in draft) is written down in `docs/contract.md`, the project setup in `docs/setup.md`; the code in `common/` is its reference.
+The component's props and events, the message contract, the map item record and object, the live value shape, the asset contract, the kind list, the setup schema, the scripting API and the CSV formats are public. They follow semantic versioning: a breaking change needs a new major version (AD-9). Messages always use the envelope `{v, type, id, body}`, and errors are `{code, message}` (AD-8). The contract as built so far (messages, error codes, ops, the map item record, the setup schema, the map store tables and the scripting API, version 0.2.0) is written down in `docs/contract.md`, the project setup in `docs/setup.md`; the code in `common/` is its reference.
 
 ## Conventions
 

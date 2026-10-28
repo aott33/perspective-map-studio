@@ -18,6 +18,8 @@ final class FakeJdbc {
 
     final List<String> executed = new ArrayList<>();
     final List<String> events = new ArrayList<>();
+    /** Every string bound to a prepared statement, in order (the version record's module_version). */
+    final List<String> boundStrings = new ArrayList<>();
     int version;
     /** Whether mapstudio_schema_version exists; null means "when version > 0". */
     Boolean tableExists;
@@ -77,7 +79,11 @@ final class FakeJdbc {
         return (PreparedStatement) Proxy.newProxyInstance(getClass().getClassLoader(),
             new Class<?>[] {PreparedStatement.class},
             (proxy, method, args) -> switch (method.getName()) {
-                case "setInt", "setString" -> null;
+                case "setInt" -> null;
+                case "setString" -> {
+                    boundStrings.add((String) args[1]);
+                    yield null;
+                }
                 case "executeUpdate" -> {
                     run(sql);
                     yield 1;

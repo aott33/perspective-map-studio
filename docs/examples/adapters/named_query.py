@@ -1,4 +1,5 @@
 # Example Map Studio kind and asset adapters wrapping named queries.
+# Map Studio contract 0.2.0 (docs/contract.md, docs/kinds-and-assets.md).
 # Jython 2.7. Put it in a project library module (for example
 # my_map_adapters/code.py) and name it in the Map Studio setup:
 #   "kindsFunction": "my_map_adapters.kinds",
