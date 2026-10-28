@@ -7,6 +7,7 @@ import { CHANGED_PAD, createBatches, editorPads, itemData, itemId, uuid5 } from 
 import { LIMITS, anyCrashed, bundleVerdict, classifyReply, countOutcomes, deltaVerdict, exitCode, latencyVerdict,
     hostBusyPct, merge, percentile, procStatCpu, resourceStats, spikeVerdict, summarize, verdicts, withoutTimestamps } from './result.mjs';
 import { compare, headlines } from './compare.mjs';
+import { MEASURES, NAMES, measureOfHeadline, parseOnly, phasesFor, wants, wantsAny } from './only.mjs';
 import { isRepeat, parseSize, parseStatsLine } from './sampler.mjs';
 
 test('uuid5 matches Python uuid.uuid5(NAMESPACE_URL, name)', () => {
@@ -180,4 +181,51 @@ test('compare lists the recorded one-page streams measure beside the judged edit
         ['edits.apply 50op-10streams-1page p95', 'recorded'], ['edits.apply 50op-10streams-1page median', 'recorded']]);
     assert.equal(exitCode(r), 3);
     assert.equal(exitCode({ measures: { editsApply: { x: { verdict: 'recorded' } } } }), 0);
+});
+
+test('--only: the measure names, their phases and the rows they own (epic 3 entry 4)', () => {
+    assert.equal(parseOnly(''), null);
+    assert.equal(parseOnly(undefined), null);
+    assert.deepEqual(parseOnly('edits.apply'), ['edits.apply']);
+    assert.deepEqual(parseOnly(' map.load, edits.apply ,bundle'), ['bundle', 'map.load', 'edits.apply']);
+    assert.throws(() => parseOnly('edits.apply,typo'), /unknown measure\(s\) typo; the measures are bundle, idle/);
+    assert.ok(wants(null, 'idle'));
+    assert.ok(wants(['edits.apply'], 'edits.apply'));
+    assert.ok(!wants(['edits.apply'], 'map.load'));
+    assert.throws(() => wants(null, 'nope'), /unknown measure nope/);
+    assert.ok(wantsAny(['edits.apply'], ['map.load', 'edits.apply']));
+    assert.ok(!wantsAny(['edits.apply'], ['map.load', 'frame-rate']));
+    assert.deepEqual(phasesFor(['edits.apply']), ['main']);
+    assert.deepEqual(phasesFor(['edits.apply', 'idle']), ['nomodule', 'main']);
+    assert.deepEqual(phasesFor(['sessions']), ['nomodule', 'main']);
+    assert.deepEqual(phasesFor(null), ['nomodule', 'main']);
+    assert.equal(measureOfHeadline('edits.apply 50op-10editors p95'), 'edits.apply');
+    assert.equal(measureOfHeadline('map.load 5000 items reply'), 'map.load');
+    assert.equal(measureOfHeadline('map.changed 50 sessions slowest'), 'map.changed');
+    assert.equal(measureOfHeadline('list refresh CPU 1 s max'), 'list-refresh');
+    assert.equal(measureOfHeadline('idleAdded heap'), 'idle');
+    assert.equal(measureOfHeadline('sessionsAdded CPU'), 'sessions');
+    assert.equal(measureOfHeadline('bundle bytes'), 'bundle');
+    assert.equal(measureOfHeadline('frame rate 30 items pan'), 'frame-rate');
+    assert.equal(measureOfHeadline('something else'), null);
+    for (const name of NAMES) assert.ok(MEASURES[name].keys.length > 0 && MEASURES[name].phases.includes('main'), name);
+});
+
+test('compare --only keeps the rows of the wanted measures', () => {
+    const a = { measures: { editsApply: { '1op-1editor': { stats: { p95: 100, median: 50 }, verdict: 'pass' } },
+        mapLoad: { 5000: { stats: { p95: 900, median: 700 }, verdict: 'pass' } }, bundle: { bytes: 10, verdict: 'pass' } } };
+    const b = { measures: { editsApply: { '1op-1editor': { stats: { p95: 120, median: 60 }, verdict: 'pass' } } } };
+    assert.deepEqual(compare(a, b, ['edits.apply']).map((r) => [r.name, r.a, r.b, r.delta, r.verdict]), [
+        ['edits.apply 1op-1editor p95', 100, 120, 20, 'pass'], ['edits.apply 1op-1editor median', 50, 60, 10, 'pass']]);
+    assert.equal(compare(a, b, ['bundle']).length, 1);
+    assert.equal(compare(a, b, ['bundle'])[0].verdict, 'not in b');
+    assert.equal(compare(a, b).length, 5);
+    assert.equal(compare(a, b, null).length, 5);
+});
+
+test('merge carries the --only selection of the main phase into the result', () => {
+    const main = { phase: 'main', only: ['edits.apply'], env: {}, measures: {} };
+    assert.deepEqual(merge(null, main).only, ['edits.apply']);
+    assert.equal(merge(null, { phase: 'main', env: {}, measures: {} }).only, null);
+    assert.equal(merge(null, { phase: 'main', only: null, env: {}, measures: {} }).only, null);
 });

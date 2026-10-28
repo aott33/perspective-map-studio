@@ -49,6 +49,37 @@ Do this on a trusted machine with a JDK 17 `keytool`.
 
 Anyone who can push a tag can start the release workflow, but the signing job waits for the owner's approval in the `release` environment, and it only ever creates a draft, for a tag on `main`.
 
+## Checks by release type
+
+Epic 3 entry 4 (owner, 2026-10-28), after the 0.2.0 release repeated the template's whole `local.sh` and full test stack twice. Each release type runs the checks below and no more; the template's own CI covers what it already covers.
+
+| When | Checks | How long |
+| --- | --- | --- |
+| Every pull request | Map Studio CI as now: build and unit tests, the web tests, the e2e suite on the dev stack, the signing check with a throwaway certificate, `check-contract-versions.sh` | CI |
+| Before a minor release's tag (`X.Y.0`) | one rehearsal on the template's test stack with a throwaway-signed build (`scripts/ci/build-signed.sh` with a certificate made on the spot, the template a scratch clone that is never pushed: [docs/template-install.md](docs/template-install.md), "0.2.0 rehearsal"); the performance run (`ops/perf.sh`, [docs/perf](docs/perf/README.md)) only when the write path, the map store or the browser bundle changed, otherwise `ops/perf.sh --only <the measures those changes touch>` or nothing | rehearsal about 30 min; perf about 30 min, `--only` 10 to 15 min |
+| After every tag, and for a patch release (`X.Y.Z`, Z > 0) | the short smoke: `ops/release-smoke.sh X.Y.Z` against the published release (below) | about 5 min on the 4-CPU agent box |
+| The template pull request (the module lock update, at the cutover) | the template's own CI (`local.sh`, `stack.yml`); nothing repeated here | the template's CI |
+
+A rehearsal or a smoke that fails stops the release: the defect becomes its own fix (plan rule of 0.2.0, kept).
+
+### The release smoke
+
+```sh
+ops/release-smoke.sh 0.2.0                           # the published v0.2.0, the expected entry built here
+ops/release-smoke.sh 0.2.0 --template ../ign-scada-template   # also check that checkout's modules/modules.lock.json entry
+ops/release-smoke.sh 0.2.0 --lock entry.json         # a file holding the lock, or the entry alone
+ops/release-smoke.sh 0.2.0 --image ign-og/ignition:8.3.9-modules --keep   # the template's image, stack kept
+```
+
+In order: the lock entry (when given) against the expected entry; the published `.modl` downloaded and its SHA-256 checked against the release's `.sha256` asset; `scripts/ci/modl-verify.sh` (signed, every file signed, the certificate fingerprint equals the README's line, `module.xml`'s version equals the version); a Gateway with that module as its only external module and a PostgreSQL database beside it (no field simulator, broker or feedback stub; no `allowunsignedmodules`, so the Gateway's own signature check runs); the module ACTIVE at the version (`GET /data/api/v1/modules/healthy`); `e2e/rehearsal/release.spec.mjs` (two Chromium instances signed in as the map editor, a line drawn in one on the other's map within 5 s with no reload); every `mapstudio_schema_version` row with `module_version` equal to the version. The stack is its own compose project (`<MAPSTUDIO_CONTAINER>-smoke`, port `SMOKE_HTTP_PORT`, default 9089) with fresh volumes, removed on exit, and `e2e/out` is searched for every secret of the run.
+
+The expected entry is `RELEASING.md`'s shape (next section) with the release's values: `sha256` from the `.sha256` asset, `certSha256` from the README. **Owner decision 2026-10-28: the template stays on 0.1.0 until the cutover** (epic-template-cutover), so the smoke never needs the template's committed lock to hold the version; `--template` or `--lock` is for the cutover and for a lock entry written by hand (the 0.2.0 entry is in `_bmad-output/handoff-epic-3.md`).
+
+The image is `--image` or `SMOKE_IMAGE`, else the template's `ign-og/ignition:8.3.9-modules` when Docker has it, else the plain `inductiveautomation/ignition:8.3.9` (the version the template pins) with the published module. What ran where:
+
+- **[live 8.3.9, plain image]** `ops/release-smoke.sh 0.2.0` on `inductiveautomation/ignition:8.3.9` with the published v0.2.0 passed on the 4-CPU agent box (2026-10-28; the numbers are in [docs/platform-checks.md](docs/platform-checks.md), "Epic 3 entry 4"), and the three failure paths each fail with the check named: `SMOKE_SHA256`, `SMOKE_CERT_SHA256` and `SMOKE_MODULE_VERSION` replace one expected value each.
+- **[not verified]** the template's image: it was not on the box and the template checkout was not available. The template image carries the six locked modules, so until the cutover it holds Map Studio 0.1.0 beside the mounted release; the smoke's ACTIVE check fails when the wrong one wins. The lock check against a real `modules/modules.lock.json` was run with a file written in the shape the hand-off records, not the template's file.
+
 ## Installing through a host's module lock
 
 A host such as `ign-scada-template` pins the release in its lock file by SHA-256 and certificate fingerprint and downloads it from the public release URL with no credential (the repository is public, so a host's `fetch` and its weekly update check work as for any public module). The lock entry for release `X.Y.Z`:
@@ -68,7 +99,7 @@ A host such as `ign-scada-template` pins the release in its lock file by SHA-256
 }
 ```
 
-Take `sha256` from the published release's `.sha256` file, `certSha256` from the README, and check both against the downloaded file with the host's own tool (`modl.py inspect`) and `scripts/ci/modl-verify.sh` before writing the entry. The run that proved this path with the v0.1.0 release (and the earlier throwaway rehearsal) is in [docs/template-install.md](docs/template-install.md).
+Take `sha256` from the published release's `.sha256` file, `certSha256` from the README, and check both against the downloaded file with the host's own tool (`modl.py inspect`) and `scripts/ci/modl-verify.sh` before writing the entry; `ops/release-smoke.sh X.Y.Z` builds this entry from those values and prints it (`e2e/out/smoke/expected-entry.json`), and `--lock` or `--template` checks a written entry against it. The run that proved this path with the v0.1.0 release (and the earlier throwaway rehearsal) is in [docs/template-install.md](docs/template-install.md).
 
 ## Release approval
 

@@ -1,0 +1,24 @@
+# The release smoke's overlay on docker-compose.yml (ops/release-smoke.sh, epic 3 entry 4).
+# The same dev stack under its own compose project (<MAPSTUDIO_CONTAINER>-smoke, fresh volumes), with:
+# - the image the smoke chose (SMOKE_IMAGE: the template's ign-og/ignition:8.3.9-modules when Docker
+#   has it, else the plain inductiveautomation/ignition:8.3.9, or --image);
+# - the downloaded, published .modl as the external modules folder (SMOKE_MODULES_DIR, under the
+#   git-ignored e2e/out/smoke/), in place of the staged dev build in ops/modules;
+# - no -Dignition.allowunsignedmodules=true: the Gateway verifies the release's signatures itself,
+#   which scripts/ci/modl-verify.sh cannot (RELEASING.md). ACCEPT_MODULE_CERTS in docker-compose.yml
+#   accepts the certificate unattended.
+# A database only: no field simulator, broker or feedback stub (the template's test stack has those).
+
+services:
+  init:
+    image: ${SMOKE_IMAGE:?set by ops/release-smoke.sh}
+
+  gateway:
+    image: ${SMOKE_IMAGE:?set by ops/release-smoke.sh}
+    volumes:
+      - ${SMOKE_MODULES_DIR:?set by ops/release-smoke.sh}:/external-modules
+    command:
+      - "-n"
+      - "mapstudio-smoke"
+      - "--"
+      - "-Dignition.gateway.externalModulesFolder=/external-modules"
