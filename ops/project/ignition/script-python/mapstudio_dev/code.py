@@ -1,4 +1,4 @@
-# Dev kind and asset adapter for the mapstudio-dev project (epic 2 story 3).
+# Dev kind and asset adapter for the mapstudio-dev project (epic 2 story 3; the L-SWD set, epic 3 entry 2).
 # Jython 2.7 (the Gateway's). Test equipment for the dev Gateway only: the
 # setup names mapstudio_dev.kinds and mapstudio_dev.assets, and the /adapters
 # page switches the mode to show each status Map Studio reports.
@@ -39,6 +39,10 @@ KINDS = [
     # An instrument kind (epic 2 story 14): its map items may be attached to a line.
     {'id': 'tap', 'name': 'Tap', 'geometry': 'point', 'icon': 'tap', 'labelRank': 2, 'instrument': True,
      'fields': [{'key': 'tag', 'label': 'Tag', 'type': 'text', 'required': False}]},
+    # A second instrument kind (epic 3 entry 2): a line valve sits on a line but, with no icon KPI in
+    # its setup, bounds no line segment.
+    {'id': 'valve', 'name': 'Line valve', 'geometry': 'point', 'icon': 'line-valve', 'labelRank': 1, 'instrument': True,
+     'fields': [{'key': 'tag', 'label': 'Tag', 'type': 'text', 'required': False}]},
 ]
 
 ASSETS = [
@@ -46,6 +50,14 @@ ASSETS = [
     {'id': 'P14', 'name': 'Pad 14', 'kind': 'pad', 'basePath': '[default]Mesa/P14'},
     {'id': 'P15', 'name': 'Pad 15', 'kind': 'pad', 'basePath': '[default]Mesa/P15'},
     {'id': 'L3', 'name': 'Line 3', 'kind': 'line', 'basePath': '[default]Mesa/Lines/L3'},
+    # The L-SWD set (epic 3 entry 2): the two pads its ends snap to, its taps and line valve, and the
+    # line itself (ops/config/core: the Pad, Tap and Valve UDT instances and Lines/LSWD).
+    {'id': 'CTB1', 'name': 'CTB 1', 'kind': 'pad', 'basePath': '[default]Mesa/CTB1'},
+    {'id': 'SWD1', 'name': 'SWD 1', 'kind': 'pad', 'basePath': '[default]Mesa/SWD1'},
+    {'id': 'PT1', 'name': 'PT-1', 'kind': 'tap', 'basePath': '[default]Mesa/PT1'},
+    {'id': 'PT2', 'name': 'PT-2', 'kind': 'tap', 'basePath': '[default]Mesa/PT2'},
+    {'id': 'LV1', 'name': 'LV-1', 'kind': 'valve', 'basePath': '[default]Mesa/LV1'},
+    {'id': 'LSWD', 'name': 'L-SWD', 'kind': 'line', 'basePath': '[default]Mesa/Lines/LSWD'},
 ]
 
 

@@ -10,5 +10,60 @@
     "tagType": "UdtInstance",
     "typeId": "Pad",
     "tags": []
+  },
+  {
+    "name": "CTB1",
+    "tagType": "UdtInstance",
+    "typeId": "Pad",
+    "tags": [
+      {
+        "name": "Pressure",
+        "value": 412.0
+      }
+    ]
+  },
+  {
+    "name": "SWD1",
+    "tagType": "UdtInstance",
+    "typeId": "Pad",
+    "tags": [
+      {
+        "name": "Pressure",
+        "value": 365.0
+      }
+    ]
+  },
+  {
+    "name": "PT1",
+    "tagType": "UdtInstance",
+    "typeId": "Tap",
+    "tags": [
+      {
+        "name": "Pressure",
+        "value": 398.0
+      }
+    ]
+  },
+  {
+    "name": "PT2",
+    "tagType": "UdtInstance",
+    "typeId": "Tap",
+    "tags": [
+      {
+        "name": "Pressure",
+        "value": 371.0
+      }
+    ]
+  },
+  {
+    "name": "LV1",
+    "tagType": "UdtInstance",
+    "typeId": "Valve",
+    "tags": [
+      {
+        "name": "Position",
+        "value": 100.0
+      }
+    ]
   }
 ]

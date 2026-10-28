@@ -41,5 +41,61 @@
         "value": 0
       }
     ]
+  },
+  {
+    "name": "Tap",
+    "tagType": "UdtType",
+    "tags": [
+      {
+        "name": "Pressure",
+        "tagType": "AtomicTag",
+        "valueSource": "memory",
+        "dataType": "Float8",
+        "value": 0.0,
+        "alarms": [
+          {
+            "name": "High pressure",
+            "mode": "AboveValue",
+            "setpointA": 900.0,
+            "priority": "High",
+            "ackMode": "Manual"
+          }
+        ]
+      },
+      {
+        "name": "Comms",
+        "tagType": "AtomicTag",
+        "valueSource": "memory",
+        "dataType": "Boolean",
+        "value": true
+      },
+      {
+        "name": "Status",
+        "tagType": "AtomicTag",
+        "valueSource": "memory",
+        "dataType": "Int4",
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "Valve",
+    "tagType": "UdtType",
+    "tags": [
+      {
+        "name": "Position",
+        "tagType": "AtomicTag",
+        "valueSource": "memory",
+        "dataType": "Float8",
+        "value": 0.0
+      },
+      {
+        "name": "Comms",
+        "tagType": "AtomicTag",
+        "valueSource": "memory",
+        "dataType": "Boolean",
+        "value": true
+      }
+    ]
   }
 ]

@@ -537,6 +537,209 @@
         ]
        }
       }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "L-SWD quiet"
+      },
+      "meta": {
+       "name": "swdQuiet",
+       "domId": "mapstudio-live-swd-quiet"
+      },
+      "position": {
+       "basis": "150px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 3 entry 2): the L-SWD set quiet (PT1 398, PT2 371, LV1 100, comms on, acknowledged), through the project library mapstudio_live, so the\n\t# e2e suite and the owner can see the L-SWD line, its instruments and its popup follow. Dev tags only; MapEditor only.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devlive')\n\tout = self.view.rootContainer.getChild('liveResult')\n\tif not mapstudio_dev.holdsMapEditor(self.session):\n\t\tout.props.text = system.util.jsonEncode({'refused': 'The live buttons write dev tags, so they need the MapEditor role. Sign in as a map editor first.', 'ranAt': system.date.toMillis(system.date.now())})\n\t\treturn\n\ttry:\n\t\tresult = mapstudio_live.swd_quiet()\n\t\tresult['status'] = mapstudio_live.swd_status()\n\texcept java.lang.Throwable as ex:\n\t\tresult = {'error': ex.getClass().getSimpleName() + ': ' + str(ex.getMessage())}\n\texcept Exception as ex:\n\t\tresult = {'error': str(ex)}\n\tresult['action'] = 'swd-quiet'\n\tresult['ranAt'] = system.date.toMillis(system.date.now())\n\tout.props.text = system.util.jsonEncode(result)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "PT1 comms off"
+      },
+      "meta": {
+       "name": "pt1CommsOff",
+       "domId": "mapstudio-live-pt1-comms-off"
+      },
+      "position": {
+       "basis": "150px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 3 entry 2): Comms of PT1 false (comms lost, its two segments dashed), through the project library mapstudio_live, so the\n\t# e2e suite and the owner can see the L-SWD line, its instruments and its popup follow. Dev tags only; MapEditor only.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devlive')\n\tout = self.view.rootContainer.getChild('liveResult')\n\tif not mapstudio_dev.holdsMapEditor(self.session):\n\t\tout.props.text = system.util.jsonEncode({'refused': 'The live buttons write dev tags, so they need the MapEditor role. Sign in as a map editor first.', 'ranAt': system.date.toMillis(system.date.now())})\n\t\treturn\n\ttry:\n\t\tresult = mapstudio_live.set_comms('PT1', False)\n\t\tresult['status'] = mapstudio_live.swd_status()\n\texcept java.lang.Throwable as ex:\n\t\tresult = {'error': ex.getClass().getSimpleName() + ': ' + str(ex.getMessage())}\n\texcept Exception as ex:\n\t\tresult = {'error': str(ex)}\n\tresult['action'] = 'pt1-comms-off'\n\tresult['ranAt'] = system.date.toMillis(system.date.now())\n\tout.props.text = system.util.jsonEncode(result)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "PT1 comms on"
+      },
+      "meta": {
+       "name": "pt1CommsOn",
+       "domId": "mapstudio-live-pt1-comms-on"
+      },
+      "position": {
+       "basis": "150px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 3 entry 2): Comms of PT1 true, through the project library mapstudio_live, so the\n\t# e2e suite and the owner can see the L-SWD line, its instruments and its popup follow. Dev tags only; MapEditor only.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devlive')\n\tout = self.view.rootContainer.getChild('liveResult')\n\tif not mapstudio_dev.holdsMapEditor(self.session):\n\t\tout.props.text = system.util.jsonEncode({'refused': 'The live buttons write dev tags, so they need the MapEditor role. Sign in as a map editor first.', 'ranAt': system.date.toMillis(system.date.now())})\n\t\treturn\n\ttry:\n\t\tresult = mapstudio_live.set_comms('PT1', True)\n\t\tresult['status'] = mapstudio_live.swd_status()\n\texcept java.lang.Throwable as ex:\n\t\tresult = {'error': ex.getClass().getSimpleName() + ': ' + str(ex.getMessage())}\n\texcept Exception as ex:\n\t\tresult = {'error': str(ex)}\n\tresult['action'] = 'pt1-comms-on'\n\tresult['ranAt'] = system.date.toMillis(system.date.now())\n\tout.props.text = system.util.jsonEncode(result)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "PT2 pressure 500"
+      },
+      "meta": {
+       "name": "pt2Pressure500",
+       "domId": "mapstudio-live-pt2-pressure-500"
+      },
+      "position": {
+       "basis": "150px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 3 entry 2): Pressure of PT2 to 500 (the tap setup's attention band), through the project library mapstudio_live, so the\n\t# e2e suite and the owner can see the L-SWD line, its instruments and its popup follow. Dev tags only; MapEditor only.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devlive')\n\tout = self.view.rootContainer.getChild('liveResult')\n\tif not mapstudio_dev.holdsMapEditor(self.session):\n\t\tout.props.text = system.util.jsonEncode({'refused': 'The live buttons write dev tags, so they need the MapEditor role. Sign in as a map editor first.', 'ranAt': system.date.toMillis(system.date.now())})\n\t\treturn\n\ttry:\n\t\tresult = mapstudio_live.set_pressure('PT2', 500)\n\t\tresult['status'] = mapstudio_live.swd_status()\n\texcept java.lang.Throwable as ex:\n\t\tresult = {'error': ex.getClass().getSimpleName() + ': ' + str(ex.getMessage())}\n\texcept Exception as ex:\n\t\tresult = {'error': str(ex)}\n\tresult['action'] = 'pt2-pressure-500'\n\tresult['ranAt'] = system.date.toMillis(system.date.now())\n\tout.props.text = system.util.jsonEncode(result)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "PT2 pressure 950"
+      },
+      "meta": {
+       "name": "pt2Pressure950",
+       "domId": "mapstudio-live-pt2-pressure-950"
+      },
+      "position": {
+       "basis": "150px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 3 entry 2): Pressure of PT2 to 950 (raises the dev alarm High pressure), through the project library mapstudio_live, so the\n\t# e2e suite and the owner can see the L-SWD line, its instruments and its popup follow. Dev tags only; MapEditor only.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devlive')\n\tout = self.view.rootContainer.getChild('liveResult')\n\tif not mapstudio_dev.holdsMapEditor(self.session):\n\t\tout.props.text = system.util.jsonEncode({'refused': 'The live buttons write dev tags, so they need the MapEditor role. Sign in as a map editor first.', 'ranAt': system.date.toMillis(system.date.now())})\n\t\treturn\n\ttry:\n\t\tresult = mapstudio_live.set_pressure('PT2', 950)\n\t\tresult['status'] = mapstudio_live.swd_status()\n\texcept java.lang.Throwable as ex:\n\t\tresult = {'error': ex.getClass().getSimpleName() + ': ' + str(ex.getMessage())}\n\texcept Exception as ex:\n\t\tresult = {'error': str(ex)}\n\tresult['action'] = 'pt2-pressure-950'\n\tresult['ranAt'] = system.date.toMillis(system.date.now())\n\tout.props.text = system.util.jsonEncode(result)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "PT2 pressure 371"
+      },
+      "meta": {
+       "name": "pt2Pressure371",
+       "domId": "mapstudio-live-pt2-pressure-371"
+      },
+      "position": {
+       "basis": "150px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 3 entry 2): Pressure of PT2 to 371 (the normal band, below the alarm), through the project library mapstudio_live, so the\n\t# e2e suite and the owner can see the L-SWD line, its instruments and its popup follow. Dev tags only; MapEditor only.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devlive')\n\tout = self.view.rootContainer.getChild('liveResult')\n\tif not mapstudio_dev.holdsMapEditor(self.session):\n\t\tout.props.text = system.util.jsonEncode({'refused': 'The live buttons write dev tags, so they need the MapEditor role. Sign in as a map editor first.', 'ranAt': system.date.toMillis(system.date.now())})\n\t\treturn\n\ttry:\n\t\tresult = mapstudio_live.set_pressure('PT2', 371)\n\t\tresult['status'] = mapstudio_live.swd_status()\n\texcept java.lang.Throwable as ex:\n\t\tresult = {'error': ex.getClass().getSimpleName() + ': ' + str(ex.getMessage())}\n\texcept Exception as ex:\n\t\tresult = {'error': str(ex)}\n\tresult['action'] = 'pt2-pressure-371'\n\tresult['ranAt'] = system.date.toMillis(system.date.now())\n\tout.props.text = system.util.jsonEncode(result)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Acknowledge PT2"
+      },
+      "meta": {
+       "name": "pt2Ack",
+       "domId": "mapstudio-live-pt2-ack"
+      },
+      "position": {
+       "basis": "150px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 3 entry 2): acknowledge PT2's active alarms, through the project library mapstudio_live, so the\n\t# e2e suite and the owner can see the L-SWD line, its instruments and its popup follow. Dev tags only; MapEditor only.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devlive')\n\tout = self.view.rootContainer.getChild('liveResult')\n\tif not mapstudio_dev.holdsMapEditor(self.session):\n\t\tout.props.text = system.util.jsonEncode({'refused': 'The live buttons write dev tags, so they need the MapEditor role. Sign in as a map editor first.', 'ranAt': system.date.toMillis(system.date.now())})\n\t\treturn\n\ttry:\n\t\tresult = mapstudio_live.acknowledge('PT2')\n\t\tresult['status'] = mapstudio_live.swd_status()\n\texcept java.lang.Throwable as ex:\n\t\tresult = {'error': ex.getClass().getSimpleName() + ': ' + str(ex.getMessage())}\n\texcept Exception as ex:\n\t\tresult = {'error': str(ex)}\n\tresult['action'] = 'pt2-ack'\n\tresult['ranAt'] = system.date.toMillis(system.date.now())\n\tout.props.text = system.util.jsonEncode(result)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
      }
     ]
    },
