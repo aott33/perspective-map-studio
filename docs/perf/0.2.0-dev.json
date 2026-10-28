@@ -1,0 +1,1600 @@
+{
+  "schema": 1,
+  "percentileMethod": "nearest-rank: the value at rank ceil(p/100 * n) of the n samples sorted ascending",
+  "limits": {
+    "mapLoadP95Ms": 1000,
+    "editsApplyP95Ms": 300,
+    "mapChangedMaxMs": 1000,
+    "listRefreshMaxMs": 1000,
+    "spikeOverIdlePct": 50,
+    "idleCpuDeltaPct": 2,
+    "idleHeapDeltaMiB": 64,
+    "sessionsCpuDeltaPct": 10,
+    "sessionsHeapDeltaMiB": 200,
+    "bundleGrowthPct": 10
+  },
+  "planned": {
+    "mapLoad": 10,
+    "editsApplyPerEditor": 20,
+    "mapChangedSaves": 5,
+    "listRefresh": 10
+  },
+  "env": {
+    "main": {
+      "target": "dev",
+      "phase": "main",
+      "gateway": {
+        "version": "8.3.10 (b2026100610)",
+        "edition": "standard",
+        "jvm": "17.0.20.1",
+        "allowUnsignedModules": true
+      },
+      "modules": [
+        {
+          "id": "com.aoindustrial.perspective.mapstudio",
+          "version": "0.1.0 (b0)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.alarm-notification",
+          "version": "7.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.connectors.kafka",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.eam",
+          "version": "5.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.eventstream",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.historian",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.historian.sql",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.jdbc.mariadb",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.jdbc.mssql",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.jdbc.postgresql",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua",
+          "version": "10.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.ablegacy",
+          "version": "7.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.bacnet",
+          "version": "3.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.dnp3",
+          "version": "5.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.dnp3v2",
+          "version": "2.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.iec61850",
+          "version": "2.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.logix",
+          "version": "6.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.micro800",
+          "version": "2.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.mitsubishi",
+          "version": "2.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.modbus",
+          "version": "8.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.omron",
+          "version": "5.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.siemens",
+          "version": "7.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.siemens-symbolic",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.tcpudp",
+          "version": "7.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.perspective",
+          "version": "3.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.phone-notification",
+          "version": "7.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.reporting",
+          "version": "7.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.sfc",
+          "version": "6.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.sms-notification",
+          "version": "7.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.sqlbridge",
+          "version": "11.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.symbol-factory",
+          "version": "8.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.vision",
+          "version": "12.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.webdev",
+          "version": "6.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        }
+      ],
+      "chromium": "153.0.8010.12",
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "softwareWebGL": true,
+      "playwright": "1.63.0",
+      "cpus": 4,
+      "memGiB": 16,
+      "loadAvgAtStart": [
+        0.15,
+        0.82,
+        1.09
+      ],
+      "containersRunning": [
+        "ms-e2s17",
+        "ms-e2s17-pg"
+      ],
+      "sampler": "docker stats stream (CPU percent of one core, memory) and every 5 s currentGauges and the sessions route (perf/sampler.mjs)",
+      "loadAvgAtEnd": [
+        4.67,
+        5.45,
+        3.49
+      ]
+    },
+    "nomodule": {
+      "target": "dev",
+      "phase": "nomodule",
+      "gateway": {
+        "version": "8.3.10 (b2026100610)",
+        "edition": "standard",
+        "jvm": "17.0.20.1",
+        "allowUnsignedModules": true
+      },
+      "modules": [
+        {
+          "id": "com.aoindustrial.perspective.mapstudio"
+        },
+        {
+          "id": "com.inductiveautomation.alarm-notification",
+          "version": "7.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.connectors.kafka",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.eam",
+          "version": "5.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.eventstream",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.historian",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.historian.sql",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.jdbc.mariadb",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.jdbc.mssql",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.jdbc.postgresql",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua",
+          "version": "10.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.ablegacy",
+          "version": "7.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.bacnet",
+          "version": "3.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.dnp3",
+          "version": "5.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.dnp3v2",
+          "version": "2.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.iec61850",
+          "version": "2.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.logix",
+          "version": "6.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.micro800",
+          "version": "2.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.mitsubishi",
+          "version": "2.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.modbus",
+          "version": "8.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.omron",
+          "version": "5.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.siemens",
+          "version": "7.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.siemens-symbolic",
+          "version": "1.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.opcua.drivers.tcpudp",
+          "version": "7.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.perspective",
+          "version": "3.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.phone-notification",
+          "version": "7.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.reporting",
+          "version": "7.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.sfc",
+          "version": "6.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.sms-notification",
+          "version": "7.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.sqlbridge",
+          "version": "11.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.symbol-factory",
+          "version": "8.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.vision",
+          "version": "12.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        },
+        {
+          "id": "com.inductiveautomation.webdev",
+          "version": "6.3.10 (b2026100610)",
+          "state": "ACTIVE"
+        }
+      ],
+      "chromium": "153.0.8010.12",
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "softwareWebGL": true,
+      "playwright": "1.63.0",
+      "cpus": 4,
+      "memGiB": 16,
+      "loadAvgAtStart": [
+        0.66,
+        1.71,
+        1.33
+      ],
+      "containersRunning": [
+        "ms-e2s17",
+        "ms-e2s17-pg"
+      ],
+      "sampler": "docker stats stream (CPU percent of one core, memory) and every 5 s currentGauges and the sessions route (perf/sampler.mjs)",
+      "loadAvgAtEnd": [
+        0.45,
+        1.15,
+        1.22
+      ]
+    }
+  },
+  "measures": {
+    "bundle": {
+      "label": "measured",
+      "method": "Decoded bytes of every /res/mapstudio/* file the Gateway served while / loaded (1440x900, 2 s after the map was ready), against every file of the v0.1.0 release .modl's web jar (mounted/, its licence text left out), downloaded from the public release and checked against the SHA-256 in ign-scada-template's module lock.",
+      "files": [
+        {
+          "file": "MapStudio.css",
+          "bytes": 73541
+        },
+        {
+          "file": "MapStudio.js",
+          "bytes": 1207353
+        },
+        {
+          "file": "maplibre-gl-worker.js",
+          "bytes": 517065
+        }
+      ],
+      "v010": [
+        {
+          "file": "MapStudio.css",
+          "bytes": 72208
+        },
+        {
+          "file": "MapStudio.js",
+          "bytes": 1179839
+        },
+        {
+          "file": "maplibre-gl-worker.js",
+          "bytes": 517065
+        }
+      ],
+      "bytes": 1797959,
+      "v010Bytes": 1769112,
+      "growthPct": 1.63,
+      "limit": "grows less than 10% against 0.1.0",
+      "verdict": "pass",
+      "reasons": []
+    },
+    "idle": {
+      "label": "measured",
+      "method": "No browser session open; the Gateway with Map Studio and the empty mapstudio-perf map.",
+      "window": {
+        "t0": 1793145907717,
+        "t1": 1793146087720,
+        "seconds": 180
+      },
+      "resources": {
+        "cpuSamples": 180,
+        "cpuIntervalMs": 1000,
+        "cpuMeanPct": 2.48,
+        "cpuMaxPct": 21.68,
+        "containerMemMeanMiB": 1135.2,
+        "heapSamples": 36,
+        "heapMinMiB": 236.1,
+        "heapMeanMiB": 266
+      }
+    },
+    "mapLoad": {
+      "30": {
+        "label": "measured",
+        "items": 30,
+        "method": "In the signed-in editor page, performance.now() around window.__mapStudioTest.send(\"map.load\") (round trip plus JSON parse; the component ignores replies the hook takes); one warm-up then 10 timed, each reply checked to hold the target item count.",
+        "stats": {
+          "n": 10,
+          "min": 88.8,
+          "median": 96.9,
+          "p95": 98.1,
+          "max": 98.1,
+          "mean": 96.1
+        },
+        "counts": {
+          "ok": 10,
+          "busy": 0,
+          "timeouts": 0,
+          "errors": {}
+        },
+        "verdict": "recorded",
+        "reasons": [],
+        "limit": "none (recorded)",
+        "payload": {
+          "replyJsonBytes": {
+            "n": 10,
+            "min": 33522,
+            "median": 33522,
+            "p95": 33522,
+            "max": 33522,
+            "mean": 33522
+          },
+          "websocketFrameBytes": {
+            "n": 11,
+            "min": 63788,
+            "median": 63788,
+            "p95": 63788,
+            "max": 63788,
+            "mean": 63788
+          },
+          "method": "replyJsonBytes: UTF-8 bytes of the reply envelope as JSON in the page; websocketFrameBytes: Playwright framereceived payload bytes of the frames that carry \"map.load.reply\" (the Perspective frame around it)"
+        }
+      },
+      "1000": {
+        "label": "measured",
+        "items": 1000,
+        "method": "In the signed-in editor page, performance.now() around window.__mapStudioTest.send(\"map.load\") (round trip plus JSON parse; the component ignores replies the hook takes); one warm-up then 10 timed, each reply checked to hold the target item count.",
+        "stats": {
+          "n": 10,
+          "min": 30.4,
+          "median": 85.9,
+          "p95": 94,
+          "max": 94,
+          "mean": 76.9
+        },
+        "counts": {
+          "ok": 10,
+          "busy": 0,
+          "timeouts": 0,
+          "errors": {}
+        },
+        "verdict": "recorded",
+        "reasons": [],
+        "limit": "none (recorded)",
+        "payload": {
+          "replyJsonBytes": {
+            "n": 10,
+            "min": 294937,
+            "median": 294937,
+            "p95": 294937,
+            "max": 294937,
+            "mean": 294937
+          },
+          "websocketFrameBytes": {
+            "n": 10,
+            "min": 609918,
+            "median": 609918,
+            "p95": 609918,
+            "max": 609918,
+            "mean": 609918
+          },
+          "method": "replyJsonBytes: UTF-8 bytes of the reply envelope as JSON in the page; websocketFrameBytes: Playwright framereceived payload bytes of the frames that carry \"map.load.reply\" (the Perspective frame around it)"
+        }
+      },
+      "5000": {
+        "label": "measured",
+        "items": 5000,
+        "method": "In the signed-in editor page, performance.now() around window.__mapStudioTest.send(\"map.load\") (round trip plus JSON parse; the component ignores replies the hook takes); one warm-up then 10 timed, each reply checked to hold the target item count.",
+        "stats": {
+          "n": 10,
+          "min": 109.5,
+          "median": 117.4,
+          "p95": 153.5,
+          "max": 153.5,
+          "mean": 123.1
+        },
+        "counts": {
+          "ok": 10,
+          "busy": 0,
+          "timeouts": 0,
+          "errors": {}
+        },
+        "verdict": "pass",
+        "reasons": [],
+        "limit": "p95 under 1000 ms",
+        "payload": {
+          "replyJsonBytes": {
+            "n": 10,
+            "min": 1377427,
+            "median": 1377427,
+            "p95": 1377427,
+            "max": 1377427,
+            "mean": 1377427
+          },
+          "websocketFrameBytes": {
+            "n": 11,
+            "min": 2866502,
+            "median": 2866502,
+            "p95": 2866502,
+            "max": 2866502,
+            "mean": 2866502
+          },
+          "method": "replyJsonBytes: UTF-8 bytes of the reply envelope as JSON in the page; websocketFrameBytes: Playwright framereceived payload bytes of the frames that carry \"map.load.reply\" (the Perspective frame around it)"
+        }
+      }
+    },
+    "frameRate": {
+      "30": {
+        "label": "measured",
+        "verdict": "recorded",
+        "items": 30,
+        "method": "lib/frameRate.mjs measureView, as tests/measures.spec.mjs: requestAnimationFrame cadence while Playwright drives a 4 s circular drag (at most 60 moves a second) and a 4 s wheel zoom (at most 25 events a second) after a 2 s warm-up, 3 runs, 1440x900.",
+        "drawn": {
+          "points": 15,
+          "lines": 15
+        },
+        "runs": [
+          {
+            "pan": {
+              "frames": 111,
+              "spanMs": 4033,
+              "fps": 27.27,
+              "intervalMs": {
+                "p50": 33.3,
+                "p95": 50.1,
+                "max": 83.4
+              },
+              "shareOver20msPercent": 91.8,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 112,
+              "spanMs": 4017,
+              "fps": 27.64,
+              "intervalMs": {
+                "p50": 33.3,
+                "p95": 66.7,
+                "max": 83.4
+              },
+              "shareOver20msPercent": 80.2,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 108,
+              "spanMs": 4017,
+              "fps": 26.64,
+              "intervalMs": {
+                "p50": 33.4,
+                "p95": 66.7,
+                "max": 83.4
+              },
+              "shareOver20msPercent": 84.1,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 115,
+              "spanMs": 4117,
+              "fps": 27.69,
+              "intervalMs": {
+                "p50": 33.3,
+                "p95": 50.1,
+                "max": 83.4
+              },
+              "shareOver20msPercent": 88.6,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 112,
+              "spanMs": 4033,
+              "fps": 27.52,
+              "intervalMs": {
+                "p50": 33.3,
+                "p95": 66.7,
+                "max": 100
+              },
+              "shareOver20msPercent": 87.4,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 115,
+              "spanMs": 4050,
+              "fps": 28.15,
+              "intervalMs": {
+                "p50": 33.3,
+                "p95": 50,
+                "max": 83.4
+              },
+              "shareOver20msPercent": 91.2,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          }
+        ],
+        "medianFps": {
+          "pan": 27.27,
+          "zoom": 27.69
+        },
+        "fpsRange": {
+          "pan": [
+            26.64,
+            27.52
+          ],
+          "zoom": [
+            27.64,
+            28.15
+          ]
+        }
+      },
+      "1000": {
+        "label": "measured",
+        "verdict": "recorded",
+        "items": 1000,
+        "method": "lib/frameRate.mjs measureView, as tests/measures.spec.mjs: requestAnimationFrame cadence while Playwright drives a 4 s circular drag (at most 60 moves a second) and a 4 s wheel zoom (at most 25 events a second) after a 2 s warm-up, 3 runs, 1440x900.",
+        "drawn": {
+          "points": 500,
+          "lines": 500
+        },
+        "runs": [
+          {
+            "pan": {
+              "frames": 98,
+              "spanMs": 4017,
+              "fps": 24.15,
+              "intervalMs": {
+                "p50": 33.4,
+                "p95": 66.7,
+                "max": 83.3
+              },
+              "shareOver20msPercent": 89.7,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 105,
+              "spanMs": 3967,
+              "fps": 26.22,
+              "intervalMs": {
+                "p50": 33.4,
+                "p95": 66.7,
+                "max": 66.7
+              },
+              "shareOver20msPercent": 86.5,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 102,
+              "spanMs": 4000,
+              "fps": 25.25,
+              "intervalMs": {
+                "p50": 33.4,
+                "p95": 50.1,
+                "max": 100
+              },
+              "shareOver20msPercent": 92.1,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 107,
+              "spanMs": 3983,
+              "fps": 26.61,
+              "intervalMs": {
+                "p50": 33.4,
+                "p95": 50.1,
+                "max": 66.8
+              },
+              "shareOver20msPercent": 95.3,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 95,
+              "spanMs": 4017,
+              "fps": 23.4,
+              "intervalMs": {
+                "p50": 33.4,
+                "p95": 66.7,
+                "max": 100
+              },
+              "shareOver20msPercent": 86.2,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 104,
+              "spanMs": 3983,
+              "fps": 25.86,
+              "intervalMs": {
+                "p50": 33.4,
+                "p95": 66.7,
+                "max": 99.9
+              },
+              "shareOver20msPercent": 90.3,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          }
+        ],
+        "medianFps": {
+          "pan": 24.15,
+          "zoom": 26.22
+        },
+        "fpsRange": {
+          "pan": [
+            23.4,
+            25.25
+          ],
+          "zoom": [
+            25.86,
+            26.61
+          ]
+        }
+      },
+      "5000": {
+        "label": "measured",
+        "verdict": "recorded",
+        "items": 5000,
+        "method": "lib/frameRate.mjs measureView, as tests/measures.spec.mjs: requestAnimationFrame cadence while Playwright drives a 4 s circular drag (at most 60 moves a second) and a 4 s wheel zoom (at most 25 events a second) after a 2 s warm-up, 3 runs, 1440x900.",
+        "drawn": {
+          "points": 2500,
+          "lines": 2500
+        },
+        "runs": [
+          {
+            "pan": {
+              "frames": 73,
+              "spanMs": 4050,
+              "fps": 17.78,
+              "intervalMs": {
+                "p50": 50,
+                "p95": 100.1,
+                "max": 116.6
+              },
+              "shareOver20msPercent": 90.3,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 80,
+              "spanMs": 4100,
+              "fps": 19.27,
+              "intervalMs": {
+                "p50": 50,
+                "p95": 83.4,
+                "max": 99.9
+              },
+              "shareOver20msPercent": 93.7,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 77,
+              "spanMs": 4050,
+              "fps": 18.77,
+              "intervalMs": {
+                "p50": 50,
+                "p95": 100,
+                "max": 116.6
+              },
+              "shareOver20msPercent": 93.4,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 80,
+              "spanMs": 4000,
+              "fps": 19.75,
+              "intervalMs": {
+                "p50": 50,
+                "p95": 83.4,
+                "max": 116.8
+              },
+              "shareOver20msPercent": 91.1,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 77,
+              "spanMs": 4016,
+              "fps": 18.92,
+              "intervalMs": {
+                "p50": 50,
+                "p95": 66.7,
+                "max": 100
+              },
+              "shareOver20msPercent": 98.7,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 75,
+              "spanMs": 4117,
+              "fps": 17.98,
+              "intervalMs": {
+                "p50": 50,
+                "p95": 116.6,
+                "max": 133.3
+              },
+              "shareOver20msPercent": 83.8,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          }
+        ],
+        "medianFps": {
+          "pan": 18.77,
+          "zoom": 19.27
+        },
+        "fpsRange": {
+          "pan": [
+            17.78,
+            18.92
+          ],
+          "zoom": [
+            17.98,
+            19.75
+          ]
+        }
+      }
+    },
+    "openToDrawn": {
+      "30": {
+        "label": "measured",
+        "verdict": "recorded",
+        "method": "Fresh anonymous context at 1440x900: Date.now() from page.goto(\"/\") to data-load-state=loaded with data-points-loaded set (map.load drawn); 3 runs.",
+        "ms": {
+          "n": 3,
+          "min": 1403,
+          "median": 1418,
+          "p95": 1427,
+          "max": 1427,
+          "mean": 1416
+        }
+      },
+      "1000": {
+        "label": "measured",
+        "verdict": "recorded",
+        "method": "Fresh anonymous context at 1440x900: Date.now() from page.goto(\"/\") to data-load-state=loaded with data-points-loaded set (map.load drawn); 3 runs.",
+        "ms": {
+          "n": 3,
+          "min": 1316,
+          "median": 1391,
+          "p95": 1427,
+          "max": 1427,
+          "mean": 1378
+        }
+      },
+      "5000": {
+        "label": "measured",
+        "verdict": "recorded",
+        "method": "Fresh anonymous context at 1440x900: Date.now() from page.goto(\"/\") to data-load-state=loaded with data-points-loaded set (map.load drawn); 3 runs.",
+        "ms": {
+          "n": 3,
+          "min": 1518,
+          "median": 1579,
+          "p95": 1645,
+          "max": 1645,
+          "mean": 1580.7
+        }
+      }
+    },
+    "mapChanged": {
+      "10": {
+        "label": "measured",
+        "sessions": 10,
+        "method": "10 anonymous contexts at 320x240 on / (1,000 items), a MutationObserver per page attached before the first save stamps Date.now() when data-store-seq changes; the editor page sends a 1-op edits.apply (Date.now() just before the send, the save included) 5 times, 1 s apart; latency = the first stamp at or above the save's seq minus the send time, the verdict on the slowest session over all saves; a session that did not see a seq within 10 s is a miss.",
+        "sessionsRoute": {
+          "total": 19,
+          "ofProject": 19
+        },
+        "saves": [
+          {
+            "seq": 4,
+            "sessionsSeen": 10,
+            "sessions": 10,
+            "maxMs": 33,
+            "latencies": {
+              "n": 10,
+              "min": 12,
+              "median": 25,
+              "p95": 33,
+              "max": 33,
+              "mean": 24.8
+            }
+          },
+          {
+            "seq": 5,
+            "sessionsSeen": 10,
+            "sessions": 10,
+            "maxMs": 24,
+            "latencies": {
+              "n": 10,
+              "min": 14,
+              "median": 17,
+              "p95": 24,
+              "max": 24,
+              "mean": 18.3
+            }
+          },
+          {
+            "seq": 6,
+            "sessionsSeen": 10,
+            "sessions": 10,
+            "maxMs": 28,
+            "latencies": {
+              "n": 10,
+              "min": 11,
+              "median": 15,
+              "p95": 28,
+              "max": 28,
+              "mean": 17.6
+            }
+          },
+          {
+            "seq": 7,
+            "sessionsSeen": 10,
+            "sessions": 10,
+            "maxMs": 34,
+            "latencies": {
+              "n": 10,
+              "min": 9,
+              "median": 13,
+              "p95": 34,
+              "max": 34,
+              "mean": 16.4
+            }
+          },
+          {
+            "seq": 8,
+            "sessionsSeen": 10,
+            "sessions": 10,
+            "maxMs": 766,
+            "latencies": {
+              "n": 10,
+              "min": 730,
+              "median": 736,
+              "p95": 766,
+              "max": 766,
+              "mean": 745.7
+            }
+          }
+        ],
+        "maxMs": 766,
+        "counts": {
+          "ok": 5,
+          "busy": 0,
+          "timeouts": 0,
+          "errors": {}
+        },
+        "limit": "every session under 1000 ms",
+        "verdict": "pass",
+        "reasons": [],
+        "openSeconds": 7
+      },
+      "50": {
+        "label": "measured",
+        "sessions": 50,
+        "method": "50 anonymous contexts at 320x240 on / (1,000 items), a MutationObserver per page attached before the first save stamps Date.now() when data-store-seq changes; the editor page sends a 1-op edits.apply (Date.now() just before the send, the save included) 5 times, 1 s apart; latency = the first stamp at or above the save's seq minus the send time, the verdict on the slowest session over all saves; a session that did not see a seq within 10 s is a miss.",
+        "sessionsRoute": {
+          "total": 52,
+          "ofProject": 52
+        },
+        "saves": [
+          {
+            "seq": 9,
+            "sessionsSeen": 50,
+            "sessions": 50,
+            "maxMs": 544,
+            "latencies": {
+              "n": 50,
+              "min": 59,
+              "median": 137,
+              "p95": 460,
+              "max": 544,
+              "mean": 215.9
+            }
+          },
+          {
+            "seq": 10,
+            "sessionsSeen": 50,
+            "sessions": 50,
+            "maxMs": 455,
+            "latencies": {
+              "n": 50,
+              "min": 205,
+              "median": 247,
+              "p95": 447,
+              "max": 455,
+              "mean": 291.3
+            }
+          },
+          {
+            "seq": 11,
+            "sessionsSeen": 50,
+            "sessions": 50,
+            "maxMs": 217,
+            "latencies": {
+              "n": 50,
+              "min": 56,
+              "median": 97,
+              "p95": 198,
+              "max": 217,
+              "mean": 110.5
+            }
+          },
+          {
+            "seq": 12,
+            "sessionsSeen": 50,
+            "sessions": 50,
+            "maxMs": 307,
+            "latencies": {
+              "n": 50,
+              "min": 245,
+              "median": 279,
+              "p95": 301,
+              "max": 307,
+              "mean": 277.5
+            }
+          },
+          {
+            "seq": 13,
+            "sessionsSeen": 50,
+            "sessions": 50,
+            "maxMs": 721,
+            "latencies": {
+              "n": 50,
+              "min": 312,
+              "median": 337,
+              "p95": 673,
+              "max": 721,
+              "mean": 403.3
+            }
+          }
+        ],
+        "maxMs": 721,
+        "counts": {
+          "ok": 5,
+          "busy": 0,
+          "timeouts": 0,
+          "errors": {}
+        },
+        "limit": "every session under 1000 ms",
+        "verdict": "pass",
+        "reasons": [],
+        "openSeconds": 52
+      }
+    },
+    "sessions20": {
+      "label": "measured",
+      "method": "20 anonymous contexts at 320x240 on / with the 1,000-item map (kept from the map.changed measure), the editor closed, 30 s settle, then the window.",
+      "sessionsRoute": {
+        "total": 51,
+        "ofProject": 51
+      },
+      "window": {
+        "t0": 1793146272471,
+        "t1": 1793146452472,
+        "seconds": 180
+      },
+      "resources": {
+        "cpuSamples": 181,
+        "cpuIntervalMs": 1000,
+        "cpuMeanPct": 1.99,
+        "cpuMaxPct": 22.42,
+        "containerMemMeanMiB": 1267.9,
+        "heapSamples": 36,
+        "heapMinMiB": 270.4,
+        "heapMeanMiB": 320.4
+      }
+    },
+    "editsApply": {
+      "1op-1editor": {
+        "label": "measured",
+        "editors": 1,
+        "opsPerBatch": 1,
+        "method": "1 signed-in editor page(s) at once, each updating the properties of its own 50 pads (disjoint), versions from map.load and then from each reply; per editor one discarded warm-up then 20 timed batches of 1 op(s), performance.now() around the test-hook send; median and p95 pooled over every editor's samples.",
+        "stats": {
+          "n": 20,
+          "min": 15.4,
+          "median": 96.2,
+          "p95": 192.3,
+          "max": 270.7,
+          "mean": 104.1
+        },
+        "counts": {
+          "ok": 20,
+          "busy": 0,
+          "timeouts": 0,
+          "errors": {}
+        },
+        "verdict": "pass",
+        "reasons": [],
+        "limit": "p95 under 300 ms",
+        "openEditorPages": 10,
+        "hostCpuBusyPct": 99.8,
+        "gateway": {
+          "window": {
+            "t0": 1793146513740,
+            "t1": 1793146515860,
+            "seconds": 2
+          },
+          "resources": {
+            "cpuSamples": 2,
+            "cpuIntervalMs": 997,
+            "cpuMeanPct": 42.61,
+            "cpuMaxPct": 77.2,
+            "containerMemMeanMiB": 1403.9,
+            "heapSamples": 0,
+            "heapMinMiB": null,
+            "heapMeanMiB": null
+          }
+        }
+      },
+      "50op-1editor": {
+        "label": "measured",
+        "editors": 1,
+        "opsPerBatch": 50,
+        "method": "1 signed-in editor page(s) at once, each updating the properties of its own 50 pads (disjoint), versions from map.load and then from each reply; per editor one discarded warm-up then 20 timed batches of 50 op(s), performance.now() around the test-hook send; median and p95 pooled over every editor's samples.",
+        "stats": {
+          "n": 20,
+          "min": 30.2,
+          "median": 115.3,
+          "p95": 200.9,
+          "max": 224.3,
+          "mean": 115.9
+        },
+        "counts": {
+          "ok": 20,
+          "busy": 0,
+          "timeouts": 0,
+          "errors": {}
+        },
+        "verdict": "pass",
+        "reasons": [],
+        "limit": "p95 under 300 ms",
+        "openEditorPages": 10,
+        "hostCpuBusyPct": 99.7,
+        "gateway": {
+          "window": {
+            "t0": 1793146515863,
+            "t1": 1793146518301,
+            "seconds": 2
+          },
+          "resources": {
+            "cpuSamples": 2,
+            "cpuIntervalMs": 1000,
+            "cpuMeanPct": 24.17,
+            "cpuMaxPct": 37.69,
+            "containerMemMeanMiB": 1403.9,
+            "heapSamples": 1,
+            "heapMinMiB": 423.3,
+            "heapMeanMiB": 423.3
+          }
+        }
+      },
+      "1op-10editors": {
+        "label": "measured",
+        "editors": 10,
+        "opsPerBatch": 1,
+        "method": "10 signed-in editor page(s) at once, each updating the properties of its own 50 pads (disjoint), versions from map.load and then from each reply; per editor one discarded warm-up then 20 timed batches of 1 op(s), performance.now() around the test-hook send; median and p95 pooled over every editor's samples.",
+        "stats": {
+          "n": 200,
+          "min": 10.4,
+          "median": 93.7,
+          "p95": 276.6,
+          "max": 562.2,
+          "mean": 120.1
+        },
+        "counts": {
+          "ok": 200,
+          "busy": 0,
+          "timeouts": 0,
+          "errors": {}
+        },
+        "verdict": "pass",
+        "reasons": [],
+        "limit": "p95 under 300 ms",
+        "openEditorPages": 10,
+        "hostCpuBusyPct": 99.7,
+        "gateway": {
+          "window": {
+            "t0": 1793146518303,
+            "t1": 1793146521718,
+            "seconds": 3
+          },
+          "resources": {
+            "cpuSamples": 4,
+            "cpuIntervalMs": 1000,
+            "cpuMeanPct": 33.88,
+            "cpuMaxPct": 41.09,
+            "containerMemMeanMiB": 1404.7,
+            "heapSamples": 1,
+            "heapMinMiB": 315.7,
+            "heapMeanMiB": 315.7
+          }
+        }
+      },
+      "50op-10editors": {
+        "label": "measured",
+        "editors": 10,
+        "opsPerBatch": 50,
+        "method": "10 signed-in editor page(s) at once, each updating the properties of its own 50 pads (disjoint), versions from map.load and then from each reply; per editor one discarded warm-up then 20 timed batches of 50 op(s), performance.now() around the test-hook send; median and p95 pooled over every editor's samples.",
+        "stats": {
+          "n": 200,
+          "min": 29.6,
+          "median": 303.4,
+          "p95": 1791.9,
+          "max": 2952.7,
+          "mean": 536.2
+        },
+        "counts": {
+          "ok": 200,
+          "busy": 0,
+          "timeouts": 0,
+          "errors": {}
+        },
+        "verdict": "miss",
+        "reasons": [
+          "p95 1791.9 ms is not under 300 ms"
+        ],
+        "limit": "p95 under 300 ms",
+        "openEditorPages": 10,
+        "hostCpuBusyPct": 99.8,
+        "gateway": {
+          "window": {
+            "t0": 1793146521722,
+            "t1": 1793146536476,
+            "seconds": 15
+          },
+          "resources": {
+            "cpuSamples": 14,
+            "cpuIntervalMs": 1000,
+            "cpuMeanPct": 40.74,
+            "cpuMaxPct": 75.44,
+            "containerMemMeanMiB": 1404,
+            "heapSamples": 2,
+            "heapMinMiB": 431.1,
+            "heapMeanMiB": 473.4
+          }
+        }
+      },
+      "50op-10streams-1page": {
+        "label": "measured",
+        "editors": 10,
+        "opsPerBatch": 50,
+        "method": "The 10 editors' pads and batches of 50op-10editors, as 10 concurrent streams from the one editor page left open (the other editor pages closed); per stream one discarded warm-up then 20 timed batches; recorded beside 50op-10editors to separate the box's browser load from the Gateway's write path, not judged.",
+        "stats": {
+          "n": 200,
+          "min": 52.6,
+          "median": 200,
+          "p95": 314.3,
+          "max": 394.7,
+          "mean": 208.6
+        },
+        "counts": {
+          "ok": 200,
+          "busy": 0,
+          "timeouts": 0,
+          "errors": {}
+        },
+        "verdict": "recorded",
+        "reasons": [],
+        "limit": "none (recorded)",
+        "openEditorPages": 1,
+        "hostCpuBusyPct": 95,
+        "gateway": {
+          "window": {
+            "t0": 1793146537672,
+            "t1": 1793146542140,
+            "seconds": 4
+          },
+          "resources": {
+            "cpuSamples": 4,
+            "cpuIntervalMs": 1000,
+            "cpuMeanPct": 81.27,
+            "cpuMaxPct": 116.75,
+            "containerMemMeanMiB": 1408.5,
+            "heapSamples": 1,
+            "heapMinMiB": 510.7,
+            "heapMeanMiB": 510.7
+          }
+        }
+      }
+    },
+    "listRefresh": {
+      "label": "measured",
+      "assets": 300,
+      "method": "The /edit page's \"Time a list refresh\" button (signed-in map editor) runs mapstudio_perf.timeRefresh: System.nanoTime() around system.mapstudio.refreshAdapters(\"mapstudio-perf\"), which waits for the kind and the asset list (300 assets) to answer; one warm-up, 30 s settle and a 15 s control window, then 10 presses one after the other, each waiting for its result; CPU from the docker stats samples between the first press and the last result.",
+      "statuses": [
+        {
+          "kinds": "ok",
+          "assets": "ok"
+        },
+        {
+          "kinds": "ok",
+          "assets": "ok"
+        },
+        {
+          "kinds": "ok",
+          "assets": "ok"
+        },
+        {
+          "kinds": "ok",
+          "assets": "ok"
+        },
+        {
+          "kinds": "ok",
+          "assets": "ok"
+        },
+        {
+          "kinds": "ok",
+          "assets": "ok"
+        },
+        {
+          "kinds": "ok",
+          "assets": "ok"
+        },
+        {
+          "kinds": "ok",
+          "assets": "ok"
+        },
+        {
+          "kinds": "ok",
+          "assets": "ok"
+        },
+        {
+          "kinds": "ok",
+          "assets": "ok"
+        }
+      ],
+      "stats": {
+        "n": 10,
+        "min": 3.8,
+        "median": 5.7,
+        "p95": 10,
+        "max": 10,
+        "mean": 5.9
+      },
+      "counts": {
+        "ok": 10,
+        "busy": 0,
+        "timeouts": 0,
+        "errors": {}
+      },
+      "verdict": "pass",
+      "reasons": [],
+      "limit": "max under 1000 ms",
+      "window": {
+        "t0": 1793146616431,
+        "t1": 1793146620268,
+        "seconds": 4
+      },
+      "resources": {
+        "cpuSamples": 4,
+        "cpuIntervalMs": 1000,
+        "cpuMeanPct": 4.12,
+        "cpuMaxPct": 7.48,
+        "containerMemMeanMiB": 1420.3,
+        "heapSamples": 1,
+        "heapMinMiB": 437.2,
+        "heapMeanMiB": 437.2
+      },
+      "control": {
+        "method": "15 s just before the refreshes: the signed-in editor page open on the 5,000-item map, no refresh pressed.",
+        "window": {
+          "t0": 1793146601422,
+          "t1": 1793146616430,
+          "seconds": 15
+        },
+        "resources": {
+          "cpuSamples": 15,
+          "cpuIntervalMs": 1000,
+          "cpuMeanPct": 1.72,
+          "cpuMaxPct": 4.42,
+          "containerMemMeanMiB": 1420.4,
+          "heapSamples": 3,
+          "heapMinMiB": 424.2,
+          "heapMeanMiB": 428.9
+        }
+      },
+      "spike": {
+        "ceilingPct": 52.48,
+        "maxPct": 7.48,
+        "limit": "no 1 s CPU sample above the idle mean + 50% of one core",
+        "verdict": "pass",
+        "reasons": []
+      }
+    },
+    "idleAdded": {
+      "cpuDeltaPct": 0,
+      "heapDeltaMiB": -138.6,
+      "containerMemDeltaMiB": 92,
+      "limit": "CPU mean at most +2% of one core and heap minimum at most +64 MiB",
+      "verdict": "pass",
+      "reasons": [],
+      "method": "Main phase idle window minus the nomodule phase idle window (same settle, no browser open): docker stats CPU mean, and the minimum of the Gateway heapMemory gauge (a live-set estimate [unverified])."
+    },
+    "sessionsAdded": {
+      "cpuDeltaPct": -0.43,
+      "heapDeltaMiB": -44.5,
+      "containerMemDeltaMiB": 182.2,
+      "limit": "CPU mean at most +10% of one core and heap minimum at most +200 MiB",
+      "verdict": "pass",
+      "reasons": [],
+      "method": "20 anonymous sessions on / of the 1,000-item map with Map Studio, against 20 on /plain without the module; window means as for idle."
+    },
+    "baseline": {
+      "idle": {
+        "label": "measured",
+        "method": "No browser session open; the Gateway without Map Studio.",
+        "window": {
+          "t0": 1793145352753,
+          "t1": 1793145532753,
+          "seconds": 180
+        },
+        "resources": {
+          "cpuSamples": 180,
+          "cpuIntervalMs": 1000,
+          "cpuMeanPct": 2.48,
+          "cpuMaxPct": 33.39,
+          "containerMemMeanMiB": 1043.2,
+          "heapSamples": 36,
+          "heapMinMiB": 374.7,
+          "heapMeanMiB": 393.8
+        }
+      },
+      "sessions20Plain": {
+        "label": "measured",
+        "method": "20 anonymous contexts at 320x240 on /plain (a label, no Map Studio), 30 s settle, then the window.",
+        "sessionsRoute": {
+          "total": 20,
+          "ofProject": 20
+        },
+        "window": {
+          "t0": 1793145575532,
+          "t1": 1793145755534,
+          "seconds": 180
+        },
+        "resources": {
+          "cpuSamples": 180,
+          "cpuIntervalMs": 1000,
+          "cpuMeanPct": 2.42,
+          "cpuMaxPct": 21.11,
+          "containerMemMeanMiB": 1085.7,
+          "heapSamples": 36,
+          "heapMinMiB": 314.9,
+          "heapMeanMiB": 349.8
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+ "custom": {},
+ "params": {},
+ "props": {
+  "defaultSize": {
+   "width": 1440,
+   "height": 900
+  }
+ },
+ "root": {
+  "type": "ia.container.flex",
+  "version": 0,
+  "props": {
+   "direction": "column"
+  },
+  "meta": {
+   "name": "root"
+  },
+  "position": {},
+  "custom": {},
+  "children": [
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {
+     "text": "Map Studio performance check: a page without the map, the baseline for sessions."
+    },
+    "meta": {
+     "name": "label",
+     "domId": "mapstudio-perf-plain"
+    },
+    "position": {
+     "basis": "40px",
+     "shrink": 0
+    },
+    "custom": {}
+   }
+  ]
+ }
+}

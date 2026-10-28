@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { chromium } from '@playwright/test';
-import { envFileValue, repoRoot, sessionUrl } from './env.mjs';
+import { e2eProject, envFileValue, repoRoot, sessionUrl } from './env.mjs';
 
 /** The dev map editor (ops/users.py): user mapeditor, role MapEditor. */
 export const EDITOR_USER = 'mapeditor';
@@ -87,7 +87,7 @@ export async function signInEditorOnce(user = EDITOR_USER) {
         await field.waitFor({ state: 'visible', timeout: 30_000 });
         await field.fill(password);
         await page.keyboard.press('Enter');
-        await page.waitForURL(/\/data\/perspective\/client\/mapstudio-dev\/edit/, { timeout: 30_000 });
+        await page.waitForURL(new RegExp('/data/perspective/client/' + e2eProject() + '/edit'), { timeout: 30_000 });
         await page.locator('#mapstudio-dev-user').filter({ hasText: 'Signed in as ' + user })
             .waitFor({ timeout: 60_000 });
         const state = await context.storageState();

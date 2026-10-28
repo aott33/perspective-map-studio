@@ -1,0 +1,11 @@
+# Second overlay for ops/perf.sh's "nomodule" phase (epic 2 story 17), on top of
+# docker-compose.perf.yml. DEVELOPMENT ONLY.
+#
+# The Gateway without Map Studio, for the baseline: an empty folder replaces the external modules
+# folder. On the dev stack that folder holds only the staged Map Studio .modl (ops/up.sh), and the
+# image inductiveautomation/ignition:8.3.10 brings no third-party module of its own, so only Map
+# Studio goes; ops/perf.sh records the Gateway's module list in both phases to show it.
+services:
+  gateway:
+    volumes:
+      - ./perf/empty-modules:/external-modules:ro

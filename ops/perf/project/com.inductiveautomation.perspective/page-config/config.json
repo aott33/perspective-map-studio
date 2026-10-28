@@ -1,0 +1,19 @@
+{
+ "pages": {
+  "/": {
+   "viewPath": "MapStudioPerf",
+   "viewParams": {}
+  },
+  "/plain": {
+   "viewPath": "MapStudioPerfPlain",
+   "viewParams": {}
+  },
+  "/edit": {
+   "viewPath": "MapStudioPerfEdit",
+   "viewParams": {}
+  }
+ },
+ "shared": {},
+ "defaultView": "MapStudioPerf",
+ "props": {}
+}

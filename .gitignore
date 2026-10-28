@@ -57,3 +57,7 @@ ops/checks/secrets/
 
 # Python bytecode (ops/tests imports the ops scripts)
 __pycache__/
+# The same for the perf check project (ops/perf.sh, epic 2 story 17)
+ops/perf/project/**/thumbnail.png
+ops/perf/project/com.inductiveautomation.perspective/session-props/
+ops/perf/project/com.inductiveautomation.vision/
