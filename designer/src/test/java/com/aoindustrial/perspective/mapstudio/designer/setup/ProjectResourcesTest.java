@@ -66,7 +66,7 @@ class ProjectResourcesTest {
         assertTrue(s.functions().contains("mapstudio_dev.assets"), s.functions().toString());
         assertTrue(s.offeredFunctions().contains("mapstudio_dev.kinds"));
         assertFalse(s.offeredFunctions().contains("mapstudio_dev._globals"));
-        assertEquals(List.of("/", "/adapters", "/edit", "/fallback-empty", "/fallback-missing", "/live", "/two"), s.pages());
+        assertEquals(List.of("/", "/adapters", "/edit", "/fallback-empty", "/fallback-missing", "/live", "/styles", "/two"), s.pages());
         assertEquals("default", s.identityProvider());
         // So the dev setup's kindsFunction and assetsFunction give no warning.
         FormLists lists = FormLists.none().withProject(s);
