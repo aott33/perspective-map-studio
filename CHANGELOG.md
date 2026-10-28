@@ -34,6 +34,7 @@ The map store and its data (epic-map-store-and-data). Contract 0.2.0; project se
 14. Instruments on lines: an instrument's attachment stored and kept on its line.
 15. Tag browse and asset-relative paths for the tag browser.
 16. The Designer setup form: pickers and layout.
+17. Performance check before 0.2.0: `ops/perf.sh` and the dev record [docs/perf/0.2.0-dev.json](docs/perf/0.2.0-dev.json) ([docs/perf/README.md](docs/perf/README.md)); the Map Studio Setup node gets its icon and opens the setup when the Designer reopens on it.
 
 ### Map store migrations
 
