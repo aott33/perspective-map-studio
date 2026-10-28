@@ -167,6 +167,7 @@
     "type": "ao.mapstudio",
     "version": 0,
     "props": {
+     "editMode": true,
      "popupView": {
       "path": "Popups/PointDetails",
       "params": {

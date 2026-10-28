@@ -88,6 +88,7 @@
     "type": "ao.mapstudio",
     "version": 0,
     "props": {
+     "editMode": true,
      "startingArea": {
       "center": {
        "lng": -104.9725,

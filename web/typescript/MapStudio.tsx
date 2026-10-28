@@ -13,8 +13,7 @@ import {
     Size2d
 } from '@inductiveautomation/perspective-client';
 import {
-    AttributionControl, ErrorEvent, GeoJSONSource, Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent, NavigationControl,
-    Popup, setWorkerUrl
+    ErrorEvent, GeoJSONSource, Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent, Popup, setWorkerUrl
 } from 'maplibre-gl';
 import type { ExpressionSpecification } from 'maplibre-gl';
 import { TerraDraw, TerraDrawLineStringMode } from 'terra-draw';
@@ -38,7 +37,7 @@ import {
     BasemapId, OSM_SOURCE, RasterSource, fallbackBasemap, initialBasemap, offeredBasemaps, refusedText, rememberBasemap,
     rememberedBasemap, tilesFailedText
 } from './basemaps';
-import { BasemapControl } from './BasemapControl';
+import { LegendControl } from './LegendControl';
 import { FIT_PADDING_PX, StartingArea, readStartingArea, startingAreaKey } from './startingArea';
 import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, itemPreset, itemState } from './live';
 import {
@@ -49,7 +48,7 @@ import {
 } from './markers';
 import { PresetPalette, StylePreview, TintPalette } from './StylePreview';
 import { MapFeatures, Selection, buildFeatures } from './features';
-import { FitControl } from './FitControl';
+import { ZoomControl } from './ZoomControl';
 import { PickList, PickRow } from './PickList';
 import { DefaultPopup } from './DefaultPopup';
 import {
@@ -100,6 +99,11 @@ export interface MapStudioProps {
      * case in its preset, and the preset and tint palettes; the kind setup screen's preview, for review.
      */
     previewStyles: boolean;
+    /**
+     * Open the component in Edit mode (epic 3 entry 14): today the spike's Draw a line tool alone, which
+     * View mode never shows; epic-editing builds the studio behind it. The dev page /edit sets it.
+     */
+    editMode: boolean;
 }
 
 /** The popup that is open: the clicked point with its map coordinates. */
@@ -791,16 +795,16 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private drawnLive = -1;
     /** The selection last drawn (its id and kind), so a changed selection redraws the sources once. */
     private drawnSelection = '';
-    /** Fit and Return (epic 3 entry 7). */
-    private fitControl: FitControl | null = null;
+    /** The zoom card with Fit and Return (epic 3 entries 7 and 14). */
+    private zoomControl: ZoomControl | null = null;
     /** The items' bounds key Fit keeps by, or null while Fit is not in force. */
     private fitKey: string | null = null;
     /** The items' bounds last drawn, for Fit. */
     private itemBounds: MapFeatures['bounds'] = null;
     private itemBoundsKey = '';
     private popupClock: ReturnType<typeof setInterval> | null = null;
-    /** The basemap switch (epic 3 entry 6) and the basemap revision last drawn. */
-    private basemapControl: BasemapControl | null = null;
+    /** The legend bottom-left, which holds the basemap choice (epic 3 entries 6 and 14), and the basemap revision last drawn. */
+    private legendControl: LegendControl | null = null;
     private drawnBasemap = -1;
     /** The raster source the map holds now (by identity), or null for none. */
     private drawnSource: RasterSource | null = null;
@@ -853,20 +857,23 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 : { center: area.center, zoom: area.zoom }),
             attributionControl: false
         });
-        map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
-        // Fit and Return under the zoom buttons (epic 3 entry 7; the template's bottom-right is the reserved corner here).
-        this.fitControl = new FitControl(this.onFit, this.onReturn);
-        map.addControl(this.fitControl, 'top-right');
-        // The basemap switch under the zoom buttons (top-right), its attribution always shown bottom-left:
-        // the bottom-right corner stays clear for the Perspective App Bar toggle (DESIGN.md).
-        this.basemapControl = new BasemapControl((id) => {
+        // The View-mode controls as designed (epic 3 entry 14, DESIGN.md View mode): one zoom card top-right
+        // (plus, the level, minus, Fit, Return), and bottom-left the Legend button with the scale bar and the
+        // attribution beside it, whose panel holds the basemap choice; the bottom-right corner stays clear
+        // for the Perspective App Bar toggle.
+        this.zoomControl = new ZoomControl(this.onFit, this.onReturn);
+        map.addControl(this.zoomControl, 'top-right');
+        this.legendControl = new LegendControl((id) => {
             const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
             if (delegate) {
                 delegate.selectBasemap(id);
             }
+        }, (open) => {
+            if (this.mapContainer) {
+                this.mapContainer.setAttribute('data-legend-open', open ? 'true' : 'false');
+            }
         });
-        map.addControl(this.basemapControl, 'top-right');
-        map.addControl(new AttributionControl({ compact: false }), 'bottom-left');
+        map.addControl(this.legendControl, 'bottom-left');
         map.on('error', this.onMapError);
         map.on('idle', this.onMapIdle);
         map.on('moveend', () => this.publishView(map));
@@ -971,8 +978,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
             // its sources and layers added.
             map.once('idle', () => this.publishReadiness(map));
         });
-        this.drawControl = new DrawControl(this.toggleDrawing);
-        map.addControl(this.drawControl, 'top-right');
+        // The spike's line tool belongs to Edit mode alone (entry 14): the dev page /edit sets the prop.
+        if (this.props.props.editMode) {
+            this.drawControl = new DrawControl(this.toggleDrawing);
+            map.addControl(this.drawControl, 'top-right');
+        }
         this.map = map;
         registerTestView((view) => {
             if (this.map === map) {
@@ -1179,9 +1189,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         const b = delegate.basemap;
         this.drawnBasemap = b.revision;
-        if (this.basemapControl) {
-            this.basemapControl.setOffered(b.offered);
-            this.basemapControl.setSelected(b.selected);
+        if (this.legendControl) {
+            this.legendControl.setOffered(b.offered);
+            this.legendControl.setSelected(b.selected);
         }
         if (b.source !== this.drawnSource) {
             // Only a changed source touches the map: a status-only change (a refusal) keeps the tiles.
@@ -1219,8 +1229,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         const b = delegate.basemap;
         const status = b.status !== '' ? b.status : this.tiles === 'failed' && b.selected ? tilesFailedText(b.selected) : '';
-        if (this.basemapControl) {
-            this.basemapControl.setStatus(status);
+        if (this.legendControl) {
+            this.legendControl.setStatus(status);
         }
         el.setAttribute('data-basemap', b.selected || '');
         el.setAttribute('data-basemap-offered', b.offered.join(','));
@@ -1361,8 +1371,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     };
 
     private publishFit(): void {
-        if (this.fitControl) {
-            this.fitControl.setFit(this.itemBounds !== null, this.fitKey !== null);
+        if (this.zoomControl) {
+            this.zoomControl.setFit(this.itemBounds !== null, this.fitKey !== null);
         }
         if (this.mapContainer) {
             this.mapContainer.setAttribute('data-fit', this.fitKey !== null ? 'kept' : 'off');
@@ -1371,8 +1381,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
 
     private publishSelection(): void {
         const selected = this.state.selected;
-        if (this.fitControl) {
-            this.fitControl.setReturn(selected !== null);
+        if (this.zoomControl) {
+            this.zoomControl.setReturn(selected !== null);
         }
         if (this.mapContainer) {
             this.mapContainer.setAttribute('data-selected', selected ? selected.id : '');
@@ -1621,8 +1631,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.map = null;
         }
         this.drawControl = null;
-        this.basemapControl = null;
-        this.fitControl = null;
+        this.legendControl = null;
+        this.zoomControl = null;
     }
 
     /**
@@ -1782,6 +1792,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private onMapClick = (ev: MapMouseEvent): void => {
         if (this.state.drawing || !this.map) {
             return;
+        }
+        // A click on the map closes the legend panel (entry 14).
+        if (this.legendControl && this.legendControl.isOpen()) {
+            this.legendControl.close(false);
         }
         const map = this.map;
         const onPoint = map.queryRenderedFeatures(ev.point, { layers: [LAYER_ITEM_MARKERS] });
@@ -2174,7 +2188,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                      data-editing={editing}
                      data-live-seq={delegate ? String(delegate.live.seq) : ''}
                      data-live-full={delegate ? String(delegate.live.fulls) : ''}
-                     data-pick-open={this.state.pick ? 'true' : 'false'} />
+                     data-pick-open={this.state.pick ? 'true' : 'false'}
+                     data-legend-open="false" />
                 <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '')}
                      data-pending={pending ? 'true' : 'false'}
                      data-drawing={this.state.drawing ? 'true' : 'false'}
@@ -2231,7 +2246,8 @@ export class MapStudioMeta implements ComponentMeta {
                 path: tree.readString('popupView.path', ''),
                 params: tree.readObject<AuthorParams>('popupView.params', {})
             },
-            previewStyles: tree.readBoolean('previewStyles', false)
+            previewStyles: tree.readBoolean('previewStyles', false),
+            editMode: tree.readBoolean('editMode', false)
         };
     }
 }
