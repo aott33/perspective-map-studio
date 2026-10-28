@@ -25,10 +25,17 @@ const PUSH_MS = 5_000;
 /** How long a redraw after a view change may take on the dev stack. */
 const DRAW_MS = 20_000;
 
-/** The seed's L-SWD (mapstudio_seed, SWD_LINE): its midpoint and the point 1,500 m along it, between PT-1 and LV-1. */
+/**
+ * The seed's L-SWD (mapstudio_seed, SWD_LINE): its midpoint, the point 1,500 m along it (between PT-1
+ * and LV-1), and the view centres that put that point in the upper part of the map (about 300 px above
+ * the centre at zoom 14 on the desktop, 115 px at zoom 15 on the phone), so the popup opens below it
+ * with room for its whole card.
+ */
 const SWD = {
     mid: [-105.00017, 39.71888],
     between: [-104.999729, 39.718789],
+    desktopCenter: [-105.00017, 39.6991],
+    phoneCenter: [-104.999729, 39.714989],
     keys: { ctb1: 'swd/ctb1', swd1: 'swd/swd1', line: 'swd/line', pt1: 'swd/pt1', lv1: 'swd/lv1', pt2: 'swd/pt2' }
 };
 
@@ -155,7 +162,8 @@ editorTest.describe('1440 px', () => {
             await expect(liveItem(page, ids.tracerLine)).toHaveAttribute('data-segments', '');
             // The instruments draw as their kinds' markers (the eighth element of the image id says instrument).
             for (const [id, icon] of [[ids.pt1, 'tap'], [ids.lv1, 'line-valve'], [ids.pt2, 'tap']]) {
-                const marker = JSON.parse(await liveItem(page, id).getAttribute('data-marker'));
+                const image = await liveItem(page, id).getAttribute('data-marker');
+                const marker = JSON.parse(image.slice(image.indexOf('[')));
                 expect(marker[0], 'the kind glyph').toBe(icon);
                 expect(marker, 'an instrument marker').toHaveLength(8);
             }
@@ -163,7 +171,7 @@ editorTest.describe('1440 px', () => {
             await expect(liveItem(page, ids.pt2)).toHaveAttribute('data-kpi', '371 psi', { timeout: INTERVAL_MS });
 
             // At zoom 14 over the line the names sit at their places along it, in order from CTB1 to SWD1.
-            await view(page, map, SWD.mid, 14);
+            await view(page, map, SWD.desktopCenter, 14);
             const labels = JSON.parse(await map.getAttribute('data-labels'));
             const xOf = (name) => {
                 const b = labels.find((l) => l.layer === 'mapstudio-items-name' && l.text === name);
@@ -177,7 +185,13 @@ editorTest.describe('1440 px', () => {
             // it): the header, the segment box, Comms over the instruments, the instruments in order between
             // the snapped ends with their distances and values, then the line's own KPI; PT-1 and PT-2
             // highlighted in the list and on the map.
-            const popup = await clickBetween(page, map, SWD.mid, 14);
+            const popup = await clickBetween(page, map, SWD.desktopCenter, 14);
+            // The card fits below the segment (the view put the click high), whole, inside the map.
+            const mapBox = await map.boundingBox();
+            const cardBox = await page.locator('.maplibregl-popup-content').boundingBox();
+            expect(cardBox.y, 'the card below the clicked segment').toBeGreaterThan(mapBox.y);
+            expect(cardBox.y + cardBox.height, 'the card inside the map').toBeLessThanOrEqual(mapBox.y + mapBox.height);
+            expect(await page.locator('.maplibregl-popup').getAttribute('class')).toContain('maplibregl-popup-anchor-top');
             expect(await popup.locator('[data-part]').evaluateAll((els) => els.map((e) => e.getAttribute('data-part'))))
                 .toEqual(['header', 'segment', 'comms', 'instruments', 'kpis']);
             await expect(popup.locator('.mapstudio-popup-name')).toHaveText('L-SWD');
@@ -200,7 +214,8 @@ editorTest.describe('1440 px', () => {
             await expect(map).toHaveAttribute('data-segment', ids.pt1 + '|' + ids.pt2);
             await expect(map).toHaveAttribute('data-highlighted', ids.pt1 + ',' + ids.pt2);
             for (const id of [ids.pt1, ids.pt2]) {
-                expect(JSON.parse(await liveItem(page, id).getAttribute('data-marker'))[5], 'the selection ring on ' + id).toBe(true);
+                const image = await liveItem(page, id).getAttribute('data-marker');
+                expect(JSON.parse(image.slice(image.indexOf('[')))[5], 'the selection ring on ' + id).toBe(true);
             }
             await shot(page, 'mapstudio-line-popup-1440.png');
 
@@ -288,18 +303,22 @@ editorTest.describe('390 px', () => {
         await mapLoaded(map);
         await expect(map).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
         await expectSegments(page, { 'pt1|pt2': { preset: 'normal', stale: false } }, INTERVAL_MS);
-        await view(page, map, SWD.between, 15);
-        const popup = await clickBetween(page, map, SWD.between, 15);
+        await view(page, map, SWD.phoneCenter, 15);
+        const popup = await clickBetween(page, map, SWD.phoneCenter, 15);
         await expect(popup).toHaveAttribute('data-segment', ids.pt1 + '|' + ids.pt2);
         await expect(popup.locator('.mapstudio-popup-segment-title')).toHaveText('Segment PT-1 to PT-2');
         expect((await rows(popup)).map((r) => r[0])).toEqual(['CTB1 outlet', 'PT-1', 'LV-1', 'PT-2', 'SWD1 inlet']);
         await expect(map).toHaveAttribute('data-highlighted', ids.pt1 + ',' + ids.pt2);
+        // The /live page's button toolbar wraps on a phone and leaves the map short: the card is clamped
+        // to the room below the click (its body scrolls) and stays inside the map and the phone.
+        const mapBox = await map.boundingBox();
         const card = await page.locator('.maplibregl-popup-content').boundingBox();
         expect(card.x, 'the card inside the phone').toBeGreaterThanOrEqual(0);
         expect(card.x + card.width, 'the card inside the phone').toBeLessThanOrEqual(390);
-        expect(card.y, 'the card inside the phone').toBeGreaterThanOrEqual(0);
-        expect(card.y + card.height, 'the card inside the phone').toBeLessThanOrEqual(844);
+        expect(card.y, 'the card inside the map').toBeGreaterThanOrEqual(mapBox.y);
+        expect(card.y + card.height, 'the card inside the map').toBeLessThanOrEqual(mapBox.y + mapBox.height);
         expect(card.width, 'the card at calc(100vw - 32px)').toBeLessThanOrEqual(358);
+        expect(await popup.locator('.mapstudio-popup-body').evaluate((e) => getComputedStyle(e).overflowY)).toBe('auto');
         const close = await popup.locator('.mapstudio-popup-close').boundingBox();
         expect(close.width, 'the close button 44 px').toBeGreaterThanOrEqual(44);
         expect(close.height, 'the close button 44 px').toBeGreaterThanOrEqual(44);

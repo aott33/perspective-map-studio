@@ -80,11 +80,11 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `common/`, `gateway/` -- the segments slot, the popup push of the instruments, the `segment` body, tests.
-- [ ] `web/` -- the split, the instrument marker, the line popup, the map item object, tests.
-- [ ] `ops/` -- the UDTs, kinds, assets, the seed, the buttons.
-- [ ] `e2e/tests/linepopup.spec.mjs` and the counts in the other specs.
-- [ ] docs, CHANGELOG, platform checks, this plan.
+- [x] `common/`, `gateway/` -- the segments slot, the popup push of the instruments, the `segment` body, tests.
+- [x] `web/` -- the split, the instrument marker, the line popup, the map item object, tests.
+- [x] `ops/` -- the UDTs, kinds, assets, the seed, the buttons.
+- [x] `e2e/tests/linepopup.spec.mjs` and the counts in the other specs.
+- [x] docs, CHANGELOG, platform checks, this plan.
 
 **Acceptance Criteria:**
 - Given the seeded L-SWD, then PT-1, LV-1 and PT-2 draw at their places on the line and the line is split at PT-1 and PT-2.
@@ -95,7 +95,17 @@ context:
 
 ## Implementation Notes
 
+Built 2026-10-28 over three sessions of one agent (a container restart stopped the first after the Gateway and browser commits; the second resumed from the worktree's commits).
+
+- **Gateway** (`1cda202`): `KindDisplay.iconKpi()` and `measures()`; `ValuePlan` keeps each line's ordered instruments (`{id, distanceM, measures}`) and snapped ends and plans a line with an instruments rule even with no slot of its own; `Segments` (pure: nodes, the worst of two grades, the line's own style from its segments); `LiveValueCache.itemJson` adds `segments` and regrades a line when one of its instruments changes; `popupItems` (the line and its instruments) and `itemsBatch`; `LiveSession.popupOpen` follows every item of the set; `MapStudioDelegate` accepts `popup.open`'s optional `segment` (two non-empty strings, else `invalid`). `InstrumentsLiveTest` (seven tests) and a delegate test.
+- **Browser** (`5c7ff69`): `live.ts` (`SegmentSlot`, `readSegmentSlot`, `iconKpiOf`, `segmentState`); `features.ts` (`lineNodes`, `segmentNodes`, `segmentAt`, `splitAt`, one feature per segment with `from`, `to` and the graded look, the highlighted ends); `markers.ts` (the 24 px instrument disc, the eighth image id element, `segmentLook`); `linePopup.ts` (the words: subline, rows, distances, the segment box, the comms line, `popupNodes`, `popupInstruments`); `LinePopup.tsx`; `MapStudio.tsx` (the line click opens the popup at the clicked segment, `popup.open {itemId, segment}`, the selection with its segment, the map item object with `instruments` and `segment`, the test attributes `data-segments`, `data-segment`, `data-highlighted`); `mapstudio.css` (the card to the review's D1 to D3). Jest: `linePopup.test.ts`, `segments.test.ts` and the updated marker and message tests.
+- **Seed and dev stack** (`63470d8`): the `Tap` and `Valve` UDTs and the instances `CTB1`, `SWD1`, `PT1`, `PT2`, `LV1` and `Lines/LSWD` in `ops/config/core` (a fresh volume once); the `valve` kind and six assets in `mapstudio_dev`; the `swd` seed set (74 items, five kind setups, `ends` and `attachment` now seed fields compared and put back on a re-run); `mapstudio_live` accepts the SWD devices (`set_position`, `swd_quiet`, `swd_status`); the seven `/live` buttons; the seed harness, `scale.spec`, `adapters.spec`, `icons.spec` and `tags.spec` counts.
+- **Placement** (this session, after the first live run at 390 px): the `/live` page's button toolbar wraps on a phone and leaves the map 471 px tall, and MapLibre anchors a popup below its point unless the point is lower than the card is tall, so the 460 px card ran 230 px past the viewport. `popupParams.linePopupPlacement` now picks the side (above when the card fits there, the review's preferred side; else below; else the side with more room) and clamps the card's max-height to the chosen room, 480 px or the map less 64 px (P3), and `showPopupAt` applies it for the line popup only (the card measured with the clamp lifted, then the token set on the popup content and MapLibre's anchor set before `setLngLat` places it again); a point's popup keeps MapLibre's anchoring. `.mapstudio .maplibregl-popup` takes `z-index: 3`, above the map's controls (the Legend button drew over the card). Unit tests in `popupParams.test.ts`.
+- **Decisions taken while building**: the valve setup's KPI is Position in `%` with `icon: false`, so LV-1 bounds no segment and reads "No value" in the list as the mockups show; `distanceText` gives "2 km" for 2,000 m (one decimal, trailing zero dropped), where the mockup writes "2.0 km"; the instruments comms line counts instruments (3 on L-SWD), where the mockup's "4 instruments" counted a pad; the dev tag browse order in `tags.spec` is case-insensitive (`CTB1, Lines, LV1, P12, ...`).
+
 ## Plan Change Log
+
+- 2026-10-28: the phone placement rule above (a plan-level addition to decision 4: the card's height follows the room on the chosen side; decision 8 unchanged otherwise).
 
 ## Review Triage Log
 

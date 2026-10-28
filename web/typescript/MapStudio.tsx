@@ -65,7 +65,7 @@ import {
     reasonFromError, savedRecords, storageKey, summaryText, unsavedItems
 } from './unsaved';
 import { UnsavedSender } from './unsavedSender';
-import { AuthorParams, LINE_POPUP_PX, POPUP_MAX_PX, PopupPoint, popupMaxWidth, popupMountPath } from './popupParams';
+import { AuthorParams, LINE_POPUP_PX, POPUP_MAX_PX, PopupPoint, linePopupPlacement, popupMaxWidth, popupMountPath } from './popupParams';
 import { registerTestHook, registerTestView, takeTestReply } from './testHook';
 import { drawColor, themeColor } from './theme';
 import { Kind } from './adapters';
@@ -2008,7 +2008,26 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (!this.map || !this.popup) {
             return;
         }
-        this.popup.setMaxWidth(popupMaxWidth(this.map.project(lngLat).x, this.map.getContainer().clientWidth, maxPx));
+        const at = this.map.project(lngLat);
+        this.popup.setMaxWidth(popupMaxWidth(at.x, this.map.getContainer().clientWidth, maxPx));
+        if (maxPx === LINE_POPUP_PX && this.popupContent) {
+            // The line popup (entry 2): above the segment where its card fits, else below, else the side
+            // with more room with the card clamped to it (the body scrolls), so it never leaves the map.
+            // The card is in the DOM already (the portal rendered before this callback), so its natural
+            // height is measured with the clamp lifted, then the clamp is set as the card's own token.
+            const content = this.popupContent;
+            content.style.setProperty('--mapstudio-popup-max-height', 'none');
+            const card = content.firstElementChild as HTMLElement | null;
+            const natural = card ? card.offsetHeight : 0;
+            const placement = linePopupPlacement(at.y, this.map.getContainer().clientHeight, natural, POPUP_OFFSET_PX);
+            content.style.setProperty('--mapstudio-popup-max-height', placement.maxHeight + 'px');
+            this.popup.options.anchor = placement.anchor;
+        } else if (this.popupContent) {
+            // A point's popup keeps MapLibre's own anchoring and the stylesheet's height.
+            this.popupContent.style.removeProperty('--mapstudio-popup-max-height');
+            this.popup.options.anchor = undefined;
+        }
+        // setLngLat runs MapLibre's placement again with the card at its real size.
         this.popup.setLngLat(lngLat);
         if (!this.popup.isOpen()) {
             this.popup.addTo(this.map);

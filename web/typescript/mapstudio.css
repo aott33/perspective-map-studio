@@ -793,6 +793,11 @@
     border-left-color: var(--container);
 }
 
+/* The card popup sits over the map's controls (the Legend button, the zoom card) as any popup should. */
+.mapstudio .maplibregl-popup {
+    z-index: 3;
+}
+
 .mapstudio-popup--card {
     display: flex;
     flex-direction: column;
