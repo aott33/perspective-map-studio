@@ -44,6 +44,11 @@ import com.aoindustrial.perspective.mapstudio.gateway.load.MapLoader;
  *
  * <p>Batches are built by the open maps' sessions ({@link LiveSession}) from {@link #batch}: the
  * items whose last change is after the session's last batch, or every item on a full batch.
+ *
+ * <p>Instruments on lines (epic 3 entry 2): a line whose style rule is the instruments source carries
+ * a {@code segments} slot graded by {@link Segments} from the instruments at each segment's ends, and
+ * an instrument's delivery marks that line changed too; an open popup of a line follows the line
+ * and every instrument attached to it ({@link #popupItems}).
  */
 public final class LiveValueCache implements AutoCloseable {
 
@@ -77,7 +82,8 @@ public final class LiveValueCache implements AutoCloseable {
         ChangeBus.Subscription changes;
     }
 
-    private record ItemListener(String itemId, Runnable onChange) {
+    /** A listener of the items in {@code itemIds} (an open popup: the item, and a line's instruments). */
+    private record ItemListener(Set<String> itemIds, Runnable onChange) {
     }
 
     private final TagSubscriber tags;
@@ -195,15 +201,22 @@ public final class LiveValueCache implements AutoCloseable {
     private void onDelivery(String project, ProjectLive state, String path, TagSubscriber.Delivery delivery) {
         state.values.put(path, delivery);
         long seq = state.seq.incrementAndGet();
-        Set<String> items = state.plan.itemsByPath().get(path);
-        if (items == null) {
+        ValuePlan.Plan plan = state.plan;
+        Set<String> served = plan.itemsByPath().get(path);
+        if (served == null) {
             return;
+        }
+        // An instrument's change regrades the segments of the line it sits on (entry 2), so that
+        // line is marked changed too and an open line popup hears of it.
+        Set<String> items = new HashSet<>(served);
+        for (String id : served) {
+            items.addAll(plan.linesRegradedBy(id));
         }
         for (String id : items) {
             state.itemSeq.put(id, seq);
         }
         for (ItemListener listener : state.listeners) {
-            if (items.contains(listener.itemId())) {
+            if (!java.util.Collections.disjoint(items, listener.itemIds())) {
                 try {
                     listener.onChange().run();
                 } catch (RuntimeException ex) {
@@ -253,16 +266,27 @@ public final class LiveValueCache implements AutoCloseable {
 
     /** One item's values as a changes-only batch (an open popup), or null when the item is not planned. */
     public Batch itemBatch(String project, String itemId) {
+        return itemsBatch(project, Set.of(itemId));
+    }
+
+    /**
+     * The planned items among {@code itemIds} as one changes-only batch (an open popup: the item
+     * and, for a line, every instrument attached to it), or null when none of them is planned.
+     */
+    public Batch itemsBatch(String project, Set<String> itemIds) {
         ProjectLive state = projects.get(project);
         if (state == null) {
             return null;
         }
-        ValuePlan.ItemPlan item = state.plan.items().get(itemId);
-        if (item == null) {
+        JsonArray items = new JsonArray();
+        for (ValuePlan.ItemPlan item : state.plan.items().values()) {
+            if (itemIds.contains(item.id())) {
+                items.add(itemJson(state, item));
+            }
+        }
+        if (items.isEmpty()) {
             return null;
         }
-        JsonArray items = new JsonArray();
-        items.add(itemJson(state, item));
         JsonObject body = new JsonObject();
         long seq = state.seq.get();
         body.addProperty("seq", seq);
@@ -271,13 +295,34 @@ public final class LiveValueCache implements AutoCloseable {
         return new Batch(seq, false, body);
     }
 
+    /**
+     * The items an open popup of {@code itemId} follows (AD-7, entry 2): the item itself and, when
+     * it is a line, every instrument attached to it, so the popup's rows stay live.
+     */
+    public Set<String> popupItems(String project, String itemId) {
+        ProjectLive state = projects.get(project);
+        Set<String> ids = new HashSet<>();
+        ids.add(itemId);
+        if (state != null) {
+            for (ValuePlan.Instrument i : state.plan.instrumentsOf(itemId)) {
+                ids.add(i.id());
+            }
+        }
+        return Set.copyOf(ids);
+    }
+
     /** Be told, on the tag system's thread, whenever a value of {@code itemId} is delivered. */
     public Subscription onItemChange(String project, String itemId, Runnable onChange) {
+        return onItemsChange(project, Set.of(itemId), onChange);
+    }
+
+    /** Be told, on the tag system's thread, whenever a value of any of {@code itemIds} is delivered. */
+    public Subscription onItemsChange(String project, Set<String> itemIds, Runnable onChange) {
         ProjectLive state = projects.get(project);
         if (state == null) {
             return () -> { };
         }
-        ItemListener listener = new ItemListener(itemId, onChange);
+        ItemListener listener = new ItemListener(Set.copyOf(itemIds), onChange);
         state.listeners.add(listener);
         return () -> state.listeners.remove(listener);
     }
@@ -336,7 +381,26 @@ public final class LiveValueCache implements AutoCloseable {
             }
             o.add("alarms", alarms.toJson());
         }
-        if (item.style() != null && slots.containsKey(ValuePlan.STYLE)) {
+        if (item.style() != null && item.style().rule().instruments()) {
+            // The instruments source (entry 2): the line's segments graded from the instruments at
+            // their ends, each instrument's grade read from its own batch item; the line's own style
+            // slot is the worst over them. The line's own alarm, comms and KPIs stay its own slots.
+            ValuePlan.Plan plan = state.plan;
+            List<ValuePlan.Instrument> instruments = plan.instrumentsOf(item.id());
+            Map<String, Segments.Grade> grades = new java.util.HashMap<>();
+            for (ValuePlan.Instrument i : instruments) {
+                if (!i.measures()) {
+                    continue;
+                }
+                ValuePlan.ItemPlan ip = plan.items().get(i.id());
+                grades.put(i.id(), ip == null
+                    ? new Segments.Grade(StyleRule.NORMAL, true, i.name() + ": " + LiveValue.NO_VALUE_YET, null)
+                    : Segments.of(i.name(), itemJson(state, ip), i.iconKpi()));
+            }
+            List<Segments.Segment> segments = Segments.grade(Segments.nodes(plan.endsOf(item.id()), instruments), grades);
+            o.add("style", Segments.lineStyle(segments));
+            o.add("segments", Segments.toJson(segments));
+        } else if (item.style() != null && slots.containsKey(ValuePlan.STYLE)) {
             TagSubscriber.Delivery d = state.values.get(slots.get(ValuePlan.STYLE));
             if (d != null && d.notFound()) {
                 problems.add(new ValuePlan.Problem(ValuePlan.STYLE, NOT_FOUND));

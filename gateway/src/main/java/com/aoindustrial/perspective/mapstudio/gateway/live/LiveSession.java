@@ -1,5 +1,6 @@
 package com.aoindustrial.perspective.mapstudio.gateway.live;
 
+import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -32,6 +33,8 @@ public final class LiveSession {
     private volatile long lastSeq = -1;
     private volatile ScheduledFuture<?> timer;
     private volatile String popupItem;
+    /** The items the open popup follows: the item and, for a line, its instruments (entry 2). */
+    private volatile Set<String> popupItems = Set.of();
     private volatile LiveValueCache.Subscription popup;
     private volatile ScheduledFuture<?> push;
 
@@ -68,11 +71,15 @@ public final class LiveSession {
         }
     }
 
-    /** The browser opened the popup of {@code itemId}: push its values on change. */
+    /**
+     * The browser opened the popup of {@code itemId}: push its values on change, and for a line the
+     * values of every instrument attached to it (AD-7, entry 2).
+     */
     public void popupOpen(String itemId) {
         popupClose();
         popupItem = itemId;
-        popup = cache.onItemChange(project, itemId, this::schedulePush);
+        popupItems = cache.popupItems(project, itemId);
+        popup = cache.onItemsChange(project, popupItems, this::schedulePush);
         // The popup opens with what the map already drew; the next change pushes.
     }
 
@@ -81,6 +88,7 @@ public final class LiveSession {
         LiveValueCache.Subscription s = popup;
         popup = null;
         popupItem = null;
+        popupItems = Set.of();
         if (s != null) {
             s.cancel();
         }
@@ -103,12 +111,12 @@ public final class LiveSession {
     }
 
     private void pushPopup() {
-        String itemId = popupItem;
-        if (itemId == null) {
+        Set<String> items = popupItems;
+        if (popupItem == null || items.isEmpty()) {
             return;
         }
         try {
-            LiveValueCache.Batch batch = cache.itemBatch(project, itemId);
+            LiveValueCache.Batch batch = cache.itemsBatch(project, items);
             if (batch != null) {
                 send.accept(batch.body());
             }
