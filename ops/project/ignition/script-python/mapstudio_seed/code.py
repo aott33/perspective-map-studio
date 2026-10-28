@@ -10,6 +10,8 @@
 #           (Tracer line), at the tracer's old coordinates; the points are linked to the dev
 #           assets P12, P14 and P15 (epic 3 entry 5), so their live values resolve (P15 has no
 #           Comms or Pressure tag, so those report unresolved).
+#   shared  two pads 15 m apart (Shared A, Shared B; epic 3 entry 7), so the map draws one shared
+#           marker whose pick list opens either.
 #   setup   the pad kind setup (epic 3 entry 5): comms {asset.path}/Comms, the KPIs Pressure
 #           (the icon value) and Flow, alarms {asset.path}, the link /pad/{item.name}.
 # Every id is a UUIDv5 of a stable name (mapstudio-dev/seed/<set>/<key>), so a re-run
@@ -107,6 +109,13 @@ TRACER_POINTS = (
 )
 TRACER_LINE = ((-104.990300, 39.739200), (-104.975000, 39.750000))
 
+# Two pads 15 m apart (0.000175 degrees of longitude at this latitude), north of the tracer: within
+# the map's 20 m shared distance, so they draw as one marker (epic 3 entry 7).
+SHARED_PADS = (
+    ('a', -104.965000, 39.757000, 'Shared A'),
+    ('b', -104.964825, 39.757000, 'Shared B'),
+)
+
 # The pad kind setup the dev map seeds (docs/kind-setup.md): the live values the tracer draws.
 PAD_SETUP = {
     'comms': {'path': '{asset.path}/Comms', 'on': True},
@@ -145,7 +154,7 @@ def _item(make_id, set_name, key, kind, name, geometry, properties, asset_id=Non
 
 
 def seed_items(make_id=seed_id):
-    """The 64 seed items: {key, id, kind, name, geometry, properties}, scale set first."""
+    """The 66 seed items: {key, id, kind, name, geometry, properties}, scale set first."""
     items = []
     for n, lng, lat in SCALE_PADS:
         items.append(_item(make_id, 'scale', 'pad-%d' % n, 'pad', 'Pad %d' % n, _point(lng, lat), PAD_PROPERTIES))
@@ -155,6 +164,8 @@ def seed_items(make_id=seed_id):
         items.append(_item(make_id, 'tracer', 'p%d' % n, 'pad', 'Point %d' % n, _point(lng, lat), PAD_PROPERTIES,
                            asset_id))
     items.append(_item(make_id, 'tracer', 'l1', 'line', 'Tracer line', _line(TRACER_LINE), {}))
+    for key, lng, lat, name in SHARED_PADS:
+        items.append(_item(make_id, 'shared', key, 'pad', name, _point(lng, lat), PAD_PROPERTIES))
     return items
 
 

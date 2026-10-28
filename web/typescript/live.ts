@@ -189,8 +189,8 @@ export interface ItemState {
     stale: boolean;
     /** The highest active alarm, or null with none active or no alarms slot. */
     alarm: { priority: 1 | 2 | 3; unacked: boolean; active: number; stale: boolean } | null;
-    /** The icon KPI's text with its unit, or null when the kind has none or it is off. */
-    iconKpi: { key: string; text: string; stale: boolean } | null;
+    /** The icon KPI's text with its unit, or null when the kind has none or it is off; `hasValue` is false before the first value. */
+    iconKpi: { key: string; text: string; stale: boolean; hasValue: boolean } | null;
     /** `comms-lost`, `alarm` or `normal`: what the badge draws (an alarm draws over comms lost). */
     badge: 'alarm' | 'comms-lost' | 'stale' | 'normal';
 }
@@ -234,7 +234,10 @@ export function itemState(values: ItemValues | undefined, display: KindDisplay |
             stale = true;
         }
         if (kpi.icon && value) {
-            iconKpi = { key: kpi.key, text: valueText(value, kpi.unit), stale: value.stale };
+            iconKpi = {
+                key: kpi.key, text: valueText(value, kpi.unit), stale: value.stale,
+                hasValue: value.value !== null && value.value !== undefined
+            };
         }
     }
     const badge: ItemState['badge'] = alarm ? 'alarm' : commsLost ? 'comms-lost' : stale ? 'stale' : 'normal';

@@ -140,7 +140,9 @@ editorTest.describe('1440 px', () => {
             await expect(p1).toHaveAttribute('data-stale', 'true');
             await expect(p1).toHaveAttribute('data-kpi-stale', 'true');
             expect(await p1.getAttribute('data-marker')).toContain('"comms-lost"');
-            expect(await p1.getAttribute('data-marker')).toContain('"Comms lost"');
+            // The word is symbol-layer text beside the name (entry 7), never in the image id.
+            expect(await p1.getAttribute('data-marker')).not.toContain('Comms lost');
+            await expect(p1).toHaveAttribute('data-word', 'Comms lost');
             await expect(popup.locator('[data-part="comms"]')).toHaveAttribute('data-comms', 'lost', { timeout: PUSH_MS });
             await expect(popup.locator('[data-part="comms"] .mapstudio-popup-value')).toHaveText(/^Comms lost - /);
             await expect(kpis.nth(0)).toHaveAttribute('data-stale', 'true');

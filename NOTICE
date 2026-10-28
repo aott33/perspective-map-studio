@@ -68,6 +68,24 @@ Tabler Icons is licensed under the MIT License:
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 
+This product bundles glyphs rendered from Noto Sans (the static Medium and
+SemiBold instances of Noto Sans from Google Fonts, web/fonts/, the source
+files and the rendered signed distance field glyphs the Gateway serves at
+/res/mapstudio/glyphs/), used for the map's text labels:
+
+    Copyright 2022 The Noto Project Authors
+    (https://github.com/notofonts/latin-greek-cyrillic)
+
+    This Font Software is licensed under the SIL Open Font License,
+    Version 1.1. The licence text is in web/fonts/OFL.txt and at
+    https://openfontlicense.org. No Reserved Font Name is declared; the
+    glyphs are served under the stack names NotoSans-SemiBold and
+    NotoSans-Medium.
+
+The glyphs are rendered at build time by web/scripts/glyphs.mjs with
+opentype.js (MIT) and pbf (BSD-3-Clause), which are build tools and are not
+redistributed.
+
 This product builds against, but does not redistribute, Inductive Automation's
 Ignition SDK and the @inductiveautomation/perspective-client package, which the
 Ignition platform provides at runtime.
