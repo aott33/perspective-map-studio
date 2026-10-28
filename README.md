@@ -88,7 +88,7 @@ Install through a host's module lock by the file's SHA-256 and this certificate 
 
 ## Message contract
 
-Every message between the browser and the Gateway is `{v, type, id, body}` under the model event `mapstudio.message`; errors are `{code, message}`. The types this version knows are listed in `common/.../Messages.java` and `web/typescript/messages.ts`: `point.click`, `point.click.reply` and `error` (contract 0.1.0; from 0.2.0 an `error` may also carry `batchId`, `op` and `conflicts`), and from contract 0.2.0 `map.load`, `map.load.reply`, `edits.apply`, `edits.apply.reply`, `map.changed`, `tags.browse`, `tags.browse.reply`, `tags.resolve` and `tags.resolve.reply`. Their bodies, the error codes and the scripting API are in [docs/contract.md](docs/contract.md).
+Every message between the browser and the Gateway is `{v, type, id, body}` under the model event `mapstudio.message`; errors are `{code, message}`. The types this version knows are listed in `common/.../Messages.java` and `web/typescript/messages.ts`: `point.click`, `point.click.reply` and `error` (contract 0.1.0; from 0.2.0 an `error` may also carry `batchId`, `op` and `conflicts`), from contract 0.2.0 `map.load`, `map.load.reply`, `edits.apply`, `edits.apply.reply`, `map.changed`, `tags.browse`, `tags.browse.reply`, `tags.resolve` and `tags.resolve.reply`, and from contract 0.3.0 (unreleased) `values.batch`, `popup.open` and `popup.close`. Their bodies, the error codes and the scripting API are in [docs/contract.md](docs/contract.md).
 
 ## Attribution
 

@@ -2,6 +2,24 @@
 
 Map Studio follows semantic versioning for its public contract (AD-9): the component's props and events, the message contract, the map item record, the kind list and asset contract, the kind setup schema, the project setup schema, the map store schema and the scripting API. Each contract document names the version it describes ([docs/contract.md](docs/contract.md), [docs/setup.md](docs/setup.md), [docs/kinds-and-assets.md](docs/kinds-and-assets.md), [docs/kind-setup.md](docs/kind-setup.md)), and `scripts/ci/check-contract-versions.sh` fails CI when one does not. Releases are signed `.modl` files on GitHub ([RELEASING.md](RELEASING.md)).
 
+## 0.3.0
+
+Unreleased: everyone reads live state from the map (epic-viewing). Contract 0.3.0; project setup schema 1; map store schema 2 (both unchanged).
+
+### Contract changes
+
+- New message types (epic 3 entry 5): `values.batch` (Gateway to browser: the live values of the open map's items, full after `map.load` and changes only per refresh interval, with `kindDisplay`, the path-free projection of every kind setup, on a full batch), `popup.open` and `popup.close` (browser to Gateway: the map item whose popup is open gets its values pushed on change). The LiveValue slot `{value, quality, t, stale, reason}` and the alarms slot's `{active, unacked, priority}` are in [docs/contract.md](docs/contract.md), "values.batch".
+- The map draws live state (entry 5): the kind glyph, comms lost in its own theme token `--mapstudio-comms-lost` (falling back to `--qual-1`) with the glyph and the word, the icon KPI, the alarm glyph with its digit on a solid badge when unacknowledged and a hollow one when acknowledged (`--mapstudio-alarm-1` to `-3`, falling back to `--error`, `--warning`, `--info`); the default popup opens on a click (header, comms with data age, KPIs, alarms) and stays live while open. The hue tokens go to the engineering review (ER-27) in entry 12.
+- The Gateway holds one subscription per project and tag path the kind setups turn on (AD-6), Alarm Metrics by Java subscription; the dev stack's Pad UDT carries a dev-only alarm for it (`ops/config/core`, a fresh volume is needed once: `ops/up.sh --fresh`).
+
+### Stories
+
+5. Tracer: live values reach an icon and its default popup.
+
+### Development
+
+- The dev project gains the `/live` page (the default popup, MapEditor-only buttons that toggle the dev tags and the dev alarm through `mapstudio_live`), the seed links the tracer's points to the dev assets and seeds the pad kind setup, and the dev setup's refresh interval is the default 10 s. The e2e measures record a real `values.batch` from the wire; the stand-in is gone.
+
 ## 0.2.0
 
 The map store and its data (epic-map-store-and-data). Contract 0.2.0; project setup schema 1; map store schema 2. Requires Ignition 8.3 and a PostgreSQL connection per project.

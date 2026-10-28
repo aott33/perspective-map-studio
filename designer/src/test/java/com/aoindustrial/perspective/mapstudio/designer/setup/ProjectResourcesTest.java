@@ -66,7 +66,7 @@ class ProjectResourcesTest {
         assertTrue(s.functions().contains("mapstudio_dev.assets"), s.functions().toString());
         assertTrue(s.offeredFunctions().contains("mapstudio_dev.kinds"));
         assertFalse(s.offeredFunctions().contains("mapstudio_dev._globals"));
-        assertEquals(List.of("/", "/adapters", "/edit", "/fallback-empty", "/fallback-missing"), s.pages());
+        assertEquals(List.of("/", "/adapters", "/edit", "/fallback-empty", "/fallback-missing", "/live"), s.pages());
         assertEquals("default", s.identityProvider());
         // So the dev setup's kindsFunction and assetsFunction give no warning.
         FormLists lists = FormLists.none().withProject(s);
@@ -84,7 +84,7 @@ class ProjectResourcesTest {
         List<Resource> all = devProject();
         assertEquals(new ResourceType("ignition", "script-python"), ProjectResources.SCRIPTS);
         assertEquals("code.py", ProjectResources.CODE);
-        assertEquals(2, ofType(all, ProjectResources.SCRIPTS).size());
+        assertEquals(3, ofType(all, ProjectResources.SCRIPTS).size());
         assertEquals("ignition/script-app-library", ScriptLibrary.RESOURCE_TYPE.toString());
         assertTrue(ofType(all, ScriptLibrary.RESOURCE_TYPE).isEmpty());
     }
