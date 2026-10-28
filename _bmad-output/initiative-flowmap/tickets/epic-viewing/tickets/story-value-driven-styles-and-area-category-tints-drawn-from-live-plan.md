@@ -3,7 +3,7 @@ title: 'Value-driven styles and area category tints drawn from live values'
 type: 'feature'
 ticket: '1'
 created: '2026-10-28'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '769f3c7'
 route: 'full'
 route_source: 'auto'
@@ -74,12 +74,12 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `common/` -- `StyleRule`, the display projections, tests.
-- [ ] `gateway/` -- `StyleExpressions`, the plan's style slot, the cache's style evaluation, the write path's parse check, tests.
-- [ ] `web/` -- the slot, the looks, the areas, the preview, the prop, tests.
-- [ ] `ops/` -- the UDT, the seed, the buttons, the `/styles` page.
-- [ ] `e2e/tests/styles.spec.mjs` -- the verify line, screenshots in both themes.
-- [ ] docs, CHANGELOG, architecture, the spike, platform checks, this plan.
+- [x] `common/` -- `StyleRule`, the display projections, tests.
+- [x] `gateway/` -- `StyleExpressions`, the plan's style slot, the cache's style evaluation, the write path's parse check, tests.
+- [x] `web/` -- the slot, the looks, the areas, the preview, the prop, tests.
+- [x] `ops/` -- the UDT, the seed, the buttons, the `/styles` page.
+- [x] `e2e/tests/styles.spec.mjs` -- the verify line, screenshots in both themes.
+- [x] docs, CHANGELOG, architecture, the spike, platform checks, this plan.
 
 **Acceptance Criteria:**
 - Given the dev Gateway with the seeded setups, when P12's Status and L3's Flow change, then Point 1's marker and the tracer line change their look within one refresh interval.
@@ -102,7 +102,21 @@ context:
 
 ## Review Triage Log
 
+Review pass 1 (quick lens, read by this agent from the diff of the five commits; no subagent tool in this session): 0 high, 2 medium, 3 low, 0 false.
+
+| Finding | Verdict | Route | Evidence |
+| --- | --- | --- | --- |
+| The expression's default function factory reaches tags and scripts (`tag()`, `runScript()`), so a kind setup editor could read any tag through a style rule | medium | patched | `StyleExpressions.DENIED` refuses them (and the stateful `hasChanged()`) at parse; `StyleExpressionsTest`, `WriteServiceKindCheckTest` |
+| The first live run's preview test counted `svg` elements in a point tile and found two (the marker image nests the kind glyph's own svg) | medium | patched | the test counts the sample's root svg; the component is right |
+| `renderStylePanel` chains a `forceUpdate` on the shared sprite promise on every render until the sprite arrives: a handful of extra renders at mount | low | rejected | the promise is one per component and the panel is a dev and review surface; no loop (the sprite settles once) |
+| `fault` and `warning` fall back to the same Perspective variables as alarm priorities 1 and 2 | low (by plan) | recorded | docs/styles.md names it for ER-27; the ring and word tell them from the badge and digit |
+| A `{kpi}` source keeps a switched-off KPI's path subscribed | low (by design) | rejected | the rule names it; docs/kind-setup.md says so |
+
 ## Design Notes
+
+**Why the Gateway, not the browser.** One evaluation per item per batch serves every open map and the popup agrees with the icon (AD-6); the expression parser is the SDK's and lives on the Gateway anyway; a viewer never sees a path or the expression text.
+
+**Why the preset name travels, not the rule.** The browser needs no rule engine and cannot disagree with the Gateway; the kind display's path-free rule is for the preview and the legend only.
 
 ## Verification
 
@@ -112,3 +126,8 @@ context:
 - `ops/up.sh --fresh --no-build` with the module staged by hand, then `cd e2e && npm ci && E2E_DOCS=1 PW_CHROMIUM_PATH=/opt/pw-browsers/chromium npm test` -- expected: every spec passes, `styles.spec.mjs` included.
 - `bash scripts/ci/check-contract-versions.sh` and `bash scripts/ci/test-contract-versions.sh` -- expected: OK.
 - `grep -rnP '\xE2\x80\x94'` on every changed file -- expected: no match.
+
+**Manual checks:**
+- The screenshots in `docs/screenshots/` show the warning ring and chip on Point 1, the attention line with its chip, the two tinted fences, and the preview panel in both themes.
+
+**Results (2026-10-28, 4-CPU agent box, Ignition 8.3.10, container `ms-68194f0d`, fresh volumes):** the final chain 20:41 to 20:59 UTC: `./gradlew clean build --offline` BUILD SUCCESSFUL with every common, Gateway, designer and Jest test; `tsc --noEmit` clean and `jest` 24 suites, 204 tests; `ops/up.sh --fresh --no-build` up; e2e with `E2E_DOCS=1` 71 passed, 2 failed, 7 skipped (15.1 min), `styles.spec.mjs` 3/3; the two failures were expectations of the dev data (`scale.spec.mjs` counts the seed's items, 66 to 68; `tags.spec.mjs` lists P12's children, which gained `Status`), fixed and re-run green on the same stack with `live.spec.mjs` and `styles.spec.mjs` (6/6 and 3/3); `check-contract-versions.sh` and `test-contract-versions.sh` OK; no em dash and no model id in a changed file. The first live run of `styles.spec.mjs` found a point tile holds two `svg` elements (the marker image nests the kind glyph); the test now counts the sample's root. Screenshots refreshed by the docs run; new for this entry: `mapstudio-styles-1440.png`, `mapstudio-styles-390.png`, `mapstudio-styles-preview-light-1440.png`, `mapstudio-styles-preview-dark-1440.png`; the files the docs run wrote that no doc references were left out. Not verified: a real tag system under the expression (memory tags), another tag provider, a date-valued source, the hues against a basemap and the 3:1 contrast (entry 12), a host theme that defines the tokens itself, the owner's Designer and laptop.
