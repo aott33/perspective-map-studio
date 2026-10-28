@@ -13,7 +13,7 @@ Release 0.1.0 was the spike; epic-map-store-and-data (contract 0.2.0, draft) is 
 
 Kept from the spike until later epics replace them: clicking a point sends `point.click` and the Gateway answers `point.click.reply` with the time it received the click; a "Draw a line" toggle (top right) starts Terra Draw's line tool (click to add points, Enter to finish, Escape to cancel), and the finished line is saved to the map store; and the spike-only prop `popupView` (`path`, `params`) opens a popup that renders a project view by path, the way the built-in Perspective Map does, with the point as its `mapItem` parameter (`{id, name}`) and a text popup when the path is empty or fails. `popupView` stays until the kind setup replaces it (epic-viewing). Story 7's spike-only prop `testSet` is gone (epic 2 story 11): the dev map's 30-pad set and the tracer's points are map items seeded through `system.mapstudio.applyEdits` (the `/edit` page's "Seed the dev map", MapEditor only, safe to re-run).
 
-The platform checks and their evidence are in [docs/platform-checks.md](docs/platform-checks.md) (toolchain pins: MapLibre GL JS 6.16.0, Terra Draw 1.38.0, adapter 1.5.0).
+The platform checks and their evidence are in [docs/platform-checks.md](docs/platform-checks.md) (toolchain pins: MapLibre GL JS 6.16.0, Terra Draw 1.38.0, adapter 1.5.0). The performance check before a release (`ops/perf.sh`, its limits and the per-release records compared with `e2e/perf/compare.mjs`) is in [docs/perf/README.md](docs/perf/README.md).
 
 ![mapstudio-dev at 1440 px](docs/screenshots/mapstudio-dev-1440.png)
 

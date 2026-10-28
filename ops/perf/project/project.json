@@ -1,0 +1,7 @@
+{
+  "title": "mapstudio-perf",
+  "description": "Map Studio performance check project (epic 2 story 17): a scratch project ops/perf.sh adds to a Gateway for one run and removes after. Never holds real map items.",
+  "enabled": true,
+  "inheritable": false,
+  "parent": ""
+}
