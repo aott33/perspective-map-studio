@@ -3,7 +3,7 @@ title: 'Tracer: live values reach an icon and its default popup'
 type: 'feature'
 ticket: '5'
 created: '2026-10-28'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '1295f4a2f7f0c4f0f4f1c7a2e8a2b6f6d4e3c2b1'
 route: 'full'
 route_source: 'pinned'
@@ -80,13 +80,13 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `common/` -- `Messages` 0.3.0 and the three types; `LiveValue`; `KindDisplay` with tests.
-- [ ] `gateway/.../live/` -- the plan, the cache, the sender, the tag seam; unit tests with a fake subscriber for every matrix row that is pure.
-- [ ] `gateway/.../MapStudioDelegate.java`, `MapStudioServices.java` -- the wiring, `popup.open`/`popup.close`, the batch timer; tests in `MapStudioDelegateTest`.
-- [ ] `web/typescript/live.ts`, `markers.ts`, `DefaultPopup.tsx`, `MapStudio.tsx`, `messages.ts`, `contract.ts`, `mapstudio.css` -- the browser side; Jest tests for `live.ts` and the readers.
-- [ ] `ops/` -- the alarm, the interval, the seed, `mapstudio_live`, the `/live` view and page.
-- [ ] `e2e/` -- `live.spec.mjs`; the measures' real batch; `valueBatch.mjs` rewritten.
-- [ ] `docs/`, `CHANGELOG.md` -- the contract section, the versions, the evidence, the screenshots.
+- [x] `common/` -- `Messages` 0.3.0 and the three types; `LiveValue`; `KindDisplay` with tests.
+- [x] `gateway/.../live/` -- the plan, the cache, the sender, the tag seam; unit tests with a fake subscriber for every matrix row that is pure.
+- [x] `gateway/.../MapStudioDelegate.java`, `MapStudioServices.java` -- the wiring, `popup.open`/`popup.close`, the batch timer; tests in `MapStudioDelegateTest`.
+- [x] `web/typescript/live.ts`, `markers.ts`, `DefaultPopup.tsx`, `MapStudio.tsx`, `messages.ts`, `contract.ts`, `mapstudio.css` -- the browser side; Jest tests for `live.ts` and the readers.
+- [x] `ops/` -- the alarm, the interval, the seed, `mapstudio_live`, the `/live` view and page.
+- [x] `e2e/` -- `live.spec.mjs`; the measures' real batch; `valueBatch.mjs` rewritten.
+- [x] `docs/`, `CHANGELOG.md` -- the contract section, the versions, the evidence, the screenshots.
 
 **Acceptance Criteria:**
 - Given the dev Gateway with the seeded kind setups and tags, when Pressure of P12 is toggled, then p1's icon KPI changes within one refresh interval.
@@ -98,7 +98,11 @@ context:
 
 ## Implementation Notes
 
-(appended as the work goes)
+- **Commits on the worktree branch** (`worktree-agent-ab31336cdd3cf305d`, baseline `1295f4a`): a549bdf (common contract and the Gateway live path: `LiveValue`, `KindDisplay`, `Messages` 0.3.0, `ValuePlan`, `LiveValueCache`, `LiveSession`, `IgnitionTagSubscriber`, the delegate wiring, unit tests over `FakeTagSubscriber`), f884dac (the browser: `live.ts`, `markers.ts`, `DefaultPopup.tsx`, the marker layer and popup in `MapStudio.tsx`, the tokens in `mapstudio.css`, Jest tests), 3b95417 (the dev stack: the dev alarm on the Pad UDT, `refreshIntervalSeconds` 10, the seed's asset links and pad kind setup, `mapstudio_live`, the `/live` view and page; `e2e/tests/live.spec.mjs`, the measures' real batch, `valueBatch.mjs`), 6f8a0c2 (docs, CHANGELOG, designer tests), 1de1106 (what the first live run taught, below), then the closing commit (evidence, screenshots, this plan).
+- **Marker stack, as built.** One symbol layer, not the four layers of the Design Notes: one image per marker state (`ms:marker:` + the JSON of `MarkerSpec`), rasterised from an SVG on `styleimagemissing` (the disc and glyph, the badge, the digit, the KPI line and the comms word), beside the circle layer that stays for the dot and the click target. The blank style has no glyph source, so text is drawn into the image, not a text field; the theme tokens are read once from the component root and the image id carries the state, so a token change needs a page reload (as every theme change does).
+- **First live run (1de1106).** The 8.3.10 Alarm Metrics node publishes `ActiveAckCount` and `ActiveUnackCount`, not the `*Acked*` spellings the plan assumed from the docs; the alarms slot read "the tag was not found" until they were renamed. `LiveValueCache.checkAssets` compared the asset list by identity, and `AdapterService` replaces the list on every refresh, so the plan was rebuilt on every tick ("0 subscribed, 0 unsubscribed" each 10 s); it compares by value now. A click on `Point 1` opened `Pad 15`'s popup: the scale set's Pad 15 lies 6 px from Point 1 at zoom 12 and marker images are 160 px wide, so `queryRenderedFeatures` returned both; the click goes to the nearest point's feature now. On the 390 px phone the 320 px default popup, left-anchored by MapLibre, ran 11 px past the edge; `popupMaxWidth` sets the popup's max-width from the room the point has (centred when it fits, the 220 px minimum beside the point at an edge). `system.alarm.acknowledge` on 8.3.10 takes all three arguments (ids, notes, username). The e2e log filter parsed `moduleStartupTime` with `Number()` (it is ISO text) and got nothing.
+- **Decision 1 corrected:** the three metrics are `ActiveAckCount`, `ActiveUnackCount` and `HighestActivePriority` (verified live, `docs/platform-checks.md`, "Epic 3 entry 5").
+- **Not done, by scope:** basemaps, labels, styles, instruments, search, legend, the bottom sheet and the custom popup view stay with their entries; the `popupView` prop keeps its precedence until entry 8.
 
 ## Plan Change Log
 
@@ -126,3 +130,13 @@ context:
 **Manual checks:**
 - The Gateway log after three sessions open `/live`: one `subscribed` line per path, none repeated per session.
 - Screenshots `docs/screenshots/mapstudio-live-{1440,390}.png` show the comms-lost token, the alarm badge and the default popup.
+
+**Results (2026-10-28, the dev stack `ms-74e93b12`, 8.3.10):**
+- `gradle.sh clean build` (the hand-off's `./gradlew clean build --offline` with `JAVA_HOME` set and an init script that keeps the node plugin from downloading Node through the proxy; `/opt/node22` on the path): BUILD SUCCESSFUL, every common, Gateway, designer and Jest test green.
+- `cd web && npx tsc --noEmit && npx jest`: no type error; 19 suites, 165 tests pass.
+- `bash scripts/ci/check-contract-versions.sh`: `OK (contract 0.3.0, setup schema 1, map store schema 2)`.
+- `e2e`: `live.spec.mjs` 3 of 3 pass alone and in the suite; the full suite 58 passed, 7 skipped, 0 failed (11.1 min) after the three test changes below; the first full run had those three failing. Three tests of other specs needed a change for entry 5's behaviour, all test-side: `popup.spec.mjs` "empty view path" now expects the default popup (a pad has a kind setup), `adapters.spec.mjs` recovers from mode slow with a second press (the dev refresh interval is 10 s now, so a periodic refresh begun in mode slow is usually in flight), and `live.spec.mjs` reads the subscribe log as an alternation (another spec turns the pad setup off and on).
+- `node --test lib/lib.test.mjs`: 9 pass.
+- Em dashes: none in any changed file; no model id outside the commit trailers.
+- Manual: the Gateway log holds one `subscribed` line per path across three sessions (asserted by the spec); the screenshots are in `docs/screenshots/` (`mapstudio-live-1440.png`, `mapstudio-live-comms-lost-1440.png`, `mapstudio-live-390.png`).
+- Not verified: the listener's Java type for `HighestActivePriority`; a Gateway with several projects holding kind setups; Perspective websocket compression; the owner's Designer and laptop GPU.

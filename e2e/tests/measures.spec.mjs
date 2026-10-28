@@ -202,9 +202,12 @@ test('size of one value batch', async ({ page, browser }) => {
         const editor = await editorContext.newPage();
         await mapLoaded(await openMap(editor, '/live'));
         const out = editor.locator('#mapstudio-live-result');
-        const before = await out.innerText();
-        await editor.locator('#mapstudio-live-pressure-' + (Date.now() % 2 === 0 ? 'low' : 'high')).click();
-        await expect.poll(() => out.innerText(), { timeout: 30_000 }).not.toBe(before);
+        // High then low: whatever the pressure was, one of the two changes it (and it ends quiet).
+        for (const level of ['high', 'low']) {
+            const before = await out.innerText();
+            await editor.locator('#mapstudio-live-pressure-' + level).click();
+            await expect.poll(() => out.innerText(), { timeout: 30_000 }).not.toBe(before);
+        }
         await expect.poll(() => batches().slice(seen).filter((b) => !b.full).length, { timeout: (2 * interval + 5) * 1000 })
             .toBeGreaterThanOrEqual(1);
         const delta = batches().slice(seen).find((b) => !b.full);

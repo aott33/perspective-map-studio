@@ -193,12 +193,23 @@ editorTest.describe('1440 px', () => {
                 const problems = await liveItem(viewer, ids.p3).getAttribute('data-problems');
                 expect(problems).not.toContain('[default]');
             }
-            // The Gateway log since the module started: one subscribe line per path, none per session.
+            // The Gateway log since the module started: one live subscription per path, none per
+            // session. Another spec may have turned the pad setup off and on again (each such rebuild
+            // unsubscribes and resubscribes the path), so the path's lines must alternate subscribed,
+            // unsubscribed, ... and end subscribed: never two subscribes without an unsubscribe between.
             const lines = await logLines('MapStudio.live', Date.parse(run.moduleStartupTime) - 1000);
-            const pressure = lines.filter((l) => l.includes('subscribed [default]Mesa/P12/Pressure'));
-            expect(pressure, lines.join('\n')).toHaveLength(1);
-            const metrics = lines.filter((l) => l.includes('subscribed [default]Mesa/P12/Alarm Metrics.'));
-            expect(metrics.map((l) => l.replace(/.*Alarm Metrics\./, '')).sort())
+            const pressure = lines
+                .map((l) => (l.includes('unsubscribed [default]Mesa/P12/Pressure') ? 'unsub'
+                    : l.includes('subscribed [default]Mesa/P12/Pressure') ? 'sub' : null))
+                .filter(Boolean);
+            expect(pressure.length, lines.join('\n')).toBeGreaterThanOrEqual(1);
+            expect(pressure[0], lines.join('\n')).toBe('sub');
+            expect(pressure[pressure.length - 1], lines.join('\n')).toBe('sub');
+            for (let i = 1; i < pressure.length; i++) {
+                expect(pressure[i], 'line ' + i + ' of ' + pressure.join(',')).not.toBe(pressure[i - 1]);
+            }
+            const metrics = lines.filter((l) => l.includes(': subscribed [default]Mesa/P12/Alarm Metrics.'));
+            expect([...new Set(metrics.map((l) => l.replace(/.*Alarm Metrics\./, '').trim()))].sort())
                 .toEqual(['ActiveAckCount', 'ActiveUnackCount', 'HighestActivePriority']);
             expect(lines.some((l) => /live plan rebuilt: \d+ map items, \d+ tag paths/.test(l))).toBe(true);
         } finally {

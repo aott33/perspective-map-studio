@@ -321,8 +321,8 @@
     "note": "The run-to-run spread on software WebGL is recorded in docs/platform-checks.md, section \"Story 7\". NFR-1 asks for 60 frames per second in a laptop browser; the renderer this ran on is in env.renderer."
   },
   "valueBatch": {
-    "label": "stand-in",
-    "method": "values.batch does not exist yet. The AD-6 envelope {v, type, id, body: {seq, full, items}} is built for the scale view's pads with three LiveValue slots per pad (comms, icon KPI, alarm count) and its JSON size is measured (UTF-8 bytes, and gzip of the same text). The pad count is the number MapLibre loaded on /scale.",
+    "label": "measured",
+    "method": "Playwright websocket frame sizes of the Perspective session socket on /live (an anonymous viewer): the frame that carries the full values.batch sent after map.load (every planned map item and the kind display), and the first changes-only values.batch after a map editor toggled one dev tag. Bytes are the frame's UTF-8 text as received (Perspective wraps the envelope in its own message); gzip of the same text is the best case, not the wire.",
     "env": {
       "chromium": "153.0.8010.12",
       "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
@@ -336,35 +336,21 @@
       "viewport": "1440x900",
       "attempt": 0
     },
-    "assumption": "AD-6 fixes only the LiveValue fields {value, quality, t, stale, reason}; the item layout (pad id plus three named slots) is this story's guess, unverified. Whether Perspective compresses websocket frames is unverified, so gzip is an upper bound on the saving, not the wire size.",
-    "pads": 30,
-    "slotsPerPad": 3,
+    "refreshIntervalSeconds": 10,
+    "mapItems": 124,
     "full": {
-      "items": 30,
-      "jsonBytes": 9230,
-      "gzipBytes": 707
+      "bytes": 32967,
+      "gzipBytes": 2291,
+      "items": 50,
+      "kindDisplay": true,
+      "seq": 314
     },
     "changesOnly": {
-      "items": 3,
-      "jsonBytes": 1019,
-      "gzipBytes": 236,
-      "rule": "every 10th pad changed"
-    },
-    "wireRoundTrip": {
-      "label": "measured",
-      "method": "Playwright websocket frame sizes of the Perspective session socket, frames whose bytes contain \"point.click\", from the click to the reply",
-      "frames": [
-        {
-          "direction": "sent",
-          "bytes": 261,
-          "type": "point.click"
-        },
-        {
-          "direction": "received",
-          "bytes": 327,
-          "type": "point.click.reply"
-        }
-      ]
+      "bytes": 2354,
+      "gzipBytes": 487,
+      "items": 2,
+      "seq": 322,
+      "rule": "the map items whose values changed since the last batch"
     }
   },
   "phone": {
