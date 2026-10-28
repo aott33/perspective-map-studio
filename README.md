@@ -12,12 +12,14 @@ An Ignition **8.3** Perspective module that puts your field on a map. Every site
 
 ## Showcase
 
+The map pictures are the design that 0.3.0 is building toward (UX mockups, 2026-10-27); parts of them, such as search, Needs you and instruments on lines, are still in progress. The setup form is the shipped Designer screen.
+
 | | |
 |---|---|
-| ![Live map with a popup](docs/screenshots/mapstudio-live-1440.png) | **Live state on the map.** Each icon shows its kind, comms, a key value and the highest alarm with its priority digit. Normal sites stay neutral grey; colour appears only when something needs you. Click a site for its popup: comms with data age, key values and alarms, updating while it is open. |
-| ![The map on a phone](docs/screenshots/mapstudio-live-390.png) | **Works on a phone.** The same map at 390 px, touch only. |
+| ![The map with a site's popup](docs/images/showcase/map-popup-desktop.png) | **Live state on the map.** Each site is a neutral disc with its kind's glyph and name; colour appears only when something needs you, always with a glyph and words ("Comms lost", "Stale", an alarm triangle with its priority). Click a site for its popup: comms with data age, key values, and its alarms with a button to your alarm page. Search and the Needs you summary sit along the top. |
+| ![A pipeline with its instruments](docs/images/showcase/line-instruments.png) | **Pipelines and their instruments.** Pressure taps, meters and line valves sit at their place on the line. Click a segment to see the instruments in order with their live values. |
+| ![The map on a phone](docs/images/showcase/phone-sheet.png) | **Made for phones too.** At 390 px the popup becomes a bottom sheet with large touch targets. |
 | ![Map Studio Setup in the Designer](docs/screenshots/setup-editor-normal.png) | **One setup per project, in the Designer.** Pick the database connection, who can edit, where your kinds and assets come from, and the basemaps. Changes apply with no Gateway restart. |
-| ![Icon set](docs/screenshots/icons-contact-sheet-1440.png) | **A built-in oil and gas icon set.** One minimalist style for wells, tanks, compressors, meters and more. |
 
 ## What it does
 
