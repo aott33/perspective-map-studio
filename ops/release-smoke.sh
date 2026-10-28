@@ -135,14 +135,15 @@ fi
 
 START_S="$(date +%s)"
 STEP_S="${START_S}"
-since() {
+PASSED=()
+# A passed check, with the seconds since the previous one.
+pass() {
   local now
   now="$(date +%s)"
-  printf '%ds' "$((now - STEP_S))"
+  ok "$1 ($((now - STEP_S)) s)"
   STEP_S="${now}"
+  PASSED+=("$1")
 }
-PASSED=()
-pass() { ok "$1 ($(since))"; PASSED+=("$1"); }
 fail() { err "$1"; exit 1; }
 
 rm -rf "${WORK:?}"
@@ -327,7 +328,8 @@ if not mine:
 m = mine[0]
 state, version = m.get("state"), str(m.get("version"))
 print("    %s %s (%s)" % (m.get("id"), version, state))
-sys.exit(0 if state == "ACTIVE" and version == os.environ["VERSION"] else 1)'; then
+# The route says "0.2.0 (b0)": the version, then the build number [live 8.3.9].
+sys.exit(0 if state == "ACTIVE" and version.split(" ")[0] == os.environ["VERSION"] else 1)'; then
   fail "The module is not ACTIVE at ${VERSION} (GET /data/api/v1/modules/healthy)"
 fi
 pass "module ${ID} ${VERSION} ACTIVE"
