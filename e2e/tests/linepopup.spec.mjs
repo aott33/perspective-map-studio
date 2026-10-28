@@ -170,15 +170,16 @@ editorTest.describe('1440 px', () => {
             await expect(liveItem(page, ids.pt1)).toHaveAttribute('data-kpi', '398 psi', { timeout: INTERVAL_MS });
             await expect(liveItem(page, ids.pt2)).toHaveAttribute('data-kpi', '371 psi', { timeout: INTERVAL_MS });
 
-            // At zoom 14 over the line the names sit at their places along it, in order from CTB1 to SWD1.
+            // At zoom 14 over the line the names sit at their places along it, in order from CTB1 to SWD1
+            // (PT-2 and SWD1 are 81 m apart, 11 px here, so one of their names gives way to the other, entry 7).
             await view(page, map, SWD.mid, 14);
             const labels = JSON.parse(await map.getAttribute('data-labels'));
-            const xOf = (name) => {
-                const b = labels.find((l) => l.layer === 'mapstudio-items-name' && l.text === name);
-                expect(b, 'the name ' + name).toBeDefined();
-                return b.x;
-            };
-            const xs = ['CTB1', 'PT-1', 'LV-1', 'PT-2', 'SWD1'].map(xOf);
+            const names = ['CTB1', 'PT-1', 'LV-1', 'PT-2', 'SWD1']
+                .map((name) => labels.find((l) => l.layer === 'mapstudio-items-name' && l.text === name))
+                .filter((b) => b !== undefined);
+            expect(names.map((b) => b.text), 'the names drawn').toEqual(expect.arrayContaining(['CTB1', 'PT-1', 'LV-1']));
+            expect(names.some((b) => b.text === 'PT-2' || b.text === 'SWD1'), 'the line end').toBe(true);
+            const xs = names.map((b) => b.x);
             expect([...xs].sort((a, b) => a - b), 'the instruments in order along the line').toEqual(xs);
 
             // A click between PT-1 and LV-1 opens the line popup at the segment PT-1 to PT-2 (LV-1 lies inside
