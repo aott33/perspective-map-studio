@@ -47,7 +47,12 @@ describe('marker properties and image ids (epic 3 entries 5 and 7)', () => {
         const props = markerProperties('p1', 'Point 1', 'pad', 'well-pad', NORMAL, { labelRank: 10 });
         expect(props).toMatchObject({ id: 'p1', name: 'Point 1', kind: 'pad', state: 'normal', word: '', kpi: '412 psi', kpiStale: false,
             members: 1, memberIds: '', selected: false });
-        expect(parseImageId(props.marker)).toEqual({ kind: 'marker', spec: { icon: 'well-pad', look: 'normal', badge: '', priority: 0, solid: false, selected: false, preset: 'normal' } });
+        expect(parseImageId(props.marker)).toEqual({ kind: 'marker', spec: { icon: 'well-pad', look: 'normal', badge: '', priority: 0, solid: false, selected: false, preset: 'normal', instrument: false } });
+        // An instrument (entry 2): the eighth element of the id, the 24 px disc in the image.
+        const tap = markerProperties('t1', 'PT-1', 'tap', 'tap', NORMAL, { instrument: true });
+        expect(parseImageId(tap.marker)).toEqual({ kind: 'marker', spec: { icon: 'tap', look: 'normal', badge: '', priority: 0, solid: false, selected: false, preset: 'normal', instrument: true } });
+        expect(tap.marker).toMatch(/,true\]$/);
+        expect(parseImageId(tap.marker.replace(',true]', ',false]'))).toBeNull();
         expect(props.marker).not.toContain('psi');
         expect(props.dotMid).toBe(dotImageId(11, false));
         expect(props.dotSmall).toBe(dotImageId(7, false));
@@ -60,7 +65,7 @@ describe('marker properties and image ids (epic 3 entries 5 and 7)', () => {
 
     test('comms lost: the comms-lost badge, the word Comms lost, the stale KPI, the marker at every zoom', () => {
         const spec = markerSpec('well-pad', LOST);
-        expect(spec).toEqual({ icon: 'well-pad', look: 'comms-lost', badge: 'comms-lost', priority: 0, solid: false, selected: false, preset: 'normal' });
+        expect(spec).toEqual({ icon: 'well-pad', look: 'comms-lost', badge: 'comms-lost', priority: 0, solid: false, selected: false, preset: 'normal', instrument: false });
         expect(parseImageId(markerImageId(spec))).toEqual({ kind: 'marker', spec });
         const props = markerProperties('p1', 'Point 1', 'pad', 'well-pad', LOST);
         expect(props).toMatchObject({ word: 'Comms lost', kpi: '412 psi', kpiStale: true, state: 'comms-lost', rank: RANK_COMMS_LOST });

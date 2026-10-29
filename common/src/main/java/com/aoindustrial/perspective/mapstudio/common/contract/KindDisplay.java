@@ -107,6 +107,26 @@ public record KindDisplay(String kindId, boolean comms, List<Kpi> kpis, boolean 
         return new KindDisplay(kindId, comms, List.copyOf(kpis), alarmsOn, count, summary, link, styleRule, areaTints);
     }
 
+    /**
+     * The icon KPI's key (a KPI that is on and marked {@code icon}), or null. An instrument of a
+     * kind with one measures (epic 3 entry 2, decision 1): it bounds a line segment and its value is
+     * the one the line popup's row and the segment look read; an instrument without one (a line
+     * valve) sits on a segment. The browser applies the same rule ({@code web/typescript/live.ts}).
+     */
+    public String iconKpi() {
+        for (Kpi kpi : kpis) {
+            if (kpi.icon() && kpi.on()) {
+                return kpi.key();
+            }
+        }
+        return null;
+    }
+
+    /** True when the kind's instruments bound line segments: the setup has an icon KPI that is on. */
+    public boolean measures() {
+        return iconKpi() != null;
+    }
+
     /** True when any part would show: comms, a KPI that is on, or alarms. */
     public boolean showsAnything() {
         if (comms || alarmsOn) {

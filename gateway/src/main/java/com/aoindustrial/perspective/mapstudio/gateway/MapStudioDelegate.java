@@ -152,11 +152,24 @@ public class MapStudioDelegate extends ComponentModelDelegate {
         }
     }
 
-    /** {@code popup.open} and {@code popup.close} (AD-7): the item id is required; nothing is answered on success. */
+    /**
+     * {@code popup.open} and {@code popup.close} (AD-7): the item id is required; nothing is answered
+     * on success. {@code popup.open} may carry {@code segment {fromId, toId}} (entry 2: the line segment
+     * the popup opened at, for the browser's own use); when present it must be two non-empty ids.
+     */
     private JsonObject popupReply(String type, String id, JsonObject body) {
         String itemId = stringOrNull(body.get("itemId"));
         if (itemId == null || itemId.isBlank()) {
             return error(id, Messages.CODE_INVALID, type + " needs an itemId.");
+        }
+        JsonElement segment = body.get("segment");
+        if (segment != null && !segment.isJsonNull()) {
+            String from = segment.isJsonObject() ? stringOrNull(segment.getAsJsonObject().get("fromId")) : null;
+            String to = segment.isJsonObject() ? stringOrNull(segment.getAsJsonObject().get("toId")) : null;
+            if (from == null || from.isBlank() || to == null || to.isBlank()) {
+                return error(id, Messages.CODE_INVALID, type + "'s segment needs fromId and toId.");
+            }
+            log.debugf("%s of %s at segment %s to %s", type, itemId, from, to);
         }
         LiveSession s = liveSession();
         if (s != null) {

@@ -35,7 +35,10 @@ describe('envelope builder', () => {
     });
 
     test('popup.open and popup.close carry the item id (epic 3 entry 5)', () => {
-        expect(popupOpen('p1', 'o')).toEqual({ v: 1, type: 'popup.open', id: 'o', body: { itemId: 'p1' } });
+        expect(popupOpen('p1', null, 'o')).toEqual({ v: 1, type: 'popup.open', id: 'o', body: { itemId: 'p1' } });
+        // Epic 3 entry 2: a line's popup names the segment it opened at.
+        expect(popupOpen('l1', { fromId: 'a', toId: 'b' }, 'o2'))
+            .toEqual({ v: 1, type: 'popup.open', id: 'o2', body: { itemId: 'l1', segment: { fromId: 'a', toId: 'b' } } });
         expect(popupClose('p1', 'c')).toEqual({ v: 1, type: 'popup.close', id: 'c', body: { itemId: 'p1' } });
         const batch = readReply({ v: 1, type: 'values.batch', id: 'b', body: { seq: 2, full: false, items: [] } });
         expect(replyText(batch)).toBe('Live values: 0 map item(s) at seq 2');

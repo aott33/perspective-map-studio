@@ -3,12 +3,26 @@
  * No MapLibre or React import, so this module is unit tested in node.
  */
 
+/** One instrument of a line's map item object (AD-7, epic 3 entry 2), in order along the line. */
+export interface PopupInstrument {
+    id: string;
+    name: string;
+    kind: string;
+    distanceM: number;
+    /** The instrument's values from the last batch (comms, kpis, alarms, style), or null before the first. */
+    liveValues: unknown;
+}
+
 /** The point record the popup view receives as its `mapItem` parameter. */
 export interface PopupPoint {
     id: string;
     name: string;
     /** The map item's kind id (epic 3 entry 5: the default popup reads its display); '' when unknown. */
     kind?: string;
+    /** A line's instruments in order (entry 2); absent on a point. */
+    instruments?: PopupInstrument[];
+    /** The segment a line's popup opened at (entry 2); absent on a point or when the click named none. */
+    segment?: { fromId: string; toId: string } | null;
 }
 
 /** Author-set parameters from the `popupView.params` prop. */
@@ -37,7 +51,13 @@ export function popupViewParams(authorParams: AuthorParams | null | undefined, p
             params[key] = authorParams[key];
         });
     }
-    params[MAP_ITEM_PARAM] = { id: point.id, name: point.name };
+    const mapItem: Record<string, unknown> = { id: point.id, name: point.name };
+    if (point.instruments) {
+        // A line's map item object carries its ordered instruments and the open segment (AD-7, entry 2).
+        mapItem.instruments = point.instruments.map((i) => ({ ...i }));
+        mapItem.segment = point.segment ? { fromId: point.segment.fromId, toId: point.segment.toId } : null;
+    }
+    params[MAP_ITEM_PARAM] = mapItem;
     return params;
 }
 
@@ -57,18 +77,50 @@ export function fallbackText(point: PopupPoint): string {
 /** The default popup's widest (its stylesheet max-width) and narrowest (min-width) in px. */
 export const POPUP_MAX_PX = 320;
 export const POPUP_MIN_PX = 220;
+/** The line popup's width (DESIGN.md line-popup-width; decision D1 keeps it at 350 px). */
+export const LINE_POPUP_PX = 350;
 /** Margin kept between the popup and the map's edge, in px. */
 const POPUP_EDGE_PX = 16;
+/** The popup card's tallest (DESIGN.md popup-max-height, decision D1) and the room the map keeps round it. */
+export const POPUP_MAX_HEIGHT_PX = 480;
+const POPUP_HEIGHT_MARGIN_PX = 64;
+/** A card is never clamped below this: the header and a few rows. */
+const POPUP_MIN_HEIGHT_PX = 120;
 
 /**
  * The popup's max-width (a CSS length) for a point at `x` px in a map `width` px wide, so a popup
  * opened near a phone's edge stays inside the map: the width that fits centred on the point, or the
  * narrowest the popup gets (MapLibre then anchors it beside the point), never wider than the
- * stylesheet's widest or the map less a margin each side.
+ * stylesheet's widest (`maxPx`, the line popup's 350) or the map less a margin each side.
  */
-export function popupMaxWidth(x: number, width: number): string {
+export function popupMaxWidth(x: number, width: number, maxPx: number = POPUP_MAX_PX): string {
     const room = Math.max(0, width - 2 * POPUP_EDGE_PX);
     const centred = 2 * Math.min(x, width - x) - POPUP_EDGE_PX;
-    const px = Math.min(POPUP_MAX_PX, room, Math.max(POPUP_MIN_PX, Math.floor(centred)));
+    const px = Math.min(maxPx, room, Math.max(POPUP_MIN_PX, Math.floor(centred)));
     return Math.max(px, Math.min(POPUP_MIN_PX, room)) + 'px';
+}
+
+/** Where the line popup goes and how tall it may be (entry 2; the popup review's P3 and P7). */
+export interface PopupPlacement {
+    /** MapLibre's anchor: `bottom` puts the card above the point, `top` below it. */
+    anchor: 'top' | 'bottom';
+    /** The card's max-height in px: the stylesheet's 480, the map less 64, or the room on the chosen side. */
+    maxHeight: number;
+}
+
+/**
+ * The line popup's placement for a point `y` px down a map `height` px tall, a card whose content is
+ * `cardHeight` px tall and MapLibre's tip `offset`: above the point when the card fits there (the
+ * review's preferred side, so the line stays in view), else below when it fits there, else the side
+ * with more room, the card clamped to that room so it never leaves the map (its body scrolls) and
+ * never taller than 480 px or the map less 64 px.
+ */
+export function linePopupPlacement(y: number, height: number, cardHeight: number, offset: number): PopupPlacement {
+    const above = Math.floor(y - offset - POPUP_EDGE_PX);
+    const below = Math.floor(height - y - offset - POPUP_EDGE_PX);
+    const cap = Math.min(POPUP_MAX_HEIGHT_PX, height - POPUP_HEIGHT_MARGIN_PX);
+    const wanted = Math.min(cardHeight, cap);
+    const anchor: 'top' | 'bottom' = wanted <= above ? 'bottom' : wanted <= below ? 'top' : above >= below ? 'bottom' : 'top';
+    const room = anchor === 'bottom' ? above : below;
+    return { anchor, maxHeight: Math.max(POPUP_MIN_HEIGHT_PX, Math.min(cap, room)) };
 }

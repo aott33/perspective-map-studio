@@ -90,8 +90,15 @@ export function mapLoad(id?: string): Envelope<Record<string, never>> {
 }
 
 /** The `popup.open` message: the browser opened a map item's popup (its values are pushed on change). */
-export function popupOpen(itemId: string, id?: string): Envelope<{ itemId: string }> {
-    return envelope(MessageTypes.POPUP_OPEN, { itemId }, id);
+/** The segment a line's popup opened at (epic 3 entry 2, AD-7): the two node ids round the clicked spot. */
+export interface PopupSegment {
+    fromId: string;
+    toId: string;
+}
+
+/** `popup.open {itemId, segment?}`: the Gateway pushes the item's values, and a line's instruments', while it is open. */
+export function popupOpen(itemId: string, segment?: PopupSegment | null, id?: string): Envelope<{ itemId: string; segment?: PopupSegment }> {
+    return envelope(MessageTypes.POPUP_OPEN, segment ? { itemId, segment: { fromId: segment.fromId, toId: segment.toId } } : { itemId }, id);
 }
 
 /** The `popup.close` message. */
