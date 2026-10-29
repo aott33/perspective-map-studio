@@ -1,0 +1,19 @@
+{
+ "pages": {
+  "/": {
+   "viewPath": "Showcase",
+   "viewParams": {}
+  },
+  "/alarms/:item": {
+   "viewPath": "ShowcaseAlarms",
+   "viewParams": {}
+  },
+  "/site/:name": {
+   "viewPath": "ShowcaseSite",
+   "viewParams": {}
+  }
+ },
+ "shared": {},
+ "defaultView": "Showcase",
+ "props": {}
+}

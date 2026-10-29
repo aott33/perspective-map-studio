@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Comms",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Boolean",
+    "value": false
+  },
+  {
+    "name": "CasingPressure",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 880.0
+  },
+  {
+    "name": "TubingPressure",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 300.0
+  },
+  {
+    "name": "GasRate",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 1.1
+  }
+]

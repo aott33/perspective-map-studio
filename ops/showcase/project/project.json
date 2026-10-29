@@ -1,0 +1,7 @@
+{
+  "title": "mapstudio-showcase",
+  "description": "Map Studio showcase project (epic 3 entry 15), bind-mounted from the repository (ops/showcase/project): one page with the Map Studio component alone, on a demo field seeded with the UX mockups' names and states by the dev project's /edit page (Seed the showcase map). No test controls or readouts.",
+  "enabled": true,
+  "inheritable": false,
+  "parent": ""
+}

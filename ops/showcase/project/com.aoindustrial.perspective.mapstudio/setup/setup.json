@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "connection": "MapStudio",
+  "roles": {
+    "full": ["MapEditor"],
+    "phone": ["MapOperator"]
+  },
+  "kindsFunction": "mapstudio_showcase.kinds",
+  "assetsFunction": "mapstudio_showcase.assets",
+  "refreshIntervalSeconds": 10,
+  "alarmPage": "/alarms/{asset.id}",
+  "basemaps": ["none", "osm"],
+  "tokenSecret": ""
+}

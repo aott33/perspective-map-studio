@@ -126,6 +126,9 @@ services:
       # The committed dev project, mounted in so a browser session can render it.
       # Designer saves write straight back into the repo.
       - ./project:/usr/local/bin/ignition/data/projects/mapstudio-dev
+      # The showcase project (epic 3 entry 15): the component alone on the mockups' demo field, seeded
+      # from the dev project's /edit page ("Seed the showcase map").
+      - ./showcase/project:/usr/local/bin/ignition/data/projects/mapstudio-showcase
     # Everything after "--" goes to the JVM.
     #   externalModulesFolder: where the Gateway looks for third-party modules.
     #   allowunsignedmodules: load the unsigned dev build (dev Gateway only).

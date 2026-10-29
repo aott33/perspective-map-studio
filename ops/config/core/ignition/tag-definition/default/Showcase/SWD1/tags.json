@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Comms",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Boolean",
+    "value": true
+  },
+  {
+    "name": "Pressure",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 365.0
+  },
+  {
+    "name": "InjectionRate",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 4200.0
+  }
+]

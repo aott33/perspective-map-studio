@@ -445,18 +445,23 @@ def _count_scale(records, seed):
     return {'pads': pads, 'lines': lines}
 
 
-def run(project=PROJECT, actor=ACTOR, api=None, make_id=seed_id, new_batch=_new_batch):
+def run(project=PROJECT, actor=ACTOR, api=None, make_id=seed_id, new_batch=_new_batch, seed=None, kind_setups=None):
     """
     Seed the project's map. Returns {created, updated, restored, unchanged, seq, ids, scale,
     kindSetup}, plus error (the refusal's text, code first) when nothing was written; scale
     counts the live map items whose ids are the scale set's seed ids, by kind ({pads, lines}),
     read back after the save; kindSetup says what happened to the pad kind setup (created,
-    updated, unchanged). `api` is system.mapstudio unless a test passes a stand-in.
+    updated, unchanged). `api` is system.mapstudio unless a test passes a stand-in. `seed` and
+    `kind_setups` are the dev map's unless another set is passed (the showcase map, epic 3 entry
+    15: mapstudio_showcase_seed, with its own ids), in the shapes seed_items and KIND_SETUPS give.
     """
     if api is None:
         api = system.mapstudio
     logger = _logger()
-    seed = seed_items(make_id)
+    if seed is None:
+        seed = seed_items(make_id)
+    if kind_setups is None:
+        kind_setups = KIND_SETUPS
     result = {'created': 0, 'updated': 0, 'restored': 0, 'unchanged': 0, 'seq': None,
               'ids': dict([(item['key'], item['id']) for item in seed]), 'scale': None}
     try:
@@ -476,12 +481,12 @@ def run(project=PROJECT, actor=ACTOR, api=None, make_id=seed_id, new_batch=_new_
     # The kind setups (epic 3 entries 5 and 1), more ops of the same batch; kindSetup says what
     # happened to the pad's (as before), kindSetups to each.
     result['kindSetups'] = {}
-    for kind_id, setup in KIND_SETUPS:
+    for kind_id, setup in kind_setups:
         setup_ops = plan_setup_ops(getattr(current, 'kindSetups', None), kind_id, setup)
         ops = ops + setup_ops
         result['kindSetups'][kind_id] = 'created' if setup_ops and setup_ops[0]['op'] == 'create' else (
             'updated' if setup_ops else 'unchanged')
-    result['kindSetup'] = result['kindSetups']['pad']
+    result['kindSetup'] = result['kindSetups'].get('pad')
     restored = 0
     if ops:
         answer = None

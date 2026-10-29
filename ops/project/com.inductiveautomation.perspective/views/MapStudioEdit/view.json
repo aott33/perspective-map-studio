@@ -160,6 +160,35 @@
         ]
        }
       }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Seed the showcase map"
+      },
+      "meta": {
+       "name": "showcase",
+       "domId": "mapstudio-dev-showcase"
+      },
+      "position": {
+       "basis": "190px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 3 entry 15): seed the mapstudio-showcase project's map with the UX mockups' demo field\n\t# and put its demo tags in the mockups' states (project library mapstudio_showcase_seed). Safe to re-run.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.seed')\n\tout = self.view.rootContainer.getChild('showcaseResult')\n\n\t# The scripting API trusts its caller (docs/contract.md), so this view checks the role itself.\n\tif not mapstudio_dev.holdsMapEditor(self.session):\n\t\tout.props.text = system.util.jsonEncode({'refused': 'Seeding writes to the map store, so it needs the MapEditor role. Sign in as a map editor first.', 'ranAt': system.date.toMillis(system.date.now())})\n\t\tlogger.info('Showcase seed refused: the session user does not hold MapEditor.')\n\t\treturn\n\n\ttry:\n\t\tresult = mapstudio_showcase_seed.run()\n\texcept java.lang.Throwable as ex:\n\t\tresult = {'error': ex.getMessage()}\n\t\tlogger.warn('Showcase seed failed: %s' % ex.getMessage())\n\texcept Exception as ex:\n\t\tresult = {'error': str(ex)}\n\t\tlogger.warn('Showcase seed failed: %s' % ex)\n\t# ranAt tells two runs with the same result apart.\n\tresult['ranAt'] = system.date.toMillis(system.date.now())\n\tout.props.text = system.util.jsonEncode(result)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
      }
     ]
    },
@@ -222,6 +251,25 @@
     "meta": {
      "name": "seedResult",
      "domId": "mapstudio-dev-seed-result"
+    },
+    "position": {
+     "basis": "24px",
+     "shrink": 0
+    },
+    "custom": {}
+   },
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {
+     "text": "",
+     "style": {
+      "padding": "4px 12px"
+     }
+    },
+    "meta": {
+     "name": "showcaseResult",
+     "domId": "mapstudio-dev-showcase-result"
     },
     "position": {
      "basis": "24px",

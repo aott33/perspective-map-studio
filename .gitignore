@@ -61,3 +61,7 @@ __pycache__/
 ops/perf/project/**/thumbnail.png
 ops/perf/project/com.inductiveautomation.perspective/session-props/
 ops/perf/project/com.inductiveautomation.vision/
+# The same for the showcase project (epic 3 entry 15)
+ops/showcase/project/**/thumbnail.png
+ops/showcase/project/com.inductiveautomation.perspective/session-props/
+ops/showcase/project/com.inductiveautomation.vision/
