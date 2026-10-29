@@ -193,7 +193,8 @@ class InstrumentsLiveTest {
         // PT-1 in fault too: the worse of the two ends.
         tags.deliver("[default]Mesa/SWD/PT1/Pressure", 700);
         assertEquals(List.of("fault", "fault", "attention"), presets(lineItem().getAsJsonArray("segments")));
-        assertFalse(lineItem().toString().contains("[default]"), "no path in the batch");
+        // No path in a values batch; only the open popup's own push carries the popup detail (entry 8).
+        assertFalse(cache.itemsBatch(P, Set.of(LINE)).body().toString().contains("[default]"), "no path in the batch");
     }
 
     @Test
@@ -279,7 +280,16 @@ class InstrumentsLiveTest {
         push.body().getAsJsonArray("items").forEach((e) -> pushed.add(e.getAsJsonObject().get("id").getAsString()));
         assertEquals(Set.of(LINE, PT1, LV1, PT2), Set.copyOf(pushed));
         assertFalse(push.full());
+        push.body().getAsJsonArray("items").forEach((e) -> assertFalse(e.getAsJsonObject().has("popup"),
+            "a batch that names no open item carries no popup detail"));
         assertNull(cache.itemsBatch(P, Set.of("nope")));
+        // The open line popup's push (entries 2 and 8 merged): the line carries the popup detail, its
+        // instruments never do.
+        LiveValueCache.Batch open = cache.itemsBatch(P, cache.popupItems(P, LINE), LINE);
+        open.body().getAsJsonArray("items").forEach((e) -> {
+            JsonObject item = e.getAsJsonObject();
+            assertEquals(LINE.equals(item.get("id").getAsString()), item.has("popup"), item.get("id").getAsString());
+        });
     }
 
     @Test
