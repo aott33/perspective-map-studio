@@ -130,4 +130,12 @@ Built 2026-10-28 over four sessions of one agent (a container restart stopped th
 
 ## Results
 
-RESULTS_PLACEHOLDER
+The final chain, green in one run on a fresh stack (2026-10-29 00:02 to 00:26 UTC, the 4-CPU agent box, `inductiveautomation/ignition:8.3.10`, container `ms-a86ba8d9` on port 9088, PostgreSQL 16, fresh volumes), after one earlier full run whose only two failures were the seed counts of `scale.spec.mjs` and `styles.spec.mjs` (fixed in `ea5e76e` and the whole chain run again):
+
+- `./gradlew clean build --offline` (JDK 17, the scratch node init script): BUILD SUCCESSFUL in 1m 2s, every unit test passed (`InstrumentsLiveTest`, `MapStudioDelegateTest` included).
+- `cd web && npx tsc --noEmit && npx jest`: clean; 27 suites, 223 tests passed.
+- `ops/up.sh --fresh --no-build` with the module staged by hand, then `cd e2e && npm ci && E2E_DOCS=1 PW_CHROMIUM_PATH=/opt/pw-browsers/chromium npm test`: 76 passed, 7 skipped (the `store-ops` and `unsaved` tests that stop the Gateway, skipped by design), 0 failed, 21.5 min; `linepopup.spec.mjs` both tests (1440 px 25 s, 390 px 16 s).
+- `bash scripts/ci/check-contract-versions.sh`: OK (contract 0.3.0, setup schema 1, map store schema 2); `bash scripts/ci/test-contract-versions.sh`: OK.
+- No em dash in any changed file.
+- Screenshots: `docs/screenshots/mapstudio-line-popup-1440.png`, `mapstudio-line-popup-stale-1440.png` and `mapstudio-line-popup-390.png` committed and compared with the key-screen-3 mockups (the card, the segment box, the comms line, the five rows with PT-1 and PT-2 highlighted, the dashed stale segments and PT-1's comms-lost badge at its place match; the differences are the ones the Decisions record: "Flow 0 bbl/d" in place of "No active alarms" since the line's setup turns alarms off, "3 instruments" not 4, "2 km" not "2.0 km", and MapLibre's focus ring on the close button); the screenshots the other specs refresh under `E2E_DOCS=1` committed as entries 1 and 7 did.
+- `docs/platform-checks.md`, "Epic 3 entry 2", holds the facts and the **[not verified]** list (a floating end, two instruments at one distance, a real touch device, the line's own alarm over the segment look, the hues against a real basemap, the owner's eye on the mockups).

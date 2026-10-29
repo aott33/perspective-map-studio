@@ -30,21 +30,21 @@
     "files": [
       {
         "file": "MapStudio.css",
-        "bytes": 79805,
-        "gzipBytes": 11780,
-        "transferredBodyBytes": 11804,
+        "bytes": 87569,
+        "gzipBytes": 12914,
+        "transferredBodyBytes": 12933,
         "contentEncoding": "gzip",
         "story2Bytes": 70976,
-        "deltaBytes": 8829
+        "deltaBytes": 16593
       },
       {
         "file": "MapStudio.js",
-        "bytes": 1269227,
-        "gzipBytes": 341923,
-        "transferredBodyBytes": 340766,
+        "bytes": 1282497,
+        "gzipBytes": 345787,
+        "transferredBodyBytes": 344646,
         "contentEncoding": "gzip",
         "story2Bytes": 1167572,
-        "deltaBytes": 101655
+        "deltaBytes": 114925
       },
       {
         "file": "mapstudio-icons.svg",
@@ -65,8 +65,8 @@
     ],
     "modl": {
       "file": "Map-Studio.unsigned.modl",
-      "bytes": 1922916,
-      "sha256": "cdca1d66129c391dbda995f0d110013424094455aa3654f666db987da7a720b2"
+      "bytes": 1940900,
+      "sha256": "8b0f2bcb89fabf069a735b905c1417f76e0369f5a5346c597002503ce6aa7c0f"
     },
     "note": "transferredBodyBytes 0 on maplibre-gl-worker.js: Playwright reported no body transfer for the worker request (Chromium fetches a worker script outside the page; why is unverified). Use bytes and gzipBytes for that file.",
     "budget": "none defined; recorded only"
@@ -96,36 +96,36 @@
           "lines": 30
         },
         "drawn": {
-          "points": 37,
-          "lines": 34
+          "points": 42,
+          "lines": 35
         },
         "runs": [
           {
             "pan": {
-              "frames": 74,
-              "spanMs": 4033,
-              "fps": 18.1,
+              "frames": 40,
+              "spanMs": 4066,
+              "fps": 9.59,
               "intervalMs": {
-                "p50": 50,
-                "p95": 83.4,
-                "max": 116.7
+                "p50": 83.4,
+                "p95": 233.3,
+                "max": 283.3
               },
-              "shareOver20msPercent": 93.2,
+              "shareOver20msPercent": 100,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
               }
             },
             "zoom": {
-              "frames": 73,
-              "spanMs": 4000,
-              "fps": 18,
+              "frames": 49,
+              "spanMs": 4100,
+              "fps": 11.71,
               "intervalMs": {
-                "p50": 50,
-                "p95": 83.4,
-                "max": 116.7
+                "p50": 83.3,
+                "p95": 166.7,
+                "max": 183.3
               },
-              "shareOver20msPercent": 97.2,
+              "shareOver20msPercent": 91.7,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
@@ -134,15 +134,47 @@
           },
           {
             "pan": {
-              "frames": 70,
-              "spanMs": 4033,
-              "fps": 17.11,
+              "frames": 40,
+              "spanMs": 4200,
+              "fps": 9.29,
+              "intervalMs": {
+                "p50": 100,
+                "p95": 216.7,
+                "max": 250
+              },
+              "shareOver20msPercent": 97.4,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 69,
+              "spanMs": 4183,
+              "fps": 16.26,
+              "intervalMs": {
+                "p50": 50,
+                "p95": 150,
+                "max": 216.6
+              },
+              "shareOver20msPercent": 79.4,
+              "longTasks": {
+                "count": 1,
+                "totalMs": 98
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 80,
+              "spanMs": 4050,
+              "fps": 19.51,
               "intervalMs": {
                 "p50": 50,
                 "p95": 83.4,
-                "max": 133.4
+                "max": 100
               },
-              "shareOver20msPercent": 94.2,
+              "shareOver20msPercent": 91.1,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
@@ -150,46 +182,14 @@
             },
             "zoom": {
               "frames": 75,
-              "spanMs": 4017,
-              "fps": 18.42,
+              "spanMs": 4117,
+              "fps": 17.98,
               "intervalMs": {
                 "p50": 50,
                 "p95": 100,
-                "max": 100.1
+                "max": 199.9
               },
-              "shareOver20msPercent": 89.2,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            }
-          },
-          {
-            "pan": {
-              "frames": 71,
-              "spanMs": 4050,
-              "fps": 17.28,
-              "intervalMs": {
-                "p50": 50.1,
-                "p95": 83.4,
-                "max": 100
-              },
-              "shareOver20msPercent": 95.7,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            },
-            "zoom": {
-              "frames": 70,
-              "spanMs": 3950,
-              "fps": 17.47,
-              "intervalMs": {
-                "p50": 50.1,
-                "p95": 99.9,
-                "max": 116.7
-              },
-              "shareOver20msPercent": 94.2,
+              "shareOver20msPercent": 90.5,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
@@ -198,17 +198,17 @@
           }
         ],
         "medianFps": {
-          "pan": 17.28,
-          "zoom": 18
+          "pan": 9.59,
+          "zoom": 16.26
         },
         "fpsRange": {
           "pan": [
-            17.11,
-            18.1
+            9.29,
+            19.51
           ],
           "zoom": [
-            17.47,
-            18.42
+            11.71,
+            17.98
           ]
         }
       }
@@ -237,25 +237,25 @@
       "attempt": 0
     },
     "refreshIntervalSeconds": 10,
-    "mapItems": 107,
+    "mapItems": 113,
     "full": {
-      "bytes": 50376,
-      "gzipBytes": 3711,
-      "items": 89,
+      "bytes": 66658,
+      "gzipBytes": 4713,
+      "items": 111,
       "kindDisplay": true,
-      "seq": 111
+      "seq": 171
     },
     "changesOnly": {
       "bytes": 1454,
-      "gzipBytes": 458,
+      "gzipBytes": 461,
       "items": 1,
-      "seq": 119,
+      "seq": 179,
       "rule": "the map items whose values changed since the last batch"
     }
   },
   "phone": {
     "label": "measured",
-    "method": "Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the dev map at / with the seeded items; each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device's touch handling is unverified. Pan and pinch are read from the open popup's tip position (a DOM stand-in for the point's map position), not from the map's centre or zoom, which the suite cannot reach by design.",
+    "method": "Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the dev map at / with the seeded items (the line-tool probe on /edit, where Edit mode holds the tool); each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device's touch handling is unverified. Pan and pinch are read from the open popup's tip position (a DOM stand-in for the point's map position), not from the map's centre or zoom, which the suite cannot reach by design.",
     "env": {
       "chromium": "153.0.8010.12",
       "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
@@ -283,8 +283,8 @@
       },
       {
         "check": "touch-targets-at-least-44-px",
-        "ok": false,
-        "detail": "Zoom in 29x29; Zoom out 29x29; Fit the map to every item 34x29; Return to the selected item 59x29; None 51x29; OpenStreetMap 111x29; Satellite 66x29; Draw a line 105x29"
+        "ok": true,
+        "detail": "Zoom in 44x44; Zoom out 44x44; Fit the map to every item 44x44; Return to the selected item 44x44; Legend 94x44"
       },
       {
         "check": "tap-a-point-gives-reply-and-popup",
@@ -304,12 +304,12 @@
       {
         "check": "pinch-zooms-the-map",
         "ok": true,
-        "detail": "popup tip distance from the pinch centre grew by a factor of 2.43 for a CDP pinch of scale 2 (needs over 1.5)"
+        "detail": "popup tip distance from the pinch centre grew by a factor of 2.41 for a CDP pinch of scale 2 (needs over 1.5)"
       },
       {
         "check": "line-tool-finishes-by-touch-alone",
         "ok": true,
-        "detail": "data-line-points after two vertex taps and a repeat tap on the last: '2' (whether Terra Draw finishes this way on touch is the thing probed)"
+        "detail": "data-line-points after two vertex taps and a repeat tap on the last, on /edit: '2' (whether Terra Draw finishes this way on touch is the thing probed)"
       },
       {
         "check": "no-console-or-page-errors",
@@ -318,8 +318,8 @@
       }
     ],
     "summary": {
-      "ok": 7,
-      "failed": 2
+      "ok": 8,
+      "failed": 1
     }
   }
 }
