@@ -14,7 +14,7 @@ The closed list is `common/.../contract/StylePresets.java` (`normal`, `attention
 
 | Preset | Point | Line | Word | Token and fallback |
 | --- | --- | --- | --- | --- |
-| `normal` | the neutral disc, glyph and 1.5 px ring | the pipeline grey, solid | none | `--neutral-60` (the line and dot) |
+| `normal` | the neutral disc, glyph and 1.5 px ring (`--neutral-50` on a site, `--neutral-60` on an instrument; DESIGN.md map-marker and instrument-marker) | the pipeline grey, solid; an untapped line and a geofence outline in `--neutral-50` (DESIGN.md line-lateral) | none | `--neutral-60` (the line and dot) |
 | `attention` | a 3 px ring, no hue | the line in the token, solid | "Attention" | `--mapstudio-attention`, falling back to `--neutral-90` (then `--label`) |
 | `warning` | a 2.5 px ring in the token | the line in the token | "Warning" | `--mapstudio-warning`, falling back to `--warning` |
 | `fault` | a 2.5 px ring in the token | the line in the token | "Fault" | `--mapstudio-fault`, falling back to `--error` |

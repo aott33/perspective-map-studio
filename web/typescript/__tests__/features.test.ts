@@ -52,9 +52,10 @@ describe('the map features (epic 3 entry 7)', () => {
         expect(out.boundsKey).toBe('-104.990000,39.740000,-104.950000,39.750000');
     });
 
-    test('a line takes its weight from its size only with an instrument on it, the thin neutral look without', () => {
+    test('a line takes its weight from its size only with an instrument on it, the thin lateral look without', () => {
+        // Untapped: 2 px in the lateral tone (DESIGN.md map-line lateral, entry 15).
         const none = buildFeatures([L], KINDS, LIVE_INITIAL, null, COLORS);
-        expect(none.lines.features[0].properties).toMatchObject({ id: 'l', weight: 2, color: 'l', dashed: false, selected: false });
+        expect(none.lines.features[0].properties).toMatchObject({ id: 'l', weight: 2, color: 'c', dashed: false, selected: false });
         expect(none.marks.features[0].properties).toMatchObject({ id: 'l', label: 'L-1', badge: '' });
         expect(none.arrow.features).toHaveLength(0);
         const tap = item('t', 'tap', 'T', { type: 'Point', coordinates: [-104.97, 39.745] }, { attachment: { lineId: 'l', distanceM: 100 } });
@@ -79,7 +80,7 @@ describe('the map features (epic 3 entry 7)', () => {
 
         const lost: LiveState = { ...live, items: { l: { id: 'l', comms: value(false), kpis: {}, problems: [] } } };
         const dashed = buildFeatures([L], KINDS, lost, { id: 'l', kind: 'line' }, COLORS);
-        expect(dashed.lines.features[0].properties).toMatchObject({ color: 'l', dashed: true });
+        expect(dashed.lines.features[0].properties).toMatchObject({ color: 'c', dashed: true });
         expect(dashed.marks.features[0].properties.label).toBe('L-1 Comms lost');
         expect(dashed.arrow.features[0].geometry.coordinates).toEqual(alongLine(L.geometry.coordinates as Array<[number, number]>, 0.5).point);
     });
@@ -119,7 +120,7 @@ describe('the map features (epic 3 entry 7)', () => {
         const far = out.points.features.find((f) => f.properties.id === 'far')!.properties;
         expect(far).toMatchObject({ state: 'stale', word: 'Stale' });
         expect(far.marker).toContain('"normal"]');
-        expect(out.lines.features[0].properties).toMatchObject({ id: 'l', dotted: true, dashed: false, dimmed: false, color: 'l' });
+        expect(out.lines.features[0].properties).toMatchObject({ id: 'l', dotted: true, dashed: false, dimmed: false, color: 'c' });
         // The area: a closed ring in its tint, no line feature, counted in the bounds.
         expect(out.lines.features).toHaveLength(1);
         expect(out.areas.features).toHaveLength(1);
@@ -128,9 +129,9 @@ describe('the map features (epic 3 entry 7)', () => {
         expect(g.geometry.coordinates[0]).toHaveLength(4);
         expect(g.geometry.coordinates[0][3]).toEqual([-104.99, 39.74]);
         expect(a.marker).not.toContain('t1');
-        // A category with no tint, and a point kind with tints by mistake: the neutral look, no tint.
+        // A category with no tint, and a point kind with tints by mistake: the outline alone in the lateral tone, no tint.
         const south = buildFeatures([{ ...G, properties: { operator: 'South' } }], [...KINDS, AREA_KIND], live, null, COLORS);
-        expect(south.areas.features[0].properties).toMatchObject({ tint: '', color: 'l' });
+        expect(south.areas.features[0].properties).toMatchObject({ tint: '', color: 'c' });
     });
 
     test('bearings: north 0, east 90, along a line', () => {

@@ -1,0 +1,79 @@
+{
+ "custom": {},
+ "params": {
+  "name": ""
+ },
+ "propConfig": {
+  "params.name": {
+   "paramDirection": "input",
+   "persistent": true
+  }
+ },
+ "props": {
+  "defaultSize": {
+   "width": 1440,
+   "height": 900
+  }
+ },
+ "root": {
+  "type": "ia.container.flex",
+  "version": 0,
+  "props": {
+   "direction": "column",
+   "style": {
+    "padding": "8px 12px",
+    "gap": "4px"
+   }
+  },
+  "meta": {
+   "name": "root"
+  },
+  "position": {},
+  "custom": {},
+  "children": [
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {
+     "style": {
+      "fontWeight": "bold"
+     }
+    },
+    "meta": {
+     "name": "title",
+     "domId": "mapstudio-showcase-site-title"
+    },
+    "position": {
+     "basis": "24px",
+     "shrink": 0
+    },
+    "custom": {},
+    "propConfig": {
+     "props.text": {
+      "binding": {
+       "type": "expr",
+       "config": {
+        "expression": "{view.params.name}"
+       }
+      }
+     }
+    }
+   },
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {
+     "text": "The site's page: where the popup's page link lands in the showcase project."
+    },
+    "meta": {
+     "name": "note"
+    },
+    "position": {
+     "basis": "24px",
+     "shrink": 0
+    },
+    "custom": {}
+   }
+  ]
+ }
+}

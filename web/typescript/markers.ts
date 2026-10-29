@@ -31,17 +31,17 @@ import { ItemState, PointPreset, Preset, Tint, alarmGlyphId, itemPreset } from '
 
 /** The theme colours the images and the text layers need, read once from the component root. */
 export interface MarkerColors {
-    /** The disc and chip fill (`--container`). */
+    /** The disc and chip fill: the panel surface (`--neutral-10`, DESIGN.md surface-panel). */
     disc: string;
-    /** The glyph, the text and the neutral ring (`--label`). */
+    /** The glyph and the text (`--label`). */
     glyph: string;
-    /** The halo round the disc and the text (`--containerRoot`). */
+    /** The halo round the disc, the badge and the text: the blank map (`--neutral-20`, DESIGN.md basemap-blank). */
     halo: string;
     /** Secondary text: a stale KPI (`--label--disabled`). */
     textSecondary: string;
-    /** The dot below zoom 14 and the pipeline grey (`--neutral-60`). */
+    /** The dot below zoom 14, the pipeline grey and an instrument's ring (`--neutral-60`, DESIGN.md line-pipeline). */
     line: string;
-    /** The chip's edge (`--neutral-50`). */
+    /** The chip's edge, a site's disc ring, a lateral (an untapped line) and an untinted area's outline (`--neutral-50`, DESIGN.md line-lateral). */
     chipEdge: string;
     /** The selection ring, casing and arrow (`--callToAction`). */
     selection: string;
@@ -88,12 +88,14 @@ export const DIMMED_OPACITY = 0.45;
 export const AREA_FILL_OPACITY = 0.22;
 export const AREA_LINE_OPACITY = 0.8;
 export const AREA_LINE_WIDTH = 1.5;
+/** The dash of an untinted area's outline (a geofence), in units of the line width: 6 px on, 4.5 off at 1.5 px. */
+export const AREA_DASH: [number, number] = [4, 3];
 
 /** The CSS custom properties the colours come from, in the order tried (the first that resolves wins). */
 export const MARKER_TOKENS = {
-    disc: ['--container'],
+    disc: ['--neutral-10', '--container'],
     glyph: ['--label', '--neutral-70'],
-    halo: ['--containerRoot'],
+    halo: ['--neutral-20', '--containerRoot'],
     textSecondary: ['--label--disabled', '--neutral-70'],
     line: ['--neutral-60', '--label'],
     chipEdge: ['--neutral-50', '--border'],
@@ -431,7 +433,9 @@ export interface LineProperties {
 export function lineProperties(id: string, name: string, kind: string, look: LineLook, colors: MarkerColors, selected: boolean): LineProperties {
     const color = look.hue === 'alarm-1' ? colors.alarm[0] : look.hue === 'alarm-2' ? colors.alarm[1]
         : look.hue === 'alarm-3' ? colors.alarm[2] : look.hue === 'attention' ? colors.attention
-        : look.hue === 'warning' ? colors.warning : look.hue === 'fault' ? colors.fault : colors.line;
+        : look.hue === 'warning' ? colors.warning : look.hue === 'fault' ? colors.fault
+        // No hue: the pipeline tone, or the lateral tone for an untapped line (DESIGN.md map-line lateral).
+        : look.weight === LINE_UNTAPPED ? colors.chipEdge : colors.line;
     return { id, name, kind, weight: look.weight, color, hue: look.hue, dashed: look.dashed, dotted: look.dotted,
         dimmed: look.dimmed, selected };
 }
@@ -443,13 +447,13 @@ export interface AreaProperties {
     kind: string;
     /** The tint name, or '' for the neutral area look. */
     tint: string;
-    /** The resolved fill and outline colour: the tint's token value, or the neutral line token. */
+    /** The resolved fill and outline colour: the tint's token value, or the lateral tone for an outline alone (DESIGN.md: the geofence outline). */
     color: string;
     selected: boolean;
 }
 
 export function areaProperties(id: string, name: string, kind: string, tint: Tint | null, colors: MarkerColors, selected: boolean): AreaProperties {
-    return { id, name, kind, tint: tint || '', color: tint ? tintColor(tint, colors) || colors.line : colors.line, selected };
+    return { id, name, kind, tint: tint || '', color: tint ? tintColor(tint, colors) || colors.line : colors.chipEdge, selected };
 }
 
 /** What an image id names. */
@@ -538,22 +542,25 @@ function glyphAt(s: SpriteSymbol | undefined, x: number, y: number, size: number
     return `<g transform="translate(${x} ${y}) scale(${scale})" color="${esc(color)}"><svg ${s.attributes} width="24" height="24" viewBox="0 0 24 24">${s.inner}</svg></g>`;
 }
 
-/** The badge (the state glyph on its disc) and the digit, drawn with the badge's centre at (bx, by). */
-function badgeAt(badge: string, priority: number, solid: boolean, bx: number, by: number, symbols: Record<string, SpriteSymbol>,
+/** The state glyph's size on the map (DESIGN.md alarm-glyph size-map) and the halo disc under it. */
+export const BADGE_GLYPH_SIZE = 18;
+export const BADGE_HALO_RADIUS = 10;
+
+/**
+ * The badge and the digit, drawn with the badge's centre at (bx, by): the state glyph itself in its
+ * token (DESIGN.md alarm-glyph: the triangle, circle or square shape is the glyph's, solid or hollow
+ * by the glyph the state names; the comms-lost and stale glyphs likewise) on a halo disc in the blank-map
+ * token, never a disc of its own (a circle round a priority 1 triangle would read as priority 2).
+ */
+function badgeAt(badge: string, priority: number, _solid: boolean, bx: number, by: number, symbols: Record<string, SpriteSymbol>,
                  colors: MarkerColors): string {
     if (!badge) {
         return '';
     }
     const alarm = priority >= 1 && priority <= 3;
     const hue = alarm ? colors.alarm[priority - 1] : badge === 'comms-lost' ? colors.commsLost : colors.glyph;
-    let out: string;
-    if (alarm && solid) {
-        out = `<circle cx="${bx}" cy="${by}" r="9" fill="${esc(hue)}" stroke="${esc(colors.halo)}" stroke-width="1.5"/>`
-            + glyphAt(symbols[badge], bx - 6, by - 6, 12, colors.disc);
-    } else {
-        out = `<circle cx="${bx}" cy="${by}" r="8.5" fill="${esc(colors.disc)}" stroke="${esc(hue)}" stroke-width="2"/>`
-            + glyphAt(symbols[badge], bx - 6, by - 6, 12, hue);
-    }
+    let out = `<circle cx="${bx}" cy="${by}" r="${BADGE_HALO_RADIUS}" fill="${esc(colors.halo)}"/>`
+        + glyphAt(symbols[badge], bx - BADGE_GLYPH_SIZE / 2, by - BADGE_GLYPH_SIZE / 2, BADGE_GLYPH_SIZE, hue);
     if (alarm) {
         out += `<text x="${bx + 11}" y="${by + 4.5}" font-family="${esc(colors.font)}" font-size="12" font-weight="700" fill="${esc(hue)}" stroke="${esc(colors.halo)}" stroke-width="3" paint-order="stroke" text-anchor="start">${priority}</text>`;
     }
@@ -592,7 +599,8 @@ export function markerSvg(spec: MarkerSpec, symbols: Record<string, SpriteSymbol
     } else if (preset === 'dimmed') {
         disc += `<circle cx="${cx}" cy="${cy}" r="${r - 1}" fill="none" stroke="${esc(colors.line)}" stroke-width="1.5" stroke-dasharray="2 2"/>`;
     } else {
-        disc += `<circle cx="${cx}" cy="${cy}" r="${r - 1}" fill="none" stroke="${esc(colors.line)}" stroke-width="1.5"/>`;
+        // A site's ring is the lateral tone, an instrument's the pipeline tone (DESIGN.md map-marker, instrument-marker).
+        disc += `<circle cx="${cx}" cy="${cy}" r="${r - 1}" fill="none" stroke="${esc(spec.instrument ? colors.line : colors.chipEdge)}" stroke-width="1.5"/>`;
     }
     disc += glyphAt(symbols[spec.icon] || symbols.point, cx - glyphSize / 2, cy - glyphSize / 2, glyphSize, hue);
     body += preset === 'dimmed' ? `<g opacity="${DIMMED_OPACITY}">${disc}</g>` : disc;

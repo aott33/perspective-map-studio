@@ -44,7 +44,7 @@ import { NeedsYouRow, needsYou } from './needsyou';
 import { FIT_PADDING_PX, StartingArea, readStartingArea, startingAreaKey } from './startingArea';
 import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, displayShows, itemPreset, itemState } from './live';
 import {
-    AREA_FILL_OPACITY, AREA_LINE_OPACITY, AREA_LINE_WIDTH, ARROW_IMAGE, CHIP_IMAGE, CHIP_PADDING, CHIP_SIZE, DIMMED_OPACITY, DISC_CENTER,
+    AREA_DASH, AREA_FILL_OPACITY, AREA_LINE_OPACITY, AREA_LINE_WIDTH, ARROW_IMAGE, CHIP_IMAGE, CHIP_PADDING, CHIP_SIZE, DIMMED_OPACITY, DISC_CENTER,
     FONT_CHIP, FONT_NAME, HALO_WIDTH, KPI_SIZE, KPI_TOP_PX, LINE_CHIP_OFFSET_BADGE_EM, LINE_CHIP_OFFSET_EM, LINE_DASH, LINE_DOT,
     MARKER_IMAGE, MARKER_TOKENS, MarkerColors, NAME_SIZE, NAME_TOP_PX, SpriteSymbol, TEXT_PADDING, ZOOM_DOT, ZOOM_KPI, ZOOM_NAME,
     imageFor, markerProperties, parseSprite, stateWord, textWidthPx
@@ -678,6 +678,7 @@ const SOURCE_ITEM_POINTS = 'mapstudio-items-point';
 const SOURCE_ITEM_AREAS = 'mapstudio-items-area';
 const LAYER_AREA_FILL = 'mapstudio-items-area-fill';
 const LAYER_AREA_LINE = 'mapstudio-items-area-line';
+const LAYER_AREA_LINE_DASHED = 'mapstudio-items-area-line-dashed';
 /** The `dotted` preset's lines (entry 1): round dots, a layer of their own since the dash pattern is not data-driven. */
 const LAYER_ITEM_LINES_DOTTED = 'mapstudio-items-line-dotted';
 /** Each line's midpoint mark (its name chip and alarm badge) and the selected line's flow arrow (features.ts). */
@@ -863,11 +864,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const area = this.startingArea();
         this.appliedArea = startingAreaKey(area) + (readStartingArea(this.props.props.startingArea).problem || '');
         const root = this.props.store.element as HTMLElement | undefined;
+        // The blank map and the halos are the blank-map token (DESIGN.md basemap-blank, `--neutral-20`).
         const colors = {
-            background: themeColor(root, '--containerRoot'),
+            background: themeColor(root, '--neutral-20'),
             line: themeColor(root, '--neutral-70'),
             point: themeColor(root, '--label'),
-            pointStroke: themeColor(root, '--containerRoot')
+            pointStroke: themeColor(root, '--neutral-20')
         };
         const mc = markerColors(root);
         this.markerColors = mc;
@@ -941,19 +943,31 @@ export class MapStudio extends Component<Props, MapStudioState> {
             map.addSource(SOURCE_LINE_MARKS, { type: 'geojson', data: empty.points });
             map.addSource(SOURCE_ARROW, { type: 'geojson', data: empty.points });
             // The areas (entry 1, AD-11): a low-saturation fill in the category tint and a firmer
-            // outline, under every line and point; a tint is never on a point or a line.
+            // outline, under every line and point; a tint is never on a point or a line. An area with
+            // no tint is its dashed outline alone in the lateral tone (DESIGN.md: the geofence outline;
+            // entry 15), with no fill: a tint is the only wash an area takes.
+            const tinted: Expression = ['!=', ['get', 'tint'], ''];
             map.addLayer({
                 id: LAYER_AREA_FILL,
                 type: 'fill',
                 source: SOURCE_ITEM_AREAS,
-                paint: { 'fill-color': ['get', 'color'], 'fill-opacity': AREA_FILL_OPACITY }
+                paint: { 'fill-color': ['get', 'color'], 'fill-opacity': ['case', tinted, AREA_FILL_OPACITY, 0] }
             });
             map.addLayer({
                 id: LAYER_AREA_LINE,
                 type: 'line',
                 source: SOURCE_ITEM_AREAS,
+                filter: tinted,
                 layout: { 'line-cap': 'round', 'line-join': 'round' },
                 paint: { 'line-color': ['get', 'color'], 'line-width': AREA_LINE_WIDTH, 'line-opacity': AREA_LINE_OPACITY }
+            });
+            map.addLayer({
+                id: LAYER_AREA_LINE_DASHED,
+                type: 'line',
+                source: SOURCE_ITEM_AREAS,
+                filter: ['!', tinted],
+                layout: { 'line-cap': 'butt', 'line-join': 'round' },
+                paint: { 'line-color': ['get', 'color'], 'line-width': AREA_LINE_WIDTH, 'line-dasharray': AREA_DASH }
             });
             // The lines (DESIGN.md map-line): the selection casing under the selected one, then dashed,
             // dotted and solid lines with their weight and hue per feature (features.ts, markers.ts
@@ -1835,7 +1849,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
      */
     private startTerraDraw(map: MapLibreMap, root: HTMLElement | undefined): void {
         const line = drawColor(root, ['--label', '--neutral-70']);
-        const outline = drawColor(root, ['--containerRoot', '--container']);
+        const outline = drawColor(root, ['--neutral-20', '--containerRoot', '--container']);
         const styles: { [key: string]: string | number } = {
             lineStringWidth: 4,
             closingPointWidth: 6,
@@ -2248,11 +2262,15 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private makePopup(): void {
         this.popupContent = document.createElement('div');
         this.popupContent.className = 'mapstudio-popup-root';
+        // The card takes the focus itself when it opens (showPopupAt), so the keyboard is inside it (Tab
+        // reaches the page link and close) and no button wears a focus ring on a click (entry 15).
+        this.popupContent.tabIndex = -1;
         this.popup = new Popup({
             // The close button is the popup's own, in its header (entry 8, UX review P1).
             closeButton: false,
             closeOnClick: false,
             closeOnMove: false,
+            focusAfterOpen: false,
             // MapLibre writes maxWidth as an inline style on the popup, so the
             // phone cap lives here, not in the stylesheet.
             maxWidth: 'calc(100vw - 32px)',
@@ -2274,6 +2292,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
             // a card measures 0 px tall until the popup's element is in the document (the first line popup
             // of a page opened above its segment and off the map's top with that 0).
             this.popup.setLngLat(lngLat).addTo(this.map);
+            if (this.popupContent) {
+                this.popupContent.focus({ preventScroll: true });
+            }
         }
         if (maxPx === LINE_POPUP_PX && this.popupContent) {
             // The line popup (entry 2): above the segment where its card fits, else below, else the side
@@ -2604,6 +2625,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const store = delegate ? delegate.store : STORE_UNKNOWN;
         const unsaved = delegate ? delegate.unsaved : [];
         const editing = delegate ? delegate.editing : 'on';
+        // The status line stays in the DOM for every state it reports (the save status, a failed load, a
+        // read-only store, unsaved edits, the line tool), but the spike's click echo shows in Edit mode
+        // alone (entry 15, as the line tool since entry 14): View mode shows the map and its controls only.
+        const quiet = !this.props.props.editMode && !pending && drawText === '' && saveText === '' && load.state !== 'failed'
+            && store.status !== 'read-only' && unsaved.length === 0;
         return (
             <div {...this.props.emit({ classes: ['mapstudio'] })}>
                 <div className="mapstudio-map" ref={this.setMapContainer}
@@ -2625,7 +2651,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                      data-legend-open="false"
                      data-search-open="false"
                      data-needs-open="false" />
-                <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '')}
+                <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '') + (quiet ? ' mapstudio-reply--quiet' : '')}
                      data-pending={pending ? 'true' : 'false'}
                      data-drawing={this.state.drawing ? 'true' : 'false'}
                      data-line-points={this.state.linePoints === null ? '' : String(this.state.linePoints)}>

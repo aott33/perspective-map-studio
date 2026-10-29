@@ -1,0 +1,9 @@
+[
+  {
+    "name": "Flow",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 3100.0
+  }
+]
