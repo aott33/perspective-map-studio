@@ -3,7 +3,7 @@ title: 'Refactor sweep'
 type: 'refactor'
 ticket: '11'
 created: '2026-10-29'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '342590d777734f907282e5645c07cff53b07c43e'
 route: 'full'
 route_source: 'auto'
@@ -77,7 +77,7 @@ Paths: `W` = `web/typescript`, `E` = `e2e/tests`, `V` = `ops/project/com.inducti
 - [x] `E/styles.spec.mjs` (b), `E/live.spec.mjs` (c).
 - [x] `V/MapStudioDev/view.json` -- (d).
 - [x] `_bmad-output/deferred-work.md` -- `resolved:` lines; `docs/platform-checks.md` -- "Epic 3 entry 11" section.
-- [ ] The final chain on a fresh stack; the referenced screenshots committed; this plan's Results.
+- [x] The final chain on a fresh stack; the referenced screenshots committed; this plan's Results.
 
 **Acceptance Criteria:**
 - Given three points within 20 m, when the map draws them, then the marker's label reads "A, B +1 more" and its pick list has three rows; given two, "A and B" as before.
@@ -136,3 +136,13 @@ Disposition of every candidate (S = this sweep):
 
 **Manual checks:**
 - The two refreshed screenshots looked at (the painted dark preview, the sheet's alarm block); a shared marker of three or more members read in the docs run if the suite leaves one.
+
+**Results (2026-10-29, 4-CPU agent box, Ignition 8.3.10, container `ms-05798e55` on port 9088, fresh volumes, the only stack on the box; the whole chain in one run, the second of two):**
+- `./gradlew clean build --offline` (JDK 17, the scratch init script, the box's Node 22): BUILD SUCCESSFUL in 45 s with every Java and Jest test.
+- `cd web && npx tsc --noEmit && npx jest`: no type error; 31 suites, 254 tests pass (the baseline's counts; `shared.test.ts` carries the two new label cases in its existing test).
+- Full e2e on the fresh stack with `E2E_DOCS=1`: 82 passed, 0 failed, 7 skipped (18.1 min; the baseline on `342590d` was 82 passed in 18.8 min). The first full run after the sweep failed 3 tests on one cause (a `path` import pruned from `basemaps.spec.mjs` and `writepath.spec.mjs` with their `shot` copies, f85283a); the chain then ran again from the build on a fresh stack and was green.
+- `check-contract-versions.sh`: `OK (contract 0.3.0, setup schema 1, map store schema 2)`; `test-contract-versions.sh`: OK.
+- Em dashes: none in any changed file; no model id outside the commit trailers.
+- Manual: `mapstudio-styles-preview-dark-1440.png` shows the dark page with the map, the lines, the two tinted fences and every swatch painted; `mapstudio-live-390.png` shows the sheet with the Flow row, the alarm block ("1 alarm - Priority 1, unacknowledged", "High pressure - Pressure, 10 s ago") and View alarms. The screenshots refreshed by the docs run that a doc references are committed with `docs/spike-measures.json` (rewritten by the bundle measure, as earlier entries did); the tracked ones no doc references were restored and the untracked ones deleted.
+- Not verified: a shared marker of three or more members drawn live (unit tested; the dev seed's pair has two); the line popup's close hover tint on a real pointer device.
+
