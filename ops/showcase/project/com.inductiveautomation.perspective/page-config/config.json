@@ -11,6 +11,10 @@
   "/site/:name": {
    "viewPath": "ShowcaseSite",
    "viewParams": {}
+  },
+  "/dark": {
+   "viewPath": "ShowcaseDark",
+   "viewParams": {}
   }
  },
  "shared": {},

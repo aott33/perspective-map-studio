@@ -103,7 +103,7 @@ test.beforeAll(async ({ browser }) => {
         expect(seed, 'the showcase seed ran').toBeTruthy();
         expect(seed.error, 'the showcase seed saved').toBeUndefined();
         expect(seed.tags.error, 'the showcase tags set').toBeUndefined();
-        expect(seed.tags.written).toBe(28);
+        expect(seed.tags.written).toBe(33);
         ids = Object.fromEntries(Object.entries(SHOWCASE.keys).map(([k, key]) => [k, seed.ids[key]]));
     } finally {
         await context.close();
