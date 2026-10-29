@@ -10,7 +10,7 @@ route_source: 'pinned'
 risk: 'low'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/handoff-epic-3.md'
@@ -81,11 +81,11 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `web/typescript/needsyou.ts`, `legend.ts`, the Jest tests.
-- [ ] `NeedsYouControl.ts`, `LegendControl.ts`, `SearchControl.ts`, `controls.ts`, `MapStudio.tsx`, `mapstudio.css`.
-- [ ] `ops/` -- the quality buttons and `set_quality`.
-- [ ] `e2e/tests/needsyou.spec.mjs`, `basemaps.spec.mjs`.
-- [ ] `docs/`, `CHANGELOG.md`, this plan, the screenshots.
+- [x] `web/typescript/needsyou.ts`, `legend.ts`, the Jest tests.
+- [x] `NeedsYouControl.ts`, `LegendControl.ts`, `SearchControl.ts`, `controls.ts`, `MapStudio.tsx`, `mapstudio.css`.
+- [x] `ops/` -- the quality buttons and `set_quality`.
+- [x] `e2e/tests/needsyou.spec.mjs`, `basemaps.spec.mjs` (and `search.spec.mjs`, the 44 px probe over visible buttons).
+- [x] `docs/`, `CHANGELOG.md`, this plan, the screenshots.
 
 **Acceptance Criteria:**
 - Given the dev stack with one alarm, one comms-lost and one stale item, when a batch arrives, then the bar reads "Needs you 3: 1 alarm, 1 comms lost, 1 stale" within one refresh interval, the list ranks them in that order with the state in words, detail and age, and a row zooms to and selects its item.
@@ -96,11 +96,31 @@ context:
 
 ## Implementation Notes
 
+- **Commits on the worktree branch** (`worktree-agent-a4d2859d9f095719c`, baseline `0b96ff3`): 34edbe7 (this plan), 802c807 (the bar and the list, the legend's key and toggles, the dev quality buttons), d49be11 (the e2e spec, the slot problems in the rows, the drawn line counts), 0f4e2a0 and 0a2d15b (what the first live runs taught: the phone field gives way to the bar, the legend panel bound to the map's height, the zoom card under the bar's one line, hidden buttons left out of the 44 px probe), b4c3222 (the docs and the changelog), dfeca0e (an open list keeps its focused row through a batch), then the closing commit (evidence, screenshots, this plan).
+- **Decision 2 refined:** at phone width the bar shows the glyphs and the alarm count alone (the mockup's "Needs you 3 [triangle] 1 [comms] [stale]"); the whole line is the button's label and title. The search field needed `min-width: 0` beside it, since a flex item's minimum is otherwise its content.
+- **Decision 5 refined:** the key is taller than the mockup's panel (section headings, 27 rows on the dev map), so the panel is bound to the map's height through `--mapstudio-map-height`, which the component writes from its ResizeObserver, and scrolls; the basemap buttons sit in one row. An open list is drawn again on every batch; the row that had the focus keeps it by its place.
+- **Decision 7 refined:** the e2e spec takes Point 3's comms lost from the seed (P15 has no Comms tag) rather than driving P14's comms, so one button pair was enough: "P14 pressure bad" and "good".
+- **Build and run on this box:** Gradle's node plugin cannot download Node through the proxy, so the build ran with the scratch init script pointing the plugin at the box's Node 22 (`download=false`) and the module was staged by hand into `ops/modules/` for `ops/up.sh --fresh --no-build`; none of it is committed.
+- **Not done, by scope:** the hue tokens' review (entry 12: the Needs you counts and the glyph key are review items there), a cap or virtualisation of the list (a field with hundreds of items needing attention at once), the Edit switch beside the bar (epic-editing).
+
 ## Plan Change Log
 
 ## Review Triage Log
 
+Review pass 1 (quick lens, read by this agent from the diff against the baseline; no subagent tool in this session): 0 high, 2 medium, 2 low, 0 false.
+
+| Finding | Verdict | Route | Evidence |
+| --- | --- | --- | --- |
+| An open list was rebuilt on every batch and the focused row lost its focus, so a keyboard user navigating the rows was thrown out every 10 s | medium | patch | `NeedsYouControl.renderList` keeps the focused row by its place (dfeca0e) |
+| The legend panel grew past the map's top with a `100vh` bound and was clipped by the component's `overflow: hidden` | medium | patch | seen on the dev page at 1440 px (the toolbar takes 90 px); bound to `--mapstudio-map-height` (0a2d15b) |
+| `setKey` while the panel is open closes and reopens it, so a save in another tab moves the focus back to the Lines checkbox or the button | low | rejected | rare (an items change while the legend is open); the focus is kept inside the panel or returned to the button, never lost |
+| The row's age is the slot's time at the last batch, not a clock that ticks while the list is open | low | rejected | the list is drawn again on every batch (10 s on the dev stack), the same cadence as the markers; the popup's own clock is for an open popup |
+
 ## Design Notes
+
+**Why the summary is not a message.** The bar's counts are the same `itemState` the markers draw from, over the items and the live state the delegate already holds, so a viewer with a batch has a summary with no extra traffic and no second subscription (AD-6); the Gateway stays unaware of the bar. The cost is a pass over the items per batch, the same as the features build.
+
+**Why the Needs you bar lives in the search control's DOM.** MapLibre stacks a corner's controls, so a control of its own would sit under the field; the slot entry 9 left in the top bar's row and the container under it give the designed row and the one expanding phone bar for free, and the same `data-search-open` tells the phone which of the two lists is open.
 
 ## Verification
 
