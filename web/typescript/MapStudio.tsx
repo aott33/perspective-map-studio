@@ -2136,6 +2136,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 mountPath={mountPath}
                 pointId={open.point.id}
                 fallback={defaultPopup}
+                mode={open.sheet ? 'sheet' : 'card'}
+                onClose={this.onSheetClose}
             />
         );
     }

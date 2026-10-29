@@ -31,6 +31,10 @@ export interface PointPopupProps {
     pointId: string;
     /** What to show when the view cannot be: Map Studio's default popup (AD-7). */
     fallback: () => React.ReactNode;
+    /** The card over the map or the phone's bottom sheet: the chrome row above the view follows it. */
+    mode: 'card' | 'sheet';
+    /** Close the popup (the chrome row's close, 32 px on the card and 44 px on the sheet). */
+    onClose: () => void;
 }
 
 interface PointPopupState {
@@ -64,12 +68,24 @@ export class PointPopup extends React.Component<PointPopupProps, PointPopupState
     };
 
     render(): React.ReactNode {
-        const { clientStore, parent, path, params, mountPath, pointId } = this.props;
+        const { clientStore, parent, path, params, mountPath, pointId, mode } = this.props;
         if (!path || this.state.failed) {
             return this.props.fallback();
         }
+        const sheet = mode === 'sheet';
         return (
-            <div className="mapstudio-popup mapstudio-popup--view" data-point-id={pointId} data-view-path={path}>
+            <div className={'mapstudio-popup mapstudio-popup--view' + (sheet ? ' mapstudio-popup--sheet' : ' mapstudio-popup--card')}
+                 data-point-id={pointId} data-view-path={path} data-popup-mode={mode}>
+                {sheet ? <div className="mapstudio-popup-handle" aria-hidden="true" /> : null}
+                <div className="mapstudio-popup-view-bar">
+                    <button type="button" className="mapstudio-popup-icon mapstudio-popup-close" aria-label="Close" title="Close"
+                            onClick={this.props.onClose}>
+                        <svg className="mapstudio-popup-chrome" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                    </button>
+                </div>
+                <div className="mapstudio-popup-view-body">
                 <ProjectView
                     key={PageStore.instanceKeyFor(path, mountPath)}
                     store={clientStore}
@@ -81,6 +97,7 @@ export class PointPopup extends React.Component<PointPopupProps, PointPopupState
                     useDefaultHeight={true}
                     onViewStateChange={this.onViewStateChange}
                 />
+                </div>
             </div>
         );
     }

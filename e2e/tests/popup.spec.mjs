@@ -139,6 +139,14 @@ editorTest('a kind setup\'s popupView opens the project view with mapItem and a 
     // The example view embeds the built-in alarm table.
     await expect(page.locator('#mapstudio-padalarms-table')).toBeVisible();
     await expect(page.locator('.mapstudio-popup--default')).toHaveCount(0);
+    // Map Studio's own close above the view (32 px on the card) closes it.
+    const viewClose = view.locator('.mapstudio-popup-close');
+    await expect(viewClose).toBeVisible();
+    const closeBox = await viewClose.boundingBox();
+    expect(Math.min(closeBox.width, closeBox.height)).toBeGreaterThanOrEqual(32);
+    await viewClose.click();
+    await expect(page.locator('.mapstudio-popup--view')).toHaveCount(0);
+    await expect(map).toHaveAttribute('data-popup-mode', '');
     await page.waitForTimeout(WARNING_SETTLE_MS);
     expect(watched.warnings, 'Map Studio warnings').toEqual([]);
 

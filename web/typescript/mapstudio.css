@@ -253,8 +253,26 @@
     line-height: 1.4;
 }
 
+/* A custom popup view: Map Studio's close in a row above the view (32 px on the card, 44 on the
+   sheet, which also keeps its handle), the view scrolling under it within the popup's height. */
 .mapstudio-popup--view {
+    display: flex;
+    flex-direction: column;
+    max-height: var(--mapstudio-popup-max-height);
     padding-top: 0;
+}
+
+.mapstudio-popup-view-bar {
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    padding: 4px 8px 0;
+}
+
+.mapstudio-popup-view-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
 }
 
 /* The custom view's card while the popup detail is awaited (a moment after the open). */
