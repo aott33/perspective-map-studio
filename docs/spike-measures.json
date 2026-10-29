@@ -66,7 +66,7 @@
     "modl": {
       "file": "Map-Studio.unsigned.modl",
       "bytes": 1958400,
-      "sha256": "a9b7a97577812b128e0d105b4ca655ed732a0a7ffd2e83f786641739d031522e"
+      "sha256": "955d390304169c1206be285e950f457e011db425b3b211de9e0b4caa4f994d94"
     },
     "note": "transferredBodyBytes 0 on maplibre-gl-worker.js: Playwright reported no body transfer for the worker request (Chromium fetches a worker script outside the page; why is unverified). Use bytes and gzipBytes for that file.",
     "budget": "none defined; recorded only"
@@ -102,45 +102,13 @@
         "runs": [
           {
             "pan": {
-              "frames": 59,
-              "spanMs": 4050,
-              "fps": 14.32,
-              "intervalMs": {
-                "p50": 66.7,
-                "p95": 116.6,
-                "max": 133.3
-              },
-              "shareOver20msPercent": 94.8,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            },
-            "zoom": {
-              "frames": 60,
-              "spanMs": 4017,
+              "frames": 61,
+              "spanMs": 4083,
               "fps": 14.69,
               "intervalMs": {
                 "p50": 66.7,
-                "p95": 116.6,
-                "max": 150
-              },
-              "shareOver20msPercent": 94.9,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            }
-          },
-          {
-            "pan": {
-              "frames": 60,
-              "spanMs": 4050,
-              "fps": 14.57,
-              "intervalMs": {
-                "p50": 66.7,
-                "p95": 116.7,
-                "max": 133.3
+                "p95": 100,
+                "max": 166.7
               },
               "shareOver20msPercent": 98.3,
               "longTasks": {
@@ -149,15 +117,15 @@
               }
             },
             "zoom": {
-              "frames": 63,
-              "spanMs": 4083,
-              "fps": 15.18,
+              "frames": 55,
+              "spanMs": 4200,
+              "fps": 12.86,
               "intervalMs": {
-                "p50": 66.7,
-                "p95": 100,
-                "max": 133.4
+                "p50": 83.3,
+                "p95": 133.3,
+                "max": 166.6
               },
-              "shareOver20msPercent": 93.5,
+              "shareOver20msPercent": 92.6,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
@@ -166,30 +134,62 @@
           },
           {
             "pan": {
-              "frames": 64,
-              "spanMs": 4033,
-              "fps": 15.62,
+              "frames": 53,
+              "spanMs": 4050,
+              "fps": 12.84,
               "intervalMs": {
-                "p50": 66.7,
-                "p95": 100,
-                "max": 116.6
+                "p50": 83.2,
+                "p95": 133.3,
+                "max": 200
               },
-              "shareOver20msPercent": 96.8,
+              "shareOver20msPercent": 100,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
               }
             },
             "zoom": {
-              "frames": 72,
-              "spanMs": 4017,
-              "fps": 17.68,
+              "frames": 54,
+              "spanMs": 4200,
+              "fps": 12.62,
               "intervalMs": {
-                "p50": 50.1,
-                "p95": 100,
-                "max": 116.7
+                "p50": 83.3,
+                "p95": 116.7,
+                "max": 150
               },
-              "shareOver20msPercent": 85.9,
+              "shareOver20msPercent": 98.1,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 48,
+              "spanMs": 4050,
+              "fps": 11.61,
+              "intervalMs": {
+                "p50": 83.3,
+                "p95": 150,
+                "max": 183.4
+              },
+              "shareOver20msPercent": 95.7,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 58,
+              "spanMs": 3983,
+              "fps": 14.31,
+              "intervalMs": {
+                "p50": 66.7,
+                "p95": 133.2,
+                "max": 166.6
+              },
+              "shareOver20msPercent": 87.7,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
@@ -198,17 +198,17 @@
           }
         ],
         "medianFps": {
-          "pan": 14.57,
-          "zoom": 15.18
+          "pan": 12.84,
+          "zoom": 12.86
         },
         "fpsRange": {
           "pan": [
-            14.32,
-            15.62
+            11.61,
+            14.69
           ],
           "zoom": [
-            14.69,
-            17.68
+            12.62,
+            14.31
           ]
         }
       }
@@ -240,16 +240,16 @@
     "mapItems": 113,
     "full": {
       "bytes": 66658,
-      "gzipBytes": 4623,
+      "gzipBytes": 4583,
       "items": 111,
       "kindDisplay": true,
-      "seq": 174
+      "seq": 172
     },
     "changesOnly": {
       "bytes": 1454,
-      "gzipBytes": 460,
+      "gzipBytes": 464,
       "items": 1,
-      "seq": 182,
+      "seq": 180,
       "rule": "the map items whose values changed since the last batch"
     }
   },
@@ -304,7 +304,7 @@
       {
         "check": "pinch-zooms-the-map",
         "ok": true,
-        "detail": "the point's distance from the pinch centre grew by a factor of 2.38 for a CDP pinch of scale 2 (needs over 1.5)"
+        "detail": "the point's distance from the pinch centre grew by a factor of 2.34 for a CDP pinch of scale 2 (needs over 1.5)"
       },
       {
         "check": "line-tool-finishes-by-touch-alone",
