@@ -25,7 +25,8 @@ let ids;
 const input = (page) => page.locator('.mapstudio-search-input');
 const panel = (page) => page.locator('.mapstudio-search-panel');
 const options = (page) => page.locator('.mapstudio-search-option');
-const popup = (page) => page.locator('.maplibregl-popup .mapstudio-popup--default');
+// The point's default popup: the card at 1440 px, the bottom sheet below 768 px (entry 8).
+const popup = (page) => page.locator('.maplibregl-popup .mapstudio-popup--default, .mapstudio-sheet .mapstudio-popup--default');
 
 async function shot(page, name) {
     await nextFrames(page);
@@ -254,6 +255,7 @@ test.describe('390 px', () => {
             await expect(map).toHaveAttribute('data-selected', ids.p1, { timeout: DRAW_MS });
             await expect(map).toHaveAttribute('data-zoom', '15.00', { timeout: DRAW_MS });
             await expect(popup(page)).toHaveAttribute('data-point-id', ids.p1, { timeout: DRAW_MS });
+            await expect(map).toHaveAttribute('data-popup-mode', 'sheet');
             await expect(input(page)).toHaveValue('');
             await expect(input(page)).not.toBeFocused();
             await expect(panel(page)).toHaveCount(0);
