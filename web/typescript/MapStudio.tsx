@@ -46,8 +46,8 @@ import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, displayShows, ite
 import {
     AREA_DASH, AREA_FILL_OPACITY, AREA_LINE_OPACITY, AREA_LINE_WIDTH, ARROW_IMAGE, CHIP_IMAGE, CHIP_PADDING, CHIP_SIZE, DIMMED_OPACITY, DISC_CENTER,
     FONT_CHIP, FONT_NAME, HALO_WIDTH, KPI_SIZE, KPI_TOP_PX, LINE_CHIP_OFFSET_BADGE_EM, LINE_CHIP_OFFSET_EM, LINE_DASH, LINE_DOT,
-    MARKER_IMAGE, MARKER_TOKENS, MarkerColors, NAME_SIZE, NAME_TOP_PX, SpriteSymbol, TEXT_PADDING, ZOOM_DOT, ZOOM_KPI, ZOOM_NAME,
-    imageFor, markerProperties, parseSprite, stateWord, textWidthPx
+    LINE_HALO_WIDTH, MARKER_IMAGE, MARKER_TOKENS, MarkerColors, NAME_SIZE, NAME_TOP_PX, SpriteSymbol, TEXT_PADDING, ZOOM_DOT, ZOOM_KPI,
+    ZOOM_NAME, imageFor, lineHaloDash, markerProperties, parseSprite, stateWord, textWidthPx
 } from './markers';
 import { PresetPalette, StylePreview, TintPalette } from './StylePreview';
 import { MapFeatures, SegmentRef, Selection, buildFeatures } from './features';
@@ -686,6 +686,10 @@ const SOURCE_LINE_MARKS = 'mapstudio-line-marks';
 const SOURCE_ARROW = 'mapstudio-arrow';
 /** The lines: the selection casing under them, dashed (comms lost, stale, no data) and solid, weight and hue per feature. */
 const LAYER_LINE_CASING = 'mapstudio-items-line-casing';
+/** The halo under every line in the blank-map token (entry 12, markers.ts LINE_HALO_WIDTH), one layer per pattern. */
+const LAYER_LINE_HALO = 'mapstudio-items-line-halo';
+const LAYER_LINE_HALO_DASHED = 'mapstudio-items-line-halo-dashed';
+const LAYER_LINE_HALO_DOTTED = 'mapstudio-items-line-halo-dotted';
 const LAYER_ITEM_LINES_DASHED = 'mapstudio-items-line-dashed';
 const LAYER_ITEM_LINES = 'mapstudio-items-line';
 /**
@@ -985,11 +989,44 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     'line-opacity': ['case', ['==', ['get', 'segmentSelected'], true], 0.85, 0.5]
                 }
             });
+            // The halo under every line (entry 12): the blank-map token, one pixel each side, as the
+            // markers' halo, so a line's hue or dash keeps 3:1 on a raster tile in either theme
+            // (docs/review-er27.md); invisible on the blank map. One layer per pattern, the dash of
+            // a dashed or dotted halo scaled per weight to sit under the line's (markers.ts lineHaloDash).
+            const dashedFilter: Expression = ['==', ['get', 'dashed'], true];
+            const dottedFilter: Expression = ['==', ['get', 'dotted'], true];
+            const solidFilter: Expression = ['all', ['!=', ['get', 'dashed'], true], ['!=', ['get', 'dotted'], true]];
+            map.addLayer({
+                id: LAYER_LINE_HALO_DASHED,
+                type: 'line',
+                source: SOURCE_ITEM_LINES,
+                filter: dashedFilter,
+                layout: { 'line-cap': 'butt', 'line-join': 'round' },
+                paint: { 'line-color': mc.halo, 'line-width': LINE_HALO_WIDTH as Expression,
+                    'line-dasharray': lineHaloDash(LINE_DASH) as Expression, 'line-opacity': dimmed }
+            });
+            map.addLayer({
+                id: LAYER_LINE_HALO_DOTTED,
+                type: 'line',
+                source: SOURCE_ITEM_LINES,
+                filter: dottedFilter,
+                layout: { 'line-cap': 'round', 'line-join': 'round' },
+                paint: { 'line-color': mc.halo, 'line-width': LINE_HALO_WIDTH as Expression,
+                    'line-dasharray': lineHaloDash(LINE_DOT) as Expression, 'line-opacity': dimmed }
+            });
+            map.addLayer({
+                id: LAYER_LINE_HALO,
+                type: 'line',
+                source: SOURCE_ITEM_LINES,
+                filter: solidFilter,
+                layout: { 'line-cap': 'round', 'line-join': 'round' },
+                paint: { 'line-color': mc.halo, 'line-width': LINE_HALO_WIDTH as Expression, 'line-opacity': dimmed }
+            });
             map.addLayer({
                 id: LAYER_ITEM_LINES_DASHED,
                 type: 'line',
                 source: SOURCE_ITEM_LINES,
-                filter: ['==', ['get', 'dashed'], true],
+                filter: dashedFilter,
                 layout: { 'line-cap': 'butt', 'line-join': 'round' },
                 paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'weight'], 'line-dasharray': LINE_DASH, 'line-opacity': dimmed }
             });
@@ -997,7 +1034,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 id: LAYER_ITEM_LINES_DOTTED,
                 type: 'line',
                 source: SOURCE_ITEM_LINES,
-                filter: ['==', ['get', 'dotted'], true],
+                filter: dottedFilter,
                 layout: { 'line-cap': 'round', 'line-join': 'round' },
                 paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'weight'], 'line-dasharray': LINE_DOT, 'line-opacity': dimmed }
             });
@@ -1005,7 +1042,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 id: LAYER_ITEM_LINES,
                 type: 'line',
                 source: SOURCE_ITEM_LINES,
-                filter: ['all', ['!=', ['get', 'dashed'], true], ['!=', ['get', 'dotted'], true]],
+                filter: solidFilter,
                 layout: { 'line-cap': 'round', 'line-join': 'round' },
                 paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'weight'], 'line-opacity': dimmed }
             });
@@ -1532,7 +1569,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (!map || !this.itemsReady) {
             return;
         }
-        const lineLayers = [LAYER_LINE_CASING, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED, LAYER_ITEM_LINES, LAYER_LINE_BADGES, LAYER_ARROW];
+        const lineLayers = [LAYER_LINE_CASING, LAYER_LINE_HALO_DASHED, LAYER_LINE_HALO_DOTTED, LAYER_LINE_HALO, LAYER_ITEM_LINES_DASHED,
+            LAYER_ITEM_LINES_DOTTED, LAYER_ITEM_LINES, LAYER_LINE_BADGES, LAYER_ARROW];
         const nameLayers = [LAYER_ITEM_NAMES, LAYER_ITEM_CHIPS, LAYER_ITEM_KPI];
         const set = (layer: string, visible: boolean): void => {
             if (map.getLayer(layer)) {

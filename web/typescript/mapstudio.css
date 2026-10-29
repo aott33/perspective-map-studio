@@ -696,22 +696,33 @@
     cursor: not-allowed;
 }
 
-/* Live state tokens (epic 3 entry 5, AD-11, plan decision 6). Each is a theme token the host
-   project may define; the fallback maps it to a Perspective theme variable, never a literal.
-   comms-lost: the magenta or purple family, distinct from every alarm hue (owner, 2026-10-28;
-   ER-27 reviews it in entry 12 with the alarm priority tokens). */
+/* The hue tokens (epic 3 entries 5, 1 and 12; AD-11; docs/review-er27.md, the engineering review
+   pack). Each is a theme token the host project may define on .mapstudio (the ign-scada-template
+   maps them to its --st-* set at the cutover); the fallback maps it to a Perspective theme variable
+   of the bundled light and dark themes, never a literal. Chosen in entry 12 by the contrast check
+   (e2e/lib/contrast.mjs, 3:1 against the blank map and the panel in both themes, WCAG 1.4.11):
+   comms-lost: the magenta family (--qual-4: magenta-70 light, magenta-40 dark), the one family in
+     the owner's decision (2026-10-28, magenta or purple) whose bundled values pass in both themes
+     (purple-60, --qual-1 dark, is 2.8:1 on the dark map); no alarm, preset or tint uses it; always
+     drawn with the comms-lost glyph and the words.
+   alarm-1, alarm-2, alarm-3: the theme's error (red), warning (bronze) and info (blue), the IEC
+     shapes and the digit beside them carry the priority without the hue. */
 .mapstudio {
-    --mapstudio-comms-lost: var(--qual-1);
+    --mapstudio-comms-lost: var(--qual-4);
     --mapstudio-alarm-1: var(--error);
     --mapstudio-alarm-2: var(--warning);
     --mapstudio-alarm-3: var(--info);
 }
 
-/* Value style presets and area tints (epic 3 entry 1, AD-11; docs/styles.md). Stand-ins until
-   entry 12 reviews the hues (ER-27): attention is a heavier neutral (no hue), warning and fault
-   take the theme's warning and error, and the six tints take qualitative palette entries that are
-   neither the comms-lost purple (--qual-1) nor the error red; the map draws a tint at low opacity
-   (a wash), never on a point or a line. A host theme redefines any of these on .mapstudio. */
+/* Value style presets and area tints (entries 1 and 12, AD-11; docs/styles.md). attention is a
+   heavier neutral ring and the word, no hue; warning and fault share the warning and error hues
+   of alarm priorities 2 and 1: a preset is a ring round the disc plus its word in the chip, an
+   alarm the IEC glyph with its digit at the top-right, and the two draw together when both apply,
+   so a shared hue never reads as the other. The six tints are low-saturation washes (22 % fill,
+   80 % outline) for area categories only, never on a point or a line, from families no state
+   uses where the bundled palette has one: teal, green, sky, navy, sand (bronze-50, the one family
+   shared with warning: a wash against a ring and a word) and a light teal (--div-12, the same in
+   both themes); none is magenta, purple or red. A host theme redefines any of these on .mapstudio. */
 .mapstudio {
     --mapstudio-attention: var(--neutral-90);
     --mapstudio-warning: var(--warning);
@@ -719,9 +730,9 @@
     --mapstudio-tint-1: var(--qual-3);
     --mapstudio-tint-2: var(--qual-7);
     --mapstudio-tint-3: var(--qual-2);
-    --mapstudio-tint-4: var(--qual-9);
+    --mapstudio-tint-4: var(--qual-8);
     --mapstudio-tint-5: var(--qual-10);
-    --mapstudio-tint-6: var(--qual-8);
+    --mapstudio-tint-6: var(--div-12);
 }
 
 /* The style preview panel (the previewStyles prop) and the preview tiles the kind setup screen

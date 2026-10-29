@@ -26,5 +26,22 @@
     "valueSource": "memory",
     "dataType": "Float8",
     "value": 1.4
+  },
+  {
+    "name": "P12-1H",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 960.0,
+    "alarms": [
+      {
+        "name": "Casing pressure high",
+        "label": "Casing pressure high",
+        "mode": "AboveValue",
+        "setpointA": 1000.0,
+        "priority": "High",
+        "ackMode": "Manual"
+      }
+    ]
   }
 ]
