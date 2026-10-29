@@ -1598,39 +1598,15 @@
 
 /* The line popup (epic 3 entry 2; DESIGN.md line-popup; the UX review's padding rules, decisions D1 to
    D3, so entry 8 need not redo them): a 350 px card, 16 px side padding in every region, the header
-   with its own 32 px close button (MapLibre's is hidden for this card), the body scrolling under
-   min(480px, map - 64px), the tip in the card's surface, the floating shadow. Token colours only.
-   Scoped to `.mapstudio-popup--line`: entry 8's point card and sheet carry `--card` and `--sheet`
-   with their own rules, and the popup's z-index is entry 8's (5, above the map's controls). */
+   with the point card's 32 px close button (44 px on a phone), the body scrolling under
+   min(480px, map - 64px), the tip in the card's surface and the popup's z-index from the point
+   popup's rules above, the floating shadow. Token colours only. Scoped to `.mapstudio-popup--line`:
+   entry 8's point card and sheet carry `--card` and `--sheet` with their own rules. */
 .mapstudio .maplibregl-popup:has(.mapstudio-popup--line) .maplibregl-popup-content {
     /* The point card's content is 320 px (entry 8); the line popup's card sets its own 350. */
     width: auto;
     border-radius: 10px;
     box-shadow: var(--mapstudio-float-shadow);
-}
-
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--line) .maplibregl-popup-close-button {
-    display: none;
-}
-
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-top .maplibregl-popup-tip,
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
-    border-bottom-color: var(--container);
-}
-
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
-    border-top-color: var(--container);
-}
-
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-left .maplibregl-popup-tip {
-    border-right-color: var(--container);
-}
-
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-right .maplibregl-popup-tip {
-    border-left-color: var(--container);
 }
 
 .mapstudio-popup--line {
@@ -1691,24 +1667,9 @@
     display: none;
 }
 
+/* The close button is the point card's (popupParts.tsx, `.mapstudio-popup-icon`), lifted to the header's top edge. */
 .mapstudio-popup--line .mapstudio-popup-close {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    width: 32px;
-    height: 32px;
-    margin: -4px 0 0;
-    padding: 0;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--label);
-    cursor: pointer;
-}
-
-.mapstudio-popup--line .mapstudio-popup-close:hover {
-    background: var(--containerRoot);
+    margin-top: -4px;
 }
 
 .mapstudio-popup--line .mapstudio-popup-body {
@@ -1853,9 +1814,11 @@
 }
 
 @media (max-width: 767px) {
+    .mapstudio-popup--line {
+        --mapstudio-popup-icon: 44px;
+    }
+
     .mapstudio-popup--line .mapstudio-popup-close {
-        width: 44px;
-        height: 44px;
         margin-top: -8px;
     }
 

@@ -8,6 +8,7 @@ import {
     ViewStateType
 } from '@inductiveautomation/perspective-client';
 import { AuthorParams, isFailedViewState } from './popupParams';
+import { CloseButton } from './popupParts';
 
 /**
  * Perspective's View is typed against React 18 while this bundle compiles with
@@ -78,12 +79,7 @@ export class PointPopup extends React.Component<PointPopupProps, PointPopupState
                  data-point-id={pointId} data-view-path={path} data-popup-mode={mode}>
                 {sheet ? <div className="mapstudio-popup-handle" aria-hidden="true" /> : null}
                 <div className="mapstudio-popup-view-bar">
-                    <button type="button" className="mapstudio-popup-icon mapstudio-popup-close" aria-label="Close" title="Close"
-                            onClick={this.props.onClose}>
-                        <svg className="mapstudio-popup-chrome" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-                            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                        </svg>
-                    </button>
+                    <CloseButton onClose={this.props.onClose} />
                 </div>
                 <div className="mapstudio-popup-view-body">
                 <ProjectView

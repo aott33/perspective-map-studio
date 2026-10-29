@@ -517,6 +517,23 @@ export function alarmSummary(value: unknown): AlarmSummary | null {
     return { active: value.active, unacked: value.unacked, priority: value.priority };
 }
 
+/**
+ * True when a kind's display shows a popup part (comms, a KPI or alarms): the default popup opens for
+ * its items; with none and no custom view a click only selects (FR-4).
+ */
+export function displayShows(display: KindDisplay | undefined): boolean {
+    return !!display && (display.comms || display.alarms.on || display.kpis.some((k) => k.on));
+}
+
+/**
+ * The sprite's alarm glyph for a priority and its acknowledgement, as the marker badge, the popups,
+ * the Needs you bar and the legend draw it: priority 3 has one glyph; 1 and 2 are solid
+ * (unacknowledged) or hollow (acknowledged).
+ */
+export function alarmGlyphId(priority: number, unacked: boolean): string {
+    return priority === 3 ? 'alarm-3' : 'alarm-' + priority + (unacked ? '-unacknowledged' : '-acknowledged');
+}
+
 /** The state of an item from its values and its kind's display (null display: nothing shows). */
 export function itemState(values: ItemValues | undefined, display: KindDisplay | undefined): ItemState {
     const none: ItemState = { commsLost: false, stale: false, alarm: null, iconKpi: null, badge: 'normal', preset: 'normal' };

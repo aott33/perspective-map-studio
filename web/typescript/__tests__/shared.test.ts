@@ -37,7 +37,8 @@ describe('shared markers (epic 3 entry 7, the template\'s section 5 item 8)', ()
         expect(sharedName([])).toBe('');
         expect(sharedName(['A'])).toBe('A');
         expect(sharedName(['CTB1', 'SWD1'])).toBe('CTB1 and SWD1');
-        expect(sharedName(['A', 'B', 'C'])).toBe('A, B and C');
+        expect(sharedName(['A', 'B', 'C'])).toBe('A, B +1 more');
+        expect(sharedName(['A', 'B', 'C', 'D', 'E'])).toBe('A, B +3 more');
     });
 
     test('the worst state: the highest alarm (unacknowledged first at one priority), comms lost, stale, normal; no KPI', () => {

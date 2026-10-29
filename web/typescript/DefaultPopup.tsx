@@ -1,7 +1,6 @@
 import * as React from 'react';
-import {
-    ItemValues, KindDisplay, PopupDetail, alarmCountsText, alarmLineText, alarmsText, commsText, itemState, staleText, valueText
-} from './live';
+import { ItemValues, KindDisplay, PopupDetail, alarmCountsText, alarmGlyphId, alarmLineText, alarmsText, commsText, itemState } from './live';
+import { Chrome, CloseButton, Glyph, KpiRows } from './popupParts';
 
 /** What the default popup is opened for: the map item and its kind's icon. */
 export interface DefaultPopupItem {
@@ -33,38 +32,6 @@ export interface DefaultPopupProps {
     onClose: () => void;
     /** Open a Perspective page of the project (the pop-out link, View alarms). */
     onNavigate: (path: string) => void;
-}
-
-/** The sprite's symbol for a glyph, inline (`<use>`), in `currentColor` (the line popup draws with it too). */
-export function Glyph(props: { id: string; className: string; size?: number }): React.ReactElement {
-    const size = props.size || 24;
-    return (
-        <svg className={props.className} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-            <use href={'/res/mapstudio/icons/mapstudio-icons.svg#ms-' + props.id} />
-        </svg>
-    );
-}
-
-/** The chrome glyphs of the popup, on a 24 px grid with a 2 px stroke in `currentColor` (as the controls'). */
-const CHROME = {
-    /** Pop-out: an arrow leaving a box (the mockup's page link icon). */
-    popout: 'M14 4h6v6M20 4l-9 9M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6',
-    close: 'M6 6l12 12M18 6L6 18',
-    /** A check mark: "No active alarms". */
-    check: 'M5 12.5l4.5 4.5L19 7'
-} as const;
-
-function Chrome(props: { name: keyof typeof CHROME; className: string }): React.ReactElement {
-    return (
-        <svg className={props.className} viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-            <path d={CHROME[props.name]} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-    );
-}
-
-/** The alarm glyph of a priority and its acknowledgement (priority 3 has one glyph). */
-function alarmGlyphId(priority: number, unacked: boolean): string {
-    return 'alarm-' + priority + (priority === 3 ? '' : unacked ? '-unacknowledged' : '-acknowledged');
 }
 
 /**
@@ -141,7 +108,6 @@ export class DefaultPopup extends React.Component<DefaultPopupProps> {
         const sheet = mode === 'sheet';
         const state = itemState(values, display);
         const comms = commsText(values ? values.comms : undefined, now);
-        const kpis = display.kpis.filter((k) => k.on).slice(0, 3);
         const viewAlarms = state.alarm !== null && alarmPage !== null;
         return (
             <div className={'mapstudio-popup mapstudio-popup--default' + (sheet ? ' mapstudio-popup--sheet' : ' mapstudio-popup--card')}
@@ -160,10 +126,7 @@ export class DefaultPopup extends React.Component<DefaultPopupProps> {
                             <Chrome name="popout" className="mapstudio-popup-chrome" />
                         </button>
                     ) : null}
-                    <button type="button" className="mapstudio-popup-icon mapstudio-popup-close" aria-label="Close" title="Close"
-                            onClick={this.props.onClose}>
-                        <Chrome name="close" className="mapstudio-popup-chrome" />
-                    </button>
+                    <CloseButton onClose={this.props.onClose} />
                 </div>
                 <div className="mapstudio-popup-body">
                     {display.comms ? (
@@ -176,24 +139,7 @@ export class DefaultPopup extends React.Component<DefaultPopupProps> {
                             </span>
                         </div>
                     ) : null}
-                    {kpis.length > 0 ? (
-                        <div className="mapstudio-popup-kpis" data-part="kpis">
-                            {kpis.map((kpi) => {
-                                const value = values ? values.kpis[kpi.key] : undefined;
-                                const text = value ? staleText(value, valueText(value, kpi.unit)) : 'No value yet';
-                                return (
-                                    <div key={kpi.key} className={'mapstudio-popup-row mapstudio-popup-kpi' + (kpi.icon ? ' mapstudio-popup-kpi--icon' : '')}
-                                         data-kpi={kpi.key} data-stale={value && value.stale ? 'true' : 'false'}>
-                                        <span className="mapstudio-popup-label">{kpi.label}</span>
-                                        <span className="mapstudio-popup-value">
-                                            {value && value.stale ? <Glyph id="stale" className="mapstudio-popup-state-glyph" size={16} /> : null}
-                                            {text}
-                                        </span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    ) : null}
+                    <KpiRows display={display} values={values} />
                     {this.renderAlarms(sheet)}
                 </div>
                 {sheet && (viewAlarms || canEdit) ? (

@@ -17,6 +17,7 @@
  */
 
 import { glyphSvg } from './controls';
+import { alarmGlyphId } from './live';
 import { ALL_OK, EMPTY_SUMMARY, NOTHING_NEEDS_YOU, NeedsYouRow, NeedsYouSummary, RANKED_NOTE, countParts, total } from './needsyou';
 
 /** The sprite the state and kind glyphs come from, as the default popup draws them (DefaultPopup.tsx). */
@@ -41,7 +42,7 @@ function spriteGlyph(id: string, className: string, size: number): SVGSVGElement
 function countGlyph(kind: 'alarm' | 'comms-lost' | 'stale', highestPriority: number): string {
     if (kind === 'alarm') {
         const p = highestPriority >= 1 && highestPriority <= 3 ? highestPriority : 1;
-        return p === 3 ? 'alarm-3' : 'alarm-' + p + '-unacknowledged';
+        return alarmGlyphId(p, true);
     }
     return kind;
 }
