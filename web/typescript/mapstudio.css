@@ -436,6 +436,16 @@
     border-bottom: 1px solid var(--neutral-30);
 }
 
+/* The comms row: the label is never cut, and the check or state glyph stays beside the word while a long
+   value ("OK - 4 instruments, oldest 9 s ago") wraps at its spaces. */
+.mapstudio-popup-comms .mapstudio-popup-label {
+    flex: 0 0 auto;
+}
+
+.mapstudio-popup-comms .mapstudio-popup-value {
+    flex-wrap: nowrap;
+}
+
 .mapstudio-popup-kpis {
     padding: 4px 0;
 }

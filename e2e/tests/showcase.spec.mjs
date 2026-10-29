@@ -56,6 +56,17 @@ async function threeStates(page) {
     await expect(liveItem(page, ids.swd1)).toHaveAttribute('data-state', 'stale');
 }
 
+/**
+ * Wait until the map's labels of the current view hold every text in `texts` (the names and icon KPIs,
+ * published on MapLibre's idle after a batch changed a marker), so a shot shows the labels settled.
+ */
+async function labelsPlaced(map, texts) {
+    await expect.poll(async () => {
+        const labels = (await map.getAttribute('data-labels')) || '';
+        return texts.filter((t) => !labels.includes('"' + t + '"'));
+    }, { timeout: DRAW_MS }).toEqual([]);
+}
+
 /** No dev control or readout on the page: the component alone fills the view. */
 async function componentAlone(page, map) {
     await expect(page.locator('button:not(.mapstudio button)')).toHaveCount(0);
@@ -106,6 +117,7 @@ test.describe('1440 px', () => {
             await threeStates(page);
             // The pipeline's segments from the taps: PT-1 to PT-2 normal, nothing stale on the line.
             await expect(liveItem(page, ids.line)).toHaveAttribute('data-segments', /"from":"[^"]+","to":"[^"]+"/, { timeout: INTERVAL_MS });
+            await labelsPlaced(map, ['P14', '1240 psi', 'SWD1', '365 psi', 'Comms lost', 'Stale', 'L-SWD']);
             await shot(page, 'showcase-view-mode-1440.png');
 
             // The ranked list under the bar and the legend panel, both open, as view-mode-needs-you-1440.png shows.
@@ -130,6 +142,7 @@ test.describe('1366 px', () => {
         const map = await openShowcase(page);
         await componentAlone(page, map);
         await threeStates(page);
+        await labelsPlaced(map, ['P14', '1240 psi', 'SWD1', '365 psi']);
         const popup = await clickP14(page, map, SHOWCASE.center, SHOWCASE.zoom);
         await expect(popup.locator('.mapstudio-popup-subline')).toHaveText('Well pad');
         const kpis = popup.locator('.mapstudio-popup-kpi .mapstudio-popup-value');
@@ -144,6 +157,7 @@ test.describe('1366 px', () => {
         const map = await openShowcase(page);
         await threeStates(page);
         await view(page, map, SHOWCASE.lineCenter, 16);
+        await labelsPlaced(map, ['P14', '1240 psi', 'PT-1', 'L-SWD']);
         const box = await map.boundingBox();
         const [x, y] = pagePixel(box, SHOWCASE.between, SHOWCASE.lineCenter, 16);
         await page.mouse.click(x, y);
@@ -169,6 +183,7 @@ test.describe('390 px', () => {
         await componentAlone(page, map);
         await threeStates(page);
         await view(page, map, SHOWCASE.phoneCenter, SHOWCASE.zoom);
+        await labelsPlaced(map, ['P14', '1240 psi']);
         const sheet = await clickP14(page, map, SHOWCASE.phoneCenter, SHOWCASE.zoom);
         await expect(map).toHaveAttribute('data-popup-mode', 'sheet');
         await expect(sheet.locator('.mapstudio-popup-view-alarms')).toBeVisible();

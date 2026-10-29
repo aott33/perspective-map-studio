@@ -128,7 +128,9 @@ export class LinePopup extends React.Component<LinePopupProps> {
                         <div className={'mapstudio-popup-alarms' + (state.alarm ? ' mapstudio-popup-alarms--active mapstudio-popup-alarms--p' + state.alarm.priority : '')}
                              data-part="alarms" data-alarm={state.alarm ? state.alarm.priority + ':' + (state.alarm.unacked ? 'unacked' : 'acked') : 'none'}
                              data-stale={values && values.alarms && values.alarms.stale ? 'true' : 'false'}>
-                            {state.alarm ? <Glyph id={alarmGlyphId(state.alarm.priority, state.alarm.unacked)} className="mapstudio-popup-alarm-glyph" /> : null}
+                            {state.alarm
+                                ? <Glyph id={alarmGlyphId(state.alarm.priority, state.alarm.unacked)} className="mapstudio-popup-alarm-glyph" />
+                                : <Chrome name="check" className="mapstudio-popup-alarm-glyph mapstudio-popup-alarm-glyph--ok" />}
                             <span className="mapstudio-popup-value">
                                 {values && values.alarms && values.alarms.stale ? 'Stale - ' : ''}{alarmsText(values ? values.alarms : undefined)}
                             </span>
