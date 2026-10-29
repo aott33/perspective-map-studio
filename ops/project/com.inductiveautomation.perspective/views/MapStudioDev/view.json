@@ -41,12 +41,6 @@
     "type": "ao.mapstudio",
     "version": 0,
     "props": {
-     "popupView": {
-      "path": "Popups/PointDetails",
-      "params": {
-       "source": "dev"
-      }
-     },
      "startingArea": {
       "center": {
        "lng": -104.9725,

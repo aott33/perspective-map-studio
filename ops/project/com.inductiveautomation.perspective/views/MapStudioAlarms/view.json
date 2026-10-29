@@ -1,0 +1,111 @@
+{
+ "custom": {},
+ "params": {
+  "item": ""
+ },
+ "propConfig": {
+  "params.item": {
+   "paramDirection": "input",
+   "persistent": true
+  }
+ },
+ "props": {
+  "defaultSize": {
+   "width": 1440,
+   "height": 900
+  }
+ },
+ "root": {
+  "type": "ia.container.flex",
+  "version": 0,
+  "props": {
+   "direction": "column",
+   "style": {
+    "padding": "8px 12px",
+    "gap": "4px"
+   }
+  },
+  "meta": {
+   "name": "root"
+  },
+  "position": {},
+  "custom": {},
+  "children": [
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {
+     "style": {
+      "fontWeight": "bold"
+     }
+    },
+    "meta": {
+     "name": "title",
+     "domId": "mapstudio-alarms-title"
+    },
+    "position": {
+     "basis": "24px",
+     "shrink": 0
+    },
+    "custom": {},
+    "propConfig": {
+     "props.text": {
+      "binding": {
+       "type": "expr",
+       "config": {
+        "expression": "\"Alarms of \" + {view.params.item}"
+       }
+      }
+     }
+    }
+   },
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {
+     "text": "Dev alarm page (epic 3 entry 8): the built-in Alarm Status Table filtered to the pad's folder. Map Studio acknowledges nothing; this table does."
+    },
+    "meta": {
+     "name": "note"
+    },
+    "position": {
+     "basis": "24px",
+     "shrink": 0
+    },
+    "custom": {}
+   },
+   {
+    "type": "ia.display.alarmstatustable",
+    "version": 0,
+    "props": {
+     "filters": {
+      "active": {
+       "conditions": {
+        "source": ""
+       }
+      }
+     }
+    },
+    "meta": {
+     "name": "alarms",
+     "domId": "mapstudio-alarms-table"
+    },
+    "position": {
+     "basis": "0px",
+     "grow": 1
+    },
+    "custom": {},
+    "propConfig": {
+     "props.filters.active.conditions.source": {
+      "binding": {
+       "type": "expr",
+       "config": {
+        "expression": "\"*/\" + {view.params.item} + \"/*\""
+       }
+      }
+     }
+    }
+   }
+  ]
+ }
+}

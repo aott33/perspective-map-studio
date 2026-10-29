@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -207,6 +208,8 @@ class LiveValueCacheTest {
         assertEquals("comms", problems.get(0).getAsJsonObject().get("slot").getAsString());
         assertEquals("the tag was not found", problems.get(0).getAsJsonObject().get("reason").getAsString());
         assertEquals("kpi:pressure", problems.get(1).getAsJsonObject().get("slot").getAsString());
+        // The popup detail (entry 8) is the one part that carries the paths, for the open popup's session alone.
+        p3.remove("popup");
         assertFalse(p3.toString().contains("[default]"), "no path reaches the browser");
         assertEquals("Bad_NotFound", p3.getAsJsonObject("comms").get("quality").getAsString());
     }
@@ -255,6 +258,64 @@ class LiveValueCacheTest {
         cache.rebuild(P);
         assertEquals(Set.of(P1, P2, P3, UNLINKED), cache.plannedItems(P));
         assertEquals(0, tags.cancelled.size());
+    }
+
+    @Test
+    void thePopupDetailCarriesThePathsAndTheAlarmSummaryForTheOpenItemOnly() {
+        // Epic 3 entry 8: itemBatch (the open popup's push) carries basePath, alarmsPath and the alarms
+        // counted by priority with the three most important listed; the interval batch does not.
+        FakeAlarmStatus alarms = new FakeAlarmStatus();
+        Instant t = Instant.parse("2026-10-28T10:00:00Z");
+        alarms.active.add(new AlarmStatus.ActiveAlarm("Low flow", "Flow", 3, false, t));
+        alarms.active.add(new AlarmStatus.ActiveAlarm("High pressure", "Pressure", 1, true, t.minusSeconds(60)));
+        alarms.active.add(new AlarmStatus.ActiveAlarm("Diag", "Comms", 0, true, t));
+        alarms.active.add(new AlarmStatus.ActiveAlarm("Older", "Pressure", 1, true, t.minusSeconds(120)));
+        alarms.active.add(new AlarmStatus.ActiveAlarm("Acked", "Pressure", 1, false, t));
+        cache = new LiveValueCache(tags, p -> snapshot, p -> adapters, null, Runnable::run, alarms);
+        cache.ensure(P);
+        cache.batch(P, -1);
+        JsonObject p1 = cache.itemBatch(P, P1).body().getAsJsonArray("items").get(0).getAsJsonObject();
+        JsonObject popup = p1.getAsJsonObject("popup");
+        assertEquals("[default]Mesa/P12", popup.get("basePath").getAsString());
+        assertEquals("[default]Mesa/P12", popup.get("alarmsPath").getAsString());
+        assertEquals(List.of("[default]Mesa/P12"), alarms.asked);
+        JsonObject summary = popup.getAsJsonObject("alarms");
+        assertEquals(3, summary.getAsJsonObject("counts").get("1").getAsInt());
+        assertEquals(0, summary.getAsJsonObject("counts").get("2").getAsInt());
+        assertEquals(1, summary.getAsJsonObject("counts").get("3").getAsInt());
+        assertEquals("", summary.get("reason").getAsString());
+        List<String> names = new ArrayList<>();
+        for (JsonElement e : summary.getAsJsonArray("list")) {
+            names.add(e.getAsJsonObject().get("name").getAsString());
+        }
+        assertEquals(List.of("High pressure", "Older", "Acked"), names, "priority 1 first, unacknowledged first, newest first, three at most");
+        JsonObject first = summary.getAsJsonArray("list").get(0).getAsJsonObject();
+        assertEquals("Pressure", first.get("source").getAsString());
+        assertTrue(first.get("unacked").getAsBoolean());
+        assertEquals("2026-10-28T09:59:00Z", first.get("activeTime").getAsString());
+        // The interval batch never carries the detail; the unlinked pad has no paths and no summary.
+        assertFalse(item(cache.batch(P, -1).body(), P1).has("popup"));
+        JsonObject unlinked = cache.itemBatch(P, UNLINKED).body().getAsJsonArray("items").get(0).getAsJsonObject()
+            .getAsJsonObject("popup");
+        assertTrue(unlinked.get("basePath").isJsonNull());
+        assertTrue(unlinked.get("alarmsPath").isJsonNull());
+        assertFalse(unlinked.has("alarms"));
+        // A failing alarm system is said in words, with no path and no exception message.
+        alarms.failure = new IllegalStateException("[default]Mesa/P12 boom");
+        summary = cache.itemBatch(P, P1).body().getAsJsonArray("items").get(0).getAsJsonObject().getAsJsonObject("popup")
+            .getAsJsonObject("alarms");
+        assertEquals(LiveValueCache.ALARMS_UNREADABLE, summary.get("reason").getAsString());
+        assertEquals(0, summary.getAsJsonArray("list").size());
+        assertEquals(0, summary.getAsJsonObject("counts").get("1").getAsInt());
+        assertFalse(summary.toString().contains("[default]"));
+    }
+
+    @Test
+    void withoutAnAlarmStatusTheSummarySaysSo() {
+        cache.batch(P, -1);
+        JsonObject summary = cache.itemBatch(P, P1).body().getAsJsonArray("items").get(0).getAsJsonObject()
+            .getAsJsonObject("popup").getAsJsonObject("alarms");
+        assertEquals(LiveValueCache.ALARMS_UNAVAILABLE, summary.get("reason").getAsString());
     }
 
     @Test
@@ -329,6 +390,7 @@ class LiveValueCacheTest {
         p1 = cache.itemBatch(P, P1).body().getAsJsonArray("items").get(0).getAsJsonObject();
         assertEquals("style", p1.getAsJsonArray("problems").get(0).getAsJsonObject().get("slot").getAsString());
         assertEquals("the tag was not found", p1.getAsJsonArray("problems").get(0).getAsJsonObject().get("reason").getAsString());
+        p1.remove("popup");
         assertFalse(p1.toString().contains("[default]"));
         assertFalse(p1.toString().contains("{value}"));
     }

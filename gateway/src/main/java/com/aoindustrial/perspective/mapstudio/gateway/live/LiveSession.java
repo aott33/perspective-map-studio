@@ -72,15 +72,16 @@ public final class LiveSession {
     }
 
     /**
-     * The browser opened the popup of {@code itemId}: push its values on change, and for a line the
-     * values of every instrument attached to it (AD-7, entry 2).
+     * The browser opened the popup of {@code itemId}: push its values now, with the popup detail
+     * (the base path, the alarms path and the alarm summary; epic 3 entry 8), then on every change;
+     * for a line, the values of every instrument attached to it too (AD-7, entry 2).
      */
     public void popupOpen(String itemId) {
         popupClose();
         popupItem = itemId;
         popupItems = cache.popupItems(project, itemId);
         popup = cache.onItemsChange(project, popupItems, this::schedulePush);
-        // The popup opens with what the map already drew; the next change pushes.
+        schedulePush(0);
     }
 
     /** The browser closed the popup. */
@@ -100,23 +101,28 @@ public final class LiveSession {
     }
 
     private void schedulePush() {
+        schedulePush(PUSH_DELAY_MS);
+    }
+
+    private void schedulePush(long delayMs) {
         if (push != null && !push.isDone()) {
             return;
         }
         try {
-            push = live.schedule(this::pushPopup, PUSH_DELAY_MS, TimeUnit.MILLISECONDS);
+            push = live.schedule(this::pushPopup, delayMs, TimeUnit.MILLISECONDS);
         } catch (RejectedExecutionException ex) {
             log.debugf("Project %s: no popup push, the module is stopping.", project);
         }
     }
 
     private void pushPopup() {
+        String item = popupItem;
         Set<String> items = popupItems;
-        if (popupItem == null || items.isEmpty()) {
+        if (item == null || items.isEmpty()) {
             return;
         }
         try {
-            LiveValueCache.Batch batch = cache.itemsBatch(project, items);
+            LiveValueCache.Batch batch = cache.itemsBatch(project, items, item);
             if (batch != null) {
                 send.accept(batch.body());
             }

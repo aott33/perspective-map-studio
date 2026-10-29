@@ -1,26 +1,18 @@
 {
  "custom": {},
  "params": {
-  "mapItem": {
-   "id": "",
-   "name": ""
-  },
-  "source": ""
+  "name": ""
  },
  "propConfig": {
-  "params.mapItem": {
-   "paramDirection": "input",
-   "persistent": true
-  },
-  "params.source": {
+  "params.name": {
    "paramDirection": "input",
    "persistent": true
   }
  },
  "props": {
   "defaultSize": {
-   "width": 220,
-   "height": 96
+   "width": 1440,
+   "height": 900
   }
  },
  "root": {
@@ -43,62 +35,41 @@
     "type": "ia.display.label",
     "version": 0,
     "props": {
-     "text": "Point details",
      "style": {
       "fontWeight": "bold"
      }
     },
     "meta": {
-     "name": "title"
+     "name": "title",
+     "domId": "mapstudio-pad-title"
     },
     "position": {
-     "basis": "20px",
+     "basis": "24px",
      "shrink": 0
     },
-    "custom": {}
-   },
-   {
-    "type": "ia.display.label",
-    "version": 0,
+    "custom": {},
     "propConfig": {
      "props.text": {
       "binding": {
        "type": "expr",
        "config": {
-        "expression": "\"Id: \" + {view.params.mapItem.id}"
+        "expression": "\"Pad \" + {view.params.name}"
        }
       }
      }
-    },
-    "props": {},
-    "meta": {
-     "name": "id"
-    },
-    "position": {
-     "basis": "20px",
-     "shrink": 0
-    },
-    "custom": {}
+    }
    },
    {
     "type": "ia.display.label",
     "version": 0,
-    "propConfig": {
-     "props.text": {
-      "binding": {
-       "type": "expr",
-       "config": {
-        "expression": "\"Name: \" + {view.params.mapItem.name} + \" (\" + {view.params.source} + \")\""
-       }
-      }
-     }
+    "props": {
+     "text": "Dev pad page (epic 3 entry 8): where the popup's page link lands."
     },
-    "props": {},
     "meta": {
-     "name": "name"
+     "name": "note"
     },
     "position": {
-     "basis": "20px",
+     "basis": "24px",
      "shrink": 0
     },
     "custom": {}

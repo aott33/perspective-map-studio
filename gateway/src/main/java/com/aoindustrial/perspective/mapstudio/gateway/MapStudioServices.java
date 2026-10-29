@@ -20,6 +20,7 @@ import com.aoindustrial.perspective.mapstudio.gateway.adapter.ProjectFunctionCal
 import com.aoindustrial.perspective.mapstudio.gateway.basemap.BasemapSources;
 import com.aoindustrial.perspective.mapstudio.gateway.basemap.IgnitionTokenSource;
 import com.aoindustrial.perspective.mapstudio.gateway.change.ChangeBus;
+import com.aoindustrial.perspective.mapstudio.gateway.live.IgnitionAlarmStatus;
 import com.aoindustrial.perspective.mapstudio.gateway.live.IgnitionTagSubscriber;
 import com.aoindustrial.perspective.mapstudio.gateway.live.LiveValueCache;
 import com.aoindustrial.perspective.mapstudio.gateway.load.MapLoader;
@@ -109,7 +110,7 @@ public final class MapStudioServices {
         this.scriptModule = new GatewayScriptModule(writes, loader, adapters);
         this.liveThread = Executors.newSingleThreadScheduledExecutor(daemon("MapStudio-live"));
         this.live = new LiveValueCache(new IgnitionTagSubscriber(context.getTagManager()), loader::snapshot,
-            adapters::snapshot, changes, liveThread);
+            adapters::snapshot, changes, liveThread, new IgnitionAlarmStatus(context.getAlarmManager()));
         this.lifecycles = new SetupLifecycleFactory(context, setups);
     }
 
