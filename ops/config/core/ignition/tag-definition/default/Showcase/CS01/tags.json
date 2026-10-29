@@ -19,5 +19,22 @@
     "valueSource": "memory",
     "dataType": "Float8",
     "value": 95.0
+  },
+  {
+    "name": "CS01-K1",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 1180.0,
+    "alarms": [
+      {
+        "name": "Discharge pressure high",
+        "label": "Discharge pressure high",
+        "mode": "AboveValue",
+        "setpointA": 1300.0,
+        "priority": "Medium",
+        "ackMode": "Manual"
+      }
+    ]
   }
 ]

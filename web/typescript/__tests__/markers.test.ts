@@ -3,7 +3,8 @@ import path from 'node:path';
 import { ItemState } from '../live';
 import {
     ARROW_IMAGE, CHIP_IMAGE, DISC_CENTER, DOT_IMAGE, MARKER_IMAGE, MARKER_TOKENS, MarkerColors, RANK_ALARM, RANK_COMMS_LOST, RANK_NORMAL,
-    BADGE_GLYPH_SIZE, BADGE_HALO_RADIUS, RANK_SELECTED, RANK_STALE, RANK_STYLE, areaProperties, badgeImageId, chipOffsetEm, dotImageId, imageFor, labelRank, lineLook,
+    BADGE_GLYPH_SIZE, BADGE_HALO_RADIUS, HALO_WIDTH, LINE_DASH, LINE_DOT, LINE_HALO_WIDTH, RANK_SELECTED, RANK_STALE, RANK_STYLE, areaProperties,
+    badgeImageId, chipOffsetEm, dotImageId, imageFor, labelRank, lineHaloDash, lineLook,
     lineProperties, lineSampleSvg, lineWeight, markerImageId, markerProperties, markerSpec, markerSvg, parseImageId, parseSprite, stateWord,
     textWidthPx, tintSampleSvg
 } from '../markers';
@@ -134,6 +135,26 @@ describe('marker properties and image ids (epic 3 entries 5 and 7)', () => {
 });
 
 describe('line looks (DESIGN.md map-line)', () => {
+    test('the line halo (entry 12): one halo width each side, its dash scaled per weight to sit under the line\'s', () => {
+        expect(LINE_HALO_WIDTH).toEqual(['+', ['get', 'weight'], HALO_WIDTH]);
+        const dash = lineHaloDash(LINE_DASH);
+        // A case over the weights 2, 3 and 4, the 6 px weight last: each a literal array in halo widths.
+        expect(dash[0]).toBe('case');
+        expect(dash).toHaveLength(1 + 3 * 2 + 1);
+        expect(dash[1]).toEqual(['==', ['get', 'weight'], 2]);
+        expect(dash[2]).toEqual(['literal', [LINE_DASH[0] * 2 / 4, LINE_DASH[1] * 2 / 4]]);
+        expect(dash[5]).toEqual(['==', ['get', 'weight'], 4]);
+        expect(dash[7]).toEqual(['literal', [LINE_DASH[0] * 6 / 8, LINE_DASH[1] * 6 / 8]]);
+        // In pixels the halo's dashes and gaps equal the line's at every weight.
+        for (const [i, w] of [[2, 2], [4, 3], [6, 4], [7, 6]] as [number, number][]) {
+            const [on, off] = (dash[i] as [string, number[]])[1];
+            expect(on * (w + HALO_WIDTH)).toBeCloseTo(LINE_DASH[0] * w, 9);
+            expect(off * (w + HALO_WIDTH)).toBeCloseTo(LINE_DASH[1] * w, 9);
+        }
+        const dots = lineHaloDash(LINE_DOT);
+        expect((dots[7] as [string, number[]])[1][1] * 8).toBeCloseTo(LINE_DOT[1] * 6, 9);
+    });
+
     test('weight by pipe size with an instrument on the line, thin and neutral without', () => {
         expect(lineWeight(2)).toBe(3);
         expect(lineWeight(4)).toBe(3);
@@ -296,8 +317,14 @@ describe('marker images', () => {
     });
 
     test('the tokens the colours come from fall back to Perspective variables, never literals', () => {
-        expect(MARKER_TOKENS.commsLost).toEqual(['--mapstudio-comms-lost', '--qual-1']);
+        // The fallbacks of entry 12's review pack (docs/review-er27.md): comms lost in the magenta family,
+        // the alarm priorities on error, warning and info, no tint in the magenta, purple or red family.
+        expect(MARKER_TOKENS.commsLost).toEqual(['--mapstudio-comms-lost', '--qual-4']);
         expect(MARKER_TOKENS.alarm1[1]).toBe('--error');
+        expect(MARKER_TOKENS.alarm2[1]).toBe('--warning');
+        expect(MARKER_TOKENS.alarm3[1]).toBe('--info');
+        expect([MARKER_TOKENS.tint1[1], MARKER_TOKENS.tint2[1], MARKER_TOKENS.tint3[1], MARKER_TOKENS.tint4[1], MARKER_TOKENS.tint5[1],
+            MARKER_TOKENS.tint6[1]]).toEqual(['--qual-3', '--qual-7', '--qual-2', '--qual-8', '--qual-10', '--div-12']);
         expect(MARKER_TOKENS.selection).toEqual(['--callToAction']);
         for (const tokens of Object.values(MARKER_TOKENS)) {
             for (const t of tokens) {

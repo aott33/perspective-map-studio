@@ -88,6 +88,9 @@ COMPRESSOR_SETUP = {
     'alarms': {'path': '{asset.path}', 'count': True, 'summary': True},
     'link': '/site/{item.name}',
 }
+# The SWD kind opens the showcase project's custom popup view Popups/SiteCard instead of the default
+# popup (epic 3 entry 12: the review pack shows Map Studio's own close row above a project view), with
+# the item's name as a param; the view reads the live pressure from the mapItem object.
 SWD_SETUP = {
     'comms': {'path': '{asset.path}/Comms', 'on': True},
     'kpis': [
@@ -95,6 +98,7 @@ SWD_SETUP = {
         {'key': 'injection', 'label': 'Injection rate', 'path': '{asset.path}/InjectionRate', 'unit': 'bbl/d', 'on': True, 'icon': False}],
     'alarms': {'path': '{asset.path}', 'count': True, 'summary': True},
     'link': '/site/{item.name}',
+    'popupView': {'path': 'Popups/SiteCard', 'params': {'siteName': '{item.name}'}},
 }
 # A pipeline takes its look per segment from the worst of the instruments at the segment's ends; its
 # alarms are its own folder's (L-SWD is linked to the asset LSWD, so its popup ends in the alarms row,
@@ -125,11 +129,28 @@ TAG_VALUES = (
     ('SWD1/Comms', True), ('SWD1/Pressure', 365.0), ('SWD1/InjectionRate', 4200.0),
     ('PT1/Comms', True), ('PT1/Pressure', 398.0), ('PT2/Comms', True), ('PT2/Pressure', 371.0),
     ('LV1/Comms', True), ('LV1/Position', 100.0), ('Lines/LSWD/Flow', 3100.0),
+    # The review alarms' tags (entry 12), quiet: below (or above) their setpoints.
+    ('CS01/CS01-K1', 1180.0), ('CTB1/CTB1-T3', 62.0), ('P12/P12-1H', 960.0), ('PT1/PT1-A', 398.0), ('PT2/PT2-A', 371.0),
 )
 ALARM_TAG = 'P14/P14-2H'
 ALARM_BELOW = 900.0
 ALARM_VALUE = 1240.0
 STALE_TAG = 'SWD1/InjectionRate'
+
+# The review states (epic 3 entry 12, the engineering review pack docs/review-er27.md): beside the
+# mockups' three states (P14 priority 1 unacknowledged, P21 comms lost, SWD1 stale) the showcase shows
+# every alarm priority and acknowledgement state the map draws, an instrument alarm at its place on
+# the line and the line's segments graded by their end instruments. (tag, raised value, acknowledged
+# after raising, the alarm source folder.)
+REVIEW_ALARMS = (
+    ('CS01/CS01-K1', 1350.0, False, 'CS01'),   # Discharge pressure high, Medium: priority 2, unacknowledged
+    ('CTB1/CTB1-T3', 88.0, False, 'CTB1'),     # Tank level high, Low: priority 3
+    ('P12/P12-1H', 1120.0, True, 'P12'),       # Casing pressure high, High: priority 1, acknowledged
+    ('PT1/PT1-A', 470.0, False, 'PT1'),        # Pressure high, Medium: priority 2 on the tap PT-1
+    ('PT2/PT2-A', 330.0, True, 'PT2'),         # Pressure low, Low: priority 3 on the tap PT-2, acknowledged
+)
+REVIEW_SOURCES = ['*Showcase/%s/*' % folder for _tag, _value, _ack, folder in REVIEW_ALARMS]
+REVIEW_COMMS_TAG = 'PT2/Comms'
 
 
 def _logger():
@@ -171,11 +192,77 @@ def _write(path, value):
     return str(system.tag.writeBlocking([path], [value], 5000)[0])
 
 
+def _acknowledge(sources, states):
+    """Acknowledge every alarm of the showcase sources in the given states; returns how many."""
+    results = system.alarm.queryStatus(source=sources, state=states)
+    ids = [str(event.getId()) for event in results]
+    if ids:
+        # 8.3.10 takes all three arguments (alarm ids, notes, username): two raise
+        # "acknowledge(): expected 3 args; got 2" (docs/platform-checks.md).
+        system.alarm.acknowledge(ids, 'showcase review acknowledgement (epic 3 entry 12)', 'mapstudio-dev')
+    return len(ids)
+
+
+def _wait_active(source, tries=40):
+    """Poll until the source has an active unacknowledged alarm (the raise is asynchronous); True when it has."""
+    import time
+    for _ in range(tries):
+        if len(system.alarm.queryStatus(source=[source], state=['ActiveUnacked'])) > 0:
+            return True
+        time.sleep(0.25)
+    return False
+
+
+def _review_off():
+    """The review alarms cleared (their tags quiet) and acknowledged, PT-2's comms on; returns the acknowledged count."""
+    for tag, _value, _ack, _folder in REVIEW_ALARMS:
+        _write(SHOWCASE_PREFIX + tag, dict(TAG_VALUES)[tag])
+    _write(SHOWCASE_PREFIX + REVIEW_COMMS_TAG, True)
+    return _acknowledge(REVIEW_SOURCES, ['ActiveUnacked', 'ClearUnacked'])
+
+
+def review_states(mode):
+    """
+    The showcase map in its review states (entry 12): `alarms` raises the review alarms and acknowledges
+    the ones marked so (P12 priority 1 acknowledged, PT-2 priority 3 acknowledged); `stale` does the same
+    and takes PT-2's comms away, so its two segments dash and its marker reads comms lost; `off` puts
+    the map back in the mockups' states (the review alarms cleared and acknowledged, comms on). Returns
+    {mode, raised, acknowledged, commsOff} or {error}. Showcase demo tags only.
+    """
+    logger = _logger()
+    result = {'mode': mode, 'raised': 0, 'acknowledged': 0, 'commsOff': False}
+    try:
+        if mode not in ('alarms', 'stale', 'off'):
+            raise ValueError('Unknown review mode %s; the modes are alarms, stale and off' % mode)
+        result['acknowledged'] = _review_off()
+        if mode == 'off':
+            return result
+        for tag, value, ack, folder in REVIEW_ALARMS:
+            _write(SHOWCASE_PREFIX + tag, value)
+            result['raised'] += 1
+            if ack:
+                source = '*Showcase/%s/*' % folder
+                if not _wait_active(source):
+                    raise ValueError('The review alarm of %s did not go active in 10 s' % folder)
+                result['acknowledged'] += _acknowledge([source], ['ActiveUnacked'])
+        if mode == 'stale':
+            _write(SHOWCASE_PREFIX + REVIEW_COMMS_TAG, False)
+            result['commsOff'] = True
+    except java.lang.Throwable as ex:
+        result['error'] = ex.getMessage()
+        logger.warn('Showcase review states not set: %s' % ex.getClass().getSimpleName())
+    except Exception as ex:
+        result['error'] = str(ex)
+        logger.warn('Showcase review states not set: %s' % type(ex).__name__)
+    return result
+
+
 def set_states():
     """
     Put the demo tags in the mockups' states: every value, the alarm raised afresh (below the setpoint,
-    then above it) and SWD1's injection rate at Bad quality so it reads stale. Returns
-    {written, alarm, stale} (qualities as text) or {error}.
+    then above it), SWD1's injection rate at Bad quality so it reads stale, and the review alarms of
+    entry 12 cleared and acknowledged. Returns {written, alarm, stale, reviewAcknowledged} (qualities
+    as text) or {error}.
     """
     from com.inductiveautomation.ignition.common.model.values import BasicQualifiedValue, QualityCode
     logger = _logger()
@@ -187,6 +274,7 @@ def set_states():
         _write(SHOWCASE_PREFIX + ALARM_TAG, ALARM_BELOW)
         result['alarm'] = _write(SHOWCASE_PREFIX + ALARM_TAG, ALARM_VALUE)
         result['stale'] = _write(SHOWCASE_PREFIX + STALE_TAG, BasicQualifiedValue(4200.0, QualityCode.Bad))
+        result['reviewAcknowledged'] = _review_off()
     except java.lang.Throwable as ex:
         result['error'] = ex.getMessage()
         logger.warn('Showcase tags not set: %s' % ex.getClass().getSimpleName())

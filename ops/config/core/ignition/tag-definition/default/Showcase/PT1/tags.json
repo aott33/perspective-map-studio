@@ -12,5 +12,22 @@
     "valueSource": "memory",
     "dataType": "Float8",
     "value": 398.0
+  },
+  {
+    "name": "PT1-A",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 398.0,
+    "alarms": [
+      {
+        "name": "Pressure high",
+        "label": "Pressure high",
+        "mode": "AboveValue",
+        "setpointA": 450.0,
+        "priority": "Medium",
+        "ackMode": "Manual"
+      }
+    ]
   }
 ]

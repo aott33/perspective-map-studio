@@ -100,7 +100,8 @@ export const MARKER_TOKENS = {
     line: ['--neutral-60', '--label'],
     chipEdge: ['--neutral-50', '--border'],
     selection: ['--callToAction'],
-    commsLost: ['--mapstudio-comms-lost', '--qual-1'],
+    // The hue tokens as mapstudio.css defines them (entry 12, the ER-27 review pack: docs/review-er27.md).
+    commsLost: ['--mapstudio-comms-lost', '--qual-4'],
     alarm1: ['--mapstudio-alarm-1', '--error'],
     alarm2: ['--mapstudio-alarm-2', '--warning'],
     alarm3: ['--mapstudio-alarm-3', '--info'],
@@ -110,9 +111,9 @@ export const MARKER_TOKENS = {
     tint1: ['--mapstudio-tint-1', '--qual-3'],
     tint2: ['--mapstudio-tint-2', '--qual-7'],
     tint3: ['--mapstudio-tint-3', '--qual-2'],
-    tint4: ['--mapstudio-tint-4', '--qual-9'],
+    tint4: ['--mapstudio-tint-4', '--qual-8'],
     tint5: ['--mapstudio-tint-5', '--qual-10'],
-    tint6: ['--mapstudio-tint-6', '--qual-8']
+    tint6: ['--mapstudio-tint-6', '--div-12']
 } as const;
 
 export type MarkerLook = 'normal' | 'comms-lost' | 'stale';
@@ -611,6 +612,33 @@ export function markerSvg(spec: MarkerSpec, symbols: Record<string, SpriteSymbol
 /** The line patterns the layers use, in units of the line width: dashed 8 6 (DESIGN.md) at the untapped weight, dotted round dots. */
 export const LINE_DASH: [number, number] = [2.5, 2];
 export const LINE_DOT: [number, number] = [0.01, 2.2];
+
+/**
+ * The line halo (entry 12, the contrast check): every line draws over a halo in the blank-map token,
+ * HALO_WIDTH wider than the line (one pixel each side), as every marker has, so a line's hue or
+ * dash reads on a light raster tile in the dark theme and on a dark tile in the light theme; on the
+ * blank map it is invisible. The halo's width expression for the layers, from the feature's weight.
+ */
+export const LINE_HALO_WIDTH: unknown[] = ['+', ['get', 'weight'], HALO_WIDTH];
+
+/** The weights a line feature may carry (markers.ts lineLook). */
+const LINE_FEATURE_WEIGHTS: number[] = [LINE_UNTAPPED, ...LINE_WEIGHTS];
+
+/**
+ * The dash pattern of a halo under a dashed or dotted line: MapLibre scales a dash by its own layer's
+ * width, so the halo, HALO_WIDTH wider, needs the line's pattern scaled by weight / (weight + HALO_WIDTH)
+ * per weight to keep the halo's dashes under the line's. A `case` over the feature's weight with a
+ * literal array per weight (the style spec takes arrays only as literals); the last is the widest.
+ */
+export function lineHaloDash(pattern: [number, number]): unknown[] {
+    const scaled = (w: number): unknown[] => ['literal', [pattern[0] * w / (w + HALO_WIDTH), pattern[1] * w / (w + HALO_WIDTH)]];
+    const expr: unknown[] = ['case'];
+    for (const w of LINE_FEATURE_WEIGHTS.slice(0, -1)) {
+        expr.push(['==', ['get', 'weight'], w], scaled(w));
+    }
+    expr.push(scaled(LINE_FEATURE_WEIGHTS[LINE_FEATURE_WEIGHTS.length - 1]));
+    return expr;
+}
 
 /**
  * A line sample for the preview (StylePreview): a 64 by 16 px line in the preset's look, the hue

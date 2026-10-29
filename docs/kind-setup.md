@@ -60,7 +60,7 @@ Closed lists in `common/.../StylePresets.java` (owner decisions, 2026-10-27); a 
 | --- | --- |
 | Presets, every kind | `normal`, `attention`, `warning`, `fault`, `dimmed` |
 | Line presets, line kinds only | `solid`, `dashed`, `dotted` |
-| Tints | `tint-1` to `tint-6`, mapped to theme tokens by epic-viewing; no hue is promised before ER-27 |
+| Tints | `tint-1` to `tint-6`, mapped to the theme tokens `--mapstudio-tint-1` to `-6` ([styles.md](styles.md); the hues chosen in [review-er27.md](review-er27.md), the engineering review of 0.3.0) |
 
 Line weight by pipe size is not a preset: a line takes it from its `diameter` property ([contract.md](contract.md), "What the map draws"). What each preset and tint looks like, in both themes: [styles.md](styles.md).
 

@@ -1,6 +1,6 @@
 # Value styles and area tints
 
-Every look a style rule can give a map item, and every tint an area can take, in both Perspective themes (epic 3 entry 1; initiative R40, prd FR-38 and FR-39, architecture AD-11 and AD-16). Entry 12 takes this page to the engineering review (ER-27) with the alarm priority tokens and the `comms-lost` token, so the hues named here are stand-ins: each is a theme token the host project may redefine, with a Perspective variable as its fallback, and no colour literal is in the module's styles or in any stored rule. How a rule is written and evaluated: [kind-setup.md](kind-setup.md), "Style rules as the map evaluates them".
+Every look a style rule can give a map item, and every tint an area can take, in both Perspective themes (epic 3 entry 1; initiative R40, prd FR-38 and FR-39, architecture AD-11 and AD-16). The hues are the tokens entry 12 chose and took to the engineering review (ER-27) with the alarm priority tokens and the `comms-lost` token ([review-er27.md](review-er27.md), sections 1 and 2: the contrast check and the reasons): each is a theme token the host project may redefine, with a Perspective variable as its fallback, and no colour literal is in the module's styles or in any stored rule. How a rule is written and evaluated: [kind-setup.md](kind-setup.md), "Style rules as the map evaluates them".
 
 Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway (Ignition 8.3.10) by `e2e/tests/styles.spec.mjs`, which takes the screenshots below from the dev page `/styles`; **[build]** unit tested in node (`web/typescript/__tests__/markers.test.ts`, `stylePreview.test.ts`); **[ER-27]** for the engineering review.
 
@@ -27,22 +27,22 @@ The word sits in the state chip beside the name (a point) or in the line's name 
 
 **Per segment (epic 3 entry 2).** A line whose rule is the instruments source (`{"instruments": "worst"}`) draws each segment between its measuring instruments in the look the Gateway graded for it: the worse of the two end instruments' presets in the hue and pattern above, `dashed` with the stale look when either end is stale, and the alarm hue with the segment's worse end alarm over both; the line's chip at the midpoint says the worst word over the segments ("L-SWD Stale"). The line's own alarm still colours the whole line. Lines without instruments, and lines with another rule, draw as one line ([instruments.md](instruments.md)).
 
-Stand-in hues to review **[ER-27]**: `fault` falls back to the same `--error` as alarm priority 1 and `warning` to the same `--warning` as priority 2; the ring and the word tell them from the alarm badge and its digit, but the review may want the presets on hues of their own. `attention` is no hue at all (DESIGN.md: a heavier outline plus the word).
+Presets against alarms **[ER-27]**: `fault` falls back to the same `--error` as alarm priority 1 and `warning` to the same `--warning` as priority 2, because a Perspective theme has one error and one warning hue and the bundled palette has no free family left for two more (magenta and purple are comms lost's, blue is priority 3's). They are never confused: a preset is a ring round the disc and a word in the chip, an alarm the IEC glyph with its digit, and both draw when both apply ([review-er27.md](review-er27.md), section 1; the review may still ask for hues of their own). `attention` is no hue at all (DESIGN.md: a heavier outline plus the word).
 
 ## Area tints
 
-Six tints, `tint-1` to `tint-6`, for area kinds only (a line kind with `area: true`): an area draws as a closed fill at 22 % opacity and a 1.5 px outline at 80 % in its tint, so the wash stays low in saturation over any basemap; a point or a line never takes one, and a category with no tint (or no `areaTints`) draws the neutral area look in the pipeline grey. The tokens fall back to Perspective's qualitative palette, chosen to avoid the comms-lost purple (`--qual-1`) and the error red:
+Six tints, `tint-1` to `tint-6`, for area kinds only (a line kind with `area: true`): an area draws as a closed fill at 22 % opacity and a 1.5 px outline at 80 % in its tint, so the wash stays low in saturation over any basemap; a point or a line never takes one, and a category with no tint (or no `areaTints`) draws the neutral area look as a dashed outline in the lateral tone. The tokens fall back to Perspective's palette variables, from the families no state uses where the bundled palette has one (entry 12): none is magenta or purple (comms lost's family) or red (priority 1's):
 
 | Tint | Token | Fallback | Light theme value | Dark theme value |
 | --- | --- | --- | --- | --- |
 | `tint-1` | `--mapstudio-tint-1` | `--qual-3` | #086962 (teal) | #08827A |
 | `tint-2` | `--mapstudio-tint-2` | `--qual-7` | #038537 (green) | #46E385 |
 | `tint-3` | `--mapstudio-tint-3` | `--qual-2` | #229AD6 (sky) | #53BAED |
-| `tint-4` | `--mapstudio-tint-4` | `--qual-9` | #ED5393 (pink) | #ED5393 |
-| `tint-5` | `--mapstudio-tint-5` | `--qual-10` | #CF7911 (amber) | #E89C3F |
-| `tint-6` | `--mapstudio-tint-6` | `--qual-8` | #114599 (navy) | #5691F0 |
+| `tint-4` | `--mapstudio-tint-4` | `--qual-8` | #114599 (navy) | #5691F0 |
+| `tint-5` | `--mapstudio-tint-5` | `--qual-10` | #CF7911 (sand) | #E89C3F |
+| `tint-6` | `--mapstudio-tint-6` | `--div-12` | #21C2B7 (light teal) | #21C2B7 |
 
-The values are what Perspective's bundled `light` and `dark` themes define for the fallbacks (read from the 8.3.10 Perspective themes, for this page only; the module never holds them). To review **[ER-27]**: `tint-5` is in the warning family and `tint-3` and `tint-6` in the info family of alarm priority 3; at 22 % the wash is far from the alarm hues, but the review may pick other palette entries or a host theme may define the six tokens itself.
+The values are what Perspective's bundled `light` and `dark` themes define for the fallbacks, read from the showcase page by the contrast check (`e2e/tests/review.spec.mjs`; the module never holds them). To review **[ER-27]**: `tint-5` (sand) is in the bronze family of alarm priority 2 and the warning preset, and `tint-4` (navy) in the blue family of priority 3 (in the dark theme the two fallbacks coincide, #5691F0); as drawn a 22 % wash with an 80 % outline is far from a glyph with a digit or a ring with a word, but the review may pick other entries or a host theme may define the six tokens itself. `tint-6` is a second teal at another lightness, the same value in both themes, because the bundled palette has five families no state uses.
 
 ## The preview
 
@@ -57,4 +57,4 @@ From the dev stack's `/styles` page (the seeded pad States rule, the line Bands 
 - [The map with a warning marker, an attention line and the two tinted geofences, 1440 px](screenshots/mapstudio-styles-1440.png)
 - [The preview on a phone, 390 px](screenshots/mapstudio-styles-390.png)
 
-A contrast check of each ring, line and wash against the basemaps and surfaces (3:1, prd NFR-3) is entry 12's, against the host theme.
+The contrast check of each ring, line and wash against the blank map, the panel and a light raster sample (3:1 for every state mark, prd NFR-3; the tints reported, not counted) is entry 12's: [review-er27.md](review-er27.md), section 2, with the tables of both bundled themes.

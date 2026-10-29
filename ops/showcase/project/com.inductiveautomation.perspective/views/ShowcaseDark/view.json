@@ -1,0 +1,64 @@
+{
+ "custom": {},
+ "events": {
+  "system": {
+   "onStartup": [
+    {
+     "config": {
+      "script": "\t# Dev only (epic 3 entry 12): the showcase page in the dark Perspective theme, so the engineering\n\t# review pack (docs/review-er27.md, e2e/tests/review.spec.mjs) renders every state in both themes.\n\t# The session keeps the theme; a new session starts light again.\n\tself.session.props.theme = 'dark'"
+     },
+     "scope": "G",
+     "type": "script"
+    }
+   ]
+  }
+ },
+ "params": {},
+ "props": {
+  "defaultSize": {
+   "width": 1440,
+   "height": 900
+  }
+ },
+ "root": {
+  "type": "ia.container.flex",
+  "version": 0,
+  "props": {
+   "direction": "column"
+  },
+  "meta": {
+   "name": "root"
+  },
+  "position": {},
+  "custom": {},
+  "children": [
+   {
+    "type": "ao.mapstudio",
+    "version": 0,
+    "props": {
+     "startingArea": {
+      "center": {
+       "lng": -104.93,
+       "lat": 39.7
+      },
+      "zoom": 15,
+      "bounds": {
+       "west": null,
+       "south": null,
+       "east": null,
+       "north": null
+      }
+     }
+    },
+    "meta": {
+     "name": "map"
+    },
+    "position": {
+     "basis": "0px",
+     "grow": 1
+    },
+    "custom": {}
+   }
+  ]
+ }
+}
