@@ -198,6 +198,8 @@ export class NeedsYouControl {
         if (!panel) {
             return;
         }
+        // A batch redraws an open list: the row that had the focus keeps it (by its place).
+        const focused = this.rowsOf().indexOf(document.activeElement as HTMLElement);
         this.rowsOf().forEach((row) => row.removeEventListener('click', this.handleRowClick));
         while (panel.firstChild) {
             panel.removeChild(panel.firstChild);
@@ -261,6 +263,10 @@ export class NeedsYouControl {
             list.appendChild(item);
         });
         panel.appendChild(list);
+        if (focused >= 0) {
+            const again = this.rowsOf();
+            again[Math.min(focused, again.length - 1)].focus();
+        }
     }
 
     private rowsOf(): HTMLElement[] {
