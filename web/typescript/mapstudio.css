@@ -1829,9 +1829,23 @@
 }
 
 .mapstudio-popup--line .mapstudio-popup-alarms {
+    display: flex;
+    align-items: center;
+    gap: 5px;
     margin: 8px 16px 8px;
     padding: 8px 12px;
     border-radius: 6px;
+}
+
+/* The line popup's comms row: the label at its own width, the value taking the rest in one run of text
+   ("OK - 4 instruments, oldest 9 s ago" beside its check), wrapping at a space only when it must. */
+.mapstudio-popup--line .mapstudio-popup-comms .mapstudio-popup-label {
+    flex: 0 0 auto;
+}
+
+.mapstudio-popup--line .mapstudio-popup-comms .mapstudio-popup-value {
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
 }
 
 @media (max-width: 767px) {

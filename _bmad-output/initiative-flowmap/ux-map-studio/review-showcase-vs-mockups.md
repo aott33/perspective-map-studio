@@ -10,11 +10,11 @@ The showcase page itself: the `mapstudio-showcase` project (`ops/showcase/projec
 
 | | Count |
 | --- | --- |
-| Differences found | 41 |
+| Differences found | 42 |
 | Fixed in this entry (theme tokens only, behaviour unchanged) | 17 |
 | Recorded: DESIGN.md or an owner decision wins over the mockup | 13 |
 | Recorded: data of the demo field, host chrome or the host theme, not Map Studio's look | 6 |
-| Backlog: not polish (a feature, a format, or a review item), listed at the end | 5 |
+| Backlog: not polish (a feature, a format, or a review item), listed at the end | 6 |
 
 Two of the fixes change alarm presentation on the map (items 3 and 4) and go to entry 12's engineering review (ER-27) with the hue tokens, as every alarm presentation change does.
 
@@ -117,6 +117,7 @@ Status: **fixed** (built here, the code named), **recorded** (left as it is, the
 | 39 | The dark theme after item 1: the panels are `--neutral-10` (`#161616`) on a `--neutral-20` (`#323232`) map, the same depth the other way round; the docs run's `mapstudio-styles-preview-dark-1440.png` shows it. | checked in the final run |
 | 40 | Every e2e spec that read the status line (`search`, `needsyou`, `measures`, `tracer`) still passes: the line stays in the DOM and `toContainText` reads a hidden element. | checked in the final run |
 | 41 | The unit tests that named the old looks (`features.test.ts`, `markers.test.ts`) now name the lateral tone and the bare badge glyph; 254 tests pass. | done |
+| 42 | L-SWD's name chip is missing at zoom 15 (the mockup shows it at the midpoint): the chip gives way to PT-1's name, because MapLibre places the names layer before the line chips layer and `symbol-sort-key` ranks within a layer only, so the kind list's rank (pipeline 5 over tap 2) cannot win across the two layers. One rank across every text layer is a layout change, not polish. At zoom 16 the chip shows. | backlog |
 
 ## Backlog (not polish)
 
@@ -127,6 +128,7 @@ Status: **fixed** (built here, the code named), **recorded** (left as it is, the
 | 23, 27 | A kind setup's subline field (a well pad's wells, a pipeline's product) in the popup and sheet headers | the kind setup schema (epic-editing's kind setup screen), `DefaultPopup.tsx`, `linePopup.ts` |
 | 16 | The Needs you row's alarm detail naming the alarm when there is one (keeping the count from two up) | `needsyou.ts` `stateDetail`; EXPERIENCE.md wording |
 | 33 | Retiring the spike's `point.click` echo altogether once the save status has its own component (epic-editing) | `MapStudio.tsx`, the spike's message types |
+| 42 | One label rank across the names, chips, KPI and line chip layers, so a pipeline's name wins over an instrument's by the kind list's rank | `MapStudio.tsx` symbol layers (one layer with a text per feature, or MapLibre's `symbol-z-order`) |
 
 ## For the owner
 
