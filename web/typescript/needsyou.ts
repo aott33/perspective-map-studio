@@ -94,6 +94,16 @@ function reasonWords(reason: string): string {
     return reason.charAt(0).toUpperCase() + reason.substring(1);
 }
 
+/** The words for a slot that has no good value: the item's problem for the slot (plain words) before the quality name. */
+function slotReason(values: ItemValues, slot: string, quality: string): string {
+    for (const p of values.problems) {
+        if (p.slot === slot) {
+            return reasonWords(p.reason);
+        }
+    }
+    return reasonWords(quality);
+}
+
 /**
  * The row's detail and age: an alarm's count and the alarms slot's age (and "comms lost" when the
  * item's comms are lost too); comms lost's last heard time, or the reason when there was never a
@@ -113,20 +123,20 @@ export function stateDetail(state: ItemState, values: ItemValues | undefined, di
             const when = age(comms.t, now);
             return when ? 'Last heard ' + when : 'No time';
         }
-        return join('No value yet', reasonWords(comms ? comms.reason : ''));
+        return join('No value yet', slotReason(values, 'comms', comms ? comms.reason : ''));
     }
     for (const kpi of display.kpis) {
         const value = values.kpis[kpi.key];
         if (kpi.on && value && value.stale) {
             const when = age(value.t, now);
-            return join(kpi.label, when ? 'last ' + when : reasonWords(value.reason));
+            return join(kpi.label, when ? 'last ' + when : slotReason(values, 'kpi:' + kpi.key, value.reason));
         }
     }
     if (values.alarms && values.alarms.stale) {
-        return join('Alarms', reasonWords(values.alarms.reason));
+        return join('Alarms', slotReason(values, 'alarms', values.alarms.reason));
     }
     if (values.style && values.style.stale) {
-        return join('Style', reasonWords(values.style.reason));
+        return join('Style', slotReason(values, 'style', values.style.reason));
     }
     return '';
 }

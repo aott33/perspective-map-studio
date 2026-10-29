@@ -61,7 +61,7 @@ describe('the Needs you summary (epic 3 entry 3)', () => {
             // Comms lost (the slot says false), heard 4 min ago.
             d: { id: 'd', comms: good(false), kpis: { pressure: stale(400, 'comms lost') }, alarms: stale(null, 'comms lost'), problems: [] },
             // Comms lost with no value ever (the tag was not found).
-            e: { id: 'e', comms: stale(null, 'the tag was not found', null), kpis: {}, problems: [{ slot: 'comms', reason: 'the tag was not found' }] },
+            e: { id: 'e', comms: stale(null, 'Bad_NotFound', null), kpis: {}, problems: [{ slot: 'comms', reason: 'the tag was not found' }] },
             // Stale: a key value at bad quality, comms fine.
             f: { id: 'f', comms: good(true), kpis: { pressure: stale(400, 'Bad_Stale'), flow: good(1) }, alarms: good({ active: 0, unacked: 0, priority: 0 }), problems: [] },
             // A stale line (its icon KPI never delivered).

@@ -270,9 +270,10 @@ test.describe('1440 px', () => {
             await expect(legendPanel(page)).toBeVisible();
             await expect(map).toHaveAttribute('data-legend-open', 'true');
             await expect(legendButton(page)).toHaveAttribute('aria-expanded', 'true');
-            await expect(legendPanel(page).locator('.mapstudio-legend-heading').first()).toHaveText('Basemap');
+            // The key's sections come first (entry 3); the Basemap section is the last, and the first control took the focus.
+            await expect(legendPanel(page).locator('.mapstudio-legend-heading').last()).toHaveText('Basemap');
             await expect(page.locator('.mapstudio-basemap-button')).toHaveCount(3);
-            await expect(button(page, 'none')).toBeFocused();
+            await expect(page.locator('.mapstudio-legend-toggle[data-toggle="lines"]')).toBeFocused();
             const panelBox = await legendPanel(page).boundingBox();
             expect(panelBox.y + panelBox.height, 'the panel opens above the button').toBeLessThanOrEqual(buttonBox.y + 1);
             await page.keyboard.press('Escape');

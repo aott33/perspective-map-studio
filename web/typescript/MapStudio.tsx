@@ -1358,6 +1358,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
             }
         }
         el.setAttribute('data-labels', JSON.stringify(boxes));
+        // The line features and the arrow MapLibre drew (none while the legend's Lines toggle is off, entry 3).
+        const drawn = (layers: string[]): number => layers.filter((l) => map.getLayer(l))
+            .reduce((n, l) => n + map.queryRenderedFeatures({ layers: [l] }).length, 0);
+        el.setAttribute('data-lines-drawn', String(drawn([LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED])));
+        el.setAttribute('data-arrow-drawn', String(drawn([LAYER_ARROW])));
         el.setAttribute('data-names-shown', String(boxes.filter((b) => b.layer === LAYER_ITEM_NAMES).length));
         el.setAttribute('data-labels-zoom', map.getZoom().toFixed(2));
     }
