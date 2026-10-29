@@ -9,8 +9,9 @@
 // inside it; with all three cleared (the alarm down and acknowledged, the quality good, Point 3
 // unlinked from P15, which rebuilds the live plan) it reads "All OK" in neutral and stays. The legend
 // names every glyph and line look and its Lines and Names toggles hide what they say, remembered for
-// the session. Screenshots at 1440 and 390 px for the docs (AD-15). The spec links Point 3 to P15
-// again when it is done, since the seed leaves an assetId alone.
+// the session. Screenshots at 1440 and 390 px for the docs (AD-15). The spec first deletes the items
+// earlier specs left (the seed restores only its own, and a stray pad can be stale or comms lost for
+// good), and links Point 3 to P15 again when it is done, since the seed leaves an assetId alone.
 
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
@@ -71,6 +72,27 @@ async function link(page, id, assetId) {
     expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
 }
 
+/**
+ * Delete every live map item that is not the seed's (earlier specs leave the items they created: a pad
+ * with an override rule on a tag that does not exist is stale for good, a pad linked to an asset with no
+ * tags comms lost), so the bar counts the seed's items alone and All OK is reachable. One batch, lines
+ * and their instruments together, as the editor through the test hook.
+ */
+async function removeStrays(page, seedIds) {
+    const keep = new Set(Object.values(seedIds));
+    const load = await send(page, 'map.load', {});
+    expect(load.type).toBe('map.load.reply');
+    const strays = load.body.items.filter((i) => !i.deleted && !keep.has(i.id));
+    if (strays.length === 0) {
+        return 0;
+    }
+    const reply = await send(page, 'edits.apply', {
+        batchId: randomUUID(), ops: strays.map((i) => ({ op: 'delete', entity: 'item', id: i.id, baseVersion: i.version }))
+    });
+    expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
+    return strays.length;
+}
+
 /** Open /live as the editor and wait for the items and the first full batch. */
 async function openLive(page) {
     const map = await openMap(page, '/live');
@@ -129,6 +151,8 @@ test.beforeAll(async ({ browser }) => {
         const seed = await runSeed(page);
         expect(seed.error, 'the seed saved').toBeUndefined();
         ids = Object.fromEntries(Object.entries(TRACER.points).map(([k, p]) => [k, seed.ids[p.key]]));
+        const removed = await removeStrays(page, seed.ids);
+        console.log('needsyou.spec: ' + removed + ' stray item(s) of earlier specs removed');
         await link(page, ids.p3, 'P15');
         await mapLoaded(await openMap(page, '/live'));
         await threeStates(page);
