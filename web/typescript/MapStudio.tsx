@@ -38,6 +38,9 @@ import {
     rememberedBasemap, tilesFailedText
 } from './basemaps';
 import { LegendControl } from './LegendControl';
+import { LegendToggle, legendKey, readToggle, sessionStore, writeToggle } from './legend';
+import { NeedsYouControl } from './NeedsYouControl';
+import { NeedsYouRow, needsYou } from './needsyou';
 import { FIT_PADDING_PX, StartingArea, readStartingArea, startingAreaKey } from './startingArea';
 import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, itemPreset, itemState } from './live';
 import {
@@ -815,12 +818,18 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private madeImages = new Map<string, Promise<void>>();
     /** The live revision last drawn into the markers. */
     private drawnLive = -1;
+    /** The full batches applied when the legend's key was last built (the kind display changes only on a full batch). */
+    private drawnFulls = -1;
     /** The selection last drawn (its id and kind), so a changed selection redraws the sources once. */
     private drawnSelection = '';
     /** The zoom card with Fit and Return (epic 3 entries 7 and 14). */
     private zoomControl: ZoomControl | null = null;
     /** The search field top-left, the View-mode top bar (epic 3 entry 9). */
     private searchControl: SearchControl | null = null;
+    /** The Needs you bar in the top bar's row and its ranked list (epic 3 entry 3). */
+    private needsYouControl: NeedsYouControl | null = null;
+    /** The legend's Lines and Names toggles (entry 3), remembered per browser session. */
+    private toggles: Record<LegendToggle, boolean> = { lines: readToggle(sessionStore(), 'lines'), names: readToggle(sessionStore(), 'names') };
     /** The items' bounds key Fit keeps by, or null while Fit is not in force. */
     private fitKey: string | null = null;
     /** The items' bounds last drawn, for Fit. */
@@ -894,6 +903,20 @@ export class MapStudio extends Component<Props, MapStudioState> {
             }
         });
         map.addControl(this.searchControl, 'top-left');
+        // The Needs you bar after the field and its list under the row (entry 3, DESIGN.md needs-you-bar).
+        const slot = this.searchControl.slot();
+        const host = this.searchControl.panelHost();
+        if (slot && host) {
+            this.needsYouControl = new NeedsYouControl(this.onNeedsYouChoose, (open) => {
+                if (this.mapContainer) {
+                    this.mapContainer.setAttribute('data-needs-open', open ? 'true' : 'false');
+                }
+                if (open && this.searchControl) {
+                    this.searchControl.close();
+                }
+            });
+            this.needsYouControl.mount(slot, host);
+        }
         this.legendControl = new LegendControl((id) => {
             const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
             if (delegate) {
@@ -903,7 +926,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             if (this.mapContainer) {
                 this.mapContainer.setAttribute('data-legend-open', open ? 'true' : 'false');
             }
-        });
+        }, this.onLegendSwitch);
+        this.legendControl.setToggles(this.toggles.lines, this.toggles.names);
         map.addControl(this.legendControl, 'bottom-left');
         map.on('error', this.onMapError);
         map.on('idle', this.onMapIdle);
@@ -997,6 +1021,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
             });
             this.addTextLayers(map, mc);
             this.itemsReady = true;
+            this.applyLayerToggles();
             this.applyBasemap();
             this.drawItems();
             const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
@@ -1029,9 +1054,17 @@ export class MapStudio extends Component<Props, MapStudioState> {
             window.addEventListener('storage', this.onStorage);
         }
 
+        this.publishHeight();
         if (typeof ResizeObserver !== 'undefined') {
-            this.resizeObserver = new ResizeObserver(() => { map.resize(); });
+            this.resizeObserver = new ResizeObserver(() => { map.resize(); this.publishHeight(); });
             this.resizeObserver.observe(this.mapContainer);
+        }
+    }
+
+    /** The map's height as a CSS variable, so a floating panel (the legend, entry 3) never grows past the map. */
+    private publishHeight(): void {
+        if (this.mapContainer) {
+            this.mapContainer.style.setProperty('--mapstudio-map-height', this.mapContainer.clientHeight + 'px');
         }
     }
 
@@ -1357,6 +1390,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
             }
         }
         el.setAttribute('data-labels', JSON.stringify(boxes));
+        // The line features and the arrow MapLibre drew (none while the legend's Lines toggle is off, entry 3).
+        const drawn = (layers: string[]): number => layers.filter((l) => map.getLayer(l))
+            .reduce((n, l) => n + map.queryRenderedFeatures({ layers: [l] }).length, 0);
+        el.setAttribute('data-lines-drawn', String(drawn([LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED])));
+        el.setAttribute('data-arrow-drawn', String(drawn([LAYER_ARROW])));
         el.setAttribute('data-names-shown', String(boxes.filter((b) => b.layer === LAYER_ITEM_NAMES).length));
         el.setAttribute('data-labels-zoom', map.getZoom().toFixed(2));
     }
@@ -1412,22 +1450,36 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * line's popup is entry 2's). The jump is this component's own move, so a kept Fit is ended here.
      */
     private onSearchChoose = (result: SearchResult): void => {
+        this.goToItem(result.id, 'Search', '(' + result.matched + ')');
+    };
+
+    /** A Needs you row chosen (entry 3, R15): the same move and selection as a search choice. */
+    private onNeedsYouChoose = (row: NeedsYouRow): void => {
+        this.goToItem(row.id, 'Needs you', '(' + row.state + ')');
+        if (this.searchControl) {
+            this.searchControl.announce(row.name + ' selected');
+        }
+    };
+
+    /** Zoom to a map item and select it as a click on it does (the search's and the Needs you list's choice). */
+    private goToItem(id: string, via: string, how: string): void {
         const map = this.map;
         const delegate = this.props.delegate;
         const store = this.props.store.delegate as MapStudioStoreDelegate | undefined;
         if (!map || !delegate) {
             return;
         }
-        const item = delegate.items.find((i) => i.id === result.id && !i.deleted);
+        const item = delegate.items.find((i) => i.id === id && !i.deleted);
         if (!item) {
-            console.info('[MapStudio] The search result ' + result.id + ' is no longer on the map.');
+            console.info('[MapStudio] The ' + via + ' choice ' + id + ' is no longer on the map.');
             return;
         }
         this.fitKey = null;
         if (item.geometry.type === 'Point') {
             const lngLat: [number, number] = [item.geometry.coordinates[0], item.geometry.coordinates[1]];
             map.jumpTo({ center: lngLat, zoom: Math.max(map.getZoom(), CHOSEN_POINT_ZOOM) });
-            this.openPopup({ id: item.id, name: item.name, kind: item.kind }, lngLat);
+            // The item with its asset link and properties, so the popup's link and a custom view's params fill (entry 8).
+            this.openPopup(this.popupPoint(item.id, item.name, item.kind), lngLat);
             if (store) {
                 store.sendPointClick(item.id);
             }
@@ -1446,8 +1498,45 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.selectLine(item.id);
         }
         this.publishFit();
-        console.info('[MapStudio] Search: ' + item.name + ' chosen (' + result.matched + ').');
+        console.info('[MapStudio] ' + via + ': ' + item.name + ' chosen ' + how + '.');
+    }
+
+    /**
+     * The legend's Lines and Names toggles (entry 3, R14): Lines off hides every line layer and the
+     * flow arrow (areas stay); Names off hides the item names, the state chips, the icon KPI text and
+     * the line name chips, and keeps the markers (an abnormal item's badge and digit stay) and the
+     * line badges. Remembered per browser session.
+     */
+    private onLegendSwitch = (toggle: LegendToggle, on: boolean): void => {
+        this.toggles = { ...this.toggles, [toggle]: on };
+        writeToggle(sessionStore(), toggle, on);
+        this.applyLayerToggles();
     };
+
+    private applyLayerToggles(): void {
+        const map = this.map;
+        if (!map || !this.itemsReady) {
+            return;
+        }
+        const lineLayers = [LAYER_LINE_CASING, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED, LAYER_ITEM_LINES, LAYER_LINE_BADGES, LAYER_ARROW];
+        const nameLayers = [LAYER_ITEM_NAMES, LAYER_ITEM_CHIPS, LAYER_ITEM_KPI];
+        const set = (layer: string, visible: boolean): void => {
+            if (map.getLayer(layer)) {
+                map.setLayoutProperty(layer, 'visibility', visible ? 'visible' : 'none');
+            }
+        };
+        for (const layer of lineLayers) {
+            set(layer, this.toggles.lines);
+        }
+        for (const layer of nameLayers) {
+            set(layer, this.toggles.names);
+        }
+        set(LAYER_LINE_CHIPS, this.toggles.lines && this.toggles.names);
+        if (this.mapContainer) {
+            this.mapContainer.setAttribute('data-lines', this.toggles.lines ? 'on' : 'off');
+            this.mapContainer.setAttribute('data-names', this.toggles.names ? 'on' : 'off');
+        }
+    }
 
     private publishFit(): void {
         if (this.zoomControl) {
@@ -1534,6 +1623,15 @@ export class MapStudio extends Component<Props, MapStudioState> {
             if (this.searchControl && delegate.itemsRevision !== this.drawnRevision) {
                 // The search's entries follow the items (entry 9): names, kinds and the linked assets' names.
                 this.searchControl.setEntries(buildEntries(items, delegate.lists.kinds, delegate.lists.assetNames));
+            }
+            if (this.needsYouControl) {
+                // The Needs you summary from the same batch the markers draw from (entry 3, AD-6).
+                this.needsYouControl.setSummary(needsYou(items, delegate.lists.kinds, delegate.live, Date.now()));
+            }
+            if (this.legendControl && (delegate.itemsRevision !== this.drawnRevision || delegate.live.fulls !== this.drawnFulls)) {
+                // The legend's key follows the kinds on the map and the kind display of the last full batch (entry 3).
+                this.legendControl.setKey(legendKey(items, delegate.lists.kinds, delegate.live.display));
+                this.drawnFulls = delegate.live.fulls;
             }
             this.drawnRevision = delegate.itemsRevision;
             this.drawnLive = delegate.liveRevision;
@@ -1717,6 +1815,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.map.remove();
             this.map = null;
         }
+        if (this.needsYouControl) {
+            this.needsYouControl.unmount();
+            this.needsYouControl = null;
+        }
         this.drawControl = null;
         this.legendControl = null;
         this.zoomControl = null;
@@ -1881,9 +1983,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (this.state.drawing || !this.map) {
             return;
         }
-        // A click on the map closes the legend panel (entry 14).
+        // A click on the map closes the legend panel (entry 14) and the Needs you list (entry 3).
         if (this.legendControl && this.legendControl.isOpen()) {
             this.legendControl.close(false);
+        }
+        if (this.needsYouControl && this.needsYouControl.isOpen()) {
+            this.needsYouControl.close(false);
         }
         const map = this.map;
         const onPoint = map.queryRenderedFeatures(ev.point, { layers: [LAYER_ITEM_MARKERS] });
@@ -2520,7 +2625,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                      data-highlighted=""
                      data-popup-mode={this.state.popup ? (this.state.popup.sheet ? 'sheet' : 'card') : ''}
                      data-legend-open="false"
-                     data-search-open="false" />
+                     data-search-open="false"
+                     data-needs-open="false" />
                 <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '')}
                      data-pending={pending ? 'true' : 'false'}
                      data-drawing={this.state.drawing ? 'true' : 'false'}

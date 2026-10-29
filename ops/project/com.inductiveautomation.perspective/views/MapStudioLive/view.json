@@ -542,6 +542,64 @@
       "type": "ia.input.button",
       "version": 0,
       "props": {
+       "text": "P14 pressure bad"
+      },
+      "meta": {
+       "name": "p14PressureBad",
+       "domId": "mapstudio-live-p14-pressure-bad"
+      },
+      "position": {
+       "basis": "150px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 3 entry 3): P14's Pressure at Bad quality (Point 2 stale, its comms fine), through the project library mapstudio_live, so the\n\t# e2e suite and the owner can see an icon and its popup follow. Dev tags only; MapEditor only.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devlive')\n\tout = self.view.rootContainer.getChild('liveResult')\n\tif not mapstudio_dev.holdsMapEditor(self.session):\n\t\tout.props.text = system.util.jsonEncode({'refused': 'The live buttons write dev tags, so they need the MapEditor role. Sign in as a map editor first.', 'ranAt': system.date.toMillis(system.date.now())})\n\t\treturn\n\ttry:\n\t\tresult = mapstudio_live.set_quality('P14', 'Pressure', False)\n\t\tresult['status'] = mapstudio_live.status('P12')\n\texcept java.lang.Throwable as ex:\n\t\tresult = {'error': ex.getClass().getSimpleName() + ': ' + str(ex.getMessage())}\n\texcept Exception as ex:\n\t\tresult = {'error': str(ex)}\n\tresult['action'] = 'p14-pressure-bad'\n\tresult['ranAt'] = system.date.toMillis(system.date.now())\n\tout.props.text = system.util.jsonEncode(result)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "P14 pressure good"
+      },
+      "meta": {
+       "name": "p14PressureGood",
+       "domId": "mapstudio-live-p14-pressure-good"
+      },
+      "position": {
+       "basis": "150px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 3 entry 3): P14's Pressure back at Good quality, through the project library mapstudio_live, so the\n\t# e2e suite and the owner can see an icon and its popup follow. Dev tags only; MapEditor only.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devlive')\n\tout = self.view.rootContainer.getChild('liveResult')\n\tif not mapstudio_dev.holdsMapEditor(self.session):\n\t\tout.props.text = system.util.jsonEncode({'refused': 'The live buttons write dev tags, so they need the MapEditor role. Sign in as a map editor first.', 'ranAt': system.date.toMillis(system.date.now())})\n\t\treturn\n\ttry:\n\t\tresult = mapstudio_live.set_quality('P14', 'Pressure', True)\n\t\tresult['status'] = mapstudio_live.status('P12')\n\texcept java.lang.Throwable as ex:\n\t\tresult = {'error': ex.getClass().getSimpleName() + ': ' + str(ex.getMessage())}\n\texcept Exception as ex:\n\t\tresult = {'error': str(ex)}\n\tresult['action'] = 'p14-pressure-good'\n\tresult['ranAt'] = system.date.toMillis(system.date.now())\n\tout.props.text = system.util.jsonEncode(result)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
        "text": "L-SWD quiet"
       },
       "meta": {

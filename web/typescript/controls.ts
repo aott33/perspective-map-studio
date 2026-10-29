@@ -26,7 +26,9 @@ export const GLYPH_PATHS = {
     /** Search: a lens and its handle (DESIGN.md search-field, entry 9). */
     search: 'M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13M15.5 15.5L20 20',
     /** Close: the Clear button of the search field. */
-    close: 'M6 6l12 12M18 6L6 18'
+    close: 'M6 6l12 12M18 6L6 18',
+    /** Chevron: the Needs you bar's open and close mark (entry 3). */
+    chevron: 'M6 9l6 6 6-6'
 } as const;
 
 export type GlyphName = keyof typeof GLYPH_PATHS;
