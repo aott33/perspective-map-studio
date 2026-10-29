@@ -76,10 +76,11 @@ export async function drawLine(page, map, { dy = 0 } = {}) {
  * Open a dev project page and wait until the map reports itself ready: the
  * component sets data-map-ready after MapLibre's load and first idle, with both
  * sources and layers added, and writes the counts it read back from MapLibre.
- * Returns the map locator.
+ * Returns the map locator. `project` is the suite's project unless another is named (the showcase
+ * project, epic 3 entry 15).
  */
-export async function openMap(page, pagePath = '/') {
-    await page.goto(sessionUrl(pagePath), { waitUntil: 'load' });
+export async function openMap(page, pagePath = '/', project = undefined) {
+    await page.goto(sessionUrl(pagePath, project), { waitUntil: 'load' });
     const map = page.locator('.mapstudio-map');
     await map.waitFor({ state: 'visible', timeout: 60_000 });
     // Perspective may drop the websocket once right after a Gateway restart;
@@ -214,6 +215,22 @@ export async function runSeed(page) {
     const out = page.locator('#mapstudio-dev-seed-result');
     const before = await out.innerText();
     await page.locator('#mapstudio-dev-seed').click();
+    await expect.poll(async () => {
+        const text = await out.innerText();
+        return text !== before && /"(created|error|refused)"/.test(text);
+    }, { timeout: 60_000 }).toBe(true);
+    return JSON.parse(await out.innerText());
+}
+
+/**
+ * Press the /edit page's "Seed the showcase map" button (ops/project/ignition/script-python/
+ * mapstudio_showcase_seed, epic 3 entry 15) on a page already open there, and return its result: the dev
+ * seed's shape plus `tags` ({written, alarm, stale} or {error}), or {error} or {refused}, each with ranAt.
+ */
+export async function runShowcaseSeed(page) {
+    const out = page.locator('#mapstudio-dev-showcase-result');
+    const before = await out.innerText();
+    await page.locator('#mapstudio-dev-showcase').click();
     await expect.poll(async () => {
         const text = await out.innerText();
         return text !== before && /"(created|error|refused)"/.test(text);
