@@ -6,8 +6,14 @@
 // kind setup is changed through the component's real session path (window.__mapStudioTest, as
 // kindsetup.spec.mjs does) and the seed puts it back afterwards.
 
+import { mkdirSync } from 'node:fs';
+import path from 'node:path';
+import { screenshotDir } from '../lib/env.mjs';
 import { TRACER, pagePixel } from '../lib/geo.mjs';
-import { EDITOR_USER, WARNING_SETTLE_MS, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, openMap, runSeed, signedInContext, test } from './fixtures.mjs';
+import {
+    EDITOR_USER, WARNING_SETTLE_MS, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, nextFrames, openMap, runSeed,
+    signedInContext, test
+} from './fixtures.mjs';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -51,6 +57,13 @@ async function changePadSetup(page, map, parts) {
         { op: 'update', entity: 'kindSetup', id: 'pad', baseVersion: stored.version, data: { setup: { ...stored.setup, ...parts } } }] });
     expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
     await expect(map).toHaveAttribute('data-live-full', String(fulls + 1), { timeout: INTERVAL_MS });
+}
+
+/** A screenshot under docs/screenshots with E2E_DOCS=1, else under e2e/out. */
+async function shot(page, name) {
+    await nextFrames(page);
+    mkdirSync(screenshotDir, { recursive: true });
+    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
 }
 
 async function clickAt(page, map, lngLat) {
@@ -144,11 +157,34 @@ editorTest('a kind setup\'s popupView opens the project view with mapItem and a 
     await expect(viewClose).toBeVisible();
     const closeBox = await viewClose.boundingBox();
     expect(Math.min(closeBox.width, closeBox.height)).toBeGreaterThanOrEqual(32);
+    await shot(page, 'mapstudio-popup-view-1440.png');
     await viewClose.click();
     await expect(page.locator('.mapstudio-popup--view')).toHaveCount(0);
     await expect(map).toHaveAttribute('data-popup-mode', '');
     await page.waitForTimeout(WARNING_SETTLE_MS);
     expect(watched.warnings, 'Map Studio warnings').toEqual([]);
+
+    // The same view on a phone: the bottom sheet with its handle and Map Studio's own 44 px close
+    // row above the view (decision 7; EXPERIENCE.md: every sheet has a visible 44 px close).
+    await page.setViewportSize({ width: 390, height: 844 });
+    const phone = await openMap(page, '/edit');
+    await mapLoaded(phone);
+    await expect(phone).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
+    await clickAt(page, phone, TRACER.points.p1.lngLat);
+    const sheetView = page.locator('.mapstudio-sheet .mapstudio-popup--view');
+    await expect(sheetView).toBeVisible({ timeout: 30_000 });
+    await expect(phone).toHaveAttribute('data-popup-mode', 'sheet');
+    await expect(page.locator('#mapstudio-padalarms-title')).toHaveText('Alarms of Point 1', { timeout: 30_000 });
+    const sheetClose = sheetView.locator('.mapstudio-popup-close');
+    await expect(sheetClose).toBeVisible();
+    const sheetCloseBox = await sheetClose.boundingBox();
+    expect(Math.min(sheetCloseBox.width, sheetCloseBox.height)).toBeGreaterThanOrEqual(44);
+    await shot(page, 'mapstudio-popup-view-390.png');
+    await sheetClose.click();
+    await expect(page.locator('.mapstudio-sheet')).toHaveCount(0);
+    await page.waitForTimeout(WARNING_SETTLE_MS);
+    expect(watched.warnings, 'Map Studio warnings').toEqual([]);
+    await page.setViewportSize({ width: 1440, height: 900 });
 
     // A view that is not there: the default popup, with exactly one warning naming the path. The map
     // is reopened first: a setup change while Point 1's view popup is open redraws that popup with
