@@ -27,7 +27,7 @@
  */
 
 import advances from '../fonts/advances.json';
-import { ItemState, PointPreset, Preset, Tint, itemPreset } from './live';
+import { ItemState, PointPreset, Preset, Tint, alarmGlyphId, itemPreset } from './live';
 
 /** The theme colours the images and the text layers need, read once from the component root. */
 export interface MarkerColors {
@@ -264,7 +264,7 @@ export function markerSpec(icon: string, state: ItemState, selected = false, ins
     if (state.alarm) {
         priority = state.alarm.priority;
         solid = state.alarm.unacked;
-        badge = priority === 3 ? 'alarm-3' : 'alarm-' + priority + (solid ? '-unacknowledged' : '-acknowledged');
+        badge = alarmGlyphId(priority, solid);
     } else if (state.commsLost) {
         badge = 'comms-lost';
     } else if (state.stale) {

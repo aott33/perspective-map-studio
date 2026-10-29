@@ -3,18 +3,9 @@
 // save is refused on the Gateway; system.mapstudio saves through the same write
 // service. Screenshots at 1440 and 390 px for the docs (AD-15).
 
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
-import { screenshotDir } from '../lib/env.mjs';
-import { EDITOR_USER, drawLine, editorTest, expect, mapLoaded, nextFrames, openMap, test } from './fixtures.mjs';
+import { EDITOR_USER, drawLine, editorTest, expect, mapLoaded, openMap, shot, test } from './fixtures.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-
-async function shot(page, name) {
-    await nextFrames(page);
-    mkdirSync(screenshotDir, { recursive: true });
-    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
-}
 
 for (const [width, height] of [[1440, 900], [390, 844]]) {
     test.describe(`${width} px`, () => {

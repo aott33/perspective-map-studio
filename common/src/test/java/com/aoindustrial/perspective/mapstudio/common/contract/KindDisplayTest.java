@@ -28,9 +28,27 @@ class KindDisplayTest {
         assertEquals("/pad/{item.name}", d.link());
         assertTrue(d.showsAnything());
         String wire = d.toJson().toString();
-        assertFalse(wire.contains("{asset.path}"), wire);
+        // No tag path: the comms and KPI paths stay on the Gateway. The popup view's templates (epic 3
+        // entry 8) are on the wire as stored: a template resolves only with the item's base path.
         assertFalse(wire.contains("[default]"), wire);
-        assertFalse(wire.contains("path"), wire);
+        assertFalse(wire.contains("/Comms"), wire);
+        assertTrue(d.hasPopupView());
+        assertEquals("{\"path\":\"Popups/PadDetails\",\"params\":{\"padName\":\"{item.name}\",\"tagPath\":\"{asset.path}\","
+            + "\"area\":\"Mesa\",\"pressure\":\"{asset.path}/Pressure\"}}", d.popupView().toString());
+        assertEquals(d.popupView(), d.toJson().getAsJsonObject("popupView"));
+    }
+
+    @Test
+    void aPopupViewNeedsAPathAndKeepsOnlyTextParams() {
+        // Epic 3 entry 8: no path (or a blank one) means the default popup; a param that is not text is dropped.
+        assertFalse(KindDisplay.of("pad", json("{\"popupView\":{\"path\":\"\",\"params\":{\"a\":\"b\"}}}")).hasPopupView());
+        assertFalse(KindDisplay.of("pad", json("{\"popupView\":{\"params\":{\"a\":\"b\"}}}")).hasPopupView());
+        assertNull(KindDisplay.of("pad", json("{\"link\":\"/pad/{item.name}\"}")).popupView());
+        KindDisplay d = KindDisplay.of("pad", json("{\"popupView\":{\"path\":\"Popups/X\",\"params\":{\"a\":\"b\",\"n\":1}}}"));
+        assertEquals("{\"path\":\"Popups/X\",\"params\":{\"a\":\"b\"}}", d.popupView().toString());
+        assertFalse(d.showsAnything(), "a popup view alone shows no default part");
+        assertFalse(KindDisplay.of("pad", json("{\"popupView\":{\"path\":\"Popups/X\"}}")).toJson().getAsJsonObject("popupView")
+            .getAsJsonObject("params").has("a"));
     }
 
     @Test
@@ -66,7 +84,8 @@ class KindDisplayTest {
         String wire = d.toJson().toString();
         assertTrue(wire.contains("\"styleRule\""));
         assertFalse(wire.contains("State"), wire);
-        assertFalse(wire.contains("asset.path"), wire);
+        // The rule's source path stays on the Gateway; the popup view's templates are on the wire (entry 8).
+        assertFalse(d.styleRule().toString().contains("asset.path"), wire);
         assertFalse(d.toJson().has("areaTints"));
         KindDisplay tints = KindDisplay.of("geofence", json("{\"areaTints\":{\"property\":\"operator\",\"tints\":["
             + "{\"category\":\"North\",\"tint\":\"tint-1\"}]}}"), KindFixtures.GEOFENCE);

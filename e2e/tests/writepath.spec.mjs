@@ -9,14 +9,8 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
 import {
-    EDITOR_USER, OPERATOR_USER, drawLine, editorTest, expect, mapLoaded, nextFrames, openMap, signedInContext, watch
+    EDITOR_USER, OPERATOR_USER, drawLine, editorTest, expect, mapLoaded, nextFrames, openMap, send, signedInContext, watch
 } from './fixtures.mjs';
-
-/** Send one message through the page's component and return the Gateway's reply envelope. */
-async function send(page, type, body) {
-    await page.waitForFunction(() => Boolean(window.__mapStudioTest));
-    return page.evaluate(([t, b]) => window.__mapStudioTest.send(t, b), [type, body]);
-}
 
 /** Send the same edits.apply body twice at once from the page. */
 async function sendTwiceAtOnce(page, body) {

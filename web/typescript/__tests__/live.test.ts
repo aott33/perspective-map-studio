@@ -1,6 +1,6 @@
 import {
-    LIVE_INITIAL, LiveValue, ageText, alarmsText, applyBatch, areaTint, commsText, itemState, readKindDisplay, readValuesBatch,
-    staleText, valueText
+    LIVE_INITIAL, LiveValue, ageText, alarmCountsText, alarmLineText, alarmsText, applyBatch, areaTint, commsText, itemState,
+    readKindDisplay, readPopupDetail, readValuesBatch, staleText, valueText
 } from '../live';
 import { readReply } from '../messages';
 
@@ -68,6 +68,35 @@ describe('values.batch reading (epic 3 entry 5)', () => {
         const third = applyBatch(second, { seq: 3, full: true, items: [P1], kindDisplay: [] });
         expect(Object.keys(third.items)).toEqual(['p1']);
         expect(third.display).toEqual({});
+    });
+
+    test('the popup detail of a pushed item is kept with its item until the next one (entry 8)', () => {
+        const detail = { basePath: '[default]Mesa/P12', alarmsPath: '[default]Mesa/P12',
+            alarms: { counts: { 1: 1, 2: 0, 3: 0 }, list: [{ name: 'High pressure', source: 'Pressure', priority: 1, unacked: true, activeTime: T }], reason: '' } };
+        const reply = readReply({ v: 1, type: 'values.batch', id: 'b2', body: { seq: 4, full: false, items: [{ ...P1, popup: detail }] } });
+        if (reply.kind !== 'values.batch' || !reply.body) {
+            throw new Error('unreadable');
+        }
+        expect(reply.body.items[0].popup).toEqual(detail);
+        const pushed = applyBatch(LIVE_INITIAL, reply.body);
+        expect(pushed.popup).toEqual({ itemId: 'p1', detail });
+        const later = applyBatch(pushed, { seq: 5, full: true, items: [P1], kindDisplay: [DISPLAY] });
+        // A batch without a detail keeps the last one.
+        expect(later.popup).toEqual({ itemId: 'p1', detail });
+        expect(later.items.p1.popup).toBeUndefined();
+        // A detail with no alarms part, and a malformed one.
+        expect(readPopupDetail({ basePath: null, alarmsPath: null })).toEqual({ basePath: null, alarmsPath: null });
+        expect(readPopupDetail({ basePath: 'x', alarmsPath: 'x', alarms: { counts: { 1: 'a' }, list: [{ nope: 1 }, { name: 'A' }], reason: 7 } }))
+            .toEqual({ basePath: 'x', alarmsPath: 'x', alarms: { counts: { 1: 0, 2: 0, 3: 0 }, list: [{ name: 'A', source: '', priority: 0, unacked: false, activeTime: null }], reason: '' } });
+        expect(readPopupDetail('no')).toBeNull();
+        expect(LIVE_INITIAL.popup).toBeNull();
+    });
+
+    test('a kind display carries its popup view with text params only; no path, no view (entry 8)', () => {
+        const d = readKindDisplay({ ...DISPLAY, popupView: { path: 'Popups/PadAlarms', params: { padName: '{item.name}', n: 1 } } });
+        expect(d && d.popupView).toEqual({ path: 'Popups/PadAlarms', params: { padName: '{item.name}' } });
+        expect(readKindDisplay({ ...DISPLAY, popupView: { path: '', params: {} } })!.popupView).toBeUndefined();
+        expect(readKindDisplay(DISPLAY)!.popupView).toBeUndefined();
     });
 });
 
@@ -186,5 +215,14 @@ describe('the popup\'s words', () => {
         expect(alarmsText(stale(null, 'comms lost'))).toBe('No value yet - comms lost');
         expect(staleText(stale(1, 'comms lost'), '1 psi')).toBe('Stale - 1 psi (comms lost)');
         expect(staleText(good(1), '1 psi')).toBe('1 psi');
+    });
+
+    test('an alarm in words with its source and age, and the counts by priority (entry 8)', () => {
+        expect(alarmLineText({ name: 'Casing pressure high', source: 'Pressure', priority: 1, unacked: true, activeTime: '2026-10-28T09:56:00Z' }, NOW))
+            .toBe('Casing pressure high - Pressure, 4 min ago');
+        expect(alarmLineText({ name: 'Down', source: '', priority: 1, unacked: true, activeTime: null }, NOW)).toBe('Down');
+        expect(alarmCountsText({ counts: { 1: 2, 2: 0, 3: 1 }, list: [], reason: '' })).toBe('2 priority 1, 1 priority 3');
+        expect(alarmCountsText({ counts: { 1: 1, 2: 0, 3: 0 }, list: [], reason: '' })).toBe('');
+        expect(alarmCountsText({ counts: { 1: 0, 2: 0, 3: 0 }, list: [], reason: '' })).toBe('');
     });
 });

@@ -7,18 +7,14 @@
 // /styles page draws every case of every rule in its preset, in both themes. The Gateway's own
 // evidence for the expression is docs/platform-checks.md, "Epic 3 entry 1". Screenshots for docs/styles.md.
 
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
-import { screenshotDir } from '../lib/env.mjs';
 import { TRACER } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, editorTest, expect, mapLoaded, nextFrames, openMap, runSeed, signedInContext, test
+    EDITOR_USER, editorTest, expect, mapLoaded, openMap, runSeed, shot, signedInContext, test, view
 } from './fixtures.mjs';
 
 /** The bound for a change to reach the map: one refresh interval (the dev setup's 10 s) plus margin. */
 const INTERVAL_MS = 25_000;
 /** How long a redraw after a view change may take on the dev stack. */
-const DRAW_MS = 20_000;
 /** A view over the tracer and the two geofences south of it. */
 const STYLES_VIEW = { center: [-104.985, 39.737], zoom: 14 };
 
@@ -38,21 +34,6 @@ async function press(page, button) {
 
 /** The hidden live-state row of one map item. */
 const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
-
-/** Move the map (the component's e2e view hook) and wait for the labels of that zoom to be published. */
-async function view(page, map, center, zoom) {
-    await page.waitForFunction(() => Boolean(window.__mapStudioTestView));
-    await page.evaluate(([c, z]) => window.__mapStudioTestView({ center: c, zoom: z }), [center, zoom]);
-    await expect(map).toHaveAttribute('data-zoom', zoom.toFixed(2), { timeout: DRAW_MS });
-    await expect(map).toHaveAttribute('data-labels-zoom', zoom.toFixed(2), { timeout: DRAW_MS });
-    await nextFrames(page);
-}
-
-async function shot(page, name) {
-    await nextFrames(page);
-    mkdirSync(screenshotDir, { recursive: true });
-    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
-}
 
 /** Every source in its quiet state: Status 0, pressures low, comms on, the line's flow below every band. */
 async function quiet(page) {
@@ -243,6 +224,10 @@ editorTest.describe('1440 px', () => {
         await mapLoaded(dark);
         await expect(page.locator('.mapstudio-style-panel')).toHaveAttribute('data-sprite', 'loaded', { timeout: 30_000 });
         expect(await dark.evaluate((el) => getComputedStyle(el.closest('.mapstudio')).backgroundColor)).not.toBe(light);
+        // The shot waits for the map's first idle publish (data-labels-zoom) and the preview's samples
+        // (one per tile), so under load the canvases and the swatches are painted when it is taken (entry 11).
+        await expect(dark).toHaveAttribute('data-labels-zoom', /^[0-9.]+$/, { timeout: 30_000 });
+        await expect(page.locator('.mapstudio-style-panel .mapstudio-style-tile .mapstudio-style-sample > svg').first()).toBeVisible();
         await shot(page, 'mapstudio-styles-preview-dark-1440.png');
         await page.locator('#mapstudio-styles-theme').click();
         await expect(page.locator('#mapstudio-styles-theme')).toHaveText('Dark theme', { timeout: 30_000 });

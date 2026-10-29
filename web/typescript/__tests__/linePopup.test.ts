@@ -167,11 +167,16 @@ describe('the line popup\'s words (DESIGN.md line-popup)', () => {
             ['pt1', 'PT-1', 'tap', 1143], ['lv1', 'LV-1', 'valve', 2000], ['pt2', 'PT-2', 'tap', 2841]
         ]);
         expect(instruments[0].liveValues).toBe(LIVE.items.pt1);
-        const params = popupViewParams({ padName: 'x' }, { id: 'l', name: 'L-SWD', kind: 'line', instruments, segment: { fromId: 'pt1', toId: 'pt2' } });
+        const params = popupViewParams({ padName: 'x' }, { id: 'l', name: 'L-SWD', kind: 'line', instruments, segment: { fromId: 'pt1', toId: 'pt2' } },
+            null, undefined);
         expect(params.padName).toBe('x');
         expect(params.mapItem).toMatchObject({ id: 'l', name: 'L-SWD', segment: { fromId: 'pt1', toId: 'pt2' } });
         expect((params.mapItem as { instruments: unknown[] }).instruments).toHaveLength(3);
-        expect(popupViewParams({}, { id: 'p', name: 'P' })).toEqual({ mapItem: { id: 'p', name: 'P' } });
+        // A point's map item object (entry 8's shape) carries no instruments and no segment.
+        const point = popupViewParams({}, { id: 'p', name: 'P' }, null, undefined).mapItem as Record<string, unknown>;
+        expect(point).toMatchObject({ id: 'p', name: 'P' });
+        expect(point.instruments).toBeUndefined();
+        expect(point.segment).toBeUndefined();
     });
 
     test('the popup renders the parts in order with the highlighted rows and the values', () => {

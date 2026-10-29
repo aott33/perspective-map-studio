@@ -14,30 +14,16 @@
 
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
-import { envFileValue, gatewayUrl, screenshotDir } from '../lib/env.mjs';
+import { envFileValue, gatewayUrl } from '../lib/env.mjs';
 import { TRACER } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, OPERATOR_USER, drawLine, editorTest, expect, mapLoaded, nextFrames, openMap, signedInContext, test
+    EDITOR_USER, OPERATOR_USER, drawLine, editorTest, expect, mapLoaded, openMap, send, shot, signedInContext, test
 } from './fixtures.mjs';
 
 const PROJECT = 'mapstudio-dev';
 const KEY = `mapstudio.unsaved.v1:${PROJECT}:${EDITOR_USER}`;
 // The component's reply timeout is 15 s; the assertion waits a little longer.
 const UNSENT_TIMEOUT_MS = 25_000;
-
-async function shot(page, name) {
-    await nextFrames(page);
-    mkdirSync(screenshotDir, { recursive: true });
-    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
-}
-
-/** Send one message through the page's component with the test hook; returns the reply envelope. */
-async function send(page, type, body) {
-    await page.waitForFunction(() => Boolean(window.__mapStudioTest));
-    return page.evaluate(([t, b]) => window.__mapStudioTest.send(t, b), [type, body]);
-}
 
 /** The queue as stored for the map editor. */
 async function storedQueue(page) {

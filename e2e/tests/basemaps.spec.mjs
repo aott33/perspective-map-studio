@@ -12,11 +12,11 @@
 // assert on the chosen basemap, the attribution and the tile state, and a routed abort proves the
 // tile-failure status. Screenshots at 1440 and 390 px for the docs (AD-15).
 
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { repoRoot, screenshotDir, sessionUrl } from '../lib/env.mjs';
+import { repoRoot, sessionUrl } from '../lib/env.mjs';
 import { backUpSetup, committedSetup, gatewayRun, logLines, putBackSetup, scanProject, writeSetup } from '../lib/gateway.mjs';
-import { ensureSeeded, expect, mapLoaded, nextFrames, openMap, test } from './fixtures.mjs';
+import { ensureSeeded, expect, mapLoaded, openMap, shot, test } from './fixtures.mjs';
 
 /** A 1 by 1 PNG (one blue pixel, so a screenshot shows the tiles drawn), served for every tile the specs route. */
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
@@ -74,12 +74,6 @@ async function storageText(page) {
         };
         return JSON.stringify({ local: dump(window.localStorage), session: dump(window.sessionStorage) });
     });
-}
-
-async function shot(page, name) {
-    await nextFrames(page);
-    mkdirSync(screenshotDir, { recursive: true });
-    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -270,9 +264,10 @@ test.describe('1440 px', () => {
             await expect(legendPanel(page)).toBeVisible();
             await expect(map).toHaveAttribute('data-legend-open', 'true');
             await expect(legendButton(page)).toHaveAttribute('aria-expanded', 'true');
-            await expect(legendPanel(page).locator('.mapstudio-legend-heading').first()).toHaveText('Basemap');
+            // The key's sections come first (entry 3); the Basemap section is the last, and the first control took the focus.
+            await expect(legendPanel(page).locator('.mapstudio-legend-heading').last()).toHaveText('Basemap');
             await expect(page.locator('.mapstudio-basemap-button')).toHaveCount(3);
-            await expect(button(page, 'none')).toBeFocused();
+            await expect(page.locator('.mapstudio-legend-toggle[data-toggle="lines"]')).toBeFocused();
             const panelBox = await legendPanel(page).boundingBox();
             expect(panelBox.y + panelBox.height, 'the panel opens above the button').toBeLessThanOrEqual(buttonBox.y + 1);
             await page.keyboard.press('Escape');

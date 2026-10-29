@@ -2,7 +2,7 @@
  * Shared markers (epic 3 entry 7, R5; the template's docs/map.md section 5 item 8): two or more
  * point map items within SHARED_M of each other draw as one marker that opens a pick list. Pure:
  * a sweep by latitude groups the points, and the group takes the worst state of its members and
- * their names as one ("CTB1 and SWD1"). Unit tested in node.
+ * their names as one ("CTB1 and SWD1"; from three members "A, B +N more"). Unit tested in node.
  */
 
 import { ItemState } from './live';
@@ -78,12 +78,22 @@ export function groupShared(points: SharedPoint[], withinM = SHARED_M): SharedPo
     return Array.from(groups.values());
 }
 
-/** The names as one: "A", "A and B", "A, B and C". */
+/** How many member names a shared marker's label spells out; the rest are counted ("+N more"). */
+export const SHARED_NAMES_SHOWN = 2;
+
+/**
+ * The names as one: "A", "A and B" (the template's rule for two), and from three members the first
+ * two with the rest counted, "A, B +3 more", so five items on one spot no longer read as a five-line
+ * list that crowds the map (epic 3 entry 11); the pick list keeps every member.
+ */
 export function sharedName(names: string[]): string {
     if (names.length <= 1) {
         return names[0] || '';
     }
-    return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    if (names.length === 2) {
+        return names[0] + ' and ' + names[1];
+    }
+    return names.slice(0, SHARED_NAMES_SHOWN).join(', ') + ' +' + (names.length - SHARED_NAMES_SHOWN) + ' more';
 }
 
 /**

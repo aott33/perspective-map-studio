@@ -30,21 +30,21 @@
     "files": [
       {
         "file": "MapStudio.css",
-        "bytes": 87569,
-        "gzipBytes": 12914,
-        "transferredBodyBytes": 12933,
+        "bytes": 100001,
+        "gzipBytes": 14670,
+        "transferredBodyBytes": 14684,
         "contentEncoding": "gzip",
         "story2Bytes": 70976,
-        "deltaBytes": 16593
+        "deltaBytes": 29025
       },
       {
         "file": "MapStudio.js",
-        "bytes": 1282497,
-        "gzipBytes": 345787,
-        "transferredBodyBytes": 344646,
+        "bytes": 1318368,
+        "gzipBytes": 355083,
+        "transferredBodyBytes": 353964,
         "contentEncoding": "gzip",
         "story2Bytes": 1167572,
-        "deltaBytes": 114925
+        "deltaBytes": 150796
       },
       {
         "file": "mapstudio-icons.svg",
@@ -65,8 +65,8 @@
     ],
     "modl": {
       "file": "Map-Studio.unsigned.modl",
-      "bytes": 1940900,
-      "sha256": "8b0f2bcb89fabf069a735b905c1417f76e0369f5a5346c597002503ce6aa7c0f"
+      "bytes": 1957857,
+      "sha256": "8332e12cdaa138e8cf77ae68f2587d4eb57e282b475f4dc604d48fd356d9417d"
     },
     "note": "transferredBodyBytes 0 on maplibre-gl-worker.js: Playwright reported no body transfer for the worker request (Chromium fetches a worker script outside the page; why is unverified). Use bytes and gzipBytes for that file.",
     "budget": "none defined; recorded only"
@@ -102,94 +102,94 @@
         "runs": [
           {
             "pan": {
-              "frames": 40,
-              "spanMs": 4066,
-              "fps": 9.59,
-              "intervalMs": {
-                "p50": 83.4,
-                "p95": 233.3,
-                "max": 283.3
-              },
-              "shareOver20msPercent": 100,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            },
-            "zoom": {
-              "frames": 49,
-              "spanMs": 4100,
-              "fps": 11.71,
-              "intervalMs": {
-                "p50": 83.3,
-                "p95": 166.7,
-                "max": 183.3
-              },
-              "shareOver20msPercent": 91.7,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            }
-          },
-          {
-            "pan": {
-              "frames": 40,
-              "spanMs": 4200,
-              "fps": 9.29,
-              "intervalMs": {
-                "p50": 100,
-                "p95": 216.7,
-                "max": 250
-              },
-              "shareOver20msPercent": 97.4,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            },
-            "zoom": {
               "frames": 69,
-              "spanMs": 4183,
-              "fps": 16.26,
+              "spanMs": 4033,
+              "fps": 16.86,
               "intervalMs": {
-                "p50": 50,
-                "p95": 150,
-                "max": 216.6
+                "p50": 66.6,
+                "p95": 100,
+                "max": 133.3
               },
-              "shareOver20msPercent": 79.4,
-              "longTasks": {
-                "count": 1,
-                "totalMs": 98
-              }
-            }
-          },
-          {
-            "pan": {
-              "frames": 80,
-              "spanMs": 4050,
-              "fps": 19.51,
-              "intervalMs": {
-                "p50": 50,
-                "p95": 83.4,
-                "max": 100
-              },
-              "shareOver20msPercent": 91.1,
+              "shareOver20msPercent": 94.1,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
               }
             },
             "zoom": {
-              "frames": 75,
-              "spanMs": 4117,
-              "fps": 17.98,
+              "frames": 73,
+              "spanMs": 3983,
+              "fps": 18.08,
               "intervalMs": {
                 "p50": 50,
                 "p95": 100,
-                "max": 199.9
+                "max": 116.7
               },
-              "shareOver20msPercent": 90.5,
+              "shareOver20msPercent": 97.2,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 71,
+              "spanMs": 4017,
+              "fps": 17.43,
+              "intervalMs": {
+                "p50": 50,
+                "p95": 100,
+                "max": 116.7
+              },
+              "shareOver20msPercent": 90,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 73,
+              "spanMs": 3966,
+              "fps": 18.15,
+              "intervalMs": {
+                "p50": 50,
+                "p95": 100,
+                "max": 133.4
+              },
+              "shareOver20msPercent": 90.3,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 74,
+              "spanMs": 4067,
+              "fps": 17.95,
+              "intervalMs": {
+                "p50": 50,
+                "p95": 100,
+                "max": 116.7
+              },
+              "shareOver20msPercent": 90.4,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 73,
+              "spanMs": 4067,
+              "fps": 17.71,
+              "intervalMs": {
+                "p50": 50,
+                "p95": 100,
+                "max": 100.1
+              },
+              "shareOver20msPercent": 94.4,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
@@ -198,17 +198,17 @@
           }
         ],
         "medianFps": {
-          "pan": 9.59,
-          "zoom": 16.26
+          "pan": 17.43,
+          "zoom": 18.08
         },
         "fpsRange": {
           "pan": [
-            9.29,
-            19.51
+            16.86,
+            17.95
           ],
           "zoom": [
-            11.71,
-            17.98
+            17.71,
+            18.15
           ]
         }
       }
@@ -240,22 +240,22 @@
     "mapItems": 113,
     "full": {
       "bytes": 66658,
-      "gzipBytes": 4713,
+      "gzipBytes": 4673,
       "items": 111,
       "kindDisplay": true,
-      "seq": 171
+      "seq": 173
     },
     "changesOnly": {
       "bytes": 1454,
-      "gzipBytes": 461,
+      "gzipBytes": 462,
       "items": 1,
-      "seq": 179,
+      "seq": 181,
       "rule": "the map items whose values changed since the last batch"
     }
   },
   "phone": {
     "label": "measured",
-    "method": "Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the dev map at / with the seeded items (the line-tool probe on /edit, where Edit mode holds the tool); each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device's touch handling is unverified. Pan and pinch are read from the open popup's tip position (a DOM stand-in for the point's map position), not from the map's centre or zoom, which the suite cannot reach by design.",
+    "method": "Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the dev map at / with the seeded items (the line-tool probe on /edit, where Edit mode holds the tool); each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device's touch handling is unverified. Pan and pinch are read from the point's page position worked out from the map's reported data-center and data-zoom (entry 8: the phone popup is a sheet with no tip).",
     "env": {
       "chromium": "153.0.8010.12",
       "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
@@ -284,27 +284,27 @@
       {
         "check": "touch-targets-at-least-44-px",
         "ok": true,
-        "detail": "Zoom in 44x44; Zoom out 44x44; Fit the map to every item 44x44; Return to the selected item 44x44; Legend 94x44"
+        "detail": "Needs you 2: 1 comms lost, 1 stale 169x48; Zoom in 44x44; Zoom out 44x44; Fit the map to every item 44x44; Return to the selected item 44x44; Legend 94x44"
       },
       {
         "check": "tap-a-point-gives-reply-and-popup",
         "ok": true,
-        "detail": "reply text and popup view shown after a touch tap"
+        "detail": "reply text and the popup sheet shown after a touch tap"
       },
       {
         "check": "popup-inside-the-viewport-with-a-44-px-close",
-        "ok": false,
-        "detail": "popup x -19..201 of 390, y 352..450 of 844; close 21x22"
+        "ok": true,
+        "detail": "popup x 8..382 of 390, y 530..788 of 844; close 44x44"
       },
       {
         "check": "touch-drag-pans-the-map",
         "ok": true,
-        "detail": "popup tip moved -93 px horizontally for a 120 px leftward touch drag (needs under -72); the tip is the stand-in for the point's map position"
+        "detail": "the point moved -120 px horizontally for a 120 px leftward touch drag (needs under -72); its page position comes from the map's data-center and data-zoom"
       },
       {
         "check": "pinch-zooms-the-map",
         "ok": true,
-        "detail": "popup tip distance from the pinch centre grew by a factor of 2.41 for a CDP pinch of scale 2 (needs over 1.5)"
+        "detail": "the point's distance from the pinch centre grew by a factor of 2.34 for a CDP pinch of scale 2 (needs over 1.5)"
       },
       {
         "check": "line-tool-finishes-by-touch-alone",
@@ -318,8 +318,8 @@
       }
     ],
     "summary": {
-      "ok": 8,
-      "failed": 1
+      "ok": 9,
+      "failed": 0
     }
   }
 }

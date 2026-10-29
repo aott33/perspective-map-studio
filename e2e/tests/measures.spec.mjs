@@ -292,14 +292,14 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
         const [x, y] = pagePixel(box, TRACER.points.p1.lngLat, TRACER.center, TRACER.zoom);
         await page.touchscreen.tap(x, y);
         await expect(reply).toContainText('Gateway received click on ' + p1, { timeout: 10_000 });
-        await expect(page.locator('.maplibregl-popup .mapstudio-popup--view')).toContainText('Id: ' + p1, { timeout: 20_000 });
-        return { ok: true, detail: 'reply text and popup view shown after a touch tap' };
+        await expect(page.locator('.mapstudio-sheet .mapstudio-popup--default .mapstudio-popup-name')).toHaveText('Point 1', { timeout: 20_000 });
+        return { ok: true, detail: 'reply text and the popup sheet shown after a touch tap' };
     });
 
     await probe('popup-inside-the-viewport-with-a-44-px-close', async () => {
         const d = await page.evaluate(() => {
-            const pop = document.querySelector('.maplibregl-popup-content');
-            const close = document.querySelector('.maplibregl-popup-close-button');
+            const pop = document.querySelector('.mapstudio-sheet');
+            const close = document.querySelector('.mapstudio-popup-close');
             if (!pop || !close) return null;
             const a = pop.getBoundingClientRect();
             const c = close.getBoundingClientRect();
@@ -314,15 +314,17 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
         };
     });
 
-    // Pan and pinch are judged on where the open popup's tip moves: the popup is anchored to p1's
-    // map position, so its tip follows the map. The tip sits a fixed offset (about 12 px) from the point
-    // and may flip side near an edge, which is why the thresholds are generous.
+    // Pan and pinch are judged on where p1 moves on the page: its position is worked out from the
+    // map's own data-center and data-zoom (the view the component reports; entry 8 made the phone's
+    // popup a bottom sheet with no tip to track). The thresholds are generous.
     const tip = () => page.evaluate(() => {
-        const t = document.querySelector('.maplibregl-popup-tip');
-        if (!t) return null;
-        const r = t.getBoundingClientRect();
-        return [r.x + r.width / 2, r.y + r.height / 2];
-    });
+        const el = document.querySelector('.mapstudio-map');
+        const c = el && el.getAttribute('data-center');
+        const z = el && el.getAttribute('data-zoom');
+        if (!c || !z) return null;
+        const [lng, lat] = c.split(',').map(Number);
+        return { center: [lng, lat], zoom: Number(z) };
+    }).then((v) => (v ? pagePixel(box, TRACER.points.p1.lngLat, v.center, v.zoom) : null));
     const cdp = await context.newCDPSession(page);
     // Gestures start above the popup (the popup spans y 450..548 on this view).
     const gx = box.x + box.width / 2;
@@ -339,7 +341,7 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
         const after = await until(tip, (t) => !!t && t[0] - before[0] < -72);
         const dx = after ? Math.round(after[0] - before[0]) : null;
-        return { ok: dx !== null && dx < -72, detail: `popup tip moved ${dx} px horizontally for a 120 px leftward touch drag (needs under -72); the tip is the stand-in for the point's map position` };
+        return { ok: dx !== null && dx < -72, detail: `the point moved ${dx} px horizontally for a 120 px leftward touch drag (needs under -72); its page position comes from the map's data-center and data-zoom` };
     });
 
     await probe('pinch-zooms-the-map', async () => {
@@ -355,7 +357,7 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
         });
         const after = await until(tip, (t) => !!t && dist(t) > 1.5 * dist(before));
         const ratio = after ? Math.round((dist(after) / dist(before)) * 100) / 100 : null;
-        return { ok: ratio !== null && ratio > 1.5, detail: `popup tip distance from the pinch centre grew by a factor of ${ratio} for a CDP pinch of scale 2 (needs over 1.5)` };
+        return { ok: ratio !== null && ratio > 1.5, detail: `the point's distance from the pinch centre grew by a factor of ${ratio} for a CDP pinch of scale 2 (needs over 1.5)` };
     });
 
     await probe('line-tool-finishes-by-touch-alone', async () => {
@@ -393,7 +395,7 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
     await context.close();
     m.phone = {
         label: 'measured',
-        method: 'Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the dev map at / with the seeded items (the line-tool probe on /edit, where Edit mode holds the tool); each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device\'s touch handling is unverified. Pan and pinch are read from the open popup\'s tip position (a DOM stand-in for the point\'s map position), not from the map\'s centre or zoom, which the suite cannot reach by design.',
+        method: 'Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the dev map at / with the seeded items (the line-tool probe on /edit, where Edit mode holds the tool); each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device\'s touch handling is unverified. Pan and pinch are read from the point\'s page position worked out from the map\'s reported data-center and data-zoom (entry 8: the phone popup is a sheet with no tip).',
         env: envFor('390x844'),
         deviceScaleFactor: 2,
         findings,

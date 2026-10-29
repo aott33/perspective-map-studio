@@ -9,10 +9,8 @@
 //                through getMap and map.load with attachment null and nothing else changed
 // Skipped in the plain suite (no scenario set). Screenshots at 1440 and 390 px (AD-15).
 
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
-import { gatewayUrl, screenshotDir } from '../lib/env.mjs';
-import { drawLine, expect, nextFrames, test } from './fixtures.mjs';
+import { gatewayUrl } from '../lib/env.mjs';
+import { drawLine, expect, shot as sharedShot, test } from './fixtures.mjs';
 
 const SCENARIO = process.env.MAPSTUDIO_STORE_SCENARIO ?? '';
 // ops/store-checks.sh sets 0 for a second run of a scenario, so the screenshots show the first.
@@ -34,9 +32,7 @@ async function openCheckMap(page) {
 
 async function shot(page, name) {
     if (!SHOTS) return;
-    await nextFrames(page);
-    mkdirSync(screenshotDir, { recursive: true });
-    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
+    await sharedShot(page, name);
 }
 
 /** getMap through the check view's button: {count, readOnly} or {error}. */

@@ -9,14 +9,12 @@
 // paths) and at 390 px, where the field is the one top bar 8 px from the edges that expands with the
 // results and every target is 44 px. Screenshots at 1440 and 390 px for the docs (AD-15).
 
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
-import { screenshotDir } from '../lib/env.mjs';
 import { TRACER } from '../lib/geo.mjs';
-import { ensureSeeded, expect, mapLoaded, nextFrames, openMap, test } from './fixtures.mjs';
+import {
+    DRAW_MS, EDITOR_USER, ensureSeeded, expect, mapLoaded, openMap, removeStrays, shot, signedInContext, test
+} from './fixtures.mjs';
 
 /** How long a redraw or a popup after a choice may take on the dev stack. */
-const DRAW_MS = 20_000;
 /** The field's placeholder (DESIGN.md search-field). */
 const PLACEHOLDER = 'Search sites, wells or lines';
 
@@ -25,15 +23,10 @@ let ids;
 const input = (page) => page.locator('.mapstudio-search-input');
 const panel = (page) => page.locator('.mapstudio-search-panel');
 const options = (page) => page.locator('.mapstudio-search-option');
-const popup = (page) => page.locator('.maplibregl-popup .mapstudio-popup--default');
+// The point's default popup: the card at 1440 px, the bottom sheet below 768 px (entry 8).
+const popup = (page) => page.locator('.maplibregl-popup .mapstudio-popup--default, .mapstudio-sheet .mapstudio-popup--default');
 
-async function shot(page, name) {
-    await nextFrames(page);
-    mkdirSync(screenshotDir, { recursive: true });
-    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
-}
-
-/** Open /live (the default popup, no popupView prop) and wait for the items and the first full batch. */
+/** Open /live as a viewer and wait for the items and the first full batch. */
 async function openLive(page) {
     const map = await openMap(page, '/live');
     await mapLoaded(map);
@@ -53,6 +46,18 @@ async function rows(page) {
 test.beforeAll(async ({ browser }) => {
     const seed = await ensureSeeded(browser);
     ids = { ...Object.fromEntries(Object.entries(TRACER.points).map(([k, p]) => [k, seed.ids[p.key]])), line: seed.ids['tracer/l1'] };
+    // The rows below are the seed's: an item another spec left (a pad named after an asset, say) would
+    // be listed too, so on a used stack the strays go first, as the editor (entry 11).
+    const context = await signedInContext(browser, EDITOR_USER);
+    try {
+        const page = await context.newPage();
+        const map = await openMap(page, '/edit');
+        await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
+        await mapLoaded(map);
+        await removeStrays(page, seed.ids);
+    } finally {
+        await context.close();
+    }
 });
 
 test.describe('1440 px', () => {
@@ -242,8 +247,9 @@ test.describe('390 px', () => {
             for (const row of await options(page).all()) {
                 expect((await row.boundingBox()).height, 'a 44 px row').toBeGreaterThanOrEqual(44);
             }
-            // Every control button is a 44 px touch target, the Clear button included.
-            for (const b of await page.locator('.mapstudio .maplibregl-ctrl button').all()) {
+            // Every control button is a 44 px touch target, the Clear button included (the Needs you bar steps
+            // aside while the results are open, entry 3, so only the visible ones count).
+            for (const b of await page.locator('.mapstudio .maplibregl-ctrl button:visible').all()) {
                 const r = await b.boundingBox();
                 expect(Math.min(r.width, r.height), (await b.getAttribute('aria-label')) || (await b.textContent())).toBeGreaterThanOrEqual(44);
             }
@@ -254,6 +260,7 @@ test.describe('390 px', () => {
             await expect(map).toHaveAttribute('data-selected', ids.p1, { timeout: DRAW_MS });
             await expect(map).toHaveAttribute('data-zoom', '15.00', { timeout: DRAW_MS });
             await expect(popup(page)).toHaveAttribute('data-point-id', ids.p1, { timeout: DRAW_MS });
+            await expect(map).toHaveAttribute('data-popup-mode', 'sheet');
             await expect(input(page)).toHaveValue('');
             await expect(input(page)).not.toBeFocused();
             await expect(panel(page)).toHaveCount(0);

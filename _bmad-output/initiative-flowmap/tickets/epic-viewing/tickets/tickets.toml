@@ -137,13 +137,24 @@ hitl = false
 risk = "low"
 
 [[entry]]
+id = 15
+type = "story"
+title = "Showcase page and View mode polish to the mockups"
+description = "Owner, 2026-10-29, after the merged renders: the dev screenshots look worse than the UX mockups. Part of that is the dev pages (test buttons, readouts, no basemap, zoomed out, test names); part is real polish. First, a showcase page in the dev project with no test controls: a Mesa-like demo field seeded with the mockups' names and states (P14 in a priority 1 unacknowledged alarm, P21 comms lost, SWD1 stale, CTB1, CS01, L-SWD with PT-1, LV-1 and PT-2, L-GL21, a geofence), a light basemap stand-in, opened at zoom 15 as the mockups are, with committed browser checks that render the same three views as the mockups (key-screen-1-view-desktop-popup.png, key-screen-3-line-instruments-live.png, key-screen-2-phone-sheet.png) plus view-mode-1440.png and view-mode-needs-you-1440.png. Then a UX comparison of each render against its mockup (DESIGN.md as the authority; a punch list of every visible difference in spacing, sizes, type, marker discs, chips, shadows, radii, colours as tokens, alignment), written beside the UX review in ux-map-studio/, and the fixes built, theme tokens only, behaviour unchanged. The owner looks at the side-by-side renders and accepts them or names what is still off (a hitl step); accepted renders replace the mockups in the README showcase."
+verify = "The showcase page renders the five views at 1440 and 390 px with no dev controls; the punch list file names every difference found and each is fixed or recorded with a reason; side-by-side images of render and mockup are committed; the owner's acceptance is recorded in the epic's Notes; e2e, unit tests and the contract checks pass."
+covers = ["R2", "R5", "R6", "R14", "R15"]
+after = [11]
+hitl = true
+risk = "medium"
+
+[[entry]]
 id = 12
 type = "story"
 title = "Hue tokens and the engineering review pack"
 description = "One review before the release (owner, 2026-10-28): the comms-lost token in the magenta or purple family, the alarm priority 1 to 3 tokens, the presets and the area tints mapped to the host project's theme variables, shown on one docs page in both themes with every glyph, line look, instrument alarm, Needs you count, the legend and the bottom sheets, and the template's docs/map.md section 5 checklist; the owner's engineering review (ER-27) is a hitl step and its findings are fixed or recorded."
 verify = "The docs page renders every token in light and dark from the dev stack's screenshots; a contrast check shows 3:1 for each against the basemaps and surfaces; no colour literal is in the module's styles; the owner's ER-27 verdict is recorded in docs/platform-checks.md and the epic's Notes."
 covers = ["R5", "R16"]
-after = [11]
+after = [15]
 hitl = true
 risk = "medium"
 
