@@ -87,7 +87,8 @@ export async function openMap(page, pagePath = '/', project = undefined) {
     // the banner's active class is the signal that it is reconnecting.
     await page.waitForSelector('.connection-banner.banner-active', { state: 'detached', timeout: 30_000 }).catch(() => {});
     await expect(map).toHaveAttribute('data-map-ready', 'true', { timeout: 60_000 });
-    await page.locator('.mapstudio-reply').waitFor({ state: 'visible' });
+    // The status line is in the DOM on every page; in View mode it shows only when it has a status (entry 15).
+    await page.locator('.mapstudio-reply').waitFor({ state: 'attached' });
     return map;
 }
 

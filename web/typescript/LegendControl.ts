@@ -251,7 +251,7 @@ export class LegendControl implements IControl {
                         'stroke-width': '3' }));
                 } else {
                     box.appendChild(svgEl('rect', { x: '3', y: '5', width: '18', height: '14', rx: '2',
-                        class: 'mapstudio-legend-area-sample mapstudio-legend-token--line' }));
+                        class: 'mapstudio-legend-area-sample mapstudio-legend-token--lateral' }));
                 }
                 this.row(kinds, box, kind.name, 'mapstudio-legend-kind', { 'data-kind': kind.id });
             }
@@ -259,19 +259,10 @@ export class LegendControl implements IControl {
         if (key.states.length > 0) {
             const states = this.section(panel, 'States', 'mapstudio-legend-section--states');
             for (const state of key.states) {
+                // The glyph as the marker's badge draws it (markers.ts badgeAt, entry 15): the state glyph itself
+                // in its token, solid or hollow by the glyph, 18 px; never a disc of its own.
                 const box = sample('mapstudio-legend-sample mapstudio-legend-token--' + state.token);
-                const alarm = state.token.indexOf('alarm-') === 0;
-                if (state.solid) {
-                    box.appendChild(svgEl('circle', { cx: '12', cy: '12', r: '9', class: 'mapstudio-legend-badge mapstudio-legend-badge--solid' }));
-                    box.appendChild(use(state.glyph, 6, 6, 12, 'mapstudio-legend-badge-glyph--solid'));
-                } else if (alarm) {
-                    box.appendChild(svgEl('circle', { cx: '12', cy: '12', r: '8.5', class: 'mapstudio-legend-badge' }));
-                    box.appendChild(use(state.glyph, 6, 6, 12));
-                } else {
-                    // Comms lost and stale: the glyph inside the dashed ring the marker takes, no disc.
-                    box.appendChild(svgEl('circle', { cx: '12', cy: '12', r: '9.5', class: 'mapstudio-legend-ring', 'stroke-dasharray': '3 3' }));
-                    box.appendChild(use(state.glyph, 5, 5, 14));
-                }
+                box.appendChild(use(state.glyph, 3, 3, 18));
                 this.row(states, box, state.words, 'mapstudio-legend-state', { 'data-glyph': state.glyph });
             }
         }

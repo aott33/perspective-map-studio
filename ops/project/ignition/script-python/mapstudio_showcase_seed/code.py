@@ -44,11 +44,12 @@ SITES = (
 # L-SWD: CTB1, a bend, SWD1 (454.0 m by the contract's formulas), its ends snapped to both sites.
 SWD_LINE = ((-104.929571, 39.699752), (-104.928670, 39.697887), (-104.927211, 39.696120))
 # (key, name, kind, asset, distance along the line in metres, longitude, latitude), the point at each
-# distance by the same formulas (within the write path's 1 m).
+# distance by the same formulas (within the write path's 1 m); PT-2 sits 59 m short of SWD1, outside the
+# map's 20 m shared-marker distance, so the two draw as their own markers.
 SWD_INSTRUMENTS = (
     ('pt1', 'PT-1', 'tap', 'PT1', 175.0, -104.928858, 39.698277),
     ('lv1', 'LV-1', 'valve', 'LV1', 313.0, -104.928095, 39.697190),
-    ('pt2', 'PT-2', 'tap', 'PT2', 438.0, -104.927311, 39.696242),
+    ('pt2', 'PT-2', 'tap', 'PT2', 395.0, -104.927581, 39.696568),
 )
 # L-GL21: P21, a bend, CS01; no instrument, so it draws as the thin untapped line (DESIGN.md map-line).
 GL21_LINE = ((-104.926030, 39.702146), (-104.924314, 39.700330), (-104.924957, 39.698432))

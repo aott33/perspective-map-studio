@@ -10,7 +10,7 @@ The project's setup lists the basemaps the map offers (`basemaps`, in the order 
 
 | Basemap | Setup name | What it draws | Attribution (always shown, beside the Legend button) |
 | --- | --- | --- | --- |
-| None | `none` | The theme's blank background (`--containerRoot`, the markers' halo token); the map items alone, for a site without internet | none |
+| None | `none` | The theme's blank background (`--neutral-20`, DESIGN.md basemap-blank, the markers' halo token; the floating controls and cards sit on `--neutral-10`, surface-panel, so they lift off it in both themes, entry 15); the map items alone, for a site without internet | none |
 | OpenStreetMap | `osm` | OpenStreetMap's public raster tiles, `https://tile.openstreetmap.org/{z}/{x}/{y}.png` **[live 8.3.10]** (tiles routed to a stub in the e2e suite; real tiles seen by hand only where the box could reach them **[not verified]** on the cloud box) | "(c) OpenStreetMap contributors", linked to the copyright page |
 | Satellite | `satellite` | Mapbox satellite imagery (the `mapbox.satellite` tileset through the Raster Tiles API, 512 px tiles) with the project's own token (below) **[live 8.3.10]** with a placeholder token and stubbed tiles; real imagery from a real token **[not verified]** here | "(c) Mapbox (c) Maxar", with the "Improve this map" link Mapbox asks for |
 
