@@ -53,6 +53,8 @@
         0 4px 12px color-mix(in srgb, var(--neutral-90) 10%, transparent));
     --mapstudio-target: 32px;
     --mapstudio-map-inset: 12px;
+    /* The search field's width (DESIGN.md search-field); the Needs you list sits right of it (entry 3). */
+    --mapstudio-search-width: 300px;
 }
 
 @media (max-width: 767px) {
@@ -193,66 +195,412 @@
     flex: 0 0 auto;
 }
 
-/* Point popup: a project view by path, or the text fallback. Token colours only.
-   The popup's own max-width is an inline style MapLibre writes from the Popup
-   option (MapStudio.tsx), so it is not set here. */
+/* The point popup (AD-7, epic 3 entry 8; DESIGN.md popup-card and bottom-sheet, the UX review's P1 to
+   P8 and Phone): one opaque surface above every map layer and control, 320 px wide (popup-width, D1),
+   at most 480 px tall or the map less 64 (popup-max-height, set as --mapstudio-popup-max-height from
+   MapStudio.tsx) with the header fixed and the body scrolling, 16 px side padding in every region, a
+   10 px pointer in the card's own surface 22 px off the marker (popup-tip, popup-offset, D3), a 10 px
+   radius and the floating shadow. Token colours only (AD-11): the surface is the host's container token
+   with the panel token as its fallback, never a colour literal. The popup's own max-width is an inline
+   style MapLibre writes from the Popup option (MapStudio.tsx), so it is not set here. */
+.mapstudio {
+    --mapstudio-popup-surface: var(--container, var(--neutral-10));
+    --mapstudio-popup-max-height: 480px;
+    --mapstudio-popup-icon: 32px;
+}
+
+/* Above the map's canvas layers, MapLibre's controls (z-index 2) and the draw layers. */
+.mapstudio .maplibregl-popup {
+    z-index: 5;
+}
+
 .mapstudio .maplibregl-popup-content {
+    box-sizing: border-box;
+    width: 320px;
+    max-width: 100%;
     padding: 0;
-    background: var(--container);
+    background: var(--mapstudio-popup-surface);
     color: var(--label);
-    border: 1px solid var(--border);
-    border-radius: var(--borderRadius);
-    box-shadow: none;
+    border: none;
+    border-radius: 10px;
+    box-shadow: var(--mapstudio-float-shadow);
     overflow: hidden;
+}
+
+/* The pointer: a wedge of the card's surface, 10 px, so no grey edge sits against the card (P7). */
+.mapstudio .maplibregl-popup-tip {
+    border-width: 10px;
 }
 
 .mapstudio .maplibregl-popup-anchor-top .maplibregl-popup-tip,
 .mapstudio .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
 .mapstudio .maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
-    border-bottom-color: var(--border);
+    border-bottom-color: var(--mapstudio-popup-surface);
 }
 
 .mapstudio .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
 .mapstudio .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
 .mapstudio .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
-    border-top-color: var(--border);
+    border-top-color: var(--mapstudio-popup-surface);
 }
 
 .mapstudio .maplibregl-popup-anchor-left .maplibregl-popup-tip {
-    border-right-color: var(--border);
+    border-right-color: var(--mapstudio-popup-surface);
 }
 
 .mapstudio .maplibregl-popup-anchor-right .maplibregl-popup-tip {
-    border-left-color: var(--border);
-}
-
-.mapstudio .maplibregl-popup-close-button {
-    color: var(--label);
-    font-size: 16px;
-    padding: 0 6px;
-    right: 2px;
-    top: 2px;
-}
-
-.mapstudio .maplibregl-popup-close-button:hover {
-    background: var(--containerRoot);
+    border-left-color: var(--mapstudio-popup-surface);
 }
 
 .mapstudio-popup {
-    min-width: 120px;
-    max-width: calc(100vw - 48px);
-    overflow: auto;
-}
-
-.mapstudio-popup--text {
-    padding: 8px 28px 8px 12px;
+    box-sizing: border-box;
+    width: 100%;
     font-size: 13px;
     line-height: 1.4;
 }
 
+/* A custom popup view: Map Studio's close in a row above the view (32 px on the card, 44 on the
+   sheet, which also keeps its handle), the view scrolling under it within the popup's height. */
 .mapstudio-popup--view {
+    display: flex;
+    flex-direction: column;
+    max-height: var(--mapstudio-popup-max-height);
     padding-top: 0;
 }
+
+.mapstudio-popup-view-bar {
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    padding: 4px 8px 0;
+}
+
+.mapstudio-popup-view-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+/* The custom view's card while the popup detail is awaited (a moment after the open). */
+.mapstudio-popup--waiting {
+    min-height: 40px;
+}
+
+/* The default popup: the header, then the body (comms, KPIs, the alarm block) scrolling under it. */
+.mapstudio-popup--default {
+    display: flex;
+    flex-direction: column;
+    max-height: var(--mapstudio-popup-max-height);
+}
+
+.mapstudio-popup-header {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 12px 8px 16px;
+}
+
+.mapstudio-popup-disc {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 9999px;
+    background: var(--neutral-20);
+    color: var(--label);
+}
+
+.mapstudio-popup-glyph {
+    flex: 0 0 auto;
+}
+
+.mapstudio-popup-title {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.mapstudio-popup-name {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mapstudio-popup-subline {
+    font-size: 12px;
+    color: var(--neutral-70);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The header's pop-out (the page link, hidden without a value) and close: 32 px boxes, 44 on a phone. */
+.mapstudio-popup-icon {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: var(--mapstudio-popup-icon);
+    height: var(--mapstudio-popup-icon);
+    margin-left: 4px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--label);
+    cursor: pointer;
+}
+
+.mapstudio-popup-icon:first-of-type {
+    margin-left: 0;
+}
+
+.mapstudio-popup-icon:hover {
+    background: var(--neutral-30);
+}
+
+.mapstudio-popup-icon:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -2px;
+}
+
+.mapstudio-popup-chrome {
+    flex: 0 0 auto;
+}
+
+.mapstudio-popup-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    padding-bottom: 8px;
+}
+
+/* Rows: the label left, the value right in tabular figures; a long value wraps at spaces, never mid-word. */
+.mapstudio-popup-row {
+    display: flex;
+    align-items: center;
+    column-gap: 12px;
+    box-sizing: border-box;
+    min-height: 32px;
+    padding: 4px 16px;
+}
+
+.mapstudio-popup-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--neutral-70);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mapstudio-popup-value {
+    display: inline-flex;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    min-width: 0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: normal;
+}
+
+.mapstudio-popup-comms {
+    border-bottom: 1px solid var(--neutral-30);
+}
+
+.mapstudio-popup-kpis {
+    padding: 4px 0;
+}
+
+.mapstudio-popup-kpi--icon .mapstudio-popup-value {
+    font-weight: 600;
+}
+
+.mapstudio-popup-state-glyph,
+.mapstudio-popup-alarm-glyph {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+}
+
+/* Comms lost in its own token, with its glyph and the words (never colour alone). */
+.mapstudio-popup-comms--lost .mapstudio-popup-value {
+    color: var(--mapstudio-comms-lost);
+}
+
+/* Stale values are marked in words ("Stale - ") and keep the secondary colour. */
+.mapstudio-popup-kpi[data-stale="true"] .mapstudio-popup-value {
+    color: var(--neutral-70);
+}
+
+/* The alarm block (P5): the priority's tint and a 3 px edge, the hue on the glyph and the heading
+   only, the alarm in words with its age, then the primary View alarms. No alarms: a check, no tint. */
+.mapstudio-popup-alarms {
+    box-sizing: border-box;
+    margin: 8px 16px 8px;
+    padding: 8px 10px;
+    border-left: 3px solid transparent;
+    border-radius: 6px;
+    color: var(--neutral-70);
+}
+
+.mapstudio-popup-alarms--active {
+    color: var(--label);
+}
+
+.mapstudio-popup-alarm-heading {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 600;
+}
+
+.mapstudio-popup-alarm-words {
+    min-width: 0;
+}
+
+.mapstudio-popup-alarms--p1 {
+    background: color-mix(in srgb, var(--mapstudio-alarm-1) 8%, var(--mapstudio-popup-surface));
+    border-left-color: var(--mapstudio-alarm-1);
+}
+
+.mapstudio-popup-alarms--p1 .mapstudio-popup-alarm-heading {
+    color: var(--mapstudio-alarm-1);
+}
+
+.mapstudio-popup-alarms--p2 {
+    background: color-mix(in srgb, var(--mapstudio-alarm-2) 8%, var(--mapstudio-popup-surface));
+    border-left-color: var(--mapstudio-alarm-2);
+}
+
+.mapstudio-popup-alarms--p2 .mapstudio-popup-alarm-heading {
+    color: var(--mapstudio-alarm-2);
+}
+
+.mapstudio-popup-alarms--p3 {
+    background: color-mix(in srgb, var(--mapstudio-alarm-3) 8%, var(--mapstudio-popup-surface));
+    border-left-color: var(--mapstudio-alarm-3);
+}
+
+.mapstudio-popup-alarms--p3 .mapstudio-popup-alarm-heading {
+    color: var(--mapstudio-alarm-3);
+}
+
+.mapstudio-popup-alarm-counts,
+.mapstudio-popup-alarm-line,
+.mapstudio-popup-alarm-more {
+    margin-top: 2px;
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--label);
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-popup-alarm-counts,
+.mapstudio-popup-alarm-more,
+.mapstudio-popup-alarm-line--reason {
+    color: var(--neutral-70);
+}
+
+.mapstudio-popup-button {
+    box-sizing: border-box;
+    height: 28px;
+    margin-top: 8px;
+    padding: 0 12px;
+    border: 1px solid var(--neutral-40);
+    border-radius: 6px;
+    background: var(--mapstudio-popup-surface);
+    color: var(--label);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.mapstudio-popup-button--primary {
+    border-color: var(--callToAction);
+    background: var(--callToAction);
+    color: var(--mapstudio-popup-surface);
+}
+
+.mapstudio-popup-button:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: 2px;
+}
+
+/* The bottom sheet (DESIGN.md bottom-sheet, EXPERIENCE.md Bottom sheet; below 768 px every point popup):
+   8 px from the sides (phone-float-inset), above the App Bar toggle, 14 px top corners, a handle, 44 px
+   pop-out and close, 16 px side padding, the body scrolling under the header, and a footer with View
+   alarms (and Edit for phone-editing roles, hidden until epic-editing builds the edit sheet). No pointer. */
+.mapstudio-sheet {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 56px;
+    z-index: 6;
+    display: flex;
+    box-sizing: border-box;
+    max-height: 60%;
+    border-radius: 14px;
+    background: var(--mapstudio-popup-surface);
+    color: var(--label);
+    box-shadow: var(--mapstudio-float-shadow);
+    overflow: hidden;
+}
+
+.mapstudio-popup--sheet {
+    max-height: 100%;
+    --mapstudio-popup-icon: 44px;
+}
+
+.mapstudio-popup-handle {
+    flex: 0 0 auto;
+    width: 36px;
+    height: 4px;
+    margin: 8px auto 0;
+    border-radius: 2px;
+    background: var(--neutral-30);
+}
+
+.mapstudio-popup--sheet .mapstudio-popup-header {
+    padding: 8px 8px 8px 16px;
+}
+
+.mapstudio-popup--sheet .mapstudio-popup-name {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-popup--sheet .mapstudio-popup-row {
+    min-height: 40px;
+}
+
+.mapstudio-popup-footer {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
+    padding: 8px 16px 16px;
+}
+
+.mapstudio-popup-footer .mapstudio-popup-button {
+    flex: 1 1 auto;
+    height: 44px;
+    margin-top: 0;
+    font-size: 14px;
+}
+
 
 /* Save state of a drawn line, in words (AD-11: no colour of its own; a refusal is said, not coloured). */
 .mapstudio-save-status--saving {
@@ -451,128 +799,6 @@
     margin-top: 6px;
 }
 
-/* The default popup (AD-7): header, comms with its data age, KPIs, alarms, in that order. */
-.mapstudio-popup--default {
-    min-width: 220px;
-    max-width: 320px;
-    padding: 0 0 8px;
-    font-size: 13px;
-    line-height: 1.4;
-}
-
-.mapstudio-popup-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 28px 8px 12px;
-    border-bottom: 1px solid var(--border);
-}
-
-.mapstudio-popup-glyph {
-    flex: 0 0 auto;
-    color: var(--label);
-}
-
-.mapstudio-popup-title {
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-.mapstudio-popup-name {
-    font-size: 16px;
-    font-weight: 600;
-    overflow-wrap: anywhere;
-}
-
-.mapstudio-popup-subline {
-    font-size: 12px;
-    color: var(--label--disabled);
-}
-
-.mapstudio-popup-link {
-    flex: 0 0 auto;
-    width: 24px;
-    height: 24px;
-}
-
-.mapstudio-popup-comms,
-.mapstudio-popup-kpi,
-.mapstudio-popup-alarms {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 12px;
-}
-
-.mapstudio-popup-comms {
-    border-bottom: 1px solid var(--border);
-}
-
-.mapstudio-popup-kpis {
-    padding: 4px 0;
-}
-
-.mapstudio-popup-label {
-    flex: 1 1 auto;
-    color: var(--label--disabled);
-}
-
-.mapstudio-popup-value {
-    text-align: right;
-    overflow-wrap: anywhere;
-}
-
-.mapstudio-popup-kpi--icon .mapstudio-popup-value {
-    font-weight: 600;
-}
-
-.mapstudio-popup-state-glyph,
-.mapstudio-popup-alarm-glyph {
-    flex: 0 0 auto;
-    width: 16px;
-    height: 16px;
-}
-
-/* Comms lost in its own token, with its glyph and the words (never colour alone). */
-.mapstudio-popup-comms--lost {
-    color: var(--mapstudio-comms-lost);
-}
-
-.mapstudio-popup-comms--lost .mapstudio-popup-label {
-    color: var(--mapstudio-comms-lost);
-}
-
-/* Stale values are marked in words ("Stale - ") and keep the neutral colour. */
-.mapstudio-popup-kpi[data-stale="true"] .mapstudio-popup-value {
-    color: var(--label--disabled);
-}
-
-.mapstudio-popup-alarms {
-    margin: 4px 12px 0;
-    padding: 6px 8px;
-    border-radius: var(--borderRadius);
-    border-left: 3px solid transparent;
-}
-
-.mapstudio-popup-alarms--active {
-    border-left-color: var(--mapstudio-alarm-1);
-}
-
-.mapstudio-popup-alarms--p1 {
-    border-left-color: var(--mapstudio-alarm-1);
-    color: var(--mapstudio-alarm-1);
-}
-
-.mapstudio-popup-alarms--p2 {
-    border-left-color: var(--mapstudio-alarm-2);
-    color: var(--mapstudio-alarm-2);
-}
-
-.mapstudio-popup-alarms--p3 {
-    border-left-color: var(--mapstudio-alarm-3);
-    color: var(--mapstudio-alarm-3);
-}
-
 /* The legend (epic 3 entry 14, DESIGN.md legend; entry 6's basemap choice lives in it): bottom-left,
    a row of the Legend button, MapLibre's scale bar and the provider's attribution (always shown with a
    basemap), wrapping upward on a phone; the panel opens above the button, 208 px wide, built from
@@ -681,17 +907,15 @@
 
 .mapstudio .mapstudio-basemap-group {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
+    flex-wrap: wrap;
+    gap: 4px;
 }
 
 .mapstudio .mapstudio-basemap-button {
-    justify-content: flex-start;
-    width: 100%;
+    flex: 1 1 auto;
     padding: 0 8px;
     border-radius: 6px;
-    font-size: 13px;
-    text-align: left;
+    font-size: 12px;
 }
 
 .mapstudio .mapstudio-basemap-button--on {
@@ -736,7 +960,7 @@
     align-items: center;
     gap: 8px;
     box-sizing: border-box;
-    width: 300px;
+    width: var(--mapstudio-search-width);
     max-width: 100%;
     height: 40px;
     padding: 0 4px 0 12px;
@@ -782,7 +1006,7 @@
 
 .mapstudio .mapstudio-topbar-panel {
     box-sizing: border-box;
-    width: 300px;
+    width: var(--mapstudio-search-width);
     max-width: 100%;
     margin-top: 6px;
     padding: 4px 0;
@@ -885,11 +1109,17 @@
 
     .mapstudio .mapstudio-search-field {
         flex: 1 1 auto;
+        /* The field gives way to the Needs you bar beside it (entry 3): its min size is not the input's own. */
+        min-width: 0;
         width: auto;
         height: 48px;
         border-radius: 10px;
         background: transparent;
         box-shadow: none;
+    }
+
+    .mapstudio .mapstudio-search-input {
+        width: 0;
     }
 
     .mapstudio .mapstudio-search-field:focus-within {
@@ -908,6 +1138,405 @@
     /* The zoom card sits under the top bar (DESIGN.md Phone). */
     .mapstudio .maplibregl-ctrl-top-right {
         top: 56px;
+    }
+}
+
+/* The Needs you bar and its ranked list (epic 3 entry 3, DESIGN.md needs-you-bar, phone top bar;
+   EXPERIENCE.md Needs you bar): the bar after the search field in the top bar's row (40 px,
+   rounded.lg, the floating shadow), "Needs you 3" in bold then each count with its glyph, or "All OK"
+   in text-secondary with no glyph; the list a card under the bar (320 px) with one row per item:
+   rank, state glyph, name and kind, the state in words, detail and age. At phone width the bar is
+   flat inside the one top bar and the list expands inside it. Token colours only (AD-11): the alarm
+   glyphs take the priority tokens, comms lost its own token, stale none. */
+.mapstudio .mapstudio-needs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+    height: 40px;
+    padding: 0 8px 0 12px;
+    border: none;
+    border-radius: 10px;
+    background: var(--container);
+    color: var(--label);
+    box-shadow: var(--mapstudio-float-shadow);
+    font: inherit;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.mapstudio .mapstudio-needs:hover {
+    background: var(--neutral-30);
+}
+
+.mapstudio .mapstudio-needs:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -2px;
+}
+
+.mapstudio .mapstudio-needs-words {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.mapstudio .mapstudio-needs--ok .mapstudio-needs-words {
+    color: var(--label--disabled);
+    font-weight: 500;
+}
+
+.mapstudio .mapstudio-needs-colon {
+    color: var(--label--disabled);
+}
+
+.mapstudio .mapstudio-needs-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--label--disabled);
+    white-space: pre;
+}
+
+.mapstudio .mapstudio-needs-count--alarm {
+    color: var(--mapstudio-alarm-1);
+}
+
+.mapstudio .mapstudio-needs[data-priority="2"] .mapstudio-needs-count--alarm {
+    color: var(--mapstudio-alarm-2);
+}
+
+.mapstudio .mapstudio-needs[data-priority="3"] .mapstudio-needs-count--alarm {
+    color: var(--mapstudio-alarm-3);
+}
+
+.mapstudio .mapstudio-needs-count--comms-lost .mapstudio-needs-glyph {
+    color: var(--mapstudio-comms-lost);
+}
+
+.mapstudio .mapstudio-needs-count--stale .mapstudio-needs-glyph {
+    color: var(--label);
+}
+
+.mapstudio .mapstudio-needs-chevron {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    color: var(--label--disabled);
+}
+
+.mapstudio .mapstudio-needs[aria-expanded="true"] .mapstudio-needs-chevron {
+    transform: rotate(180deg);
+}
+
+/* The list: a card under the bar, right of the search field (its width plus the row's gap). */
+.mapstudio .mapstudio-needs-panel {
+    width: 320px;
+    margin-left: calc(var(--mapstudio-search-width) + 12px);
+    padding: 8px 0 6px;
+}
+
+.mapstudio .mapstudio-needs-note {
+    padding: 2px 16px 6px;
+    color: var(--label--disabled);
+    font-size: 11px;
+}
+
+.mapstudio .mapstudio-needs-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.mapstudio .mapstudio-needs-row {
+    display: grid;
+    grid-template-columns: 16px 20px 1fr;
+    column-gap: 10px;
+    align-items: start;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: var(--mapstudio-target);
+    padding: 8px 16px;
+    border: none;
+    background: var(--container);
+    color: var(--label);
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: left;
+    cursor: pointer;
+}
+
+.mapstudio .mapstudio-needs-row:hover {
+    background: var(--neutral-30);
+}
+
+.mapstudio .mapstudio-needs-row:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -2px;
+}
+
+.mapstudio .mapstudio-needs-rank {
+    color: var(--label--disabled);
+    font-size: 12px;
+    line-height: 20px;
+}
+
+.mapstudio .mapstudio-needs-row-glyph {
+    color: var(--label);
+}
+
+.mapstudio .mapstudio-needs-row-glyph--p1 {
+    color: var(--mapstudio-alarm-1);
+}
+
+.mapstudio .mapstudio-needs-row-glyph--p2 {
+    color: var(--mapstudio-alarm-2);
+}
+
+.mapstudio .mapstudio-needs-row-glyph--p3 {
+    color: var(--mapstudio-alarm-3);
+}
+
+.mapstudio .mapstudio-needs-row-glyph--comms-lost {
+    color: var(--mapstudio-comms-lost);
+}
+
+.mapstudio .mapstudio-needs-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.mapstudio .mapstudio-needs-title {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+}
+
+.mapstudio .mapstudio-needs-name {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mapstudio .mapstudio-needs-kind {
+    color: var(--label--disabled);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.mapstudio .mapstudio-needs-state {
+    color: var(--label);
+}
+
+.mapstudio .mapstudio-needs-detail {
+    color: var(--label--disabled);
+    font-size: 12px;
+}
+
+/* The legend's key (entry 3, DESIGN.md legend): one row per glyph or line look, the sample in
+   currentColor through a token class, the words beside it; the Show section's checkboxes and note. */
+/* The panel never grows past the map: the component writes the map's height into the variable; a
+   taller key scrolls (the Legend button row and the insets take about 100 px). */
+.mapstudio .mapstudio-legend-panel {
+    max-height: calc(var(--mapstudio-map-height, 100vh) - 100px);
+    overflow-y: auto;
+}
+
+.mapstudio .mapstudio-legend-key-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 20px;
+    font-size: 12px;
+    line-height: 1.25;
+}
+
+.mapstudio .mapstudio-legend-key-words {
+    min-width: 0;
+}
+
+.mapstudio .mapstudio-legend-sample {
+    flex: 0 0 auto;
+    color: var(--label);
+}
+
+.mapstudio .mapstudio-legend-token--line {
+    color: var(--neutral-60);
+}
+
+.mapstudio .mapstudio-legend-token--alarm-1 {
+    color: var(--mapstudio-alarm-1);
+}
+
+.mapstudio .mapstudio-legend-token--alarm-2 {
+    color: var(--mapstudio-alarm-2);
+}
+
+.mapstudio .mapstudio-legend-token--alarm-3 {
+    color: var(--mapstudio-alarm-3);
+}
+
+.mapstudio .mapstudio-legend-token--comms-lost {
+    color: var(--mapstudio-comms-lost);
+}
+
+.mapstudio .mapstudio-legend-token--stale {
+    color: var(--label);
+}
+
+.mapstudio .mapstudio-legend-token--attention {
+    color: var(--mapstudio-attention);
+}
+
+.mapstudio .mapstudio-legend-token--warning {
+    color: var(--mapstudio-warning);
+}
+
+.mapstudio .mapstudio-legend-token--fault {
+    color: var(--mapstudio-fault);
+}
+
+.mapstudio .mapstudio-legend-token--dimmed {
+    color: var(--neutral-60);
+}
+
+.mapstudio .mapstudio-legend-token--tint-1 { color: var(--mapstudio-tint-1); }
+.mapstudio .mapstudio-legend-token--tint-2 { color: var(--mapstudio-tint-2); }
+.mapstudio .mapstudio-legend-token--tint-3 { color: var(--mapstudio-tint-3); }
+.mapstudio .mapstudio-legend-token--tint-4 { color: var(--mapstudio-tint-4); }
+.mapstudio .mapstudio-legend-token--tint-5 { color: var(--mapstudio-tint-5); }
+.mapstudio .mapstudio-legend-token--tint-6 { color: var(--mapstudio-tint-6); }
+
+/* A kind's disc as the marker draws it: the panel fill with the neutral ring, the glyph in the text colour. */
+.mapstudio .mapstudio-legend-disc {
+    fill: var(--container);
+    stroke: var(--neutral-60);
+    stroke-width: 1.5;
+}
+
+/* A state badge: hollow in its token, or solid with the glyph in the panel colour (acknowledged is hollow). */
+.mapstudio .mapstudio-legend-badge {
+    fill: var(--container);
+    stroke: currentColor;
+    stroke-width: 2;
+}
+
+.mapstudio .mapstudio-legend-badge--solid {
+    fill: currentColor;
+    stroke: var(--containerRoot);
+    stroke-width: 1.5;
+}
+
+.mapstudio .mapstudio-legend-badge-glyph--solid {
+    color: var(--container);
+}
+
+.mapstudio .mapstudio-legend-ring {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+}
+
+.mapstudio .mapstudio-legend-ring--attention {
+    stroke-width: 3;
+}
+
+.mapstudio .mapstudio-legend-ring--dimmed {
+    stroke-width: 1.5;
+}
+
+.mapstudio .mapstudio-legend-line-sample {
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.mapstudio .mapstudio-legend-area-sample {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-dasharray: 3 2;
+}
+
+.mapstudio .mapstudio-legend-tint-sample {
+    fill: currentColor;
+    fill-opacity: 0.22;
+    stroke: currentColor;
+    stroke-opacity: 0.8;
+    stroke-width: 1.5;
+}
+
+.mapstudio .mapstudio-legend-toggles {
+    display: flex;
+    gap: 14px;
+}
+
+.mapstudio .mapstudio-legend-toggle-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 24px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.mapstudio .mapstudio-legend-toggle {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--callToAction);
+}
+
+.mapstudio .mapstudio-legend-note {
+    margin-top: 6px;
+    color: var(--label--disabled);
+    font-size: 11px;
+}
+
+@media (max-width: 767px) {
+    /* The bar flat inside the one top bar, after a divider; the glyphs alone say the counts (the
+       words are the button's label); hidden while the search results are open. */
+    .mapstudio .mapstudio-needs {
+        flex: 0 0 auto;
+        height: 48px;
+        padding: 0 8px 0 10px;
+        border-left: 1px solid var(--neutral-30);
+        border-radius: 0 10px 10px 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .mapstudio .mapstudio-needs-colon,
+    .mapstudio .mapstudio-needs-count-word,
+    .mapstudio .mapstudio-needs-count--comms-lost .mapstudio-needs-count-n,
+    .mapstudio .mapstudio-needs-count--stale .mapstudio-needs-count-n {
+        display: none;
+    }
+
+    .mapstudio .mapstudio-topbar[data-search-open="true"] .mapstudio-needs {
+        display: none;
+    }
+
+    .mapstudio .mapstudio-needs-panel {
+        width: auto;
+        margin: 0;
+    }
+
+    .mapstudio .mapstudio-needs-row {
+        min-height: 52px;
+    }
+
+    .mapstudio .mapstudio-legend-toggle-label {
+        min-height: var(--mapstudio-target);
+    }
+
+    .mapstudio .mapstudio-legend-toggle {
+        width: 20px;
+        height: 20px;
     }
 }
 
@@ -970,42 +1599,41 @@
 /* The line popup (epic 3 entry 2; DESIGN.md line-popup; the UX review's padding rules, decisions D1 to
    D3, so entry 8 need not redo them): a 350 px card, 16 px side padding in every region, the header
    with its own 32 px close button (MapLibre's is hidden for this card), the body scrolling under
-   min(480px, map - 64px), the tip in the card's surface, the floating shadow. Token colours only. */
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--card) .maplibregl-popup-content {
+   min(480px, map - 64px), the tip in the card's surface, the floating shadow. Token colours only.
+   Scoped to `.mapstudio-popup--line`: entry 8's point card and sheet carry `--card` and `--sheet`
+   with their own rules, and the popup's z-index is entry 8's (5, above the map's controls). */
+.mapstudio .maplibregl-popup:has(.mapstudio-popup--line) .maplibregl-popup-content {
+    /* The point card's content is 320 px (entry 8); the line popup's card sets its own 350. */
+    width: auto;
     border-radius: 10px;
     box-shadow: var(--mapstudio-float-shadow);
 }
 
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--card) .maplibregl-popup-close-button {
+.mapstudio .maplibregl-popup:has(.mapstudio-popup--line) .maplibregl-popup-close-button {
     display: none;
 }
 
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--card).maplibregl-popup-anchor-top .maplibregl-popup-tip,
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--card).maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--card).maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
     border-bottom-color: var(--container);
 }
 
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--card).maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--card).maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--card).maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
     border-top-color: var(--container);
 }
 
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--card).maplibregl-popup-anchor-left .maplibregl-popup-tip {
+.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-left .maplibregl-popup-tip {
     border-right-color: var(--container);
 }
 
-.mapstudio .maplibregl-popup:has(.mapstudio-popup--card).maplibregl-popup-anchor-right .maplibregl-popup-tip {
+.mapstudio .maplibregl-popup:has(.mapstudio-popup--line).maplibregl-popup-anchor-right .maplibregl-popup-tip {
     border-left-color: var(--container);
 }
 
-/* The card popup sits over the map's controls (the Legend button, the zoom card) as any popup should. */
-.mapstudio .maplibregl-popup {
-    z-index: 3;
-}
-
-.mapstudio-popup--card {
+.mapstudio-popup--line {
     display: flex;
     flex-direction: column;
     width: 350px;
@@ -1016,15 +1644,17 @@
     line-height: 1.4;
 }
 
-.mapstudio-popup--card .mapstudio-popup-card-header {
+.mapstudio-popup--line .mapstudio-popup-card-header {
     display: flex;
     align-items: flex-start;
     gap: 8px;
     flex: 0 0 auto;
     padding: 12px 12px 8px 16px;
+    /* The divider under the header, which the line popup had from the 0.3.0 header rule entry 8 replaced. */
+    border-bottom: 1px solid var(--border);
 }
 
-.mapstudio-popup--card .mapstudio-popup-glyph-disc {
+.mapstudio-popup--line .mapstudio-popup-glyph-disc {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1036,32 +1666,32 @@
     color: var(--label);
 }
 
-.mapstudio-popup--card .mapstudio-popup-glyph-disc .mapstudio-popup-glyph {
+.mapstudio-popup--line .mapstudio-popup-glyph-disc .mapstudio-popup-glyph {
     width: 18px;
     height: 18px;
 }
 
-.mapstudio-popup--card .mapstudio-popup-title {
+.mapstudio-popup--line .mapstudio-popup-title {
     flex: 1 1 auto;
     min-width: 0;
 }
 
-.mapstudio-popup--card .mapstudio-popup-name {
+.mapstudio-popup--line .mapstudio-popup-name {
     font-size: 16px;
     font-weight: 600;
     line-height: 1.3;
 }
 
-.mapstudio-popup--card .mapstudio-popup-subline {
+.mapstudio-popup--line .mapstudio-popup-subline {
     font-size: 12px;
     color: var(--label--disabled);
 }
 
-.mapstudio-popup--card .mapstudio-popup-link {
+.mapstudio-popup--line .mapstudio-popup-link {
     display: none;
 }
 
-.mapstudio-popup--card .mapstudio-popup-close {
+.mapstudio-popup--line .mapstudio-popup-close {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1077,11 +1707,11 @@
     cursor: pointer;
 }
 
-.mapstudio-popup--card .mapstudio-popup-close:hover {
+.mapstudio-popup--line .mapstudio-popup-close:hover {
     background: var(--containerRoot);
 }
 
-.mapstudio-popup--card .mapstudio-popup-body {
+.mapstudio-popup--line .mapstudio-popup-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
@@ -1123,7 +1753,7 @@
 }
 
 /* Rows: label left, value right, 32 px tall, 16 px side padding (review P4). */
-.mapstudio-popup--card .mapstudio-popup-row {
+.mapstudio-popup--line .mapstudio-popup-row {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -1131,7 +1761,7 @@
     padding: 4px 16px;
 }
 
-.mapstudio-popup--card .mapstudio-popup-label {
+.mapstudio-popup--line .mapstudio-popup-label {
     flex: 1 1 auto;
     color: var(--label--disabled);
     white-space: nowrap;
@@ -1139,7 +1769,7 @@
     text-overflow: ellipsis;
 }
 
-.mapstudio-popup--card .mapstudio-popup-value {
+.mapstudio-popup--line .mapstudio-popup-value {
     display: inline-flex;
     align-items: center;
     justify-content: flex-end;
@@ -1150,14 +1780,14 @@
     overflow-wrap: normal;
 }
 
-.mapstudio-popup--card .mapstudio-popup-value--key {
+.mapstudio-popup--line .mapstudio-popup-value--key {
     font-weight: 600;
 }
 
-.mapstudio-popup--card .mapstudio-popup-comms + .mapstudio-popup-instruments,
-.mapstudio-popup--card .mapstudio-popup-instruments + .mapstudio-popup-kpis,
-.mapstudio-popup--card .mapstudio-popup-kpis + .mapstudio-popup-alarms,
-.mapstudio-popup--card .mapstudio-popup-instruments + .mapstudio-popup-alarms {
+.mapstudio-popup--line .mapstudio-popup-comms + .mapstudio-popup-instruments,
+.mapstudio-popup--line .mapstudio-popup-instruments + .mapstudio-popup-kpis,
+.mapstudio-popup--line .mapstudio-popup-kpis + .mapstudio-popup-alarms,
+.mapstudio-popup--line .mapstudio-popup-instruments + .mapstudio-popup-alarms {
     border-top: 1px solid var(--border);
     margin-top: 4px;
     padding-top: 4px;
@@ -1199,37 +1829,37 @@
     color: var(--label--disabled);
 }
 
-.mapstudio-popup--card .mapstudio-popup-alarm-digit {
+.mapstudio-popup--line .mapstudio-popup-alarm-digit {
     font-size: 11px;
     font-weight: 700;
 }
 
-.mapstudio-popup--card .mapstudio-popup-alarm-glyph--p1 {
+.mapstudio-popup--line .mapstudio-popup-alarm-glyph--p1 {
     color: var(--mapstudio-alarm-1);
 }
 
-.mapstudio-popup--card .mapstudio-popup-alarm-glyph--p2 {
+.mapstudio-popup--line .mapstudio-popup-alarm-glyph--p2 {
     color: var(--mapstudio-alarm-2);
 }
 
-.mapstudio-popup--card .mapstudio-popup-alarm-glyph--p3 {
+.mapstudio-popup--line .mapstudio-popup-alarm-glyph--p3 {
     color: var(--mapstudio-alarm-3);
 }
 
-.mapstudio-popup--card .mapstudio-popup-alarms {
+.mapstudio-popup--line .mapstudio-popup-alarms {
     margin: 8px 16px 8px;
     padding: 8px 12px;
     border-radius: 6px;
 }
 
 @media (max-width: 767px) {
-    .mapstudio-popup--card .mapstudio-popup-close {
+    .mapstudio-popup--line .mapstudio-popup-close {
         width: 44px;
         height: 44px;
         margin-top: -8px;
     }
 
-    .mapstudio-popup--card .mapstudio-popup-row {
+    .mapstudio-popup--line .mapstudio-popup-row {
         min-height: 40px;
     }
 }

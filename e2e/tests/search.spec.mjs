@@ -25,7 +25,8 @@ let ids;
 const input = (page) => page.locator('.mapstudio-search-input');
 const panel = (page) => page.locator('.mapstudio-search-panel');
 const options = (page) => page.locator('.mapstudio-search-option');
-const popup = (page) => page.locator('.maplibregl-popup .mapstudio-popup--default');
+// The point's default popup: the card at 1440 px, the bottom sheet below 768 px (entry 8).
+const popup = (page) => page.locator('.maplibregl-popup .mapstudio-popup--default, .mapstudio-sheet .mapstudio-popup--default');
 
 async function shot(page, name) {
     await nextFrames(page);
@@ -242,8 +243,9 @@ test.describe('390 px', () => {
             for (const row of await options(page).all()) {
                 expect((await row.boundingBox()).height, 'a 44 px row').toBeGreaterThanOrEqual(44);
             }
-            // Every control button is a 44 px touch target, the Clear button included.
-            for (const b of await page.locator('.mapstudio .maplibregl-ctrl button').all()) {
+            // Every control button is a 44 px touch target, the Clear button included (the Needs you bar steps
+            // aside while the results are open, entry 3, so only the visible ones count).
+            for (const b of await page.locator('.mapstudio .maplibregl-ctrl button:visible').all()) {
                 const r = await b.boundingBox();
                 expect(Math.min(r.width, r.height), (await b.getAttribute('aria-label')) || (await b.textContent())).toBeGreaterThanOrEqual(44);
             }
@@ -254,6 +256,7 @@ test.describe('390 px', () => {
             await expect(map).toHaveAttribute('data-selected', ids.p1, { timeout: DRAW_MS });
             await expect(map).toHaveAttribute('data-zoom', '15.00', { timeout: DRAW_MS });
             await expect(popup(page)).toHaveAttribute('data-point-id', ids.p1, { timeout: DRAW_MS });
+            await expect(map).toHaveAttribute('data-popup-mode', 'sheet');
             await expect(input(page)).toHaveValue('');
             await expect(input(page)).not.toBeFocused();
             await expect(panel(page)).toHaveCount(0);

@@ -2,7 +2,7 @@
  * The search field (epic 3 entry 9, R4; DESIGN.md search-field, Phone top bar; EXPERIENCE.md Search):
  * one MapLibre control top-left that is the View-mode top bar. Its row holds the search field first
  * (a glyph, the input and a Clear button while there is text) and leaves a slot after it, where entry 3
- * puts the Needs you summary; below the row a panel opens with the results while the field has text
+ * puts the Needs you summary (NeedsYouControl, whose list opens under the row too); below the row a panel opens with the results while the field has text
  * and focus, or says "No matches". On a desktop the field and the panel are two floating cards; at
  * phone width the control is the one top bar, 8 px from the edges, and the panel expands inside it.
  *
@@ -109,6 +109,18 @@ export class SearchControl implements IControl {
     /** The top bar's row: the search field is its first child; entry 3 appends the Needs you summary after it. */
     slot(): HTMLElement | null {
         return this.row;
+    }
+
+    /** The top bar's container, under whose row the Needs you list opens (entry 3), as the results panel does. */
+    panelHost(): HTMLElement | null {
+        return this.container;
+    }
+
+    /** Say something in the top bar's polite live region (a Needs you choice uses it too, entry 3). */
+    announce(text: string): void {
+        if (this.status) {
+            this.status.textContent = text;
+        }
     }
 
     /** The map's entries (every live item); an open list is searched again. */

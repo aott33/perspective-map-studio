@@ -6,6 +6,8 @@ import { project, pagePixel } from './geo.mjs';
 import { unavailable, validateMeasures, without } from './measures.mjs';
 import { frameStats, median, percentile } from './stats.mjs';
 import { batchSize, isValuesBatchFrame, parseBatchFrame } from './valueBatch.mjs';
+import { decodePng, firstOddPixel } from './png.mjs';
+import { deflateSync } from 'node:zlib';
 
 test('median and percentile', () => {
     assert.equal(median([3, 1, 2]), 2);
@@ -105,4 +107,47 @@ test('validateMeasures refuses an unlabelled number, a missing section and a sec
     assert.match(problems, /valueBatch: env needs/);
     assert.match(problems, /phone: missing/);
     assert.match(validateMeasures({}).join('|'), /env needs/);
+});
+
+/** A PNG encoded by hand: 8-bit RGB, no interlace, filter 0 on every row, from rows of [r, g, b] pixels. */
+function encodePng(rows) {
+    const crcTable = [];
+    for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+        crcTable[n] = c >>> 0;
+    }
+    const crc = (buf) => {
+        let c = 0xffffffff;
+        for (const b of buf) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8);
+        return (c ^ 0xffffffff) >>> 0;
+    };
+    const chunk = (type, body) => {
+        const len = Buffer.alloc(4);
+        len.writeUInt32BE(body.length);
+        const tb = Buffer.concat([Buffer.from(type, 'latin1'), body]);
+        const c = Buffer.alloc(4);
+        c.writeUInt32BE(crc(tb));
+        return Buffer.concat([len, tb, c]);
+    };
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(rows[0].length, 0);
+    ihdr.writeUInt32BE(rows.length, 4);
+    ihdr[8] = 8; ihdr[9] = 2;
+    const raw = Buffer.concat(rows.map((r) => Buffer.from([0, ...r.flat()])));
+    return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+
+test('a PNG decoded and its flat region checked, the surface divider allowed', () => {
+    const s = [244, 244, 244];
+    const d = [216, 216, 216];
+    const png = decodePng(encodePng([[s, s, s], [d, d, d], [s, s, [12, 200, 30]]]));
+    assert.equal(png.width, 3);
+    assert.equal(png.height, 3);
+    assert.deepEqual(png.pixel(2, 2), [12, 200, 30, 255]);
+    assert.deepEqual(firstOddPixel(png, 0, 0, 3, 1, 2), null);
+    assert.deepEqual(firstOddPixel(png, 0, 0, 3, 2, 2), { x: 0, y: 1, pixel: [216, 216, 216, 255], ref: [244, 244, 244, 255] });
+    assert.deepEqual(firstOddPixel(png, 0, 0, 3, 2, 2, [d]), null);
+    assert.deepEqual(firstOddPixel(png, 0, 0, 3, 3, 2, [d]), { x: 2, y: 2, pixel: [12, 200, 30, 255], ref: [244, 244, 244, 255] });
 });

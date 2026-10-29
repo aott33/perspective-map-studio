@@ -86,25 +86,32 @@ class LiveSessionTest {
         await(1);
         session.popupOpen(P1);
         assertEquals(P1, session.popupItem());
+        // Epic 3 entry 8: the open itself pushes the item at once, with the popup detail.
+        await(2);
+        assertFalse(sent.get(1).get("full").getAsBoolean());
+        JsonObject opened = sent.get(1).getAsJsonArray("items").get(0).getAsJsonObject();
+        assertEquals(P1, opened.get("id").getAsString());
+        assertEquals("[default]Mesa/P12", opened.getAsJsonObject("popup").get("basePath").getAsString());
         long before = System.nanoTime();
         tags.deliver("[default]Mesa/P12/Pressure", 1);
         tags.deliver("[default]Mesa/P12/Pressure", 2);
-        await(2);
+        await(3);
         long tookMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - before);
         assertTrue(tookMs < 2000, "pushed within the delay, not the 60 s interval: " + tookMs + " ms");
-        assertFalse(sent.get(1).get("full").getAsBoolean());
-        assertEquals(2, sent.get(1).getAsJsonArray("items").get(0).getAsJsonObject().getAsJsonObject("kpis")
+        assertFalse(sent.get(2).get("full").getAsBoolean());
+        assertEquals(2, sent.get(2).getAsJsonArray("items").get(0).getAsJsonObject().getAsJsonObject("kpis")
             .getAsJsonObject("pressure").get("value").getAsInt(), "the push carries the latest value, once");
+        assertTrue(sent.get(2).getAsJsonArray("items").get(0).getAsJsonObject().has("popup"), "every push carries the detail");
         Thread.sleep(400);
-        assertEquals(2, sent.size(), "two deliveries within the delay are one push");
+        assertEquals(3, sent.size(), "two deliveries within the delay are one push");
         // Another item's change pushes nothing.
         tags.deliver("[default]Mesa/P14/Pressure", 1);
         Thread.sleep(400);
-        assertEquals(2, sent.size());
+        assertEquals(3, sent.size());
         session.popupClose();
         assertNull(session.popupItem());
         tags.deliver("[default]Mesa/P12/Pressure", 3);
         Thread.sleep(400);
-        assertEquals(2, sent.size(), "closed: no push");
+        assertEquals(3, sent.size(), "closed: no push");
     }
 }

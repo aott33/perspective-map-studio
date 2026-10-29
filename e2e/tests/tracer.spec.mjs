@@ -38,9 +38,15 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             const reply = page.locator('.mapstudio-reply');
             await expect(reply).toContainText('Gateway received click on ' + p1, { timeout: 15_000 });
 
-            // The click also opens the project view popup with the point id.
-            const popup = page.locator('.maplibregl-popup .mapstudio-popup--view');
-            await expect(popup).toContainText('Id: ' + p1, { timeout: 30_000 });
+            // The click also opens the default popup from the pad kind setup (a card at 1440 px, a
+            // bottom sheet at 390 px; epic 3 entry 8 retired the spike's popupView prop).
+            const popup = page.locator((width === 1440 ? '.maplibregl-popup' : '.mapstudio-sheet') + ' .mapstudio-popup--default');
+            await expect(popup).toBeVisible({ timeout: 30_000 });
+            await expect(popup).toHaveAttribute('data-point-id', p1);
+            await expect(popup.locator('.mapstudio-popup-name')).toHaveText('Point 1');
+            // Closed before drawing: at 390 px the sheet covers the middle of the map, where the vertices go.
+            await popup.locator('.mapstudio-popup-close').click();
+            await expect(page.locator('.mapstudio-popup--default')).toHaveCount(0);
 
             // Escape cancels a drawing: one vertex, then nothing is drawn.
             const cx = box.x + box.width / 2;

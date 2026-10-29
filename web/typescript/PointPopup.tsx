@@ -7,7 +7,7 @@ import {
     ViewProps,
     ViewStateType
 } from '@inductiveautomation/perspective-client';
-import { AuthorParams, PopupPoint, fallbackText, isFailedViewState, popupViewParams } from './popupParams';
+import { AuthorParams, isFailedViewState } from './popupParams';
 
 /**
  * Perspective's View is typed against React 18 while this bundle compiles with
@@ -21,14 +21,20 @@ export interface PointPopupProps {
     clientStore: ClientStore;
     /** The Map Studio component store, passed to the view as its parent (view cycle check). */
     parent: ComponentStore;
-    /** Project view path; empty shows the text fallback. */
+    /** The kind setup's project view path. */
     path: string;
-    /** Author params from the `popupView.params` prop. */
+    /** The view's params: the kind setup's filled params with `mapItem` (popupParams.ts). */
     params: AuthorParams;
     /** Mount path for the embedded view. */
     mountPath: string;
-    /** The clicked point. */
-    point: PopupPoint;
+    /** The map item's id, for tests. */
+    pointId: string;
+    /** What to show when the view cannot be: Map Studio's default popup (AD-7). */
+    fallback: () => React.ReactNode;
+    /** The card over the map or the phone's bottom sheet: the chrome row above the view follows it. */
+    mode: 'card' | 'sheet';
+    /** Close the popup (the chrome row's close, 32 px on the card and 44 px on the sheet). */
+    onClose: () => void;
 }
 
 interface PointPopupState {
@@ -37,44 +43,61 @@ interface PointPopupState {
 }
 
 /**
- * The content of the point popup: the project view named by `path`, rendered
- * with Perspective's own View component the way the built-in Map renders its
- * custom controls and view layer (AD-7), or a text fallback with the point id
- * when there is no path or the view cannot be shown.
+ * The content of the point popup when the kind setup names a custom popup view (AD-7, epic 3
+ * entry 8): the project view rendered with Perspective's own View component the way the built-in
+ * Map renders its custom controls and view layer, with `mapItem` and the filled params; a missing
+ * or failing view (not found, an error, access denied) falls back to the default popup with one
+ * console warning naming the path.
  */
 export class PointPopup extends React.Component<PointPopupProps, PointPopupState> {
     state: PointPopupState = { failed: false };
 
+    /**
+     * Set the moment the view first reports a failed state: the View can report it more than once
+     * before the state update lands, and the warning is given once.
+     */
+    private warned = false;
+
     private onViewStateChange = (state: ViewStateType): void => {
-        if (isFailedViewState(state) && !this.state.failed) {
+        if (isFailedViewState(state) && !this.warned) {
+            this.warned = true;
             console.warn('[MapStudio] Popup view "' + this.props.path + '" cannot be shown (' + state
-                + '); showing the text popup instead.');
+                + '); showing the default popup instead.');
             this.setState({ failed: true });
         }
     };
 
     render(): React.ReactNode {
-        const { clientStore, parent, path, params, mountPath, point } = this.props;
+        const { clientStore, parent, path, params, mountPath, pointId, mode } = this.props;
         if (!path || this.state.failed) {
-            return (
-                <div className="mapstudio-popup mapstudio-popup--text" data-point-id={point.id}>
-                    {fallbackText(point)}
-                </div>
-            );
+            return this.props.fallback();
         }
+        const sheet = mode === 'sheet';
         return (
-            <div className="mapstudio-popup mapstudio-popup--view" data-point-id={point.id}>
+            <div className={'mapstudio-popup mapstudio-popup--view' + (sheet ? ' mapstudio-popup--sheet' : ' mapstudio-popup--card')}
+                 data-point-id={pointId} data-view-path={path} data-popup-mode={mode}>
+                {sheet ? <div className="mapstudio-popup-handle" aria-hidden="true" /> : null}
+                <div className="mapstudio-popup-view-bar">
+                    <button type="button" className="mapstudio-popup-icon mapstudio-popup-close" aria-label="Close" title="Close"
+                            onClick={this.props.onClose}>
+                        <svg className="mapstudio-popup-chrome" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                    </button>
+                </div>
+                <div className="mapstudio-popup-view-body">
                 <ProjectView
                     key={PageStore.instanceKeyFor(path, mountPath)}
                     store={clientStore}
                     parent={parent}
                     resourcePath={path}
                     mountPath={mountPath}
-                    params={popupViewParams(params, point)}
+                    params={params}
                     useDefaultWidth={true}
                     useDefaultHeight={true}
                     onViewStateChange={this.onViewStateChange}
                 />
+                </div>
             </div>
         );
     }

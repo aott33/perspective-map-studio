@@ -49,6 +49,9 @@ class ValuePlanTest {
         assertEquals("[default]Mesa/P12/Alarm Metrics.HighestActivePriority", p1.slots().get(ValuePlan.ALARM_PRIORITY));
         assertEquals(List.of(), p1.problems());
         assertEquals(Set.of(P1), plan.itemsByPath().get("[default]Mesa/P12/Pressure"));
+        // Epic 3 entry 8: the open popup's detail reads the base path and the resolved alarms path.
+        assertEquals("[default]Mesa/P12", p1.basePath());
+        assertEquals("[default]Mesa/P12", p1.alarmsPath());
         // The unlinked pad: every asset-relative slot is a problem, no path, and it is still in the plan.
         ValuePlan.ItemPlan unlinked = plan.items().get(UNLINKED);
         assertEquals(0, unlinked.slots().size());
@@ -58,6 +61,8 @@ class ValuePlanTest {
         assertEquals(4, plan.problemCount());
         assertEquals(1, plan.display().size());
         assertEquals("pad", plan.display().get(0).kindId());
+        assertNull(unlinked.basePath());
+        assertNull(unlinked.alarmsPath());
         assertFalse(plan.display().toString().contains("{asset.path}"));
     }
 
@@ -104,6 +109,16 @@ class ValuePlanTest {
         assertTrue(plan.items().isEmpty(), "nothing on: no item in the plan");
         MapItemRecord tomb = pad(P1, "Point 1", "P12", null).at(2, true);
         assertTrue(ValuePlan.build(List.of(padSetup()), List.of(tomb), ASSETS).items().isEmpty());
+        // Epic 3 entry 8: a setup with only a popup view (or a link) keeps its items planned with no
+        // path, so popup.open finds the base path the view's params are filled with.
+        KindSetupRecord viewOnly = new KindSetupRecord("pad", json("{\"popupView\":{\"path\":\"Popups/X\","
+            + "\"params\":{\"p\":\"{asset.path}/Pressure\"}}}"), 1, false);
+        ValuePlan.Plan views = ValuePlan.build(List.of(viewOnly), items(), ASSETS);
+        assertEquals(Set.of(), views.paths());
+        assertEquals("[default]Mesa/P12", views.items().get(P1).basePath());
+        assertNull(views.items().get(P1).alarmsPath());
+        assertTrue(views.items().get(P1).slots().isEmpty());
+        assertTrue(views.display().get(0).hasPopupView());
     }
 
     @Test

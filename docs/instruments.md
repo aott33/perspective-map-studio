@@ -33,7 +33,7 @@ A click on a line whose kind setup shows anything, or that carries an instrument
 
 While it is open the Gateway pushes the line and every listed instrument within 250 ms of a change (PT-2's row followed its tag in under a second on the dev stack), the popup clock refreshes the ages, and a new click on another segment of the same line sends a new `popup.open` with that segment. Closing it (the header button, the ground) sends `popup.close` and clears the line's selection and the highlight **[live 8.3.10]**. At 390 px the card is the same, `calc(100vw - 32px)` wide with 44 px header buttons, inside the viewport; the bottom sheet is entry 8's.
 
-A custom popup view (the spike's `popupView` prop today, the kind setup's view from entry 8) gets the line's map item object with `instruments: [{id, name, kind, distanceM, liveValues}]` in order along the line and the open `segment: {fromId, toId}` (AD-7).
+A line kind's custom popup view (the kind setup's `popupView`, entry 8; a missing or failing view falls back to the line popup) gets the line's map item object (entry 8's `{id, name, kind, assetId, properties, basePath, alarmsPath, values}`) with `instruments: [{id, name, kind, distanceM, liveValues}]` in order along the line and the open `segment: {fromId, toId}` (AD-7).
 
 ## Screenshots
 

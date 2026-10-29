@@ -16,7 +16,8 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
  * {"kindId", "comms": true|false, "kpis": [{"key", "label", "unit", "icon", "on"}],
  *  "alarms": {"on", "count", "summary"}, "link": "/pad/{item.name}" or "",
  *  "styleRule": {"type", "source", "cases": [{"label", "preset"}]} or absent,
- *  "areaTints": {"property", "tints": [{"category", "tint"}]} or absent}
+ *  "areaTints": {"property", "tints": [{"category", "tint"}]} or absent,
+ *  "popupView": {"path", "params": {name: template}} or absent}
  * </pre>
  *
  * Defaults as docs/kind-setup.md states them: {@code on} true, {@code count} and {@code summary} true,
@@ -29,14 +30,27 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
  * expression's text stays on the Gateway), so the preview and the legend draw every case; and
  * {@code areaTints} is the area kind's category tints as stored (a property name and tint names,
  * no path), so a viewer draws an area's tint from its property.
+ *
+ * <p>Epic 3 entry 8: {@code popupView} is the kind's custom popup view as stored, {@code {path,
+ * params}} (AD-7): the view path and each param's template (a literal, one placeholder, or
+ * {@code {asset.path}/<suffix>}), which the browser fills from the clicked map item when the popup
+ * opens. A template is not a tag path: {@code {asset.path}} resolves only with the item's base path,
+ * which reaches the one session whose popup is open (the popup detail of a pushed batch).
  */
 public record KindDisplay(String kindId, boolean comms, List<Kpi> kpis, boolean alarmsOn, boolean alarmsCount,
-                          boolean alarmsSummary, String link, JsonObject styleRule, JsonObject areaTints) {
+                          boolean alarmsSummary, String link, JsonObject styleRule, JsonObject areaTints,
+                          JsonObject popupView) {
 
-    /** A display with no style rule and no area tints (entry 5's shape). */
+    /** A display with no style rule, no area tints and no popup view (entry 5's shape). */
     public KindDisplay(String kindId, boolean comms, List<Kpi> kpis, boolean alarmsOn, boolean alarmsCount,
                        boolean alarmsSummary, String link) {
-        this(kindId, comms, kpis, alarmsOn, alarmsCount, alarmsSummary, link, null, null);
+        this(kindId, comms, kpis, alarmsOn, alarmsCount, alarmsSummary, link, null, null, null);
+    }
+
+    /** A display with no popup view (entry 1's shape). */
+    public KindDisplay(String kindId, boolean comms, List<Kpi> kpis, boolean alarmsOn, boolean alarmsCount,
+                       boolean alarmsSummary, String link, JsonObject styleRule, JsonObject areaTints) {
+        this(kindId, comms, kpis, alarmsOn, alarmsCount, alarmsSummary, link, styleRule, areaTints, null);
     }
 
     /** One KPI's words: the key, its label (the key when none), unit, whether it is the icon value, and on. */
@@ -104,7 +118,31 @@ public record KindDisplay(String kindId, boolean comms, List<Kpi> kpis, boolean 
                 && t.getAsJsonObject().get("tints") != null && t.getAsJsonObject().get("tints").isJsonArray()) {
             areaTints = t.getAsJsonObject().deepCopy();
         }
-        return new KindDisplay(kindId, comms, List.copyOf(kpis), alarmsOn, count, summary, link, styleRule, areaTints);
+        JsonObject popupView = null;
+        JsonElement p = setup.get("popupView");
+        if (p != null && p.isJsonObject() && isText(p.getAsJsonObject().get("path"))
+                && !p.getAsJsonObject().get("path").getAsString().isBlank()) {
+            popupView = new JsonObject();
+            popupView.addProperty("path", p.getAsJsonObject().get("path").getAsString());
+            JsonObject params = new JsonObject();
+            JsonElement stored = p.getAsJsonObject().get("params");
+            if (stored != null && stored.isJsonObject()) {
+                for (String name : stored.getAsJsonObject().keySet()) {
+                    JsonElement v = stored.getAsJsonObject().get(name);
+                    if (isText(v)) {
+                        params.addProperty(name, v.getAsString());
+                    }
+                }
+            }
+            popupView.add("params", params);
+        }
+        return new KindDisplay(kindId, comms, List.copyOf(kpis), alarmsOn, count, summary, link, styleRule, areaTints,
+            popupView);
+    }
+
+    /** True when the kind opens a custom popup view instead of the default popup (a non-empty path). */
+    public boolean hasPopupView() {
+        return popupView != null;
     }
 
     /**
@@ -158,6 +196,9 @@ public record KindDisplay(String kindId, boolean comms, List<Kpi> kpis, boolean 
         }
         if (areaTints != null) {
             o.add("areaTints", areaTints.deepCopy());
+        }
+        if (popupView != null) {
+            o.add("popupView", popupView.deepCopy());
         }
         return o;
     }
