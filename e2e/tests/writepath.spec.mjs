@@ -6,6 +6,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
+import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
 import {
     EDITOR_USER, OPERATOR_USER, drawLine, editorTest, expect, mapLoaded, nextFrames, openMap, send, signedInContext, watch

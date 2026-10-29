@@ -8,7 +8,8 @@
 
 import { TRACER, pagePixel } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, WARNING_SETTLE_MS, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, openMap, runSeed, send, shot, signedInContext, test
+    EDITOR_USER, WARNING_SETTLE_MS, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, openMap, runSeed, send, shot,
+    signedInContext, test
 } from './fixtures.mjs';
 
 test.use({ viewport: { width: 1440, height: 900 } });

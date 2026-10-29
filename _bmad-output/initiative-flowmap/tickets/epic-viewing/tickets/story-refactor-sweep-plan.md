@@ -100,6 +100,14 @@ Paths: `W` = `web/typescript`, `E` = `e2e/tests`, `V` = `ops/project/com.inducti
 
 ## Review Triage Log
 
+Review pass 1 (quick lens, read by this agent from the diff against the baseline after the unit tests and before the final chain; no subagent tool in this session): 0 high, 0 medium, 3 low, 0 false.
+
+| Finding | Verdict | Route | Evidence |
+| --- | --- | --- | --- |
+| The line popup's close button takes the card's hover tint (`--neutral-30` for `--containerRoot`) with the shared class | low (decision 2) | recorded | `mapstudio.css`; the size, place and 44 px phone target are unchanged and `linepopup.spec.mjs` measures them at both widths |
+| `tags.spec.mjs` deletes its pads in a `finally`, so a failure inside the resolve checks still cleans up; a failure of the delete itself would now hide the first failure's message | low | rejected | the delete is the same `edits.apply` the test just used to create them; Playwright reports both errors when the `finally` throws |
+| `KpiRows` passes `size={16}` to the stale glyph where the line popup passed none (24) | low (no change) | rejected | `.mapstudio-popup-state-glyph` fixes the box at 16 px in `mapstudio.css`, so both drew 16 px before |
+
 ## Design Notes
 
 Disposition of every candidate (S = this sweep):

@@ -12,7 +12,8 @@
 // assert on the chosen basemap, the attribution and the tile state, and a routed abort proves the
 // tile-failure status. Screenshots at 1440 and 390 px for the docs (AD-15).
 
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import { repoRoot, sessionUrl } from '../lib/env.mjs';
 import { backUpSetup, committedSetup, gatewayRun, logLines, putBackSetup, scanProject, writeSetup } from '../lib/gateway.mjs';
 import { ensureSeeded, expect, mapLoaded, openMap, shot, test } from './fixtures.mjs';
