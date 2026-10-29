@@ -41,6 +41,7 @@ ASSETS = [
     {'id': 'PT1', 'name': 'PT-1', 'kind': 'tap', 'basePath': PREFIX + 'PT1'},
     {'id': 'PT2', 'name': 'PT-2', 'kind': 'tap', 'basePath': PREFIX + 'PT2'},
     {'id': 'LV1', 'name': 'LV-1', 'kind': 'valve', 'basePath': PREFIX + 'LV1'},
+    {'id': 'LSWD', 'name': 'L-SWD', 'kind': 'pipeline', 'basePath': PREFIX + 'Lines/LSWD'},
 ]
 
 

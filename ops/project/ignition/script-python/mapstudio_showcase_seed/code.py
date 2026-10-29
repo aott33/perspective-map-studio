@@ -95,8 +95,11 @@ SWD_SETUP = {
     'alarms': {'path': '{asset.path}', 'count': True, 'summary': True},
     'link': '/site/{item.name}',
 }
-# A pipeline takes its look per segment from the worst of the instruments at the segment's ends.
-PIPELINE_SETUP = {'styleRule': {'source': {'instruments': 'worst'}}}
+# A pipeline takes its look per segment from the worst of the instruments at the segment's ends; its
+# alarms are its own folder's (L-SWD is linked to the asset LSWD, so its popup ends in the alarms row,
+# "No active alarms" as the mockup shows).
+PIPELINE_SETUP = {'alarms': {'path': '{asset.path}', 'count': True, 'summary': True},
+                  'styleRule': {'source': {'instruments': 'worst'}}}
 TAP_SETUP = {
     'comms': {'path': '{asset.path}/Comms', 'on': True},
     'kpis': [{'key': 'pressure', 'label': 'Pressure', 'path': '{asset.path}/Pressure', 'unit': 'psi', 'on': True, 'icon': True}],
@@ -120,7 +123,7 @@ TAG_VALUES = (
     ('CS01/Comms', True), ('CS01/DischargePressure', 1180.0), ('CS01/SuctionPressure', 95.0),
     ('SWD1/Comms', True), ('SWD1/Pressure', 365.0), ('SWD1/InjectionRate', 4200.0),
     ('PT1/Comms', True), ('PT1/Pressure', 398.0), ('PT2/Comms', True), ('PT2/Pressure', 371.0),
-    ('LV1/Comms', True), ('LV1/Position', 100.0),
+    ('LV1/Comms', True), ('LV1/Position', 100.0), ('Lines/LSWD/Flow', 3100.0),
 )
 ALARM_TAG = 'P14/P14-2H'
 ALARM_BELOW = 900.0
@@ -148,7 +151,7 @@ def seed_items(make_id=seed_id):
         items.append(item(make_id, 'sites', key, kind, name, point(lng, lat), properties, asset_id))
     line_id = make_id('lines', 'swd')
     items.append(item(make_id, 'lines', 'swd', 'pipeline', 'L-SWD', line(SWD_LINE), {'diameter': 6, 'product': 'Produced water'},
-                      None, None, {'start': {'itemId': make_id('sites', 'ctb1')}, 'end': {'itemId': make_id('sites', 'swd1')}}))
+                      'LSWD', None, {'start': {'itemId': make_id('sites', 'ctb1')}, 'end': {'itemId': make_id('sites', 'swd1')}}))
     for key, name, kind, asset_id, distance_m, lng, lat in SWD_INSTRUMENTS:
         items.append(item(make_id, 'instruments', key, kind, name, point(lng, lat), {}, asset_id, None, None,
                           {'lineId': line_id, 'distanceM': distance_m}))

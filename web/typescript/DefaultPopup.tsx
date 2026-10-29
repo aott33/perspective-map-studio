@@ -134,7 +134,8 @@ export class DefaultPopup extends React.Component<DefaultPopupProps> {
                              data-part="comms" data-comms={comms.lost ? 'lost' : 'ok'}>
                             <span className="mapstudio-popup-label">Comms</span>
                             <span className="mapstudio-popup-value">
-                                {comms.lost ? <Glyph id="comms-lost" className="mapstudio-popup-state-glyph" size={16} /> : null}
+                                {comms.lost ? <Glyph id="comms-lost" className="mapstudio-popup-state-glyph" size={16} />
+                                    : <Chrome name="check" className="mapstudio-popup-state-glyph mapstudio-popup-ok-glyph" />}
                                 {comms.word}{comms.detail ? ' - ' + comms.detail : ''}
                             </span>
                         </div>

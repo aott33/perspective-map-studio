@@ -224,6 +224,11 @@
     z-index: 5;
 }
 
+/* The card holds the focus when it opens (MapStudio.tsx makePopup): the open card is the signal, no ring. */
+.mapstudio .mapstudio-popup-root:focus {
+    outline: none;
+}
+
 .mapstudio .maplibregl-popup-content {
     box-sizing: border-box;
     width: 320px;

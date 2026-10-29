@@ -2262,11 +2262,15 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private makePopup(): void {
         this.popupContent = document.createElement('div');
         this.popupContent.className = 'mapstudio-popup-root';
+        // The card takes the focus itself when it opens (showPopupAt), so the keyboard is inside it (Tab
+        // reaches the page link and close) and no button wears a focus ring on a click (entry 15).
+        this.popupContent.tabIndex = -1;
         this.popup = new Popup({
             // The close button is the popup's own, in its header (entry 8, UX review P1).
             closeButton: false,
             closeOnClick: false,
             closeOnMove: false,
+            focusAfterOpen: false,
             // MapLibre writes maxWidth as an inline style on the popup, so the
             // phone cap lives here, not in the stylesheet.
             maxWidth: 'calc(100vw - 32px)',
@@ -2288,6 +2292,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
             // a card measures 0 px tall until the popup's element is in the document (the first line popup
             // of a page opened above its segment and off the map's top with that 0).
             this.popup.setLngLat(lngLat).addTo(this.map);
+            if (this.popupContent) {
+                this.popupContent.focus({ preventScroll: true });
+            }
         }
         if (maxPx === LINE_POPUP_PX && this.popupContent) {
             // The line popup (entry 2): above the segment where its card fits, else below, else the side
