@@ -1245,6 +1245,8 @@
     gap: 8px;
     flex: 0 0 auto;
     padding: 12px 12px 8px 16px;
+    /* The divider under the header, which the line popup had from the 0.3.0 header rule entry 8 replaced. */
+    border-bottom: 1px solid var(--border);
 }
 
 .mapstudio-popup--line .mapstudio-popup-glyph-disc {
