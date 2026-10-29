@@ -159,10 +159,11 @@ export class LegendControl implements IControl {
         this.button.setAttribute('aria-expanded', 'true');
         this.renderBasemaps();
         this.renderStatus();
-        // The first control takes the focus (the Lines checkbox; the first basemap button without a key).
+        // The first control takes the focus (the Lines checkbox; the first basemap button without a key),
+        // without scrolling the key away: the panel opens at its top.
         const first = panel.querySelector('input, button');
         if (first) {
-            (first as HTMLElement).focus();
+            (first as HTMLElement).focus({ preventScroll: true });
         }
         this.onToggle(true);
     }
