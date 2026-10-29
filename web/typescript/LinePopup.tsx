@@ -2,7 +2,7 @@ import * as React from 'react';
 import { SegmentRef } from './features';
 import { PopupNode, distanceText, instrumentsComms, instrumentsHeading, lineSubline, nodeValue, rowName, segmentWords } from './linePopup';
 import { ItemValues, KindDisplay, alarmGlyphId, alarmsText, commsText, itemState } from './live';
-import { CloseButton, Glyph, KpiRows } from './popupParts';
+import { Chrome, CloseButton, Glyph, KpiRows } from './popupParts';
 
 /** The line the popup is opened for. */
 export interface LinePopupLine {
@@ -76,7 +76,8 @@ export class LinePopup extends React.Component<LinePopupProps> {
                              data-part="comms" data-comms={comms.lost ? 'lost' : 'ok'}>
                             <span className="mapstudio-popup-label">Comms</span>
                             <span className="mapstudio-popup-value">
-                                {comms.lost ? <Glyph id={comms.word.endsWith('comms lost') ? 'comms-lost' : 'stale'} className="mapstudio-popup-state-glyph" /> : null}
+                                {comms.lost ? <Glyph id={comms.word.endsWith('comms lost') ? 'comms-lost' : 'stale'} className="mapstudio-popup-state-glyph" />
+                                    : <Chrome name="check" className="mapstudio-popup-state-glyph mapstudio-popup-ok-glyph" />}
                                 {comms.word}{comms.detail ? ' - ' + comms.detail : ''}
                             </span>
                         </div>
@@ -84,7 +85,11 @@ export class LinePopup extends React.Component<LinePopupProps> {
                         <div className={'mapstudio-popup-row mapstudio-popup-comms' + (ownComms.lost ? ' mapstudio-popup-comms--lost' : '')}
                              data-part="comms" data-comms={ownComms.lost ? 'lost' : 'ok'}>
                             <span className="mapstudio-popup-label">Comms</span>
-                            <span className="mapstudio-popup-value">{ownComms.word}{ownComms.detail ? ' - ' + ownComms.detail : ''}</span>
+                            <span className="mapstudio-popup-value">
+                                {ownComms.lost ? <Glyph id="comms-lost" className="mapstudio-popup-state-glyph" />
+                                    : <Chrome name="check" className="mapstudio-popup-state-glyph mapstudio-popup-ok-glyph" />}
+                                {ownComms.word}{ownComms.detail ? ' - ' + ownComms.detail : ''}
+                            </span>
                         </div>
                     ) : null}
                     {nodes.some((n) => n.role === 'instrument') ? (
@@ -123,7 +128,9 @@ export class LinePopup extends React.Component<LinePopupProps> {
                         <div className={'mapstudio-popup-alarms' + (state.alarm ? ' mapstudio-popup-alarms--active mapstudio-popup-alarms--p' + state.alarm.priority : '')}
                              data-part="alarms" data-alarm={state.alarm ? state.alarm.priority + ':' + (state.alarm.unacked ? 'unacked' : 'acked') : 'none'}
                              data-stale={values && values.alarms && values.alarms.stale ? 'true' : 'false'}>
-                            {state.alarm ? <Glyph id={alarmGlyphId(state.alarm.priority, state.alarm.unacked)} className="mapstudio-popup-alarm-glyph" /> : null}
+                            {state.alarm
+                                ? <Glyph id={alarmGlyphId(state.alarm.priority, state.alarm.unacked)} className="mapstudio-popup-alarm-glyph" />
+                                : <Chrome name="check" className="mapstudio-popup-alarm-glyph mapstudio-popup-alarm-glyph--ok" />}
                             <span className="mapstudio-popup-value">
                                 {values && values.alarms && values.alarms.stale ? 'Stale - ' : ''}{alarmsText(values ? values.alarms : undefined)}
                             </span>

@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Comms",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Boolean",
+    "value": true
+  },
+  {
+    "name": "Pressure",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 398.0
+  }
+]

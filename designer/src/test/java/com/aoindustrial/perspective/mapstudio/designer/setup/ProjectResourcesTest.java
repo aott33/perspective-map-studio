@@ -84,7 +84,8 @@ class ProjectResourcesTest {
         List<Resource> all = devProject();
         assertEquals(new ResourceType("ignition", "script-python"), ProjectResources.SCRIPTS);
         assertEquals("code.py", ProjectResources.CODE);
-        assertEquals(3, ofType(all, ProjectResources.SCRIPTS).size());
+        // mapstudio_dev, mapstudio_live, mapstudio_seed and mapstudio_showcase_seed (epic 3 entry 15).
+        assertEquals(4, ofType(all, ProjectResources.SCRIPTS).size());
         assertEquals("ignition/script-app-library", ScriptLibrary.RESOURCE_TYPE.toString());
         assertTrue(ofType(all, ScriptLibrary.RESOURCE_TYPE).isEmpty());
     }

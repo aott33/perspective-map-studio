@@ -35,7 +35,7 @@ export interface LegendStateRow {
 export interface LegendLineRow {
     weight: number;
     dashed: boolean;
-    /** The token class: `line` (neutral) or `alarm-1`. */
+    /** The token class: `line` (the pipeline grey), `lateral` (the thin untapped line) or `alarm-1`. */
     token: string;
     words: string;
 }
@@ -77,7 +77,7 @@ export const STATE_ROWS: LegendStateRow[] = [
 /** The line rows, fixed (DESIGN.md map-line): weight by size, thin without instruments, dashed, the alarm hue. */
 export const LINE_ROWS: LegendLineRow[] = [
     { weight: 4, dashed: false, token: 'line', words: 'Pipeline, weight by size' },
-    { weight: 2, dashed: false, token: 'line', words: 'Thin: no instruments' },
+    { weight: 2, dashed: false, token: 'lateral', words: 'Thin: no instruments' },
     { weight: 4, dashed: true, token: 'line', words: 'Dashed: no data or comms lost' },
     { weight: 4, dashed: false, token: 'alarm-1', words: 'Hue: the highest alarm' }
 ];

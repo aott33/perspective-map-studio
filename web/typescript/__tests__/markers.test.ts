@@ -3,7 +3,7 @@ import path from 'node:path';
 import { ItemState } from '../live';
 import {
     ARROW_IMAGE, CHIP_IMAGE, DISC_CENTER, DOT_IMAGE, MARKER_IMAGE, MARKER_TOKENS, MarkerColors, RANK_ALARM, RANK_COMMS_LOST, RANK_NORMAL,
-    RANK_SELECTED, RANK_STALE, RANK_STYLE, areaProperties, badgeImageId, chipOffsetEm, dotImageId, imageFor, labelRank, lineLook,
+    BADGE_GLYPH_SIZE, BADGE_HALO_RADIUS, RANK_SELECTED, RANK_STALE, RANK_STYLE, areaProperties, badgeImageId, chipOffsetEm, dotImageId, imageFor, labelRank, lineLook,
     lineProperties, lineSampleSvg, lineWeight, markerImageId, markerProperties, markerSpec, markerSvg, parseImageId, parseSprite, stateWord,
     textWidthPx, tintSampleSvg
 } from '../markers';
@@ -169,7 +169,7 @@ describe('line looks (DESIGN.md map-line)', () => {
         expect(labelRank({ ...NORMAL, preset: 'fault' }, 0, false)).toBe(RANK_STYLE);
         expect(labelRank({ ...NORMAL, preset: 'dimmed' }, 0, false)).toBe(104);
         expect(areaProperties('g', 'G', 'geofence', 'tint-3', COLORS, false)).toEqual({ id: 'g', name: 'G', kind: 'geofence', tint: 'tint-3', color: COLORS.tints[2], selected: false });
-        expect(areaProperties('g', 'G', 'geofence', null, COLORS, true)).toMatchObject({ tint: '', color: COLORS.line });
+        expect(areaProperties('g', 'G', 'geofence', null, COLORS, true)).toMatchObject({ tint: '', color: COLORS.chipEdge });
     });
 
     test('hue only from alarms with the badge at the midpoint; dashed for comms lost or stale', () => {
@@ -211,13 +211,20 @@ describe('marker images', () => {
         expect(lost).not.toContain('Comms lost');
         expect(lost).toContain('M3 3l18 18');
 
+        // The badge is the state glyph itself in its token on a halo disc, 18 px, never a disc of its own
+        // (entry 15, DESIGN.md alarm-glyph): the acknowledged glyph is the hollow one.
         const alarm = markerSvg(markerSpec('well-pad', ALARM), symbols, COLORS);
+        expect(alarm).toContain('color="' + COLORS.alarm[0] + '"');
         expect(alarm).toContain('fill="' + COLORS.alarm[0] + '"');
         expect(alarm).toContain('>1</text>');
         expect(alarm).toContain('M12 2.5l10 18h-20z');
+        expect(alarm).toContain('r="' + BADGE_HALO_RADIUS + '" fill="' + COLORS.halo + '"');
+        expect(alarm).toContain('scale(' + (BADGE_GLYPH_SIZE / 24) + ')');
+        expect(alarm).not.toContain('r="9" fill="' + COLORS.alarm[0] + '"');
         const acked = markerSvg(markerSpec('well-pad', { ...ALARM, alarm: { priority: 1, unacked: false, active: 1, stale: false } }), symbols, COLORS);
-        expect(acked).toContain('stroke="' + COLORS.alarm[0] + '" stroke-width="2"');
-        expect(acked).not.toContain('r="9" fill="' + COLORS.alarm[0] + '"');
+        expect(acked).toContain('color="' + COLORS.alarm[0] + '"');
+        expect(acked).toContain(symbols['alarm-1-acknowledged'].inner.slice(0, 30));
+        expect(acked).not.toContain('stroke="' + COLORS.alarm[0] + '"');
 
         const selected = markerSvg(markerSpec('well-pad', NORMAL, true), symbols, COLORS);
         expect(selected).toContain('stroke="' + COLORS.selection + '"');

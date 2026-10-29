@@ -1,8 +1,13 @@
-/* Map Studio component. Colours come only from the host theme's tokens. */
+/* Map Studio component. Colours come only from the host theme's tokens. The two surfaces are DESIGN.md's:
+   every floating control, card, chip and marker disc sits on surface-panel (`--neutral-10`) and the blank
+   map, the halos and the component behind the panels are basemap-blank (`--neutral-20`); in Perspective's
+   themes those are `--containerRoot` and `--container`, so the panels lift off the map in light and dark. */
 .mapstudio {
+    --mapstudio-surface: var(--neutral-10, var(--containerRoot));
+    --mapstudio-blank: var(--neutral-20, var(--container));
     position: relative;
     overflow: hidden;
-    background: var(--containerRoot);
+    background: var(--mapstudio-blank);
     color: var(--label);
 }
 
@@ -25,7 +30,7 @@
     padding: 6px 10px;
     border: 1px solid var(--border);
     border-radius: var(--borderRadius);
-    background: var(--container);
+    background: var(--mapstudio-surface);
     color: var(--label);
     font-size: 13px;
     line-height: 1.4;
@@ -41,6 +46,11 @@
 
 .mapstudio-reply--pending {
     color: var(--label--disabled);
+}
+
+/* View mode with nothing to report (the spike's click echo alone): the line stays in the DOM, unseen. */
+.mapstudio-reply--quiet {
+    display: none;
 }
 
 /* Floating controls (epic 3 entry 14, DESIGN.md Elevation, Layout): one soft shadow, the host theme's
@@ -77,7 +87,7 @@
 }
 
 .mapstudio .maplibregl-ctrl-group {
-    background: var(--container);
+    background: var(--mapstudio-surface);
     border: none;
     border-radius: 8px;
     box-shadow: var(--mapstudio-float-shadow);
@@ -103,7 +113,7 @@
     height: var(--mapstudio-target);
     padding: 0;
     border: none;
-    background: var(--container);
+    background: var(--mapstudio-surface);
     color: var(--label);
     font: inherit;
     font-size: 12px;
@@ -173,7 +183,7 @@
     height: var(--mapstudio-target);
     padding: 0 10px;
     border: none;
-    background: var(--container);
+    background: var(--mapstudio-surface);
     color: var(--label);
     font: inherit;
     font-size: 12px;
@@ -204,7 +214,7 @@
    with the panel token as its fallback, never a colour literal. The popup's own max-width is an inline
    style MapLibre writes from the Popup option (MapStudio.tsx), so it is not set here. */
 .mapstudio {
-    --mapstudio-popup-surface: var(--container, var(--neutral-10));
+    --mapstudio-popup-surface: var(--mapstudio-surface);
     --mapstudio-popup-max-height: 480px;
     --mapstudio-popup-icon: 32px;
 }
@@ -212,6 +222,11 @@
 /* Above the map's canvas layers, MapLibre's controls (z-index 2) and the draw layers. */
 .mapstudio .maplibregl-popup {
     z-index: 5;
+}
+
+/* The card holds the focus when it opens (MapStudio.tsx makePopup): the open card is the signal, no ring. */
+.mapstudio .mapstudio-popup-root:focus {
+    outline: none;
 }
 
 .mapstudio .maplibregl-popup-content {
@@ -306,10 +321,12 @@
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
+    box-sizing: border-box;
     width: 28px;
     height: 28px;
+    border: 1px solid var(--neutral-40);
     border-radius: 9999px;
-    background: var(--neutral-20);
+    background: var(--mapstudio-surface);
     color: var(--label);
 }
 
@@ -417,6 +434,16 @@
 
 .mapstudio-popup-comms {
     border-bottom: 1px solid var(--neutral-30);
+}
+
+/* The comms row: the label is never cut, and the check or state glyph stays beside the word while a long
+   value ("OK - 4 instruments, oldest 9 s ago") wraps at its spaces. */
+.mapstudio-popup-comms .mapstudio-popup-label {
+    flex: 0 0 auto;
+}
+
+.mapstudio-popup-comms .mapstudio-popup-value {
+    flex-wrap: nowrap;
 }
 
 .mapstudio-popup-kpis {
@@ -648,7 +675,7 @@
     padding: 2px 8px;
     border: 1px solid var(--border);
     border-radius: var(--borderRadius);
-    background: var(--container);
+    background: var(--mapstudio-surface);
     color: var(--label);
     font-size: 12px;
     cursor: pointer;
@@ -665,7 +692,7 @@
 
 .mapstudio .mapstudio-draw-button:disabled {
     color: var(--label--disabled);
-    background: var(--container);
+    background: var(--mapstudio-surface);
     cursor: not-allowed;
 }
 
@@ -710,7 +737,7 @@
     padding: 8px 12px;
     border: 1px solid var(--border);
     border-radius: var(--borderRadius);
-    background: var(--container);
+    background: var(--mapstudio-surface);
     color: var(--label);
     font-size: 13px;
     line-height: 1.4;
@@ -756,7 +783,7 @@
     padding: 4px 6px;
     border: 1px solid var(--border);
     border-radius: var(--borderRadius);
-    background: var(--containerRoot);
+    background: var(--mapstudio-blank);
 }
 
 .mapstudio-style-sample {
@@ -847,14 +874,17 @@
 
 /* MapLibre's scale bar on the theme's tokens instead of its white and #333. */
 .mapstudio .maplibregl-ctrl-scale {
+    box-sizing: border-box;
     margin-bottom: 4px;
-    padding: 0 4px;
-    border: 2px solid var(--neutral-70);
+    padding: 0 4px 2px;
+    border: 1px solid var(--neutral-70);
     border-top: none;
-    background: color-mix(in srgb, var(--container) 70%, transparent);
-    color: var(--label);
-    font-size: 10px;
-    line-height: 1.4;
+    height: 18px;
+    background: transparent;
+    color: var(--label--disabled);
+    font-size: 11px;
+    line-height: 1.3;
+    white-space: nowrap;
 }
 
 /* The provider's attribution: MapLibre's own control on the theme's tokens instead of its white. */
@@ -863,7 +893,7 @@
     padding: 0 6px;
     border: 1px solid var(--border);
     border-radius: var(--borderRadius);
-    background: var(--container);
+    background: var(--mapstudio-surface);
     color: var(--label);
     font-size: 11px;
     line-height: 1.6;
@@ -883,7 +913,7 @@
     max-width: 100%;
     padding: 10px 12px 12px;
     border-radius: 10px;
-    background: var(--container);
+    background: var(--mapstudio-surface);
     color: var(--label);
     box-shadow: var(--mapstudio-float-shadow);
     font-size: 13px;
@@ -965,7 +995,7 @@
     height: 40px;
     padding: 0 4px 0 12px;
     border-radius: 10px;
-    background: var(--container);
+    background: var(--mapstudio-surface);
     color: var(--label);
     box-shadow: var(--mapstudio-float-shadow);
 }
@@ -1011,7 +1041,7 @@
     margin-top: 6px;
     padding: 4px 0;
     border-radius: 10px;
-    background: var(--container);
+    background: var(--mapstudio-surface);
     color: var(--label);
     box-shadow: var(--mapstudio-float-shadow);
     font-size: 13px;
@@ -1098,7 +1128,7 @@
     .mapstudio .mapstudio-topbar {
         align-items: stretch;
         border-radius: 10px;
-        background: var(--container);
+        background: var(--mapstudio-surface);
         box-shadow: var(--mapstudio-float-shadow);
     }
 
@@ -1157,7 +1187,7 @@
     padding: 0 8px 0 12px;
     border: none;
     border-radius: 10px;
-    background: var(--container);
+    background: var(--mapstudio-surface);
     color: var(--label);
     box-shadow: var(--mapstudio-float-shadow);
     font: inherit;
@@ -1193,9 +1223,12 @@
 .mapstudio .mapstudio-needs-count {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
     color: var(--label--disabled);
     white-space: pre;
+}
+
+.mapstudio .mapstudio-needs-count .mapstudio-needs-glyph {
+    margin-right: 4px;
 }
 
 .mapstudio .mapstudio-needs-count--alarm {
@@ -1257,7 +1290,7 @@
     min-height: var(--mapstudio-target);
     padding: 8px 16px;
     border: none;
-    background: var(--container);
+    background: var(--mapstudio-surface);
     color: var(--label);
     font: inherit;
     font-size: 13px;
@@ -1341,7 +1374,7 @@
 /* The panel never grows past the map: the component writes the map's height into the variable; a
    taller key scrolls (the Legend button row and the insets take about 100 px). */
 .mapstudio .mapstudio-legend-panel {
-    max-height: calc(var(--mapstudio-map-height, 100vh) - 100px);
+    max-height: calc(var(--mapstudio-map-height, 100vh) - var(--mapstudio-target) - 2 * var(--mapstudio-map-inset) - 8px - 12px);
     overflow-y: auto;
 }
 
@@ -1365,6 +1398,10 @@
 
 .mapstudio .mapstudio-legend-token--line {
     color: var(--neutral-60);
+}
+
+.mapstudio .mapstudio-legend-token--lateral {
+    color: var(--neutral-50);
 }
 
 .mapstudio .mapstudio-legend-token--alarm-1 {
@@ -1412,28 +1449,12 @@
 
 /* A kind's disc as the marker draws it: the panel fill with the neutral ring, the glyph in the text colour. */
 .mapstudio .mapstudio-legend-disc {
-    fill: var(--container);
+    fill: var(--mapstudio-surface);
     stroke: var(--neutral-60);
     stroke-width: 1.5;
 }
 
 /* A state badge: hollow in its token, or solid with the glyph in the panel colour (acknowledged is hollow). */
-.mapstudio .mapstudio-legend-badge {
-    fill: var(--container);
-    stroke: currentColor;
-    stroke-width: 2;
-}
-
-.mapstudio .mapstudio-legend-badge--solid {
-    fill: currentColor;
-    stroke: var(--containerRoot);
-    stroke-width: 1.5;
-}
-
-.mapstudio .mapstudio-legend-badge-glyph--solid {
-    color: var(--container);
-}
-
 .mapstudio .mapstudio-legend-ring {
     fill: none;
     stroke: currentColor;
@@ -1565,7 +1586,7 @@
     min-height: 32px;
     padding: 4px 12px;
     border: none;
-    background: var(--container);
+    background: var(--mapstudio-surface);
     color: var(--label);
     font: inherit;
     text-align: left;
@@ -1638,7 +1659,7 @@
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: var(--containerRoot);
+    background: var(--mapstudio-blank);
     color: var(--label);
 }
 
@@ -1687,7 +1708,7 @@
     padding: 8px 12px;
     border: 1px solid var(--callToAction);
     border-radius: 6px;
-    background: color-mix(in srgb, var(--callToAction) 10%, var(--container));
+    background: color-mix(in srgb, var(--callToAction) 10%, var(--mapstudio-surface));
 }
 
 .mapstudio-popup-segment-head {
@@ -1765,7 +1786,7 @@
 }
 
 .mapstudio-popup-instrument--highlighted {
-    background: color-mix(in srgb, var(--callToAction) 10%, var(--container));
+    background: color-mix(in srgb, var(--callToAction) 10%, var(--mapstudio-surface));
     border-left-color: var(--callToAction);
 }
 
@@ -1808,9 +1829,23 @@
 }
 
 .mapstudio-popup--line .mapstudio-popup-alarms {
+    display: flex;
+    align-items: center;
+    gap: 5px;
     margin: 8px 16px 8px;
     padding: 8px 12px;
     border-radius: 6px;
+}
+
+/* The line popup's comms row: the label at its own width, the value taking the rest in one run of text
+   ("OK - 4 instruments, oldest 9 s ago" beside its check), wrapping at a space only when it must. */
+.mapstudio-popup--line .mapstudio-popup-comms .mapstudio-popup-label {
+    flex: 0 0 auto;
+}
+
+.mapstudio-popup--line .mapstudio-popup-comms .mapstudio-popup-value {
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
 }
 
 @media (max-width: 767px) {

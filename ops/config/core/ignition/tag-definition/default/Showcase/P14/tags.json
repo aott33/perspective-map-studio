@@ -1,0 +1,47 @@
+[
+  {
+    "name": "Comms",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Boolean",
+    "value": true
+  },
+  {
+    "name": "CasingPressure",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 1240.0
+  },
+  {
+    "name": "TubingPressure",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 410.0
+  },
+  {
+    "name": "GasRate",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 1.8
+  },
+  {
+    "name": "P14-2H",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 1240.0,
+    "alarms": [
+      {
+        "name": "Casing pressure high",
+        "label": "Casing pressure high",
+        "mode": "AboveValue",
+        "setpointA": 1000.0,
+        "priority": "High",
+        "ackMode": "Manual"
+      }
+    ]
+  }
+]

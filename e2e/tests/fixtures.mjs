@@ -76,17 +76,19 @@ export async function drawLine(page, map, { dy = 0 } = {}) {
  * Open a dev project page and wait until the map reports itself ready: the
  * component sets data-map-ready after MapLibre's load and first idle, with both
  * sources and layers added, and writes the counts it read back from MapLibre.
- * Returns the map locator.
+ * Returns the map locator. `project` is the suite's project unless another is named (the showcase
+ * project, epic 3 entry 15).
  */
-export async function openMap(page, pagePath = '/') {
-    await page.goto(sessionUrl(pagePath), { waitUntil: 'load' });
+export async function openMap(page, pagePath = '/', project = undefined) {
+    await page.goto(sessionUrl(pagePath, project), { waitUntil: 'load' });
     const map = page.locator('.mapstudio-map');
     await map.waitFor({ state: 'visible', timeout: 60_000 });
     // Perspective may drop the websocket once right after a Gateway restart;
     // the banner's active class is the signal that it is reconnecting.
     await page.waitForSelector('.connection-banner.banner-active', { state: 'detached', timeout: 30_000 }).catch(() => {});
     await expect(map).toHaveAttribute('data-map-ready', 'true', { timeout: 60_000 });
-    await page.locator('.mapstudio-reply').waitFor({ state: 'visible' });
+    // The status line is in the DOM on every page; in View mode it shows only when it has a status (entry 15).
+    await page.locator('.mapstudio-reply').waitFor({ state: 'attached' });
     return map;
 }
 
@@ -208,7 +210,8 @@ export async function mapLoaded(map) {
  * Press the /edit page's "Seed the dev map" button (ops/project/ignition/script-python/mapstudio_seed)
  * on a page already open there, and return its result: {created, updated, restored, unchanged, seq,
  * ids, scale} or {error} or {refused}, each with ranAt (the Gateway's time in ms), which tells this
- * run's result from the one the label showed before.
+ * run's result from the one the label showed before. The same press seeds the showcase map (epic 3
+ * entry 15, mapstudio_showcase_seed): its result, the same shape plus `tags`, is under `showcase`.
  */
 export async function runSeed(page) {
     const out = page.locator('#mapstudio-dev-seed-result');
