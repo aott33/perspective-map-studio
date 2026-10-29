@@ -142,9 +142,14 @@ editorTest('a kind setup\'s popupView opens the project view with mapItem and a 
     await page.waitForTimeout(WARNING_SETTLE_MS);
     expect(watched.warnings, 'Map Studio warnings').toEqual([]);
 
-    // A view that is not there: the default popup, with exactly one warning naming the path.
-    await changePadSetup(page, map, { popupView: { path: 'Popups/Nope', params: {} } });
-    await clickAt(page, map, TRACER.points.p3.lngLat);
+    // A view that is not there: the default popup, with exactly one warning naming the path. The map
+    // is reopened first: a setup change while Point 1's view popup is open redraws that popup with
+    // the new path, which is one more fallback and one more warning.
+    const again = await openMap(page, '/edit');
+    await mapLoaded(again);
+    await expect(again).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
+    await changePadSetup(page, again, { popupView: { path: 'Popups/Nope', params: {} } });
+    await clickAt(page, again, TRACER.points.p3.lngLat);
     const fallback = page.locator('.maplibregl-popup .mapstudio-popup--default');
     await expect(fallback).toBeVisible({ timeout: 30_000 });
     await expect(fallback).toHaveAttribute('data-point-id', ids.p3);
