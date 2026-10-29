@@ -47,6 +47,25 @@ def set_comms(pad, on):
     return {'path': _path(pad, 'Comms'), 'value': bool(on), 'quality': write(_path(pad, 'Comms'), bool(on))}
 
 
+def set_quality(pad, member, good):
+    """The quality of a dev pad's tag (epic 3 entry 3): Bad draws the slot stale on the map (its item stale while
+    comms are fine); Good restores it. The value written is the one the tag holds now."""
+    from com.inductiveautomation.ignition.common.model.values import BasicQualifiedValue, QualityCode
+    if member not in ('Pressure', 'Flow', 'Status'):
+        raise ValueError('Unknown dev pad member %s' % member)
+    path = _path(pad, member)
+    try:
+        current = system.tag.readBlocking([path])[0].value
+    except java.lang.Throwable as ex:
+        logger.warn('Dev tag read failed: %s' % ex.getClass().getSimpleName())
+        raise
+    except Exception as ex:
+        logger.warn('Dev tag read failed: %s' % type(ex).__name__)
+        raise
+    quality = QualityCode.Good if good else QualityCode.Bad
+    return {'path': path, 'value': current, 'quality': write(path, BasicQualifiedValue(current, quality))}
+
+
 def set_status(pad, value):
     """Status of a dev pad (epic 3 entry 1): the pad kind's States rule reads it (1 attention, 2 warning, 3 fault, 4 dimmed)."""
     return {'path': _path(pad, 'Status'), 'value': int(value), 'quality': write(_path(pad, 'Status'), int(value))}
