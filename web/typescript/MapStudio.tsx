@@ -1030,9 +1030,17 @@ export class MapStudio extends Component<Props, MapStudioState> {
             window.addEventListener('storage', this.onStorage);
         }
 
+        this.publishHeight();
         if (typeof ResizeObserver !== 'undefined') {
-            this.resizeObserver = new ResizeObserver(() => { map.resize(); });
+            this.resizeObserver = new ResizeObserver(() => { map.resize(); this.publishHeight(); });
             this.resizeObserver.observe(this.mapContainer);
+        }
+    }
+
+    /** The map's height as a CSS variable, so a floating panel (the legend, entry 3) never grows past the map. */
+    private publishHeight(): void {
+        if (this.mapContainer) {
+            this.mapContainer.style.setProperty('--mapstudio-map-height', this.mapContainer.clientHeight + 'px');
         }
     }
 
