@@ -973,26 +973,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 layout: { 'line-cap': 'butt', 'line-join': 'round' },
                 paint: { 'line-color': ['get', 'color'], 'line-width': AREA_LINE_WIDTH, 'line-dasharray': AREA_DASH }
             });
-            // The lines (DESIGN.md map-line): the selection casing under the selected one, then dashed,
-            // dotted and solid lines with their weight and hue per feature (features.ts, markers.ts
-            // lineLook); the dimmed preset fades the line.
-            const dimmed: Expression = ['case', ['==', ['get', 'dimmed'], true], DIMMED_OPACITY, 1];
-            map.addLayer({
-                id: LAYER_LINE_CASING,
-                type: 'line',
-                source: SOURCE_ITEM_LINES,
-                filter: ['==', ['get', 'selected'], true],
-                layout: { 'line-cap': 'round', 'line-join': 'round' },
-                paint: {
-                    'line-color': mc.selection, 'line-width': ['+', ['get', 'weight'], 4],
-                    // The open segment of a line (its popup, entry 2) firmer than the rest of the selected line.
-                    'line-opacity': ['case', ['==', ['get', 'segmentSelected'], true], 0.85, 0.5]
-                }
-            });
             // The halo under every line (entry 12): the blank-map token, one pixel each side, as the
             // markers' halo, so a line's hue or dash keeps 3:1 on a raster tile in either theme
-            // (docs/review-er27.md); invisible on the blank map. One layer per pattern, the dash of
-            // a dashed or dotted halo scaled per weight to sit under the line's (markers.ts lineHaloDash).
+            // (docs/review-er27.md); invisible on the blank map, and under the selection casing, which
+            // covers it on the selected line. One layer per pattern, the dash of a dashed or dotted halo
+            // scaled per weight to sit under the line's (markers.ts lineHaloDash).
+            const dimmed: Expression = ['case', ['==', ['get', 'dimmed'], true], DIMMED_OPACITY, 1];
             const dashedFilter: Expression = ['==', ['get', 'dashed'], true];
             const dottedFilter: Expression = ['==', ['get', 'dotted'], true];
             const solidFilter: Expression = ['all', ['!=', ['get', 'dashed'], true], ['!=', ['get', 'dotted'], true]];
@@ -1021,6 +1007,21 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 filter: solidFilter,
                 layout: { 'line-cap': 'round', 'line-join': 'round' },
                 paint: { 'line-color': mc.halo, 'line-width': LINE_HALO_WIDTH as Expression, 'line-opacity': dimmed }
+            });
+            // The lines (DESIGN.md map-line): the selection casing over the halo under the selected one, then dashed,
+            // dotted and solid lines with their weight and hue per feature (features.ts, markers.ts
+            // lineLook); the dimmed preset fades the line.
+            map.addLayer({
+                id: LAYER_LINE_CASING,
+                type: 'line',
+                source: SOURCE_ITEM_LINES,
+                filter: ['==', ['get', 'selected'], true],
+                layout: { 'line-cap': 'round', 'line-join': 'round' },
+                paint: {
+                    'line-color': mc.selection, 'line-width': ['+', ['get', 'weight'], 4],
+                    // The open segment of a line (its popup, entry 2) firmer than the rest of the selected line.
+                    'line-opacity': ['case', ['==', ['get', 'segmentSelected'], true], 0.85, 0.5]
+                }
             });
             map.addLayer({
                 id: LAYER_ITEM_LINES_DASHED,

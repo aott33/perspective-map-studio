@@ -24,4 +24,6 @@ tested in node (`web/typescript/__tests__/`); **[ER-27]** to the engineering rev
 | 11 | The map is the page: every other part floats in a corner, collapses to a chip, the phone keeps the shape with top sheets | The map fills the component; the search field and the Needs you bar float top-left (one top bar on a phone, entries 9 and 3), one zoom card top-right, the Legend button with the scale bar and the attribution bottom-left (entry 14), and the bottom-right corner stays clear; the phone takes bottom sheets (entry 8) instead of the chip row and top sheets | the listed departure **[ER-27]** (entry 12); entry 8 |
 
 What the review decides (entry 12): the kind glyph in the marker, the comms-lost hue, the alarm
-glyph set and the Fit and Return placement; the bottom sheets against the template's top sheets.
+glyph set and the Fit and Return placement; the bottom sheets against the template's top sheets. The
+review pack, with every state rendered in both themes and a verdict line per item, is
+[review-er27.md](review-er27.md) (its section 3.8 repeats the listed items above with their verdict lines).
