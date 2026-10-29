@@ -4,7 +4,7 @@
 // ER-27 review sees every glyph, alarm priority and acknowledgement state, comms lost, stale, the
 // line looks per segment, instrument alarms, the Needs you bar and list, the legend's key, the point
 // card, the phone bottom sheet and the custom popup view's close row, side by side in both themes.
-// The review states come from the dev /live page's showcase buttons (mapstudio_showcase_seed
+// The review states come from the dev /styles page's showcase buttons (mapstudio_showcase_seed
 // .review_states): beside the mockups' three states, CS01 priority 2, CTB1 priority 3, P12 priority 1
 // acknowledged, PT-1 priority 2 and PT-2 priority 3 acknowledged; `stale` adds PT-2 comms lost. The
 // contrast check (e2e/lib/contrast.mjs) reads every hue token's computed value from the page in each
@@ -45,15 +45,15 @@ let ids;
 const bar = (page) => page.locator('.mapstudio-needs');
 const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
 
-/** Press a /live dev button as the editor and return its result; the page is opened and closed here. */
+/** Press a /styles dev button as the editor and return its result; the page is opened and closed here. */
 async function pressLive(browser, button) {
     const context = await signedInContext(browser, EDITOR_USER);
     try {
         const page = await context.newPage();
-        await mapLoaded(await openMap(page, '/live'));
-        const out = page.locator('#mapstudio-live-result');
+        await mapLoaded(await openMap(page, '/styles'));
+        const out = page.locator('#mapstudio-styles-result');
         const before = await out.innerText();
-        await page.locator('#mapstudio-live-' + button).click();
+        await page.locator('#mapstudio-styles-' + button).click();
         await expect.poll(() => out.innerText(), { timeout: 60_000 }).not.toBe(before);
         const result = JSON.parse(await out.innerText());
         expect(result.error, 'the dev button ' + button).toBeUndefined();
