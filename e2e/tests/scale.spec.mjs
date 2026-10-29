@@ -57,13 +57,13 @@ editorTest('the seed is safe to re-run and restores a deleted seed item', async 
 
     const first = await runSeed(page);
     expect(first.error).toBeUndefined();
-    expect(first.created + first.updated + first.restored + first.unchanged).toBe(68);
+    expect(first.created + first.updated + first.restored + first.unchanged).toBe(74);
     expect(first.scale).toEqual({ pads: 30, lines: 30 });
-    expect(Object.keys(first.ids)).toHaveLength(68);
+    expect(Object.keys(first.ids)).toHaveLength(74);
     for (const id of Object.values(first.ids)) expect(id).toMatch(UUID5);
 
     const second = await runSeed(page);
-    expect(second).toMatchObject({ created: 0, updated: 0, restored: 0, unchanged: 68, seq: null,
+    expect(second).toMatchObject({ created: 0, updated: 0, restored: 0, unchanged: 74, seq: null,
         scale: { pads: 30, lines: 30 } });
     expect(second.ids).toEqual(first.ids);
 
@@ -78,10 +78,10 @@ editorTest('the seed is safe to re-run and restores a deleted seed item', async 
     expect(deleted.type, JSON.stringify(deleted.body)).toBe('edits.apply.reply');
 
     const third = await runSeed(page);
-    expect(third).toMatchObject({ created: 0, updated: 0, restored: 1, unchanged: 67, scale: { pads: 30, lines: 30 } });
+    expect(third).toMatchObject({ created: 0, updated: 0, restored: 1, unchanged: 73, scale: { pads: 30, lines: 30 } });
     expect(third.seq).toBeGreaterThan(0);
     const fourth = await runSeed(page);
-    expect(fourth).toMatchObject({ restored: 0, unchanged: 68, seq: null, scale: { pads: 30, lines: 30 } });
+    expect(fourth).toMatchObject({ restored: 0, unchanged: 74, seq: null, scale: { pads: 30, lines: 30 } });
 });
 
 test('/ draws the seeded 30-pad set and the tracer from the map store', async ({ page, browser }) => {

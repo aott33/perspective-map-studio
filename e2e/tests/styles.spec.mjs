@@ -197,7 +197,8 @@ editorTest.describe('1440 px', () => {
         const map = await openMap(page, '/styles');
         await mapLoaded(map);
         const panel = page.locator('.mapstudio-style-panel');
-        await expect(panel).toHaveAttribute('data-previews', '3', { timeout: 30_000 });
+        // Four previews: the pad's States rule, the line's and the tap's Bands rules (epic 3 entry 2's seed), the geofence tints.
+        await expect(panel).toHaveAttribute('data-previews', '4', { timeout: 30_000 });
         await expect(panel).toHaveAttribute('data-sprite', 'loaded', { timeout: 30_000 });
         const pad = panel.locator('.mapstudio-style-preview[data-kind="pad"]');
         await expect(pad).toHaveAttribute('data-cases', '4');
@@ -214,6 +215,10 @@ editorTest.describe('1440 px', () => {
         await expect(line).toHaveAttribute('data-cases', '3');
         await expect(line).toContainText('Bands on the key value flow');
         await expect(line).toContainText('When the value is 50 to 200');
+        const tap = panel.locator('.mapstudio-style-preview[data-kind="tap"]');
+        await expect(tap).toHaveAttribute('data-cases', '3');
+        await expect(tap).toContainText('Bands on the key value pressure');
+        await expect(tap).toContainText('When the value is 450 to 600');
         const fence = panel.locator('.mapstudio-style-preview[data-kind="geofence"]');
         await expect(fence).toHaveAttribute('data-tints', '2');
         await expect(fence.locator('.mapstudio-style-tile[data-tint="tint-4"]')).toContainText('South');

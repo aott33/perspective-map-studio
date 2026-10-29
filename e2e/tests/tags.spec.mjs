@@ -68,7 +68,9 @@ editorTest.describe('tag browse and resolve', () => {
         ]);
         const mesa = expectReply(await send(page, 'tags.browse', { folder: 'Mesa' }), 'tags.browse.reply');
         expect(mesa.children.map((c) => [c.name, c.type, c.dataType])).toEqual([
-            ['Lines', 'folder', null], ['P12', 'udt-instance', null], ['P14', 'udt-instance', null], ['P15', 'folder', null]
+            ['CTB1', 'udt-instance', null], ['Lines', 'folder', null], ['LV1', 'udt-instance', null], ['P12', 'udt-instance', null],
+            ['P14', 'udt-instance', null], ['P15', 'folder', null], ['PT1', 'udt-instance', null], ['PT2', 'udt-instance', null],
+            ['SWD1', 'udt-instance', null]
         ]);
 
         // A second provider, and the unknown ones.

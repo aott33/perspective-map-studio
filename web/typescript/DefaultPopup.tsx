@@ -20,8 +20,8 @@ export interface DefaultPopupProps {
     now: number;
 }
 
-/** The sprite's symbol for a glyph, inline (`<use>`), in `currentColor`. */
-function Glyph(props: { id: string; className: string }): React.ReactElement {
+/** The sprite's symbol for a glyph, inline (`<use>`), in `currentColor` (the line popup draws with it too). */
+export function Glyph(props: { id: string; className: string }): React.ReactElement {
     return (
         <svg className={props.className} width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
             <use href={'/res/mapstudio/icons/mapstudio-icons.svg#ms-' + props.id} />

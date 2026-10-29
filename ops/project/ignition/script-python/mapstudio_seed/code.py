@@ -14,17 +14,25 @@
 #           marker whose pick list opens either.
 #   areas   two geofences (North, South; epic 3 entry 1) whose operator property picks a category
 #           tint from the geofence kind setup.
+#   swd     the L-SWD set (epic 3 entry 2): the pads CTB1 and SWD1 (linked to the dev assets CTB1
+#           and SWD1), the line L-SWD between them (diameter 6, 2,922 m, linked to LSWD, its ends
+#           snapped to both pads, an override style rule {instruments: "worst"}), and on it the taps
+#           PT-1 at 1,143 m and PT-2 at 2,841 m (linked to PT1 and PT2) and the line valve LV-1 at
+#           2,000 m (linked to LV1), south-west of the geofences; the verify line of entry 2.
 #   setup   the kind setups (epic 3 entries 5 and 1): the pad setup with comms {asset.path}/Comms,
 #           the KPIs Pressure (the icon value) and Flow, alarms {asset.path}, the link
 #           /pad/{item.name} and a States rule on {asset.path}/Status; the line setup with the
 #           KPI Flow and a Bands rule on it (the tracer line is linked to the asset L3 for it);
-#           the geofence setup with the area tints. Point 2 carries an override expression rule
-#           on [default]Mesa/P14/Pressure (an Ignition expression, evaluated on the Gateway).
+#           the geofence setup with the area tints; the tap setup (comms, the KPI Pressure as the
+#           icon value, alarms, a Bands rule on it) and the valve setup (comms, the KPI Position, no
+#           icon value, so a valve bounds no line segment; entry 2). Point 2 carries an override
+#           expression rule on [default]Mesa/P14/Pressure (an Ignition expression, evaluated on the
+#           Gateway).
 # Every id is a UUIDv5 of a stable name (mapstudio-dev/seed/<set>/<key>), so a re-run
 # finds its items: unchanged ones are left alone, edited ones are put back on the seed
-# fields, kind, name, geometry and properties, plus assetId where the seed sets one (an
-# update at the stored version; an assetId the seed does not set, overrides, ends or
-# attachment an editor added stays), and deleted ones are restored (a create at the tombstone's
+# fields, kind, name, geometry and properties, plus assetId, overrides, ends and attachment
+# where the seed sets them (an update at the stored version; one the seed does not set that an
+# editor added stays), and deleted ones are restored (a create at the tombstone's
 # version, read from the conflict the first save returns). One batch, all or none,
 # under the actor seed-script; the only second batch is that restore. The kind setup is
 # one more op of the same batch when it is absent or differs.
@@ -151,6 +159,43 @@ LINE_SETUP = {
         {'min': 200, 'max': None, 'preset': 'fault'}]},
 }
 
+# The L-SWD set (epic 3 entry 2): the line's three vertices (2,922.0 m by the contract's formulas,
+# LineMeasure), the point at each instrument's distance along it (the same formulas, 6 decimals, within
+# the write path's 1 m), and the two pads at its ends.
+SWD_LINE = ((-105.012000, 39.726200), (-105.009441, 39.720791), (-104.983671, 39.715476))
+SWD_PADS = (
+    ('ctb1', 'CTB1', 'CTB1', -105.012000, 39.726200),
+    ('swd1', 'SWD1', 'SWD1', -104.983671, 39.715476),
+)
+# (key, name, kind, asset, distance along the line in metres, longitude, latitude).
+SWD_INSTRUMENTS = (
+    ('pt1', 'PT-1', 'tap', 'PT1', 1143.0, -105.003761, 39.719620),
+    ('lv1', 'LV-1', 'valve', 'LV1', 2000.0, -104.994083, 39.717624),
+    ('pt2', 'PT-2', 'tap', 'PT2', 2841.0, -104.984586, 39.715665),
+)
+# The line's override (entry 2): its look per segment from the worst of the instruments at the segment's
+# ends, in place of the line kind's Bands rule, which stays entry 1's for the tracer line.
+SWD_LINE_OVERRIDES = {'styleRule': {'source': {'instruments': 'worst'}}}
+
+# The tap kind setup (entry 2): comms, the KPI Pressure as the icon value (so a tap bounds a line
+# segment), alarms, and a Bands rule on the pressure: below 450 normal, 450 to 600 attention, 600 and
+# above fault.
+TAP_SETUP = {
+    'comms': {'path': '{asset.path}/Comms', 'on': True},
+    'kpis': [{'key': 'pressure', 'label': 'Pressure', 'path': '{asset.path}/Pressure', 'unit': 'psi', 'on': True, 'icon': True}],
+    'alarms': {'path': '{asset.path}', 'count': True, 'summary': True},
+    'styleRule': {'source': {'kpi': 'pressure'}, 'type': 'bands', 'cases': [
+        {'min': None, 'max': 450, 'preset': 'normal'}, {'min': 450, 'max': 600, 'preset': 'attention'},
+        {'min': 600, 'max': None, 'preset': 'fault'}]},
+}
+
+# The line valve kind setup (entry 2): comms and the KPI Position, no icon value, so a valve sits on a
+# segment and bounds none.
+VALVE_SETUP = {
+    'comms': {'path': '{asset.path}/Comms', 'on': True},
+    'kpis': [{'key': 'position', 'label': 'Position', 'path': '{asset.path}/Position', 'unit': '%', 'on': True, 'icon': False}],
+}
+
 # The geofence kind setup (epic 3 entry 1): the category tints by the operator property.
 GEOFENCE_SETUP = {
     'areaTints': {'property': 'operator', 'tints': [
@@ -158,7 +203,7 @@ GEOFENCE_SETUP = {
 }
 
 # The kind setups the seed keeps, in the order they are saved.
-KIND_SETUPS = (('pad', PAD_SETUP), ('line', LINE_SETUP), ('geofence', GEOFENCE_SETUP))
+KIND_SETUPS = (('pad', PAD_SETUP), ('line', LINE_SETUP), ('geofence', GEOFENCE_SETUP), ('tap', TAP_SETUP), ('valve', VALVE_SETUP))
 
 # Point 2's override (epic 3 entry 1): an expression rule on a full path replaces the pad kind's
 # States rule for that one item; Ignition's expression language, {value} its one reference.
@@ -186,18 +231,23 @@ def _line(coords):
     return {'type': 'LineString', 'coordinates': [[c[0], c[1]] for c in coords]}
 
 
-def _item(make_id, set_name, key, kind, name, geometry, properties, asset_id=None, overrides=None):
+def _item(make_id, set_name, key, kind, name, geometry, properties, asset_id=None, overrides=None, ends=None,
+          attachment=None):
     item = {'key': set_name + '/' + key, 'id': make_id(set_name, key), 'kind': kind, 'name': name,
             'geometry': geometry, 'properties': dict(properties)}
     if asset_id is not None:
         item['assetId'] = asset_id
     if overrides is not None:
         item['overrides'] = overrides
+    if ends is not None:
+        item['ends'] = ends
+    if attachment is not None:
+        item['attachment'] = attachment
     return item
 
 
 def seed_items(make_id=seed_id):
-    """The 68 seed items: {key, id, kind, name, geometry, properties}, scale set first."""
+    """The 74 seed items: {key, id, kind, name, geometry, properties}, scale set first."""
     items = []
     for n, lng, lat in SCALE_PADS:
         items.append(_item(make_id, 'scale', 'pad-%d' % n, 'pad', 'Pad %d' % n, _point(lng, lat), PAD_PROPERTIES))
@@ -211,6 +261,16 @@ def seed_items(make_id=seed_id):
         items.append(_item(make_id, 'shared', key, 'pad', name, _point(lng, lat), PAD_PROPERTIES))
     for key, name, operator, coords in GEOFENCES:
         items.append(_item(make_id, 'areas', key, 'geofence', name, _line(coords), {'operator': operator}))
+    # The L-SWD set (entry 2): the pads first, so the line's ends and the instruments' attachment name
+    # ids of the same batch; the ends and the attachments are seed fields, put back on a re-run.
+    for key, name, asset_id, lng, lat in SWD_PADS:
+        items.append(_item(make_id, 'swd', key, 'pad', name, _point(lng, lat), PAD_PROPERTIES, asset_id))
+    line_id = make_id('swd', 'line')
+    items.append(_item(make_id, 'swd', 'line', 'line', 'L-SWD', _line(SWD_LINE), {'diameter': 6}, 'LSWD',
+                       SWD_LINE_OVERRIDES, {'start': {'itemId': make_id('swd', 'ctb1')}, 'end': {'itemId': make_id('swd', 'swd1')}}))
+    for key, name, kind, asset_id, distance_m, lng, lat in SWD_INSTRUMENTS:
+        items.append(_item(make_id, 'swd', key, kind, name, _point(lng, lat), {}, asset_id, None, None,
+                           {'lineId': line_id, 'distanceM': distance_m}))
     return items
 
 
@@ -221,6 +281,10 @@ def _data(item):
         data['assetId'] = item['assetId']
     if 'overrides' in item:
         data['overrides'] = item['overrides']
+    if 'ends' in item:
+        data['ends'] = item['ends']
+    if 'attachment' in item:
+        data['attachment'] = item['attachment']
     return data
 
 
@@ -235,7 +299,7 @@ def _coords(geometry):
 
 
 def _same(stored, item):
-    """Whether a stored record equals the seed item on kind, name, geometry and properties."""
+    """Whether a stored record equals the seed item on kind, name, geometry, properties and the seed's optional fields."""
     geometry = stored.get('geometry')
     if stored.get('kind') != item['kind'] or stored.get('name') != item['name']:
         return False
@@ -246,6 +310,10 @@ def _same(stored, item):
     if 'assetId' in item and stored.get('assetId') != item['assetId']:
         return False
     if 'overrides' in item and _plain(stored.get('overrides') or {}) != _plain(item['overrides']):
+        return False
+    if 'ends' in item and _plain(stored.get('ends') or {}) != _plain(item['ends']):
+        return False
+    if 'attachment' in item and _plain(stored.get('attachment') or {}) != _plain(item['attachment']):
         return False
     return dict(stored.get('properties') or {}) == item['properties']
 

@@ -52,6 +52,22 @@ export interface StyleSlot {
     reason: string;
 }
 
+/**
+ * One segment of a line whose style rule is the instruments source (epic 3 entry 2, docs/contract.md):
+ * between the nodes `from` and `to` (an instrument's id, the id of the item the line's end snaps to,
+ * or `start` and `end` for a floating end), the worst of the instruments at its ends as the Gateway
+ * graded it: stale (dashed) when either is stale with the first named in `reason`, else the worse
+ * preset; `alarm` the worse active alarm of the two, drawn over the preset.
+ */
+export interface SegmentSlot {
+    from: string;
+    to: string;
+    preset: Preset;
+    stale: boolean;
+    reason: string;
+    alarm: AlarmSummary | null;
+}
+
 /** One map item's values as a batch carries them. */
 export interface ItemValues {
     id: string;
@@ -60,8 +76,14 @@ export interface ItemValues {
     alarms?: LiveValue;
     /** Present only for an item with a style rule. */
     style?: StyleSlot;
+    /** Present only for a line whose style rule is the instruments source (entry 2). */
+    segments?: SegmentSlot[];
     problems: SlotProblem[];
 }
+
+/** The floating ends' node ids in a segment (the Gateway's `Segments.START` and `END`). */
+export const SEGMENT_START = 'start';
+export const SEGMENT_END = 'end';
 
 /** One case of a style rule as the display lists it: the words of the case and its preset. */
 export interface RuleCase {
@@ -102,6 +124,36 @@ export function isPreset(value: unknown): value is Preset {
 
 export function isTint(value: unknown): value is Tint {
     return typeof value === 'string' && (TINTS as readonly string[]).indexOf(value) >= 0;
+}
+
+/** A segment of a batch item, or null when it is not one. */
+export function readSegmentSlot(value: unknown): SegmentSlot | null {
+    if (!isRecord(value) || typeof value.from !== 'string' || typeof value.to !== 'string' || !isPreset(value.preset)
+        || typeof value.stale !== 'boolean') {
+        return null;
+    }
+    return {
+        from: value.from, to: value.to, preset: value.preset, stale: value.stale,
+        reason: typeof value.reason === 'string' ? value.reason : '', alarm: alarmSummary(value.alarm)
+    };
+}
+
+/**
+ * The icon KPI of a kind's display (a KPI that is on and marked `icon`), or null. An instrument of a
+ * kind with one measures (entry 2, decision 1): it bounds a line segment and its value is the one
+ * the line popup's row shows; one without (a line valve) sits on a segment. The same rule as the
+ * Gateway's `KindDisplay.iconKpi`.
+ */
+export function iconKpiOf(display: KindDisplay | undefined): KindDisplay['kpis'][number] | null {
+    if (!display) {
+        return null;
+    }
+    for (const kpi of display.kpis) {
+        if (kpi.icon && kpi.on) {
+            return kpi;
+        }
+    }
+    return null;
 }
 
 /** The style slot of a batch item, or null when it is not one. */
@@ -224,6 +276,9 @@ function readItem(value: unknown): ItemValues | null {
     if (style) {
         item.style = style;
     }
+    if (Array.isArray(value.segments)) {
+        item.segments = value.segments.map(readSegmentSlot).filter((s): s is SegmentSlot => s !== null);
+    }
     if (Array.isArray(value.problems)) {
         for (const p of value.problems) {
             if (isRecord(p) && typeof p.slot === 'string' && typeof p.reason === 'string') {
@@ -331,6 +386,22 @@ export interface ItemState {
 /** The preset an item draws: `normal` unless its style slot carries a fresh one. */
 export function itemPreset(state: ItemState): Preset {
     return state.preset || 'normal';
+}
+
+/**
+ * The state a graded segment draws as (entry 2): stale dashes it, the preset gives its hue and word,
+ * the worse end alarm draws over them; comms lost is never a segment's own (an end instrument's comms
+ * lost makes it stale), and no KPI.
+ */
+export function segmentState(segment: SegmentSlot): ItemState {
+    const alarm: ItemState['alarm'] = segment.alarm && segment.alarm.active > 0 && segment.alarm.priority >= 1 && segment.alarm.priority <= 3
+        ? { priority: segment.alarm.priority as 1 | 2 | 3, unacked: segment.alarm.unacked > 0, active: segment.alarm.active, stale: false }
+        : null;
+    return {
+        commsLost: false, stale: segment.stale, alarm, iconKpi: null,
+        badge: alarm ? 'alarm' : segment.stale ? 'stale' : 'normal',
+        preset: segment.stale ? 'normal' : segment.preset
+    };
 }
 
 export function alarmSummary(value: unknown): AlarmSummary | null {

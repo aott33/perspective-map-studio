@@ -10,6 +10,7 @@ describe('the View-mode controls (epic 3 entry 14)', () => {
     });
 
     test('every chrome glyph is a stroked path in currentColor with no colour of its own', () => {
+        expect(Object.keys(GLYPH_PATHS)).toEqual(expect.arrayContaining(['search', 'close']));
         for (const name of Object.keys(GLYPH_PATHS) as Array<keyof typeof GLYPH_PATHS>) {
             const svg = glyphSvg(name, 'g');
             expect(svg).toContain('stroke="currentColor"');

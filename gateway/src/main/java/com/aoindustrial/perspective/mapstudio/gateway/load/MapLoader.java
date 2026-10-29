@@ -27,7 +27,8 @@ import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
  * adapters, readOnly, setup}}, and {@code getMap}'s list from the map store and the host
  * adapters' cache. {@code assets} (with their tag paths) go only to sessions that may link
  * items, {@code phone} and {@code full} (owner decision, 2026-10-26); every level
- * gets the kinds and both statuses, but level {@code none} gets the viewer
+ * gets the kinds, {@code assetNames} (the assets' ids and names alone, for the search of
+ * epic 3 entry 9) and both statuses, but level {@code none} gets the viewer
  * messages, without host error text or row ids. A read-only store (newer schema, or
  * this Gateway a standby) is read as usual; {@code readOnly} carries the reason, null
  * when saving works (epic 2 story 5). {@code setup} is the part of the project setup
@@ -120,6 +121,8 @@ public final class MapLoader {
             body.add("assets", Asset.toJson(lists.assets()));
             body.add("kindSetups", kindSetupsJson(snapshot.kindSetups()));
         }
+        // Every level gets the asset names (no base path), so a viewer's search finds a map item by its asset (entry 9).
+        body.add("assetNames", Asset.namesJson(lists.assets()));
         body.add("adapters", lists.statusJson(editor));
         if (loaded.readOnly() == null) {
             body.add("readOnly", JsonNull.INSTANCE);

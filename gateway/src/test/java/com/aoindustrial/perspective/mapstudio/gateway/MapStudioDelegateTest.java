@@ -139,6 +139,21 @@ class MapStudioDelegateTest {
         delegate.handleEvent(new com.inductiveautomation.perspective.gateway.messages.EventFiredMsg(
             "view", "root/map", "model", "mapstudio.message", envelope(1, "popup.close", "c1", body)));
         assertEquals(1, map.fired.size(), "nothing is answered on success");
+        // Epic 3 entry 2: popup.open may name the line segment it opened at; a malformed one is refused.
+        JsonObject segment = new JsonObject();
+        segment.addProperty("fromId", "22222222-2222-4222-8222-222222222222");
+        segment.addProperty("toId", "33333333-3333-4333-8333-333333333333");
+        body.add("segment", segment);
+        delegate.handleEvent(new com.inductiveautomation.perspective.gateway.messages.EventFiredMsg(
+            "view", "root/map", "model", "mapstudio.message", envelope(1, "popup.open", "o2", body)));
+        assertEquals(1, map.fired.size(), "a well-formed segment is quiet");
+        JsonObject bad = new JsonObject();
+        bad.addProperty("fromId", "x");
+        body.add("segment", bad);
+        delegate.handleEvent(new com.inductiveautomation.perspective.gateway.messages.EventFiredMsg(
+            "view", "root/map", "model", "mapstudio.message", envelope(1, "popup.open", "o3", body)));
+        assertEquals(2, map.fired.size());
+        assertEquals("popup.open's segment needs fromId and toId.", map.fired.get(1).getAsJsonObject("body").get("message").getAsString());
     }
 
     @Test

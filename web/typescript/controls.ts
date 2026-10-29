@@ -22,7 +22,11 @@ export const GLYPH_PATHS = {
     /** Return: a target ring round a dot, re-centring on the selected item. */
     return: 'M12 3v3M12 18v3M3 12h3M18 12h3M12 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10',
     /** Layers: the legend's glyph (DESIGN.md: a "Legend" button with a layers glyph). */
-    layers: 'M12 4l8 4.5-8 4.5-8-4.5L12 4zM4 13l8 4.5 8-4.5M4 16.5L12 21l8-4.5'
+    layers: 'M12 4l8 4.5-8 4.5-8-4.5L12 4zM4 13l8 4.5 8-4.5M4 16.5L12 21l8-4.5',
+    /** Search: a lens and its handle (DESIGN.md search-field, entry 9). */
+    search: 'M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13M15.5 15.5L20 20',
+    /** Close: the Clear button of the search field. */
+    close: 'M6 6l12 12M18 6L6 18'
 } as const;
 
 export type GlyphName = keyof typeof GLYPH_PATHS;

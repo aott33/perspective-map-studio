@@ -2,6 +2,7 @@ import {
     MAP_ITEM_PARAM,
     fallbackText,
     isFailedViewState,
+    linePopupPlacement,
     popupMaxWidth,
     popupMountPath,
     popupViewParams
@@ -84,5 +85,26 @@ describe('popupMaxWidth', () => {
     test('never wider than the map less a margin each side', () => {
         expect(popupMaxWidth(150, 300)).toBe('268px');
         expect(popupMaxWidth(100, 200)).toBe('168px');
+    });
+});
+
+describe('linePopupPlacement', () => {
+    it('puts the card above the point when it fits there', () => {
+        expect(linePopupPlacement(600, 850, 440, 22)).toEqual({ anchor: 'bottom', maxHeight: 480 });
+    });
+    it('puts it below when only that side has the room', () => {
+        expect(linePopupPlacement(200, 850, 440, 22)).toEqual({ anchor: 'top', maxHeight: 480 });
+    });
+    it('clamps it to the larger side when neither fits, so it never leaves the map', () => {
+        expect(linePopupPlacement(235, 471, 460, 22)).toEqual({ anchor: 'top', maxHeight: 198 });
+        expect(linePopupPlacement(240, 471, 460, 22)).toEqual({ anchor: 'bottom', maxHeight: 202 });
+    });
+    it('never exceeds 480 px or the map less 64 px', () => {
+        expect(linePopupPlacement(600, 2000, 900, 22).maxHeight).toBe(480);
+        expect(linePopupPlacement(300, 400, 900, 22).maxHeight).toBe(262);
+    });
+    it('keeps a floor for a point hard against an edge', () => {
+        expect(linePopupPlacement(5, 300, 460, 22)).toEqual({ anchor: 'top', maxHeight: 236 });
+        expect(linePopupPlacement(5, 100, 460, 22).maxHeight).toBe(120);
     });
 });
