@@ -1,6 +1,7 @@
 # The showcase seed (epic 3 entry 15). Jython 2.7 (the Gateway's). Test equipment for the dev
-# Gateway only: the dev project's /edit page ("Seed the showcase map") calls run(), and the e2e
-# suite presses it before the showcase renders (e2e/tests/showcase.spec.mjs).
+# Gateway only: the dev project's /edit page's "Seed the dev map" calls run() after the dev seed (its
+# result under 'showcase'), and the e2e suite presses it before the showcase renders
+# (e2e/tests/showcase.spec.mjs).
 #
 # It writes the mapstudio-showcase project's map (ops/showcase/project: the Map Studio component
 # alone, no test controls) through mapstudio_seed.run, the same seed path as the dev map (one batch

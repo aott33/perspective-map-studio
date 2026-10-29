@@ -1,7 +1,7 @@
 # The showcase project's kind and asset adapter (epic 3 entry 15). Jython 2.7 (the Gateway's).
 # The mapstudio-showcase project (ops/showcase/project) shows the Map Studio component alone on a
 # Mesa-like demo field with the UX mockups' names, kinds and states; its map items and kind setups
-# are seeded by the dev project's /edit page ("Seed the showcase map", project library
+# are seeded by the dev project's /edit page ("Seed the dev map" seeds both maps; project library
 # mapstudio_showcase_seed in ops/project), which names the kind ids and asset ids below. The tags
 # are the dev tag provider's Showcase folder (ops/config/core, memory tags; the one alarm is dev-only
 # test equipment on the disposable dev Gateway, never for a real Gateway or the template).

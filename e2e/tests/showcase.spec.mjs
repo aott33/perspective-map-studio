@@ -1,7 +1,7 @@
 // The showcase page (epic 3 entry 15): the mapstudio-showcase project (ops/showcase/project) shows the
 // Map Studio component alone, with no test control or readout, on a Mesa-like demo field seeded with
-// the UX mockups' names, kinds, places and states by the dev project's /edit page ("Seed the showcase
-// map", project library mapstudio_showcase_seed). This spec seeds it, then renders the same five views
+// the UX mockups' names, kinds, places and states by the dev project's /edit page ("Seed the dev map"
+// seeds it too, project library mapstudio_showcase_seed). This spec seeds it, then renders the same five views
 // as the mockups in _bmad-output/initiative-flowmap/ux-map-studio/mockups/ for the UX comparison
 // (ux-map-studio/review-showcase-vs-mockups.md) and the docs: view mode at 1440 px (view-mode-1440.png),
 // the Needs you list and the legend open (view-mode-needs-you-1440.png), P14's popup at 1366 px
@@ -11,7 +11,7 @@
 // the mockups.
 
 import { pagePixel } from '../lib/geo.mjs';
-import { DRAW_MS, EDITOR_USER, expect, mapLoaded, openMap, runShowcaseSeed, shot, signedInContext, test, view } from './fixtures.mjs';
+import { DRAW_MS, EDITOR_USER, expect, mapLoaded, openMap, runSeed, shot, signedInContext, test, view } from './fixtures.mjs';
 
 /** The bound for the seeded states to reach the map: one refresh interval (the showcase setup's 10 s) plus margin. */
 const INTERVAL_MS = 25_000;
@@ -90,13 +90,17 @@ async function clickP14(page, map, center, zoom) {
 }
 
 test.beforeAll(async ({ browser }) => {
-    // Seed the showcase map as the editor from the dev project's /edit page: the items, the kind
-    // setups and the demo tags' states; safe to re-run, so a used stack gets the mockups' states back.
+    // Seed the showcase map as the editor from the dev project's /edit page (the dev seed's button seeds
+    // both maps): the items, the kind setups and the demo tags' states; safe to re-run, so a used stack
+    // gets the mockups' states back.
     const context = await signedInContext(browser, EDITOR_USER);
     try {
         const page = await context.newPage();
         await mapLoaded(await openMap(page, '/edit'));
-        const seed = await runShowcaseSeed(page);
+        const dev = await runSeed(page);
+        expect(dev.error, 'the dev seed saved').toBeUndefined();
+        const seed = dev.showcase;
+        expect(seed, 'the showcase seed ran').toBeTruthy();
         expect(seed.error, 'the showcase seed saved').toBeUndefined();
         expect(seed.tags.error, 'the showcase tags set').toBeUndefined();
         expect(seed.tags.written).toBe(28);

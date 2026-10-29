@@ -30,21 +30,21 @@
     "files": [
       {
         "file": "MapStudio.css",
-        "bytes": 100001,
-        "gzipBytes": 14670,
-        "transferredBodyBytes": 14684,
+        "bytes": 100701,
+        "gzipBytes": 14763,
+        "transferredBodyBytes": 14773,
         "contentEncoding": "gzip",
         "story2Bytes": 70976,
-        "deltaBytes": 29025
+        "deltaBytes": 29725
       },
       {
         "file": "MapStudio.js",
-        "bytes": 1318368,
-        "gzipBytes": 355083,
-        "transferredBodyBytes": 353964,
+        "bytes": 1318876,
+        "gzipBytes": 355202,
+        "transferredBodyBytes": 354075,
         "contentEncoding": "gzip",
         "story2Bytes": 1167572,
-        "deltaBytes": 150796
+        "deltaBytes": 151304
       },
       {
         "file": "mapstudio-icons.svg",
@@ -65,8 +65,8 @@
     ],
     "modl": {
       "file": "Map-Studio.unsigned.modl",
-      "bytes": 1957857,
-      "sha256": "8332e12cdaa138e8cf77ae68f2587d4eb57e282b475f4dc604d48fd356d9417d"
+      "bytes": 1958059,
+      "sha256": "ccbbebecdc4fe13cad9ce13f49eb4eaf72477a5674fe0605a2845dc6929fb7ef"
     },
     "note": "transferredBodyBytes 0 on maplibre-gl-worker.js: Playwright reported no body transfer for the worker request (Chromium fetches a worker script outside the page; why is unverified). Use bytes and gzipBytes for that file.",
     "budget": "none defined; recorded only"
@@ -102,94 +102,94 @@
         "runs": [
           {
             "pan": {
-              "frames": 69,
-              "spanMs": 4033,
-              "fps": 16.86,
+              "frames": 67,
+              "spanMs": 4017,
+              "fps": 16.43,
               "intervalMs": {
-                "p50": 66.6,
+                "p50": 50.1,
                 "p95": 100,
                 "max": 133.3
               },
-              "shareOver20msPercent": 94.1,
+              "shareOver20msPercent": 98.5,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
               }
             },
             "zoom": {
-              "frames": 73,
-              "spanMs": 3983,
-              "fps": 18.08,
-              "intervalMs": {
-                "p50": 50,
-                "p95": 100,
-                "max": 116.7
-              },
-              "shareOver20msPercent": 97.2,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            }
-          },
-          {
-            "pan": {
-              "frames": 71,
-              "spanMs": 4017,
-              "fps": 17.43,
-              "intervalMs": {
-                "p50": 50,
-                "p95": 100,
-                "max": 116.7
-              },
-              "shareOver20msPercent": 90,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            },
-            "zoom": {
-              "frames": 73,
-              "spanMs": 3966,
-              "fps": 18.15,
-              "intervalMs": {
-                "p50": 50,
-                "p95": 100,
-                "max": 133.4
-              },
-              "shareOver20msPercent": 90.3,
-              "longTasks": {
-                "count": 0,
-                "totalMs": 0
-              }
-            }
-          },
-          {
-            "pan": {
               "frames": 74,
-              "spanMs": 4067,
-              "fps": 17.95,
+              "spanMs": 4000,
+              "fps": 18.25,
               "intervalMs": {
                 "p50": 50,
-                "p95": 100,
-                "max": 116.7
+                "p95": 83.3,
+                "max": 99.9
               },
-              "shareOver20msPercent": 90.4,
+              "shareOver20msPercent": 89,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 68,
+              "spanMs": 4033,
+              "fps": 16.61,
+              "intervalMs": {
+                "p50": 50.1,
+                "p95": 100,
+                "max": 150
+              },
+              "shareOver20msPercent": 94,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
               }
             },
             "zoom": {
-              "frames": 73,
-              "spanMs": 4067,
-              "fps": 17.71,
+              "frames": 77,
+              "spanMs": 4017,
+              "fps": 18.92,
               "intervalMs": {
                 "p50": 50,
-                "p95": 100,
+                "p95": 99.9,
                 "max": 100.1
               },
-              "shareOver20msPercent": 94.4,
+              "shareOver20msPercent": 90.8,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            }
+          },
+          {
+            "pan": {
+              "frames": 78,
+              "spanMs": 4050,
+              "fps": 19.01,
+              "intervalMs": {
+                "p50": 50,
+                "p95": 83.4,
+                "max": 116.6
+              },
+              "shareOver20msPercent": 87,
+              "longTasks": {
+                "count": 0,
+                "totalMs": 0
+              }
+            },
+            "zoom": {
+              "frames": 82,
+              "spanMs": 4083,
+              "fps": 19.84,
+              "intervalMs": {
+                "p50": 50,
+                "p95": 66.7,
+                "max": 99.9
+              },
+              "shareOver20msPercent": 95.1,
               "longTasks": {
                 "count": 0,
                 "totalMs": 0
@@ -198,17 +198,17 @@
           }
         ],
         "medianFps": {
-          "pan": 17.43,
-          "zoom": 18.08
+          "pan": 16.61,
+          "zoom": 18.92
         },
         "fpsRange": {
           "pan": [
-            16.86,
-            17.95
+            16.43,
+            19.01
           ],
           "zoom": [
-            17.71,
-            18.15
+            18.25,
+            19.84
           ]
         }
       }
@@ -240,16 +240,16 @@
     "mapItems": 113,
     "full": {
       "bytes": 66658,
-      "gzipBytes": 4673,
+      "gzipBytes": 4592,
       "items": 111,
       "kindDisplay": true,
-      "seq": 173
+      "seq": 172
     },
     "changesOnly": {
       "bytes": 1454,
       "gzipBytes": 462,
       "items": 1,
-      "seq": 181,
+      "seq": 180,
       "rule": "the map items whose values changed since the last batch"
     }
   },
@@ -284,7 +284,7 @@
       {
         "check": "touch-targets-at-least-44-px",
         "ok": true,
-        "detail": "Needs you 2: 1 comms lost, 1 stale 169x48; Zoom in 44x44; Zoom out 44x44; Fit the map to every item 44x44; Return to the selected item 44x44; Legend 94x44"
+        "detail": "Needs you 2: 1 comms lost, 1 stale 177x48; Zoom in 44x44; Zoom out 44x44; Fit the map to every item 44x44; Return to the selected item 44x44; Legend 94x44"
       },
       {
         "check": "tap-a-point-gives-reply-and-popup",
@@ -304,12 +304,12 @@
       {
         "check": "pinch-zooms-the-map",
         "ok": true,
-        "detail": "the point's distance from the pinch centre grew by a factor of 2.34 for a CDP pinch of scale 2 (needs over 1.5)"
+        "detail": "the point's distance from the pinch centre grew by a factor of 2.36 for a CDP pinch of scale 2 (needs over 1.5)"
       },
       {
         "check": "line-tool-finishes-by-touch-alone",
-        "ok": true,
-        "detail": "data-line-points after two vertex taps and a repeat tap on the last, on /edit: '2' (whether Terra Draw finishes this way on touch is the thing probed)"
+        "ok": false,
+        "detail": "data-line-points after two vertex taps and a repeat tap on the last, on /edit: '' (whether Terra Draw finishes this way on touch is the thing probed)"
       },
       {
         "check": "no-console-or-page-errors",
@@ -318,8 +318,8 @@
       }
     ],
     "summary": {
-      "ok": 9,
-      "failed": 0
+      "ok": 8,
+      "failed": 1
     }
   }
 }

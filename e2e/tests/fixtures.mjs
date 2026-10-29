@@ -210,28 +210,13 @@ export async function mapLoaded(map) {
  * Press the /edit page's "Seed the dev map" button (ops/project/ignition/script-python/mapstudio_seed)
  * on a page already open there, and return its result: {created, updated, restored, unchanged, seq,
  * ids, scale} or {error} or {refused}, each with ranAt (the Gateway's time in ms), which tells this
- * run's result from the one the label showed before.
+ * run's result from the one the label showed before. The same press seeds the showcase map (epic 3
+ * entry 15, mapstudio_showcase_seed): its result, the same shape plus `tags`, is under `showcase`.
  */
 export async function runSeed(page) {
     const out = page.locator('#mapstudio-dev-seed-result');
     const before = await out.innerText();
     await page.locator('#mapstudio-dev-seed').click();
-    await expect.poll(async () => {
-        const text = await out.innerText();
-        return text !== before && /"(created|error|refused)"/.test(text);
-    }, { timeout: 60_000 }).toBe(true);
-    return JSON.parse(await out.innerText());
-}
-
-/**
- * Press the /edit page's "Seed the showcase map" button (ops/project/ignition/script-python/
- * mapstudio_showcase_seed, epic 3 entry 15) on a page already open there, and return its result: the dev
- * seed's shape plus `tags` ({written, alarm, stale} or {error}), or {error} or {refused}, each with ranAt.
- */
-export async function runShowcaseSeed(page) {
-    const out = page.locator('#mapstudio-dev-showcase-result');
-    const before = await out.innerText();
-    await page.locator('#mapstudio-dev-showcase').click();
     await expect.poll(async () => {
         const text = await out.innerText();
         return text !== before && /"(created|error|refused)"/.test(text);
