@@ -70,13 +70,13 @@ Paths: `W` = `web/typescript`, `E` = `e2e/tests`, `V` = `ops/project/com.inducti
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] Baseline -- the chain on the baseline commit (build, fresh stack, the whole suite with its per-test durations) recorded in Implementation Notes.
-- [ ] `W/shared.ts`, `shared.test.ts`, `docs/contract.md`, `docs/map-parity.md`, `CHANGELOG.md` -- (a).
-- [ ] `W/live.ts` (`alarmGlyphId`, `displayShows`), `W/popupParts.tsx` (`Glyph`, `Chrome`, `KpiRows`), `W/DefaultPopup.tsx`, `W/LinePopup.tsx`, `W/markers.ts`, `W/needsyou.ts`, `W/NeedsYouControl.ts`, `W/MapStudio.tsx`, `W/mapstudio.css`, `W/placeholders.ts` -- (f); Jest green with the existing tests.
-- [ ] `E/fixtures.mjs` (`send`, `shot`, `view`, `removeStrays`), the specs that held copies, `E/tags.spec.mjs` (deletes its pads), `E/search.spec.mjs` (strays removed in `beforeAll`, the stale comment) -- (e).
-- [ ] `E/styles.spec.mjs` (b), `E/live.spec.mjs` (c).
-- [ ] `V/MapStudioDev/view.json` -- (d).
-- [ ] `_bmad-output/deferred-work.md` -- `resolved:` lines; `docs/platform-checks.md` -- "Epic 3 entry 11" section.
+- [x] Baseline -- the chain on the baseline commit (build, fresh stack, the whole suite with its per-test durations) recorded in Implementation Notes.
+- [x] `W/shared.ts`, `shared.test.ts`, `docs/contract.md`, `docs/map-parity.md`, `CHANGELOG.md` -- (a).
+- [x] `W/live.ts` (`alarmGlyphId`, `displayShows`), `W/popupParts.tsx` (`Glyph`, `Chrome`, `KpiRows`), `W/DefaultPopup.tsx`, `W/LinePopup.tsx`, `W/markers.ts`, `W/needsyou.ts`, `W/NeedsYouControl.ts`, `W/MapStudio.tsx`, `W/mapstudio.css`, `W/placeholders.ts` -- (f); Jest green with the existing tests.
+- [x] `E/fixtures.mjs` (`send`, `shot`, `view`, `removeStrays`), the specs that held copies, `E/tags.spec.mjs` (deletes its pads), `E/search.spec.mjs` (strays removed in `beforeAll`, the stale comment) -- (e).
+- [x] `E/styles.spec.mjs` (b), `E/live.spec.mjs` (c).
+- [x] `V/MapStudioDev/view.json` -- (d).
+- [x] `_bmad-output/deferred-work.md` -- `resolved:` lines; `docs/platform-checks.md` -- "Epic 3 entry 11" section.
 - [ ] The final chain on a fresh stack; the referenced screenshots committed; this plan's Results.
 
 **Acceptance Criteria:**
@@ -88,6 +88,14 @@ Paths: `W` = `web/typescript`, `E` = `e2e/tests`, `V` = `ops/project/com.inducti
 
 ## Implementation Notes
 
+- **Commits on the worktree branch** (`worktree-agent-a2568c90fc3808333`, baseline `342590d`): b435f5a (this plan), d19fe28 (the shared marker's label; `popupParts.tsx`, `alarmGlyphId`, `displayShows`, `liveItem`, the CSS and the dead export), 319aacc (the e2e helpers into `fixtures.mjs`, the tag spec's cleanup, the search spec's `beforeAll`, the two shots, the dev label, the deferred-work lines), then the closing commit (the platform checks, the screenshots, this plan).
+- **Baseline** (the chain on `342590d`, fresh stack, port 9088, the only stack on the box): `./gradlew clean build --offline` BUILD SUCCESSFUL; Jest 31 suites, 254 tests; e2e 82 passed, 7 skipped, 0 failed in 18.8 min, 14.5 min of it inside the tests (`unsaved.spec` 2.0 min in all; the longest single tests 39.8 s `unsaved`, 37.5 s `adapters`, 36.9 s `needsyou`, 34.4 s `popup`, 29.3 s the frame-rate measure) and about 4 min outside them (the per-test editor sign-in, the global setup).
+- **(g) judged and dropped:** the time is spread over 21 specs and sits in waits on the 10 s refresh interval and the deliberate measures; the one saving worth a look is the sign-in process before each of the 40 editor tests, whose cause (`fixtures.mjs`: a sign-in saved once was signed out by the time the suite reached the editor tests) was never established, so it is a harness change, not cleanup. No timeout changed.
+- **(a) as built:** `sharedName` keeps "A" and "A and B"; three or more read "A, B +N more" (`SHARED_NAMES_SHOWN` 2); the chip offset follows the shorter label through `textWidthPx` as before; `features.ts` unchanged.
+- **(f) as built:** `popupParts.tsx` holds `Glyph`, `Chrome`, `CloseButton` and `KpiRows`; `DefaultPopup`, `LinePopup` and `PointPopup` (the custom view's close row) use them; `live.ts` gains `alarmGlyphId` (used by `markers.ts`, `needsyou.ts`, `NeedsYouControl.ts` and both popups in place of four copies) and `displayShows` (three sites in `MapStudio.tsx`); `MapStudio.tsx` gains `liveItem(id)` for the eight `items.find(... && !i.deleted)` and loses `onSheetClose` (every close goes through `closePopup`); `mapstudio.css` loses the line popup's hidden MapLibre close button rule, its five tip colour rules and its own close button block (the shared `.mapstudio-popup-icon` with `margin-top: -4px`, and `--mapstudio-popup-icon: 44px` under 768 px); `placeholders.ts` loses the unread `FIXED_PLACEHOLDERS`. The comms rows stay in each popup: the line popup's carries the instruments' summary and its own-comms variant, so they are not one component.
+- **(e) as built:** `fixtures.mjs` exports `send`, `shot`, `DRAW_MS`, `view(page, map, center, zoom)` and `removeStrays`; seventeen specs lost their copies (`store-ops.spec` keeps its `SHOTS` guard around the shared `shot`; `needsyou.spec`'s `view` took an object and now takes the two arguments); `tags.spec.mjs` deletes its three pads in a `finally`; `search.spec.mjs` removes strays in `beforeAll` through an editor context, as `ensureSeeded` opens one.
+- **(b), (c), (d) as built:** `styles.spec` waits for `data-labels-zoom` and a visible preview sample before the dark shot; `live.spec` scrolls the sheet's alarm block into view before the 390 shot; the dev page's label reads "Map Studio: the dev map in View mode. Click a point for its popup, a line for the line popup; editing is on /edit."
+- **Deferred-work:** the shared-marker entry (entry 7) resolved here; the `values.batch` stand-in entry (epic 1 story 7), which entry 5 closed in fact, gets its `resolved:` line too.
 ## Plan Change Log
 
 ## Review Triage Log
