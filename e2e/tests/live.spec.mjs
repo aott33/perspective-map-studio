@@ -8,14 +8,11 @@
 // order and its KPI updates while open, and three open sessions share one subscription per path
 // (the Gateway log of MapStudio.live). Screenshots at 1440 and 390 px for the docs (AD-15).
 
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
-import { screenshotDir } from '../lib/env.mjs';
 import { gatewayRun, logLines } from '../lib/gateway.mjs';
 import { TRACER, pagePixel } from '../lib/geo.mjs';
 import { decodePng, firstOddPixel } from '../lib/png.mjs';
 import {
-    EDITOR_USER, editorTest, expect, loadedCounts, mapLoaded, nextFrames, openMap, runSeed, signedInContext, test
+    EDITOR_USER, editorTest, expect, loadedCounts, mapLoaded, openMap, runSeed, shot, signedInContext, test
 } from './fixtures.mjs';
 
 /** The bound for a change to reach the icon: one refresh interval (the dev setup's 10 s) plus margin. */
@@ -45,12 +42,6 @@ async function clickPoint(page, map, key) {
     const box = await map.boundingBox();
     const [x, y] = pagePixel(box, TRACER.points[key].lngLat, TRACER.center, TRACER.zoom);
     await page.mouse.click(x, y);
-}
-
-async function shot(page, name) {
-    await nextFrames(page);
-    mkdirSync(screenshotDir, { recursive: true });
-    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
 }
 
 /** Put the dev pad P12 in its quiet state: pressure 400 (no alarm), comms on, nothing unacknowledged. */
@@ -297,6 +288,9 @@ editorTest.describe('390 px', () => {
         const divider = (geometry.divider.match(/\d+/g) || []).slice(0, 3).map(Number);
         const odd = firstOddPixel(decodePng(await page.screenshot({ clip })), 0, 0, clip.width, clip.height, 3, [divider]);
         expect(odd, 'a pixel of the sheet gutter that is not the surface').toBeNull();
+        // The dev page's button bar leaves the map short at 390 px, so the alarm block sits below the
+        // body's fold: the docs shot shows it (entry 11).
+        await sheet.locator('[data-part="alarms"]').scrollIntoViewIfNeeded();
         await shot(page, 'mapstudio-live-390.png');
         // The marker stays above the sheet (the map panned if it had to).
         const marker = await map.evaluate((el) => el.getAttribute('data-center'));

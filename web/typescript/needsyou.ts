@@ -10,7 +10,7 @@
 
 import { Kind } from './adapters';
 import { MapItemRecord } from './contract';
-import { ItemState, ItemValues, KindDisplay, LiveState, ageText, itemState } from './live';
+import { ItemState, ItemValues, KindDisplay, LiveState, ageText, alarmGlyphId, itemState } from './live';
 
 export type NeedsYouState = 'alarm' | 'comms-lost' | 'stale';
 
@@ -62,8 +62,7 @@ export const EMPTY_SUMMARY: NeedsYouSummary = { counts: { alarm: 0, commsLost: 0
 /** The badge glyph of a state as the marker draws it (markers.ts markerSpec). */
 export function stateGlyph(state: ItemState): string {
     if (state.alarm) {
-        const p = state.alarm.priority;
-        return p === 3 ? 'alarm-3' : 'alarm-' + p + (state.alarm.unacked ? '-unacknowledged' : '-acknowledged');
+        return alarmGlyphId(state.alarm.priority, state.alarm.unacked);
     }
     return state.commsLost ? 'comms-lost' : 'stale';
 }

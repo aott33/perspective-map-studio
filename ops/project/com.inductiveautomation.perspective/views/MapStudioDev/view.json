@@ -23,7 +23,7 @@
     "type": "ia.display.label",
     "version": 0,
     "props": {
-     "text": "Map Studio: click a point to open the project view Popups/PointDetails as a popup.",
+     "text": "Map Studio: the dev map in View mode. Click a point for its popup, a line for the line popup; editing is on /edit.",
      "style": {
       "padding": "8px 12px"
      }

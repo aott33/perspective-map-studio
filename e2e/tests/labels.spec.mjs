@@ -8,12 +8,9 @@
 // the ground clears the selection; the flow arrow draws on the selected line alone. Screenshots at
 // 1440 and 390 px for the docs (AD-15).
 
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
-import { screenshotDir } from '../lib/env.mjs';
 import { TRACER, pagePixel } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, editorTest, expect, loadedCounts, mapLoaded, nextFrames, openMap, runSeed, signedInContext, test
+    DRAW_MS, EDITOR_USER, editorTest, expect, loadedCounts, mapLoaded, nextFrames, openMap, runSeed, shot, signedInContext, test, view
 } from './fixtures.mjs';
 
 /** The seed's shared pair (ops/project/ignition/script-python/mapstudio_seed, SHARED_PADS). */
@@ -23,18 +20,8 @@ const TRACER_LINE_MID = [(-104.9903 + -104.975) / 2, (39.7392 + 39.75) / 2];
 /** A place on the ground: on the tracer's view, well away from every seeded item and line. */
 const GROUND = [-104.9725 + 0.004, 39.7445 - 0.0065];
 /** How long a redraw after a view change may take on the dev stack. */
-const DRAW_MS = 20_000;
 
 let ids;
-
-/** Move the map (the component's e2e view hook) and wait for the labels of that zoom to be published. */
-async function view(page, map, center, zoom) {
-    await page.waitForFunction(() => Boolean(window.__mapStudioTestView));
-    await page.evaluate(([c, z]) => window.__mapStudioTestView({ center: c, zoom: z }), [center, zoom]);
-    await expect(map).toHaveAttribute('data-zoom', zoom.toFixed(2), { timeout: DRAW_MS });
-    await expect(map).toHaveAttribute('data-labels-zoom', zoom.toFixed(2), { timeout: DRAW_MS });
-    await nextFrames(page);
-}
 
 /** The label boxes the component published for the view it is at. */
 async function labels(map) {
@@ -60,12 +47,6 @@ async function clickAt(page, map, lngLat, center, zoom) {
     const box = await map.boundingBox();
     const [x, y] = pagePixel(box, lngLat, center, zoom);
     await page.mouse.click(x, y);
-}
-
-async function shot(page, name) {
-    await nextFrames(page);
-    mkdirSync(screenshotDir, { recursive: true });
-    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
 }
 
 async function checkLabels(page, map, center, zoom) {

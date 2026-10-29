@@ -20,6 +20,7 @@
   summary: Replace the `values.batch` stand-in (`e2e/lib/valueBatch.mjs`) with a measurement of the real message when epic-viewing builds it.
   evidence: The item layout and the websocket compression are unverified guesses; only the LiveValue fields are fixed by AD-6.
   goes_to: epic-viewing.
+  resolved: 2026-10-28 epic 3 entry 5 (plan decision 9; recorded here by entry 11): `e2e/lib/valueBatch.mjs` reads a real `values.batch` frame off the Perspective session socket and the measures record its size as it travelled (`e2e/tests/measures.spec.mjs`); the websocket compression itself stays **[not verified]** (entry 5's plan).
 
 - source_plan: `_bmad-output/initiative-flowmap/tickets/epic-module-foundation/tickets/story-install-through-the-template-s-module-lock-plan.md`
   summary: Possible race in the ign-scada-template (its owner to look): the phone-native-night render of `/well/Mesa/P12/P12-3H/trends` failed once with `Cannot subscribe to "ProjectDefinition" state. "Parts/Asset/Trends/" does not exist`, an embed path whose type segment was still empty.
@@ -115,3 +116,4 @@
   summary: A shared marker's label joins every member's name, so five items at one spot read as a five-line list ("Script check pad (renamed), Script check pad (renamed), ... and Script check pad (renamed)") that crowds the map; the template's rule is written for two ("CTB1 and SWD1").
   evidence: `docs/screenshots/mapstudio-styles-1440.png` (entry 1's docs run, 2026-10-28), where the e2e suite's script-check pads pile up on one spot of the dev map.
   goes_to: epic-viewing entry 11 (refactor sweep) or entry 14 if it touches the label: name the first two and "+N more" ("CTB1, SWD1 +3"), the pick list keeping every member.
+  resolved: 2026-10-29 epic 3 entry 11 (the refactor sweep): `sharedName` keeps "A and B" for two members and from three reads the first two and the rest counted, "A, B +3 more" (`web/typescript/shared.ts`, `shared.test.ts`); the pick list keeps every member; `docs/contract.md`, `docs/map-parity.md` and the changelog say so.

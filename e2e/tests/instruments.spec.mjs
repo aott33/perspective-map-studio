@@ -6,7 +6,7 @@
 
 import { randomUUID } from 'node:crypto';
 import {
-    EDITOR_USER, OPERATOR_USER, editorTest, expect, mapLoaded, openMap, signedInContext
+    EDITOR_USER, OPERATOR_USER, editorTest, expect, mapLoaded, openMap, send, signedInContext
 } from './fixtures.mjs';
 
 /** L-SWD of the plan: 2,922.35 m; PT-1 at 1,143 m and PT-2 at 2,841 m. */
@@ -17,11 +17,6 @@ const PT2_AT = [-103.491211, 31.925703];
 const SWD_RESHAPED = [[-103.52, 31.92], [-103.505, 31.9223], [-103.490423, 31.926]];
 const PT1_RESHAPED = { at: [-103.508198, 31.92181], distanceM: 1131.9 };
 const PT2_RESHAPED = { at: [-103.491243, 31.925792], distanceM: 2793.8 };
-
-async function send(page, type, body) {
-    await page.waitForFunction(() => Boolean(window.__mapStudioTest));
-    return page.evaluate(([t, b]) => window.__mapStudioTest.send(t, b), [type, body]);
-}
 
 async function load(page) {
     const reply = await send(page, 'map.load', {});

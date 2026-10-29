@@ -42,7 +42,7 @@ import { LegendToggle, legendKey, readToggle, sessionStore, writeToggle } from '
 import { NeedsYouControl } from './NeedsYouControl';
 import { NeedsYouRow, needsYou } from './needsyou';
 import { FIT_PADDING_PX, StartingArea, readStartingArea, startingAreaKey } from './startingArea';
-import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, itemPreset, itemState } from './live';
+import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, displayShows, itemPreset, itemState } from './live';
 import {
     AREA_FILL_OPACITY, AREA_LINE_OPACITY, AREA_LINE_WIDTH, ARROW_IMAGE, CHIP_IMAGE, CHIP_PADDING, CHIP_SIZE, DIMMED_OPACITY, DISC_CENTER,
     FONT_CHIP, FONT_NAME, HALO_WIDTH, KPI_SIZE, KPI_TOP_PX, LINE_CHIP_OFFSET_BADGE_EM, LINE_CHIP_OFFSET_EM, LINE_DASH, LINE_DOT,
@@ -1422,7 +1422,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (!this.map || !selected || !delegate) {
             return;
         }
-        const item = delegate.items.find((i) => i.id === selected.id && !i.deleted);
+        const item = this.liveItem(selected.id);
         if (!item) {
             return;
         }
@@ -1469,7 +1469,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (!map || !delegate) {
             return;
         }
-        const item = delegate.items.find((i) => i.id === id && !i.deleted);
+        const item = this.liveItem(id);
         if (!item) {
             console.info('[MapStudio] The ' + via + ' choice ' + id + ' is no longer on the map.');
             return;
@@ -2049,14 +2049,13 @@ export class MapStudio extends Component<Props, MapStudioState> {
      */
     private openLinePopup(id: string, segment: SegmentRef | null, lngLat: [number, number]): void {
         const delegate = this.props.delegate;
-        const item = delegate ? delegate.items.find((i) => i.id === id && !i.deleted) : undefined;
+        const item = this.liveItem(id);
         if (!this.map || !delegate || !item || item.geometry.type !== 'LineString') {
             this.selectLine(id, segment);
             return;
         }
         const display = delegate.live.display[item.kind];
-        const shows = (display && (!!display.popupView || display.comms || display.alarms.on || display.kpis.some((k) => k.on)))
-            || instrumentsOn(delegate.items, id).length > 0;
+        const shows = (display && (!!display.popupView || displayShows(display))) || instrumentsOn(delegate.items, id).length > 0;
         if (!shows) {
             this.selectLine(id, segment);
             return;
@@ -2081,6 +2080,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
         console.info('[MapStudio] Line ' + id + ' selected' + (segment ? ' at ' + segment.fromId + ' to ' + segment.toId : '') + '.');
     }
 
+    /** The map item with this id that is on the map (not deleted), or undefined. */
+    private liveItem(id: string): MapItemRecord | undefined {
+        const delegate = this.props.delegate;
+        return delegate ? delegate.items.find((i) => i.id === id && !i.deleted) : undefined;
+    }
+
     /** The ground tapped: the selection and the popup go. */
     private clearSelection(): void {
         this.closePopup();
@@ -2094,8 +2099,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * link and the properties from the item record (what the placeholders fill from, entry 8).
      */
     private popupPoint(id: string, name: string, kind: string): PopupPoint {
-        const delegate = this.props.delegate;
-        const item = delegate ? delegate.items.find((i) => i.id === id && !i.deleted) : undefined;
+        const item = this.liveItem(id);
         return {
             id, name: item ? item.name : name, kind: item ? item.kind : kind,
             assetId: item ? item.assetId : null, properties: item ? item.properties : {}
@@ -2103,9 +2107,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
     }
 
     /**
-     * Close the open popup, card or sheet (also the line popup's own close button, entry 2): the
-     * MapLibre popup's close event does the rest for a card (onPopupClosed); a sheet has no MapLibre
-     * popup, so its state goes here.
+     * Close the open popup, card or sheet (every popup's own close button, the default popup's, the
+     * line popup's and the custom view's row): the MapLibre popup's close event does the rest for a
+     * card (onPopupClosed); a sheet has no MapLibre popup, so its state goes here.
      */
     private closePopup = (): void => {
         if (this.popup && this.popup.isOpen()) {
@@ -2115,11 +2119,6 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (this.state.popup !== null && this.state.popup.sheet) {
             this.onPopupClosed();
         }
-    };
-
-    /** The sheet's close button and footer: close it as a card's close would. */
-    private onSheetClose = (): void => {
-        this.closePopup();
     };
 
     /**
@@ -2149,7 +2148,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         const rows: PickRow[] = [];
         for (const id of memberIds.split(',')) {
-            const item = delegate.items.find((i) => i.id === id && !i.deleted);
+            const item = this.liveItem(id);
             if (!item) {
                 continue;
             }
@@ -2171,8 +2170,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
 
     /** A row of the pick list: what a click on that item's own marker does. */
     private onPick = (id: string): void => {
-        const delegate = this.props.delegate;
-        const item = delegate ? delegate.items.find((i) => i.id === id && !i.deleted) : undefined;
+        const item = this.liveItem(id);
         if (!item || item.geometry.type !== 'Point') {
             return;
         }
@@ -2354,7 +2352,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (open.line) {
             // A line (entry 2): its default popup with the instruments in order, and for a custom view
             // the map item object carrying them and the open segment (AD-7).
-            const line = delegate.items.find((i) => i.id === open.point.id && !i.deleted);
+            const line = this.liveItem(open.point.id);
             const nodes = line ? popupNodes(line, delegate.items, delegate.lists.kinds, delegate.live, open.segment) : [];
             point = { ...open.point, instruments: popupInstruments(nodes), segment: open.segment };
             if (line && line.geometry.type === 'LineString') {
@@ -2381,7 +2379,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (!display) {
             return null;
         }
-        const defaultPopup = lineDefault || ((): React.ReactNode => (display.comms || display.alarms.on || display.kpis.some((k) => k.on) ? (
+        const defaultPopup = lineDefault || ((): React.ReactNode => (displayShows(display) ? (
             <DefaultPopup
                 key={'default|' + open.point.id}
                 item={{ id: open.point.id, name: open.point.name, kind: kindId,
@@ -2394,7 +2392,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 alarmPage={fillLink(delegate.alarmPage, item)}
                 mode={open.sheet ? 'sheet' : 'card'}
                 canEdit={false}
-                onClose={this.onSheetClose}
+                onClose={this.closePopup}
                 onNavigate={this.navigate}
             />
         ) : null));
@@ -2419,7 +2417,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 pointId={open.point.id}
                 fallback={defaultPopup}
                 mode={open.sheet ? 'sheet' : 'card'}
-                onClose={this.onSheetClose}
+                onClose={this.closePopup}
             />
         );
     }
@@ -2428,7 +2426,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private hasPopupContent(point: PopupPoint): boolean {
         const delegate = this.props.delegate;
         const display = delegate ? delegate.live.display[point.kind || ''] : undefined;
-        return !!display && (!!display.popupView || display.comms || display.alarms.on || display.kpis.some((k) => k.on));
+        return !!display && (!!display.popupView || displayShows(display));
     }
 
     /**

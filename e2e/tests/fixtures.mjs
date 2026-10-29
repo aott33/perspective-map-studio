@@ -1,9 +1,11 @@
 // Shared test plumbing: error watching and opening the Map Studio view.
 
 import { expect, test as base } from '@playwright/test';
-import { sessionUrl } from '../lib/env.mjs';
+import { screenshotDir, sessionUrl } from '../lib/env.mjs';
 import { TRACER } from '../lib/geo.mjs';
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EDITOR_USER, OPERATOR_USER, editorStateFile, stateFile } from '../lib/editorAuth.mjs';
@@ -106,6 +108,56 @@ export async function loadedCounts(map) {
  */
 export async function nextFrames(page) {
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+/** A screenshot after the next frames, into the run's screenshot folder (docs/screenshots with E2E_DOCS=1). */
+export async function shot(page, name) {
+    await nextFrames(page);
+    mkdirSync(screenshotDir, { recursive: true });
+    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
+}
+
+/** How long a spec gives the map to draw and publish a moved view or a changed layer. */
+export const DRAW_MS = 20_000;
+
+/** Move the map (the component's e2e view hook) and wait for the labels of that zoom to be published. */
+export async function view(page, map, center, zoom) {
+    await page.waitForFunction(() => Boolean(window.__mapStudioTestView));
+    await page.evaluate(([c, z]) => window.__mapStudioTestView({ center: c, zoom: z }), [center, zoom]);
+    await expect(map).toHaveAttribute('data-zoom', zoom.toFixed(2), { timeout: DRAW_MS });
+    await expect(map).toHaveAttribute('data-labels-zoom', zoom.toFixed(2), { timeout: DRAW_MS });
+    await nextFrames(page);
+}
+
+/**
+ * Send one message through the page's component (the test hook window.__mapStudioTest,
+ * web/typescript/testHook.ts, the component's real session path) and return the Gateway's reply envelope.
+ */
+export async function send(page, type, body) {
+    await page.waitForFunction(() => Boolean(window.__mapStudioTest));
+    return page.evaluate(([t, b]) => window.__mapStudioTest.send(t, b), [type, body]);
+}
+
+/**
+ * Delete every live map item that is not the seed's, as the editor through the test hook (one batch,
+ * lines and their instruments together): specs leave the items they create (a pad with an override
+ * rule on a tag that does not exist is stale for good, a pad linked to an asset with no tags comms
+ * lost, a pad named after an asset turns up in a search), so a spec that counts or lists the seed's
+ * items alone runs this first. Returns how many went.
+ */
+export async function removeStrays(page, seedIds) {
+    const keep = new Set(Object.values(seedIds));
+    const load = await send(page, 'map.load', {});
+    expect(load.type).toBe('map.load.reply');
+    const strays = load.body.items.filter((i) => !i.deleted && !keep.has(i.id));
+    if (strays.length === 0) {
+        return 0;
+    }
+    const reply = await send(page, 'edits.apply', {
+        batchId: randomUUID(), ops: strays.map((i) => ({ op: 'delete', entity: 'item', id: i.id, baseVersion: i.version }))
+    });
+    expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
+    return strays.length;
 }
 
 export { EDITOR_USER, OPERATOR_USER };

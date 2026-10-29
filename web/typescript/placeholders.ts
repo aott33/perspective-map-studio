@@ -11,9 +11,6 @@ export const ASSET_PATH = '{asset.path}';
 /** `{item.properties.X}`: this prefix, a form field key, then "}". */
 export const PROPERTY_PREFIX = '{item.properties.';
 
-/** The fixed placeholders, in the order messages list them. */
-export const FIXED_PLACEHOLDERS = [ITEM_ID, ITEM_NAME, ASSET_ID, ASSET_PATH] as const;
-
 /** What a placeholder is filled from: one map item and its asset (null when it has none). */
 export interface ItemView {
     itemId: string;

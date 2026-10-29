@@ -8,11 +8,8 @@
 // The spec changes the committed dev setup and always puts it back (finally, and
 // the global setup after a crashed run). Screenshots at 1440 and 390 px.
 
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
-import { screenshotDir } from '../lib/env.mjs';
 import { backUpSetup, committedSetup, gatewayRun, putBackSetup, scanProject, setupWarnings, writeSetup } from '../lib/gateway.mjs';
-import { EDITOR_USER, editorTest, expect, nextFrames, openMap, test } from './fixtures.mjs';
+import { EDITOR_USER, editorTest, expect, openMap, shot, test } from './fixtures.mjs';
 
 /** How long a scanned change may take to reach a fresh map.load (seen well under 1 s, docs/platform-checks.md). */
 const APPLY_CAP_MS = 30_000;
@@ -41,12 +38,6 @@ async function reloadUntil(page, pagePath, want) {
     }
     expect(seen, `map.load within ${APPLY_CAP_MS / 1000} s of the scan`).toMatchObject(want);
     return seen;
-}
-
-async function shot(page, name) {
-    await nextFrames(page);
-    mkdirSync(screenshotDir, { recursive: true });
-    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
 }
 
 async function putBack() {

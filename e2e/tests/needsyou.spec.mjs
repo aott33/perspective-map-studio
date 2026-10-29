@@ -14,18 +14,14 @@
 // good), and links Point 3 to P15 again when it is done, since the seed leaves an assetId alone.
 
 import { randomUUID } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
-import { screenshotDir } from '../lib/env.mjs';
 import { TRACER } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, editorTest, expect, mapLoaded, nextFrames, openMap, runSeed, signedInContext, test
+    DRAW_MS, EDITOR_USER, editorTest, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot, signedInContext, test, view
 } from './fixtures.mjs';
 
 /** The bound for a change to reach the map: one refresh interval (the dev setup's 10 s) plus margin. */
 const INTERVAL_MS = 25_000;
 /** How long a redraw or a popup after a choice may take on the dev stack. */
-const DRAW_MS = 20_000;
 /** Where the three tracer points are all in view at zoom 14. */
 const TRACER_VIEW = { center: TRACER.center, zoom: 14 };
 
@@ -53,11 +49,6 @@ async function press(page, button) {
     return result;
 }
 
-async function send(page, type, body) {
-    await page.waitForFunction(() => Boolean(window.__mapStudioTest));
-    return page.evaluate(([t, b]) => window.__mapStudioTest.send(t, b), [type, body]);
-}
-
 /** Link a map item to an asset (or to none with null) through the component's real session path, as the editor. */
 async function link(page, id, assetId) {
     const load = await send(page, 'map.load', {});
@@ -73,27 +64,6 @@ async function link(page, id, assetId) {
     expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
 }
 
-/**
- * Delete every live map item that is not the seed's (earlier specs leave the items they created: a pad
- * with an override rule on a tag that does not exist is stale for good, a pad linked to an asset with no
- * tags comms lost), so the bar counts the seed's items alone and All OK is reachable. One batch, lines
- * and their instruments together, as the editor through the test hook.
- */
-async function removeStrays(page, seedIds) {
-    const keep = new Set(Object.values(seedIds));
-    const load = await send(page, 'map.load', {});
-    expect(load.type).toBe('map.load.reply');
-    const strays = load.body.items.filter((i) => !i.deleted && !keep.has(i.id));
-    if (strays.length === 0) {
-        return 0;
-    }
-    const reply = await send(page, 'edits.apply', {
-        batchId: randomUUID(), ops: strays.map((i) => ({ op: 'delete', entity: 'item', id: i.id, baseVersion: i.version }))
-    });
-    expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
-    return strays.length;
-}
-
 /** Open /live as the editor and wait for the items and the first full batch. */
 async function openLive(page) {
     const map = await openMap(page, '/live');
@@ -102,21 +72,6 @@ async function openLive(page) {
     await expect(map).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
     await expect(bar(page)).toBeVisible();
     return map;
-}
-
-/** Move the map (the component's e2e view hook) and wait for the labels of that zoom to be published. */
-async function view(page, map, { center, zoom }) {
-    await page.waitForFunction(() => Boolean(window.__mapStudioTestView));
-    await page.evaluate(([c, z]) => window.__mapStudioTestView({ center: c, zoom: z }), [center, zoom]);
-    await expect(map).toHaveAttribute('data-zoom', zoom.toFixed(2), { timeout: DRAW_MS });
-    await expect(map).toHaveAttribute('data-labels-zoom', zoom.toFixed(2), { timeout: DRAW_MS });
-    await nextFrames(page);
-}
-
-async function shot(page, name) {
-    await nextFrames(page);
-    mkdirSync(screenshotDir, { recursive: true });
-    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
 }
 
 /** The three states: Point 1 in alarm, Point 2 stale, Point 3 comms lost (as the seed leaves it). */
@@ -220,7 +175,7 @@ editorTest.describe('1440 px', () => {
             expect(colors.comms).not.toBe(colors.alarm);
 
             // A click opens the ranked list under the bar: alarm, comms lost, stale, each with the words, detail and age.
-            await view(page, map, TRACER_VIEW);
+            await view(page, map, TRACER_VIEW.center, TRACER_VIEW.zoom);
             await bar(page).click();
             await expect(panel(page)).toBeVisible();
             await expect(map).toHaveAttribute('data-needs-open', 'true');
@@ -380,7 +335,7 @@ editorTest.describe('1440 px, all cleared', () => {
             await shot(page, 'mapstudio-needs-you-ok-1440.png');
 
             // The legend's key: the kinds on the map, the states, the lines, the pad's styles, the geofence's tints, Show, Basemap.
-            await view(page, map, TRACER_VIEW);
+            await view(page, map, TRACER_VIEW.center, TRACER_VIEW.zoom);
             await legendButton(page).focus();
             await page.keyboard.press('Enter');
             await expect(legendPanel(page)).toBeVisible();

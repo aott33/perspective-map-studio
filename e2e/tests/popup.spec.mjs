@@ -6,12 +6,9 @@
 // kind setup is changed through the component's real session path (window.__mapStudioTest, as
 // kindsetup.spec.mjs does) and the seed puts it back afterwards.
 
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
-import { screenshotDir } from '../lib/env.mjs';
 import { TRACER, pagePixel } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, WARNING_SETTLE_MS, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, nextFrames, openMap, runSeed,
+    EDITOR_USER, WARNING_SETTLE_MS, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, openMap, runSeed, send, shot,
     signedInContext, test
 } from './fixtures.mjs';
 
@@ -41,11 +38,6 @@ test.afterAll(async ({ browser }) => {
     }
 });
 
-async function send(page, type, body) {
-    await page.waitForFunction(() => Boolean(window.__mapStudioTest));
-    return page.evaluate(([t, b]) => window.__mapStudioTest.send(t, b), [type, body]);
-}
-
 /** Change parts of the stored pad kind setup and wait for the open map's next full batch to carry it. */
 async function changePadSetup(page, map, parts) {
     const load = await send(page, 'map.load', {});
@@ -57,13 +49,6 @@ async function changePadSetup(page, map, parts) {
         { op: 'update', entity: 'kindSetup', id: 'pad', baseVersion: stored.version, data: { setup: { ...stored.setup, ...parts } } }] });
     expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
     await expect(map).toHaveAttribute('data-live-full', String(fulls + 1), { timeout: INTERVAL_MS });
-}
-
-/** A screenshot under docs/screenshots with E2E_DOCS=1, else under e2e/out. */
-async function shot(page, name) {
-    await nextFrames(page);
-    mkdirSync(screenshotDir, { recursive: true });
-    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
 }
 
 async function clickAt(page, map, lngLat) {
