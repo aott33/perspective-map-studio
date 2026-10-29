@@ -919,3 +919,20 @@ Labels: **[live 8.3.10]** seen on the dev stack above; **[build]** the Jest unit
 | Gradle's `webpack` task reran on the stylesheet change (`inputs.dir("typescript")` holds `mapstudio.css`); a served stylesheet without a fix was a stale module staged before the edit, not a cache | **[build]** |
 
 **[not verified]**: a real touch device (the suite's taps are clicks at 390 px); a screen reader's reading of the bar (`aria-expanded`, `aria-controls`, the list region and its rows are set, not heard); a map with hundreds of items needing attention (the list has no cap or virtualisation; the rows are a handful of DOM nodes per item); a kind with a priority 2 or 3 alarm on the dev stack (the dev alarm is priority High; the priority 2 and 3 glyphs and tokens are drawn in the legend and unit tested in the bar's glyph choice); the owner's eye on the mockup match (the screenshots are in `docs/screenshots/`).
+
+## Epic 3 entries 2, 8, 9 and 3 together - the merge
+
+**Answer:** with entries 9 (search), 2 (instruments and the line popup), 8 (the whole default popup and the sheet) and 3 (Needs you and the legend) in one build, every feature kept its behaviour: an open line popup is pushed with its instruments and only the line carries the popup detail; an open point popup gets its alarm summary; the line popup keeps its own placement (350 px, above or below its segment, clamped) at every width, the point card is entry 8's 320 px card and the sheet takes every point popup below 768 px; a search or Needs you choice opens the point's card or sheet with the item's asset and properties, so its link fills. The final chain ran green in one run on a fresh stack (2026-10-29, port 9188, Ignition 8.3.10): 82 e2e passed, 7 skipped by design.
+
+Labels: **[live 8.3.10]** seen on the dev stack above; **[build]** the Gradle and Jest unit tests.
+
+| Fact | Evidence |
+| --- | --- |
+| The open line popup's push carries `popup` on the line alone, never on its instruments; a values batch carries none | **[build]** `InstrumentsLiveTest` (the popup items test) |
+| Entry 2's stylesheet named its line card `.mapstudio-popup--card`, the class entry 8 gives the point card: merged as written, the point card took the line popup's 350 px and row rules and entry 2's popup `z-index: 3` overrode entry 8's 5. The line popup's rules now read `.mapstudio-popup--line` and its popup content takes the card's own width; the point card measures 320 px with `z-index` 5 and the line popup 350 px | **[live 8.3.10]** `popup.spec.mjs`, `linepopup.spec.mjs`; `mapstudio-live-1440.png`, `mapstudio-line-popup-1440.png` |
+| Search and Needs you were built before the sheet: their 390 px choices waited for a MapLibre popup; at 390 px the chosen point opens `.mapstudio-sheet` (`data-popup-mode` `sheet`) | **[live 8.3.10]** `search.spec.mjs`, `needsyou.spec.mjs` (390 px) |
+| The legend's Kinds lists entry 2's seeded Tap and Line valve after Well pad, Gathering line and Geofence | **[live 8.3.10]** `needsyou.spec.mjs`; `mapstudio-legend-1440.png` |
+| A custom popup view sits under Map Studio's own close row: 32 px on the card, 44 px on the sheet with its handle | **[live 8.3.10]** `popup.spec.mjs`; `mapstudio-popup-view-1440.png`, `mapstudio-popup-view-390.png` |
+
+**[not verified]**: a line kind with a custom popup view (no dev setup names one; the fallback to the line popup and the map item object's instruments are unit tested only); the line popup's page link (entry 2 left the slot empty and entry 8 fills the point card's only); on the 390 px `/live` page the toolbar of dev buttons leaves the map short, so `mapstudio-live-390.png` shows the sheet's rows and footer but not its alarm block (the spec reads the alarm words in the sheet before the shot); not looked into further.
+
