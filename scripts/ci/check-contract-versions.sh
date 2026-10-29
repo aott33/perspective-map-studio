@@ -67,8 +67,10 @@ fi
 files="$(list | grep -v -E '^(_bmad-output|_bmad|\.claude)/' \
   | grep -v -x -F scripts/ci/check-contract-versions.sh \
   | grep -v -x -F scripts/ci/test-contract-versions.sh || true)"
-# An empty list would make the search pass without looking at anything.
-printf '%s\n' "$files" | grep -q -x -F docs/contract.md \
+# An empty list would make the search pass without looking at anything. No `grep -q`: it stops
+# reading at the first match, and with pipefail a list larger than the pipe buffer then fails
+# on printf's broken pipe.
+printf '%s\n' "$files" | grep -x -F docs/contract.md >/dev/null \
   || { echo "check-contract-versions: the file list for the draft search is empty or misses docs/contract.md" >&2; exit 1; }
 draft_re='([0-9]+\.[0-9]+\.[0-9]+[^a-z0-9]{0,6}(in )?\(?draft|draft[^.]{0,40}[0-9]+\.[0-9]+\.[0-9]+)'
 set +e
