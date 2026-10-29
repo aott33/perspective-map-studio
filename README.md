@@ -12,13 +12,13 @@ An Ignition **8.3** Perspective module that puts your field on a map. Every site
 
 ## Showcase
 
-The map pictures are the design that 0.3.0 is building toward (UX mockups, 2026-10-27); parts of them, such as search, Needs you and instruments on lines, are still in progress. The setup form is the shipped Designer screen.
+The map pictures are Map Studio itself, rendered from the development stack's showcase project (a demo field, `docs/development.md`). The setup form is the Designer screen.
 
 | | |
 |---|---|
-| ![The map with a site's popup](docs/images/showcase/map-popup-desktop.png) | **Live state on the map.** Each site is a neutral disc with its kind's glyph and name; colour appears only when something needs you, always with a glyph and words ("Comms lost", "Stale", an alarm triangle with its priority). Click a site for its popup: comms with data age, key values, and its alarms with a button to your alarm page. Search and the Needs you summary sit along the top. |
-| ![A pipeline with its instruments](docs/images/showcase/line-instruments.png) | **Pipelines and their instruments.** Pressure taps, meters and line valves sit at their place on the line. Click a segment to see the instruments in order with their live values. |
-| ![The map on a phone](docs/images/showcase/phone-sheet.png) | **Made for phones too.** At 390 px the popup becomes a bottom sheet with large touch targets. |
+| ![The map with a site's popup](docs/screenshots/showcase-view-desktop-popup-1366.png) | **Live state on the map.** Each site is a neutral disc with its kind's glyph and name; colour appears only when something needs you, always with a glyph and words ("Comms lost", "Stale", an alarm triangle with its priority). Click a site for its popup: comms with data age, key values, and its alarms with a button to your alarm page. Search and the Needs you summary sit along the top. |
+| ![A pipeline with its instruments](docs/screenshots/showcase-line-instruments-1366.png) | **Pipelines and their instruments.** Pressure taps, meters and line valves sit at their place on the line. Click a segment to see the instruments in order with their live values. |
+| ![The map on a phone](docs/screenshots/showcase-phone-sheet-390.png) | **Made for phones too.** At 390 px the popup becomes a bottom sheet with large touch targets. |
 | ![Map Studio Setup in the Designer](docs/screenshots/setup-editor-normal.png) | **One setup per project, in the Designer.** Pick the database connection, who can edit, where your kinds and assets come from, and the basemaps. Changes apply with no Gateway restart. |
 
 ## What it does
@@ -27,10 +27,10 @@ The map pictures are the design that 0.3.0 is building toward (UX mockups, 2026-
 - **Live values without the tag load.** The Gateway keeps one subscription per project and sends each open map one batch of changes per refresh (10 s by default), never a subscription per site per session.
 - **Your assets, your kinds.** The project supplies its list of kinds (pad, tank, pipeline...) and assets (with their tag paths) from its own script functions. A kind setup says once which tags feed comms, the key values and alarms, for every site of that kind.
 - **Alarms from Ignition.** Alarm state comes from Ignition's Alarm Metrics. Map Studio shows alarms and links to your alarm page; it never acknowledges anything itself.
-- **Saved as you go.** Each finished edit is saved at once and shows on every open map within seconds; two editors never overwrite each other silently, and every change records who made it and when. The full editing tools (draw, move, link to assets, undo) are being built now; today a map editor can draw a line.
+- **Saved as you go.** Each finished edit is saved at once and shows on every open map within seconds; two editors never overwrite each other silently, and every change records who made it and when. The full editing tools (draw, move, link to assets, undo) come next; today a map editor can draw a line on the editing page.
 - **Scripting.** `system.mapstudio.getMap` and `system.mapstudio.applyEdits` read and write the map from Gateway scripts.
 
-Map Studio is under active development: basemaps, labels, search, value-driven styles, instruments on lines, the legend and the Needs you summary are next. What is in each release is in [CHANGELOG.md](CHANGELOG.md).
+Map Studio is under active development: the map view (basemaps, labels, search, value-driven styles, instruments on lines, the legend and the Needs you summary) is in 0.3.0; the editing tools are next. What is in each release is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Install and quick start
 
