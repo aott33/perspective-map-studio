@@ -117,3 +117,8 @@
   evidence: `docs/screenshots/mapstudio-styles-1440.png` (entry 1's docs run, 2026-10-28), where the e2e suite's script-check pads pile up on one spot of the dev map.
   goes_to: epic-viewing entry 11 (refactor sweep) or entry 14 if it touches the label: name the first two and "+N more" ("CTB1, SWD1 +3"), the pick list keeping every member.
   resolved: 2026-10-29 epic 3 entry 11 (the refactor sweep): `sharedName` keeps "A and B" for two members and from three reads the first two and the rest counted, "A, B +3 more" (`web/typescript/shared.ts`, `shared.test.ts`); the pick list keeps every member; `docs/contract.md`, `docs/map-parity.md` and the changelog say so.
+
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-setup-editor-in-the-designer-plan.md`
+  summary: `SetupLookupsTest.aHungSecretProviderHoldsOneThreadAndNeverTheOtherLists` is timing-sensitive: it gives the lookups a 50 ms timeout and asserts every other list answers OK ten times while a hung secret provider holds one thread; on a busy CI runner a list call can miss 50 ms.
+  evidence: PR #30, run 40823995671 (2026-10-29): the test failed once in the "Signing check (throwaway certificate)" job while the same test passed in "Build and test" on the same commit; the next run passed. The PR changed nothing under `gateway/`.
+  goes_to: a small test fix the next time `gateway/` setup lookups are touched, or sooner if it fails again: separate the timeout the hung provider waits on from the one the healthy lists answer within (or raise it to a value a shared runner meets), without changing what the test proves.

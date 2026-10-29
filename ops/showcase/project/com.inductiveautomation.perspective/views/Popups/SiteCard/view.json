@@ -1,0 +1,112 @@
+{
+ "custom": {},
+ "params": {
+  "mapItem": {
+   "id": "",
+   "name": "",
+   "values": {}
+  },
+  "siteName": ""
+ },
+ "propConfig": {
+  "params.mapItem": {
+   "paramDirection": "input",
+   "persistent": true
+  },
+  "params.siteName": {
+   "paramDirection": "input",
+   "persistent": true
+  }
+ },
+ "props": {
+  "defaultSize": {
+   "width": 288,
+   "height": 120
+  }
+ },
+ "root": {
+  "type": "ia.container.flex",
+  "version": 0,
+  "props": {
+   "direction": "column",
+   "style": {
+    "padding": "0 16px 12px 16px",
+    "gap": "4px"
+   }
+  },
+  "meta": {
+   "name": "root"
+  },
+  "position": {},
+  "custom": {},
+  "children": [
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {
+     "style": {
+      "fontWeight": "bold"
+     }
+    },
+    "meta": {
+     "name": "title",
+     "domId": "mapstudio-sitecard-title"
+    },
+    "position": {
+     "basis": "24px",
+     "shrink": 0
+    },
+    "custom": {},
+    "propConfig": {
+     "props.text": {
+      "binding": {
+       "type": "expr",
+       "config": {
+        "expression": "{view.params.siteName} + ' - site card'"
+       }
+      }
+     }
+    }
+   },
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {},
+    "meta": {
+     "name": "pressure",
+     "domId": "mapstudio-sitecard-pressure"
+    },
+    "position": {
+     "basis": "24px",
+     "shrink": 0
+    },
+    "custom": {},
+    "propConfig": {
+     "props.text": {
+      "binding": {
+       "type": "expr",
+       "config": {
+        "expression": "\"Pressure: \" + coalesce({view.params.mapItem.values.kpis.pressure.value}, \"none\") + \" psi\""
+       }
+      }
+     }
+    }
+   },
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {
+     "text": "A custom popup view of the showcase project (Popups/SiteCard, the SWD kind setup's popupView). Map Studio's own close row sits above it."
+    },
+    "meta": {
+     "name": "note"
+    },
+    "position": {
+     "basis": "60px",
+     "shrink": 0
+    },
+    "custom": {}
+   }
+  ]
+ }
+}

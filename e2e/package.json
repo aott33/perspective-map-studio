@@ -7,7 +7,7 @@
     "type": "module",
     "scripts": {
         "test": "playwright test",
-        "test:unit": "node --test lib/lib.test.mjs lib/secretScan.test.mjs perf/perf.test.mjs",
+        "test:unit": "node --test lib/lib.test.mjs lib/secretScan.test.mjs lib/contrast.test.mjs perf/perf.test.mjs",
         "docs": "E2E_DOCS=1 playwright test",
         "perf": "playwright test -c perf/playwright.perf.config.mjs"
     },

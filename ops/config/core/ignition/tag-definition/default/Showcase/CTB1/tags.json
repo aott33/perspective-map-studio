@@ -19,5 +19,22 @@
     "valueSource": "memory",
     "dataType": "Float8",
     "value": 62.0
+  },
+  {
+    "name": "CTB1-T3",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 62.0,
+    "alarms": [
+      {
+        "name": "Tank level high",
+        "label": "Tank level high",
+        "mode": "AboveValue",
+        "setpointA": 80.0,
+        "priority": "Low",
+        "ackMode": "Manual"
+      }
+    ]
   }
 ]
