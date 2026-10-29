@@ -294,9 +294,9 @@ editorTest.describe('390 px', () => {
         for (const row of await rows(page).all()) {
             expect((await row.boundingBox()).height, 'a 44 px row').toBeGreaterThanOrEqual(44);
         }
-        // The zoom card sits under the bar; nothing in the bottom-right corner.
+        // The zoom card sits under the bar's one line (the list expands over the map); nothing in the bottom-right corner.
         const zoomBox = await page.locator('.mapstudio-zoom').boundingBox();
-        expect(zoomBox.y).toBeGreaterThanOrEqual(topBox.y + topBox.height + 8 - 1);
+        expect(zoomBox.y).toBeGreaterThanOrEqual(topBox.y + 48 + 8 - 1);
         await shot(page, 'mapstudio-needs-you-390.png');
         const corner = { x: 390 - 64, y: 844 - 64 };
         for (const b of [topBox, zoomBox, await legendButton(page).boundingBox()]) {

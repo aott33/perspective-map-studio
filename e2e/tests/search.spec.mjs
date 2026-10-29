@@ -242,8 +242,9 @@ test.describe('390 px', () => {
             for (const row of await options(page).all()) {
                 expect((await row.boundingBox()).height, 'a 44 px row').toBeGreaterThanOrEqual(44);
             }
-            // Every control button is a 44 px touch target, the Clear button included.
-            for (const b of await page.locator('.mapstudio .maplibregl-ctrl button').all()) {
+            // Every control button is a 44 px touch target, the Clear button included (the Needs you bar steps
+            // aside while the results are open, entry 3, so only the visible ones count).
+            for (const b of await page.locator('.mapstudio .maplibregl-ctrl button:visible').all()) {
                 const r = await b.boundingBox();
                 expect(Math.min(r.width, r.height), (await b.getAttribute('aria-label')) || (await b.textContent())).toBeGreaterThanOrEqual(44);
             }
