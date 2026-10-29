@@ -34,7 +34,8 @@ let ids;
 const bar = (page) => page.locator('.mapstudio-needs');
 const panel = (page) => page.locator('.mapstudio-needs-panel');
 const rows = (page) => page.locator('.mapstudio-needs-row');
-const popup = (page) => page.locator('.maplibregl-popup .mapstudio-popup--default');
+// The point's default popup: the card at 1440 px, the bottom sheet below 768 px (entry 8).
+const popup = (page) => page.locator('.maplibregl-popup .mapstudio-popup--default, .mapstudio-sheet .mapstudio-popup--default');
 const legendButton = (page) => page.locator('.mapstudio-legend-button');
 const legendPanel = (page) => page.locator('.mapstudio-legend-panel');
 const toggle = (page, name) => page.locator('.mapstudio-legend-toggle[data-toggle="' + name + '"]');
@@ -387,7 +388,8 @@ editorTest.describe('1440 px, all cleared', () => {
             expect(await legendPanel(page).locator('.mapstudio-legend-heading').allTextContents())
                 .toEqual(['Kinds', 'States', 'Lines', 'Styles', 'Areas', 'Show', 'Basemap']);
             expect(await legendPanel(page).locator('.mapstudio-legend-kind .mapstudio-legend-key-words').allTextContents())
-                .toEqual(['Well pad', 'Gathering line', 'Geofence']);
+                // Entry 2's seed adds the L-SWD instruments' kinds, Tap and Line valve.
+                .toEqual(['Well pad', 'Gathering line', 'Geofence', 'Tap', 'Line valve']);
             expect(await legendPanel(page).locator('.mapstudio-legend-state .mapstudio-legend-key-words').allTextContents())
                 .toEqual(['Priority 1 alarm, digit beside', 'Priority 2 alarm', 'Priority 3 alarm', 'Acknowledged', 'Comms lost', 'Stale value']);
             expect(await legendPanel(page).locator('.mapstudio-legend-line .mapstudio-legend-key-words').allTextContents())
