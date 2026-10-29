@@ -23,3 +23,5 @@ The owner accepted epic-viewing entry 15's showcase renders on 2026-10-29 ("I'll
 ## Notes
 
 - Item 1 (owner, 2026-10-29): the scale bar beside the Legend button "looks floating"; bottom-align it with the Legend button (`web/typescript/LegendControl.ts`, the bottom-left row; `mapstudio.css`).
+- Item 2 (owner, 2026-10-29, with a 390 px screenshot of the open legend): "The legend for the phone and the phone layout needs rework. Why is the basemap selected here, isn't that a project setting?" At 390 px the open legend panel covers most of the map. Open: whether the viewer chooses the basemap at all (entry 14 put the choice in the legend because viewers never reach Edit mode's Layers rail) or the project setup's basemap is the only one shown.
+- Item 3 (owner, 2026-10-29): "Make the attribution more discrete and put it along the bottom right of the map pretty much underneath the ignition black info button." Small text along the bottom-right edge, under Perspective's App Bar toggle, never covering the toggle.
