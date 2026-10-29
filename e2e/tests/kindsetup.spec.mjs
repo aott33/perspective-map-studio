@@ -6,14 +6,7 @@
 // every save but a delete is refused.
 
 import { randomUUID } from 'node:crypto';
-import {
-    OPERATOR_USER, editorTest, expect, mapLoaded, openMap, signedInContext, test
-} from './fixtures.mjs';
-
-async function send(page, type, body) {
-    await page.waitForFunction(() => Boolean(window.__mapStudioTest));
-    return page.evaluate(([t, b]) => window.__mapStudioTest.send(t, b), [type, body]);
-}
+import { OPERATOR_USER, editorTest, expect, mapLoaded, openMap, send, signedInContext, test } from './fixtures.mjs';
 
 async function load(page) {
     const reply = await send(page, 'map.load', {});

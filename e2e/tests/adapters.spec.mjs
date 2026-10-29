@@ -6,26 +6,11 @@
 // kind list empty a save is refused (epic 2 story 12: was unit tested only).
 
 import { randomUUID } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
-import { screenshotDir } from '../lib/env.mjs';
-import { EDITOR_USER, editorTest, expect, mapLoaded, nextFrames, openMap, test } from './fixtures.mjs';
+import { EDITOR_USER, editorTest, expect, mapLoaded, openMap, send, shot, test } from './fixtures.mjs';
 
 const PAGE = '/adapters';
 const KINDS_FN = 'mapstudio_dev.kinds';
 const ASSETS_FN = 'mapstudio_dev.assets';
-
-/** Send one message through the page's component (window.__mapStudioTest) and return the reply envelope. */
-async function send(page, type, body) {
-    await page.waitForFunction(() => Boolean(window.__mapStudioTest));
-    return page.evaluate(([t, b]) => window.__mapStudioTest.send(t, b), [type, body]);
-}
-
-async function shot(page, name) {
-    await nextFrames(page);
-    mkdirSync(screenshotDir, { recursive: true });
-    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
-}
 
 /** Press a dev page button and wait for its result label to report `mode`; returns the parsed result. */
 async function press(page, button, mode) {

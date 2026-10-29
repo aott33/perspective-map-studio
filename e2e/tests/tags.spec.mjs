@@ -7,14 +7,8 @@
 
 import { randomUUID } from 'node:crypto';
 import {
-    OPERATOR_USER, editorTest, expect, mapLoaded, openMap, signedInContext, test, watch
+    OPERATOR_USER, editorTest, expect, mapLoaded, openMap, send, signedInContext, test, watch
 } from './fixtures.mjs';
-
-/** Send one message through the page's component and return the Gateway's reply envelope. */
-async function send(page, type, body) {
-    await page.waitForFunction(() => Boolean(window.__mapStudioTest));
-    return page.evaluate(([t, b]) => window.__mapStudioTest.send(t, b), [type, body]);
-}
 
 function expectReply(reply, type) {
     expect(reply.type, JSON.stringify(reply.body)).toBe(type);
@@ -81,32 +75,41 @@ editorTest.describe('tag browse and resolve', () => {
         expect(expectRefused(await send(page, 'tags.browse', { folder: 'Mesa/Nope' }), 'invalid').message)
             .toContain('Mesa/Nope');
 
-        // Three pads linked to P12, P14 and P15; P15 has no Pressure.
-        const saved = await send(page, 'edits.apply', {
-            batchId: randomUUID(), ops: [createPad('P12', 0), createPad('P14', 1), createPad('P15', 2)]
-        });
-        expectReply(saved, 'edits.apply.reply');
-        const loaded = expectReply(await send(page, 'map.load', {}), 'map.load.reply');
-        const pads = new Set(loaded.assets.filter((a) => a.kind === 'pad').map((a) => a.id));
-        const linked = loaded.items.filter((i) => i.kind === 'pad' && pads.has(i.assetId));
-        const m = linked.length;
-        const n = m - linked.filter((i) => i.assetId === 'P15').length;
-        expect(m).toBeGreaterThanOrEqual(3);
+        // Three pads linked to P12, P14 and P15; P15 has no Pressure. Deleted again at the end: a pad
+        // named after an asset would otherwise turn up in later specs' searches and counts (entry 11).
+        const pads3 = [createPad('P12', 0), createPad('P14', 1), createPad('P15', 2)];
+        expectReply(await send(page, 'edits.apply', { batchId: randomUUID(), ops: pads3 }), 'edits.apply.reply');
+        try {
+            const loaded = expectReply(await send(page, 'map.load', {}), 'map.load.reply');
+            const pads = new Set(loaded.assets.filter((a) => a.kind === 'pad').map((a) => a.id));
+            const linked = loaded.items.filter((i) => i.kind === 'pad' && pads.has(i.assetId));
+            const m = linked.length;
+            const n = m - linked.filter((i) => i.assetId === 'P15').length;
+            expect(m).toBeGreaterThanOrEqual(3);
 
-        const inside = { kindId: 'pad', assetId: 'P12', path: '[default]Mesa/P12/Pressure' };
-        expect(expectReply(await send(page, 'tags.resolve', inside), 'tags.resolve.reply'))
-            .toEqual({ path: '{asset.path}/Pressure', relative: true, n, m });
-        expect(expectReply(await send(page, 'tags.resolve', { ...inside, path: '{asset.path}/Pressure' }),
-            'tags.resolve.reply')).toEqual({ path: '{asset.path}/Pressure', relative: true, n, m });
-        // Flow exists on all three.
-        expect(expectReply(await send(page, 'tags.resolve', { ...inside, path: '[default]Mesa/P12/Flow' }),
-            'tags.resolve.reply')).toEqual({ path: '{asset.path}/Flow', relative: true, n: m, m });
-        expect(expectReply(await send(page, 'tags.resolve', { ...inside, path: '[default]Plant/Header/Pressure' }),
-            'tags.resolve.reply')).toEqual({ path: '[default]Plant/Header/Pressure', relative: false });
+            const inside = { kindId: 'pad', assetId: 'P12', path: '[default]Mesa/P12/Pressure' };
+            expect(expectReply(await send(page, 'tags.resolve', inside), 'tags.resolve.reply'))
+                .toEqual({ path: '{asset.path}/Pressure', relative: true, n, m });
+            expect(expectReply(await send(page, 'tags.resolve', { ...inside, path: '{asset.path}/Pressure' }),
+                'tags.resolve.reply')).toEqual({ path: '{asset.path}/Pressure', relative: true, n, m });
+            // Flow exists on all three.
+            expect(expectReply(await send(page, 'tags.resolve', { ...inside, path: '[default]Mesa/P12/Flow' }),
+                'tags.resolve.reply')).toEqual({ path: '{asset.path}/Flow', relative: true, n: m, m });
+            expect(expectReply(await send(page, 'tags.resolve', { ...inside, path: '[default]Plant/Header/Pressure' }),
+                'tags.resolve.reply')).toEqual({ path: '[default]Plant/Header/Pressure', relative: false });
 
-        expectRefused(await send(page, 'tags.resolve', { ...inside, path: 'Mesa/P12/Pressure' }), 'invalid');
-        expectRefused(await send(page, 'tags.resolve', { ...inside, kindId: 'line' }), 'invalid');
-        expectRefused(await send(page, 'tags.resolve', { ...inside, assetId: 'P99' }), 'invalid');
+            expectRefused(await send(page, 'tags.resolve', { ...inside, path: 'Mesa/P12/Pressure' }), 'invalid');
+            expectRefused(await send(page, 'tags.resolve', { ...inside, kindId: 'line' }), 'invalid');
+            expectRefused(await send(page, 'tags.resolve', { ...inside, assetId: 'P99' }), 'invalid');
+        } finally {
+            const made = new Set(pads3.map((op) => op.id));
+            const now = expectReply(await send(page, 'map.load', {}), 'map.load.reply');
+            const ops = now.items.filter((i) => made.has(i.id) && !i.deleted)
+                .map((i) => ({ op: 'delete', entity: 'item', id: i.id, baseVersion: i.version }));
+            if (ops.length > 0) {
+                expectReply(await send(page, 'edits.apply', { batchId: randomUUID(), ops }), 'edits.apply.reply');
+            }
+        }
     });
 
     editorTest('a phone editor is refused role for both lookups', async ({ browser }) => {

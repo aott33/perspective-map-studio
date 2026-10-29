@@ -13,10 +13,9 @@
 // tile-failure status. Screenshots at 1440 and 390 px for the docs (AD-15).
 
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import path from 'node:path';
-import { repoRoot, screenshotDir, sessionUrl } from '../lib/env.mjs';
+import { repoRoot, sessionUrl } from '../lib/env.mjs';
 import { backUpSetup, committedSetup, gatewayRun, logLines, putBackSetup, scanProject, writeSetup } from '../lib/gateway.mjs';
-import { ensureSeeded, expect, mapLoaded, nextFrames, openMap, test } from './fixtures.mjs';
+import { ensureSeeded, expect, mapLoaded, openMap, shot, test } from './fixtures.mjs';
 
 /** A 1 by 1 PNG (one blue pixel, so a screenshot shows the tiles drawn), served for every tile the specs route. */
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
@@ -74,12 +73,6 @@ async function storageText(page) {
         };
         return JSON.stringify({ local: dump(window.localStorage), session: dump(window.sessionStorage) });
     });
-}
-
-async function shot(page, name) {
-    await nextFrames(page);
-    mkdirSync(screenshotDir, { recursive: true });
-    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
 }
 
 test.beforeAll(async ({ browser }) => {

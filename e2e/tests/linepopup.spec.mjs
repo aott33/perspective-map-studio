@@ -10,12 +10,9 @@
 // attention on PT-1 to PT-2 and PT-2 to SWD1 only, PT-2 at 950 draws the alarm over both and in PT-2's
 // marker; the same at 390 px. Screenshots for the docs (AD-15).
 
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
-import { screenshotDir } from '../lib/env.mjs';
 import { pagePixel } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, editorTest, expect, mapLoaded, nextFrames, openMap, runSeed, signedInContext, test
+    EDITOR_USER, editorTest, expect, mapLoaded, openMap, runSeed, send, shot, signedInContext, test, view
 } from './fixtures.mjs';
 
 /** The bound for a change to reach the map: one refresh interval (the dev setup's 10 s) plus margin. */
@@ -23,7 +20,6 @@ const INTERVAL_MS = 25_000;
 /** The bound for an open popup's push (250 ms on the Gateway, plus the round trip). */
 const PUSH_MS = 5_000;
 /** How long a redraw after a view change may take on the dev stack. */
-const DRAW_MS = 20_000;
 
 /**
  * The seed's L-SWD (mapstudio_seed, SWD_LINE): its midpoint, the point 1,500 m along it (between PT-1
@@ -77,26 +73,6 @@ async function expectSegments(page, expected, timeout) {
         }
         return out;
     }, { timeout }).toEqual(expected);
-}
-
-/** Move the map (the component's e2e view hook) and wait for the labels of that zoom to be published. */
-async function view(page, map, center, zoom) {
-    await page.waitForFunction(() => Boolean(window.__mapStudioTestView));
-    await page.evaluate(([c, z]) => window.__mapStudioTestView({ center: c, zoom: z }), [center, zoom]);
-    await expect(map).toHaveAttribute('data-zoom', zoom.toFixed(2), { timeout: DRAW_MS });
-    await expect(map).toHaveAttribute('data-labels-zoom', zoom.toFixed(2), { timeout: DRAW_MS });
-    await nextFrames(page);
-}
-
-async function send(page, type, body) {
-    await page.waitForFunction(() => Boolean(window.__mapStudioTest));
-    return page.evaluate(([t, b]) => window.__mapStudioTest.send(t, b), [type, body]);
-}
-
-async function shot(page, name) {
-    await nextFrames(page);
-    mkdirSync(screenshotDir, { recursive: true });
-    await page.screenshot({ path: path.join(screenshotDir, name), fullPage: false });
 }
 
 /** Click the line between PT-1 and LV-1 on a map centred on `center` at `zoom`, and return the open line popup. */
