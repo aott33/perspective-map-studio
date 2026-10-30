@@ -70,7 +70,7 @@ Notes:
 
 ## 4. Live state: the dev map with `/live`
 
-Open `/live` (signed in) in one window and the dev map (`/`) in another, and watch the map as you press the buttons. The buttons are named after the **asset**; the dev map's points have their own names:
+Open http://localhost:9088/data/perspective/client/mapstudio-dev/live and sign in (**Log in** at the top left). The buttons are the rows across the top, starting with **P12 pressure 400** and **P12 pressure 950** right after Log in; the page's own dev map is under them, so one window is enough. The buttons are named after the **asset**; the dev map's points have their own names:
 
 | Button names | Point on the dev map | Find it |
 |---|---|---|
