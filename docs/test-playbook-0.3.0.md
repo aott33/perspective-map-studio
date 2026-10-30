@@ -134,7 +134,7 @@ Notes (with the frame rate you saw):
 
 ## 13. Satellite (optional)
 
-Put a public `pk.` Mapbox token in `ops/secrets/map_token`, then `ops/up.sh --fresh` and seed again.
+Put a public `pk.` Mapbox token in `ops/secrets/map_token` (one line) and restart the Gateway (`ops/up.sh --no-build`); no fresh volume or new seed is needed on a stack started after this release's pull. Satellite is offered on the dev project's map (`/`), not the showcase, whose setup offers None and OpenStreetMap.
 
 - [ ] Satellite imagery loads, the attribution shows Mapbox, labels and states stay readable over imagery.
 
