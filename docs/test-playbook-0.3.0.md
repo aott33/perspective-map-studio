@@ -2,12 +2,20 @@
 
 A walk through everything 0.3.0 does, in order, on the local development stack. Tick each box, and note anything that looks or feels off in the Notes line under each section (a screenshot helps). Each note goes into `_bmad-output/backlog/story-owner-review-notes-on-the-0-3-0-map.md`.
 
+## Results so far
+
+| Section | Result | Date |
+|---|---|---|
+| 0. Before you start | passed: stack up, seeded, private window, trial time | 2026-10-30 |
+| 13. Satellite | passed: imagery with the owner's Mapbox token; more Mapbox styles go to the backlog after 0.3.0 | 2026-10-30 |
+| 1. First look | in progress: opens at zoom 15 (by design, the showcase's starting area) | 2026-10-30 |
+
 ## 0. Before you start
 
-- [ ] `ops/up.sh` is up (after a version change: `./gradlew clean` first; after a pull that changes the dev Gateway's config: `ops/up.sh --fresh`).
-- [ ] Seeded: http://localhost:9088/data/perspective/client/mapstudio-dev/edit, signed in as `mapeditor` (`MAPSTUDIO_EDITOR_PASSWORD` in `.env`), **Seed the dev map** pressed once.
-- [ ] A second browser or a private window for the "viewer" checks (not signed in).
-- [ ] The Gateway trial has time left (bottom-right App Bar button, then the session menu); reset it on the Gateway page when it runs out.
+- [x] `ops/up.sh` is up (after a version change: `./gradlew clean` first; after a pull that changes the dev Gateway's config: `ops/up.sh --fresh`).
+- [x] Seeded: http://localhost:9088/data/perspective/client/mapstudio-dev/edit, signed in as `mapeditor` (`MAPSTUDIO_EDITOR_PASSWORD` in `.env`), **Seed the dev map** pressed once.
+- [x] A second browser or a private window for the "viewer" checks (not signed in).
+- [x] The Gateway trial has time left (bottom-right App Bar button, then the session menu); reset it on the Gateway page when it runs out.
 
 Pages used below. Dev project: `/` (View), `/edit` (editing and the seed), `/live` (buttons that change tags), `/styles` (style rules and the review states), `/adapters`, `/two`. Showcase project: http://localhost:9088/data/perspective/client/mapstudio-showcase (`/` and `/dark`).
 
@@ -15,7 +23,7 @@ Pages used below. Dev project: `/` (View), `/edit` (editing and the seed), `/liv
 
 On the showcase page, at a laptop size.
 
-- [ ] The map opens on the Mesa field at zoom 15, no test buttons, nothing in the bottom-right but Perspective's App Bar button.
+- [ ] The map opens on the Mesa field at zoom 15 (by design: the showcase's starting area; the dev map opens at zoom 12), no test buttons, nothing in the bottom-right but Perspective's App Bar button.
 - [ ] Sites are neutral discs with their kind's glyph and name; a value under the name from zoom 15 (zoom out one step: values go, names stay; below zoom 14 normal sites become small dots).
 - [ ] P14 shows a red priority 1 alarm triangle with its digit; P21 a magenta comms-lost glyph, dashed ring and "Comms lost" chip; SWD1 the hourglass and "Stale" chip, no colour.
 - [ ] The geofence is a dashed outline; lines are grey, weight by size, with name chips.
@@ -136,6 +144,6 @@ Notes (with the frame rate you saw):
 
 Put a public `pk.` Mapbox token in `ops/secrets/map_token` (one line) and restart the Gateway (`ops/up.sh --no-build`); no fresh volume or new seed is needed on a stack started after this release's pull. Satellite is offered on the dev project's map (`/`), not the showcase, whose setup offers None and OpenStreetMap.
 
-- [ ] Satellite imagery loads, the attribution shows Mapbox, labels and states stay readable over imagery.
+- [x] Satellite imagery loads, the attribution shows Mapbox, labels and states stay readable over imagery.
 
 Notes:
