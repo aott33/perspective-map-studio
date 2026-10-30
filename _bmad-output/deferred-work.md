@@ -122,3 +122,8 @@
   summary: `SetupLookupsTest.aHungSecretProviderHoldsOneThreadAndNeverTheOtherLists` is timing-sensitive: it gives the lookups a 50 ms timeout and asserts every other list answers OK ten times while a hung secret provider holds one thread; on a busy CI runner a list call can miss 50 ms.
   evidence: PR #30, run 40823995671 (2026-10-29): the test failed once in the "Signing check (throwaway certificate)" job while the same test passed in "Build and test" on the same commit; the next run passed. The PR changed nothing under `gateway/`.
   goes_to: a small test fix the next time `gateway/` setup lookups are touched, or sooner if it fails again: separate the timeout the hung provider waits on from the one the healthy lists answer within (or raise it to a value a shared runner meets), without changing what the test proves.
+
+- source_plan: none (owner's local run, 2026-10-30)
+  summary: After a version change, an incremental build fails at `:zipModule` with "Library 'designer' exists in multiple versions in build/moduleContent": the step that fills `build/moduleContent` copies the new versioned jars in but never removes the old ones, so a checkout built at 0.2.0 and pulled to 0.3.0-SNAPSHOT holds both. `./gradlew clean` clears it.
+  evidence: the owner's `ops/up.sh --fresh` after a `git pull`, 2026-10-30 (all compile tasks UP-TO-DATE, `assembleModlStructure` then `zipModule FAILED`).
+  goes_to: a small build fix before the next version bump (the module content folder as a sync of the current jars, or cleaned when the version changes), with the epic's next story or the 0.3.0 release story.
