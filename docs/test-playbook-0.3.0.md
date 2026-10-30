@@ -9,7 +9,7 @@ A walk through everything 0.3.0 does, in order, on the local development stack. 
 | 0. Before you start | passed: stack up, seeded, private window, trial time | 2026-10-30 |
 | 13. Satellite | passed: imagery with the owner's Mapbox token; more Mapbox styles go to the backlog after 0.3.0 | 2026-10-30 |
 | 1. First look | passed: lines and chips fine; opens at zoom 15 (by design); neutral discs confirmed; P14 red triangle confirmed; P21 comms lost and SWD1 stale confirmed on `mapstudio-showcase` (the first check was on the dev map, which has no P21); notes: dots too small (bigger dots, item 6), the instrument icon does not read well (item 7) | 2026-10-30 |
-| 3. The popup card | reviewed with notes (pop-out works; View alarms and live values not yet checked): layout option A chosen (item 13); a click on empty map closes it, Esc does not (bug, item 14); "Bad_NotFound" shown to the operator (item 15) | 2026-10-30 |
+| 3. The popup card | reviewed with notes (pop-out and View alarms work; live values with the card open checked in section 4): layout option A chosen (item 13); a click on empty map closes it, Esc does not (bug, item 14); "Bad_NotFound" shown to the operator (item 15) | 2026-10-30 |
 | 2. Search and Needs you | passed (with notes): typing, Esc, search by asset name and Tab order work; search works and zooms to zoom 15; notes: a chevron opens a simple alphabetical list of every item, typing filters it (item 8); hovering Needs you makes its background disappear (bug, item 9), also over OpenStreetMap on the showcase; the list shows the items correctly; on a phone the counts as glyph and number only and the placeholder "Search assets" (item 12) | 2026-10-30 |
 
 ## 0. Before you start
@@ -58,7 +58,7 @@ Click P14.
 
 - [x] Card order: kind glyph and name, subline, pop-out (page link) and close; Comms with its age; 2 to 3 values; the alarm block with "View alarms".
 - [x] Padding even on both sides, nothing cut off, nothing from the map showing through.
-- [ ] The pop-out icon opens the site's page (`/site/P14` on the showcase) (works); **View alarms** opens the alarm page with the built-in alarm table.
+- [x] The pop-out icon opens the site's page (`/site/P14` on the showcase); **View alarms** opens the alarm page with the built-in alarm table.
 - [ ] Values update while the card is open (on the dev map use `/live`: "P12 pressure 400" / "950" with Point 1's card open).
 - [ ] A click on empty map closes the card (works); Esc closes it (fails: item 14).
 
