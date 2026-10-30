@@ -8,7 +8,7 @@ A walk through everything 0.3.0 does, in order, on the local development stack. 
 |---|---|---|
 | 0. Before you start | passed: stack up, seeded, private window, trial time | 2026-10-30 |
 | 13. Satellite | passed: imagery with the owner's Mapbox token; more Mapbox styles go to the backlog after 0.3.0 | 2026-10-30 |
-| 1. First look | in progress: opens at zoom 15 (by design); neutral discs confirmed; P14 red triangle confirmed; P21 not seen and SWD1 not stale after a Gateway restart (re-seed, then check); notes: dots too small (bigger dots, item 6), the instrument icon does not read well (item 7) | 2026-10-30 |
+| 1. First look | in progress: opens at zoom 15 (by design); neutral discs confirmed; P14 red triangle confirmed; P21 not seen and SWD1 not stale: likely the dev map (`mapstudio-dev`), which has no P21; recheck on `mapstudio-showcase`; notes: dots too small (bigger dots, item 6), the instrument icon does not read well (item 7) | 2026-10-30 |
 | 2. Search and Needs you | in progress: search works and zooms to zoom 15; notes: a chevron opens a simple alphabetical list of every item, typing filters it (item 8); hovering Needs you makes its background disappear (bug, item 9) | 2026-10-30 |
 
 ## 0. Before you start
@@ -23,7 +23,7 @@ Pages used below. Dev project: `/` (View), `/edit` (editing and the seed), `/liv
 
 ## 1. First look: the showcase, as an operator sees it
 
-On the showcase page, at a laptop size.
+On the showcase page, http://localhost:9088/data/perspective/client/mapstudio-showcase (not the dev map at `.../mapstudio-dev/`, which has its own P14 and SWD1 but no P21 and no showcase states), at a laptop size.
 
 - [ ] The map opens on the Mesa field at zoom 15 (by design: the showcase's starting area; the dev map opens at zoom 12), no test buttons, nothing in the bottom-right but Perspective's App Bar button.
 - [ ] Sites are neutral discs with their kind's glyph and name; a value under the name from zoom 15 (zoom out one step: values go, names stay; below zoom 14 normal sites become small dots).
