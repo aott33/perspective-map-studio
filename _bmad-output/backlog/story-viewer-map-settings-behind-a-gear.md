@@ -35,7 +35,7 @@ The idea to think through: the Legend becomes the key only, and a gear button (b
 
 ## Notes
 
-- Decision: 2026-10-30 Owner: "add to backlog to think through": after release 0.3.0; 0.3.0 ships story 10 item 3 as decided (the setup's default basemap, a switch only when the setup lists more than one, the toggles in the Legend).
+- Decision: 2026-10-30 Owner: "add to backlog to think through", then "agree, keep the gear for after 0.3.0": after release 0.3.0; 0.3.0 ships story 10 item 3 as decided (the setup's default basemap, a switch only when the setup lists more than one, the toggles in the Legend).
 - Open question: Where the gear sits (beside the zoom card on desktop; on a phone in the top bar or beside the Legend button) and whether the Legend keeps its toggles as well.
 - Open question: Whether the setup can lock a setting (for example force Names on for a control room) or only offer choices.
 - Constraint: alarm presentation (ER-27): a viewer setting may hide context (lines, names, geofences), never a state mark or the Needs you count.
