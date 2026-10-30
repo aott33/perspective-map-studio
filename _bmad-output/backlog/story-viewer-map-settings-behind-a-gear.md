@@ -20,11 +20,12 @@ The idea to think through: the Legend becomes the key only, and a gear button (b
 
 - Basemap: the setup's list, the setup's default first; hidden when the setup lists one.
 - Display: Lines, Names (today's Legend toggles), and later ones (values under names, instruments, geofences) as they come.
+- Needs you counts (owner, 2026-10-30): which counts the bar shows besides alarms: comms lost, stale, and Out of service (useful in oil and gas, from a style rule's `dimmed` preset). The setup says which are offered and on by default, the viewer adjusts within that (as for the basemap); the alarm count is always shown and cannot be turned off.
 - Remembered per browser as today (local storage, per project), with a "Reset to the project's defaults".
 
 ## Requirements
 
-- Verify: when it is scheduled, a viewer changes the basemap only among the setup's basemaps and the change survives a reload; with one basemap in the setup the basemap section is absent; the Lines and Names toggles work from the gear as they do from the Legend today; keyboard and 44 px touch targets as for the Legend; nothing in the gear can hide an alarm, comms-lost or stale mark.
+- Verify: when it is scheduled, the bar shows only the counts the setup offers and the viewer chose, the alarm count always; a viewer changes the basemap only among the setup's basemaps and the change survives a reload; with one basemap in the setup the basemap section is absent; the Lines and Names toggles work from the gear as they do from the Legend today; keyboard and 44 px touch targets as for the Legend; nothing in the gear can hide an alarm, comms-lost or stale mark.
 
 ## References
 
