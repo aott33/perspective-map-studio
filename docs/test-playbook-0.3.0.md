@@ -8,13 +8,14 @@ A walk through everything 0.3.0 does, in order, on the local development stack. 
 |---|---|---|
 | 0. Before you start | passed: stack up, seeded, private window, trial time | 2026-10-30 |
 | 13. Satellite | passed: imagery with the owner's Mapbox token; more Mapbox styles go to the backlog after 0.3.0 | 2026-10-30 |
-| 1. First look | in progress: opens at zoom 15 (by design); notes: dots too small (bigger dots, item 6), the instrument icon does not read well (item 7) | 2026-10-30 |
+| 1. First look | in progress: opens at zoom 15 (by design); neutral discs confirmed; P14 red triangle confirmed; P21 not seen and SWD1 not stale after a Gateway restart (re-seed, then check); notes: dots too small (bigger dots, item 6), the instrument icon does not read well (item 7) | 2026-10-30 |
 | 2. Search and Needs you | in progress: search works and zooms to zoom 15; notes: a chevron opens a simple alphabetical list of every item, typing filters it (item 8); hovering Needs you makes its background disappear (bug, item 9) | 2026-10-30 |
 
 ## 0. Before you start
 
 - [x] `ops/up.sh` is up (after a version change: `./gradlew clean` first; after a pull that changes the dev Gateway's config: `ops/up.sh --fresh`).
 - [x] Seeded: http://localhost:9088/data/perspective/client/mapstudio-dev/edit, signed in as `mapeditor` (`MAPSTUDIO_EDITOR_PASSWORD` in `.env`), **Seed the dev map** pressed once.
+- [x] After any Gateway restart (for example `ops/up.sh --no-build` for the Mapbox token), press **Seed the dev map** again: memory tags keep their values across a restart but lose the Bad quality that makes SWD1 stale.
 - [x] A second browser or a private window for the "viewer" checks (not signed in).
 - [x] The Gateway trial has time left (bottom-right App Bar button, then the session menu); reset it on the Gateway page when it runs out.
 
