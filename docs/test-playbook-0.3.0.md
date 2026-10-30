@@ -58,14 +58,22 @@ Notes:
 
 ## 4. Live state: the dev map with `/live`
 
-Open `/live` (signed in) and watch the dev map (`/`) as you press the buttons. On the dev map the tags of asset P12 feed the point named **Point 1**, P14's **Point 2** and P15's **Point 3** (search "Point 1"); the buttons name the asset.
+Open `/live` (signed in) in one window and the dev map (`/`) in another, and watch the map as you press the buttons. The buttons are named after the **asset**; the dev map's points have their own names:
 
-- [ ] **P12 pressure 400 / 950**: P12's value changes within the refresh interval (10 s).
-- [ ] At 950, P12 raises its "High pressure" alarm: triangle and digit on the marker, Needs you counts it. **Acknowledge P12**: the triangle turns hollow.
-- [ ] **P12 comms off**: comms lost in magenta, chip, Needs you counts it; **P12 comms on** restores it.
-- [ ] **P14 pressure bad**: P14 goes stale (hourglass, no colour, value marked stale); **P14 pressure good** restores it.
-- [ ] **P12 status 0 to 4**: P12's style preset changes (Attention, Warning, Fault rings with words, Out of service faded).
-- [ ] **L3 flow 20 / 120 / 300**: line L3's look follows its Bands rule.
+| Button names | Point on the dev map | Find it |
+|---|---|---|
+| P12 | **Point 1** | search "Point 1" |
+| P14 | **Point 2** | search "Point 2" |
+| L3 | **Tracer line** (Point 1 to Point 2) | search "Tracer" |
+
+Values reach the map within the refresh interval (10 s), so give each press a moment.
+
+- [ ] **P12 pressure 400 / 950**: Point 1's value changes.
+- [ ] At 950, Point 1 raises its "High pressure" alarm: triangle and digit on the marker, Needs you counts it. **Acknowledge P12**: the triangle turns hollow.
+- [ ] **P12 comms off**: Point 1 shows comms lost in magenta with its chip, Needs you counts it; **P12 comms on** restores it.
+- [ ] **P14 pressure bad**: Point 2 goes stale (hourglass, no colour, value marked stale); **P14 pressure good** restores it.
+- [ ] **P12 status 0 to 4**: Point 1's style changes (Attention, Warning, Fault rings with words, Out of service faded).
+- [ ] **L3 flow 20 / 120 / 300**: the Tracer line's look follows its Bands rule.
 - [ ] An alarm always draws over a style; stale drops the style until a fresh value.
 
 Notes:
