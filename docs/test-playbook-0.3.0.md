@@ -9,7 +9,7 @@ A walk through everything 0.3.0 does, in order, on the local development stack. 
 | 0. Before you start | passed: stack up, seeded, private window, trial time | 2026-10-30 |
 | 13. Satellite | passed: imagery with the owner's Mapbox token; more Mapbox styles go to the backlog after 0.3.0 | 2026-10-30 |
 | 1. First look | passed: lines and chips fine; opens at zoom 15 (by design); neutral discs confirmed; P14 red triangle confirmed; P21 comms lost and SWD1 stale confirmed on `mapstudio-showcase` (the first check was on the dev map, which has no P21); notes: dots too small (bigger dots, item 6), the instrument icon does not read well (item 7) | 2026-10-30 |
-| 2. Search and Needs you | in progress: search works and zooms to zoom 15; notes: a chevron opens a simple alphabetical list of every item, typing filters it (item 8); hovering Needs you makes its background disappear (bug, item 9) | 2026-10-30 |
+| 2. Search and Needs you | in progress: search works and zooms to zoom 15; notes: a chevron opens a simple alphabetical list of every item, typing filters it (item 8); hovering Needs you makes its background disappear (bug, item 9), also over OpenStreetMap on the showcase | 2026-10-30 |
 
 ## 0. Before you start
 
