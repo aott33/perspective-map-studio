@@ -27,4 +27,21 @@ Pure code and unit tests first (6, 7, 11, 16, 22, 25, 29, 32, 5), then the dev p
 
 ## Status
 
-In progress.
+Built (2026-11-02), branch `ccr-e1048b93-r2p8l4-notes-c`, on two agents (the first stopped at a usage limit with its work committed; the second verified it and finished):
+
+- Item 6. Built: 14 and 10 px dots with the halo in the blank-map token (commit 2e4eb80).
+- Item 7. Built: the tap, meter and valve glyphs redrawn, the 28 px instrument disc, the acknowledged glyphs outlined with a bold "!" (option B; option A rendered beside it, `renders/notes-c/7-glyph-options-3x.png`, for the owner to choose) (commits 2e4eb80, 4bed1f6).
+- Contract wording. Built: "outlined with "!"" in the contract and the legend's States row (commit a5ecace).
+- Item 11. Built: weight from the size alone, the tone with the weight rule (recommended; the alternative rendered, `renders/notes-c/option-11-tone-by-instruments-z15-1440.png`) (commit 2e4eb80).
+- Item 16. Built: the marker image sized from its rings (commit 2e4eb80).
+- Item 22. Built: the arrow repeated along the selected line, the legend's Lines row (commits 2e4eb80, 1dc9adb).
+- Item 25. Built: the quiet OpenStreetMap paint and the contrast check over it (commits 1dc9adb, 14dafb9).
+- Item 29. Built: the theme watch and redraw (commit 1dc9adb).
+- Item 32. Built: the connection chip, the frozen values, the Needs you `unknown` hook, the reload on reconnect (commit 1dc9adb; the e2e spec leaves out the client's own simulated-disconnect console errors, commit after a2817fd). The "no batch for two refresh intervals" trigger is not built: the Gateway sends a batch only when something changed, so a quiet map would read as lost; the client's connection flag is the signal (docs/contract.md says so).
+- Item 4. Built: the dev View page's empty-map line (commit 14dafb9).
+- Item 5. Built: the click echo in Edit mode only (commit 1dc9adb).
+- Item 10. Built: the showcase pages restore SWD1's stale state as they open (commit 14dafb9). Chosen over a Gateway startup script or `ops/up.sh` pressing the seed: it needs no dev-stack step and holds after any restart.
+- Item 31. Built: Map token provider and Map token secret rows (commit 14dafb9).
+- Stale-jar build fix. Built: `build/moduleContent` cleared before the structure is assembled; a scratch copy built at 0.3.0-SNAPSHOT then at 0.3.1 without `clean` failed at `:zipModule` before and builds after (commit 2e4eb80; `_bmad-output/deferred-work.md` resolved).
+
+Renders: `_bmad-output/backlog/renders/notes-c/README.md`.
