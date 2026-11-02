@@ -446,6 +446,11 @@
     flex-wrap: nowrap;
 }
 
+/* Option A (owner review notes item 13): the point card's comms status sits right-aligned like the values. */
+.mapstudio-popup--default .mapstudio-popup-comms .mapstudio-popup-value {
+    margin-left: auto;
+}
+
 .mapstudio-popup-kpis {
     padding: 4px 0;
 }
@@ -511,6 +516,13 @@
 .mapstudio-popup-alarm-heading .mapstudio-popup-note {
     font-weight: 400;
     text-align: left;
+}
+
+/* With no alarm the block has no tint and no edge, so its words (or the hourglass) start on the labels' column. */
+.mapstudio-popup-alarms:not(.mapstudio-popup-alarms--active) {
+    padding-left: 0;
+    padding-right: 0;
+    border-left-width: 0;
 }
 
 /* The alarm block (P5): the priority's tint and a 3 px edge, the hue on the glyph and the heading
@@ -1779,9 +1791,16 @@
 .mapstudio-popup-instrument-list {
     flex: 1 1 auto;
     min-height: 88px;
-    max-height: 168px;
+    /* About four rows (32 px) and half of the next, so a longer list shows that it scrolls (item 19). */
+    max-height: 144px;
     overflow-y: auto;
     overflow-x: hidden;
+}
+
+@media (max-width: 767px) {
+    .mapstudio-popup-instrument-list {
+        max-height: 180px;
+    }
 }
 
 .mapstudio-popup-pinned + .mapstudio-popup-instruments {
@@ -1912,11 +1931,17 @@
 
 .mapstudio-popup--line .mapstudio-popup-alarms {
     display: flex;
-    align-items: center;
-    gap: 5px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
     margin: 8px 16px 8px;
     padding: 8px 12px;
     border-radius: 6px;
+}
+
+.mapstudio-popup--line .mapstudio-popup-alarms:not(.mapstudio-popup-alarms--active) {
+    padding-left: 0;
+    padding-right: 0;
 }
 
 /* The line popup's comms row: the label at its own width, the value taking the rest in one run of text
