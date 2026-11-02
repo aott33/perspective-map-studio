@@ -12,6 +12,7 @@ A walk through everything 0.3.0 does, in order, on the local development stack. 
 | 3. The popup card | reviewed with notes (pop-out, View alarms and live values with the card open work): layout option A chosen (item 13); a click on empty map closes it, Esc does not (bug, item 14); "Bad_NotFound" shown to the operator (item 15) | 2026-10-30 |
 | 4. Live state | passed (with notes): the alarm raises, acknowledges ("!" in the triangle) and clears; the card updates while open; comms off and on, pressure bad and good, status 0 to 4, L3 flow, an alarm over a style and comms lost dropping the style work; comms on, pressure 400 and status 0 reset Point 1; notes: a selected marker's rings are cut off (item 16) | 2026-11-02 |
 | 5. Lines and instruments | passed (with notes): instruments in place, the shared marker's pick list, the segment popup, comms off dashing, PT-2's alarm, L-SWD quiet and the flow arrow work; notes: the popup over the top bar and cut off (item 18), the line popup's layout (item 19) | 2026-11-02 |
+| 6. Zoom card, Legend and basemaps | in progress: zoom card and basemap switching work; notes: the legend over the top bar (item 23), kinds in the legend (item 24), OpenStreetMap readability (item 25) | 2026-11-02 |
 | 2. Search and Needs you | passed (with notes): typing, Esc, search by asset name and Tab order work; search works and zooms to zoom 15; notes: a chevron opens a simple alphabetical list of every item, typing filters it (item 8); hovering Needs you makes its background disappear (bug, item 9), also over OpenStreetMap on the showcase; the list shows the items correctly; on a phone the counts as glyph and number only and the placeholder "Search assets" (item 12) | 2026-10-30 |
 
 ## 0. Before you start
@@ -116,12 +117,14 @@ Notes:
 
 ## 6. Zoom card, Legend and basemaps
 
-- [ ] Zoom card top-right: plus, the zoom level, minus, Fit (fits the field), Return (disabled with nothing selected; recentres on a selection).
+- [x] Zoom card top-right: plus, the zoom level, minus, Fit (fits the field), Return (disabled with nothing selected; recentres on a selection).
 - [ ] Legend bottom-left: opens and closes by click, Enter/Space and Esc; the key matches what the map draws; Lines and Names toggles hide and show, and are remembered when the page reloads.
-- [ ] Basemaps: None, OpenStreetMap (real tiles here), Satellite (needs a Mapbox token, below); attribution shown.
+- [x] Basemaps: None, OpenStreetMap (real tiles here), Satellite (needs a Mapbox token, below); attribution shown.
 - [ ] Labels stay readable over OpenStreetMap (halos), lines stay visible.
 
 Notes:
+
+- The open legend grows over the top bar (item 23); whether to list every kind (item 24); hard to read over OpenStreetMap, fine over Satellite (item 25). Basemap and the Show toggles move to the gear after 0.3.0 (story 12).
 
 ## 7. Phone (390 px)
 
