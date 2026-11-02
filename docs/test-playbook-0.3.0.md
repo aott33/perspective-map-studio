@@ -18,6 +18,7 @@ A walk through everything 0.3.0 does, in order, on the local development stack. 
 | 9. Dark theme and the review states | passed (with notes): every state reads in the dark theme; the ER-27 review passed with changes (docs/review-er27.md); notes: thin scroll bars (item 28), the map light on `/dark` until a reload (item 29) | 2026-11-02 |
 | 10. Designer setup form | passed (with notes): reads well, saves, a change applies without a restart (the wrong-value messages not checked); notes: the Map token rows (item 31) | 2026-11-02 |
 | 11. When things go wrong | passed (with notes): the adapter statuses, live sync between windows, a viewer cannot draw, recovery after a Gateway start; notes: the map does not say it lost the Gateway (item 32) | 2026-11-02 |
+| 12. Feel (R11) | 60.0 fps on the owner's laptop (Intel Arc Pro, Chrome 156, hardware WebGL) | 2026-11-02 |
 | 2. Search and Needs you | passed (with notes): typing, Esc, search by asset name and Tab order work; search works and zooms to zoom 15; notes: a chevron opens a simple alphabetical list of every item, typing filters it (item 8); hovering Needs you makes its background disappear (bug, item 9), also over OpenStreetMap on the showcase; the list shows the items correctly; on a phone the counts as glyph and number only and the placeholder "Search assets" (item 12) | 2026-10-30 |
 
 ## 0. Before you start
@@ -188,10 +189,12 @@ Notes:
 
 In a browser with hardware WebGL (`chrome://gpu`; under WSL use the Windows browser):
 
-- [ ] Pan and zoom the dev map's 30-pad set and the showcase: smooth (60 frames per second). DevTools' frame rendering stats or Performance panel show the rate; write down what you see.
+- [x] Pan and zoom the dev map's 30-pad set and the showcase: smooth (60 frames per second). DevTools' frame rendering stats or Performance panel show the rate; write down what you see.
 - [ ] Opening a popup, a search result and the legend feels instant.
 
 Notes (with the frame rate you saw):
+
+- 2026-11-02, owner's laptop: 60.0 fps in Chrome's frame rendering stats (the display's own 60 Hz, so the rate is capped by the screen), GPU raster on. Chrome 156 on Windows 11 (build 26200), WebGL hardware accelerated through ANGLE on Direct3D 11, the integrated Intel Arc Pro GPU active (an NVIDIA RTX 500 Ada laptop GPU present, not used by Chrome), 63 GB RAM, 22 threads, display 1536 x 960 at 2.5x. Read on the dev map as a viewer.
 
 ## 13. Satellite (optional)
 
