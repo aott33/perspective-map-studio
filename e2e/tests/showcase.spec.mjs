@@ -151,7 +151,7 @@ test.describe('1440 px, the legend', () => {
             await expect(panel).toBeVisible();
             // States first; the Kinds section is a button that starts closed with the count of kinds on the map.
             expect(await panel.locator('.mapstudio-legend-heading').allTextContents())
-                .toEqual(['States', 'Kinds (9)', 'Lines', 'Styles', 'Areas', 'Show', 'Basemap']);
+                .toEqual(['States', 'Kinds (9)', 'Lines', 'Styles', 'Show', 'Basemap']);
             const kinds = panel.locator('.mapstudio-legend-section--kinds .mapstudio-legend-heading');
             await expect(kinds).toHaveAttribute('aria-expanded', 'false');
             await expect(panel.locator('.mapstudio-legend-kind')).toHaveCount(0);
@@ -204,7 +204,13 @@ test.describe('1440 px, the legend', () => {
     test('hovering the Needs you bar and its rows keeps an opaque background, so the text never sits on the imagery (item 9)', async ({ page }) => {
         await openShowcase(page);
         const alpha = async (locator) => locator.evaluate((el) => {
-            const m = getComputedStyle(el).backgroundColor.match(/rgba?\(([^)]+)\)/);
+            const bg = getComputedStyle(el).backgroundColor;
+            // color-mix computes to color(srgb r g b) or color(srgb r g b / a).
+            if (bg.startsWith('color(')) {
+                const a = bg.match(/\/\s*([0-9.]+)\)/);
+                return a ? parseFloat(a[1]) : 1;
+            }
+            const m = bg.match(/rgba?\(([^)]+)\)/);
             const parts = m ? m[1].split(',').map((x) => parseFloat(x)) : [0, 0, 0, 0];
             return parts.length > 3 ? parts[3] : 1;
         });

@@ -161,7 +161,7 @@ test.describe('1440 px', () => {
             // Scrolling to the end draws the next page; the list scrolls inside its card.
             await panel(page).evaluate((el) => { el.scrollTop = el.scrollHeight; });
             await expect.poll(() => options(page).count()).toBeGreaterThan(50);
-            await expect(panel(page)).toHaveAttribute('data-shown', /^(100|[0-9]{3,})$/);
+            await expect(panel(page)).toHaveAttribute('data-shown', String(total));
             const box = await panel(page).boundingBox();
             expect(box.height, 'the list scrolls inside its card (50 vh at most)').toBeLessThanOrEqual(900 * 0.5 + 1);
 
