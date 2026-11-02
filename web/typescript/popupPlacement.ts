@@ -132,7 +132,7 @@ export interface CameraPadding {
  * of anything else across the top, such as the zoom card on a phone, where it sits under the bar),
  * `right` the zoom card's column on a desktop, `bottom` the open sheet's height and the legend row,
  * and an open card's own side (`card`, with its anchor) so a Return keeps it in view. Each side is
- * capped so the visible area keeps at least a third of the map.
+ * capped at 45 % of the map, so the visible area never closes.
  */
 export function cameraPadding(width: number, height: number, controls: { topBar: Rect | null; zoomCard: Rect | null; bottomRow: Rect | null },
                               sheet: Rect | null, card: { rect: Rect; anchor: PopupAnchor } | null): CameraPadding {
@@ -165,7 +165,7 @@ export function cameraPadding(width: number, height: number, controls: { topBar:
             left = Math.max(left, r.w + gap);
         }
     }
-    const capY = Math.floor(height / 3);
-    const capX = Math.floor(width / 3);
+    const capY = Math.floor(height * 0.45);
+    const capX = Math.floor(width * 0.45);
     return { top: Math.min(top, capY), bottom: Math.min(bottom, capY), left: Math.min(left, capX), right: Math.min(right, capX) };
 }

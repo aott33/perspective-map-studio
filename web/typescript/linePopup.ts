@@ -11,7 +11,7 @@ import { MapItemRecord } from './contract';
 import { LineNode, SegmentRef, lineNodes } from './features';
 import { instrumentsOn, lengthM } from './geometry';
 import {
-    ItemState, ItemValues, KindDisplay, LiveState, LiveValue, ageText, alarmsText, iconKpiOf, itemState, staleWords, valueText
+    ItemState, ItemValues, KindDisplay, LiveState, LiveValue, ageText, alarmsText, iconKpiOf, itemState, qualityWords, valueText
 } from './live';
 
 /** One row of the instruments list: a node with its words and values. */
@@ -80,6 +80,17 @@ export interface NodeValue {
     commsLost: boolean;
 }
 
+/** "Stale - last value, comms lost", "Stale - last value (Bad_Stale)", "Stale - no value yet": the row's tooltip in plain words. */
+function staleNote(value: LiveValue, hasValue: boolean): string {
+    const words = qualityWords(value.reason);
+    const code = words !== value.reason && value.reason !== '' ? ' (' + value.reason + ')' : '';
+    const why = words === '' || words === 'stale' ? '' : words;
+    if (!hasValue) {
+        return 'Stale' + (why !== '' ? ' - ' + why : '') + code;
+    }
+    return 'Stale - last value' + (why !== '' ? ', ' + why : '') + code;
+}
+
 export function nodeValue(node: PopupNode): NodeValue {
     const kpi = iconKpiOf(node.display);
     const value: LiveValue | undefined = kpi && node.values ? node.values.kpis[kpi.key] : undefined;
@@ -91,7 +102,7 @@ export function nodeValue(node: PopupNode): NodeValue {
     const hasValue = value.value !== null && value.value !== undefined;
     const number = typeof value.value === 'number' && isFinite(value.value) ? value.value : null;
     const plain = hasValue ? valueText(value, unit) : 'No value';
-    const note = value.stale ? staleWords(value).replace('Stale', hasValue ? 'Stale - last value' : 'Stale') : '';
+    const note = value.stale ? staleNote(value, hasValue) : '';
     return {
         text: plain, stale: value.stale, note, hasValue, number: value.stale ? null : number, unit, t: value.t,
         alarm: state.alarm, commsLost: state.commsLost

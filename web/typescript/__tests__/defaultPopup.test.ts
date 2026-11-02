@@ -81,22 +81,60 @@ describe('the default popup card (epic 3 entry 8, AD-7)', () => {
         expect(html).not.toContain('[default]');
     });
 
-    test('with no alarm page there is no View alarms; with no alarms a check and the words, no tint and no button', () => {
+    test('with no alarm page there is no View alarms; with no alarms the words alone (no check mark, option A), no tint and no button', () => {
         expect(render({ alarmPage: null })).not.toContain('View alarms');
         const quiet = render({ values: QUIET, detail: { ...DETAIL, alarms: { counts: { 1: 0, 2: 0, 3: 0 }, list: [], reason: '' } } });
         expect(quiet).toContain('No active alarms');
-        expect(quiet).toContain('mapstudio-popup-alarm-glyph--ok');
+        expect(quiet).not.toContain('mapstudio-popup-alarm-glyph--ok');
+        expect(quiet).not.toContain('#ms-stale');
         expect(quiet).not.toContain('mapstudio-popup-alarms--active');
         expect(quiet).not.toContain('View alarms');
         expect(quiet).not.toContain('mapstudio-popup-alarm-line');
     });
 
-    test('an alarm whose list could not be read says so in words, and a stale alarms slot is marked', () => {
+    test('option A rows (owner review notes items 13, 15 and 21): the comms status right-aligned, a stale value as the hourglass alone, no data in words', () => {
+        const html = render();
+        // The comms row keeps its check and the age; its label is never cut.
+        expect(html).toMatch(/data-comms="ok"[^>]*>.*mapstudio-popup-ok-glyph.*OK - 4 min ago/);
+        // A stale value: the hourglass before the value, the reason in the row's tooltip, the code kept for tests.
+        const stale = render({ values: { ...ALARMED, kpis: { pressure: { value: 880, quality: 'Bad', t: T, stale: true, reason: 'comms lost' }, flow: ALARMED.kpis.flow } } });
+        expect(stale).toMatch(/data-kpi="pressure"[^>]*data-stale="true"[^>]*data-quality="Bad"[^>]*title="Stale - comms lost"/);
+        expect(stale).toMatch(/#ms-stale.*880 psi/);
+        expect(stale).not.toContain('Stale - 880');
+        expect(stale).not.toContain('(comms lost)');
+        // No data yet: no check, no glyph, the words in the secondary colour by class, the quality in plain words.
+        const none = render({ values: { id: 'p1', comms: { value: null, quality: 'Bad_NotFound', t: null, stale: true, reason: 'Bad_NotFound' },
+            kpis: {}, problems: [] }, detail: null });
+        expect(none).toMatch(/mapstudio-popup-comms--unknown[^>]*data-comms="unknown"[^>]*data-quality="Bad_NotFound"/);
+        expect(none).toContain('No data yet - tag not found');
+        expect(none).not.toContain('Bad_NotFound)</span>');
+        expect(none).toContain('title="No data yet - tag not found (Bad_NotFound)"');
+        expect(none).not.toContain('mapstudio-popup-ok-glyph');
+        expect(none).toContain('mapstudio-popup-kpi--none');
+        expect(none).toContain('No data yet</span>');
+        expect(none).toContain('Alarm state unknown');
+        expect(none).toContain('data-alarm="unknown"');
+        expect(none).not.toContain('#ms-check');
+        // No comms slot at all (no asset linked): the same words, the problem's reason.
+        const unlinked = render({ values: { id: 'p1', kpis: {}, problems: [{ slot: 'comms', reason: 'no asset is linked' }] }, detail: null });
+        expect(unlinked).toContain('No data yet - no asset is linked');
+    });
+
+    test('an alarm whose list could not be read says so in words, and a stale alarms slot shows the hourglass with its reason', () => {
         const html = render({ detail: { ...DETAIL, alarms: { counts: { 1: 0, 2: 0, 3: 0 }, list: [], reason: 'the alarm status could not be read' } } });
         expect(html).toContain('The alarms could not be listed: the alarm status could not be read.');
-        const stale = render({ values: { ...ALARMED, alarms: { ...ALARMED.alarms!, stale: true, reason: 'comms lost' } } });
+        // An alarm while comms are lost (item 13): the alarm glyph, then the hourglass, then the words; no "Stale - ".
+        const stale = render({ values: { ...ALARMED, comms: { ...ALARMED.comms!, value: false },
+            alarms: { ...ALARMED.alarms!, stale: true, reason: 'comms lost' } } });
         expect(stale).toContain('data-stale="true"');
-        expect(stale).toContain('Stale - 2 alarms - Priority 1, unacknowledged');
+        expect(stale).toMatch(/#ms-alarm-1-unacknowledged.*#ms-stale.*2 alarms - Priority 1, unacknowledged/);
+        expect(stale).not.toContain('Stale - 2 alarms');
+        expect(stale).toContain('title="Alarm state may be out of date: comms lost 4 min ago"');
+        // No active alarms while comms are lost: the hourglass before the words, the same tooltip.
+        const quietLost = render({ values: { ...QUIET, comms: { ...QUIET.comms!, value: false }, alarms: { ...QUIET.alarms!, stale: true, reason: 'comms lost' } },
+            detail: { ...DETAIL, alarms: { counts: { 1: 0, 2: 0, 3: 0 }, list: [], reason: '' } } });
+        expect(quietLost).toMatch(/#ms-stale.*No active alarms/);
+        expect(quietLost).toContain('Alarm state may be out of date: comms lost 4 min ago');
         // Before the detail arrives the block shows the counts from the metrics alone.
         const early = render({ detail: null });
         expect(early).toContain('2 alarms - Priority 1, unacknowledged');

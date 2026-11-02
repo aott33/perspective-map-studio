@@ -89,6 +89,15 @@ describe('the Needs you summary (epic 3 entry 3)', () => {
         expect(countText('stale', 3)).toBe('3 stale');
     });
 
+    test('a quality code in the detail reads in plain words (owner review notes item 15)', () => {
+        // Comms lost with no value ever and no problem row: the quality name is said in words, not as the code.
+        const s = needsYou(ITEMS, [PAD, LINE], live({
+            e: { id: 'e', comms: stale(null, 'Bad_NotFound', null), kpis: {}, problems: [] },
+            f: { id: 'f', comms: good(true), kpis: { pressure: stale(null, 'Bad_Disabled', null) }, problems: [] }
+        }), NOW);
+        expect(s.rows.map((r) => r.detail)).toEqual(['No value yet - Tag not found', 'Pressure - Tag disabled']);
+    });
+
     test('an item whose kind has no display, or that has no values, never counts', () => {
         const s = needsYou([point('x', 'X', 'unknown')], [PAD], { ...LIVE_INITIAL, items: { x: { id: 'x', comms: good(false), kpis: {}, problems: [] } }, display: { pad: PAD_DISPLAY } }, NOW);
         expect(s.rows).toEqual([]);
