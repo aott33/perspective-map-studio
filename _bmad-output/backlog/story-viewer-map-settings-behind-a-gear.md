@@ -21,6 +21,7 @@ The idea to think through: the Legend becomes the key only, and a gear button (b
 - Basemap: the setup's list, the setup's default first; hidden when the setup lists one.
 - Display: Lines, Names (today's Legend toggles), and later ones (values under names, instruments, geofences) as they come.
 - Needs you counts (owner, 2026-10-30): which counts the bar shows besides alarms: comms lost, stale, and Out of service (useful in oil and gas, from a style rule's `dimmed` preset). The setup says which are offered and on by default, the viewer adjusts within that (as for the basemap); the alarm count is always shown and cannot be turned off.
+- Show by state (owner, 2026-11-02): filter the map to the items in a state: in alarm (by priority), comms lost, stale, a style state (Attention, Warning, Fault), Out of service; the other items fade or hide, lines and areas stay as context. The Needs you list already ranks the first three; a filter also covers the style states and Out of service.
 - Remembered per browser as today (local storage, per project), with a "Reset to the project's defaults".
 
 ## Requirements
@@ -39,4 +40,5 @@ The idea to think through: the Legend becomes the key only, and a gear button (b
 - Decision: 2026-10-30 Owner: "add to backlog to think through", then "agree, keep the gear for after 0.3.0": after release 0.3.0; 0.3.0 ships story 10 item 3 as decided (the setup's default basemap, a switch only when the setup lists more than one, the toggles in the Legend).
 - Open question: Where the gear sits (beside the zoom card on desktop; on a phone in the top bar or beside the Legend button) and whether the Legend keeps its toggles as well.
 - Open question: Whether the setup can lock a setting (for example force Names on for a control room) or only offer choices.
-- Constraint: alarm presentation (ER-27): a viewer setting may hide context (lines, names, geofences), never a state mark or the Needs you count.
+- Open question: Whether a state filter fades the other items (they stay findable) or hides them, and whether it shows in the Needs you bar so a filtered map is never mistaken for a quiet one.
+- Constraint: alarm presentation (ER-27): a viewer setting may hide context (lines, names, geofences), never a state mark or the Needs you count; a state filter may narrow the map to abnormal items, never hide an alarm while it is on.
