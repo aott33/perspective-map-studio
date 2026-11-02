@@ -16,6 +16,7 @@ A walk through everything 0.3.0 does, in order, on the local development stack. 
 | 7. Phone | passed (with notes): the top bar, the bottom sheet and tap targets; notes: the list under the zoom card (item 26), centring under the sheet (item 27), the legend (items 3, 23) | 2026-11-02 |
 | 8. Custom popup view | passed: SWD1's custom view with the close row, on the phone sheet; the hidden link is covered by the automated test | 2026-11-02 |
 | 9. Dark theme and the review states | passed (with notes): every state reads in the dark theme; the ER-27 review passed with changes (docs/review-er27.md); notes: thin scroll bars (item 28), the map light on `/dark` until a reload (item 29) | 2026-11-02 |
+| 10. Designer setup form | in progress: reads well; notes: the Map token rows (item 31) | 2026-11-02 |
 | 2. Search and Needs you | passed (with notes): typing, Esc, search by asset name and Tab order work; search works and zooms to zoom 15; notes: a chevron opens a simple alphabetical list of every item, typing filters it (item 8); hovering Needs you makes its background disappear (bug, item 9), also over OpenStreetMap on the showcase; the list shows the items correctly; on a phone the counts as glyph and number only and the placeholder "Search assets" (item 12) | 2026-10-30 |
 
 ## 0. Before you start
@@ -168,6 +169,8 @@ Open the Designer on the dev project, Project Browser, **Map Studio Setup**.
 - [ ] A wrong value (an unknown role, an empty connection) is explained beside its field.
 
 Notes:
+
+- Map token's two combo boxes (provider and secret name) become two labelled rows (item 31).
 
 ## 11. When things go wrong
 
