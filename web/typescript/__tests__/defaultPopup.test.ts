@@ -108,6 +108,7 @@ describe('the default popup card (epic 3 entry 8, AD-7)', () => {
         expect(notFound).toMatch(/mapstudio-popup-comms--lost[^>]*data-comms="lost"[^>]*data-quality="Bad_NotFound"/);
         expect(notFound).toContain('No data yet - tag not found');
         expect(notFound).not.toContain('Bad_NotFound)</span>');
+        expect(notFound).toContain('title="No data yet - tag not found (Bad_NotFound)"');
         expect(notFound).toContain('#ms-comms-lost');
         expect(notFound).not.toContain('mapstudio-popup-ok-glyph');
         expect(notFound).toContain('mapstudio-popup-kpi--none');

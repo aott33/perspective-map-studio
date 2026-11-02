@@ -142,7 +142,7 @@ export class DefaultPopup extends React.Component<DefaultPopupProps> {
                     {display.comms ? (
                         <NoteRow className={'mapstudio-popup-row mapstudio-popup-comms' + (comms.lost ? ' mapstudio-popup-comms--lost' : '')
                                      + (comms.unknown ? ' mapstudio-popup-comms--unknown' : '')}
-                                 note={comms.unknown && comms.code !== '' ? comms.word + (comms.detail ? ' - ' + comms.detail : '') + ' (' + comms.code + ')' : ''}
+                                 note={comms.code !== '' ? comms.word + (comms.detail ? ' - ' + comms.detail : '') + ' (' + comms.code + ')' : ''}
                                  data={{ 'data-part': 'comms', 'data-comms': comms.lost ? 'lost' : comms.unknown ? 'unknown' : 'ok', 'data-quality': comms.code }}>
                             <span className="mapstudio-popup-label">Comms</span>
                             <span className="mapstudio-popup-value">

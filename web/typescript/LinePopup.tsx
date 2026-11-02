@@ -91,7 +91,7 @@ export class LinePopup extends React.Component<LinePopupProps> {
         return (
             <NoteRow className={'mapstudio-popup-row mapstudio-popup-comms' + (own.lost ? ' mapstudio-popup-comms--lost' : '')
                          + (own.unknown ? ' mapstudio-popup-comms--unknown' : '')}
-                     note={own.unknown && own.code !== '' ? own.word + (own.detail ? ' - ' + own.detail : '') + ' (' + own.code + ')' : ''}
+                     note={own.code !== '' ? own.word + (own.detail ? ' - ' + own.detail : '') + ' (' + own.code + ')' : ''}
                      data={{ 'data-part': 'comms', 'data-comms': own.lost ? 'lost' : own.unknown ? 'unknown' : 'ok', 'data-quality': own.code }}>
                 <span className="mapstudio-popup-label">Comms</span>
                 <span className="mapstudio-popup-value">
