@@ -206,10 +206,10 @@ test.describe('1440 px', () => {
             // At zoom 18 the two are more than a marker apart on screen: each draws where it is, with its own
             // name, and a click opens its own popup anchored at its own place, no pick list (item 20).
             await view(page, map, SHARED.a, 18);
-            await expect(map).toHaveAttribute('data-shared-markers', '0', { timeout: DRAW_MS });
-            const names18 = (await labels(map)).filter((b) => b.layer === 'mapstudio-items-name').map((b) => b.text);
-            expect(names18).toEqual(expect.arrayContaining(['Shared A', 'Shared B']));
-            expect(names18).not.toContain('Shared A and Shared B');
+            // (data-shared-markers counts the whole map: items other specs draw closer than 10 m still share.)
+            const names18 = async () => (await labels(map)).filter((b) => b.layer === 'mapstudio-items-name').map((b) => b.text);
+            await expect.poll(names18, { timeout: DRAW_MS }).toEqual(expect.arrayContaining(['Shared A', 'Shared B']));
+            expect(await names18()).not.toContain('Shared A and Shared B');
             await clickAt(page, map, SHARED.a, SHARED.a, 18);
             await expect(page.locator('.maplibregl-popup .mapstudio-popup--default .mapstudio-popup-name')).toHaveText('Shared A', { timeout: 30_000 });
             await expect(map).toHaveAttribute('data-pick-open', 'false');
