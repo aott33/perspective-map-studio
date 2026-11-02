@@ -103,7 +103,7 @@ On the map, a warning marker, an attention line and two tinted geofences: [mapst
 
 What changed against the template: the template's map has no value-driven styles and no area tints (prd FR-38, FR-39 are Map Studio's; owner, 2026-10-26). The rule (AD-11): a preset is a ring and a word, never colour alone; an alarm draws over a preset; a stale source drops the preset; a tint is a wash on an area only. `warning` and `fault` share the alarm hues of priorities 2 and 1 (section 1).
 
-Verdict (the presets, and whether `warning` and `fault` may share the alarm hues):
+Verdict (the presets, and whether `warning` and `fault` may share the alarm hues): accepted; `warning` and `fault` keep the alarm hues of priorities 2 and 1, told apart by shape (a ring and a word against a glyph and a digit) (owner, 2026-11-02).
 
 Verdict (the six tints):
 
