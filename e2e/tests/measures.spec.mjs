@@ -266,7 +266,6 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
     await mapLoaded(map);
     await loadedCounts(map);
     const box = await map.boundingBox();
-    const reply = page.locator('.mapstudio-reply');
     const p1 = seed.ids[TRACER.points.p1.key];
 
     await probe('page-has-no-horizontal-overflow', async () => {
@@ -291,9 +290,10 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
     await probe('tap-a-point-gives-reply-and-popup', async () => {
         const [x, y] = pagePixel(box, TRACER.points.p1.lngLat, TRACER.center, TRACER.zoom);
         await page.touchscreen.tap(x, y);
-        await expect(reply).toContainText('Gateway received click on ' + p1, { timeout: 10_000 });
+        // The click echo left View mode (owner review notes item 5): the reply is read from the map's attribute.
+        await expect(map).toHaveAttribute('data-last-reply', new RegExp('Gateway received click on ' + p1), { timeout: 10_000 });
         await expect(page.locator('.mapstudio-sheet .mapstudio-popup--default .mapstudio-popup-name')).toHaveText('Point 1', { timeout: 20_000 });
-        return { ok: true, detail: 'reply text and the popup sheet shown after a touch tap' };
+        return { ok: true, detail: 'the reply and the popup sheet shown after a touch tap' };
     });
 
     await probe('popup-inside-the-viewport-with-a-44-px-close', async () => {

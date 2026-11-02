@@ -46,7 +46,15 @@ export interface NeedsYouSummary {
     rows: NeedsYouRow[];
     /** The highest alarm priority among the rows (1 to 3), 0 with no alarm: the bar's alarm glyph. */
     highestPriority: number;
+    /**
+     * The state is unknown (owner review notes item 32): the Gateway connection is lost, so no count
+     * can be given; the bar says so instead of a count, and the list carries STATE_UNKNOWN alone.
+     */
+    unknown?: boolean;
 }
+
+/** What the bar and the list say while the connection is lost (item 32). */
+export const STATE_UNKNOWN = 'State unknown - no connection';
 
 /** What the bar reads with nothing to attend to (EXPERIENCE.md: neutral, and the bar stays). */
 export const ALL_OK = 'All OK';
@@ -148,8 +156,15 @@ function rankOf(state: ItemState): number {
     return state.commsLost ? 10 : 11;
 }
 
-/** The summary from the loaded items, the kind list and the live state. Pure. */
-export function needsYou(items: readonly MapItemRecord[], kinds: readonly Kind[], live: LiveState, now: number): NeedsYouSummary {
+/**
+ * The summary from the loaded items, the kind list and the live state. Pure. With `options.unknown`
+ * (the connection is lost, item 32) the summary is empty and marked unknown: no item is counted.
+ */
+export function needsYou(items: readonly MapItemRecord[], kinds: readonly Kind[], live: LiveState, now: number,
+                         options: { unknown?: boolean } = {}): NeedsYouSummary {
+    if (options.unknown) {
+        return { ...EMPTY_SUMMARY, unknown: true };
+    }
     const kindById = new Map<string, Kind>();
     for (const kind of kinds) {
         kindById.set(kind.id, kind);

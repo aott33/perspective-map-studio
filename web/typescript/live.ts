@@ -469,6 +469,41 @@ export function applyBatch(state: LiveState, batch: ValuesBatchBody): LiveState 
     return { seq: batch.seq, batches: state.batches + 1, fulls: state.fulls + (batch.full ? 1 : 0), items, display, popup };
 }
 
+/** The reason every frozen slot carries (owner review notes item 32). */
+export const NO_CONNECTION_REASON = 'no connection';
+
+/**
+ * The live state with every value marked stale, for a map whose Gateway connection is lost (item 32,
+ * AD-6): the KPIs, the alarms slot, the style and the segments of every item take `stale` with the
+ * reason "no connection" and keep their values and times (the popup shows the hourglass and the age),
+ * so nothing reads as live; the comms slot keeps its own state (a stale comms slot would read as comms
+ * lost, which is a different thing from this browser losing the Gateway). The popup detail is kept.
+ * Pure; the next full batch (the reload on reconnect) replaces it all.
+ */
+export function freezeLive(state: LiveState): LiveState {
+    const freeze = (v: LiveValue): LiveValue => (v.stale ? v : { ...v, stale: true, reason: NO_CONNECTION_REASON });
+    const items: Record<string, ItemValues> = {};
+    for (const id of Object.keys(state.items)) {
+        const item = state.items[id];
+        const kpis: Record<string, LiveValue> = {};
+        for (const key of Object.keys(item.kpis)) {
+            kpis[key] = freeze(item.kpis[key]);
+        }
+        const frozen: ItemValues = { ...item, kpis };
+        if (item.alarms) {
+            frozen.alarms = freeze(item.alarms);
+        }
+        if (item.style) {
+            frozen.style = item.style.stale ? item.style : { ...item.style, stale: true, reason: NO_CONNECTION_REASON };
+        }
+        if (item.segments) {
+            frozen.segments = item.segments.map((seg) => (seg.stale ? seg : { ...seg, stale: true, reason: NO_CONNECTION_REASON }));
+        }
+        items[id] = frozen;
+    }
+    return { ...state, items };
+}
+
 /** The state of one map item for the icon: what the badge, the word and the KPI text say. */
 export interface ItemState {
     /** The comms slot says false, or is stale (no value, bad quality). */

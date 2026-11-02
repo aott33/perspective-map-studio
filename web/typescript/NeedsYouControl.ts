@@ -18,7 +18,7 @@
 
 import { glyphSvg } from './controls';
 import { alarmGlyphId } from './live';
-import { ALL_OK, EMPTY_SUMMARY, NOTHING_NEEDS_YOU, NeedsYouRow, NeedsYouSummary, RANKED_NOTE, countParts, total } from './needsyou';
+import { ALL_OK, EMPTY_SUMMARY, NOTHING_NEEDS_YOU, NeedsYouRow, NeedsYouSummary, RANKED_NOTE, STATE_UNKNOWN, countParts, total } from './needsyou';
 
 /** The sprite the state and kind glyphs come from, as the default popup draws them (DefaultPopup.tsx). */
 const SPRITE_URL = '/res/mapstudio/icons/mapstudio-icons.svg';
@@ -151,13 +151,20 @@ export class NeedsYouControl {
             bar.removeChild(bar.firstChild);
         }
         const n = total(this.summary.counts);
+        const unknown = this.summary.unknown === true;
         bar.setAttribute('data-count', String(n));
-        bar.setAttribute('data-state', n === 0 ? 'ok' : 'needs');
+        bar.setAttribute('data-state', unknown ? 'unknown' : n === 0 ? 'ok' : 'needs');
         bar.setAttribute('data-priority', String(this.summary.highestPriority));
         bar.classList.toggle('mapstudio-needs--ok', n === 0);
         const words = document.createElement('span');
         words.className = 'mapstudio-needs-words';
-        if (n === 0) {
+        if (unknown) {
+            // The connection is lost (item 32): the state is unknown, so no count is shown.
+            words.textContent = STATE_UNKNOWN;
+            bar.title = STATE_UNKNOWN;
+            bar.setAttribute('aria-label', STATE_UNKNOWN);
+            bar.appendChild(words);
+        } else if (n === 0) {
             words.textContent = ALL_OK;
             bar.title = ALL_OK;
             bar.setAttribute('aria-label', ALL_OK);
@@ -209,7 +216,7 @@ export class NeedsYouControl {
         panel.setAttribute('data-rows', String(rows.length));
         const note = document.createElement('div');
         note.className = 'mapstudio-needs-note';
-        note.textContent = rows.length === 0 ? NOTHING_NEEDS_YOU : RANKED_NOTE;
+        note.textContent = this.summary.unknown ? STATE_UNKNOWN : rows.length === 0 ? NOTHING_NEEDS_YOU : RANKED_NOTE;
         panel.appendChild(note);
         if (rows.length === 0) {
             return;

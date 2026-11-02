@@ -118,7 +118,7 @@ test.describe('1440 px', () => {
             await expect(popup(page)).toBeVisible({ timeout: DRAW_MS });
             await expect(popup(page)).toHaveAttribute('data-point-id', ids.p2);
             await expect(popup(page).locator('.mapstudio-popup-name')).toHaveText('Point 2');
-            await expect(page.locator('.mapstudio-reply')).toContainText('Gateway received click on ' + ids.p2, { timeout: DRAW_MS });
+            await expect(map).toHaveAttribute('data-last-reply', /Gateway received click on ' + ids.p2 + '/, { timeout: DRAW_MS });
             await expect(page.locator('.mapstudio-return-button')).toBeEnabled();
             // The field is cleared and closed; the live region says what was chosen.
             await expect(input(page)).toHaveValue('');

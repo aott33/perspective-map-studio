@@ -53,6 +53,45 @@
     display: none;
 }
 
+/* The connection chip (owner review notes item 32): in words with the hourglass, centred under the top bar,
+   on the panel surface with the attention token as its edge; never colour alone. Above the map and its
+   controls, under an open popup. */
+.mapstudio .mapstudio-connection {
+    position: absolute;
+    top: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 4;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(100% - 24px);
+    padding: 6px 12px;
+    border: 1px solid var(--mapstudio-attention, var(--neutral-90, var(--label)));
+    border-radius: 999px;
+    background: var(--mapstudio-surface);
+    color: var(--label);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.mapstudio .mapstudio-connection-glyph {
+    flex: none;
+    color: var(--label);
+}
+
+@media (max-width: 767px) {
+    .mapstudio .mapstudio-connection {
+        top: 68px;
+        font-size: 12px;
+        white-space: normal;
+        text-align: center;
+    }
+}
+
 /* Floating controls (epic 3 entry 14, DESIGN.md Elevation, Layout): one soft shadow, the host theme's
    where it has one (Perspective's themes define --boxShadow1), else two layers of the attention token
    at about 10 %; 12 px from the map edge, 8 px on a phone; 32 px targets with a mouse, 44 px below
@@ -1227,6 +1266,12 @@
     font-weight: 500;
 }
 
+/* The state is unknown while the Gateway connection is lost (item 32): the words alone, secondary. */
+.mapstudio .mapstudio-needs[data-state="unknown"] .mapstudio-needs-words {
+    color: var(--label--disabled);
+    font-weight: 500;
+}
+
 .mapstudio .mapstudio-needs-colon {
     color: var(--label--disabled);
 }
@@ -1417,6 +1462,18 @@
 
 .mapstudio .mapstudio-legend-token--alarm-1 {
     color: var(--mapstudio-alarm-1);
+}
+
+/* The selected line's row (item 22): the casing tone, with the flow arrows in the selection token. */
+.mapstudio .mapstudio-legend-token--selection {
+    color: var(--callToAction);
+}
+
+.mapstudio .mapstudio-legend-arrow-sample {
+    fill: var(--mapstudio-surface);
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
 }
 
 .mapstudio .mapstudio-legend-token--alarm-2 {

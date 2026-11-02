@@ -35,8 +35,8 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             // One round trip: click p1, the Gateway answers in the envelope.
             const [x, y] = pagePixel(box, TRACER.points.p1.lngLat, TRACER.center, TRACER.zoom);
             await page.mouse.click(x, y);
-            const reply = page.locator('.mapstudio-reply');
-            await expect(reply).toContainText('Gateway received click on ' + p1, { timeout: 15_000 });
+            // The click echo left View mode (owner review notes item 5): the reply is the map's `data-last-reply`.
+            await expect(map).toHaveAttribute('data-last-reply', new RegExp('Gateway received click on ' + p1), { timeout: 15_000 });
 
             // The click also opens the default popup from the pad kind setup (a card at 1440 px, a
             // bottom sheet at 390 px; epic 3 entry 8 retired the spike's popupView prop).

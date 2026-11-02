@@ -275,6 +275,12 @@ export class LegendControl implements IControl {
                     path.setAttribute('stroke-dasharray', (line.weight * 2) + ' ' + (line.weight * 1.5));
                 }
                 box.appendChild(path);
+                if (line.arrow) {
+                    // The flow arrows along the selected line, pointing the drawn direction (item 22).
+                    for (const x of [8, 18]) {
+                        box.appendChild(svgEl('path', { d: 'M' + (x - 3) + ' 7L' + (x + 3) + ' 12L' + (x - 3) + ' 17Z', class: 'mapstudio-legend-arrow-sample' }));
+                    }
+                }
                 this.row(lines, box, line.words, 'mapstudio-legend-line');
             }
         }

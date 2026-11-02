@@ -42,7 +42,9 @@ import { LegendToggle, legendKey, readToggle, sessionStore, writeToggle } from '
 import { NeedsYouControl } from './NeedsYouControl';
 import { NeedsYouRow, needsYou } from './needsyou';
 import { FIT_PADDING_PX, StartingArea, readStartingArea, startingAreaKey } from './startingArea';
-import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, displayShows, itemPreset, itemState } from './live';
+import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, displayShows, freezeLive, itemPreset, itemState } from './live';
+import { CONNECTED, ConnectionState, ConnectionWatch, connectionChipText, connectionDetailText } from './connection';
+import { ThemeWatch } from './themeWatch';
 import {
     AREA_DASH, AREA_FILL_OPACITY, AREA_LINE_OPACITY, AREA_LINE_WIDTH, ARROW_IMAGE, CHIP_IMAGE, CHIP_PADDING, CHIP_SIZE, DIMMED_OPACITY, DISC_CENTER,
     FONT_CHIP, FONT_NAME, HALO_WIDTH, KPI_SIZE, KPI_TOP_PX, LINE_CHIP_OFFSET_BADGE_EM, LINE_CHIP_OFFSET_EM, LINE_DASH, LINE_DOT,
@@ -76,6 +78,7 @@ import {
 } from './popupParams';
 import { registerTestHook, registerTestView, takeTestReply } from './testHook';
 import { drawColor, themeColor } from './theme';
+import { rasterPaint } from './basemaps';
 import { Kind } from './adapters';
 
 /** Must match MapStudioComponent.COMPONENT_ID on the Java side. */
@@ -208,6 +211,8 @@ export interface MapStudioDelegateState {
     live: LiveState;
     /** Bumped whenever a batch is applied, so the component knows to redraw the markers. */
     liveRevision: number;
+    /** The Gateway connection (owner review notes item 32): lost, and whether the values shown are frozen. */
+    connection: ConnectionState;
 }
 
 /** `localStorage`, or null when the browser refuses it (a private window, blocked site data). */
@@ -270,6 +275,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private saveBatchId: string | null = null;
     private live: LiveState = LIVE_INITIAL;
     private liveRevision = 0;
+    private connection: ConnectionState = CONNECTED;
+    /** Polls the client's connection flag (item 32): the values freeze while it is lost, the map reloads when it is back. */
+    private connectionWatch: ConnectionWatch;
     private basemap: BasemapState = BASEMAP_INITIAL;
     /** The id of the basemap.source message whose reply is awaited, or null. */
     private basemapPendingId: string | null = null;
@@ -296,6 +304,29 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         if (!storage) {
             this.warnStorage();
         }
+        this.connectionWatch = new ConnectionWatch(() => this.connected(), () => this.onConnectionLost(), () => this.onConnectionBack());
+        this.connectionWatch.start();
+    }
+
+    /**
+     * The client lost the Gateway (item 32, AD-6): every value shown freezes as stale with the reason
+     * "no connection" (the markers, the popup and the lists draw it so), the Needs you summary says the
+     * state is unknown and the chip names the time the values are from. Nothing reads as live.
+     */
+    private onConnectionLost(): void {
+        this.connection = { ...this.connection, lost: true, frozen: true };
+        this.live = freezeLive(this.live);
+        this.liveRevision++;
+        console.info('[MapStudio] No connection to the Gateway: the values shown are frozen as stale.');
+        this.notify();
+    }
+
+    /** The client is back: the map reloads (map.load, then the Gateway's full batch replaces the frozen values). */
+    private onConnectionBack(): void {
+        this.connection = { ...this.connection, lost: false };
+        console.info('[MapStudio] The Gateway connection is back: reloading the map.');
+        this.notify();
+        this.changes.load();
     }
 
     private warnStorage(): void {
@@ -327,7 +358,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             editing: this.store.status === 'unavailable' ? 'off' : 'on',
             storageWarning: this.storageWarning,
             live: this.live,
-            liveRevision: this.liveRevision
+            liveRevision: this.liveRevision,
+            connection: this.connection
         };
     }
 
@@ -438,6 +470,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         }
         this.live = applyBatch(this.live, body);
         this.liveRevision++;
+        // A full batch after a reconnect replaces the frozen values (item 32); the time is the chip's.
+        this.connection = { ...this.connection, valuesAt: Date.now(), frozen: this.connection.frozen && !body.full };
         console.debug('[MapStudio] Live values: ' + (body.full ? 'full, ' : '') + body.items.length + ' item(s) at seq ' + body.seq);
         this.notify();
     }
@@ -494,9 +528,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.sender.storage(key);
     }
 
-    /** Stop the replay and load retry timers (the component unmounted). */
+    /** Stop the replay, load retry and connection timers (the component unmounted). */
     stopReplay(): void {
         this.sender.stop();
+        this.connectionWatch.stop();
         if (this.loadRetryTimer !== null) {
             clearTimeout(this.loadRetryTimer);
             this.loadRetryTimer = null;
@@ -703,6 +738,8 @@ const LAYER_LINE_CHIPS = 'mapstudio-line-chip';
 const LAYER_LINE_BADGES = 'mapstudio-line-badge';
 const LAYER_ITEM_MARKERS = 'mapstudio-items-marker';
 const LAYER_ARROW = 'mapstudio-arrow';
+/** How far apart the flow arrows sit along the selected line (item 22), in px. */
+const ARROW_SPACING_PX = 250;
 /** The served sprite the marker images are drawn from (docs/icons.md). */
 const SPRITE_URL = '/res/mapstudio/icons/mapstudio-icons.svg';
 /** The served glyphs the text layers are set in (web/scripts/glyphs.mjs, docs/icons.md). */
@@ -759,6 +796,10 @@ function markerColors(root: HTMLElement | undefined): MarkerColors {
     };
 }
 
+/** Every token the map draws with (item 29): the marker tokens and the blank map's, the theme watch's snapshot. */
+const THEME_TOKENS: readonly string[] = ['--neutral-20', '--neutral-70', '--label', '--containerRoot', '--container']
+    .concat(...Object.values(MARKER_TOKENS).map((tokens) => tokens.slice()));
+
 /** A style expression as the layer definitions take it (the spec's own type is too narrow for the ones built here). */
 type Expression = ExpressionSpecification;
 
@@ -813,8 +854,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private drawnUnsaved = '';
     /** Terra Draw features of finished lines: removed once queued, as the unsaved layer draws them. */
     private queuedFeatures: Array<string | number> = [];
-    /** The theme colours the marker images are drawn with, read once at mount. */
+    /** The theme colours the marker images are drawn with, read at mount and again on a theme change (item 29). */
     private markerColors: MarkerColors | null = null;
+    /** Re-reads the tokens when the theme changes and redraws (item 29). */
+    private themeWatch: ThemeWatch | null = null;
+    /** How many times the theme was re-read, for tests. */
+    private themeRevision = 0;
     /** The sprite's symbols once fetched (empty when the fetch failed); null before. */
     private symbols: Record<string, SpriteSymbol> | null = null;
     /** The sprite's fetch, shared by every image asked for before it arrived. */
@@ -1096,6 +1141,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             map.addControl(this.drawControl, 'top-right');
         }
         this.map = map;
+        this.themeWatch = new ThemeWatch(root, THEME_TOKENS, () => this.applyTheme());
+        this.themeWatch.start();
         registerTestView((view) => {
             if (this.map === map) {
                 map.jumpTo({ center: view.center, zoom: view.zoom });
@@ -1118,6 +1165,59 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (this.mapContainer) {
             this.mapContainer.style.setProperty('--mapstudio-map-height', this.mapContainer.clientHeight + 'px');
         }
+    }
+
+    /**
+     * The theme changed after the map mounted (item 29: the `/dark` page's startup script, a session
+     * theme switch): the tokens are read again, every paint colour the layers took at mount is set
+     * again, the marker images are dropped so the resolver draws them in the new colours, and the
+     * features are rebuilt (their line and area colours are resolved token values).
+     */
+    private applyTheme(): void {
+        const map = this.map;
+        const root = this.props.store.element as HTMLElement | undefined;
+        if (!map || !this.itemsReady) {
+            return;
+        }
+        const mc = markerColors(root);
+        this.markerColors = mc;
+        this.themeRevision++;
+        const blank = themeColor(root, '--neutral-20');
+        const setPaint = (layer: string, name: string, value: unknown): void => {
+            if (map.getLayer(layer)) {
+                // The paint property names are the style spec's; the typed overload is too narrow for a name in a variable.
+                (map.setPaintProperty as unknown as (l: string, n: string, v: unknown) => void)(layer, name, value);
+            }
+        };
+        setPaint('background', 'background-color', blank);
+        for (const layer of [LAYER_LINE_HALO, LAYER_LINE_HALO_DASHED, LAYER_LINE_HALO_DOTTED]) {
+            setPaint(layer, 'line-color', mc.halo);
+        }
+        setPaint(LAYER_LINE_CASING, 'line-color', mc.selection);
+        setPaint(LAYER_UNSAVED_LINES, 'line-color', themeColor(root, '--label'));
+        setPaint(LAYER_UNSAVED_POINTS, 'circle-color', blank);
+        setPaint(LAYER_UNSAVED_POINTS, 'circle-stroke-color', themeColor(root, '--label'));
+        setPaint(LAYER_ITEM_KPI, 'text-color', ['case', ['==', ['get', 'kpiStale'], true], mc.textSecondary, mc.glyph]);
+        for (const layer of [LAYER_ITEM_CHIPS, LAYER_ITEM_NAMES, LAYER_LINE_CHIPS]) {
+            setPaint(layer, 'text-color', mc.glyph);
+        }
+        for (const layer of [LAYER_ITEM_KPI, LAYER_ITEM_NAMES]) {
+            setPaint(layer, 'text-halo-color', mc.halo);
+        }
+        // The images were drawn in the old colours: dropped, so the missing-image resolver draws them again.
+        for (const id of Array.from(this.madeImages.keys())) {
+            if (map.hasImage(id)) {
+                map.removeImage(id);
+            }
+        }
+        this.madeImages.clear();
+        this.drawnRevision = -1;
+        this.drawItems();
+        if (this.mapContainer) {
+            this.mapContainer.setAttribute('data-theme-revision', String(this.themeRevision));
+            this.mapContainer.setAttribute('data-blank', blank);
+        }
+        console.info('[MapStudio] The theme changed: the map colours were read again.');
     }
 
     componentDidUpdate(): void {
@@ -1267,18 +1367,22 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 'symbol-sort-key': ['-', 1000, ['get', 'rank']]
             }
         });
+        // The flow arrow repeated along the selected line (item 22): MapLibre lays the arrow image's x axis
+        // along the line every ARROW_SPACING_PX (one at the centre when the line is shorter), in the line's
+        // drawn direction, under the line's chip and badge so the midpoint mark stays on top.
         map.addLayer({
             id: LAYER_ARROW,
             type: 'symbol',
             source: SOURCE_ARROW,
             layout: {
+                'symbol-placement': 'line',
+                'symbol-spacing': ARROW_SPACING_PX,
                 'icon-image': ARROW_IMAGE,
-                'icon-rotate': ['get', 'bearing'],
                 'icon-rotation-alignment': 'map',
                 'icon-allow-overlap': true,
                 'icon-ignore-placement': true
             }
-        });
+        }, LAYER_LINE_CHIPS);
     }
 
     /** A changed startingArea prop moves the map there (once per value). */
@@ -1330,7 +1434,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     maxzoom: b.source.maxzoom,
                     attribution: b.source.attribution
                 });
-                map.addLayer({ id: LAYER_BASEMAP, type: 'raster', source: SOURCE_BASEMAP },
+                // OpenStreetMap drawn quiet (item 25, basemaps.ts rasterPaint); Satellite as it comes.
+                map.addLayer({ id: LAYER_BASEMAP, type: 'raster', source: SOURCE_BASEMAP, paint: rasterPaint(b.selected) },
                     map.getLayer(LAYER_AREA_FILL) ? LAYER_AREA_FILL : undefined);
                 this.tiles = 'loading';
             } else {
@@ -1356,6 +1461,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         el.setAttribute('data-basemap-offered', b.offered.join(','));
         el.setAttribute('data-basemap-status', status);
         el.setAttribute('data-basemap-tiles', this.tiles);
+        el.setAttribute('data-basemap-paint', JSON.stringify(rasterPaint(b.selected)));
     }
 
     /**
@@ -1679,7 +1785,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             }
             if (this.needsYouControl) {
                 // The Needs you summary from the same batch the markers draw from (entry 3, AD-6).
-                this.needsYouControl.setSummary(needsYou(items, delegate.lists.kinds, delegate.live, Date.now()));
+                this.needsYouControl.setSummary(needsYou(items, delegate.lists.kinds, delegate.live, Date.now(),
+                    { unknown: delegate.connection.frozen }));
             }
             if (this.legendControl && (delegate.itemsRevision !== this.drawnRevision || delegate.live.fulls !== this.drawnFulls)) {
                 // The legend's key follows the kinds on the map and the kind display of the last full batch (entry 3).
@@ -1851,6 +1958,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
             this.resizeObserver = null;
+        }
+        if (this.themeWatch) {
+            this.themeWatch.stop();
+            this.themeWatch = null;
         }
         if (this.mapContainer) {
             this.mapContainer.removeEventListener('keydown', this.onKeyDown, true);
@@ -2665,10 +2776,15 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const unsaved = delegate ? delegate.unsaved : [];
         const editing = delegate ? delegate.editing : 'on';
         // The status line stays in the DOM for every state it reports (the save status, a failed load, a
-        // read-only store, unsaved edits, the line tool), but the spike's click echo shows in Edit mode
-        // alone (entry 15, as the line tool since entry 14): View mode shows the map and its controls only.
-        const quiet = !this.props.props.editMode && !pending && drawText === '' && saveText === '' && load.state !== 'failed'
+        // read-only store, unsaved edits, the line tool), but the spike's click echo is dev-page test
+        // output and leaves View mode (owner review notes item 5, after entry 15): it renders in Edit mode
+        // alone, and View mode shows the map and its controls only. The last reply stays readable for the
+        // tests as `data-last-reply` on the map.
+        const echo = this.props.props.editMode;
+        const quiet = !echo && drawText === '' && saveText === '' && load.state !== 'failed'
             && store.status !== 'read-only' && unsaved.length === 0;
+        const connection = delegate ? delegate.connection : CONNECTED;
+        const chipText = connectionChipText(connection);
         return (
             <div {...this.props.emit({ classes: ['mapstudio'] })}>
                 <div className="mapstudio-map" ref={this.setMapContainer}
@@ -2683,6 +2799,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                      data-editing={editing}
                      data-live-seq={delegate ? String(delegate.live.seq) : ''}
                      data-live-full={delegate ? String(delegate.live.fulls) : ''}
+                     data-last-reply={delegate ? delegate.lastReply : ''}
+                     data-connection={connection.lost ? 'lost' : connection.frozen ? 'reloading' : 'ok'}
                      data-pick-open={this.state.pick ? 'true' : 'false'}
                      data-segment=""
                      data-highlighted=""
@@ -2694,7 +2812,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                      data-pending={pending ? 'true' : 'false'}
                      data-drawing={this.state.drawing ? 'true' : 'false'}
                      data-line-points={this.state.linePoints === null ? '' : String(this.state.linePoints)}>
-                    <div>{pending ? 'Waiting for the Gateway ...' : replyLine}</div>
+                    {echo ? <div>{pending ? 'Waiting for the Gateway ...' : replyLine}</div> : null}
                     {drawText !== '' ? <div className="mapstudio-draw-status">{drawText}</div> : null}
                     {saveText !== '' ? (
                         <div className={'mapstudio-save-status mapstudio-save-status--' + save.state}
@@ -2713,6 +2831,16 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     {this.renderUnsaved(unsaved, delegate ? delegate.level : null,
                         delegate ? delegate.storageWarning : '', delegate ? delegate.sending : [])}
                 </div>
+                {chipText !== '' ? (
+                    // The connection chip (item 32): in words, with the hourglass, over the map under the top bar.
+                    <div className="mapstudio-connection" role="status" title={connectionDetailText(connection)}
+                         data-state={connection.lost ? 'lost' : 'reloading'}>
+                        <svg className="mapstudio-connection-glyph" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                            <use href={SPRITE_URL + '#ms-stale'} />
+                        </svg>
+                        <span>{chipText}</span>
+                    </div>
+                ) : null}
                 {this.renderAdapterStatus(delegate ? delegate.lists : NO_HOST_LISTS)}
                 {delegate ? this.renderLiveState(delegate.live, delegate.lists.kinds) : null}
                 {this.renderStylePanel()}

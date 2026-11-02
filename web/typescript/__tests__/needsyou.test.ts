@@ -1,7 +1,7 @@
 import { Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import { KindDisplay, LIVE_INITIAL, LiveState, LiveValue } from '../live';
-import { ALL_OK, countParts, countText, needsYou, summaryText, total } from '../needsyou';
+import { ALL_OK, EMPTY_SUMMARY, STATE_UNKNOWN, countParts, countText, needsYou, summaryText, total } from '../needsyou';
 
 const T = '2026-10-28T10:00:00Z';
 const NOW = Date.parse('2026-10-28T10:04:00Z');
@@ -40,6 +40,15 @@ function live(items: LiveState['items']): LiveState {
 }
 
 describe('the Needs you summary (epic 3 entry 3)', () => {
+    test('with the connection lost the state is unknown: nothing is counted and the summary says so (item 32)', () => {
+        const items = live({ c: { id: 'c', comms: good(true), kpis: { pressure: good(950) }, alarms: good({ active: 1, unacked: 1, priority: 1 }), problems: [] } });
+        expect(needsYou(ITEMS, [PAD, LINE], items, NOW).counts.alarm).toBe(1);
+        const unknown = needsYou(ITEMS, [PAD, LINE], items, NOW, { unknown: true });
+        expect(unknown).toEqual({ ...EMPTY_SUMMARY, unknown: true });
+        expect(needsYou(ITEMS, [PAD, LINE], items, NOW, { unknown: false }).unknown).toBeUndefined();
+        expect(STATE_UNKNOWN).toBe('State unknown - no connection');
+    });
+
     test('nothing to attend to reads All OK', () => {
         const s = needsYou(ITEMS, [PAD, LINE], live({ n: { id: 'n', comms: good(true), kpis: { pressure: good(400) }, alarms: good({ active: 0, unacked: 0, priority: 0 }), problems: [] } }), NOW);
         expect(s.rows).toEqual([]);

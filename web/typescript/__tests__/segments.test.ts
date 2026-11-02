@@ -102,10 +102,10 @@ describe('segment features (epic 3 entry 2)', () => {
         const selected = out.points.features.filter((f) => f.properties.selected).map((f) => f.properties.id).sort();
         expect(selected).toEqual(['pt1', 'pt2']);
         expect(out.arrow.features).toHaveLength(1);
-        // No instruments: one feature, start to end, the thin neutral look.
+        // No instruments: one feature, start to end, the weight from the 6 in size alone (item 11).
         const bare = buildFeatures([LINE, CTB1, SWD1], KINDS, live, null, COLORS);
         expect(bare.lines.features).toHaveLength(1);
-        expect(bare.lines.features[0].properties).toMatchObject({ from: 'ctb1', to: 'swd1', weight: 2, segmentSelected: false });
+        expect(bare.lines.features[0].properties).toMatchObject({ from: 'ctb1', to: 'swd1', weight: 4, segmentSelected: false });
     });
 
     test('the segments slot is read from a batch and a graded segment\'s state draws as stale, preset or alarm', () => {

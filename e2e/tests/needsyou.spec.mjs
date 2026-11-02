@@ -208,7 +208,7 @@ editorTest.describe('1440 px', () => {
             await expect(map).toHaveAttribute('data-center', '-104.97500,39.75000');
             await expect(popup(page)).toHaveAttribute('data-point-id', ids.p2, { timeout: DRAW_MS });
             await expect(page.locator('.mapstudio-search-status')).toHaveText('Point 2 selected');
-            await expect(page.locator('.mapstudio-reply')).toContainText('Gateway received click on ' + ids.p2, { timeout: DRAW_MS });
+            await expect(map).toHaveAttribute('data-last-reply', /Gateway received click on ' + ids.p2 + '/, { timeout: DRAW_MS });
 
             // By keyboard: Enter on the bar opens the list with the first row focused, the arrows move and wrap,
             // Esc closes it and returns the focus to the bar; Enter on a row chooses it.
@@ -346,9 +346,10 @@ editorTest.describe('1440 px, all cleared', () => {
                 // Entry 2's seed adds the L-SWD instruments' kinds, Tap and Line valve.
                 .toEqual(['Well pad', 'Gathering line', 'Geofence', 'Tap', 'Line valve']);
             expect(await legendPanel(page).locator('.mapstudio-legend-state .mapstudio-legend-key-words').allTextContents())
-                .toEqual(['Priority 1 alarm, digit beside', 'Priority 2 alarm', 'Priority 3 alarm', 'Acknowledged', 'Comms lost', 'Stale value']);
+                .toEqual(['Priority 1 alarm, digit beside', 'Priority 2 alarm', 'Priority 3 alarm', 'Acknowledged: outlined, with "!"', 'Comms lost', 'Stale value']);
             expect(await legendPanel(page).locator('.mapstudio-legend-line .mapstudio-legend-key-words').allTextContents())
-                .toEqual(['Pipeline, weight by size', 'Thin: no instruments', 'Dashed: no data or comms lost', 'Hue: the highest alarm']);
+                .toEqual(['Pipeline, weight by size', 'Thin: no size given', 'Dashed: no data or comms lost', 'Hue: the highest alarm',
+                    'Selected: arrows show the drawn direction']);
             expect(await legendPanel(page).locator('.mapstudio-legend-style .mapstudio-legend-key-words').allTextContents())
                 .toEqual(['Attention', 'Warning', 'Fault', 'Out of service']);
             expect(await legendPanel(page).locator('.mapstudio-legend-tint .mapstudio-legend-key-words').allTextContents())

@@ -1,6 +1,6 @@
 import {
-    LIVE_INITIAL, LiveValue, ageText, alarmCountsText, alarmLineText, alarmsText, applyBatch, areaTint, commsText, itemState,
-    readKindDisplay, readPopupDetail, readValuesBatch, staleText, valueText
+    LIVE_INITIAL, LiveValue, NO_CONNECTION_REASON, ageText, alarmCountsText, alarmLineText, alarmsText, applyBatch, areaTint, commsText,
+    freezeLive, itemState, readKindDisplay, readPopupDetail, readValuesBatch, staleText, valueText
 } from '../live';
 import { readReply } from '../messages';
 
@@ -97,6 +97,36 @@ describe('values.batch reading (epic 3 entry 5)', () => {
         expect(d && d.popupView).toEqual({ path: 'Popups/PadAlarms', params: { padName: '{item.name}' } });
         expect(readKindDisplay({ ...DISPLAY, popupView: { path: '', params: {} } })!.popupView).toBeUndefined();
         expect(readKindDisplay(DISPLAY)!.popupView).toBeUndefined();
+    });
+});
+
+describe('the frozen live state (owner review notes item 32)', () => {
+    test('every KPI, the alarms, the style and the segments go stale with the reason no connection; the comms slot and the values stay', () => {
+        const state = applyBatch(LIVE_INITIAL, { seq: 3, full: true, items: [
+            { ...P1, style: { preset: 'warning', stale: false, reason: '' },
+                segments: [{ from: 'a', to: 'b', preset: 'normal', stale: false, reason: '', alarm: null }] },
+            { id: 'p2', comms: good(false), kpis: { pressure: stale(1, 'comms lost') }, problems: [] }
+        ], kindDisplay: [DISPLAY] });
+        const frozen = freezeLive(state);
+        expect(frozen.seq).toBe(3);
+        expect(frozen.display).toBe(state.display);
+        const p1 = frozen.items.p1;
+        expect(p1.comms).toEqual(good(true));
+        expect(p1.kpis.pressure).toEqual({ ...good(412.456), stale: true, reason: NO_CONNECTION_REASON });
+        expect(p1.kpis.flow).toMatchObject({ value: 80, t: T, stale: true, reason: NO_CONNECTION_REASON });
+        expect(p1.alarms).toMatchObject({ value: { active: 1, unacked: 1, priority: 1 }, stale: true, reason: NO_CONNECTION_REASON });
+        expect(p1.style).toEqual({ preset: 'warning', stale: true, reason: NO_CONNECTION_REASON });
+        expect(p1.segments).toEqual([{ from: 'a', to: 'b', preset: 'normal', stale: true, reason: NO_CONNECTION_REASON, alarm: null }]);
+        // A slot that was stale already keeps its own reason.
+        expect(frozen.items.p2.kpis.pressure).toEqual(stale(1, 'comms lost'));
+        expect(frozen.items.p2.comms).toEqual(good(false));
+        // The item draws stale (the hourglass) with its last alarm, never as live; the style is gone.
+        const drawn = itemState(p1, DISPLAY);
+        expect(drawn).toMatchObject({ stale: true, commsLost: false, badge: 'alarm', preset: 'normal' });
+        expect(drawn.iconKpi).toMatchObject({ text: '412.5 psi', stale: true });
+        // The input is untouched.
+        expect(state.items.p1.kpis.pressure.stale).toBe(false);
+        expect(freezeLive(LIVE_INITIAL)).toEqual(LIVE_INITIAL);
     });
 });
 
