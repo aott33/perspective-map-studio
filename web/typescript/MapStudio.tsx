@@ -72,9 +72,9 @@ import {
 import { UnsavedSender } from './unsavedSender';
 import {
     LINE_POPUP_PX, POPUP_WIDTH_PX, PopupPoint, fillLink, fillParams, isSheetWidth, popupItemView, popupMaxHeight,
-    popupMaxWidth, popupMountPath, popupViewParams
+    popupMountPath, popupViewParams
 } from './popupParams';
-import { CameraPadding, PopupAnchor, Rect, cameraPadding, placePopup } from './popupPlacement';
+import { CameraPadding, PopupAnchor, Rect, cameraPadding, placePopup, placedMaxWidth } from './popupPlacement';
 import { SHARED_M, sharedWithinM } from './shared';
 import { registerTestHook, registerTestView, takeTestReply } from './testHook';
 import { drawColor, themeColor } from './theme';
@@ -2459,7 +2459,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const at = map.project(lngLat);
         const width = map.getContainer().clientWidth;
         const height = map.getContainer().clientHeight;
-        this.popup.setMaxWidth(popupMaxWidth(at.x, width, maxPx));
+        // The card keeps its own width; near an edge it goes beside the point or on a corner (item 18).
+        this.popup.setMaxWidth(placedMaxWidth(width, maxPx) + 'px');
         if (!this.popup.isOpen()) {
             // The popup joins the map before it is placed: its content rendered already (the portal), but
             // a card measures 0 px tall until the popup's element is in the document (the first line popup

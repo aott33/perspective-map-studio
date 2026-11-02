@@ -1,5 +1,5 @@
 import {
-    ANCHOR_ORDER, PLACEMENT_MARGIN_PX, PLACEMENT_MIN_HEIGHT_PX, Rect, cameraPadding, cardRect, intersects, placePopup
+    ANCHOR_ORDER, PLACEMENT_MARGIN_PX, PLACEMENT_MIN_HEIGHT_PX, Rect, cameraPadding, cardRect, intersects, placePopup, placedMaxWidth
 } from '../popupPlacement';
 
 /** A 1440 by 900 map with the desktop's controls: the top bar (search and Needs you) and the zoom card. */
@@ -89,6 +89,21 @@ describe('the popup card\'s placement (owner review notes item 18)', () => {
         // A point past the map's left edge with the card wider than the room: shifted right.
         const edge = placePopup({ x: 5, y: 20 }, 320, 420, 480, 300, 150, [], 22);
         expect(edge.shift[0]).toBeGreaterThan(0);
+    });
+});
+
+describe('the card\'s width (owner review notes item 18)', () => {
+    test('a card keeps its own width near an edge (it goes beside the point), and only a map narrower than the card narrows it', () => {
+        // Point 1 at 1320 px on a 1440 px map: the old centred rule gave 225 px and the comms words wrapped.
+        expect(placedMaxWidth(W, 320)).toBe(320);
+        expect(placedMaxWidth(W, 350)).toBe(350);
+        expect(placedMaxWidth(300, 320)).toBe(300 - 2 * PLACEMENT_MARGIN_PX);
+        const p = place(1320, 418);
+        expect(p.shift).toEqual([0, 0]);
+        const r = rectOf(1320, 418, p);
+        expect(r.w).toBe(320);
+        expect(insideFree(r)).toBe(true);
+        expect(intersects(r, ZOOM)).toBe(false);
     });
 });
 

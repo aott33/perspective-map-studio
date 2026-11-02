@@ -33,6 +33,15 @@ export const PLACEMENT_MARGIN_PX = 16;
 export const PLACEMENT_MIN_HEIGHT_PX = 120;
 
 /**
+ * The card's max-width for a map `width` px wide (item 18): the card's own width (`maxPx`, 320 for a
+ * point, 350 for a line) when the map has room for it less a margin each side. The card is no longer
+ * narrowed to stay centred on a point near an edge: `placePopup` puts it beside the point or on a corner.
+ */
+export function placedMaxWidth(width: number, maxPx: number): number {
+    return Math.max(0, Math.min(maxPx, width - 2 * PLACEMENT_MARGIN_PX));
+}
+
+/**
  * The card's rectangle for an anchor, as MapLibre lays it out for a numeric offset: the tip `offset`
  * px from the point on a side, or `offset / sqrt(2)` each way on a corner.
  */
