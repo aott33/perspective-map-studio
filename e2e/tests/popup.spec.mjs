@@ -273,9 +273,10 @@ test.describe('the owner\'s review notes: Esc, plain words, placement and the ca
         expect(topLeft).not.toBeNull();
         expect(topRight).not.toBeNull();
         const spots = {
-            'under the top bar': [260, 48],
-            'under the zoom card': [box.width - 34, 130],
-            'the top-left corner': [40, 40],
+            // Just below the controls (a point under one cannot be clicked): the card used to grow up over them.
+            'just below the top bar': [260, topLeft.y + topLeft.h - box.y + 24],
+            'just below the zoom card': [box.width - 34, topRight.y + topRight.h - box.y + 24],
+            'the left edge near the top': [28, topLeft.y + topLeft.h - box.y + 40],
             'the left edge': [28, box.height / 2],
             'the right edge': [box.width - 28, box.height / 2],
             'the bottom edge': [box.width / 2, box.height - 28],
