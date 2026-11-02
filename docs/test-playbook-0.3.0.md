@@ -14,6 +14,7 @@ A walk through everything 0.3.0 does, in order, on the local development stack. 
 | 5. Lines and instruments | passed (with notes): instruments in place, the shared marker's pick list, the segment popup, comms off dashing, PT-2's alarm, L-SWD quiet and the flow arrow work; notes: the popup over the top bar and cut off (item 18), the line popup's layout (item 19) | 2026-11-02 |
 | 6. Zoom card, Legend and basemaps | passed (with notes): zoom card, legend keyboard, toggles kept after a reload and basemap switching work; notes: the legend over the top bar (item 23), kinds in the legend (item 24), OpenStreetMap readability (item 25) | 2026-11-02 |
 | 7. Phone | passed (with notes): the top bar, the bottom sheet and tap targets; notes: the list under the zoom card (item 26), centring under the sheet (item 27), the legend (items 3, 23) | 2026-11-02 |
+| 8. Custom popup view | passed: SWD1's custom view with the close row, on the phone sheet; the hidden link is covered by the automated test | 2026-11-02 |
 | 2. Search and Needs you | passed (with notes): typing, Esc, search by asset name and Tab order work; search works and zooms to zoom 15; notes: a chevron opens a simple alphabetical list of every item, typing filters it (item 8); hovering Needs you makes its background disappear (bug, item 9), also over OpenStreetMap on the showcase; the list shows the items correctly; on a phone the counts as glyph and number only and the placeholder "Search assets" (item 12) | 2026-10-30 |
 
 ## 0. Before you start
@@ -143,8 +144,8 @@ Notes:
 
 ## 8. Custom popup view, links, alarm page
 
-- [ ] On the showcase, click SWD1: its kind uses a custom popup view (`Popups/SiteCard`) with Map Studio's close row above it, on desktop and as the phone sheet.
-- [ ] Rename a pad's asset or leave a placeholder empty (Designer, the dev adapter): the page link icon hides instead of opening a broken link.
+- [x] On the showcase, click SWD1: its kind uses a custom popup view (`Popups/SiteCard`) with Map Studio's close row above it, on desktop and as the phone sheet.
+- [ ] Optional: the page link icon hides instead of opening a broken link when its placeholder has no value. Not a Designer step in 0.3.0 (kind setups have no editor until epic-editing, and every seeded link uses `{item.name}`, which always has a value); the automated test covers it (`e2e/tests/popup.spec.mjs`, "the page link ... hidden with no value": the pad link set to `/pad/{asset.id}`, then Pad 1, which has no asset, shows no icon).
 
 Notes:
 
