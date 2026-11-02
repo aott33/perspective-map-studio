@@ -151,10 +151,13 @@ Notes:
 
 ## 9. Dark theme and the review states
 
-- [ ] Showcase `/dark`: the same map in Perspective's dark theme; every state still reads (magenta comms lost, alarm hues, chips).
+- [ ] Showcase `/dark` (reload once after it opens, item 29): the same map in Perspective's dark theme; every state still reads (magenta comms lost, alarm hues, chips).
 - [ ] `/styles`, **Showcase review alarms / stale / off**: the showcase shows every alarm priority and acknowledgement state, the stale states, then quiet again. Compare with `docs/review-er27.md` while you do the ER-27 review.
 
 Notes:
+
+- The scroll bars are wide and loud, mostly in the dark theme (item 28).
+- The map stays light on `/dark` until a reload: the map reads the theme once when it opens (item 29).
 
 ## 10. Designer: the setup form
 
