@@ -2413,6 +2413,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (y > limit) {
             this.map.panBy([0, y - limit], { duration: 200 });
         }
+        // The sheet takes the focus as the card does, so Esc reaches the component (item 14) and the keyboard is inside it.
+        sheetEl.focus({ preventScroll: true });
     }
 
     /**
@@ -2643,7 +2645,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         if (open.sheet) {
             return (
-                <div className="mapstudio-sheet" role="dialog" aria-label={open.point.name} data-point-id={open.point.id}>
+                <div className="mapstudio-sheet" role="dialog" aria-label={open.point.name} data-point-id={open.point.id} tabIndex={-1}>
                     {this.popupContentFor(open)}
                 </div>
             );

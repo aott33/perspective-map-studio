@@ -629,6 +629,11 @@
     overflow: hidden;
 }
 
+/* The sheet holds the focus when it opens (MapStudio.tsx showSheetFor): the open sheet is the signal, no ring. */
+.mapstudio-sheet:focus {
+    outline: none;
+}
+
 .mapstudio-popup--sheet {
     max-height: 100%;
     --mapstudio-popup-icon: 44px;

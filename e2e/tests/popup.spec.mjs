@@ -6,10 +6,10 @@
 // kind setup is changed through the component's real session path (window.__mapStudioTest, as
 // kindsetup.spec.mjs does) and the seed puts it back afterwards.
 
-import { TRACER, pagePixel } from '../lib/geo.mjs';
+import { TRACER, centerFor, pagePixel } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, WARNING_SETTLE_MS, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, openMap, runSeed, send, shot,
-    signedInContext, test
+    DRAW_MS, EDITOR_USER, WARNING_SETTLE_MS, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, openMap, runSeed, send, shot,
+    signedInContext, test, view
 } from './fixtures.mjs';
 
 test.use({ viewport: { width: 1440, height: 900 } });
@@ -187,4 +187,148 @@ editorTest('a kind setup\'s popupView opens the project view with mapItem and a 
     await page.waitForTimeout(WARNING_SETTLE_MS);
     const nope = watched.warnings.filter((w) => w.includes('"Popups/Nope"'));
     expect(nope, watched.warnings.join('\n')).toHaveLength(1);
+});
+
+// The owner's review notes on the 0.3.0 map, group a (_bmad-output/backlog/story-owner-review-notes-on-the-0-3-0-map.md):
+// item 14 (Esc closes the card or the sheet and returns the focus), item 15 (plain words for a quality
+// code), item 18 (the card placed inside the map less the top bar and the zoom card) and item 27 (Return
+// centres in the visible area). As a viewer on the View page, which has no test buttons.
+
+/** The rectangle of the first element a selector finds, in page pixels, or null. */
+const rectOf = (page, selector) => page.evaluate((s) => {
+    const el = document.querySelector(s);
+    if (!el) return null;
+    const b = el.getBoundingClientRect();
+    return { x: b.x, y: b.y, w: b.width, h: b.height };
+}, selector);
+
+const overlaps = (a, b) => a && b && a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+const card = (page) => page.locator('.maplibregl-popup .mapstudio-popup--default');
+
+/** Click the map's centre, where `view` put the point. */
+async function clickCentre(page, map) {
+    const box = await map.boundingBox();
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+}
+
+/** Open the View page as a viewer and wait for the first full batch. */
+async function openView(page) {
+    const map = await openMap(page, '/');
+    await mapLoaded(map);
+    await expect(map).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
+    return map;
+}
+
+test.describe('the owner\'s review notes: Esc, plain words, placement and the camera', () => {
+    test('Esc closes the card and returns the focus to the map, or to the search field that opened it (item 14)', async ({ page, watched }) => {
+        const map = await openView(page);
+        await view(page, map, TRACER.points.p1.lngLat, 15);
+        await clickCentre(page, map);
+        await expect(card(page)).toBeVisible({ timeout: 30_000 });
+        await expect(map).toHaveAttribute('data-popup-mode', 'card');
+        await page.keyboard.press('Escape');
+        await expect(card(page)).toHaveCount(0);
+        await expect(map).toHaveAttribute('data-popup-mode', '');
+        await expect(map).toHaveAttribute('data-selected', '');
+        expect(await page.evaluate(() => document.activeElement && document.activeElement.classList.contains('maplibregl-canvas')),
+            'the focus on the map').toBe(true);
+        // Opened from the search: Esc closes it and the field has the focus again.
+        await page.locator('.mapstudio-search-input').fill('Point 1');
+        await page.locator('.mapstudio-search-option').first().click();
+        await expect(card(page)).toHaveAttribute('data-point-id', ids.p1, { timeout: DRAW_MS });
+        await page.keyboard.press('Escape');
+        await expect(card(page)).toHaveCount(0);
+        await expect(page.locator('.mapstudio-search-input')).toBeFocused();
+        // Esc with nothing open is nobody's: the legend stays as it was, nothing throws.
+        await page.keyboard.press('Escape');
+        await expect(map).toHaveAttribute('data-popup-mode', '');
+        expect(watched.warnings, 'Map Studio warnings').toEqual([]);
+    });
+
+    test('a comms tag that is not there reads in plain words, the code kept in the tooltip (item 15)', async ({ page }) => {
+        const map = await openView(page);
+        await view(page, map, TRACER.points.p3.lngLat, 15);
+        await clickCentre(page, map);
+        await expect(card(page)).toHaveAttribute('data-point-id', ids.p3, { timeout: 30_000 });
+        const comms = card(page).locator('[data-part="comms"]');
+        await expect(comms).toHaveAttribute('data-comms', 'lost');
+        await expect(comms).toHaveAttribute('data-quality', 'Bad_NotFound');
+        await expect(comms.locator('.mapstudio-popup-value')).toHaveText('No data yet - the tag was not found');
+        await expect(comms).toHaveAttribute('title', /\(Bad_NotFound\)$/);
+        // Its values have never arrived: no "Stale - ... (comms lost)" words, the reason in the tooltip.
+        const kpi = card(page).locator('.mapstudio-popup-kpi').first();
+        await expect(kpi.locator('.mapstudio-popup-value')).not.toContainText('Stale');
+        await expect(kpi.locator('.mapstudio-popup-value')).not.toContainText('Bad_');
+    });
+
+    test('the card stays inside the map, off the top bar and the zoom card, for a point near every edge (item 18)', async ({ page }) => {
+        const map = await openView(page);
+        const box = await map.boundingBox();
+        const topLeft = await rectOf(page, '.maplibregl-ctrl-top-left');
+        const topRight = await rectOf(page, '.maplibregl-ctrl-top-right');
+        expect(topLeft).not.toBeNull();
+        expect(topRight).not.toBeNull();
+        const spots = {
+            'under the top bar': [260, 48],
+            'under the zoom card': [box.width - 34, 130],
+            'the top-left corner': [40, 40],
+            'the left edge': [28, box.height / 2],
+            'the right edge': [box.width - 28, box.height / 2],
+            'the bottom edge': [box.width / 2, box.height - 28],
+            'the bottom-right corner': [box.width - 40, box.height - 40]
+        };
+        for (const [where, at] of Object.entries(spots)) {
+            const center = centerFor(box, TRACER.points.p1.lngLat, at, 15);
+            await view(page, map, center, 15);
+            await page.mouse.click(box.x + at[0], box.y + at[1]);
+            await expect(card(page)).toHaveAttribute('data-point-id', ids.p1, { timeout: 30_000 });
+            // The card may have panned the map by what was missing; its rectangle settles within the pan's 200 ms.
+            await expect.poll(async () => {
+                const r = await rectOf(page, '.maplibregl-popup-content');
+                const inside = r && r.x >= box.x - 1 && r.y >= box.y - 1 && r.x + r.w <= box.x + box.width + 1 && r.y + r.h <= box.y + box.height + 1;
+                return inside && !overlaps(r, topLeft) && !overlaps(r, topRight) ? 'placed' : JSON.stringify(r);
+            }, { message: 'the card for a point ' + where, timeout: 5_000 }).toBe('placed');
+            await page.keyboard.press('Escape');
+            await expect(card(page)).toHaveCount(0);
+        }
+    });
+});
+
+test.describe('390 px: Esc on the sheet, Return under the sheet', () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+
+    test('Esc closes the bottom sheet (item 14); Return centres the item in the map above the sheet and below the top bar (item 27)',
+        async ({ page, watched }) => {
+            const map = await openView(page);
+            await view(page, map, TRACER.points.p2.lngLat, 15);
+            const box = await map.boundingBox();
+            const [x, y] = pagePixel(box, TRACER.points.p2.lngLat, TRACER.points.p2.lngLat, 15);
+            await page.mouse.click(x, y);
+            const sheet = page.locator('.mapstudio-sheet .mapstudio-popup--default');
+            await expect(sheet).toHaveAttribute('data-point-id', ids.p2, { timeout: 30_000 });
+            await expect(map).toHaveAttribute('data-popup-mode', 'sheet');
+            await page.keyboard.press('Escape');
+            await expect(page.locator('.mapstudio-sheet')).toHaveCount(0);
+            await expect(map).toHaveAttribute('data-popup-mode', '');
+
+            // Open again, move away at zoom 17, Return: the marker sits in the visible area, between the top bar
+            // and the sheet, not under either (the name label's box, published with the labels).
+            await page.mouse.click(x, y);
+            await expect(sheet).toHaveAttribute('data-point-id', ids.p2, { timeout: 30_000 });
+            await view(page, map, [TRACER.points.p2.lngLat[0] + 0.004, TRACER.points.p2.lngLat[1] + 0.001], 17);
+            await page.locator('.mapstudio-return-button').click();
+            await expect(map).toHaveAttribute('data-center', TRACER.points.p2.lngLat[0].toFixed(5) + ',' + TRACER.points.p2.lngLat[1].toFixed(5), { timeout: DRAW_MS });
+            const sheetRect = await rectOf(page, '.mapstudio-sheet');
+            const topBar = await rectOf(page, '.maplibregl-ctrl-top-left');
+            await expect.poll(async () => {
+                const labels = JSON.parse(await map.getAttribute('data-labels') || '[]');
+                const name = labels.find((b) => b.layer === 'mapstudio-items-name' && b.text === 'Point 2');
+                if (!name) return 'no label yet';
+                const top = box.y + name.y;
+                const bottom = box.y + name.y + name.h;
+                return top > topBar.y + topBar.h && bottom < sheetRect.y ? 'in view' : JSON.stringify({ top, bottom, bar: topBar.y + topBar.h, sheet: sheetRect.y });
+            }, { message: 'Point 2 between the top bar and the sheet', timeout: DRAW_MS }).toBe('in view');
+            expect(watched.warnings, 'Map Studio warnings').toEqual([]);
+        });
 });
