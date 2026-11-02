@@ -10,7 +10,7 @@ A walk through everything 0.3.0 does, in order, on the local development stack. 
 | 13. Satellite | passed: imagery with the owner's Mapbox token; more Mapbox styles go to the backlog after 0.3.0 | 2026-10-30 |
 | 1. First look | passed: lines and chips fine; opens at zoom 15 (by design); neutral discs confirmed; P14 red triangle confirmed; P21 comms lost and SWD1 stale confirmed on `mapstudio-showcase` (the first check was on the dev map, which has no P21); notes: dots too small (bigger dots, item 6), the instrument icon does not read well (item 7) | 2026-10-30 |
 | 3. The popup card | reviewed with notes (pop-out, View alarms and live values with the card open work): layout option A chosen (item 13); a click on empty map closes it, Esc does not (bug, item 14); "Bad_NotFound" shown to the operator (item 15) | 2026-10-30 |
-| 4. Live state | in progress: the alarm raises, acknowledges ("!" in the triangle) and clears; the card updates while open; comms off and on, pressure bad and good, status 0 to 4, L3 flow work; notes: a selected marker's rings are cut off (item 16) | 2026-11-02 |
+| 4. Live state | passed (with notes): the alarm raises, acknowledges ("!" in the triangle) and clears; the card updates while open; comms off and on, pressure bad and good, status 0 to 4, L3 flow, an alarm over a style and comms lost dropping the style work; comms on, pressure 400 and status 0 reset Point 1; notes: a selected marker's rings are cut off (item 16) | 2026-11-02 |
 | 2. Search and Needs you | passed (with notes): typing, Esc, search by asset name and Tab order work; search works and zooms to zoom 15; notes: a chevron opens a simple alphabetical list of every item, typing filters it (item 8); hovering Needs you makes its background disappear (bug, item 9), also over OpenStreetMap on the showcase; the list shows the items correctly; on a phone the counts as glyph and number only and the placeholder "Search assets" (item 12) | 2026-10-30 |
 
 ## 0. Before you start
@@ -87,12 +87,13 @@ Values reach the map within the refresh interval (10 s), so give each press a mo
 - [x] **P14 pressure bad**: Point 2 goes stale (hourglass, no colour, value marked stale); **P14 pressure good** restores it.
 - [x] **P12 status 0 to 4**: Point 1's style changes (Attention, Warning, Fault rings with words, Out of service faded).
 - [x] **L3 flow 20 / 120 / 300**: the Tracer line's look follows its Bands rule.
-- [ ] An alarm always draws over a style; stale drops the style until a fresh value.
+- [x] An alarm always draws over a style; stale drops the style until a fresh value.
 
 Notes:
 
 - A selected marker's selection ring is cut off at its edges, with a style ring or a dashed state ring (item 16).
 - The popup of a line with no instruments shows a meaningless segment block, "Segment Line start to Line end / No value to No value" (item 17).
+- With comms lost the alarm block's heading reads "Stale - 1 alarm - Priority 1, unacknowledged" and wraps (goes with item 13).
 - Stale values say "(Bad)" or "(comms lost)" after the value: goes with the popup rework (item 13) and plain words (item 15).
 
 ## 5. Lines and instruments

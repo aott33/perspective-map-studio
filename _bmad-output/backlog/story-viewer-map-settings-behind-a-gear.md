@@ -40,5 +40,5 @@ The idea to think through: the Legend becomes the key only, and a gear button (b
 - Decision: 2026-10-30 Owner: "add to backlog to think through", then "agree, keep the gear for after 0.3.0": after release 0.3.0; 0.3.0 ships story 10 item 3 as decided (the setup's default basemap, a switch only when the setup lists more than one, the toggles in the Legend).
 - Open question: Where the gear sits (beside the zoom card on desktop; on a phone in the top bar or beside the Legend button) and whether the Legend keeps its toggles as well.
 - Open question: Whether the setup can lock a setting (for example force Names on for a control room) or only offer choices.
-- Open question: Whether a state filter fades the other items (they stay findable) or hides them, and whether it shows in the Needs you bar so a filtered map is never mistaken for a quiet one.
+- Decision: 2026-11-02 Owner: a state filter fades the other items for now (hiding them may be better later, decided when this story is refined), and the map shows that a filter is applied, so a filtered map is never mistaken for a quiet one.
 - Constraint: alarm presentation (ER-27): a viewer setting may hide context (lines, names, geofences), never a state mark or the Needs you count; a state filter may narrow the map to abnormal items, never hide an alarm while it is on.
