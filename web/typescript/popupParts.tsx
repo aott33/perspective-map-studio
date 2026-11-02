@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ItemValues, KindDisplay, LiveValue, NO_DATA, qualityWords, staleWords, valueText } from './live';
+import { ItemValues, KindDisplay, LiveValue, NO_DATA, capitalised, qualityWords, staleWords, valueText } from './live';
 
 /**
  * The parts the point popup (DefaultPopup.tsx) and the line popup (LinePopup.tsx) share (epic 3
@@ -77,11 +77,7 @@ function noDataNote(value: LiveValue | undefined): string {
         return '';
     }
     const words = qualityWords(value.reason !== '' ? value.reason : value.quality);
-    return words === '' || words === 'no value yet' ? '' : capitalise(words) + (words !== value.quality ? ' (' + value.quality + ')' : '');
-}
-
-function capitalise(words: string): string {
-    return words.charAt(0).toUpperCase() + words.substring(1);
+    return words === '' || words === 'no value yet' ? '' : capitalised(words) + (words !== value.quality ? ' (' + value.quality + ')' : '');
 }
 
 /**
