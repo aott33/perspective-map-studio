@@ -6,6 +6,11 @@
  * and focus, or says "No matches". On a desktop the field and the panel are two floating cards; at
  * phone width the control is the one top bar, 8 px from the edges, and the panel expands inside it.
  *
+ * A chevron in the field (owner review item 8) opens the list of every map item in one alphabetical list, no
+ * groups; typing filters it (every match, not eight). The list is drawn in pages of 50 rows as it scrolls,
+ * so a 300-site field opens fast, and the arrow keys and End reach the rows not drawn yet. The chevron is a
+ * pointer affordance (not a tab stop); ArrowDown in the empty field opens the same list for the keyboard.
+ *
  * The input is an ARIA combobox over a listbox: `aria-expanded`, `aria-controls`, `aria-autocomplete`
  * and `aria-activedescendant` on the input; `role="option"` and `aria-selected` on the rows. Arrow
  * keys move the active row (wrapping), Home and End jump, Enter chooses the active row (the first
@@ -20,7 +25,7 @@
 
 import { IControl, Map as MapLibreMap } from 'maplibre-gl';
 import { glyphSvg } from './controls';
-import { NO_MATCHES, SEARCH_PLACEHOLDER, SearchEntry, SearchResult, chosenText, searchEntries } from './search';
+import { NO_MATCHES, SEARCH_LABEL, SEARCH_PLACEHOLDER, SearchEntry, SearchResult, allEntries, chosenText, pagedCount, searchEntries } from './search';
 
 /** The width below which the control is the phone top bar (the stylesheet's phone breakpoint). */
 const PHONE_QUERY = '(max-width: 767px)';
@@ -34,6 +39,11 @@ export class SearchControl implements IControl {
     private field: HTMLDivElement | null = null;
     private input: HTMLInputElement | null = null;
     private clearButton: HTMLButtonElement | null = null;
+    private chevronButton: HTMLButtonElement | null = null;
+    /** The list of every item was asked for (the chevron, ArrowDown), so an empty field still shows it. */
+    private listAll = false;
+    /** How many rows of `results` are in the DOM (a page at a time). */
+    private shown = 0;
     private panel: HTMLDivElement | null = null;
     private status: HTMLDivElement | null = null;
     private entries: SearchEntry[] = [];
@@ -61,7 +71,7 @@ export class SearchControl implements IControl {
         input.autocomplete = 'off';
         input.spellcheck = false;
         input.setAttribute('role', 'combobox');
-        input.setAttribute('aria-label', SEARCH_PLACEHOLDER);
+        input.setAttribute('aria-label', SEARCH_LABEL);
         input.setAttribute('aria-autocomplete', 'list');
         input.setAttribute('aria-haspopup', 'listbox');
         input.setAttribute('aria-expanded', 'false');
@@ -72,6 +82,20 @@ export class SearchControl implements IControl {
         input.addEventListener('focus', this.handleFocus);
         input.addEventListener('blur', this.handleBlur);
         field.appendChild(input);
+        // The chevron: opens the list of every item (item 8). A press keeps the focus in the input.
+        const chevron = document.createElement('button');
+        chevron.type = 'button';
+        chevron.className = 'mapstudio-ctrl-button mapstudio-search-chevron';
+        chevron.tabIndex = -1;
+        chevron.title = 'Show every item';
+        chevron.setAttribute('aria-label', 'Show every item');
+        chevron.setAttribute('aria-expanded', 'false');
+        chevron.setAttribute('aria-controls', this.listId);
+        chevron.innerHTML = glyphSvg('chevron', 'mapstudio-ctrl-glyph');
+        chevron.addEventListener('mousedown', this.keepFocus);
+        chevron.addEventListener('click', this.handleChevron);
+        field.appendChild(chevron);
+        this.chevronButton = chevron;
         row.appendChild(field);
         container.appendChild(row);
         const status = document.createElement('div');
@@ -96,6 +120,11 @@ export class SearchControl implements IControl {
             this.input.removeEventListener('blur', this.handleBlur);
         }
         this.showClear(false);
+        if (this.chevronButton) {
+            this.chevronButton.removeEventListener('mousedown', this.keepFocus);
+            this.chevronButton.removeEventListener('click', this.handleChevron);
+            this.chevronButton = null;
+        }
         if (this.container && this.container.parentNode) {
             this.container.parentNode.removeChild(this.container);
         }
@@ -140,10 +169,16 @@ export class SearchControl implements IControl {
         if (!this.panel || !this.container || !this.input) {
             return;
         }
+        this.panel.removeEventListener('scroll', this.handleScroll);
         this.container.removeChild(this.panel);
         this.panel = null;
         this.results = [];
+        this.shown = 0;
+        this.listAll = false;
         this.active = -1;
+        if (this.chevronButton) {
+            this.chevronButton.setAttribute('aria-expanded', 'false');
+        }
         this.input.setAttribute('aria-expanded', 'false');
         this.input.removeAttribute('aria-activedescendant');
         this.container.setAttribute('data-search-open', 'false');
@@ -171,7 +206,7 @@ export class SearchControl implements IControl {
             // A press keeps the focus in the input; the click clears.
             button.addEventListener('mousedown', this.keepFocus);
             button.addEventListener('click', this.handleClear);
-            this.field.appendChild(button);
+            this.field.insertBefore(button, this.chevronButton);
             this.clearButton = button;
         } else if (!show && this.clearButton) {
             this.clearButton.removeEventListener('mousedown', this.keepFocus);
@@ -192,19 +227,26 @@ export class SearchControl implements IControl {
         }
         const text = input.value;
         this.showClear(text !== '');
-        if (text.trim() === '') {
+        const all = text.trim() === '';
+        if (all && !this.listAll) {
             this.close();
             return;
         }
-        this.results = searchEntries(this.entries, text);
+        // Every match, not a handful: the list scrolls and is drawn in pages (item 8).
+        this.results = all ? allEntries(this.entries) : searchEntries(this.entries, text, Number.POSITIVE_INFINITY);
+        this.shown = pagedCount(this.results.length, Math.max(this.shown, 0));
         if (!this.panel) {
             const panel = document.createElement('div');
             panel.className = 'mapstudio-topbar-panel mapstudio-search-panel';
             // A press inside the panel keeps the focus in the input, so a row's click (or tap) reaches it.
             panel.addEventListener('mousedown', this.keepFocus);
+            panel.addEventListener('scroll', this.handleScroll);
             container.appendChild(panel);
             this.panel = panel;
             input.setAttribute('aria-expanded', 'true');
+            if (this.chevronButton) {
+                this.chevronButton.setAttribute('aria-expanded', 'true');
+            }
             container.setAttribute('data-search-open', 'true');
             this.onToggle(true);
         }
@@ -242,7 +284,7 @@ export class SearchControl implements IControl {
         list.id = this.listId;
         list.setAttribute('role', 'listbox');
         list.setAttribute('aria-label', 'Search results');
-        this.results.forEach((result, i) => {
+        this.results.slice(0, this.shown).forEach((result, i) => {
             const li = document.createElement('li');
             li.className = 'mapstudio-search-option';
             li.id = this.listId + '-' + i;
@@ -274,8 +316,46 @@ export class SearchControl implements IControl {
         });
         panel.appendChild(list);
         panel.setAttribute('data-results', String(this.results.length));
+        panel.setAttribute('data-shown', String(this.shown));
+        list.setAttribute('aria-setsize', String(this.results.length));
         this.setActive(this.active);
     }
+
+    /** Draw the next page of rows when the list scrolls near its end, or a row beyond the drawn ones is wanted. */
+    private showMore(upTo: number): void {
+        if (!this.panel || this.shown >= this.results.length) {
+            return;
+        }
+        const next = pagedCount(this.results.length, Math.max(upTo, this.shown + 1));
+        if (next === this.shown) {
+            return;
+        }
+        const scroll = this.panel.scrollTop;
+        this.shown = next;
+        this.renderList();
+        this.panel.scrollTop = scroll;
+    }
+
+    private handleScroll = (): void => {
+        const panel = this.panel;
+        if (panel && this.shown < this.results.length && panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 80) {
+            this.showMore(this.shown + 1);
+        }
+    };
+
+    /** The chevron: every item in one alphabetical list, or close it. */
+    private handleChevron = (ev: MouseEvent): void => {
+        ev.preventDefault();
+        if (this.panel) {
+            this.close();
+            return;
+        }
+        this.listAll = true;
+        if (this.input) {
+            this.input.focus();
+        }
+        this.search();
+    };
 
     /** Mark one row active (`aria-selected`, `aria-activedescendant`); -1 for none. */
     private setActive(index: number): void {
@@ -318,8 +398,15 @@ export class SearchControl implements IControl {
 
     private handleInput = (): void => {
         this.active = -1;
+        this.shown = 0;
         this.search();
     };
+
+    /** Make a row the active one, drawing its page first when it is beyond the rows drawn. */
+    private activate(index: number): void {
+        this.showMore(index + 1);
+        this.setActive(index);
+    }
 
     private handleFocus = (): void => {
         this.search();
@@ -356,28 +443,30 @@ export class SearchControl implements IControl {
             case 'ArrowDown':
                 ev.preventDefault();
                 if (!this.panel) {
+                    // In an empty field ArrowDown opens the list of every item (the keyboard's chevron).
+                    this.listAll = this.input !== null && this.input.value.trim() === '';
                     this.search();
                 }
                 if (this.results.length > 0) {
-                    this.setActive(this.active < 0 ? 0 : (this.active + 1) % this.results.length);
+                    this.activate(this.active < 0 ? 0 : (this.active + 1) % this.results.length);
                 }
                 break;
             case 'ArrowUp':
                 ev.preventDefault();
                 if (n > 0) {
-                    this.setActive(this.active <= 0 ? n - 1 : this.active - 1);
+                    this.activate(this.active <= 0 ? n - 1 : this.active - 1);
                 }
                 break;
             case 'Home':
                 if (this.panel && n > 0) {
                     ev.preventDefault();
-                    this.setActive(0);
+                    this.activate(0);
                 }
                 break;
             case 'End':
                 if (this.panel && n > 0) {
                     ev.preventDefault();
-                    this.setActive(n - 1);
+                    this.activate(n - 1);
                 }
                 break;
             case 'Enter':

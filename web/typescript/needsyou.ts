@@ -44,12 +44,23 @@ export interface NeedsYouSummary {
     counts: NeedsYouCounts;
     /** The items that need attention, alarms by priority, then comms lost, then stale. */
     rows: NeedsYouRow[];
-    /** The highest alarm priority among the rows (1 to 3), 0 with no alarm: the bar's alarm glyph. */
+    /** The highest alarm priority among the rows (1 to 3), 0 with no alarm. */
     highestPriority: number;
+    /**
+     * The highest priority (1 to 3) among the alarms nobody has acknowledged, 0 when there is none (no alarm, or every
+     * alarm acknowledged): the hue of the bar's bell (owner review, item 12).
+     */
+    highestUnackedPriority: number;
 }
 
-/** What the bar reads with nothing to attend to (EXPERIENCE.md: neutral, and the bar stays). */
-export const ALL_OK = 'All OK';
+/**
+ * What the bar says to assistive technology and in its hover title with nothing to attend to. The bar itself has
+ * no words at any width (owner review, item 12): a grey bell alone, never "All OK".
+ */
+export const BAR_QUIET = 'Needs you: nothing needs attention';
+
+/** What the bar says while the state is unknown (the Gateway cannot be reached; group c's hook, item 32). */
+export const BAR_UNKNOWN = 'Needs you: state unknown, no connection to the Gateway';
 
 /** What the list says with nothing to attend to. */
 export const NOTHING_NEEDS_YOU = 'Nothing needs you';
@@ -57,7 +68,27 @@ export const NOTHING_NEEDS_YOU = 'Nothing needs you';
 /** The list's one line of explanation (the mockups' "Ranked: alarms by priority, then comms lost, then stale"). */
 export const RANKED_NOTE = 'Ranked: alarms by priority, then comms lost, then stale';
 
-export const EMPTY_SUMMARY: NeedsYouSummary = { counts: { alarm: 0, commsLost: 0, stale: 0 }, rows: [], highestPriority: 0 };
+export const EMPTY_SUMMARY: NeedsYouSummary = { counts: { alarm: 0, commsLost: 0, stale: 0 }, rows: [], highestPriority: 0, highestUnackedPriority: 0 };
+
+/** How the bar's bell looks: its sprite glyph and its tone (a priority 1 to 3 hue, `acknowledged` neutral, `none` grey). */
+export interface BellLook {
+    /** `bell` (solid) while an alarm is unacknowledged, `bell-outline` (hollow) otherwise. */
+    glyph: 'bell' | 'bell-outline';
+    tone: 'p1' | 'p2' | 'p3' | 'acknowledged' | 'none';
+}
+
+/**
+ * The bell of the bar (owner review, item 12): solid in the hue of the highest unacknowledged priority; neutral and
+ * hollow when every alarm is acknowledged; grey and hollow with no alarm. The triangle with a digit stays the
+ * map's mark, so the bar's count and a marker's alarm no longer read alike.
+ */
+export function bellLook(summary: NeedsYouSummary): BellLook {
+    const p = summary.highestUnackedPriority;
+    if (p >= 1 && p <= 3) {
+        return { glyph: 'bell', tone: p === 1 ? 'p1' : p === 2 ? 'p2' : 'p3' };
+    }
+    return { glyph: 'bell-outline', tone: summary.counts.alarm > 0 ? 'acknowledged' : 'none' };
+}
 
 /** The badge glyph of a state as the marker draws it (markers.ts markerSpec). */
 export function stateGlyph(state: ItemState): string {
@@ -157,6 +188,7 @@ export function needsYou(items: readonly MapItemRecord[], kinds: readonly Kind[]
     const counts: NeedsYouCounts = { alarm: 0, commsLost: 0, stale: 0 };
     const ranked: Array<{ row: NeedsYouRow; rank: number; key: string }> = [];
     let highest = 0;
+    let highestUnacked = 0;
     for (const item of items) {
         if (item.deleted) {
             continue;
@@ -173,6 +205,9 @@ export function needsYou(items: readonly MapItemRecord[], kinds: readonly Kind[]
             counts.alarm++;
             if (state.alarm && (highest === 0 || state.alarm.priority < highest)) {
                 highest = state.alarm.priority;
+            }
+            if (state.alarm && state.alarm.unacked && (highestUnacked === 0 || state.alarm.priority < highestUnacked)) {
+                highestUnacked = state.alarm.priority;
             }
         } else if (rowState === 'comms-lost') {
             counts.commsLost++;
@@ -205,7 +240,7 @@ export function needsYou(items: readonly MapItemRecord[], kinds: readonly Kind[]
         }
         return a.row.id < b.row.id ? -1 : a.row.id > b.row.id ? 1 : 0;
     });
-    return { counts, rows: ranked.map((r) => r.row), highestPriority: highest };
+    return { counts, rows: ranked.map((r) => r.row), highestPriority: highest, highestUnackedPriority: highestUnacked };
 }
 
 export function total(counts: NeedsYouCounts): number {
@@ -235,11 +270,11 @@ export function countParts(counts: NeedsYouCounts): Array<{ kind: NeedsYouState;
     return out;
 }
 
-/** The whole bar as one line: "Needs you 3: 1 alarm, 1 comms lost, 1 stale", or "All OK". */
+/** The whole bar as one line for the hover title and screen readers: "Needs you 3: 1 alarm, 1 comms lost, 1 stale", or the quiet line. */
 export function summaryText(counts: NeedsYouCounts): string {
     const n = total(counts);
     if (n === 0) {
-        return ALL_OK;
+        return BAR_QUIET;
     }
     return 'Needs you ' + n + ': ' + countParts(counts).map((p) => p.text).join(', ');
 }

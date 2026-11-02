@@ -61,6 +61,22 @@ export interface LegendKey {
     tints: LegendTintRow[];
 }
 
+/**
+ * The Kinds section starts collapsed ("Kinds (9)") when more than this many kinds are on the map, so the key the
+ * operator needs, the States, is on top and in view (owner review, item 24; "more than about six").
+ */
+export const KINDS_COLLAPSE_OVER = 6;
+
+/** Whether the Kinds section starts collapsed for `count` kinds on the map. */
+export function kindsStartCollapsed(count: number): boolean {
+    return count > KINDS_COLLAPSE_OVER;
+}
+
+/** The Kinds heading: "Kinds", or "Kinds (9)" with the count once there are more than a few. */
+export function kindsHeading(count: number): string {
+    return kindsStartCollapsed(count) ? 'Kinds (' + count + ')' : 'Kinds';
+}
+
 /** The note under the toggles (DESIGN.md legend, the zoom 14 rule). */
 export const ZOOM_NOTE = 'Below zoom 14 sites show as dots';
 

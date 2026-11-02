@@ -1,5 +1,5 @@
 import {
-    BASEMAP_STORAGE_KEY, OSM_SOURCE, basemapSourceBody, fallbackBasemap, initialBasemap, offeredBasemaps, readBasemapSource,
+    BASEMAP_STORAGE_KEY, OSM_SOURCE, basemapSourceBody, fallbackBasemap, initialBasemap, offeredBasemaps, offersBasemapSwitch, readBasemapSource,
     refusedText, rememberBasemap, rememberedBasemap, tilesFailedText
 } from '../basemaps';
 import { MessageTypes, basemapSource, readReply, replyText } from '../messages';
@@ -91,5 +91,16 @@ describe('basemap.source and its reply', () => {
         expect(text).not.toContain(TOKEN);
         expect(replyText(readReply({ v: 1, type: 'basemap.source.reply', id: 'b2', body: {} })))
             .toBe('Basemap source: unreadable reply');
+    });
+});
+
+describe('the basemap switch (owner review, item 3)', () => {
+    test('a viewer gets a switch only when the setup lists more than one basemap; the first listed is the default', () => {
+        expect(offersBasemapSwitch([])).toBe(false);
+        expect(offersBasemapSwitch(['osm'])).toBe(false);
+        expect(offersBasemapSwitch(['osm', 'none'])).toBe(true);
+        expect(offersBasemapSwitch(['none', 'osm', 'satellite'])).toBe(true);
+        // The setup's first line is the default when the viewer has chosen nothing.
+        expect(initialBasemap(['osm', 'none'], null)).toBe('osm');
     });
 });

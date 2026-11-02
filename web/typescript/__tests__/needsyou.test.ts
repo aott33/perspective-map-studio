@@ -1,7 +1,7 @@
 import { Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import { KindDisplay, LIVE_INITIAL, LiveState, LiveValue } from '../live';
-import { ALL_OK, countParts, countText, needsYou, summaryText, total } from '../needsyou';
+import { BAR_QUIET, bellLook, countParts, countText, EMPTY_SUMMARY, needsYou, summaryText, total } from '../needsyou';
 
 const T = '2026-10-28T10:00:00Z';
 const NOW = Date.parse('2026-10-28T10:04:00Z');
@@ -40,11 +40,13 @@ function live(items: LiveState['items']): LiveState {
 }
 
 describe('the Needs you summary (epic 3 entry 3)', () => {
-    test('nothing to attend to reads All OK', () => {
+    test('nothing to attend to says so in the hover title only: the bar has no words (item 12)', () => {
         const s = needsYou(ITEMS, [PAD, LINE], live({ n: { id: 'n', comms: good(true), kpis: { pressure: good(400) }, alarms: good({ active: 0, unacked: 0, priority: 0 }), problems: [] } }), NOW);
         expect(s.rows).toEqual([]);
         expect(s.counts).toEqual({ alarm: 0, commsLost: 0, stale: 0 });
-        expect(summaryText(s.counts)).toBe(ALL_OK);
+        expect(summaryText(s.counts)).toBe(BAR_QUIET);
+        expect(BAR_QUIET).not.toContain('All OK');
+        expect(bellLook(s)).toEqual({ glyph: 'bell-outline', tone: 'none' });
         expect(total(s.counts)).toBe(0);
         expect(needsYou(ITEMS, [PAD, LINE], LIVE_INITIAL, NOW).rows).toEqual([]);
     });
@@ -73,6 +75,8 @@ describe('the Needs you summary (epic 3 entry 3)', () => {
         }), NOW);
         expect(s.counts).toEqual({ alarm: 3, commsLost: 2, stale: 2 });
         expect(s.highestPriority).toBe(1);
+        expect(s.highestUnackedPriority).toBe(1);
+        expect(bellLook(s)).toEqual({ glyph: 'bell', tone: 'p1' });
         expect(s.rows.map((r) => r.id)).toEqual(['c', 'b', 'a', 'd', 'e', 'l', 'f']);
         expect(s.rows.map((r) => r.state)).toEqual(['alarm', 'alarm', 'alarm', 'comms-lost', 'comms-lost', 'stale', 'stale']);
         expect(s.rows.map((r) => r.glyph)).toEqual(['alarm-1-unacknowledged', 'alarm-1-acknowledged', 'alarm-2-unacknowledged',
@@ -92,5 +96,27 @@ describe('the Needs you summary (epic 3 entry 3)', () => {
     test('an item whose kind has no display, or that has no values, never counts', () => {
         const s = needsYou([point('x', 'X', 'unknown')], [PAD], { ...LIVE_INITIAL, items: { x: { id: 'x', comms: good(false), kpis: {}, problems: [] } }, display: { pad: PAD_DISPLAY } }, NOW);
         expect(s.rows).toEqual([]);
+    });
+
+    test('the bell: solid in the hue of the highest unacknowledged priority, neutral and hollow when every alarm is acknowledged (item 12)', () => {
+        const pads = [point('a', 'Pad A'), point('b', 'Pad B'), point('c', 'Pad C')];
+        const alarm = (id: string, priority: number, unacked: number) => ({ id, comms: good(true), kpis: { pressure: good(950) },
+            alarms: good({ active: 1, unacked, priority }), problems: [] });
+        // Priority 1 acknowledged, priority 2 and 3 not: the bell takes the priority 2 hue (the highest unacknowledged), the count is all three.
+        const mixed = needsYou(pads, [PAD], live({ a: alarm('a', 1, 0), b: alarm('b', 2, 1), c: alarm('c', 3, 1) }), NOW);
+        expect(mixed.counts.alarm).toBe(3);
+        expect(mixed.highestPriority).toBe(1);
+        expect(mixed.highestUnackedPriority).toBe(2);
+        expect(bellLook(mixed)).toEqual({ glyph: 'bell', tone: 'p2' });
+        // Every alarm acknowledged: neutral and hollow, still counted.
+        const acked = needsYou(pads, [PAD], live({ a: alarm('a', 1, 0), b: alarm('b', 2, 0) }), NOW);
+        expect(acked.counts.alarm).toBe(2);
+        expect(acked.highestUnackedPriority).toBe(0);
+        expect(bellLook(acked)).toEqual({ glyph: 'bell-outline', tone: 'acknowledged' });
+        // Comms lost alone: the bell is grey and hollow with no alarm.
+        const lost = needsYou(pads, [PAD], live({ a: { id: 'a', comms: good(false), kpis: {}, problems: [] } }), NOW);
+        expect(lost.counts).toEqual({ alarm: 0, commsLost: 1, stale: 0 });
+        expect(bellLook(lost)).toEqual({ glyph: 'bell-outline', tone: 'none' });
+        expect(bellLook(EMPTY_SUMMARY)).toEqual({ glyph: 'bell-outline', tone: 'none' });
     });
 });

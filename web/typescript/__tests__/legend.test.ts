@@ -1,7 +1,7 @@
 import { Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import { KindDisplay } from '../live';
-import { LINE_ROWS, STATE_ROWS, STYLE_ROWS, TOGGLE_KEYS, ToggleStore, legendKey, readToggle, writeToggle } from '../legend';
+import { KINDS_COLLAPSE_OVER, LINE_ROWS, STATE_ROWS, STYLE_ROWS, TOGGLE_KEYS, ToggleStore, kindsHeading, kindsStartCollapsed, legendKey, readToggle, writeToggle } from '../legend';
 
 const PAD: Kind = { id: 'pad', name: 'Well pad', geometry: 'point', icon: 'well-pad', labelRank: 10, fields: [] };
 const SWD: Kind = { id: 'swd', name: 'SWD', geometry: 'point', icon: 'swd', labelRank: 8, fields: [] };
@@ -66,5 +66,16 @@ describe('the legend key (epic 3 entry 3)', () => {
         const refusing: ToggleStore = { getItem: () => { throw new Error('no'); }, setItem: () => { throw new Error('no'); } };
         expect(readToggle(refusing, 'names')).toBe(true);
         expect(() => writeToggle(refusing, 'names', false)).not.toThrow();
+    });
+});
+
+describe('the Kinds section (owner review, item 24)', () => {
+    test('starts collapsed with more than six kinds on the map, and says how many', () => {
+        expect(KINDS_COLLAPSE_OVER).toBe(6);
+        expect(kindsStartCollapsed(6)).toBe(false);
+        expect(kindsStartCollapsed(7)).toBe(true);
+        expect(kindsHeading(3)).toBe('Kinds');
+        expect(kindsHeading(6)).toBe('Kinds');
+        expect(kindsHeading(9)).toBe('Kinds (9)');
     });
 });

@@ -117,6 +117,18 @@
             "geometry": "point"
         },
         {
+            "id": "bell",
+            "label": "Needs you bell, alarms unacknowledged (the bar's count, not a map mark)",
+            "group": "state",
+            "geometry": null
+        },
+        {
+            "id": "bell-outline",
+            "label": "Needs you bell, hollow: every alarm acknowledged, or nothing needs attention",
+            "group": "state",
+            "geometry": null
+        },
+        {
             "id": "comms-lost",
             "label": "Comms lost",
             "group": "state",

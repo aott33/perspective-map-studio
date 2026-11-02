@@ -13,7 +13,7 @@ import {
     Size2d
 } from '@inductiveautomation/perspective-client';
 import {
-    ErrorEvent, GeoJSONSource, Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent, Popup, setWorkerUrl
+    AttributionControl, ErrorEvent, GeoJSONSource, Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent, Popup, setWorkerUrl
 } from 'maplibre-gl';
 import type { ExpressionSpecification } from 'maplibre-gl';
 import { TerraDraw, TerraDrawLineStringMode } from 'terra-draw';
@@ -935,6 +935,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }, this.onLegendSwitch);
         this.legendControl.setToggles(this.toggles.lines, this.toggles.names);
         map.addControl(this.legendControl, 'bottom-left');
+        // The provider's attribution (R10, always shown with a basemap): small muted text along the bottom-right
+        // edge under the App Bar toggle, never covering it (owner review, item 3).
+        map.addControl(new AttributionControl({ compact: false }), 'bottom-right');
         map.on('error', this.onMapError);
         map.on('idle', this.onMapIdle);
         map.on('moveend', () => this.publishView(map));
@@ -1117,6 +1120,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private publishHeight(): void {
         if (this.mapContainer) {
             this.mapContainer.style.setProperty('--mapstudio-map-height', this.mapContainer.clientHeight + 'px');
+            this.mapContainer.style.setProperty('--mapstudio-map-width', this.mapContainer.clientWidth + 'px');
         }
     }
 

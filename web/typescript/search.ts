@@ -11,14 +11,20 @@
 import { AssetName, Kind } from './adapters';
 import { MapItemRecord } from './contract';
 
-/** How many results the list shows at most. */
+/** How many results a typed query's pure search returns by default; the control lists every match (item 8). */
 export const SEARCH_LIMIT = 8;
+
+/** The list is drawn in pages of this many rows as it scrolls, so a 300-site field opens fast (owner review, item 8). */
+export const SEARCH_PAGE = 50;
 
 /** The zoom a chosen point is shown at, at least: the kind glyph, the name and the icon KPI are all drawn from 15. */
 export const CHOSEN_POINT_ZOOM = 15;
 
-/** The field's placeholder (DESIGN.md search-field). */
-export const SEARCH_PLACEHOLDER = 'Search sites, wells or lines';
+/** The field's placeholder (DESIGN.md search-field): short, so it fits the phone's field (owner review, item 12). */
+export const SEARCH_PLACEHOLDER = 'Search assets';
+
+/** The field's accessible name: the longer description the placeholder no longer says. */
+export const SEARCH_LABEL = 'Search sites, wells or lines';
 
 /** What the list says with a query that matches nothing (EXPERIENCE.md, "No search results"). */
 export const NO_MATCHES = 'No matches';
@@ -139,6 +145,28 @@ export function searchEntries(entries: readonly SearchEntry[], query: string, li
         return a.entry.id < b.entry.id ? -1 : a.entry.id > b.entry.id ? 1 : 0;
     });
     return ranked.slice(0, Math.max(0, limit)).map((r) => ({ ...r.entry, matched: r.matched, detail: resultDetail(r.entry, r.matched) }));
+}
+
+/**
+ * Every map item as one alphabetical list (owner review, item 8: "a light View-mode list ... every item in one
+ * alphabetical list, no groups, no attention-first order"): by name without regard to case or accents, by id
+ * within equal names. The row's detail is the item's kind.
+ */
+export function allEntries(entries: readonly SearchEntry[]): SearchResult[] {
+    const keyed = entries.map((entry) => ({ entry, key: fold(entry.name) }));
+    keyed.sort((a, b) => {
+        if (a.key !== b.key) {
+            return a.key < b.key ? -1 : 1;
+        }
+        return a.entry.id < b.entry.id ? -1 : a.entry.id > b.entry.id ? 1 : 0;
+    });
+    return keyed.map((k) => ({ ...k.entry, matched: 'name' as const, detail: resultDetail(k.entry, 'name') }));
+}
+
+/** The rows drawn for a list of `total` rows when `wanted` of them must be in the DOM (a page at a time, at least one page). */
+export function pagedCount(total: number, wanted: number): number {
+    const pages = Math.max(1, Math.ceil(Math.max(0, wanted) / SEARCH_PAGE));
+    return Math.min(total, pages * SEARCH_PAGE);
 }
 
 /** The words the live region says after a choice. */

@@ -1,6 +1,6 @@
 import { Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
-import { SEARCH_LIMIT, buildEntries, chosenText, fold, resultDetail, searchEntries } from '../search';
+import { SEARCH_LABEL, SEARCH_LIMIT, SEARCH_PAGE, SEARCH_PLACEHOLDER, allEntries, buildEntries, chosenText, fold, pagedCount, resultDetail, searchEntries } from '../search';
 
 const PAD: Kind = { id: 'pad', name: 'Well pad', geometry: 'point', icon: 'well-pad', labelRank: 10, fields: [] };
 const LINE: Kind = { id: 'line', name: 'Gathering line', geometry: 'line', icon: 'pipeline', labelRank: 5, fields: [] };
@@ -92,5 +92,40 @@ describe('the search (epic 3 entry 9)', () => {
 
     test('the live region names the chosen item', () => {
         expect(chosenText(ENTRIES[0])).toBe('Pad 1 selected');
+    });
+});
+
+describe('the list of every item (owner review, item 8)', () => {
+    test('is one alphabetical list of every live item, no groups, no attention order', () => {
+        const all = allEntries(ENTRIES);
+        // Names folded (case and accents ignored): Éclair sorts with E; deleted items are not entries.
+        expect(all.map((r) => r.name)).toEqual(['Éclair pad', 'North fence', 'Pad 1', 'Pad 12', 'Pad 14', 'Pad 2', 'Point 1', 'Point 2', 'Point 3', 'Tracer line']);
+        expect(all.every((r) => r.matched === 'name')).toBe(true);
+        expect(all[0].detail).toBe('unknown-kind');
+        expect(all[2].detail).toBe('Well pad');
+        // The same entries in another order give the same list.
+        expect(allEntries(ENTRIES.slice().reverse()).map((r) => r.id)).toEqual(all.map((r) => r.id));
+    });
+
+    test('typing filters every match, not only eight (the control passes no limit)', () => {
+        const many = Array.from({ length: 30 }, (_, i) => point('m' + i, 'Meter ' + i));
+        const entries = buildEntries(many, [PAD], []);
+        expect(searchEntries(entries, 'meter').length).toBe(SEARCH_LIMIT);
+        expect(searchEntries(entries, 'meter', Number.POSITIVE_INFINITY).length).toBe(30);
+    });
+
+    test('is drawn a page at a time', () => {
+        expect(SEARCH_PAGE).toBe(50);
+        expect(pagedCount(300, 0)).toBe(50);
+        expect(pagedCount(300, 50)).toBe(50);
+        expect(pagedCount(300, 51)).toBe(100);
+        expect(pagedCount(300, 300)).toBe(300);
+        expect(pagedCount(20, 1)).toBe(20);
+        expect(pagedCount(0, 10)).toBe(0);
+    });
+
+    test('the placeholder is short for the phone field, the accessible name keeps the long description (item 12)', () => {
+        expect(SEARCH_PLACEHOLDER).toBe('Search assets');
+        expect(SEARCH_LABEL).toBe('Search sites, wells or lines');
     });
 });

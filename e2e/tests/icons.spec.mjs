@@ -10,7 +10,7 @@ import { screenshotDir } from '../lib/env.mjs';
 import { EDITOR_USER, editorTest, expect, mapLoaded, openMap, test } from './fixtures.mjs';
 
 const BASE = '/res/mapstudio/icons/';
-const ICON_COUNT = 28;
+const ICON_COUNT = 30;
 
 /** File, and a content type the browser accepts for its use. */
 const SERVED = [

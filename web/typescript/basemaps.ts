@@ -80,6 +80,15 @@ export function initialBasemap(offered: readonly BasemapId[], remembered: string
     return offered.length > 0 ? offered[0] : null;
 }
 
+/**
+ * Whether a viewer gets a basemap switch (owner review, item 3): the basemap is the project's setting, so the legend
+ * shows the Basemap section only when the setup lists more than one. The first basemap the setup lists is the
+ * default (`initialBasemap`).
+ */
+export function offersBasemapSwitch(offered: readonly BasemapId[]): boolean {
+    return offered.length > 1;
+}
+
 /** The basemap to fall back to when `refused` cannot be drawn: the first offered one that needs no token. */
 export function fallbackBasemap(offered: readonly BasemapId[], refused: BasemapId): BasemapId | null {
     for (const id of offered) {
