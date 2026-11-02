@@ -187,6 +187,9 @@ editorTest('a kind setup\'s popupView opens the project view with mapItem and a 
     await page.waitForTimeout(WARNING_SETTLE_MS);
     const nope = watched.warnings.filter((w) => w.includes('"Popups/Nope"'));
     expect(nope, watched.warnings.join('\n')).toHaveLength(1);
+    // The default popup back for the tests after this one (no popupView: the key drops out of the message).
+    await page.locator('.maplibregl-popup .mapstudio-popup-close').first().click();
+    await changePadSetup(page, again, { popupView: undefined });
 });
 
 // The owner's review notes on the 0.3.0 map, group a (_bmad-output/backlog/story-owner-review-notes-on-the-0-3-0-map.md):
