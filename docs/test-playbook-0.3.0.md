@@ -10,6 +10,7 @@ A walk through everything 0.3.0 does, in order, on the local development stack. 
 | 13. Satellite | passed: imagery with the owner's Mapbox token; more Mapbox styles go to the backlog after 0.3.0 | 2026-10-30 |
 | 1. First look | passed: lines and chips fine; opens at zoom 15 (by design); neutral discs confirmed; P14 red triangle confirmed; P21 comms lost and SWD1 stale confirmed on `mapstudio-showcase` (the first check was on the dev map, which has no P21); notes: dots too small (bigger dots, item 6), the instrument icon does not read well (item 7) | 2026-10-30 |
 | 3. The popup card | reviewed with notes (pop-out and View alarms work; live values with the card open checked in section 4): layout option A chosen (item 13); a click on empty map closes it, Esc does not (bug, item 14); "Bad_NotFound" shown to the operator (item 15) | 2026-10-30 |
+| 4. Live state | in progress: P12 pressure 950 raises Point 1's alarm | 2026-11-02 |
 | 2. Search and Needs you | passed (with notes): typing, Esc, search by asset name and Tab order work; search works and zooms to zoom 15; notes: a chevron opens a simple alphabetical list of every item, typing filters it (item 8); hovering Needs you makes its background disappear (bug, item 9), also over OpenStreetMap on the showcase; the list shows the items correctly; on a phone the counts as glyph and number only and the placeholder "Search assets" (item 12) | 2026-10-30 |
 
 ## 0. Before you start
@@ -80,8 +81,8 @@ Open http://localhost:9088/data/perspective/client/mapstudio-dev/live and sign i
 
 Values reach the map within the refresh interval (10 s), so give each press a moment.
 
-- [ ] **P12 pressure 400 / 950**: Point 1's value changes.
-- [ ] At 950, Point 1 raises its "High pressure" alarm: triangle and digit on the marker, Needs you counts it. **Acknowledge P12**: the triangle turns hollow.
+- [x] **P12 pressure 400 / 950**: Point 1's value changes.
+- [ ] At 950, Point 1 raises its "High pressure" alarm: triangle and digit on the marker, Needs you counts it. **Acknowledge P12**: the triangle turns hollow. (alarm raised: works; acknowledge not yet checked)
 - [ ] **P12 comms off**: Point 1 shows comms lost in magenta with its chip, Needs you counts it; **P12 comms on** restores it.
 - [ ] **P14 pressure bad**: Point 2 goes stale (hourglass, no colour, value marked stale); **P14 pressure good** restores it.
 - [ ] **P12 status 0 to 4**: Point 1's style changes (Attention, Warning, Fault rings with words, Out of service faded).
