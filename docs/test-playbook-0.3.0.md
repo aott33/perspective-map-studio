@@ -13,6 +13,7 @@ A walk through everything 0.3.0 does, in order, on the local development stack. 
 | 4. Live state | passed (with notes): the alarm raises, acknowledges ("!" in the triangle) and clears; the card updates while open; comms off and on, pressure bad and good, status 0 to 4, L3 flow, an alarm over a style and comms lost dropping the style work; comms on, pressure 400 and status 0 reset Point 1; notes: a selected marker's rings are cut off (item 16) | 2026-11-02 |
 | 5. Lines and instruments | passed (with notes): instruments in place, the shared marker's pick list, the segment popup, comms off dashing, PT-2's alarm, L-SWD quiet and the flow arrow work; notes: the popup over the top bar and cut off (item 18), the line popup's layout (item 19) | 2026-11-02 |
 | 6. Zoom card, Legend and basemaps | passed (with notes): zoom card, legend keyboard, toggles kept after a reload and basemap switching work; notes: the legend over the top bar (item 23), kinds in the legend (item 24), OpenStreetMap readability (item 25) | 2026-11-02 |
+| 7. Phone | passed (with notes): the top bar, the bottom sheet and tap targets; notes: the list under the zoom card (item 26), centring under the sheet (item 27), the legend (items 3, 23) | 2026-11-02 |
 | 2. Search and Needs you | passed (with notes): typing, Esc, search by asset name and Tab order work; search works and zooms to zoom 15; notes: a chevron opens a simple alphabetical list of every item, typing filters it (item 8); hovering Needs you makes its background disappear (bug, item 9), also over OpenStreetMap on the showcase; the list shows the items correctly; on a phone the counts as glyph and number only and the placeholder "Search assets" (item 12) | 2026-10-30 |
 
 ## 0. Before you start
@@ -130,12 +131,15 @@ Notes:
 
 Your phone (see `docs/development.md` for binding the Gateway to your LAN) or the browser's device mode at 390 px.
 
-- [ ] One top bar: search and Needs you; it expands on tap.
-- [ ] Tapping a site opens a bottom sheet (handle, close, values, alarm block, View alarms), clear of the App Bar button; no pointer.
-- [ ] Every button is comfortably tappable (44 px).
+- [x] One top bar: search and Needs you; it expands on tap.
+- [x] Tapping a site opens a bottom sheet (handle, close, values, alarm block, View alarms), clear of the App Bar button; no pointer.
+- [x] Every button is comfortably tappable (44 px).
 - [ ] The legend, the zoom card and the attribution fit without covering what you need.
 
 Notes:
+
+- The bottom sheet looks good.
+- The Needs you list opens under the zoom card (item 26); Return and search choices centre the item under the sheet (item 27); the legend grows over the top bar and cuts off Show (item 23, the bottom sheet of item 3).
 
 ## 8. Custom popup view, links, alarm page
 
