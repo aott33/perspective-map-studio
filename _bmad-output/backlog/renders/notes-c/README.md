@@ -12,7 +12,7 @@ Before (the base build, `761c36a`) and after (this branch) renders of the items 
 | 11 | `before-11-lines-z15-1440.png` | `after-11-lines-z15-1440.png` | L-GL21 (4 in, no instrument) now 3 px in the pipeline grey like the other sized lines; the laterals with no size stay thin in the lateral tone |
 | 11 (tone option) | | `option-11-tone-by-instruments-z15-1440.png` | The alternative tone rule: weight from the size, but the lateral tone kept for every line without instruments (L-GL21 3 px in the lighter tone) |
 | 16 | `before-16-selected-ring-3x.png` | `after-16-selected-ring-3x.png` | Point 1 selected, in alarm, with the Warning ring: the selection ring no longer clipped |
-| 22 | `before-22-arrows-z16-1440.png` | `after-22-arrows-z16-1440.png` | L-SWD selected: the flow arrow repeated along the line |
+| 22 | `before-22-arrows-z17-1440.png` | `after-22-arrows-z17-1440.png` | L-SWD selected at zoom 17 (its card hidden for the render): the flow arrow repeated along the line about every 250 px, where before one sat by the name chip |
 | 25 | `before-25-osm-{light,dark}-1440.png` | `after-25-osm-{light,dark}-1440.png` | OpenStreetMap drawn quiet under the map's marks |
 | 29 | `before-29-dark-no-reload-1440.png` | `after-29-dark-no-reload-1440.png` | `/dark` without a reload: the map itself dark |
 | 32 | `before-32-lost-{light,dark}-1440.png` | `after-32-lost-{light,dark}-1440.png` | The connection lost: the chip in words, every value stale, Needs you "State unknown" |
