@@ -1462,6 +1462,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         el.setAttribute('data-basemap-status', status);
         el.setAttribute('data-basemap-tiles', this.tiles);
         el.setAttribute('data-basemap-paint', JSON.stringify(rasterPaint(b.selected)));
+        // What OpenStreetMap is drawn with whatever the choice (item 25), for the contrast check's quiet raster sample.
+        el.setAttribute('data-quiet-paint', JSON.stringify(rasterPaint('osm')));
     }
 
     /**

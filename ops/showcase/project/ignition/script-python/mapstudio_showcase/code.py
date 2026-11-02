@@ -53,3 +53,39 @@ def kinds():
 def assets():
     """The showcase assets, one per demo site and instrument."""
     return [dict(a) for a in ASSETS]
+
+
+# The one showcase state a Gateway restart loses (owner review notes item 10): memory tags keep their
+# values, but not the Bad quality the seed gives SWD1's injection rate so it reads stale. The
+# Showcase and ShowcaseDark views' startup scripts call restore_states(), so the showcase is right
+# after any restart with no re-seed; the full seed stays the dev project's "Seed the dev map"
+# (mapstudio_showcase_seed, which sets this tag the same way).
+STALE_TAG = PREFIX + 'SWD1/InjectionRate'
+STALE_VALUE = 4200.0
+
+
+def restore_states():
+    """
+    Put back the showcase states a Gateway restart loses, when they are gone: SWD1's injection rate
+    at Bad quality (so SWD1 reads stale). Returns {restored: bool, quality: text} or {error}. Showcase
+    demo tags only; safe to call on every page open.
+    """
+    import java.lang
+    from com.inductiveautomation.ignition.common.model.values import BasicQualifiedValue, QualityCode
+    logger = system.util.getLogger('MapStudio.showcase')
+    result = {'restored': False}
+    try:
+        current = system.tag.readBlocking([STALE_TAG])[0]
+        result['quality'] = str(current.quality)
+        if current.quality.isGood():
+            quality = system.tag.writeBlocking([STALE_TAG], [BasicQualifiedValue(STALE_VALUE, QualityCode.Bad)], 5000)[0]
+            result['restored'] = True
+            result['quality'] = str(quality)
+            logger.info('Showcase states restored after a restart: SWD1 stale again (%s)' % quality)
+    except java.lang.Throwable as ex:
+        result['error'] = ex.getMessage()
+        logger.warn('Showcase states not restored: %s' % ex.getClass().getSimpleName())
+    except Exception as ex:
+        result['error'] = str(ex)
+        logger.warn('Showcase states not restored: %s' % type(ex).__name__)
+    return result

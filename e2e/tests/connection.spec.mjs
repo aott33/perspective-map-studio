@@ -1,0 +1,90 @@
+// The lost Gateway connection (owner review notes item 32; AD-6): while the Perspective client is
+// disconnected the map says so in words (a status chip, "No connection - values from 14:02"), draws
+// every value as stale (the hourglass, no style) and the Needs you bar says the state is unknown; when
+// the connection is back the map reloads (map.load, then the Gateway's full batch) and the chip goes.
+// The client's own dev-console helper `__client.simulateLostConnection(seconds)` closes the channel
+// for that long, which is what the suite uses (a real `docker stop` is the playbook's step).
+
+import { TRACER } from '../lib/geo.mjs';
+import { EDITOR_USER, expect, mapLoaded, openMap, runSeed, signedInContext, test } from './fixtures.mjs';
+
+/** The bound for a state to reach the map: one refresh interval (the dev setup's 10 s) plus margin. */
+const INTERVAL_MS = 25_000;
+/** How long the simulated loss lasts. */
+const LOST_S = 8;
+
+let ids;
+
+const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
+const chip = (page) => page.locator('.mapstudio-connection');
+const bar = (page) => page.locator('.mapstudio-needs');
+
+test.beforeAll(async ({ browser }) => {
+    const context = await signedInContext(browser, EDITOR_USER);
+    try {
+        const page = await context.newPage();
+        await mapLoaded(await openMap(page, '/edit'));
+        const seed = await runSeed(page);
+        expect(seed.error, 'the seed saved').toBeUndefined();
+        ids = Object.fromEntries(Object.entries(TRACER.points).map(([k, p]) => [k, seed.ids[p.key]]));
+    } finally {
+        await context.close();
+    }
+});
+
+test.describe('1440 px', () => {
+    test.use({ viewport: { width: 1440, height: 900 } });
+
+    test('a lost connection shows the chip, freezes every value as stale and makes the Needs you state unknown; the map reloads when it is back', async ({ page }) => {
+        const map = await openMap(page, '/live');
+        await mapLoaded(map);
+        await expect(map).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
+        await expect(map).toHaveAttribute('data-connection', 'ok');
+        await expect(chip(page)).toHaveCount(0);
+        // Point 1 (P12) is quiet after live.spec's setup, so it reads normal; with the connection lost it reads stale.
+        await expect(liveItem(page, ids.p1)).toHaveAttribute('data-state', /^(normal|stale|alarm|comms-lost)$/, { timeout: INTERVAL_MS });
+        const fullsBefore = Number(await map.getAttribute('data-live-full'));
+        const stateBefore = await bar(page).getAttribute('data-state');
+        expect(['ok', 'needs']).toContain(stateBefore);
+
+        await page.evaluate((s) => window.__client.simulateLostConnection(s), LOST_S);
+        await expect(map).toHaveAttribute('data-connection', 'lost', { timeout: 10_000 });
+        await expect(chip(page)).toBeVisible();
+        await expect(chip(page)).toHaveText(/^No connection - (values from \d\d:\d\d|no values yet)$/);
+        await expect(chip(page)).toHaveAttribute('data-state', 'lost');
+        // Every item with values is drawn stale (an alarm keeps its badge over the stale ring): nothing reads as live.
+        const states = await page.locator('.mapstudio-live-item').evaluateAll((els) => els.map((el) => el.getAttribute('data-state')));
+        expect(states.length).toBeGreaterThan(0);
+        expect(states.every((s) => s === 'stale' || s === 'alarm' || s === 'comms-lost')).toBe(true);
+        await expect(liveItem(page, ids.p1)).toHaveAttribute('data-state', /^(stale|alarm|comms-lost)$/);
+        await expect(bar(page)).toHaveAttribute('data-state', 'unknown');
+        await expect(bar(page)).toHaveAttribute('aria-label', 'State unknown - no connection');
+        await expect(bar(page)).toHaveText(/State unknown - no connection/);
+
+        // Back: the map reloads (another full batch), the chip goes and the bar counts again.
+        await expect(map).toHaveAttribute('data-connection', 'ok', { timeout: (LOST_S + 30) * 1000 });
+        await expect(chip(page)).toHaveCount(0);
+        await expect.poll(() => map.getAttribute('data-live-full').then(Number), { timeout: 30_000 }).toBeGreaterThan(fullsBefore);
+        await expect(bar(page)).toHaveAttribute('data-state', /^(ok|needs)$/);
+        await expect(liveItem(page, ids.p1)).toHaveAttribute('data-state', /^(normal|stale|alarm|comms-lost)$/, { timeout: INTERVAL_MS });
+    });
+});
+
+test.describe('390 px', () => {
+    test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+    test('the chip fits the phone under the top bar', async ({ page }) => {
+        const map = await openMap(page, '/live');
+        await mapLoaded(map);
+        await expect(map).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
+        await page.evaluate((s) => window.__client.simulateLostConnection(s), LOST_S);
+        await expect(chip(page)).toBeVisible({ timeout: 10_000 });
+        const box = await chip(page).boundingBox();
+        const mapBox = await map.boundingBox();
+        expect(box.x).toBeGreaterThanOrEqual(mapBox.x);
+        expect(box.x + box.width).toBeLessThanOrEqual(mapBox.x + mapBox.width);
+        // Under the one top bar (48 px tall, 8 px from the top).
+        expect(box.y).toBeGreaterThanOrEqual(mapBox.y + 56);
+        await expect(map).toHaveAttribute('data-connection', 'ok', { timeout: (LOST_S + 30) * 1000 });
+    });
+});

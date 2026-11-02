@@ -1,5 +1,18 @@
 {
  "custom": {},
+ "events": {
+  "system": {
+   "onStartup": [
+    {
+     "config": {
+      "script": "\t# Dev only (owner review notes item 10): a Gateway restart keeps the memory tags' values but not\n\t# SWD1's stale quality, so the showcase puts its states back as the page opens (project library\n\t# mapstudio_showcase.restore_states; it writes only when the state is gone).\n\tmapstudio_showcase.restore_states()"
+     },
+     "scope": "G",
+     "type": "script"
+    }
+   ]
+  }
+ },
  "params": {},
  "props": {
   "defaultSize": {

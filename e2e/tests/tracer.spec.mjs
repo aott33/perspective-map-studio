@@ -35,6 +35,10 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             // One round trip: click p1, the Gateway answers in the envelope.
             const [x, y] = pagePixel(box, TRACER.points.p1.lngLat, TRACER.center, TRACER.zoom);
             await page.mouse.click(x, y);
+            // The dev page's line says how to fill an empty map, and the click hint once items exist (owner review notes
+            // item 4: the view's startup script counts the map store's items); the echo is dev-page output in Edit mode alone.
+            await expect(page.locator('#mapstudio-dev-title')).toContainText('Click a point for its popup');
+            await expect(page.locator('.mapstudio-reply')).toBeHidden();
             // The click echo left View mode (owner review notes item 5): the reply is the map's `data-last-reply`.
             await expect(map).toHaveAttribute('data-last-reply', new RegExp('Gateway received click on ' + p1), { timeout: 15_000 });
 

@@ -2,7 +2,9 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { MARKS, MINIMUM, OSM_LAND, TOKENS, checkTheme, contrastRatio, hex, luminance, markdownTable, misses, over, parseColor } from './contrast.mjs';
+import {
+    MARKS, MINIMUM, OSM_LAND, TOKENS, checkTheme, contrastRatio, hex, luminance, markdownTable, misses, over, parseColor, quietColor
+} from './contrast.mjs';
 
 test('colours parse from hex and rgb() forms; anything else is refused', () => {
     assert.deepEqual(parseColor('#F4F4F4'), [244, 244, 244, 1]);
@@ -68,4 +70,23 @@ test('purple-60 on the dark map is the miss that moved comms lost to the magenta
 
 test('a value the browser cannot give fails the check instead of passing it', () => {
     assert.throws(() => checkTheme({ ...LIGHT, alarm1: '' }));
+});
+
+test('the quiet OpenStreetMap paint (item 25) is applied to the raster sample as MapLibre draws it, and every state mark still passes', () => {
+    // No paint: the sample is the land colour itself.
+    assert.equal(quietColor(OSM_LAND, {}), OSM_LAND);
+    // Brightness alone lifts the darks: black at min 0.3 is #4D4D4D, white stays white.
+    assert.equal(quietColor('#000000', { 'raster-brightness-min': 0.3 }), '#4D4D4D');
+    assert.equal(quietColor('#FFFFFF', { 'raster-brightness-min': 0.3 }), '#FFFFFF');
+    // Saturation -1 is grey (the channel average); contrast -1 is mid grey.
+    assert.equal(quietColor('#FF0000', { 'raster-saturation': -1 }), '#555555');
+    assert.equal(quietColor('#FF0000', { 'raster-contrast': -1 }), '#808080');
+    const paint = { 'raster-saturation': -0.55, 'raster-contrast': -0.2, 'raster-brightness-min': 0.3 };
+    const quiet = quietColor(OSM_LAND, paint);
+    assert.notEqual(quiet, OSM_LAND);
+    for (const [theme, values] of [['light', LIGHT], ['dark', DARK]]) {
+        const result = checkTheme(values, paint);
+        assert.equal(result.surfaces.raster, quiet);
+        assert.deepEqual(misses(result).map((m) => m.id), [], theme + ' misses over the quiet tile');
+    }
 });
