@@ -10,7 +10,7 @@
 
 import { Kind } from './adapters';
 import { MapItemRecord } from './contract';
-import { ItemState, ItemValues, KindDisplay, LiveState, ageText, alarmGlyphId, itemState } from './live';
+import { ItemState, ItemValues, KindDisplay, LiveState, ageText, alarmGlyphId, itemState, qualityWords } from './live';
 
 export type NeedsYouState = 'alarm' | 'comms-lost' | 'stale';
 
@@ -93,14 +93,17 @@ function reasonWords(reason: string): string {
     return reason.charAt(0).toUpperCase() + reason.substring(1);
 }
 
-/** The words for a slot that has no good value: the item's problem for the slot (plain words) before the quality name. */
+/**
+ * The words for a slot that has no good value: the item's problem for the slot (plain words) before the
+ * quality name, itself in plain words ("Tag not found" for `Bad_NotFound`, owner review notes item 15).
+ */
 function slotReason(values: ItemValues, slot: string, quality: string): string {
     for (const p of values.problems) {
         if (p.slot === slot) {
             return reasonWords(p.reason);
         }
     }
-    return reasonWords(quality);
+    return reasonWords(qualityWords(quality));
 }
 
 /**

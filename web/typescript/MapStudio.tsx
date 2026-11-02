@@ -42,7 +42,7 @@ import { LegendToggle, legendKey, readToggle, sessionStore, writeToggle } from '
 import { NeedsYouControl } from './NeedsYouControl';
 import { NeedsYouRow, needsYou } from './needsyou';
 import { FIT_PADDING_PX, StartingArea, readStartingArea, startingAreaKey } from './startingArea';
-import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, displayShows, itemPreset, itemState } from './live';
+import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, displayShows, iconKpiOf, itemPreset, itemState } from './live';
 import {
     AREA_DASH, AREA_FILL_OPACITY, AREA_LINE_OPACITY, AREA_LINE_WIDTH, ARROW_IMAGE, CHIP_IMAGE, CHIP_PADDING, CHIP_SIZE, DIMMED_OPACITY, DISC_CENTER,
     FONT_CHIP, FONT_NAME, HALO_WIDTH, KPI_SIZE, KPI_TOP_PX, LINE_CHIP_OFFSET_BADGE_EM, LINE_CHIP_OFFSET_EM, LINE_DASH, LINE_DOT,
@@ -71,9 +71,11 @@ import {
 } from './unsaved';
 import { UnsavedSender } from './unsavedSender';
 import {
-    LINE_POPUP_PX, POPUP_WIDTH_PX, PopupPoint, fillLink, fillParams, isSheetWidth, linePopupPlacement, popupItemView, popupMaxHeight,
+    LINE_POPUP_PX, POPUP_WIDTH_PX, PopupPoint, fillLink, fillParams, isSheetWidth, popupItemView, popupMaxHeight,
     popupMaxWidth, popupMountPath, popupViewParams
 } from './popupParams';
+import { CameraPadding, PopupAnchor, Rect, cameraPadding, placePopup } from './popupPlacement';
+import { SHARED_M, sharedWithinM } from './shared';
 import { registerTestHook, registerTestView, takeTestReply } from './testHook';
 import { drawColor, themeColor } from './theme';
 import { Kind } from './adapters';
@@ -841,6 +843,15 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private itemBounds: MapFeatures['bounds'] = null;
     private itemBoundsKey = '';
     private popupClock: ReturnType<typeof setInterval> | null = null;
+    /** Where each member of a shared marker is drawn, by item id (owner review notes item 20): a popup anchors there. */
+    private anchors: Record<string, [number, number]> = {};
+    /** The sharing distance at the map's zoom (item 20) and the one the features were last built with. */
+    private withinM = SHARED_M;
+    private drawnWithinM = SHARED_M;
+    /** What opened the popup (item 14): Esc returns the focus there; null for a click on the map. */
+    private openedBy: 'search' | 'needsyou' | null = null;
+    /** The side the open card's tip is on (item 18), for the camera padding; null while no card is open. */
+    private popupAnchor: PopupAnchor | null = null;
     /** The legend bottom-left, which holds the basemap choice (epic 3 entries 6 and 14), and the basemap revision last drawn. */
     private legendControl: LegendControl | null = null;
     private drawnBasemap = -1;
@@ -939,6 +950,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         map.on('idle', this.onMapIdle);
         map.on('moveend', () => this.publishView(map));
         map.on('movestart', this.onMoveStart);
+        map.on('zoomend', () => this.onZoomEnd(map));
         map.on('load', () => {
             const empty = itemsToGeoJson([]);
             map.addSource(SOURCE_ITEM_LINES, { type: 'geojson', data: empty.lines });
@@ -1098,7 +1110,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.map = map;
         registerTestView((view) => {
             if (this.map === map) {
-                map.jumpTo({ center: view.center, zoom: view.zoom });
+                // A test's move centres on the whole map: the camera padding of the last choice (item 27) is cleared.
+                map.jumpTo({ center: view.center, zoom: view.zoom, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
             }
         });
         this.applyEditing();
@@ -1451,6 +1464,71 @@ export class MapStudio extends Component<Props, MapStudioState> {
         el.setAttribute('data-labels-zoom', map.getZoom().toFixed(2));
     }
 
+    /**
+     * The zoom settled (owner review notes item 20): the sharing distance follows the zoom, so a group
+     * of points splits once its members are a marker apart on screen; the features are rebuilt when it moves.
+     */
+    private onZoomEnd(map: MapLibreMap): void {
+        if (this.map !== map) {
+            return;
+        }
+        const withinM = sharedWithinM(map.getZoom(), map.getCenter().lat);
+        if (withinM !== this.withinM) {
+            this.withinM = withinM;
+            this.drawItems();
+        }
+    }
+
+    /** Where a point item's popup anchors: the marker drawn for it, which for a member of a shared marker is the group's (item 20). */
+    private anchorFor(id: string, lngLat: [number, number]): [number, number] {
+        return this.anchors[id] || lngLat;
+    }
+
+    /** A control's rectangle in map pixels, or null when it is not there. */
+    private controlRect(selector: string): Rect | null {
+        if (!this.map) {
+            return null;
+        }
+        const container = this.map.getContainer();
+        const el = container.querySelector(selector) as HTMLElement | null;
+        if (!el || el.offsetWidth === 0 || el.offsetHeight === 0) {
+            return null;
+        }
+        const base = container.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
+    }
+
+    /**
+     * The camera padding of the moment (item 27): the top bar, the zoom card, the legend row, an open
+     * sheet or card, so a Return, a search choice, a Needs you choice or Fit centres in what a person sees.
+     */
+    private cameraPadding(): CameraPadding {
+        if (!this.map) {
+            return { top: 0, bottom: 0, left: 0, right: 0 };
+        }
+        const container = this.map.getContainer();
+        const sheetEl = this.mapContainer && this.mapContainer.parentElement
+            ? this.mapContainer.parentElement.querySelector('.mapstudio-sheet') as HTMLElement | null : null;
+        let sheet: Rect | null = null;
+        if (sheetEl && sheetEl.offsetHeight > 0) {
+            const base = container.getBoundingClientRect();
+            const r = sheetEl.getBoundingClientRect();
+            sheet = { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
+        }
+        let card: { rect: Rect; anchor: PopupAnchor } | null = null;
+        if (this.popup && this.popup.isOpen() && this.popupAnchor && this.popupContent) {
+            const base = container.getBoundingClientRect();
+            const r = this.popupContent.getBoundingClientRect();
+            card = { rect: { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height }, anchor: this.popupAnchor };
+        }
+        return cameraPadding(container.clientWidth, container.clientHeight, {
+            topBar: this.controlRect('.maplibregl-ctrl-top-left'),
+            zoomCard: this.controlRect('.maplibregl-ctrl-top-right'),
+            bottomRow: this.controlRect('.maplibregl-ctrl-bottom-left')
+        }, sheet, card);
+    }
+
     /** Fit (epic 3 entry 7): the view fits every item's bounds and keeps until the bounds change or the user moves the map. */
     private onFit = (): void => {
         if (!this.map || !this.itemBounds) {
@@ -1461,13 +1539,19 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.publishFit();
     };
 
+    /** Fit bounds inside the visible area (item 27): the fit's own margin plus the camera padding. */
     private fitTo(bounds: [number, number, number, number]): void {
         if (this.map) {
-            this.map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], { padding: FIT_ITEMS_PADDING_PX, animate: false, maxZoom: 16 });
+            const pad = this.cameraPadding();
+            this.map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], {
+                padding: { top: pad.top + FIT_ITEMS_PADDING_PX, bottom: pad.bottom + FIT_ITEMS_PADDING_PX,
+                    left: pad.left + FIT_ITEMS_PADDING_PX, right: pad.right + FIT_ITEMS_PADDING_PX },
+                animate: false, maxZoom: 16
+            });
         }
     }
 
-    /** Return: the map pans to the selected point at the zoom it has, or fits the selected line. */
+    /** Return: the map pans to the selected point at the zoom it has (centred in the visible area, item 27), or fits the selected line. */
     private onReturn = (): void => {
         const selected = this.state.selected;
         const delegate = this.props.delegate;
@@ -1479,7 +1563,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             return;
         }
         if (item.geometry.type === 'Point') {
-            this.map.panTo([item.geometry.coordinates[0], item.geometry.coordinates[1]], { animate: false });
+            const at = this.anchorFor(item.id, [item.geometry.coordinates[0], item.geometry.coordinates[1]]);
+            this.map.jumpTo({ center: at, padding: this.cameraPadding() });
         } else {
             let west = Infinity;
             let south = Infinity;
@@ -1502,11 +1587,13 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * line's popup is entry 2's). The jump is this component's own move, so a kept Fit is ended here.
      */
     private onSearchChoose = (result: SearchResult): void => {
+        this.openedBy = 'search';
         this.goToItem(result.id, 'Search', '(' + result.matched + ')');
     };
 
     /** A Needs you row chosen (entry 3, R15): the same move and selection as a search choice. */
     private onNeedsYouChoose = (row: NeedsYouRow): void => {
+        this.openedBy = 'needsyou';
         this.goToItem(row.id, 'Needs you', '(' + row.state + ')');
         if (this.searchControl) {
             this.searchControl.announce(row.name + ' selected');
@@ -1528,8 +1615,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         this.fitKey = null;
         if (item.geometry.type === 'Point') {
-            const lngLat: [number, number] = [item.geometry.coordinates[0], item.geometry.coordinates[1]];
-            map.jumpTo({ center: lngLat, zoom: Math.max(map.getZoom(), CHOSEN_POINT_ZOOM) });
+            const lngLat = this.anchorFor(item.id, [item.geometry.coordinates[0], item.geometry.coordinates[1]]);
+            // Centred in the visible area, less the top bar, the zoom card and an open sheet or card (item 27).
+            map.jumpTo({ center: lngLat, zoom: Math.max(map.getZoom(), CHOSEN_POINT_ZOOM), padding: this.cameraPadding() });
             // The item with its asset link and properties, so the popup's link and a custom view's params fill (entry 8).
             this.openPopup(this.popupPoint(item.id, item.name, item.kind), lngLat);
             if (store) {
@@ -1656,11 +1744,13 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const selectionKey = selected ? selected.kind + ':' + selected.id : '';
         if (!this.map || !this.itemsReady || !delegate || !this.markerColors
             || (delegate.itemsRevision === this.drawnRevision && delegate.liveRevision === this.drawnLive
-                && selectionKey === this.drawnSelection)) {
+                && selectionKey === this.drawnSelection && this.withinM === this.drawnWithinM)) {
             return;
         }
         const items = delegate.editing === 'off' ? [] : delegate.items;
-        const data = buildFeatures(items, delegate.lists.kinds, delegate.live, selected, this.markerColors);
+        const data = buildFeatures(items, delegate.lists.kinds, delegate.live, selected, this.markerColors, this.withinM);
+        this.anchors = data.anchors;
+        this.drawnWithinM = this.withinM;
         const source = (id: string): GeoJSONSource | undefined => this.map!.getSource(id) as GeoJSONSource | undefined;
         const lines = source(SOURCE_ITEM_LINES);
         const areas = source(SOURCE_ITEM_AREAS);
@@ -1991,6 +2081,31 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     };
 
+    /**
+     * Esc anywhere in the component closes the open popup, card, sheet or pick list (owner review notes
+     * item 14) and returns the focus to the map, or to the search field or the Needs you bar that opened
+     * it. The controls that handle Esc themselves (the search list, the Needs you list, the legend) stop
+     * the event before it gets here, and the draw tool's own Esc runs on the map container.
+     */
+    private onRootKeyDown = (ev: React.KeyboardEvent<HTMLDivElement>): void => {
+        if (ev.key !== 'Escape' || ev.defaultPrevented || this.state.drawing) {
+            return;
+        }
+        if (this.state.popup === null && this.state.pick === null) {
+            return;
+        }
+        ev.preventDefault();
+        const openedBy = this.openedBy;
+        this.closePopup();
+        if (openedBy === 'search' && this.searchControl) {
+            this.searchControl.focusInput();
+        } else if (openedBy === 'needsyou' && this.needsYouControl) {
+            this.needsYouControl.focusBar();
+        } else if (this.map) {
+            this.map.getCanvas().focus({ preventScroll: true });
+        }
+    };
+
     private setDrawState(state: DrawState): void {
         this.setState(state);
         if (this.drawControl) {
@@ -2015,6 +2130,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const lngLat: [number, number] = geometry && geometry.type === 'Point'
             ? [geometry.coordinates[0], geometry.coordinates[1]]
             : [ev.lngLat.lng, ev.lngLat.lat];
+        this.openedBy = null;
         this.openPopup(this.popupPoint(pointId, name, kindId), lngLat);
 
         const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
@@ -2108,11 +2224,17 @@ export class MapStudio extends Component<Props, MapStudioState> {
             return;
         }
         const display = delegate.live.display[item.kind];
-        const shows = (display && (!!display.popupView || displayShows(display))) || instrumentsOn(delegate.items, id).length > 0;
+        const instruments = instrumentsOn(delegate.items, id);
+        const shows = (display && (!!display.popupView || displayShows(display))) || instruments.length > 0;
         if (!shows) {
             this.selectLine(id, segment);
             return;
         }
+        if (!instruments.some((i) => iconKpiOf(delegate.live.display[i.kind]) !== null)) {
+            // A line with no measuring instrument has no segment to show or to highlight (owner review notes item 17).
+            segment = null;
+        }
+        this.openedBy = null;
         const store = this.props.store.delegate as MapStudioStoreDelegate | undefined;
         const before = this.state.popup;
         if (before && before.point.id !== id && store) {
@@ -2227,8 +2349,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (!item || item.geometry.type !== 'Point') {
             return;
         }
+        // The popup anchors to the shared marker drawn, not the member's own place (item 20).
         this.openPopup(this.popupPoint(item.id, item.name, item.kind),
-            [item.geometry.coordinates[0], item.geometry.coordinates[1]]);
+            this.anchorFor(item.id, [item.geometry.coordinates[0], item.geometry.coordinates[1]]));
         const store = this.props.store.delegate as MapStudioStoreDelegate | undefined;
         if (store) {
             store.sendPointClick(item.id);
@@ -2319,40 +2442,51 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.popup.on('close', this.onPopupClosed);
     }
 
-    /** Move the popup to the point (after the state that fills its portal has rendered) and open it. */
+    /**
+     * Move the popup to the point (after the state that fills its portal has rendered) and open it,
+     * placed inside the map less the top bar and the zoom card (owner review notes item 18): the card
+     * is measured in the document with the clamp lifted, `placePopup` picks the anchor (above the point
+     * first, so its name label stays clear; else beside, below or a corner), clamps the card to the room
+     * when nothing fits whole, and pans the map by what is still missing. Point and line cards alike.
+     */
     private showPopupAt(lngLat: [number, number], maxPx: number = POPUP_WIDTH_PX): void {
         if (!this.map || !this.popup) {
             return;
         }
-        const at = this.map.project(lngLat);
-        this.popup.setMaxWidth(popupMaxWidth(at.x, this.map.getContainer().clientWidth, maxPx));
+        const map = this.map;
+        const at = map.project(lngLat);
+        const width = map.getContainer().clientWidth;
+        const height = map.getContainer().clientHeight;
+        this.popup.setMaxWidth(popupMaxWidth(at.x, width, maxPx));
         if (!this.popup.isOpen()) {
             // The popup joins the map before it is placed: its content rendered already (the portal), but
             // a card measures 0 px tall until the popup's element is in the document (the first line popup
             // of a page opened above its segment and off the map's top with that 0).
-            this.popup.setLngLat(lngLat).addTo(this.map);
+            this.popup.setLngLat(lngLat).addTo(map);
             if (this.popupContent) {
                 this.popupContent.focus({ preventScroll: true });
             }
         }
-        if (maxPx === LINE_POPUP_PX && this.popupContent) {
-            // The line popup (entry 2): above the segment where its card fits, else below, else the side
-            // with more room with the card clamped to it (the body scrolls), so it never leaves the map.
-            // The card is in the document now, so its natural height is measured with the clamp lifted,
-            // then the clamp is set as the card's own token.
+        if (this.popupContent) {
             const content = this.popupContent;
             content.style.setProperty('--mapstudio-popup-max-height', 'none');
             const card = content.firstElementChild as HTMLElement | null;
             const natural = card ? card.offsetHeight : 0;
-            const placement = linePopupPlacement(at.y, this.map.getContainer().clientHeight, natural, POPUP_OFFSET_PX);
+            const cardWidth = card ? card.offsetWidth : Math.min(maxPx, width);
+            const obstacles = [this.controlRect('.maplibregl-ctrl-top-left'), this.controlRect('.maplibregl-ctrl-top-right')]
+                .filter((r): r is Rect => r !== null);
+            const placement = placePopup(at, cardWidth, natural, popupMaxHeight(height), width, height, obstacles, POPUP_OFFSET_PX);
             content.style.setProperty('--mapstudio-popup-max-height', placement.maxHeight + 'px');
             this.popup.options.anchor = placement.anchor;
-        } else if (this.popupContent) {
-            // A point's card (entry 8) keeps MapLibre's own anchoring; its tallest (P3) is 480 px or the
-            // map less 64, the header staying and the body scrolling.
-            this.popupContent.style.setProperty('--mapstudio-popup-max-height',
-                popupMaxHeight(this.map.getContainer().clientHeight) + 'px');
-            this.popup.options.anchor = undefined;
+            this.popupAnchor = placement.anchor;
+            if (this.mapContainer) {
+                this.mapContainer.setAttribute('data-popup-anchor', lngLat[0].toFixed(6) + ',' + lngLat[1].toFixed(6));
+                this.mapContainer.setAttribute('data-popup-side', placement.anchor);
+            }
+            if (placement.shift[0] !== 0 || placement.shift[1] !== 0) {
+                // The card still does not fit: the map pans so the point moves by the shift (the popup moves with it).
+                map.panBy([-placement.shift[0], -placement.shift[1]], { duration: 200 });
+            }
         }
         // setLngLat runs MapLibre's placement again with the anchor chosen and the card at its real size.
         this.popup.setLngLat(lngLat);
@@ -2377,6 +2511,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
      */
     private onPopupClosed = (): void => {
         this.stopPopupClock();
+        this.popupAnchor = null;
+        if (this.mapContainer) {
+            this.mapContainer.setAttribute('data-popup-anchor', '');
+            this.mapContainer.setAttribute('data-popup-side', '');
+        }
         const open = this.state.popup;
         if (open !== null) {
             const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
@@ -2670,7 +2809,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const quiet = !this.props.props.editMode && !pending && drawText === '' && saveText === '' && load.state !== 'failed'
             && store.status !== 'read-only' && unsaved.length === 0;
         return (
-            <div {...this.props.emit({ classes: ['mapstudio'] })}>
+            <div {...this.props.emit({ classes: ['mapstudio'] })} onKeyDown={this.onRootKeyDown}>
                 <div className="mapstudio-map" ref={this.setMapContainer}
                      data-edit-level={delegate && delegate.level ? delegate.level : ''}
                      data-load-state={load.state}
@@ -2684,6 +2823,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                      data-live-seq={delegate ? String(delegate.live.seq) : ''}
                      data-live-full={delegate ? String(delegate.live.fulls) : ''}
                      data-pick-open={this.state.pick ? 'true' : 'false'}
+                     data-popup-anchor=""
+                     data-popup-side=""
                      data-segment=""
                      data-highlighted=""
                      data-popup-mode={this.state.popup ? (this.state.popup.sheet ? 'sheet' : 'card') : ''}

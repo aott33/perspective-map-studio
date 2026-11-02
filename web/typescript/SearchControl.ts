@@ -150,6 +150,13 @@ export class SearchControl implements IControl {
         this.onToggle(false);
     }
 
+    /** Give the field the focus (Esc on a popup the search opened returns it here, owner review notes item 14). */
+    focusInput(): void {
+        if (this.input) {
+            this.input.focus();
+        }
+    }
+
     /** Clear the text and close the list; the focus stays in the input. */
     clear(): void {
         if (this.input) {
