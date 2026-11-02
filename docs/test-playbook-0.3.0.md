@@ -17,6 +17,7 @@ A walk through everything 0.3.0 does, in order, on the local development stack. 
 | 8. Custom popup view | passed: SWD1's custom view with the close row, on the phone sheet; the hidden link is covered by the automated test | 2026-11-02 |
 | 9. Dark theme and the review states | passed (with notes): every state reads in the dark theme; the ER-27 review passed with changes (docs/review-er27.md); notes: thin scroll bars (item 28), the map light on `/dark` until a reload (item 29) | 2026-11-02 |
 | 10. Designer setup form | passed (with notes): reads well, saves, a change applies without a restart (the wrong-value messages not checked); notes: the Map token rows (item 31) | 2026-11-02 |
+| 11. When things go wrong | in progress: the adapter statuses work | 2026-11-02 |
 | 2. Search and Needs you | passed (with notes): typing, Esc, search by asset name and Tab order work; search works and zooms to zoom 15; notes: a chevron opens a simple alphabetical list of every item, typing filters it (item 8); hovering Needs you makes its background disappear (bug, item 9), also over OpenStreetMap on the showcase; the list shows the items correctly; on a phone the counts as glyph and number only and the placeholder "Search assets" (item 12) | 2026-10-30 |
 
 ## 0. Before you start
@@ -174,7 +175,7 @@ Notes:
 
 ## 11. When things go wrong
 
-- [ ] `/adapters` (signed in): **Adapter: empty / broken / slow / incomplete** each give a plain-words status in the result line at the bottom of the page (the map itself shows no status in 0.3.0: showing it to people is epic-editing's; the map keeps drawing from the last good list); **Adapter: ok** recovers. **Adapter: unknown icon** draws that kind as a plain point.
+- [x] `/adapters` (signed in): **Adapter: empty / broken / slow / incomplete** each give a plain-words status in the result line at the bottom of the page (the map itself shows no status in 0.3.0: showing it to people is epic-editing's; the map keeps drawing from the last good list); **Adapter: ok** recovers. **Adapter: unknown icon** draws that kind as a plain point.
 - [ ] Two windows on `/edit`: draw a line in one (the spike's "Draw a line", Enter to finish); it shows in the other within seconds, with no reload.
 - [ ] A viewer (not signed in) cannot save: drawing is not offered on `/`.
 - [ ] Stop the Gateway (`docker stop` the `ms-...` container) with a map open: the map says so in words and shows nothing stale as current; start it again: the map recovers.
