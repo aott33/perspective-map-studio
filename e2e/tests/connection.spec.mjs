@@ -6,7 +6,24 @@
 // for that long, which is what the suite uses (a real `docker stop` is the playbook's step).
 
 import { TRACER } from '../lib/geo.mjs';
-import { EDITOR_USER, expect, mapLoaded, openMap, runSeed, signedInContext, test } from './fixtures.mjs';
+import { EDITOR_USER, expect, mapLoaded, openMap, runSeed, signedInContext, test as watchedTest, watch } from './fixtures.mjs';
+
+/**
+ * The client logs its own failed reconnect attempts while the loss is simulated ("Hello API call
+ * failed ... Simulated disconnect"): those are the loss itself, so they are left out; any other
+ * console or page error still fails the test.
+ */
+const SIMULATED = /Simulated disconnect/;
+const test = watchedTest.extend({
+    watched: [
+        async ({ page }, use) => {
+            const w = watch(page);
+            await use(w);
+            expect(w.errors.filter((e) => !SIMULATED.test(e)), 'browser console and page errors').toEqual([]);
+        },
+        { auto: true }
+    ]
+});
 
 /** The bound for a state to reach the map: one refresh interval (the dev setup's 10 s) plus margin. */
 const INTERVAL_MS = 25_000;
