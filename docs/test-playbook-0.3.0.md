@@ -174,7 +174,7 @@ Notes:
 
 ## 11. When things go wrong
 
-- [ ] `/adapters` (signed in): **Adapter: empty / broken / slow / incomplete** each show a plain-words status on the map; **Adapter: ok** recovers.
+- [ ] `/adapters` (signed in): **Adapter: empty / broken / slow / incomplete** each give a plain-words status in the result line at the bottom of the page (the map itself shows no status in 0.3.0: showing it to people is epic-editing's; the map keeps drawing from the last good list); **Adapter: ok** recovers. **Adapter: unknown icon** draws that kind as a plain point.
 - [ ] Two windows on `/edit`: draw a line in one (the spike's "Draw a line", Enter to finish); it shows in the other within seconds, with no reload.
 - [ ] A viewer (not signed in) cannot save: drawing is not offered on `/`.
 - [ ] Stop the Gateway (`docker stop` the `ms-...` container) with a map open: the map says so in words and shows nothing stale as current; start it again: the map recovers.
