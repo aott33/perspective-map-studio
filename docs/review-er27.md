@@ -105,7 +105,7 @@ What changed against the template: the template's map has no value-driven styles
 
 Verdict (the presets, and whether `warning` and `fault` may share the alarm hues): accepted; `warning` and `fault` keep the alarm hues of priorities 2 and 1, told apart by shape (a ring and a word against a glyph and a digit) (owner, 2026-11-02).
 
-Verdict (the six tints):
+Verdict (the six tints): accepted (owner, 2026-11-02).
 
 ### 3.4 The line looks per segment and instrument alarms
 
@@ -163,11 +163,11 @@ Verdict (the close row above a custom view): accepted (owner, 2026-11-02).
 
 | # | The template's item | Map Studio | Verdict |
 | --- | --- | --- | --- |
-| 1 | Markers show state only; the comms icon with no hue | the kind glyph in the marker; comms lost in its token; the badge the bare glyph (3.1) | Verdict: |
-| 3 | Lines: the alarm glyph with the digit at the segment's midpoint | an instrument's alarm at its place, the line's own at the midpoint; the segment look per end instruments (3.4) | Verdict: |
-| 5 | Fit field and Return to selected bottom-right with the zoom | in the one zoom card top-right; the bottom-right corner is the Perspective App Bar's (DESIGN.md) | Verdict: |
-| 7 | A collapsible panel and legend, chips below 1024 px | the Needs you bar and list, the search field, the legend as a key (3.2) | Verdict: |
-| 11 | The phone keeps the shape with top sheets | bottom sheets and one top bar (3.6) | Verdict: |
+| 1 | Markers show state only; the comms icon with no hue | the kind glyph in the marker; comms lost in its token; the badge the bare glyph (3.1) | Verdict: accepted (owner, 2026-11-02) |
+| 3 | Lines: the alarm glyph with the digit at the segment's midpoint | an instrument's alarm at its place, the line's own at the midpoint; the segment look per end instruments (3.4) | Verdict: accepted (owner, 2026-11-02) |
+| 5 | Fit field and Return to selected bottom-right with the zoom | in the one zoom card top-right; the bottom-right corner is the Perspective App Bar's (DESIGN.md) | Verdict: accepted (owner, 2026-11-02) |
+| 7 | A collapsible panel and legend, chips below 1024 px | the Needs you bar and list, the search field, the legend as a key (3.2) | Verdict: accepted (owner, 2026-11-02) |
+| 11 | The phone keeps the shape with top sheets | bottom sheets and one top bar (3.6) | Verdict: accepted (owner, 2026-11-02) |
 
 Items 2, 4, 6, 8, 9 and 10 are met as the template has them (names from zoom 14, dots below 12, the toggles, the shared marker, a tap on the ground, Fit keeps).
 
