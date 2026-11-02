@@ -56,6 +56,8 @@ State glyphs (never colour alone: each pairs with a word or a digit). The alarm 
 | `alarm-1-rectified` | Priority 1, cleared and not yet acknowledged: filled triangle with a check mark, full strength | drawn | Apache-2.0 |
 | `alarm-2-unacknowledged`, `alarm-2-acknowledged`, `alarm-2-rectified` | Priority 2 (Medium): the same three on a filled circle | drawn | Apache-2.0 |
 | `alarm-3` | Priority 3 (Low): an outlined square with "!" in every state; the map fades it once acknowledged | drawn | Apache-2.0 |
+| `bell` | The Needs you bar's alarm count (owner review item 12), solid: an unacknowledged alarm, in the hue of the highest unacknowledged priority. Not a map mark: the triangle with a digit stays the marker's alarm | drawn | Apache-2.0 |
+| `bell-outline` | The same bell hollow: every alarm acknowledged (neutral), or nothing needing attention (grey) | drawn | Apache-2.0 |
 
 The priority digit is a text label beside the glyph, never part of it. Diagnostic alarms never show.
 

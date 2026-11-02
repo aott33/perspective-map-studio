@@ -23,7 +23,7 @@ The tab holds one form, at most 760 px wide and left aligned, in four sections: 
 | Kinds function | `kindsFunction` | Editable combo box, monospace | The project library's (`ignition/script-python`) top-level functions as `package.function` (names starting with `_` are not offered) |
 | Assets function | `assetsFunction` | As above | As above |
 | Refresh interval | `refreshIntervalSeconds` | The Designer's number spinner, "seconds"; its arrows step the typed number; any text can be typed | none |
-| Basemaps | `basemaps` | Checkboxes None, OpenStreetMap, Satellite, Mapbox (and a box for any other name in the file, so it can be unticked) | fixed |
+| Basemaps | `basemaps` | Checkboxes None, OpenStreetMap, Satellite, Mapbox (and a box for any other name in the file, so it can be unticked); the list is saved in the order the boxes were ticked, and the first is the project's default basemap (a viewer gets a basemap switch only when more than one is listed; owner review, item 3) | fixed |
 | Alarm page | `alarmPage` | Editable combo box, monospace | The page URLs of the project's page configuration, then **Insert placeholder...**, which inserts `{item.id}`, `{item.name}`, `{asset.id}`, `{asset.path}` or `{item.properties.<field key>}` at the cursor. A picked URL with a `:param` gets `{item.name}` there, selected |
 | Map token | `tokenSecret` | Secret provider combo box and secret name combo box; saved as `<provider>/<name>` | The Gateway's secret providers, then the chosen provider's secret names |
 
