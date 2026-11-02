@@ -13,7 +13,7 @@ Status: built and unit tested; the Gateway half of the lists is checked live; th
 
 ## The form
 
-The tab holds one form, at most 760 px wide and left aligned, in four sections: Map store, Who can edit, Kinds and assets, Map. On a narrow tab each label moves above its control and the form wraps; there is never a horizontal scroll bar. The header shows "Map Studio Setup", a **Refresh lists** link and "Schema version 1" as text (never a field). Help is in each label's tooltip (and is the control's accessible description); the one line under a field is under Map token: "Names only - the Designer never reads the token."
+The tab holds one form, at most 760 px wide and left aligned, in four sections: Map store, Who can edit, Kinds and assets, Map. On a narrow tab each label moves above its control and the form wraps; there is never a horizontal scroll bar. The header shows "Map Studio Setup", a **Refresh lists** link and "Schema version 1" as text (never a field). Help is in each label's tooltip (and is the control's accessible description); the one line under a field is under Map token secret: "Names only - the Designer never reads the token."
 
 | Field | `setup.json` key | Control | List |
 | --- | --- | --- | --- |
@@ -25,7 +25,8 @@ The tab holds one form, at most 760 px wide and left aligned, in four sections: 
 | Refresh interval | `refreshIntervalSeconds` | The Designer's number spinner, "seconds"; its arrows step the typed number; any text can be typed | none |
 | Basemaps | `basemaps` | Checkboxes None, OpenStreetMap, Satellite, Mapbox (and a box for any other name in the file, so it can be unticked) | fixed |
 | Alarm page | `alarmPage` | Editable combo box, monospace | The page URLs of the project's page configuration, then **Insert placeholder...**, which inserts `{item.id}`, `{item.name}`, `{asset.id}`, `{asset.path}` or `{item.properties.<field key>}` at the cursor. A picked URL with a `:param` gets `{item.name}` there, selected |
-| Map token | `tokenSecret` | Secret provider combo box and secret name combo box; saved as `<provider>/<name>` | The Gateway's secret providers, then the chosen provider's secret names |
+| Map token provider | `tokenSecret` (the part before the first `/`) | Editable combo box (owner review notes item 31: two labelled rows in place of one row of two unlabelled boxes) | The Gateway's secret providers |
+| Map token secret | `tokenSecret` (the part after it); saved as `<provider>/<name>`, so `setup.json` is unchanged | Editable combo box, the note "Names only - the Designer never reads the token." under it; a token warning shows under the row it is about (the provider's under the first, the name's under the second) | The chosen provider's secret names |
 
 Every list is a suggestion: anything can be typed, and it is saved as typed. Gateway lists load when the tab opens and with Refresh lists, off the Swing thread; project lists are read from the open project. A list that fails (no Gateway, a refusal, a Gateway module without the setup RPC, an identity provider that does not list its roles) stays empty, with no message: typing still works, and the Designer itself shows when it has no Gateway connection (owner, 2026-10-27).
 

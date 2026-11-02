@@ -180,6 +180,7 @@ See [key-screen-9-save-states-saved.png](mockups/key-screen-9-save-states-saved.
 | Busy (loading) | Map, list, import preview | [ASSUMPTION] the save-status spinner pattern on the busy surface; no skeletons specified yet. |
 | No search results | Search | "No matches" [ASSUMPTION: wording]. |
 | Nothing needs you | Needs you bar | "All OK" in neutral; the bar stays. |
+| No connection | Whole component | While the Perspective client is disconnected (owner review notes item 32): a status chip in words under the top bar ("No connection - values from 14:02"), every value drawn stale (the hourglass, no style; an alarm keeps its last badge over the stale ring), the Needs you bar "State unknown - no connection"; the map reloads when the connection is back and the chip goes once the fresh values arrive. An operator never reads a frozen map as live (ER-27). |
 | Import preview | Import, map | Preview rows on the map as rings with "Preview - not on the map yet"; existing items that will change carry "Updated". |
 | Import errors | Import, Preview | Count found, rows with problems flagged with reasons and decided in Match; cancel changes nothing. |
 | Permission | Whole component | No editing role: no Edit switch, no tools, no affordance (FR-7). |
