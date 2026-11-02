@@ -140,6 +140,96 @@ test.describe('1440 px', () => {
         });
 });
 
+test.describe('1440 px, the legend', () => {
+    test.use({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+
+    test('the legend starts with States, collapses its nine kinds to "Kinds (9)", and stops below the top bar, its key scrolling inside (items 23, 24, 28)',
+        async ({ page, watched }) => {
+            const map = await openShowcase(page);
+            await page.locator('.mapstudio-legend-button').click();
+            const panel = page.locator('.mapstudio-legend-panel');
+            await expect(panel).toBeVisible();
+            // States first; the Kinds section is a button that starts closed with the count of kinds on the map.
+            expect(await panel.locator('.mapstudio-legend-heading').allTextContents())
+                .toEqual(['States', 'Kinds (9)', 'Lines', 'Styles', 'Areas', 'Show', 'Basemap']);
+            const kinds = panel.locator('.mapstudio-legend-section--kinds .mapstudio-legend-heading');
+            await expect(kinds).toHaveAttribute('aria-expanded', 'false');
+            await expect(panel.locator('.mapstudio-legend-kind')).toHaveCount(0);
+            await expect(panel.locator('.mapstudio-legend-state')).toHaveCount(6);
+            // The setup lists None and OpenStreetMap: two basemaps, so the switch is there.
+            await expect(panel.locator('.mapstudio-basemap-button')).toHaveCount(2);
+            await shot(page, 'showcase-legend-1440.png');
+            // Open, the nine kinds show; the whole key is taller than the room under the top bar, so it scrolls inside the panel.
+            await kinds.click();
+            await expect(kinds).toHaveAttribute('aria-expanded', 'true');
+            await expect(panel.locator('.mapstudio-legend-kind')).toHaveCount(9);
+            const topBar = await page.locator('.mapstudio-topbar-row').boundingBox();
+            const button = await page.locator('.mapstudio-legend-button').boundingBox();
+            const box = await panel.boundingBox();
+            expect(box.y, 'the panel stops below the top bar').toBeGreaterThanOrEqual(topBar.y + topBar.height);
+            expect(box.y + box.height, 'above the Legend button').toBeLessThanOrEqual(button.y + 1);
+            const body = panel.locator('.mapstudio-legend-body');
+            expect(await body.evaluate((el) => el.scrollHeight > el.clientHeight), 'the key scrolls inside the panel').toBe(true);
+            // Thin themed scroll bars on the panel (item 28).
+            expect(await body.evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe('thin');
+            // Still open after a batch redraws the key; closed again by its heading.
+            await kinds.click();
+            await expect(panel.locator('.mapstudio-legend-kind')).toHaveCount(0);
+            // A short window: the panel still stops below the top bar.
+            await page.setViewportSize({ width: 1440, height: 560 });
+            await kinds.click();
+            await expect.poll(async () => (await panel.boundingBox()).y).toBeGreaterThanOrEqual(topBar.y + topBar.height);
+            expect(watched.warnings, 'Map Studio warnings').toEqual([]);
+        });
+
+    test('the thin scroll bars sit on every scrolling panel in the theme\'s tokens (item 28)', async ({ page }) => {
+        await openShowcase(page);
+        await bar(page).click();
+        await expect(page.locator('.mapstudio-needs-panel')).toBeVisible();
+        const style = (selector) => page.locator(selector).first().evaluate((el) => {
+            const cs = getComputedStyle(el);
+            return { width: cs.scrollbarWidth, color: cs.scrollbarColor };
+        });
+        for (const selector of ['.mapstudio-needs-panel', '.mapstudio-legend-button']) {
+            const s = await style(selector);
+            expect(s.width, selector).toBe('thin');
+            // A neutral thumb and a clear track: the track is transparent, so it sits on the panel's own surface.
+            expect(s.color, selector).toMatch(/ rgba\(0, 0, 0, 0\)$|transparent$/);
+        }
+        // The panel's own surface is opaque (no white strip beside the list in the dark theme: the track shows it).
+        const surface = await page.locator('.mapstudio-needs-panel').evaluate((el) => getComputedStyle(el).backgroundColor);
+        expect(surface).not.toMatch(/rgba\(.*, 0\)$/);
+    });
+
+    test('hovering the Needs you bar and its rows keeps an opaque background, so the text never sits on the imagery (item 9)', async ({ page }) => {
+        await openShowcase(page);
+        const alpha = async (locator) => locator.evaluate((el) => {
+            const m = getComputedStyle(el).backgroundColor.match(/rgba?\(([^)]+)\)/);
+            const parts = m ? m[1].split(',').map((x) => parseFloat(x)) : [0, 0, 0, 0];
+            return parts.length > 3 ? parts[3] : 1;
+        });
+        await bar(page).hover();
+        expect(await alpha(bar(page)), 'the bar hovered').toBe(1);
+        // The hover is a visible tint, not the surface itself and not MapLibre's 5 % black wash.
+        const hovered = await bar(page).evaluate((el) => getComputedStyle(el).backgroundColor);
+        await page.mouse.move(700, 600);
+        const resting = await bar(page).evaluate((el) => getComputedStyle(el).backgroundColor);
+        expect(hovered).not.toBe(resting);
+        await bar(page).click();
+        const row = page.locator('.mapstudio-needs-row').first();
+        await row.hover();
+        expect(await alpha(row), 'a row hovered').toBe(1);
+        // With the host's neutral-30 missing the fallback still makes an opaque tint.
+        await page.evaluate(() => {
+            const root = document.querySelector('.mapstudio');
+            root.style.setProperty('--neutral-30', 'initial');
+        });
+        await page.mouse.move(700, 600);
+        await row.hover();
+        expect(await alpha(row), 'a row hovered with no neutral-30').toBe(1);
+    });
+});
+
 test.describe('1366 px', () => {
     test.use({ viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1 });
 

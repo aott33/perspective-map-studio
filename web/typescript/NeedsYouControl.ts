@@ -25,7 +25,7 @@
  */
 
 import { glyphSvg } from './controls';
-import { BAR_UNKNOWN, EMPTY_SUMMARY, NOTHING_NEEDS_YOU, NeedsYouRow, NeedsYouSummary, RANKED_NOTE, bellLook, countParts, summaryText, total } from './needsyou';
+import { EMPTY_SUMMARY, NOTHING_NEEDS_YOU, NeedsYouRow, NeedsYouSummary, RANKED_NOTE, barModel, total } from './needsyou';
 
 /** The sprite the state and kind glyphs come from, as the default popup draws them (DefaultPopup.tsx). */
 const SPRITE_URL = '/res/mapstudio/icons/mapstudio-icons.svg';
@@ -43,11 +43,6 @@ function spriteGlyph(id: string, className: string, size: number): SVGSVGElement
     use.setAttribute('href', SPRITE_URL + '#ms-' + id);
     svg.appendChild(use);
     return svg;
-}
-
-/** The glyph of a count in the bar: the bell (hollow or solid by the summary), the comms-lost or the stale symbol. */
-function countGlyph(kind: 'alarm' | 'comms-lost' | 'stale', bell: string): string {
-    return kind === 'alarm' ? bell : kind;
 }
 
 export class NeedsYouControl {
@@ -159,11 +154,11 @@ export class NeedsYouControl {
     }
 
     /** One count of the bar: its glyph and its number (the number is left out of the quiet bell). */
-    private count(kind: 'alarm' | 'comms-lost' | 'stale', glyph: string, n: string): HTMLSpanElement {
+    private count(kind: string, glyph: string, n: string): HTMLSpanElement {
         const count = document.createElement('span');
         count.className = 'mapstudio-needs-count mapstudio-needs-count--' + kind;
         count.setAttribute('data-kind', kind);
-        count.appendChild(spriteGlyph(countGlyph(kind, glyph), 'mapstudio-needs-glyph', 18));
+        count.appendChild(spriteGlyph(glyph, 'mapstudio-needs-glyph', 18));
         if (n !== '') {
             const number = document.createElement('span');
             number.className = 'mapstudio-needs-count-n';
@@ -181,29 +176,18 @@ export class NeedsYouControl {
         while (bar.firstChild) {
             bar.removeChild(bar.firstChild);
         }
-        const n = total(this.summary.counts);
-        const look = bellLook(this.summary);
-        bar.setAttribute('data-count', String(n));
-        bar.setAttribute('data-state', this.unknown ? 'unknown' : n === 0 ? 'ok' : 'needs');
+        const model = barModel(this.summary, this.unknown);
+        bar.setAttribute('data-count', String(total(this.summary.counts)));
+        bar.setAttribute('data-state', model.state);
         bar.setAttribute('data-priority', String(this.summary.highestPriority));
-        bar.setAttribute('data-bell', this.unknown ? 'none' : look.tone);
-        bar.classList.toggle('mapstudio-needs--ok', n === 0 && !this.unknown);
-        bar.classList.toggle('mapstudio-needs--unknown', this.unknown);
+        bar.setAttribute('data-bell', model.bell);
+        bar.classList.toggle('mapstudio-needs--ok', model.state === 'ok');
+        bar.classList.toggle('mapstudio-needs--unknown', model.state === 'unknown');
         // The words are the label and the hover title only; nothing in the bar is text but the numbers.
-        const line = this.unknown ? BAR_UNKNOWN : summaryText(this.summary.counts);
-        bar.title = line;
-        bar.setAttribute('aria-label', line);
-        if (this.unknown) {
-            bar.appendChild(this.count('alarm', 'bell-outline', '?'));
-        } else {
-            // The bell is always there (the alarm count cannot be turned off); its number only while an alarm is active.
-            const alarms = this.summary.counts.alarm;
-            bar.appendChild(this.count('alarm', look.glyph, alarms > 0 ? String(alarms) : ''));
-            for (const part of countParts(this.summary.counts)) {
-                if (part.kind !== 'alarm') {
-                    bar.appendChild(this.count(part.kind, part.kind, part.text.substring(0, part.text.indexOf(' '))));
-                }
-            }
+        bar.title = model.label;
+        bar.setAttribute('aria-label', model.label);
+        for (const count of model.counts) {
+            bar.appendChild(this.count(count.kind, count.glyph, count.n));
         }
         bar.insertAdjacentHTML('beforeend', glyphSvg('chevron', 'mapstudio-ctrl-glyph mapstudio-needs-chevron'));
     }

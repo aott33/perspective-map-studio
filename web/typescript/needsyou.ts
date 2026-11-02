@@ -179,6 +179,45 @@ function rankOf(state: ItemState): number {
     return state.commsLost ? 10 : 11;
 }
 
+/** One count of the bar: its kind, the sprite glyph and the number ('' for the bell with no alarm, '?' when unknown). */
+export interface BarCount {
+    kind: NeedsYouState;
+    glyph: string;
+    n: string;
+}
+
+/** What the bar draws (the control only builds the DOM from it, so the logic is unit tested). */
+export interface BarModel {
+    /** `ok` nothing needs attention, `needs` something does, `unknown` the Gateway cannot be reached. */
+    state: 'ok' | 'needs' | 'unknown';
+    /** The hover title and the accessible name: the only words the bar has. */
+    label: string;
+    /** The bell's tone, for the `data-bell` attribute and the CSS. */
+    bell: BellLook['tone'];
+    /** The counts in order: the bell always first, then comms lost and stale while they are not zero. */
+    counts: BarCount[];
+}
+
+/**
+ * The bar from the summary (owner review, item 12) or, with `unknown`, as the state-unknown look: a hollow grey bell with
+ * a question mark and no counts, so a frozen summary is never read as live (item 32, group c's hook).
+ */
+export function barModel(summary: NeedsYouSummary, unknown: boolean): BarModel {
+    if (unknown) {
+        return { state: 'unknown', label: BAR_UNKNOWN, bell: 'none', counts: [{ kind: 'alarm', glyph: 'bell-outline', n: '?' }] };
+    }
+    const look = bellLook(summary);
+    const counts: BarCount[] = [{ kind: 'alarm', glyph: look.glyph, n: summary.counts.alarm > 0 ? String(summary.counts.alarm) : '' }];
+    if (summary.counts.commsLost > 0) {
+        counts.push({ kind: 'comms-lost', glyph: 'comms-lost', n: String(summary.counts.commsLost) });
+    }
+    if (summary.counts.stale > 0) {
+        counts.push({ kind: 'stale', glyph: 'stale', n: String(summary.counts.stale) });
+    }
+    const n = total(summary.counts);
+    return { state: n === 0 ? 'ok' : 'needs', label: summaryText(summary.counts), bell: look.tone, counts };
+}
+
 /** The summary from the loaded items, the kind list and the live state. Pure. */
 export function needsYou(items: readonly MapItemRecord[], kinds: readonly Kind[], live: LiveState, now: number): NeedsYouSummary {
     const kindById = new Map<string, Kind>();

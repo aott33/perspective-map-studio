@@ -2,12 +2,13 @@
 // legend, EXPERIENCE.md Needs you bar and Legend). On the dev Gateway with the seeded kind setups
 // and the tracer: Point 1 in alarm (P12 pressure 950), Point 3 comms lost (P15 has no Comms tag, the
 // not-found case entry 5 left) and Point 2 stale (P14's Pressure at Bad quality, its comms fine) read
-// "Needs you 3: 1 alarm, 1 comms lost, 1 stale" within one refresh interval, from the same batch the
+// "Needs you 3: 1 alarm, 1 comms lost, 1 stale" (the button's label; the bar itself is glyphs and numbers, owner
+// review item 12) within one refresh interval, from the same batch the
 // markers draw from; the list ranks them alarm, comms lost, stale with the state in words, detail and
 // age, and a row zooms to and selects its item; the whole thing works by keyboard (Enter, arrows, Esc
 // with the focus returned); at 390 px the bar shares the one top bar with search and the list expands
 // inside it; with all three cleared (the alarm down and acknowledged, the quality good, Point 3
-// unlinked from P15, which rebuilds the live plan) it reads "All OK" in neutral and stays. The legend
+// unlinked from P15, which rebuilds the live plan) the bar is a grey bell alone, never words, and stays. The legend
 // names every glyph and line look and its Lines and Names toggles hide what they say, remembered for
 // the session. Screenshots at 1440 and 390 px for the docs (AD-15). The spec first deletes the items
 // earlier specs left (the seed restores only its own, and a stray pad can be stale or comms lost for
@@ -149,8 +150,12 @@ editorTest.describe('1440 px', () => {
             await expect(bar(page)).toHaveAttribute('aria-label', 'Needs you 3: 1 alarm, 1 comms lost, 1 stale', { timeout: INTERVAL_MS });
             await expect(bar(page)).toHaveAttribute('data-count', '3');
             await expect(bar(page)).toHaveAttribute('data-state', 'needs');
-            await expect(bar(page)).toHaveText(/^Needs you 3:\s*1 alarm\s*1 comms lost\s*1 stale$/);
-            await expect(bar(page).locator('.mapstudio-needs-count--alarm use')).toHaveAttribute('href', /#ms-alarm-1-unacknowledged$/);
+            // No words at any width (item 12): a bell and its number, the comms-lost glyph and its number, the hourglass and its number.
+            await expect(bar(page)).toHaveText(/^\s*1\s*1\s*1\s*$/);
+            await expect(bar(page).locator('.mapstudio-needs-count-word, .mapstudio-needs-words, .mapstudio-needs-colon')).toHaveCount(0);
+            await expect(bar(page)).toHaveAttribute('title', 'Needs you 3: 1 alarm, 1 comms lost, 1 stale');
+            await expect(bar(page)).toHaveAttribute('data-bell', 'p1');
+            await expect(bar(page).locator('.mapstudio-needs-count--alarm use')).toHaveAttribute('href', /#ms-bell$/);
             await expect(bar(page).locator('.mapstudio-needs-count--comms-lost use')).toHaveAttribute('href', /#ms-comms-lost$/);
             await expect(bar(page).locator('.mapstudio-needs-count--stale use')).toHaveAttribute('href', /#ms-stale$/);
             await expect(liveItem(page, ids.p1)).toHaveAttribute('data-state', 'alarm');
@@ -165,7 +170,7 @@ editorTest.describe('1440 px', () => {
                     alarmToken: token('--mapstudio-alarm-1'),
                     comms: getComputedStyle(el.querySelector('.mapstudio-needs-count--comms-lost .mapstudio-needs-glyph')).color,
                     commsToken: token('--mapstudio-comms-lost'),
-                    words: getComputedStyle(el.querySelector('.mapstudio-needs-words')).color
+                    words: getComputedStyle(el.querySelector('.mapstudio-needs-count--stale .mapstudio-needs-count-n')).color
                 };
             });
             expect(colors.alarmToken).not.toBe('');
@@ -192,8 +197,12 @@ editorTest.describe('1440 px', () => {
             await expect(rows(page).nth(1).locator('use')).toHaveAttribute('href', /#ms-comms-lost$/);
             await expect(rows(page).nth(2).locator('use')).toHaveAttribute('href', /#ms-stale$/);
             const panelBox = await panel(page).boundingBox();
-            expect(Math.round(panelBox.width)).toBe(320);
+            // The list keeps its own width now that the bar has no words and is narrower than it (item 30).
+            expect(Math.round(panelBox.width)).toBe(360);
+            expect(barBox.width, 'the wordless bar is narrower than the list').toBeLessThan(panelBox.width);
             expect(Math.round(panelBox.x), 'the list under the bar').toBe(Math.round(barBox.x));
+            const zoomLeft = (await page.locator('.mapstudio-zoom').boundingBox()).x;
+            expect(panelBox.x + panelBox.width, 'never wider than the map less the zoom card').toBeLessThanOrEqual(zoomLeft);
             expect(panelBox.y).toBeGreaterThanOrEqual(barBox.y + barBox.height);
             // The first row took the focus.
             await expect(rows(page).nth(0)).toBeFocused();
@@ -258,9 +267,13 @@ editorTest.describe('390 px', () => {
         expect(barBox.height, 'a 44 px target').toBeGreaterThanOrEqual(44);
         expect(barBox.x).toBeGreaterThanOrEqual(fieldBox.x + fieldBox.width - 1);
         expect(barBox.x + barBox.width).toBeLessThanOrEqual(topBox.x + topBox.width + 1);
-        // The glyphs carry the counts on the phone; the words are the button's label.
+        // A glyph and its number for every count, on the phone as on a desktop; the words are the button's label.
         await expect(bar(page)).toHaveAttribute('aria-label', 'Needs you 3: 1 alarm, 1 comms lost, 1 stale');
-        await expect(bar(page).locator('.mapstudio-needs-count--comms-lost .mapstudio-needs-count-word')).toBeHidden();
+        await expect(bar(page).locator('.mapstudio-needs-count-n')).toHaveCount(3);
+        for (const n of await bar(page).locator('.mapstudio-needs-count-n').all()) {
+            await expect(n).toBeVisible();
+        }
+        await expect(bar(page).locator('.mapstudio-needs-count-word')).toHaveCount(0);
 
         // A tap expands the list inside the bar, rows at least 44 px.
         await bar(page).click();
@@ -274,7 +287,8 @@ editorTest.describe('390 px', () => {
         for (const row of await rows(page).all()) {
             expect((await row.boundingBox()).height, 'a 44 px row').toBeGreaterThanOrEqual(44);
         }
-        // The zoom card sits under the bar's one line (the list expands over the map); nothing in the bottom-right corner.
+        // The open list draws over the zoom card at the bar's full width, the zoom card hidden while it is open (item 26).
+        await expect(page.locator('.mapstudio-zoom')).toBeHidden();
         const zoomBox = await page.locator('.mapstudio-zoom').boundingBox();
         expect(zoomBox.y).toBeGreaterThanOrEqual(topBox.y + 48 + 8 - 1);
         await shot(page, 'mapstudio-needs-you-390.png');
@@ -282,9 +296,10 @@ editorTest.describe('390 px', () => {
         for (const b of [topBox, zoomBox, await legendButton(page).boundingBox()]) {
             expect(b.x + b.width > corner.x && b.y + b.height > corner.y, 'nothing in the bottom-right corner').toBe(false);
         }
-        // A tap on a row chooses it; the bar is back to one line.
+        // A tap on a row chooses it; the bar is back to one line and the zoom card is back.
         await rows(page).nth(0).click();
         await expect(panel(page)).toHaveCount(0);
+        await expect(page.locator('.mapstudio-zoom')).toBeVisible();
         await expect(map).toHaveAttribute('data-selected', ids.p1, { timeout: DRAW_MS });
         await expect(popup(page)).toHaveAttribute('data-point-id', ids.p1, { timeout: DRAW_MS });
         barBox = await bar(page).boundingBox();
@@ -302,7 +317,7 @@ editorTest.describe('390 px', () => {
 editorTest.describe('1440 px, all cleared', () => {
     editorTest.use({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 
-    editorTest('with nothing to attend to the bar reads All OK in neutral and stays; the legend names every glyph and line look and its toggles work, remembered for the session',
+    editorTest('with nothing to attend to the bar is a grey bell alone, with no words and no number, and stays; the legend names every glyph and line look and its toggles work, remembered for the session',
         async ({ page, watched }) => {
             const map = await openLive(page);
             await expect(bar(page)).toHaveAttribute('data-count', '3', { timeout: INTERVAL_MS });
@@ -311,13 +326,18 @@ editorTest.describe('1440 px, all cleared', () => {
             await expect(bar(page)).toHaveAttribute('aria-label', 'Needs you 1: 1 comms lost', { timeout: INTERVAL_MS });
             await link(page, ids.p3, null);
             await expect(bar(page)).toHaveAttribute('data-state', 'ok', { timeout: INTERVAL_MS });
-            await expect(bar(page)).toHaveText('All OK');
+            await expect(bar(page)).toHaveText('');
+            await expect(bar(page)).toHaveAttribute('aria-label', 'Needs you: nothing needs attention');
+            await expect(bar(page)).toHaveAttribute('data-bell', 'none');
+            await expect(bar(page).locator('.mapstudio-needs-count')).toHaveCount(1);
+            await expect(bar(page).locator('.mapstudio-needs-count-n')).toHaveCount(0);
+            await expect(bar(page).locator('.mapstudio-needs-count--alarm use')).toHaveAttribute('href', /#ms-bell-outline$/);
             await expect(bar(page)).toHaveAttribute('data-count', '0');
             await expect(bar(page)).toBeVisible();
-            // Neutral: the words take the secondary text token, not an alarm or comms-lost hue.
+            // Neutral: the bell takes the secondary text token, not an alarm or comms-lost hue.
             const ok = await bar(page).evaluate((el) => {
                 const root = el.closest('.mapstudio');
-                const words = getComputedStyle(el.querySelector('.mapstudio-needs-words')).color;
+                const words = getComputedStyle(el.querySelector('.mapstudio-needs-count--alarm')).color;
                 const probe = document.createElement('span');
                 probe.style.color = 'var(--label--disabled)';
                 root.appendChild(probe);
@@ -334,14 +354,14 @@ editorTest.describe('1440 px, all cleared', () => {
             await expect(bar(page)).toBeFocused();
             await shot(page, 'mapstudio-needs-you-ok-1440.png');
 
-            // The legend's key: the kinds on the map, the states, the lines, the pad's styles, the geofence's tints, Show, Basemap.
+            // The legend's key: the states, the kinds on the map, the lines, the pad's styles, the geofence's tints, Show, Basemap (the dev setup lists three).
             await view(page, map, TRACER_VIEW.center, TRACER_VIEW.zoom);
             await legendButton(page).focus();
             await page.keyboard.press('Enter');
             await expect(legendPanel(page)).toBeVisible();
             await expect(toggle(page, 'lines')).toBeFocused();
             expect(await legendPanel(page).locator('.mapstudio-legend-heading').allTextContents())
-                .toEqual(['Kinds', 'States', 'Lines', 'Styles', 'Areas', 'Show', 'Basemap']);
+                .toEqual(['States', 'Kinds', 'Lines', 'Styles', 'Areas', 'Show', 'Basemap']);
             expect(await legendPanel(page).locator('.mapstudio-legend-kind .mapstudio-legend-key-words').allTextContents())
                 // Entry 2's seed adds the L-SWD instruments' kinds, Tap and Line valve.
                 .toEqual(['Well pad', 'Gathering line', 'Geofence', 'Tap', 'Line valve']);
@@ -405,11 +425,49 @@ editorTest.describe('1440 px, all cleared', () => {
                 await mapLoaded(viewerMap);
                 await expect(viewerMap).toHaveAttribute('data-lines', 'on');
                 await expect(viewerMap).toHaveAttribute('data-names', 'on');
-                // A viewer gets the summary too (level none, no tag path): All OK while everything is quiet.
+                // A viewer gets the summary too (level none, no tag path): the grey bell while everything is quiet.
                 await expect(viewer.locator('.mapstudio-needs')).toHaveAttribute('data-state', 'ok', { timeout: 30_000 });
             } finally {
                 await fresh.close();
             }
+            expect(watched.warnings, 'Map Studio warnings').toEqual([]);
+        });
+});
+
+editorTest.describe('1440 px, the bell', () => {
+    editorTest.use({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+
+    editorTest('the bell is solid in the hue of the highest unacknowledged priority and neutral and hollow once every alarm is acknowledged, still counted (item 12)',
+        async ({ page, watched }) => {
+            await openLive(page);
+            await quiet(page);
+            await expect(bar(page)).toHaveAttribute('data-bell', 'none', { timeout: INTERVAL_MS });
+            // An unacknowledged priority 1 alarm: a solid bell in the priority 1 hue with its count.
+            await press(page, 'pressure-high');
+            await expect(bar(page)).toHaveAttribute('data-bell', 'p1', { timeout: INTERVAL_MS });
+            await expect(bar(page).locator('.mapstudio-needs-count--alarm use')).toHaveAttribute('href', /#ms-bell$/);
+            await expect(bar(page).locator('.mapstudio-needs-count--alarm .mapstudio-needs-count-n')).toHaveText('1');
+            const hue = await bar(page).evaluate((el) => {
+                const root = el.closest('.mapstudio');
+                return { bell: getComputedStyle(el.querySelector('.mapstudio-needs-count--alarm')).color,
+                    token: (() => { const p = document.createElement('span'); p.style.color = 'var(--mapstudio-alarm-1)'; root.appendChild(p);
+                        const c = getComputedStyle(p).color; p.remove(); return c; })() };
+            });
+            expect(hue.bell).toBe(hue.token);
+            // Acknowledged: the same count, neutral and hollow.
+            await press(page, 'ack');
+            await expect(bar(page)).toHaveAttribute('data-bell', 'acknowledged', { timeout: INTERVAL_MS });
+            await expect(bar(page).locator('.mapstudio-needs-count--alarm use')).toHaveAttribute('href', /#ms-bell-outline$/);
+            await expect(bar(page).locator('.mapstudio-needs-count--alarm .mapstudio-needs-count-n')).toHaveText('1');
+            const neutral = await bar(page).evaluate((el) => {
+                const root = el.closest('.mapstudio');
+                const p = document.createElement('span'); p.style.color = 'var(--label)'; root.appendChild(p);
+                const c = getComputedStyle(p).color; p.remove();
+                return { bell: getComputedStyle(el.querySelector('.mapstudio-needs-count--alarm')).color, label: c };
+            });
+            expect(neutral.bell).toBe(neutral.label);
+            await quiet(page);
+            await expect(bar(page)).toHaveAttribute('data-bell', 'none', { timeout: INTERVAL_MS });
             expect(watched.warnings, 'Map Studio warnings').toEqual([]);
         });
 });

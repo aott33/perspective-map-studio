@@ -63,12 +63,10 @@
         0 4px 12px color-mix(in srgb, var(--neutral-90) 10%, transparent));
     --mapstudio-target: 32px;
     --mapstudio-map-inset: 12px;
-    /* The hover tint (owner review, item 9): the theme's neutral-30 is a translucent wash in Perspective's themes
-       (rgba(0, 0, 0, 0.05) in the light one), so a hover that sets it as the background lets the imagery show
-       through the card. The tint is a layer over the opaque surface instead (`background: var(--mapstudio-hover-bg),
-       <the surface>`), and where a host theme defines no neutral-30 it is the text colour at 10 %. */
-    --mapstudio-hover-tint: var(--neutral-30, color-mix(in srgb, var(--label) 10%, transparent));
-    --mapstudio-hover-bg: linear-gradient(var(--mapstudio-hover-tint), var(--mapstudio-hover-tint));
+    /* The hover tint (owner review, item 9): the card surface with the theme's neutral-30 wash, and where a host theme
+       defines no neutral-30 the text colour at 12 % on the surface; opaque either way, so a hovered card never lets
+       the imagery show through. */
+    --mapstudio-hover: var(--neutral-30, color-mix(in srgb, var(--label) 12%, var(--mapstudio-surface)));
     /* The thin scroll bars (item 28): a neutral thumb, the track left clear so it sits on the panel's own surface. */
     --mapstudio-scroll-thumb: var(--neutral-50, color-mix(in srgb, var(--label) 40%, transparent));
     /* The search field's width (DESIGN.md search-field); the Needs you list sits right of it (entry 3). */
@@ -130,7 +128,7 @@
 }
 
 .mapstudio .mapstudio-ctrl-button:hover:not(:disabled) {
-    background: var(--mapstudio-hover-bg), var(--mapstudio-surface);
+    background: var(--mapstudio-hover);
 }
 
 .mapstudio .mapstudio-ctrl-button:focus-visible {
@@ -200,7 +198,7 @@
 }
 
 .mapstudio .mapstudio-draw-button:hover {
-    background: var(--mapstudio-hover-bg), var(--mapstudio-surface);
+    background: var(--mapstudio-hover);
 }
 
 .mapstudio .mapstudio-draw-button--on {
@@ -387,7 +385,7 @@
 }
 
 .mapstudio-popup-icon:hover {
-    background: var(--mapstudio-hover-bg), var(--mapstudio-popup-surface);
+    background: var(--mapstudio-hover);
 }
 
 .mapstudio-popup-icon:focus-visible {
@@ -690,7 +688,7 @@
 }
 
 .mapstudio-unsaved-row button:hover:not(:disabled) {
-    background: var(--mapstudio-hover-bg), var(--mapstudio-surface);
+    background: var(--mapstudio-hover);
 }
 
 .mapstudio-unsaved-row button:disabled {
@@ -1119,7 +1117,7 @@
 
 .mapstudio .mapstudio-search-option:hover,
 .mapstudio .mapstudio-search-option[aria-selected="true"] {
-    background: var(--mapstudio-hover-bg), var(--mapstudio-surface);
+    background: var(--mapstudio-hover);
 }
 
 .mapstudio .mapstudio-search-kind-glyph {
@@ -1249,8 +1247,11 @@
     cursor: pointer;
 }
 
-.mapstudio .mapstudio-needs:hover {
-    background: var(--mapstudio-hover-bg), var(--mapstudio-surface);
+/* MapLibre's own `.maplibregl-ctrl button:not(:disabled):hover { background-color: rgba(0, 0, 0, .05) }` is more specific
+   than a plain `.mapstudio .mapstudio-needs:hover`, so the bar's hover became a 5 % black wash on a transparent
+   background and the text sat on the imagery (item 9): these rules name the control class too and beat it. */
+.mapstudio .maplibregl-ctrl .mapstudio-needs:hover:not(:disabled) {
+    background: var(--mapstudio-hover);
 }
 
 .mapstudio .mapstudio-needs:focus-visible {
@@ -1355,8 +1356,8 @@
     cursor: pointer;
 }
 
-.mapstudio .mapstudio-needs-row:hover {
-    background: var(--mapstudio-hover-bg), var(--mapstudio-surface);
+.mapstudio .maplibregl-ctrl .mapstudio-needs-row:hover:not(:disabled) {
+    background: var(--mapstudio-hover);
 }
 
 .mapstudio .mapstudio-needs-row:focus-visible {
@@ -1677,7 +1678,7 @@
 }
 
 .mapstudio-pick-row:hover {
-    background: var(--mapstudio-hover-bg), var(--mapstudio-surface);
+    background: var(--mapstudio-hover);
 }
 
 .mapstudio-pick-name {

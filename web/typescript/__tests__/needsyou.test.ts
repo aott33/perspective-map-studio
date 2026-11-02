@@ -1,7 +1,7 @@
 import { Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import { KindDisplay, LIVE_INITIAL, LiveState, LiveValue } from '../live';
-import { BAR_QUIET, bellLook, countParts, countText, EMPTY_SUMMARY, needsYou, summaryText, total } from '../needsyou';
+import { BAR_QUIET, BAR_UNKNOWN, barModel, bellLook, countParts, countText, EMPTY_SUMMARY, needsYou, summaryText, total } from '../needsyou';
 
 const T = '2026-10-28T10:00:00Z';
 const NOW = Date.parse('2026-10-28T10:04:00Z');
@@ -118,5 +118,26 @@ describe('the Needs you summary (epic 3 entry 3)', () => {
         expect(lost.counts).toEqual({ alarm: 0, commsLost: 1, stale: 0 });
         expect(bellLook(lost)).toEqual({ glyph: 'bell-outline', tone: 'none' });
         expect(bellLook(EMPTY_SUMMARY)).toEqual({ glyph: 'bell-outline', tone: 'none' });
+    });
+
+    test('the bar model: a bell always, comms lost and stale while not zero, words only in the label; unknown is a hollow bell with a question mark (items 12 and 32)', () => {
+        const pads = [point('a', 'Pad A'), point('b', 'Pad B'), point('c', 'Pad C')];
+        const s = needsYou(pads, [PAD], live({
+            a: { id: 'a', comms: good(true), kpis: { pressure: good(950) }, alarms: good({ active: 1, unacked: 1, priority: 2 }), problems: [] },
+            b: { id: 'b', comms: good(false), kpis: {}, problems: [] },
+            c: { id: 'c', comms: good(true), kpis: { pressure: stale(400, 'Bad_Stale') }, alarms: good({ active: 0, unacked: 0, priority: 0 }), problems: [] }
+        }), NOW);
+        const m = barModel(s, false);
+        expect(m).toEqual({
+            state: 'needs', label: 'Needs you 3: 1 alarm, 1 comms lost, 1 stale', bell: 'p2',
+            counts: [{ kind: 'alarm', glyph: 'bell', n: '1' }, { kind: 'comms-lost', glyph: 'comms-lost', n: '1' }, { kind: 'stale', glyph: 'stale', n: '1' }]
+        });
+        // The bar has numbers and glyphs only: no count carries a word.
+        expect(m.counts.every((c) => /^[0-9]*$/.test(c.n))).toBe(true);
+        // Quiet: one hollow grey bell, no number, the label says so in words for screen readers.
+        expect(barModel(EMPTY_SUMMARY, false)).toEqual({ state: 'ok', label: BAR_QUIET, bell: 'none', counts: [{ kind: 'alarm', glyph: 'bell-outline', n: '' }] });
+        // Unknown: whatever the last summary was, the bar shows no counts.
+        expect(barModel(s, true)).toEqual({ state: 'unknown', label: BAR_UNKNOWN, bell: 'none', counts: [{ kind: 'alarm', glyph: 'bell-outline', n: '?' }] });
+        expect(BAR_UNKNOWN).toContain('state unknown');
     });
 });

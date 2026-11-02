@@ -2,7 +2,9 @@
 // dev Gateway with the seeded 30-pad set and the tracer: the field top-left lists the map items whose
 // name or linked asset name holds what is typed, without regard to letter case or accents, a name
 // that starts with the text first, then an asset name that does, then the names and asset names that
-// hold it, capped at eight rows each with the kind glyph, the name and the kind (or kind and asset);
+// hold it, every match listed (no cap; drawn a page of 50 at a time) each with the kind glyph, the name and the kind (or kind and asset);
+// a chevron in the field (owner review item 8) opens the list of every map item in one alphabetical list and
+// typing filters it;
 // a click, a tap or the keyboard alone (arrows, Enter; Esc clears and closes) chooses one, which
 // zooms to the item and selects it as a click on it does (a point with its popup open, a line fitted
 // and selected); the whole flow works for a viewer (level none, who gets the asset names without tag
@@ -15,8 +17,9 @@ import {
 } from './fixtures.mjs';
 
 /** How long a redraw or a popup after a choice may take on the dev stack. */
-/** The field's placeholder (DESIGN.md search-field). */
-const PLACEHOLDER = 'Search sites, wells or lines';
+/** The field's placeholder (owner review item 12: short enough for the phone's field) and its accessible name. */
+const PLACEHOLDER = 'Search assets';
+const LABEL = 'Search sites, wells or lines';
 
 let ids;
 
@@ -63,7 +66,7 @@ test.beforeAll(async ({ browser }) => {
 test.describe('1440 px', () => {
     test.use({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 
-    test('typing lists the matches ranked, capped and with the kind; a click zooms to the item and selects it with its popup',
+    test('typing lists every match ranked, with the kind; a click zooms to the item and selects it with its popup',
         async ({ page, watched }) => {
             const map = await openLive(page);
             const field = page.locator('.mapstudio-search-field');
@@ -75,6 +78,7 @@ test.describe('1440 px', () => {
             expect(Math.round(fieldBox.x - mapBox.x)).toBe(12);
             expect(Math.round(fieldBox.y - mapBox.y)).toBe(12);
             await expect(input(page)).toHaveAttribute('placeholder', PLACEHOLDER);
+            await expect(input(page)).toHaveAttribute('aria-label', LABEL);
             await expect(input(page)).toHaveAttribute('role', 'combobox');
             await expect(input(page)).toHaveAttribute('aria-expanded', 'false');
             await expect(panel(page)).toHaveCount(0);
@@ -93,12 +97,12 @@ test.describe('1440 px', () => {
             const listId = await input(page).getAttribute('aria-controls');
             await expect(page.locator('#' + listId)).toHaveAttribute('role', 'listbox');
 
-            // Prefix matches first (Pad 1, Pad 10, ... by name), then the rest; the list is capped at eight.
+            // Prefix matches first (Pad 1, Pad 10, ... by name), then the rest; every match is listed, not eight.
             await input(page).fill('Pad 1');
-            await expect(options(page)).toHaveCount(8);
+            await expect.poll(() => options(page).count()).toBeGreaterThan(8);
             const padRows = await rows(page);
             expect(padRows[0]).toBe('Pad 1|Well pad|name');
-            expect(padRows.every((r) => r.startsWith('Pad 1'))).toBe(true);
+            expect(padRows.slice(0, 8).every((r) => r.startsWith('Pad 1'))).toBe(true);
             await shot(page, 'mapstudio-search-1440.png');
 
             // Nothing starts with "d 3": the names that hold it, by name, lines and pads alike.
@@ -127,6 +131,61 @@ test.describe('1440 px', () => {
             await expect(map).toHaveAttribute('data-search-open', 'false');
             await expect(page.locator('.mapstudio-search-status')).toHaveText('Point 2 selected');
             await shot(page, 'mapstudio-search-chosen-1440.png');
+            expect(watched.warnings, 'Map Studio warnings').toEqual([]);
+        });
+
+    test('the chevron opens one alphabetical list of every item, drawn in pages; typing filters it; ArrowDown opens it by keyboard (item 8)',
+        async ({ page, watched }) => {
+            const map = await openLive(page);
+            const chevron = page.locator('.mapstudio-search-chevron');
+            await expect(chevron).toBeVisible();
+            await expect(chevron).toHaveAttribute('aria-expanded', 'false');
+            await expect(panel(page)).toHaveCount(0);
+            // Not a tab stop: the keyboard has ArrowDown.
+            await expect(chevron).toHaveAttribute('tabindex', '-1');
+
+            await chevron.click();
+            await expect(panel(page)).toBeVisible();
+            await expect(chevron).toHaveAttribute('aria-expanded', 'true');
+            await expect(map).toHaveAttribute('data-search-open', 'true');
+            await expect(input(page)).toBeFocused();
+            const total = Number(await panel(page).getAttribute('data-results'));
+            expect(total, 'every map item of the scale set and the tracer').toBeGreaterThan(60);
+            // Drawn a page at a time: 50 rows, in alphabetical order by name (case and accents aside).
+            await expect(options(page)).toHaveCount(50);
+            const names = (await rows(page)).map((r) => r.split('|')[0]);
+            const sorted = names.slice().sort((a, b) => (a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0));
+            expect(names, 'alphabetical').toEqual(sorted);
+            // No groups: one list, every row a map item with its kind.
+            await expect(panel(page).locator('.mapstudio-search-list')).toHaveCount(1);
+            // Scrolling to the end draws the next page; the list scrolls inside its card.
+            await panel(page).evaluate((el) => { el.scrollTop = el.scrollHeight; });
+            await expect.poll(() => options(page).count()).toBeGreaterThan(50);
+            await expect(panel(page)).toHaveAttribute('data-shown', /^(100|[0-9]{3,})$/);
+            const box = await panel(page).boundingBox();
+            expect(box.height, 'the list scrolls inside its card (50 vh at most)').toBeLessThanOrEqual(900 * 0.5 + 1);
+
+            // Typing filters the same list; the text left empty shows every item again.
+            await input(page).fill('Point');
+            await expect(options(page)).toHaveCount(3);
+            await input(page).fill('');
+            await expect(panel(page)).toBeVisible();
+            await expect.poll(async () => Number(await panel(page).getAttribute('data-results'))).toBe(total);
+            // The chevron again closes it; ArrowDown in the empty field opens it for the keyboard.
+            await chevron.click();
+            await expect(panel(page)).toHaveCount(0);
+            await input(page).focus();
+            await page.keyboard.press('ArrowDown');
+            await expect(panel(page)).toBeVisible();
+            await expect(options(page).first()).toHaveAttribute('aria-selected', 'true');
+            // End reaches the last row even though it is not drawn yet.
+            await page.keyboard.press('End');
+            await expect(options(page)).toHaveCount(total);
+            await expect(options(page).last()).toHaveAttribute('aria-selected', 'true');
+            // A click on a row chooses it as typing does.
+            await options(page).nth(0).click();
+            await expect(panel(page)).toHaveCount(0);
+            await expect(map).toHaveAttribute('data-selected', /.+/, { timeout: DRAW_MS });
             expect(watched.warnings, 'Map Studio warnings').toEqual([]);
         });
 
@@ -206,7 +265,7 @@ test.describe('1440 px', () => {
         await expect(popup(page)).toHaveAttribute('data-point-id', ids.p2, { timeout: DRAW_MS });
         // The Clear button clears the text and keeps the focus in the field.
         await input(page).fill('Pad');
-        await expect(options(page)).toHaveCount(8);
+        await expect.poll(() => options(page).count()).toBeGreaterThan(8);
         await page.locator('.mapstudio-search-clear').click();
         await expect(input(page)).toHaveValue('');
         await expect(panel(page)).toHaveCount(0);
@@ -234,6 +293,17 @@ test.describe('390 px', () => {
             const zoomBox = await page.locator('.mapstudio-zoom').boundingBox();
             expect(zoomBox.y, 'the zoom card under the top bar').toBeGreaterThanOrEqual(barBox.y + barBox.height + 8 - 1);
             expect(zoomBox.x + zoomBox.width).toBeLessThanOrEqual(390);
+
+            // The chevron opens the list of every item inside the expanded bar, rows 44 px, the zoom card hidden under it (item 26).
+            await page.locator('.mapstudio-search-chevron').click();
+            await expect(panel(page)).toBeVisible();
+            await expect.poll(() => options(page).count()).toBeGreaterThan(20);
+            const listBox = await panel(page).boundingBox();
+            expect(Math.round(listBox.width)).toBe(Math.round(barBox.width));
+            await expect(page.locator('.mapstudio-zoom')).toBeHidden();
+            await page.locator('.mapstudio-search-chevron').click();
+            await expect(panel(page)).toHaveCount(0);
+            await expect(page.locator('.mapstudio-zoom')).toBeVisible();
 
             // A tap on the field and the text: the bar expands with the results inside it.
             await input(page).click();
