@@ -37,10 +37,9 @@ export interface LineMarkProperties {
     selected: boolean;
 }
 
+/** The selected line's geometry, which the arrow layer repeats the flow arrow along (item 22). */
 export interface ArrowProperties {
     id: string;
-    /** Degrees clockwise from north along the line at the arrow. */
-    bearing: number;
 }
 
 export interface MapFeatures {
@@ -49,7 +48,8 @@ export interface MapFeatures {
     /** The items of area kinds (a line kind with `area: true`), closed, with their category tint (entry 1). */
     areas: FeatureCollection<Polygon, AreaProperties>;
     marks: FeatureCollection<Point, LineMarkProperties>;
-    arrow: FeatureCollection<Point, ArrowProperties>;
+    /** The selected line (one feature, its whole geometry), along which the flow arrow repeats. */
+    arrow: FeatureCollection<LineString, ArrowProperties>;
     /** The items' bounds as "west,south,east,north" (6 decimals), or '' with no item. */
     boundsKey: string;
     bounds: [number, number, number, number] | null;
@@ -189,7 +189,7 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
     const lines: Array<Feature<LineString, LineProperties>> = [];
     const areas: Array<Feature<Polygon, AreaProperties>> = [];
     const marks: Array<Feature<Point, LineMarkProperties>> = [];
-    const arrow: Array<Feature<Point, ArrowProperties>> = [];
+    const arrow: Array<Feature<LineString, ArrowProperties>> = [];
     let west = Infinity;
     let south = Infinity;
     let east = -Infinity;
@@ -268,7 +268,7 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
         lineItems++;
         const instruments = instrumentsOn(live_, item.id);
         const diameter = item.properties ? item.properties.diameter : undefined;
-        const look = lineLook(state, diameter, instruments.length > 0);
+        const look = lineLook(state, diameter);
         const nodes = lineNodes(item, instruments, live, coords.length >= 2 ? lengthM(coords) : 0);
         const bounding = segmentNodes(nodes);
         const openSegment = isSelected && selected ? selected.segment || null : null;
@@ -294,7 +294,7 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
                 const from = bounding[i];
                 const to = bounding[i + 1];
                 const slot = graded.find((g) => g.from === from.id && g.to === to.id);
-                const segmentLook = slot && !state.alarm && !state.commsLost ? lineLook(segmentState(slot), diameter, true) : look;
+                const segmentLook = slot && !state.alarm && !state.commsLost ? lineLook(segmentState(slot), diameter) : look;
                 lines.push({
                     type: 'Feature',
                     properties: { ...lineProperties(item.id, item.name, item.kind, segmentLook, colors, isSelected), ...segmentOf(from, to) },
@@ -313,9 +313,9 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
                 selected: isSelected
             }));
             if (isSelected) {
-                // The arrow at the midpoint, or at the three-quarter point when the alarm badge holds the midpoint.
-                const at = look.badge ? alongLine(coords, 0.75) : mid;
-                arrow.push(pointFeature(at.point, { id: item.id, bearing: at.bearing }));
+                // The selected line's geometry: the arrow layer repeats the flow arrow along it in the line's
+                // drawn direction, first vertex to last (item 22), under the midpoint chip and badge.
+                arrow.push({ type: 'Feature', properties: { id: item.id }, geometry: { type: 'LineString', coordinates: coords } });
             }
         }
     }

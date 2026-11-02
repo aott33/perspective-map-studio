@@ -99,6 +99,13 @@ val stageLicense = tasks.register<Copy>("stageLicense") {
 }
 
 tasks.named("assembleModlStructure") {
+    // The plugin copies the current jars into build/moduleContent and never removes the old ones, so
+    // after a version change an incremental build held two versions of each jar and :zipModule
+    // refused ("Library 'designer' exists in multiple versions"; the owner's run, 2026-10-30). The
+    // folder is cleared first, so `./gradlew build` after a version bump works without `clean`.
+    doFirst {
+        delete(moduleContentDir)
+    }
     finalizedBy(stageLicense)
 }
 

@@ -8,7 +8,7 @@
  * Images hold no text (entry 7, UX review M1): the marker image is the neutral disc with the kind
  * glyph, the ring look (dashed for comms lost and stale), the state badge top-right and the
  * priority digit, one image per icon, look, badge and selection; a normal item below zoom 14 is a
- * dot in a 44 px image, so its hit area stays; the chip is a 9-slice box the state word is set in;
+ * dot in a 44 px image (14 px to zoom 12, 10 px below), so its hit area stays; the chip is a 9-slice box the state word is set in;
  * the arrow is the flow arrow of the selected line. The name, the state word ("Stale", "Comms
  * lost", decision D5) and the icon KPI are symbol-layer text in the bundled glyphs (NotoSans-SemiBold,
  * NotoSans-Medium; web/scripts/glyphs.mjs) with a halo, colliding and giving way by `rank`.
@@ -172,21 +172,42 @@ export const BADGE_PREFIX = 'ms:badge:';
 export const CHIP_IMAGE = 'ms:chip';
 export const ARROW_IMAGE = 'ms:arrow';
 
-/**
- * The marker image: the disc at DISC_CENTER with room for the badge top-right and the digit beside
- * it, and no more: the image's box is what the labels keep clear of (icons are placed first), so
- * it is kept tight, the disc 20 px from the left edge and the digit's room on the right.
- */
-export const MARKER_IMAGE = { width: 56, height: 46 };
-/** The disc's centre in the marker image (the point the marker is anchored at) and its radius. */
-export const DISC_CENTER: [number, number] = [20, 23];
+/** The disc's radius; the selection ring sits SELECTION_GAP outside it, SELECTION_WIDTH wide. */
 export const DISC_RADIUS = 17;
-/** An instrument's disc (DESIGN.md instrument-marker: 24 px), at the same centre. */
-export const INSTRUMENT_DISC_RADIUS = 12;
-/** The dot images: the dot centred in a 44 px square, the template's hit area. */
+export const SELECTION_GAP = 5;
+export const SELECTION_WIDTH = 2;
+/**
+ * An instrument's disc (DESIGN.md instrument-marker; owner review notes item 7: 28 px, up from 24,
+ * with an 18 px glyph, so the tap, meter and valve glyphs read at their drawn size), at the same centre.
+ */
+export const INSTRUMENT_DISC_RADIUS = 14;
+export const INSTRUMENT_GLYPH_SIZE = 18;
+export const KIND_GLYPH_SIZE = 20;
+/** The state glyph's size on the map (DESIGN.md alarm-glyph size-map) and the halo disc under it. */
+export const BADGE_GLYPH_SIZE = 18;
+export const BADGE_HALO_RADIUS = 10;
+/** The badge's centre, from the disc's centre: up and to the right by this much. */
+export const BADGE_OFFSET = 13;
+/**
+ * The marker image is sized from what it draws (owner review notes item 16: a 56 by 46 px image cut
+ * the selection ring off): the disc's centre sits one ring's reach from the top and the left (the
+ * selection ring outside its gap, or the badge's halo disc, whichever reaches further), the same
+ * below, and to the right the badge's halo disc and the digit's room. The image's box is what the
+ * labels keep clear of (icons are placed first), so it is no bigger than that.
+ */
+export const MARKER_REACH = Math.ceil(Math.max(DISC_RADIUS + SELECTION_GAP + SELECTION_WIDTH, BADGE_OFFSET + BADGE_HALO_RADIUS)) + 1;
+export const DIGIT_ROOM = 12;
+export const MARKER_IMAGE = { width: MARKER_REACH + BADGE_OFFSET + BADGE_HALO_RADIUS + DIGIT_ROOM + 1, height: MARKER_REACH * 2 };
+/** The disc's centre in the marker image (the point the marker is anchored at). */
+export const DISC_CENTER: [number, number] = [MARKER_REACH, MARKER_REACH];
+/**
+ * The dot images: the dot centred in a 44 px square, the template's hit area. The sizes are the
+ * owner's (review notes item 6): 14 px from zoom 12 to 14 and 10 px below, each with the 2 px halo in
+ * the blank-map token so it reads on any basemap.
+ */
 export const DOT_IMAGE = 44;
-export const DOT_MID = 11;
-export const DOT_SMALL = 7;
+export const DOT_MID = 14;
+export const DOT_SMALL = 10;
 /** The badge image (a line's midpoint glyph): the badge and the digit. */
 export const BADGE_IMAGE = { width: 40, height: 24 };
 /**
@@ -359,7 +380,7 @@ export function markerProperties(id: string, name: string, kind: string, icon: s
  * comms lost or the `dashed` preset; dotted for the `dotted` preset; faded for `dimmed`.
  */
 export interface LineLook {
-    /** 3, 4 or 6 px by pipe size with an instrument on the line; 2 px (untapped) without. */
+    /** 3, 4 or 6 px by pipe size (the `diameter` property); 2 px (the thin line) without a size. */
     weight: number;
     /** 'alarm-1' to 'alarm-3', 'attention', 'warning', 'fault', or '' for the pipeline grey. */
     hue: string;
@@ -377,21 +398,28 @@ export interface LineLook {
 export const LINE_WEIGHTS: [number, number, number] = [3, 4, 6];
 export const LINE_UNTAPPED = 2;
 
+/** The pipe size as a number of inches, or null when the property is missing, not a number or not positive. */
+export function pipeSize(sizeIn: unknown): number | null {
+    const n = typeof sizeIn === 'number' ? sizeIn : typeof sizeIn === 'string' && sizeIn.trim() !== '' ? Number(sizeIn) : NaN;
+    return isFinite(n) && n > 0 ? n : null;
+}
+
 /** The weight for a pipe size in inches: 3 px up to 4 in, 4 px up to 8 in, 6 px above; 3 px when unknown. */
 export function lineWeight(sizeIn: unknown): number {
-    const n = typeof sizeIn === 'number' ? sizeIn : typeof sizeIn === 'string' ? Number(sizeIn) : NaN;
-    if (!isFinite(n) || n <= 0) {
+    const n = pipeSize(sizeIn);
+    if (n === null) {
         return LINE_WEIGHTS[0];
     }
     return n <= 4 ? LINE_WEIGHTS[0] : n <= 8 ? LINE_WEIGHTS[1] : LINE_WEIGHTS[2];
 }
 
 /**
- * A line's look from its state (its own kind setup's slots), its pipe size and whether an instrument
- * sits on it. Without an instrument the whole line is one untapped segment (2 px); a state still draws.
+ * A line's look from its state (its own kind setup's slots) and its pipe size: the size alone sets
+ * the weight (owner review notes item 11; instruments or not), and a line with no size is the thin
+ * 2 px line in the lateral tone. A state draws on either.
  */
-export function lineLook(state: ItemState, sizeIn: unknown, hasInstruments: boolean): LineLook {
-    const weight = hasInstruments ? lineWeight(sizeIn) : LINE_UNTAPPED;
+export function lineLook(state: ItemState, sizeIn: unknown): LineLook {
+    const weight = pipeSize(sizeIn) === null ? LINE_UNTAPPED : lineWeight(sizeIn);
     const spec = markerSpec('', state);
     // No data is a comms or value slot with no value yet, which the Gateway reports stale; a stale
     // line drops its value style (the Gateway sends normal then).
@@ -435,7 +463,8 @@ export function lineProperties(id: string, name: string, kind: string, look: Lin
     const color = look.hue === 'alarm-1' ? colors.alarm[0] : look.hue === 'alarm-2' ? colors.alarm[1]
         : look.hue === 'alarm-3' ? colors.alarm[2] : look.hue === 'attention' ? colors.attention
         : look.hue === 'warning' ? colors.warning : look.hue === 'fault' ? colors.fault
-        // No hue: the pipeline tone, or the lateral tone for an untapped line (DESIGN.md map-line lateral).
+        // No hue: the pipeline tone, or the lateral tone for the thin line with no size (DESIGN.md map-line
+        // lateral; item 11: the tone follows the weight rule, so one rule sets both).
         : look.weight === LINE_UNTAPPED ? colors.chipEdge : colors.line;
     return { id, name, kind, weight: look.weight, color, hue: look.hue, dashed: look.dashed, dotted: look.dotted,
         dimmed: look.dimmed, selected };
@@ -543,10 +572,6 @@ function glyphAt(s: SpriteSymbol | undefined, x: number, y: number, size: number
     return `<g transform="translate(${x} ${y}) scale(${scale})" color="${esc(color)}"><svg ${s.attributes} width="24" height="24" viewBox="0 0 24 24">${s.inner}</svg></g>`;
 }
 
-/** The state glyph's size on the map (DESIGN.md alarm-glyph size-map) and the halo disc under it. */
-export const BADGE_GLYPH_SIZE = 18;
-export const BADGE_HALO_RADIUS = 10;
-
 /**
  * The badge and the digit, drawn with the badge's centre at (bx, by): the state glyph itself in its
  * token (DESIGN.md alarm-glyph: the triangle, circle or square shape is the glyph's, solid or hollow
@@ -580,14 +605,14 @@ function svg(width: number, height: number, body: string): string {
  */
 export function markerSvg(spec: MarkerSpec, symbols: Record<string, SpriteSymbol>, colors: MarkerColors): string {
     const [cx, cy] = DISC_CENTER;
-    // An instrument's disc is the 24 px one (DESIGN.md instrument-marker), its glyph 14 px; the badge keeps its place.
+    // An instrument's disc is the 28 px one (DESIGN.md instrument-marker, item 7), its glyph 18 px; the badge keeps its place.
     const r = spec.instrument ? INSTRUMENT_DISC_RADIUS : DISC_RADIUS;
-    const glyphSize = spec.instrument ? 14 : 20;
+    const glyphSize = spec.instrument ? INSTRUMENT_GLYPH_SIZE : KIND_GLYPH_SIZE;
     const hue = spec.look === 'comms-lost' ? colors.commsLost : colors.glyph;
     const preset = spec.look === 'normal' ? spec.preset : 'normal';
     let body = '';
     if (spec.selected) {
-        body += `<circle cx="${cx}" cy="${cy}" r="${r + 5}" fill="none" stroke="${esc(colors.selection)}" stroke-width="2"/>`;
+        body += `<circle cx="${cx}" cy="${cy}" r="${r + SELECTION_GAP}" fill="none" stroke="${esc(colors.selection)}" stroke-width="${SELECTION_WIDTH}"/>`;
     }
     // The dimmed preset fades the disc and its glyph (DESIGN.md: faded and dashed); the badge stays full.
     let disc = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${esc(colors.disc)}" stroke="${esc(colors.halo)}" stroke-width="${HALO_WIDTH}"/>`;
@@ -605,7 +630,7 @@ export function markerSvg(spec: MarkerSpec, symbols: Record<string, SpriteSymbol
     }
     disc += glyphAt(symbols[spec.icon] || symbols.point, cx - glyphSize / 2, cy - glyphSize / 2, glyphSize, hue);
     body += preset === 'dimmed' ? `<g opacity="${DIMMED_OPACITY}">${disc}</g>` : disc;
-    body += badgeAt(spec.badge, spec.priority, spec.solid, cx + 13, cy - 13, symbols, colors);
+    body += badgeAt(spec.badge, spec.priority, spec.solid, cx + BADGE_OFFSET, cy - BADGE_OFFSET, symbols, colors);
     return svg(MARKER_IMAGE.width, MARKER_IMAGE.height, body);
 }
 
@@ -645,7 +670,7 @@ export function lineHaloDash(pattern: [number, number]): unknown[] {
  * (an alarm never draws here), the dash or dots, the fade. Only token values.
  */
 export function lineSampleSvg(preset: Preset, colors: MarkerColors): string {
-    const look = lineLook({ commsLost: false, stale: false, alarm: null, iconKpi: null, badge: 'normal', preset }, 6, true);
+    const look = lineLook({ commsLost: false, stale: false, alarm: null, iconKpi: null, badge: 'normal', preset }, 6);
     const color = look.hue === 'attention' ? colors.attention : look.hue === 'warning' ? colors.warning
         : look.hue === 'fault' ? colors.fault : colors.line;
     const w = look.weight;
@@ -668,7 +693,7 @@ export function dotSvg(size: number, selected: boolean, colors: MarkerColors): s
     const r = size / 2;
     let body = '';
     if (selected) {
-        body += `<circle cx="${c}" cy="${c}" r="${r + 5}" fill="none" stroke="${esc(colors.selection)}" stroke-width="2"/>`;
+        body += `<circle cx="${c}" cy="${c}" r="${r + SELECTION_GAP}" fill="none" stroke="${esc(colors.selection)}" stroke-width="${SELECTION_WIDTH}"/>`;
     }
     body += `<circle cx="${c}" cy="${c}" r="${r}" fill="${esc(colors.line)}" stroke="${esc(colors.halo)}" stroke-width="${HALO_WIDTH}"/>`;
     return svg(DOT_IMAGE, DOT_IMAGE, body);
@@ -687,10 +712,13 @@ export function chipSvg(colors: MarkerColors): string {
         + `<rect x="1.5" y="1.5" width="${s - 3}" height="${s - 3}" rx="3" fill="${esc(colors.disc)}" stroke="${esc(colors.chipEdge)}" stroke-width="1"/>`);
 }
 
-/** The flow arrow of the selected line: a chevron pointing up (rotated along the line's bearing), in the selection token with a halo. */
+/**
+ * The flow arrow of the selected line (item 22: repeated along the line by MapLibre's line placement,
+ * which lays the image's x axis along the line): a chevron pointing right, in the selection token with a halo.
+ */
 export function arrowSvg(colors: MarkerColors): string {
     const s = ARROW_IMAGE_SIZE;
-    const path = `M${s / 2} 3 L${s - 4} ${s - 6} L${s / 2} ${s - 10} L4 ${s - 6} Z`;
+    const path = `M${s - 3} ${s / 2} L6 ${s - 4} L10 ${s / 2} L6 4 Z`;
     return svg(s, s,
         `<path d="${path}" fill="${esc(colors.halo)}" stroke="${esc(colors.halo)}" stroke-width="4" stroke-linejoin="round"/>`
         + `<path d="${path}" fill="${esc(colors.selection)}" stroke="none"/>`);
