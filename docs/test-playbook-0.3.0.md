@@ -11,7 +11,7 @@ A walk through everything 0.3.0 does, in order, on the local development stack. 
 | 1. First look | passed: lines and chips fine; opens at zoom 15 (by design); neutral discs confirmed; P14 red triangle confirmed; P21 comms lost and SWD1 stale confirmed on `mapstudio-showcase` (the first check was on the dev map, which has no P21); notes: dots too small (bigger dots, item 6), the instrument icon does not read well (item 7) | 2026-10-30 |
 | 3. The popup card | reviewed with notes (pop-out, View alarms and live values with the card open work): layout option A chosen (item 13); a click on empty map closes it, Esc does not (bug, item 14); "Bad_NotFound" shown to the operator (item 15) | 2026-10-30 |
 | 4. Live state | passed (with notes): the alarm raises, acknowledges ("!" in the triangle) and clears; the card updates while open; comms off and on, pressure bad and good, status 0 to 4, L3 flow, an alarm over a style and comms lost dropping the style work; comms on, pressure 400 and status 0 reset Point 1; notes: a selected marker's rings are cut off (item 16) | 2026-11-02 |
-| 5. Lines and instruments | in progress: instruments in place, the segment popup, comms off dashing, PT-2's alarm, L-SWD quiet and the flow arrow work; notes: the popup over the top bar and cut off (item 18), the line popup's layout (item 19) | 2026-11-02 |
+| 5. Lines and instruments | passed (with notes): instruments in place, the shared marker's pick list, the segment popup, comms off dashing, PT-2's alarm, L-SWD quiet and the flow arrow work; notes: the popup over the top bar and cut off (item 18), the line popup's layout (item 19) | 2026-11-02 |
 | 2. Search and Needs you | passed (with notes): typing, Esc, search by asset name and Tab order work; search works and zooms to zoom 15; notes: a chevron opens a simple alphabetical list of every item, typing filters it (item 8); hovering Needs you makes its background disappear (bug, item 9), also over OpenStreetMap on the showcase; the list shows the items correctly; on a phone the counts as glyph and number only and the placeholder "Search assets" (item 12) | 2026-10-30 |
 
 ## 0. Before you start
@@ -105,7 +105,7 @@ On the dev map (`/`), find L-SWD (CTB1 to SWD1) or on the showcase.
 - [x] Click the line between PT-1 and PT-2: the line popup opens at "Segment PT-1 to PT-2", lists the instruments in order with distances and values, and highlights the two ends on the map and in the list.
 - [x] `/live` **PT1 comms off**: the segments either side of PT-1 dash; **PT2 pressure 500**: the segments either side of PT-2 show attention; **PT2 pressure 950** raises PT-2's alarm at its place on the line.
 - [x] A selected line shows the flow arrow; only the selected one.
-- [ ] Two sites within 20 m (Shared A and Shared B on the dev map) are one marker that opens a pick list.
+- [x] Two sites within 20 m (Shared A and Shared B on the dev map) are one marker that opens a pick list.
 
 Notes:
 
