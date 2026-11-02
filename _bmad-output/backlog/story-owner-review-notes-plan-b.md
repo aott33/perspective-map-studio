@@ -26,4 +26,6 @@ Group a and c edit the same big files: edits here stay inside the controls' own 
 
 ## Status
 
-(updated at the end)
+Status: built. Items 1, 2, 3, 8, 9, 12, 23, 24, 26, 28, 30 are built as the table says (see each item's "Built:" line in the notes file). Deviations from the table: item 9's cause was MapLibre's own button hover outranking the bar's rule (neutral-30 is opaque in the bundled themes), fixed by specificity plus the `--mapstudio-hover` token; the Designer's list order is the default (no new setup field); the bar's logic is `barModel` in `needsyou.ts` (unit tested) rather than e2e-only.
+
+Group c's hook for item 32: `needsYouControl.setUnknown(true)` (and `false` on reconnect) in `MapStudio.tsx`; the summary is kept and shows again at once. The "state unknown" look is `data-state="unknown"`: a hollow grey bell with "?" and no counts, label `BAR_UNKNOWN` in `needsyou.ts`.
