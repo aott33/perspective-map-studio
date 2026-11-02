@@ -71,11 +71,11 @@ What is drawn: the alarm badge is the priority glyph itself in its token on a ha
 
 What changed against the template's reviewed rules (template `docs/ux.md` ER-27, `docs/map.md` section 5 item 1): **the kind glyph is in the marker** (the template's markers show state only, a dot for a normal site); **the badge is the bare glyph on a halo** (entry 15, punch list items 3 and 4: the template's icon is the IEC shape in the hue; an earlier build here drew a filled disc, which read as priority 2); **comms lost has a colour** (the template: "comms lost ... never a colour"; owner, 2026-10-28, because it is critical and must not get lost; the glyph and the words stay, so colour is never the only signal); **stale has no colour** (the owner's decision, as the template); **nothing blinks and nothing fades** (the template's map never blinks either; its cards fade an alarm that is not live, ER-5, and fade an acknowledged priority 3 square: Map Studio draws neither fade); the unacknowledged mark is Map Studio's own drawing (icons.md, reviewed in 0.2.0).
 
-Verdict (tokens `--mapstudio-alarm-1/2/3`, the badge, the acknowledgement look):
+Verdict (tokens `--mapstudio-alarm-1/2/3`, the badge, the acknowledgement look): accepted, with one change: the acknowledged glyph differs from the unacknowledged one only by the small mark inside at 18 px and the owner could not tell them apart, so it is redrawn with the instrument glyphs (owner review notes item 7 and the section 4 note) (owner, 2026-11-02).
 
-Verdict (`--mapstudio-comms-lost`, the magenta family; or purple from the host theme):
+Verdict (`--mapstudio-comms-lost`, the magenta family; or purple from the host theme): accepted, magenta (owner, 2026-10-30 and 2026-11-02).
 
-Verdict (stale with no colour):
+Verdict (stale with no colour): accepted (owner, 2026-11-02).
 
 ### 3.2 The Needs you bar and list, and the legend's key
 
@@ -87,9 +87,9 @@ What is drawn: the bar counts the items by their worst state ("Needs you 8: 6 al
 
 What changed against the template: the template's map has a chip row ("Sites 12", the count chips of its board) and a collapsible items panel; Map Studio has the Needs you bar and list beside the search field (EXPERIENCE.md, R15) and no items panel in View mode; the template's legend is a checkbox form, Map Studio's a key of every glyph with the toggles and the basemap choice (R14). The counts count map items by their worst state, as the template's chips count assets by their worst band (its ER-7), not alarms.
 
-Verdict (the Needs you counts and the ranking):
+Verdict (the Needs you counts and the ranking): change: the bar has no words at any width, a bell with the alarm count, then comms lost and stale with their counts, a grey bell when nothing needs you (owner review notes item 12); the list keeps its own width under the bar (owner review notes item 30); the ranking accepted (owner, 2026-11-02).
 
-Verdict (the legend's key):
+Verdict (the legend's key): change: the Kinds section starts collapsed with many kinds, States first (owner review notes item 24); the open panel stops below the top bar (owner review notes item 23); the key itself accepted (owner, 2026-11-02).
 
 ### 3.3 The presets and the area tints
 
@@ -118,7 +118,7 @@ What is drawn: L-SWD (6 in, 6 px) is cut at its measuring instruments PT-1 and P
 
 What changed against the template (`docs/map.md` section 5 item 3): the template grades a segment from its taps' board rows and draws the alarm glyph at the segment's midpoint; Map Studio draws the instrument's alarm at the instrument's place (owner, 2026-10-27) and the line's own alarm at the midpoint; the segment look is otherwise the template's (the hue of the worse end alarm, dashed for no data or comms lost at either end, a plain neutral line with none, thin with no taps, weight by size never by state, the flow arrow on the selected segment only). Since entry 12 every line has a one-pixel halo in the blank-map token (section 2).
 
-Verdict (instrument alarms at their place, the per-segment look, the line halo):
+Verdict (instrument alarms at their place, the per-segment look, the line halo): accepted, with line weight from the pipe size alone (owner review notes item 11) and the flow arrow repeated along a selected line (owner review notes item 22) (owner, 2026-11-02).
 
 ### 3.5 The point card
 
@@ -130,7 +130,7 @@ What is drawn: the header (kind glyph in a ringed disc, the name, the kind, the 
 
 What changed against the template: the template's map opens a side pane (desktop) with the site's rows; Map Studio opens a card over the marker (DESIGN.md popup-card, the owner's popup review D1 to D5). The alarm block's tint and edge are new presentation (EXPERIENCE.md Engineering Review Items, 8).
 
-Verdict (the card and its alarm block):
+Verdict (the card and its alarm block): change: option A (owner review notes item 13): comms status right-aligned with its age, stale values as the hourglass alone with a tooltip, full labels, no check mark, the hourglass before "No active alarms" when stale (owner, 2026-11-02).
 
 ### 3.6 The phone bottom sheet
 
@@ -142,7 +142,7 @@ And the one top bar with the Needs you list open: [light](screenshots/review-lig
 
 What changed against the template (`docs/map.md` section 5 items 7 and 11): the template's phone keeps a chip row and **top sheets**; Map Studio opens a **bottom sheet** (8 px from the sides, above the App Bar toggle, a handle, 44 px buttons, a footer with View alarms) and shares one expanding top bar between search and Needs you (EXPERIENCE.md, Engineering Review Items 1).
 
-Verdict (bottom sheets and the one top bar, against the template's chip row and top sheets):
+Verdict (bottom sheets and the one top bar, against the template's chip row and top sheets): accepted: bottom sheets and the one top bar (owner, 2026-11-02).
 
 ### 3.7 The custom popup view's close row
 
@@ -155,7 +155,7 @@ What is drawn: the SWD kind setup of the showcase names `Popups/SiteCard`, a pro
 
 What changed against the template: no equivalent; a project view in a map popup is Map Studio's (R9).
 
-Verdict (the close row above a custom view):
+Verdict (the close row above a custom view): accepted (owner, 2026-11-02).
 
 ### 3.8 The template's `docs/map.md` section 5 checklist
 
