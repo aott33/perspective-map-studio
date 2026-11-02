@@ -51,7 +51,7 @@ Two modes on one component. **No Publish step** (owner, confirmed): every finish
 | Bulk form | Edit | Select several items | Shared fields, Mixed values |
 | Kinds | Edit | Rail, Kinds | Set up each kind the project defines |
 | Tag browser | Edit (full editing role) | The tag button on any tag path: Kinds (key values, comms, alarms, style rule value, popup params) and an item's override in Details | Pick a tag from one provider's tree; in a kind's setup it opens at the preview item's asset folder |
-| Layers | Edit | Rail, Layers | Basemap switch only: None, OpenStreetMap, Satellite |
+| Layers | Edit | Rail, Layers | Basemap switch only: None, OpenStreetMap, Satellite (View mode's switch is in the Legend, only when the setup lists more than one basemap) |
 | Import | Edit | Rail, Import | Guided import, CSV templates, export [ASSUMPTION: export lives here, as in the mock] |
 | Recent changes | Edit | Save status | The edit record with Revert per change |
 | Conflict card | Edit | Save status in conflict | The other editor's change and the choice |
@@ -79,7 +79,7 @@ Plain words a pumper or an admin reads at a glance. States are nouns, actions ar
 | "Saved" / "Saving..." | "Changes successfully persisted" |
 | "Not saved - conflict with Sam's change" | "Error 409" |
 | "Map Studio is busy with other map requests; nothing was saved. Try again in a moment." | "Request failed" |
-| "Needs you 3: 1 alarm, 1 comms lost, 1 stale" / "All OK" | "3 issues detected" / "0 issues" |
+| "Needs you 3: 1 alarm, 1 comms lost, 1 stale" (the Needs you button's label and hover title; the bar itself is glyphs and numbers) | "3 issues detected" / "0 issues" |
 | "Comms lost", "Stale", "Unlinked" | A coloured dot with no word |
 | "Click the map, then drag the pin to fine-tune. Type here as a backup." | "Set geometry" |
 | "Mixed - 3 values" / "Pick a value to set it on all 20" | A blank field for differing values |
@@ -123,9 +123,9 @@ Behavioural rules. Visual specs are in `DESIGN.md`, Components.
 | Line popup | Click or tap a line | Opens at the clicked point. Order: header (glyph, name, subline with service, size and length, pop-out, close); the **segment box** for the clicked line segment between its nearest instruments ("Segment PT-1 to PT-2", its span, and its end values or its stale state); comms for the line ("OK - 4 instruments, oldest 9 s ago", or which instrument is stale); the instruments in order along the line between the items its ends snap to, each with distance and live value (for example CTB1 outlet 0 km, PT-1 1.1 km, LV-1 2.0 km "No value", PT-2 2.8 km, SWD1 inlet 2.9 km); then the line's own key values, if its kind sets any, and alarms. The instruments at the segment's ends are highlighted on the map and in the list (FR-40). |
 | Bottom sheet | Phone | Popup and edit form open as a bottom sheet with a visible 44 px close; it stops above the App Bar toggle. The popup sheet keeps the popup order and ends with "View alarms" and, for phone-editing roles, **Edit**. Edit turns the sheet into the edit sheet for that one item: Location with **Move**, Name, kind fields, Undo and Done; fields save as they are finished. Done closes the edit sheet. |
 | Phone top bar | Phone, view | Search and Needs you share one bar; tapping Needs you expands the ranked list inside the bar and closes any sheet; tapping a row opens that item's sheet. |
-| Needs you bar | View mode | Count of sites in alarm, comms lost or stale, with a glyph per state. Click lists them, ranked: alarms by priority, then comms lost, then stale; click a row zooms to and selects the site. With nothing to attend to it stays and reads **"All OK"** in neutral. |
-| Search | View mode top-left (always visible); Items list | Search by name or asset as you type, results with kind; choosing zooms and selects (lines and areas fitted). Works keyboard only and at 390 px (FR-33). |
-| Legend | View mode bottom-left | Collapsed to a button; opens on request. Holds the Lines and Names toggles and the zoom 14 note. |
+| Needs you bar | View mode | No words at any width (owner review item 12): a bell with the count of sites in alarm (solid in the hue of the highest unacknowledged priority, neutral and hollow when all are acknowledged), then comms lost and stale each with its glyph and count while not zero. Click lists them, ranked: alarms by priority, then comms lost, then stale; click a row zooms to and selects the site. With nothing to attend to it stays, a grey hollow bell alone. While the Gateway cannot be reached it shows the bell with a question mark: the state is unknown. On a phone an open list draws over the zoom card. |
+| Search | View mode top-left (always visible); Items list | Search by name or asset as you type, results with kind; a chevron in the field opens one alphabetical list of every item and typing filters it (owner review item 8); choosing zooms and selects (lines and areas fitted). Works keyboard only and at 390 px (FR-33). |
+| Legend | View mode bottom-left | Collapsed to a button; opens on request: States, the kinds on the map (collapsed with more than six), the line looks, then the Lines and Names toggles with the zoom 14 note, and the Basemap switch only when the setup lists more than one (the first is the default). Stops below the top bar and scrolls inside; on a phone a bottom sheet with Show first and no basemap. |
 | Kind setup | Kinds | Lists only the kinds the project defines (read-only list from the host adapter, AD-4/AD-16); no adding kinds. Sections in order: **Icon, Key values, Comms, Alarms, Popup, Style rule** (last, it builds on the key values). Each key value has an on/off switch that sets what the popup shows; one key value is the icon value. Comms takes one heartbeat path, the clock for data age, Stale and Comms lost. Alarms takes the alarm source and the View alarms link. The popup order is fixed: comms, values, alarms. Each path reports how many items it resolves for. Style rule: States, Bands or Expression on a key value; each state maps to a preset with its preview tile. The **preview item** is chosen once, in the kind's header: the tag browser opens at its asset folder and the style rule previews on it, on the map too with a "Preview" word; the note says what the preview item shows now and when its alarm wins over the rule. Every tag path has a tag button that opens the tag browser. |
 | Tag browser | Every tag pick (owner, 2026-10-27) | One browser for every tag pick: key values, comms path, alarms path, a style rule's value, popup params, and a path on one item's override. Shown only to the full editing role; the Gateway refuses anyone else (`tags.browse`, AD-8). A **Provider** dropdown lists the Gateway's tag providers, the default marked "Default" and selected first; the tree shows that one provider, navigated by expanding folders and UDT instances, each row with name, type and data type. **In a kind's setup** it opens at the preview item's asset folder (for example `[default]Mesa/P14`), expanded, with the folder marked "Asset folder"; the editor can go up and out of it, into any folder or any provider, and a "P14 folder" button returns there. **A pick inside the asset folder** is saved as `{asset.path}/...` and shows "Resolves for N of M well pads" (M counts the kind's items with a base path; `tags.resolve`). **A pick outside it** is saved as the full path with the warning "Same tag for every well pad", which also stays on the key value row; it is allowed. **On one item's override** every pick is saved as the full path, with no conversion, marked Override with Reset [ASSUMPTION: it opens at that item's own asset folder]. **Popup params**: a tag picked inside the asset folder for a custom popup view's param gives `{asset.path}/<suffix>`, the one param form beside a literal and one placeholder (owner, 2026-10-27); outside it, the full path as a literal. **Typed paths** go in the Path field and are converted the same way. "Use this tag" (or "Use for P14") is inert until a tag is picked; Cancel or Esc changes nothing. A folder is not a pick. |
 | Import steps | Import | Drop CSV, KML or GeoJSON ("You see a preview first. Nothing changes until you add."); then guided steps. **1 Preview**: map plus table, rows drawn as preview rings on the map, rows with problems flagged with the reason ("No location", "repeats row 40") and left for step 3. **2 Map columns**: pick the kind for the file when it has no kind column; each column goes to a field or "Do not import"; columns are matched by heading first; name and location are required. **3 Match to assets**: confident matches ticked, doubtful flagged with the reason ("Letter O, not zero", "Name differs"), existing items update in place, rows that cannot import are skipped with the reason; tick a flagged row to accept it or pick another asset; unmatched rows import unlinked. **4 Summary**: new, updated, skipped, the matches you confirmed, how many stay unlinked, and the undo step; then **Import 123 items**. Back at any step; Cancel at any step changes nothing. An import undoes as one step. CSV template per kind downloads here. |
@@ -179,7 +179,7 @@ See [key-screen-9-save-states-saved.png](mockups/key-screen-9-save-states-saved.
 | Tag browser: provider unreachable | Tag browser | The tree is replaced by "Can't browse edge-p12" (cloud glyph, `{colors.warning}`), "The Gateway cannot reach this tag provider right now. Try again, pick another provider, or type the path below." and "Try again"; the Path field still works and typed paths are converted as usual. See [key-screen-6-kinds-tags-unreachable.png](mockups/key-screen-6-kinds-tags-unreachable.png). |
 | Busy (loading) | Map, list, import preview | [ASSUMPTION] the save-status spinner pattern on the busy surface; no skeletons specified yet. |
 | No search results | Search | "No matches" [ASSUMPTION: wording]. |
-| Nothing needs you | Needs you bar | "All OK" in neutral; the bar stays. |
+| Nothing needs you | Needs you bar | A grey hollow bell alone, no words, no number; the bar stays. The list says "Nothing needs you". |
 | Import preview | Import, map | Preview rows on the map as rings with "Preview - not on the map yet"; existing items that will change carry "Updated". |
 | Import errors | Import, Preview | Count found, rows with problems flagged with reasons and decided in Match; cancel changes nothing. |
 | Permission | Whole component | No editing role: no Edit switch, no tools, no affordance (FR-7). |
@@ -319,7 +319,7 @@ Alarm presentation changes go to the template's engineering review (ER-27, templ
 5. **Alarm glyphs** and their hue tokens in both themes, including the unacknowledged mark at 16 px and triangle-like kind outlines (line valve, compressor station).
 6. **Instruments on lines**: instrument alarm glyphs at their place on the line, the per-segment line look from the worst of each segment's two end instruments, and the normal look of a segment with no instrument at either end (FR-40).
 7. **Area category tints** (FR-39).
-8. **Popup alarm block** in the alarm-1 tint, the Needs you counts and its neutral "All OK".
+8. **Popup alarm block** in the alarm-1 tint, the Needs you counts and its neutral grey bell.
 
 ## Key Flows
 
@@ -384,13 +384,13 @@ This flow follows the owner's crosshair decision, which replaces the PRD's long-
 
 Riley, viewer, desktop, View mode, no tools.
 
-1. The Needs you bar reads "Needs you 1: 1 alarm". CTB1's icon shows a normal comms glyph, an alarm glyph and the digit 2 beside it.
+1. The Needs you bar's label reads "Needs you 1: 1 alarm" (a bell and the number 1). CTB1's icon shows a normal comms glyph, an alarm glyph and the digit 2 beside it.
 2. Riley clicks CTB1: the popup shows comms with its data age, two key values, then "2 alarms" with the most important in words and "View alarms".
 3. Riley clicks "View alarms" and lands on the alarm page filtered to CTB1, acknowledges one there; later Riley opens CTB1's page with the pop-out icon in the popup header.
 4. Riley clicks L-SWD between PT-1 and PT-2: the line popup opens at "Segment PT-1 to PT-2", lists CTB1 outlet, PT-1, LV-1, PT-2 and SWD1 inlet with live values, and PT-2 shows its own alarm badge, as its glyph does at its place on the line.
 5. **Climax:** Riley sees CTB1's alarms in the alarm table, or its page, within two clicks of seeing the alarm.
 
-Failure: CTB1's comms are lost: the icon has a dashed ring and "Comms lost", the popup says "Comms lost", and values show as stale with their age, never as current. When the alarms clear and comms return, the bar reads "All OK".
+Failure: CTB1's comms are lost: the icon has a dashed ring and "Comms lost", the popup says "Comms lost", and values show as stale with their age, never as current. When the alarms clear and comms return, the bar is the grey bell alone.
 
 ## Open Questions
 

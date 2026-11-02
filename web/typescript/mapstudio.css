@@ -1995,10 +1995,16 @@
 }
 
 @media (max-width: 767px) {
-    /* The corner spans the map so the sheet can; the row keeps its own width and the App Bar corner stays clear. */
+    /* The corner spans the map so the sheet can; the row keeps its own width and the App Bar corner stays clear.
+       MapLibre gives every control `transform: translate(0)`, which would make the legend control the sheet's
+       containing block; none, so the corner is. */
     .mapstudio .maplibregl-ctrl-bottom-left {
         right: 0;
         max-width: none;
+    }
+
+    .mapstudio .mapstudio-legend {
+        transform: none;
     }
 
     .mapstudio .mapstudio-legend-panel--sheet {
