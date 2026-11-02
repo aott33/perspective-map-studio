@@ -63,6 +63,14 @@
         0 4px 12px color-mix(in srgb, var(--neutral-90) 10%, transparent));
     --mapstudio-target: 32px;
     --mapstudio-map-inset: 12px;
+    /* The hover tint (owner review, item 9): the theme's neutral-30 is a translucent wash in Perspective's themes
+       (rgba(0, 0, 0, 0.05) in the light one), so a hover that sets it as the background lets the imagery show
+       through the card. The tint is a layer over the opaque surface instead (`background: var(--mapstudio-hover-bg),
+       <the surface>`), and where a host theme defines no neutral-30 it is the text colour at 10 %. */
+    --mapstudio-hover-tint: var(--neutral-30, color-mix(in srgb, var(--label) 10%, transparent));
+    --mapstudio-hover-bg: linear-gradient(var(--mapstudio-hover-tint), var(--mapstudio-hover-tint));
+    /* The thin scroll bars (item 28): a neutral thumb, the track left clear so it sits on the panel's own surface. */
+    --mapstudio-scroll-thumb: var(--neutral-50, color-mix(in srgb, var(--label) 40%, transparent));
     /* The search field's width (DESIGN.md search-field); the Needs you list sits right of it (entry 3). */
     --mapstudio-search-width: 300px;
 }
@@ -122,7 +130,7 @@
 }
 
 .mapstudio .mapstudio-ctrl-button:hover:not(:disabled) {
-    background: var(--neutral-30);
+    background: var(--mapstudio-hover-bg), var(--mapstudio-surface);
 }
 
 .mapstudio .mapstudio-ctrl-button:focus-visible {
@@ -192,7 +200,7 @@
 }
 
 .mapstudio .mapstudio-draw-button:hover {
-    background: var(--neutral-30);
+    background: var(--mapstudio-hover-bg), var(--mapstudio-surface);
 }
 
 .mapstudio .mapstudio-draw-button--on {
@@ -379,7 +387,7 @@
 }
 
 .mapstudio-popup-icon:hover {
-    background: var(--neutral-30);
+    background: var(--mapstudio-hover-bg), var(--mapstudio-popup-surface);
 }
 
 .mapstudio-popup-icon:focus-visible {
@@ -433,7 +441,7 @@
 }
 
 .mapstudio-popup-comms {
-    border-bottom: 1px solid var(--neutral-30);
+    border-bottom: 1px solid var(--neutral-30, var(--border));
 }
 
 /* The comms row: the label is never cut, and the check or state glyph stays beside the word while a long
@@ -598,7 +606,7 @@
     height: 4px;
     margin: 8px auto 0;
     border-radius: 2px;
-    background: var(--neutral-30);
+    background: var(--neutral-30, var(--border));
 }
 
 .mapstudio-popup--sheet .mapstudio-popup-header {
@@ -682,7 +690,7 @@
 }
 
 .mapstudio-unsaved-row button:hover:not(:disabled) {
-    background: var(--neutral-30);
+    background: var(--mapstudio-hover-bg), var(--mapstudio-surface);
 }
 
 .mapstudio-unsaved-row button:disabled {
@@ -838,9 +846,10 @@
 }
 
 /* The legend (epic 3 entry 14, DESIGN.md legend; entry 6's basemap choice lives in it): bottom-left,
-   a row of the Legend button, MapLibre's scale bar and the provider's attribution (always shown with a
-   basemap), wrapping upward on a phone; the panel opens above the button, 208 px wide, built from
-   sections so entry 3 adds the glyph key and the toggles. Token colours only (AD-11). */
+   a row of the Legend button and MapLibre's scale bar on the button's bottom edge; the panel opens above the
+   button, 208 px wide, built from sections (States, Kinds, Lines, Styles, Areas, Show, and Basemap only when
+   the setup lists more than one), stopping below the top bar; on a phone it is a bottom sheet (owner review,
+   items 1, 2, 3, 23, 24). The provider's attribution is its own control, bottom-right. Token colours only (AD-11). */
 /* The corner's container is bounded so the row wraps on a phone and keeps clear of the App Bar
    toggle's corner (app-bar-clearance 76 px); a percentage of the row's own float would resolve to nothing. */
 .mapstudio .maplibregl-ctrl-bottom-left {
@@ -886,7 +895,8 @@
 /* MapLibre's scale bar on the theme's tokens instead of its white and #333. */
 .mapstudio .maplibregl-ctrl-scale {
     box-sizing: border-box;
-    margin-bottom: 4px;
+    /* Sitting on the Legend button's bottom edge (the row aligns its items to the bottom), not floating above it (item 1). */
+    margin-bottom: 0;
     padding: 0 4px 2px;
     border: 1px solid var(--neutral-70);
     border-top: none;
@@ -898,20 +908,40 @@
     white-space: nowrap;
 }
 
-/* The provider's attribution: MapLibre's own control on the theme's tokens instead of its white. */
+/* The provider's attribution (R10, owner review item 3): MapLibre's own control, small and muted, in the
+   bottom-right corner along the bottom edge, under Perspective's App Bar toggle (which floats about 16 px up
+   from the edge) and never covering it: one line of 10 px text, 14 px tall, 2 px off the edge. A faint panel
+   tint keeps it legible over imagery. */
+.mapstudio .maplibregl-ctrl-bottom-right {
+    right: 0;
+    bottom: 0;
+    max-width: 100%;
+}
+
+.mapstudio .maplibregl-ctrl-bottom-right .maplibregl-ctrl {
+    margin: 0 6px 2px 0;
+}
+
 .mapstudio .maplibregl-ctrl-attrib {
+    box-sizing: border-box;
     margin: 0;
-    padding: 0 6px;
-    border: 1px solid var(--border);
-    border-radius: var(--borderRadius);
-    background: var(--mapstudio-surface);
-    color: var(--label);
-    font-size: 11px;
-    line-height: 1.6;
+    padding: 0 4px;
+    border: none;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--mapstudio-surface) 78%, transparent);
+    color: var(--label--disabled);
+    font-size: 10px;
+    line-height: 14px;
+    white-space: nowrap;
 }
 
 .mapstudio .maplibregl-ctrl-attrib a {
-    color: var(--label);
+    color: inherit;
+    text-decoration: none;
+}
+
+.mapstudio .maplibregl-ctrl-attrib a:hover {
+    text-decoration: underline;
 }
 
 .mapstudio .maplibregl-ctrl-attrib.maplibregl-attrib-empty {
@@ -919,10 +949,13 @@
 }
 
 .mapstudio .mapstudio-legend-panel {
+    display: flex;
+    flex-direction: column;
     box-sizing: border-box;
     width: 208px;
     max-width: 100%;
-    padding: 10px 12px 12px;
+    padding: 0;
+    overflow: hidden;
     border-radius: 10px;
     background: var(--mapstudio-surface);
     color: var(--label);
@@ -934,7 +967,14 @@
 .mapstudio .mapstudio-legend-section + .mapstudio-legend-section {
     margin-top: 10px;
     padding-top: 8px;
-    border-top: 1px solid var(--neutral-30);
+    border-top: 1px solid var(--neutral-30, var(--border));
+}
+
+.mapstudio .mapstudio-legend-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 10px 12px 12px;
+    overflow-y: auto;
 }
 
 .mapstudio .mapstudio-legend-heading {
@@ -1079,7 +1119,7 @@
 
 .mapstudio .mapstudio-search-option:hover,
 .mapstudio .mapstudio-search-option[aria-selected="true"] {
-    background: var(--neutral-30);
+    background: var(--mapstudio-hover-bg), var(--mapstudio-surface);
 }
 
 .mapstudio .mapstudio-search-kind-glyph {
@@ -1170,7 +1210,7 @@
     .mapstudio .mapstudio-topbar-panel {
         width: auto;
         margin: 0;
-        border-top: 1px solid var(--neutral-30);
+        border-top: 1px solid var(--neutral-30, var(--border));
         border-radius: 0 0 10px 10px;
         box-shadow: none;
         max-height: 60vh;
@@ -1183,16 +1223,17 @@
 }
 
 /* The Needs you bar and its ranked list (epic 3 entry 3, DESIGN.md needs-you-bar, phone top bar;
-   EXPERIENCE.md Needs you bar): the bar after the search field in the top bar's row (40 px,
-   rounded.lg, the floating shadow), "Needs you 3" in bold then each count with its glyph, or "All OK"
-   in text-secondary with no glyph; the list a card under the bar (320 px) with one row per item:
+   EXPERIENCE.md Needs you bar; owner review items 12 and 30): the bar after the search field in the top bar's
+   row (40 px, rounded.lg, the floating shadow), no words at any width: a bell with the alarm count, then the
+   comms-lost and the stale glyphs with their counts, a grey bell alone with nothing needing attention; the
+   list a card under the bar keeping its own width (360 px) with one row per item:
    rank, state glyph, name and kind, the state in words, detail and age. At phone width the bar is
    flat inside the one top bar and the list expands inside it. Token colours only (AD-11): the alarm
    glyphs take the priority tokens, comms lost its own token, stale none. */
 .mapstudio .mapstudio-needs {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     box-sizing: border-box;
     height: 40px;
     padding: 0 8px 0 12px;
@@ -1209,7 +1250,7 @@
 }
 
 .mapstudio .mapstudio-needs:hover {
-    background: var(--neutral-30);
+    background: var(--mapstudio-hover-bg), var(--mapstudio-surface);
 }
 
 .mapstudio .mapstudio-needs:focus-visible {
@@ -1217,41 +1258,41 @@
     outline-offset: -2px;
 }
 
-.mapstudio .mapstudio-needs-words {
-    font-size: 13px;
-    font-weight: 600;
-}
-
-.mapstudio .mapstudio-needs--ok .mapstudio-needs-words {
-    color: var(--label--disabled);
-    font-weight: 500;
-}
-
-.mapstudio .mapstudio-needs-colon {
-    color: var(--label--disabled);
-}
-
+/* The counts: a glyph and its number, nothing else is text (item 12). */
 .mapstudio .mapstudio-needs-count {
     display: inline-flex;
     align-items: center;
-    color: var(--label--disabled);
+    gap: 4px;
+    color: var(--label);
     white-space: pre;
 }
 
-.mapstudio .mapstudio-needs-count .mapstudio-needs-glyph {
-    margin-right: 4px;
+.mapstudio .mapstudio-needs-count-n {
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
 }
 
-.mapstudio .mapstudio-needs-count--alarm {
+/* The bell: solid in the hue of the highest unacknowledged priority (the bar's data-bell), neutral and hollow
+   when every alarm is acknowledged, grey and hollow with no alarm; the bar's count, so no longer the map's triangle. */
+.mapstudio .mapstudio-needs[data-bell="p1"] .mapstudio-needs-count--alarm {
     color: var(--mapstudio-alarm-1);
 }
 
-.mapstudio .mapstudio-needs[data-priority="2"] .mapstudio-needs-count--alarm {
+.mapstudio .mapstudio-needs[data-bell="p2"] .mapstudio-needs-count--alarm {
     color: var(--mapstudio-alarm-2);
 }
 
-.mapstudio .mapstudio-needs[data-priority="3"] .mapstudio-needs-count--alarm {
+.mapstudio .mapstudio-needs[data-bell="p3"] .mapstudio-needs-count--alarm {
     color: var(--mapstudio-alarm-3);
+}
+
+.mapstudio .mapstudio-needs[data-bell="acknowledged"] .mapstudio-needs-count--alarm {
+    color: var(--label);
+}
+
+.mapstudio .mapstudio-needs[data-bell="none"] .mapstudio-needs-count--alarm {
+    color: var(--label--disabled);
 }
 
 .mapstudio .mapstudio-needs-count--comms-lost .mapstudio-needs-glyph {
@@ -1273,9 +1314,13 @@
     transform: rotate(180deg);
 }
 
-/* The list: a card under the bar, right of the search field (its width plus the row's gap). */
+/* The list: a card under the bar, right of the search field (its width plus the row's gap), keeping its own
+   width (360 px) now that the bar has no words and is narrower than it, never wider than the map less the
+   zoom card (item 30). */
 .mapstudio .mapstudio-needs-panel {
-    width: 320px;
+    width: 360px;
+    max-width: calc(var(--mapstudio-map-width, 100vw) - 2 * var(--mapstudio-map-inset) - var(--mapstudio-search-width) - 12px
+        - var(--mapstudio-target) - 8px);
     margin-left: calc(var(--mapstudio-search-width) + 12px);
     padding: 8px 0 6px;
 }
@@ -1311,7 +1356,7 @@
 }
 
 .mapstudio .mapstudio-needs-row:hover {
-    background: var(--neutral-30);
+    background: var(--mapstudio-hover-bg), var(--mapstudio-surface);
 }
 
 .mapstudio .mapstudio-needs-row:focus-visible {
@@ -1382,11 +1427,44 @@
 
 /* The legend's key (entry 3, DESIGN.md legend): one row per glyph or line look, the sample in
    currentColor through a token class, the words beside it; the Show section's checkboxes and note. */
-/* The panel never grows past the map: the component writes the map's height into the variable; a
-   taller key scrolls (the Legend button row and the insets take about 100 px). */
+/* The panel stops below the top bar (owner review, item 23): its height is the map less the bottom row (the
+   button, its inset and the 8 px gap) and less the top bar (its 40 px, its inset's worth of room and a gap), the
+   component writing the map's height into the variable; a taller key scrolls inside, at every width. */
 .mapstudio .mapstudio-legend-panel {
-    max-height: calc(var(--mapstudio-map-height, 100vh) - var(--mapstudio-target) - 2 * var(--mapstudio-map-inset) - 8px - 12px);
-    overflow-y: auto;
+    max-height: calc(var(--mapstudio-map-height, 100vh) - var(--mapstudio-target) - 2 * var(--mapstudio-map-inset) - 8px - 48px);
+}
+
+/* The Kinds heading as a disclosure button when there are many kinds (item 24): "Kinds (9)" and a chevron. */
+.mapstudio .mapstudio-legend-heading-button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 24px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+}
+
+.mapstudio .mapstudio-legend-heading-button:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: 2px;
+}
+
+.mapstudio .mapstudio-legend-chevron {
+    width: 16px;
+    height: 16px;
+}
+
+.mapstudio .mapstudio-legend-heading-button[aria-expanded="true"] .mapstudio-legend-chevron {
+    transform: rotate(180deg);
+}
+
+.mapstudio .mapstudio-legend-section--kinds[data-open="false"] .mapstudio-legend-heading {
+    margin-bottom: 0;
 }
 
 .mapstudio .mapstudio-legend-key-row {
@@ -1530,23 +1608,16 @@
 }
 
 @media (max-width: 767px) {
-    /* The bar flat inside the one top bar, after a divider; the glyphs alone say the counts (the
+    /* The bar flat inside the one top bar, after a divider; a glyph and its number for every count (the
        words are the button's label); hidden while the search results are open. */
     .mapstudio .mapstudio-needs {
         flex: 0 0 auto;
         height: 48px;
         padding: 0 8px 0 10px;
-        border-left: 1px solid var(--neutral-30);
+        border-left: 1px solid var(--neutral-30, var(--border));
         border-radius: 0 10px 10px 0;
         background: transparent;
         box-shadow: none;
-    }
-
-    .mapstudio .mapstudio-needs-colon,
-    .mapstudio .mapstudio-needs-count-word,
-    .mapstudio .mapstudio-needs-count--comms-lost .mapstudio-needs-count-n,
-    .mapstudio .mapstudio-needs-count--stale .mapstudio-needs-count-n {
-        display: none;
     }
 
     .mapstudio .mapstudio-topbar[data-search-open="true"] .mapstudio-needs {
@@ -1555,6 +1626,7 @@
 
     .mapstudio .mapstudio-needs-panel {
         width: auto;
+        max-width: none;
         margin: 0;
     }
 
@@ -1605,7 +1677,7 @@
 }
 
 .mapstudio-pick-row:hover {
-    background: var(--neutral-30);
+    background: var(--mapstudio-hover-bg), var(--mapstudio-surface);
 }
 
 .mapstudio-pick-name {
@@ -1870,5 +1942,149 @@
 
     .mapstudio-popup--line .mapstudio-popup-row {
         min-height: 40px;
+    }
+}
+
+/* ---- Owner review notes on the 0.3.0 map, group b (top bar, legend, phone) ---- */
+
+/* Thin scroll bars on every scrolling panel (item 28: the legend, the popup body, the lists): the standard
+   properties first, the WebKit pseudo-elements to match; a neutral thumb from the theme's tokens and a track
+   left clear, so it sits on the panel's own surface (no white strip in the dark theme). */
+.mapstudio,
+.mapstudio * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--mapstudio-scroll-thumb) transparent;
+}
+
+.mapstudio ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.mapstudio ::-webkit-scrollbar-track,
+.mapstudio ::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+.mapstudio ::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 4px;
+    background: var(--mapstudio-scroll-thumb);
+    background-clip: content-box;
+}
+
+/* The search field's chevron (item 8): opens the list of every item; a pointer affordance beside the Clear button. */
+.mapstudio .mapstudio-search-chevron {
+    flex: 0 0 auto;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--label--disabled);
+}
+
+.mapstudio .mapstudio-search-chevron[aria-expanded="true"] .mapstudio-ctrl-glyph {
+    transform: rotate(180deg);
+}
+
+/* The legend's phone bottom sheet (items 2, 3 and 23): like the popups' sheet, 8 px from the sides, 14 px
+   corners, above the Legend row, a handle, a header with a 44 px Close, Show first, the key in two columns, no
+   Basemap; it stops below the top bar and scrolls inside. */
+.mapstudio-legend-handle,
+.mapstudio-legend-header {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    /* The corner spans the map so the sheet can; the row keeps its own width and the App Bar corner stays clear. */
+    .mapstudio .maplibregl-ctrl-bottom-left {
+        right: 0;
+        max-width: none;
+    }
+
+    .mapstudio .mapstudio-legend-panel--sheet {
+        position: absolute;
+        left: var(--mapstudio-map-inset);
+        right: var(--mapstudio-map-inset);
+        bottom: calc(var(--mapstudio-map-inset) + var(--mapstudio-target) + 4px);
+        width: auto;
+        /* Below the top bar (8 px inset, 48 px, 8 px) and above the row (56 px). */
+        max-height: calc(var(--mapstudio-map-height, 100vh) - 56px - 64px);
+        border-radius: 14px;
+    }
+
+    .mapstudio .mapstudio-legend-panel--sheet .mapstudio-legend-handle {
+        display: block;
+        flex: 0 0 auto;
+        width: 36px;
+        height: 4px;
+        margin: 8px auto 0;
+        border-radius: 2px;
+        background: var(--neutral-30, var(--border));
+    }
+
+    .mapstudio .mapstudio-legend-panel--sheet .mapstudio-legend-header {
+        display: flex;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 8px 0 16px;
+    }
+
+    .mapstudio .mapstudio-legend-title {
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .mapstudio .mapstudio-legend-close {
+        border-radius: 8px;
+        background: transparent;
+    }
+
+    .mapstudio .mapstudio-legend-panel--sheet .mapstudio-legend-body {
+        padding: 0 16px 12px;
+    }
+
+    /* The key in two columns: an inner block of auto height, so the columns balance and the body scrolls. */
+    .mapstudio .mapstudio-legend-columns {
+        column-count: 2;
+        column-gap: 20px;
+    }
+
+    .mapstudio .mapstudio-legend-panel--sheet .mapstudio-legend-section {
+        break-inside: avoid;
+    }
+
+    .mapstudio .mapstudio-legend-panel--sheet .mapstudio-legend-section + .mapstudio-legend-section {
+        margin-top: 8px;
+        padding-top: 0;
+        border-top: none;
+    }
+
+    /* Show leads, above both columns, with its toggles side by side. */
+    .mapstudio .mapstudio-legend-panel--sheet .mapstudio-legend-section--show {
+        margin-bottom: 8px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--neutral-30, var(--border));
+    }
+
+    .mapstudio .mapstudio-legend-panel--sheet .mapstudio-legend-key-row {
+        gap: 6px;
+        min-height: 20px;
+        font-size: 12px;
+        line-height: 1.2;
+    }
+
+    .mapstudio .mapstudio-legend-panel--sheet .mapstudio-legend-heading {
+        margin-bottom: 2px;
+    }
+
+    .mapstudio .mapstudio-legend-panel--sheet .mapstudio-legend-heading-button {
+        min-height: var(--mapstudio-target);
+    }
+
+    /* An open top-bar list (search results or Needs you) draws over the zoom card at the top bar's full width:
+       the zoom card is hidden while one is open (item 26), so its right edge is never covered or covering. */
+    .mapstudio .mapstudio-map[data-search-open="true"] .maplibregl-ctrl-top-right,
+    .mapstudio .mapstudio-map[data-needs-open="true"] .maplibregl-ctrl-top-right {
+        visibility: hidden;
     }
 }

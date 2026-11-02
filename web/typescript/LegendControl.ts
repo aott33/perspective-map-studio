@@ -215,7 +215,10 @@ export class LegendControl implements IControl {
         if (phone) {
             // The sheet leads with what a viewer changes: Show (the Lines and Names toggles); no basemap section.
             this.renderShow(body);
-            this.renderKey(body);
+            const columns = document.createElement('div');
+            columns.className = 'mapstudio-legend-columns';
+            body.appendChild(columns);
+            this.renderKey(columns);
         } else {
             // Sections in order: the key in the map's words (States first), Show, then Basemap when there is a choice.
             this.renderKey(body);
