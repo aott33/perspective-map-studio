@@ -51,8 +51,8 @@ describe('the map features (epic 3 entry 7)', () => {
         expect(shared.geometry.coordinates).toEqual(centre);
         expect(out.anchors).toEqual({ a: centre, b: centre });
         expect(out.shared).toBe(1);
-        // At a sharing distance under their 15 m (a close zoom, item 20) the two draw as their own markers.
-        const split = buildFeatures([A, B, FAR, L], KINDS, live, null, COLORS, 10);
+        // At a sharing distance under their 8.6 m (a close zoom, item 20) the two draw as their own markers.
+        const split = buildFeatures([A, B, FAR, L], KINDS, live, null, COLORS, 5);
         expect(split.points.features).toHaveLength(3);
         expect(split.shared).toBe(0);
         expect(split.anchors).toEqual({});

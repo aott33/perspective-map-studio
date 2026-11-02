@@ -102,22 +102,31 @@ describe('the default popup card (epic 3 entry 8, AD-7)', () => {
         expect(stale).toMatch(/#ms-stale.*880 psi/);
         expect(stale).not.toContain('Stale - 880');
         expect(stale).not.toContain('(comms lost)');
-        // No data yet: no check, no glyph, the words in the secondary colour by class, the quality in plain words.
-        const none = render({ values: { id: 'p1', comms: { value: null, quality: 'Bad_NotFound', t: null, stale: true, reason: 'Bad_NotFound' },
+        // A comms tag that is not there (Point 3): comms lost as the marker draws it, the code in plain words, kept in the tooltip.
+        const notFound = render({ values: { id: 'p1', comms: { value: null, quality: 'Bad_NotFound', t: null, stale: true, reason: 'Bad_NotFound' },
             kpis: {}, problems: [] }, detail: null });
-        expect(none).toMatch(/mapstudio-popup-comms--unknown[^>]*data-comms="unknown"[^>]*data-quality="Bad_NotFound"/);
-        expect(none).toContain('No data yet - tag not found');
-        expect(none).not.toContain('Bad_NotFound)</span>');
-        expect(none).toContain('title="No data yet - tag not found (Bad_NotFound)"');
-        expect(none).not.toContain('mapstudio-popup-ok-glyph');
-        expect(none).toContain('mapstudio-popup-kpi--none');
-        expect(none).toContain('No data yet</span>');
-        expect(none).toContain('Alarm state unknown');
-        expect(none).toContain('data-alarm="unknown"');
-        expect(none).not.toContain('#ms-check');
-        // No comms slot at all (no asset linked): the same words, the problem's reason.
+        expect(notFound).toMatch(/mapstudio-popup-comms--lost[^>]*data-comms="lost"[^>]*data-quality="Bad_NotFound"/);
+        expect(notFound).toContain('No data yet - tag not found');
+        expect(notFound).not.toContain('Bad_NotFound)</span>');
+        expect(notFound).toContain('#ms-comms-lost');
+        expect(notFound).not.toContain('mapstudio-popup-ok-glyph');
+        expect(notFound).toContain('mapstudio-popup-kpi--none');
+        expect(notFound).toContain('No data yet</span>');
+        expect(notFound).toContain('Alarm state unknown');
+        expect(notFound).toContain('data-alarm="unknown"');
+        // No data yet (item 21, no comms slot at all: no asset linked): neither OK nor lost, no glyph, the words in the
+        // secondary colour by class with the problem's reason, and the alarm state unknown.
         const unlinked = render({ values: { id: 'p1', kpis: {}, problems: [{ slot: 'comms', reason: 'no asset is linked' }] }, detail: null });
+        expect(unlinked).toMatch(/mapstudio-popup-comms--unknown[^>]*data-comms="unknown"/);
         expect(unlinked).toContain('No data yet - no asset is linked');
+        expect(unlinked).not.toContain('mapstudio-popup-ok-glyph');
+        expect(unlinked).not.toContain('#ms-comms-lost');
+        expect(unlinked).toContain('Alarm state unknown');
+        // A slot that has simply not delivered yet reads the same, its code in the tooltip.
+        const early = render({ values: { id: 'p1', comms: { value: null, quality: 'Uncertain_InitialValue', t: null, stale: true, reason: 'no value yet' },
+            kpis: {}, problems: [] }, detail: null });
+        expect(early).toMatch(/data-comms="unknown"[^>]*data-quality="Uncertain_InitialValue"/);
+        expect(early).toContain('title="No data yet (Uncertain_InitialValue)"');
     });
 
     test('an alarm whose list could not be read says so in words, and a stale alarms slot shows the hourglass with its reason', () => {

@@ -466,9 +466,51 @@
     color: var(--mapstudio-comms-lost);
 }
 
-/* Stale values are marked in words ("Stale - ") and keep the secondary colour. */
-.mapstudio-popup-kpi[data-stale="true"] .mapstudio-popup-value {
+/* Option A (owner review notes item 13): a KPI label is never cut, it wraps; a stale value is the hourglass
+   alone before the value in the secondary colour, its reason in the row's tooltip and, on a tap, in a note
+   line under the row. No data (item 21) and an unknown alarm state read in the secondary colour with no glyph. */
+.mapstudio-popup-kpi .mapstudio-popup-label {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+.mapstudio-popup-kpi[data-stale="true"] .mapstudio-popup-value,
+.mapstudio-popup-kpi--none .mapstudio-popup-value,
+.mapstudio-popup-comms--unknown .mapstudio-popup-value,
+.mapstudio-popup-alarms--unknown .mapstudio-popup-alarm-words {
     color: var(--neutral-70);
+    font-weight: 400;
+}
+
+.mapstudio-popup-row--noted {
+    cursor: help;
+}
+
+.mapstudio-popup-row[data-note-shown="true"] {
+    flex-wrap: wrap;
+}
+
+.mapstudio-popup-note {
+    flex: 1 0 100%;
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--neutral-70);
+    text-align: right;
+}
+
+/* The hourglass before the alarm words keeps the text colour inside a tinted alarm block (stale has no hue). */
+.mapstudio-popup-alarm-stale {
+    color: var(--label);
+}
+
+.mapstudio-popup-alarm-heading[data-note-shown="true"] {
+    flex-wrap: wrap;
+}
+
+.mapstudio-popup-alarm-heading .mapstudio-popup-note {
+    font-weight: 400;
+    text-align: left;
 }
 
 /* The alarm block (P5): the priority's tint and a 3 px edge, the hue on the glyph and the heading
@@ -1704,13 +1746,42 @@
     margin-top: -4px;
 }
 
+/* The body (owner review notes item 19): the pinned part (segment, comms, the line's values, alarms) stays
+   at the top and only the instrument list scrolls, about four rows tall; when the card is clamped short the
+   list keeps at least two rows and the body scrolls as a whole. */
 .mapstudio-popup--line .mapstudio-popup-body {
+    display: flex;
+    flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-gutter: stable;
     padding-bottom: 8px;
+}
+
+.mapstudio-popup-pinned {
+    flex: 0 0 auto;
+}
+
+.mapstudio-popup-instruments {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.mapstudio-popup-instrument-list {
+    flex: 1 1 auto;
+    min-height: 88px;
+    max-height: 168px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.mapstudio-popup-pinned + .mapstudio-popup-instruments {
+    margin-top: 4px;
+    border-top: 1px solid var(--neutral-30);
 }
 
 /* The segment box: the selection tint with a 1 px selection border (DESIGN.md line-popup). */
@@ -1777,13 +1848,8 @@
     font-weight: 600;
 }
 
-.mapstudio-popup--line .mapstudio-popup-comms + .mapstudio-popup-instruments,
-.mapstudio-popup--line .mapstudio-popup-instruments + .mapstudio-popup-kpis,
-.mapstudio-popup--line .mapstudio-popup-kpis + .mapstudio-popup-alarms,
-.mapstudio-popup--line .mapstudio-popup-instruments + .mapstudio-popup-alarms {
-    border-top: 1px solid var(--border);
+.mapstudio-popup--line .mapstudio-popup-kpis + .mapstudio-popup-alarms {
     margin-top: 4px;
-    padding-top: 4px;
 }
 
 .mapstudio-popup-section-label {

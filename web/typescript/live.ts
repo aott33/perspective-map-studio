@@ -725,12 +725,15 @@ export interface CommsWords {
 /**
  * The comms row of the popup: "OK - 12 s ago", "Comms lost - 3 min ago", or "No data yet" with the reason
  * in plain words ("No data yet - tag not found", items 15 and 21); `problem` is the item's problem for
- * the comms slot when the Gateway could not resolve it ("no asset is linked").
+ * the comms slot when the Gateway could not resolve it ("no asset is linked"). With no slot, or a slot
+ * that has not delivered yet, the state is unknown (no glyph); a slot the Gateway marked stale with no
+ * value (a tag that is not there) is comms lost, as the marker draws it, with the same words.
  */
 export function commsText(comms: LiveValue | undefined, now: number, problem = ''): CommsWords {
     if (!comms || comms.value === null || comms.value === undefined) {
         const reason = problem !== '' ? problem : comms ? qualityWords(comms.reason !== '' ? comms.reason : comms.quality) : '';
-        return { word: NO_DATA, detail: reason === 'no value yet' ? '' : reason, lost: false, unknown: true, code: comms ? comms.quality : '' };
+        const lost = !!comms && comms.stale && reason !== 'no value yet';
+        return { word: NO_DATA, detail: reason === 'no value yet' ? '' : reason, lost, unknown: !lost, code: comms ? comms.quality : '' };
     }
     const lost = comms.stale || comms.value === false;
     const age = ageText(comms.t, now);

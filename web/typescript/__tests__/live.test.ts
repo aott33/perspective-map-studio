@@ -210,8 +210,9 @@ describe('the popup\'s words', () => {
         expect(commsText(undefined, NOW)).toEqual({ word: 'No data yet', detail: '', lost: false, unknown: true, code: '' });
         expect(commsText(stale(null, 'no value yet', 'Uncertain_InitialValue'), NOW))
             .toEqual({ word: 'No data yet', detail: '', lost: false, unknown: true, code: 'Uncertain_InitialValue' });
+        // A slot the Gateway marked stale with no value (the tag is not there): comms lost, as the marker draws it, in plain words.
         expect(commsText(stale(null, 'Bad_NotFound', 'Bad_NotFound'), NOW))
-            .toEqual({ word: 'No data yet', detail: 'tag not found', lost: false, unknown: true, code: 'Bad_NotFound' });
+            .toEqual({ word: 'No data yet', detail: 'tag not found', lost: true, unknown: false, code: 'Bad_NotFound' });
         expect(commsText(stale(null, 'Bad_NotFound', 'Bad_NotFound'), NOW, 'the tag was not found').detail).toBe('the tag was not found');
         expect(alarmsText(good({ active: 0, unacked: 0, priority: 0 }))).toBe('No active alarms');
         expect(alarmsText(good({ active: 1, unacked: 1, priority: 1 }))).toBe('1 alarm - Priority 1, unacknowledged');
