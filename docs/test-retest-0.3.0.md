@@ -6,13 +6,19 @@ Setup: `git pull`, `./gradlew clean`, `ops/up.sh --fresh`, sign in as `mapeditor
 
 ## 1. Showcase at a laptop size (5 min)
 
-- [ ] Top bar: "Search assets" with a chevron (opens an A to Z list, typing filters); the bar shows a red bell 1, comms lost 1, stale 1 and no words; hovering it keeps its background.
-- [ ] Dots below zoom 14 are bigger; the tap, meter and valve icons read clearly; L-GL21 is now as thick as its size says.
-- [ ] Click P14: option A card (comms right-aligned, values right-aligned, the alarm block). Esc closes it.
-- [ ] Click P21: the hourglass before each value (hover one for the reason), the hourglass before the alarm words.
-- [ ] Click L-SWD near the top of the map: the card stays inside the map, clear of the top bar and the zoom card; only the instrument list scrolls; selected, the arrows repeat along the line.
-- [ ] L-SWD's Comms row is one line, "OK - 3, oldest 39 min" (or "Comms lost - 1 of 3"); hover it for the full sentence, and on the phone tap it to see the sentence under the row.
-- [ ] Legend: stops below the top bar, States first, thin scroll bar; the scale bar sits level with the Legend button; the attribution is small, bottom-right.
+- [x] Top bar: "Search assets" with a chevron (opens an A to Z list, typing filters); the bar shows a red bell 1, comms lost 1, stale 1 and no words; hovering it keeps its background.
+- [x] Dots below zoom 14 are bigger; the tap, meter and valve icons read clearly; L-GL21 is now as thick as its size says.
+- [x] Click P14: option A card (comms right-aligned, values right-aligned, the alarm block). Esc closes it.
+- [x] Click P21: the hourglass before each value (hover one for the reason), the hourglass before the alarm words.
+- [x] Click L-SWD near the top of the map: the card stays inside the map, clear of the top bar and the zoom card; only the instrument list scrolls; selected, the arrows repeat along the line.
+- [x] L-SWD's Comms row is one line, "OK - 3, oldest 39 min" (or "Comms lost - 1 of 3"); hover it for the full sentence, and on the phone tap it to see the sentence under the row.
+- [x] Legend: stops below the top bar, States first, thin scroll bar; the scale bar sits level with the Legend button; the attribution is small, bottom-right.
+
+Notes (owner, 2026-11-03):
+
+- The top bar looks better. Closing a popup makes the Needs you icons flash (R1).
+- With L-SWD's popup open, panning the map carries the card over the top bar and the zoom card; the card should go under the controls (R2).
+- The legend stops below the top bar; make it as wide as the search field so fewer rows wrap (R3).
 
 ## 2. Dev map with `/live` (5 min)
 
