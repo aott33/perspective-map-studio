@@ -103,7 +103,7 @@ async function expectMapboxAttribution(page, map) {
  * right") and cover none of the Legend button, the scale bar, the zoom card, each other and the App Bar toggle.
  * At 768 px and wider: one row on the bottom edge, the logo just left of the attribution. On a phone: the logo
  * on the Legend button's bottom edge and the attribution as one line above the Legend row, both right-aligned
- * at the App Bar clearance (76 px).
+ * 90 px from the right edge, left of the App Bar toggle.
  */
 async function expectLogoPlaced(page, map) {
     const mapBox = await map.boundingBox();
@@ -131,7 +131,7 @@ async function expectLogoPlaced(page, map) {
         expect(attrib.height, 'the attribution on one line').toBeLessThanOrEqual(16);
         expect(attrib.y + attrib.height, 'the attribution above the Legend row').toBeLessThanOrEqual(legend.y);
         expect(Math.abs((logo.x + logo.width) - (attrib.x + attrib.width)), 'right-aligned together').toBeLessThanOrEqual(1);
-        expect(right - (logo.x + logo.width), 'clear of the App Bar corner').toBeGreaterThanOrEqual(64);
+        expect(right - (logo.x + logo.width), 'left of the App Bar toggle').toBeGreaterThanOrEqual(84);
     }
     const others = [['the Legend button', legend], ['the scale bar', scale], ['the zoom card', zoom]];
     for (const [name, other] of others) {

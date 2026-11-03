@@ -2183,14 +2183,15 @@
 @media (max-width: 767px) {
     /* Satellite on a phone (owner, 0.3.0 re-test: every logo bottom-right): the logo and Mapbox's four links
        (about 270 px) do not fit on one line beside the Legend row, and under the App Bar toggle there is room only
-       for the 14 px text, not the 23 px logo. So both stand right-aligned at the App Bar clearance (76 px from the
-       right edge, never under or over the toggle): the logo on the bottom row at the map inset, its bottom on the
+       for the 14 px text, not the 23 px logo. So both stand right-aligned 90 px from the right edge, left of the
+       toggle (Perspective's toggle measured 70 px wide and 14 px from the edge on 8.3.10, so 84 px, more than the
+       76 px app-bar-clearance; 6 px to spare): the logo on the bottom row at the map inset, its bottom on the
        Legend button's bottom edge and left of the toggle, and the attribution as one line above it, its bottom
        6 px above the 44 px Legend row, so neither meets the Legend button or the scale bar. */
     .mapstudio .mapstudio-map[data-provider-logo="mapbox"] .maplibregl-ctrl-bottom-right {
-        right: 76px;
+        right: 90px;
         bottom: var(--mapstudio-map-inset);
-        max-width: calc(100% - 76px - var(--mapstudio-map-inset));
+        max-width: calc(100% - 90px - var(--mapstudio-map-inset));
         flex-direction: column;
         align-items: flex-end;
         /* 44 px Legend row + 6 px - the logo's 23 px. */
