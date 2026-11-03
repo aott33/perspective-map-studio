@@ -285,6 +285,10 @@ test.describe('the owner\'s review notes: Esc, plain words, placement and the ca
         };
         for (const [where, at] of Object.entries(spots)) {
             const center = centerFor(box, TRACER.points.p1.lngLat, at, 15);
+            // Every spot is at zoom 15, so view()'s wait on data-labels-zoom (set when the map goes idle) would
+            // pass at once: cleared, it waits for this jump's idle, after MapLibre placed the markers anew (a
+            // click before that queries the markers where the last placement left them and can hit the line).
+            await map.evaluate((el) => el.removeAttribute('data-labels-zoom'));
             await view(page, map, center, 15);
             await page.mouse.click(box.x + at[0], box.y + at[1]);
             await expect(card(page)).toHaveAttribute('data-point-id', ids.p1, { timeout: 30_000 });
