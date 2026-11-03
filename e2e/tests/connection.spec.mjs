@@ -70,7 +70,10 @@ test.describe('1440 px', () => {
         await expect(chip(page)).toHaveText(/^No connection - (values from \d\d:\d\d|no values yet)$/);
         await expect(chip(page)).toHaveAttribute('data-state', 'lost');
         // Every item with values is drawn stale (an alarm keeps its badge over the stale ring): nothing reads as live.
-        const states = await page.locator('.mapstudio-live-item').evaluateAll((els) => els.map((el) => el.getAttribute('data-state')));
+        // Items that show no value (stray items of earlier specs, no comms, KPI, style or alarm) have nothing to freeze.
+        const states = await page.locator('.mapstudio-live-item').evaluateAll((els) => els
+            .filter((el) => ['data-comms', 'data-kpi', 'data-style', 'data-alarm'].some((a) => el.getAttribute(a)))
+            .map((el) => el.getAttribute('data-state')));
         expect(states.length).toBeGreaterThan(0);
         expect(states.every((s) => s === 'stale' || s === 'alarm' || s === 'comms-lost')).toBe(true);
         await expect(liveItem(page, ids.p1)).toHaveAttribute('data-state', /^(stale|alarm|comms-lost)$/);

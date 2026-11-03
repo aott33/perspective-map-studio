@@ -208,7 +208,7 @@ editorTest.describe('1440 px', () => {
             await expect(map).toHaveAttribute('data-center', '-104.97500,39.75000');
             await expect(popup(page)).toHaveAttribute('data-point-id', ids.p2, { timeout: DRAW_MS });
             await expect(page.locator('.mapstudio-search-status')).toHaveText('Point 2 selected');
-            await expect(map).toHaveAttribute('data-last-reply', /Gateway received click on ' + ids.p2 + '/, { timeout: DRAW_MS });
+            await expect(map).toHaveAttribute('data-last-reply', new RegExp('Gateway received click on ' + ids.p2), { timeout: DRAW_MS });
 
             // By keyboard: Enter on the bar opens the list with the first row focused, the arrows move and wrap,
             // Esc closes it and returns the focus to the bar; Enter on a row chooses it.
