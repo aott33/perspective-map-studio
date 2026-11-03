@@ -4,7 +4,7 @@ Map Studio follows semantic versioning for its public contract (AD-9): the compo
 
 ## 0.3.0
 
-Unreleased: everyone reads live state from the map (epic-viewing). Contract 0.3.0; project setup schema 1; map store schema 2 (both unchanged).
+Everyone reads live state from the map (epic-viewing). Contract 0.3.0; project setup schema 1; map store schema 2 (both unchanged, so no migration). Requires Ignition 8.3 and a PostgreSQL connection per project, as 0.2.0.
 
 ### Contract changes
 
@@ -54,6 +54,11 @@ Unreleased: everyone reads live state from the map (epic-viewing). Contract 0.3.
 3. Needs you summary and legend in View mode.
 15. Showcase page and View mode polish to the mockups.
 12. Hue tokens and the engineering review pack.
+4. Shorter release checks: `ops/release-smoke.sh`, `ops/perf.sh --only` and the checks by release type in [RELEASING.md](RELEASING.md).
+11. Refactor sweep.
+13. This release, rehearsed on the `ign-scada-template` test stack with the field simulator's live tags ([docs/template-install.md](docs/template-install.md), "0.3.0 rehearsal"); the frame rate reading of R11 in [docs/perf/README.md](docs/perf/README.md).
+
+With them, backlog story 10: the owner's review notes on the 0.3.0 map (groups a, b and c), the Mapbox logo and attribution with Satellite, and the re-test changes (the line popup's short comms row, the Mapbox logo bottom-right).
 
 ### Development
 
