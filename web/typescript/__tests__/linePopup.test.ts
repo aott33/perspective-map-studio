@@ -194,12 +194,22 @@ describe('the line popup\'s words (DESIGN.md line-popup)', () => {
             .toBe('398 to 400 psi - rise 2 psi over 1.7 km');
     });
 
-    test('the comms line over the instruments: OK with the oldest age, or the first stale one', () => {
-        expect(instrumentsComms(nodes(), NOW)).toEqual({ word: 'OK', detail: '3 instruments, oldest 9 s ago', lost: false });
+    test('the comms row over the instruments: short on the row, the full sentence in its note', () => {
+        expect(instrumentsComms(nodes(), NOW)).toEqual({
+            word: 'OK', detail: '3, oldest 9 s', lost: false, state: 'ok', note: 'OK - 3 instruments, oldest 9 s ago'
+        });
         const staleLive: LiveState = { ...LIVE, items: { ...LIVE.items, pt2: { ...LIVE.items.pt2, kpis: { pressure: stale(371, 'Bad_Stale') } } } };
-        expect(instrumentsComms(popupNodes(LINE, ITEMS, KINDS, staleLive, null), NOW)).toEqual({ word: 'PT-2 stale', detail: 'last 9 s ago', lost: true });
+        expect(instrumentsComms(popupNodes(LINE, ITEMS, KINDS, staleLive, null), NOW)).toEqual({
+            word: 'Stale', detail: '1 of 3', lost: true, state: 'stale', note: 'Stale on 1 of 3 instruments: PT-2, last 9 s ago'
+        });
         const lost: LiveState = { ...LIVE, items: { ...LIVE.items, pt1: { ...LIVE.items.pt1, comms: good(false) } } };
-        expect(instrumentsComms(popupNodes(LINE, ITEMS, KINDS, lost, null), NOW)).toEqual({ word: 'PT-1 comms lost', detail: 'last 9 s ago', lost: true });
+        expect(instrumentsComms(popupNodes(LINE, ITEMS, KINDS, lost, null), NOW)).toEqual({
+            word: 'Comms lost', detail: '1 of 3', lost: true, state: 'comms-lost', note: 'Comms lost on 1 of 3 instruments: PT-1, last 9 s ago'
+        });
+        // Comms lost wins over stale; every instrument in that state is named in the note.
+        const both: LiveState = { ...lost, items: { ...lost.items, pt2: { ...lost.items.pt2, comms: good(false) }, lv1: { ...lost.items.lv1, kpis: { position: stale(50, 'Bad_Stale') } } } };
+        const c = instrumentsComms(popupNodes(LINE, ITEMS, KINDS, both, null), NOW)!;
+        expect([c.word, c.detail, c.note]).toEqual(['Comms lost', '2 of 3', 'Comms lost on 2 of 3 instruments: PT-1, last 9 s ago; PT-2, last 9 s ago']);
         expect(instrumentsComms(popupNodes(LINE, [LINE, CTB1, SWD1], KINDS, LIVE, null), NOW)).toBeNull();
     });
 
@@ -235,7 +245,9 @@ describe('the line popup\'s words (DESIGN.md line-popup)', () => {
         expect(html).toContain('Gathering line - 6 in, 2.9 km');
         expect(html).toContain('Segment PT-1 to PT-2');
         expect(html).toContain('398 to 371 psi - drop 27 psi over 1.7 km');
-        expect(html).toContain('OK - 3 instruments, oldest 9 s ago');
+        // The short row, the full sentence in its tooltip (owner, 0.3.0 re-test: the long form wrapped).
+        expect(html).toContain('OK - 3, oldest 9 s<');
+        expect(html).toContain('title="OK - 3 instruments, oldest 9 s ago"');
         expect(html).toContain('Instruments, CTB1 to SWD1');
         const rows = Array.from(html.matchAll(/data-row-id="([a-z0-9]+)"[^>]*data-role="([a-z]+)"[^>]*data-highlighted="(true|false)"/g)).map((m) => m.slice(1));
         expect(rows).toEqual([['ctb1', 'start', 'false'], ['pt1', 'instrument', 'true'], ['lv1', 'instrument', 'false'], ['pt2', 'instrument', 'true'], ['swd1', 'end', 'false']]);

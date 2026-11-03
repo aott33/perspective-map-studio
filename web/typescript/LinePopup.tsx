@@ -72,15 +72,16 @@ export class LinePopup extends React.Component<LinePopupProps> {
         const comms = instrumentsComms(nodes, now);
         if (comms) {
             return (
-                <div className={'mapstudio-popup-row mapstudio-popup-comms' + (comms.lost ? ' mapstudio-popup-comms--lost' : '')}
-                     data-part="comms" data-comms={comms.lost ? 'lost' : 'ok'}>
+                <NoteRow className={'mapstudio-popup-row mapstudio-popup-comms' + (comms.lost ? ' mapstudio-popup-comms--lost' : '')}
+                         note={comms.note}
+                         data={{ 'data-part': 'comms', 'data-comms': comms.lost ? 'lost' : 'ok' }}>
                     <span className="mapstudio-popup-label">Comms</span>
                     <span className="mapstudio-popup-value">
-                        {comms.lost ? <Glyph id={comms.word.endsWith('comms lost') ? 'comms-lost' : 'stale'} className="mapstudio-popup-state-glyph" />
+                        {comms.state !== 'ok' ? <Glyph id={comms.state} className="mapstudio-popup-state-glyph" />
                             : <Chrome name="check" className="mapstudio-popup-state-glyph mapstudio-popup-ok-glyph" />}
                         {comms.word}{comms.detail ? ' - ' + comms.detail : ''}
                     </span>
-                </div>
+                </NoteRow>
             );
         }
         if (!display || !display.comms) {

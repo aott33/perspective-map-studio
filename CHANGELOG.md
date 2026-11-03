@@ -39,6 +39,8 @@ Unreleased: everyone reads live state from the map (epic-viewing). Contract 0.3.
 
 - The Mapbox logo and attribution with Satellite (owner decision 2026-11-03; Mapbox's attribution guide; no wire change, the contract stays 0.3.0): Satellite at a client site runs on the client's own Mapbox account and public token (the client accepts Mapbox's terms and pays its tile requests; Map Studio ships no token, [docs/setup.md](docs/setup.md)); while Satellite is drawn, and only then, the map shows Mapbox's own wordmark (from mapbox-gl-js v1.13.3, BSD 3-Clause, inlined in the bundle, [NOTICE](NOTICE)) in the Legend row after the scale bar, and the Gateway's Satellite `attribution` is four links, "(c) Mapbox (c) OpenStreetMap Improve this map (c) Maxar", the browser adding the map's place to "Improve this map" after every move; below 768 px the Satellite attribution sits on one line above the Legend row, clear of the App Bar toggle ([docs/basemaps.md](docs/basemaps.md), "The Mapbox logo and attribution with Satellite"; [docs/contract.md](docs/contract.md), "basemap.source").
 
+- The line popup's comms row, short so it stays on one line at the card's width (owner, 0.3.0 re-test; no wire change): "OK - 3, oldest 39 min", "Comms lost - 1 of 3" (before stale) or "Stale - 1 of 3", the full sentence naming the instruments ("OK - 3 instruments, oldest 39 min ago", "Comms lost on 1 of 3 instruments: PT-1, last 18 min ago") in the row's tooltip and under the row on a tap, as the point card's rows do ([docs/instruments.md](docs/instruments.md)).
+
 ### Stories
 
 5. Tracer: live values reach an icon and its default popup.

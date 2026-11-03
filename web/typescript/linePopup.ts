@@ -197,25 +197,58 @@ export function segmentWords(nodes: PopupNode[], segment: SegmentRef | null): Se
     return { title, span, line, stale: false };
 }
 
+/** The comms row over a line's instruments: the short words on the row and the full sentence for its note. */
+export interface InstrumentsComms {
+    /** "OK", "Comms lost" or "Stale": the row's first words. */
+    word: string;
+    /** "3, oldest 39 min" or "1 of 3": short, so the row fits the card on one line. */
+    detail: string;
+    /** True when an instrument's comms are lost or its value stale. */
+    lost: boolean;
+    /** The glyph before the words. */
+    state: 'ok' | 'comms-lost' | 'stale';
+    /** The full sentence, in the row's tooltip and under the row on a tap. */
+    note: string;
+}
+
+/** "39 min ago" to "39 min" for the short row; the note keeps "ago". */
+function shortAge(age: string): string {
+    return age.replace(/ ago$/, '');
+}
+
 /**
- * The comms line over the line's instruments: "OK - 4 instruments, oldest 9 s ago", or the first
- * stale or comms-lost instrument, "PT-2 stale - last 18 min ago"; null with no instrument on the line.
+ * The comms row over the line's instruments (owner, 0.3.0 re-test: the long form wrapped at the
+ * card's width): "OK - 3, oldest 39 min" with the note "OK - 3 instruments, oldest 39 min ago";
+ * with any instrument's comms lost "Comms lost - 1 of 3" with the note "Comms lost on 1 of 3
+ * instruments: PT-1, last 18 min ago" (comms lost before stale); else with any stale "Stale - 1 of 3"
+ * with the note "Stale on 1 of 3 instruments: PT-2, last 9 s ago". Null with no instrument on the line.
  */
-export function instrumentsComms(nodes: PopupNode[], now: number): { word: string; detail: string; lost: boolean } | null {
+export function instrumentsComms(nodes: PopupNode[], now: number): InstrumentsComms | null {
     const instruments = nodes.filter((n) => n.role === 'instrument');
     if (instruments.length === 0) {
         return null;
     }
-    for (const n of instruments) {
-        const v = nodeValue(n);
-        if (v.commsLost) {
-            const age = ageText(n.values && n.values.comms ? n.values.comms.t : null, now);
-            return { word: n.name + ' comms lost', detail: age ? 'last ' + age : '', lost: true };
-        }
-        if (v.stale) {
-            const age = ageText(v.t, now);
-            return { word: n.name + ' stale', detail: age ? 'last ' + age : '', lost: true };
-        }
+    const total = instruments.length;
+    const lostOnes = instruments.filter((n) => nodeValue(n).commsLost);
+    const staleOnes = instruments.filter((n) => !nodeValue(n).commsLost && nodeValue(n).stale);
+    const named = (list: PopupNode[], at: (n: PopupNode) => string | null): string => list.map((n) => {
+        const age = ageText(at(n), now);
+        return n.name + (age ? ', last ' + age : '');
+    }).join('; ');
+    const of = (k: number): string => k + ' of ' + total;
+    const instrumentWord = total === 1 ? ' instrument' : ' instruments';
+    if (lostOnes.length > 0) {
+        return {
+            word: 'Comms lost', detail: of(lostOnes.length), lost: true, state: 'comms-lost',
+            note: 'Comms lost on ' + of(lostOnes.length) + instrumentWord + ': '
+                + named(lostOnes, (n) => (n.values && n.values.comms ? n.values.comms.t : null))
+        };
+    }
+    if (staleOnes.length > 0) {
+        return {
+            word: 'Stale', detail: of(staleOnes.length), lost: true, state: 'stale',
+            note: 'Stale on ' + of(staleOnes.length) + instrumentWord + ': ' + named(staleOnes, (n) => nodeValue(n).t)
+        };
     }
     let oldest = Infinity;
     for (const n of instruments) {
@@ -225,9 +258,11 @@ export function instrumentsComms(nodes: PopupNode[], now: number): { word: strin
             oldest = at;
         }
     }
-    const count = instruments.length === 1 ? '1 instrument' : instruments.length + ' instruments';
     const age = isFinite(oldest) ? ageText(new Date(oldest).toISOString(), now) : '';
-    return { word: 'OK', detail: count + (age ? ', oldest ' + age : ''), lost: false };
+    return {
+        word: 'OK', detail: total + (age ? ', oldest ' + shortAge(age) : ''), lost: false, state: 'ok',
+        note: 'OK - ' + total + instrumentWord + (age ? ', oldest ' + age : '')
+    };
 }
 
 /** "Instruments, CTB1 to SWD1" (the snapped ends' names), or "Instruments" when an end floats. */
