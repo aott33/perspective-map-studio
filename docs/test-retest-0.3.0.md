@@ -38,7 +38,7 @@ Notes (owner, 2026-11-03):
 ## 3. Phone, 390 px device mode (4 min)
 
 - [x] Tap a site, then Return: the site sits above the sheet, not under it.
-- [ ] Needs you list opens over the zoom card; Legend opens as a bottom sheet with the toggles first and no basemap section.
+- [x] Needs you list opens over the zoom card; Legend opens as a bottom sheet with the toggles first and no basemap section.
 
 Notes (owner, 2026-11-03):
 
