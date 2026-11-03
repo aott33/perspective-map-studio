@@ -860,6 +860,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private themeWatch: ThemeWatch | null = null;
     /** How many times the theme was re-read, for tests. */
     private themeRevision = 0;
+    /** A theme change came before the layers were ready (item 29): applied once they are, not lost. */
+    private themePending = false;
     /** The sprite's symbols once fetched (empty when the fetch failed); null before. */
     private symbols: Record<string, SpriteSymbol> | null = null;
     /** The sprite's fetch, shared by every image asked for before it arrived. */
@@ -922,6 +924,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
         };
         const mc = markerColors(root);
         this.markerColors = mc;
+        // The colours this map was built with, for the e2e suite (item 29); applyTheme updates them.
+        this.mapContainer.setAttribute('data-theme-revision', '0');
+        this.mapContainer.setAttribute('data-blank', colors.background);
         this.makePopup();
         const map = new MapLibreMap({
             container: this.mapContainer,
@@ -1121,6 +1126,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.applyLayerToggles();
             this.applyBasemap();
             this.drawItems();
+            if (this.themePending) {
+                // The theme changed between the mount's colour read and now (item 29): read and draw again.
+                this.applyTheme();
+            }
             const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
             if (delegate) {
                 delegate.sendMapLoad();
@@ -1177,8 +1186,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const map = this.map;
         const root = this.props.store.element as HTMLElement | undefined;
         if (!map || !this.itemsReady) {
+            // The watch has taken the new reading already: remember the change for the load handler.
+            this.themePending = true;
             return;
         }
+        this.themePending = false;
         const mc = markerColors(root);
         this.markerColors = mc;
         this.themeRevision++;

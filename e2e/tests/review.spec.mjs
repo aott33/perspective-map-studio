@@ -223,9 +223,10 @@ for (const theme of ['light', 'dark']) {
                     const map = await openMap(page, '/dark', SHOWCASE.project);
                     await expect.poll(() => isDark(page), { timeout: 30_000 }).toBe(true);
                     await mapLoaded(map);
-                    await expect(map).toHaveAttribute('data-theme-revision', /^[1-9][0-9]*$/, { timeout: 30_000 });
+                    // The map's blank is the dark token, whether the switch came after the mount (a theme revision,
+                    // the watch) or between the mount and the layers' load (the change kept for the load handler).
                     const blank = await page.evaluate(() => getComputedStyle(document.querySelector('.mapstudio')).getPropertyValue('--neutral-20').trim());
-                    await expect(map).toHaveAttribute('data-blank', blank);
+                    await expect(map).toHaveAttribute('data-blank', blank, { timeout: 30_000 });
                     // The markers are drawn again from the dark tokens: the first full batch's items and the labels are back.
                     await expect(map).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
                     await labelsPlaced(map, ['P14', 'SWD1']);

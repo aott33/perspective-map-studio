@@ -52,7 +52,8 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             const [x, y] = pagePixel(box, TRACER.points.p1.lngLat, TRACER.center, TRACER.zoom);
             await page.mouse.click(x, y);
             // The click echo is dev-page output in Edit mode (owner review notes item 5); the map's `data-last-reply` holds it too.
-            await expect(page.locator('.mapstudio-reply')).toContainText('Gateway received click on ' + p1, { timeout: 15_000 });
+            const reply = page.locator('.mapstudio-reply');
+            await expect(reply).toContainText('Gateway received click on ' + p1, { timeout: 15_000 });
             await expect(map).toHaveAttribute('data-last-reply', new RegExp('Gateway received click on ' + p1));
 
             // The click also opens the default popup from the pad kind setup (a card at 1440 px, a
