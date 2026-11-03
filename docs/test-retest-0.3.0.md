@@ -46,7 +46,7 @@ Notes (owner, 2026-11-03):
 
 ## 4. Dark (3 min)
 
-- [ ] Open the showcase's `/dark` with no reload: the map itself turns dark (not only the panels); thin scroll bars.
+- [x] Open the showcase's `/dark` with no reload: the map itself turns dark (not only the panels); thin scroll bars.
 
 ## 5. By hand only (8 min)
 
