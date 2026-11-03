@@ -55,7 +55,7 @@
 
 /* The connection chip (owner review notes item 32): in words with the hourglass, centred under the top bar,
    on the panel surface with the attention token as its edge; never colour alone. Above the map and its
-   controls, under an open popup. */
+   map, under the controls and an open popup's sheet (owner re-test R2: the controls stack above the popup layer). */
 .mapstudio .mapstudio-connection {
     position: absolute;
     top: 64px;
@@ -264,9 +264,19 @@
     --mapstudio-popup-icon: 32px;
 }
 
-/* Above the map's canvas layers, MapLibre's controls (z-index 2) and the draw layers. */
+/* Above the map's canvas layers and the draw layers, below the controls (owner re-test R2): an open card that
+   follows its item when the map pans slides under the top bar, the zoom card, the legend row and the attribution
+   and logo, which stack above it. Item 18 places the card clear of the top bar and the zoom card when it opens. */
 .mapstudio .maplibregl-popup {
     z-index: 5;
+}
+
+/* MapLibre's four control corners (its own z-index 2) above the popup layer (R2); the phone's bottom sheet above them. */
+.mapstudio .maplibregl-ctrl-top-left,
+.mapstudio .maplibregl-ctrl-top-right,
+.mapstudio .maplibregl-ctrl-bottom-left,
+.mapstudio .maplibregl-ctrl-bottom-right {
+    z-index: 6;
 }
 
 /* The card holds the focus when it opens (MapStudio.tsx makePopup): the open card is the signal, no ring. */
@@ -320,7 +330,8 @@
 }
 
 /* A custom popup view: Map Studio's close in a row above the view (32 px on the card, 44 on the
-   sheet, which also keeps its handle), the view scrolling under it within the popup's height. */
+   sheet, which also keeps its handle), the view below the row at its content's height (its default height at
+   least, PointPopup.tsx; owner re-test R7) up to the popup's maximum height, and scrolling only past it. */
 .mapstudio-popup--view {
     display: flex;
     flex-direction: column;
@@ -336,9 +347,10 @@
 }
 
 .mapstudio-popup-view-body {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-height: 0;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 /* The custom view's card while the popup detail is awaited (a moment after the open). */
@@ -675,7 +687,8 @@
     left: 8px;
     right: 8px;
     bottom: 56px;
-    z-index: 6;
+    /* Above the control corners (6, owner re-test R2): the sheet is the phone's popup and stays on top. */
+    z-index: 7;
     display: flex;
     box-sizing: border-box;
     max-height: 60%;
@@ -943,7 +956,7 @@
 
 /* The legend (epic 3 entry 14, DESIGN.md legend; entry 6's basemap choice lives in it): bottom-left,
    a row of the Legend button and MapLibre's scale bar on the button's bottom edge; the panel opens above the
-   button, 208 px wide, built from sections (States, Kinds, Lines, Styles, Areas, Show, and Basemap only when
+   button, as wide as the search field (owner re-test R3) and never wider than the map less the zoom card, built from sections (States, Kinds, Lines, Styles, Areas, Show, and Basemap only when
    the setup lists more than one), stopping below the top bar; on a phone it is a bottom sheet (owner review,
    items 1, 2, 3, 23, 24). The provider's attribution is its own control, bottom-right. Token colours only (AD-11). */
 /* The corner's container is bounded so the row wraps on a phone and keeps clear of the App Bar
@@ -1087,8 +1100,10 @@
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
-    width: 208px;
-    max-width: 100%;
+    /* The search field's width (the top bar's search part, owner re-test R3), so its rows wrap less; never wider
+       than the map less the zoom card (its inset, its width and an 8 px gap). The phone's sheet sets its own. */
+    width: var(--mapstudio-search-width);
+    max-width: min(100%, calc(var(--mapstudio-map-width, 100vw) - 2 * var(--mapstudio-map-inset) - var(--mapstudio-target) - 8px));
     padding: 0;
     overflow: hidden;
     border-radius: 10px;
@@ -1563,6 +1578,38 @@
     font-size: 12px;
 }
 
+/* An open top-bar list joins what opened it (owner re-test R6): while the search results or the Needs you list are
+   open, the search field's or the bar's bottom corners are square and the list meets them with no gap and square
+   top corners where they join, so the two read as one panel; closed, the corners round again. The list's shadow is
+   clipped at its top edge so it does not fall back over the field or the bar. Phone rules below. */
+.mapstudio .mapstudio-topbar[data-search-open="true"] .mapstudio-search-field {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.mapstudio .mapstudio-needs[aria-expanded="true"] {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.mapstudio .mapstudio-topbar-panel {
+    clip-path: inset(0 -24px -24px -24px);
+}
+
+.mapstudio .mapstudio-search-panel {
+    margin-top: 0;
+    border-top: 1px solid var(--neutral-30, var(--border));
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+/* The Needs you list is wider than the bar: square where it meets the bar (its top-left), rounded past it. */
+.mapstudio .mapstudio-needs-panel {
+    margin-top: 0;
+    border-top: 1px solid var(--neutral-30, var(--border));
+    border-top-left-radius: 0;
+}
+
 /* The legend's key (entry 3, DESIGN.md legend): one row per glyph or line look, the sample in
    currentColor through a token class, the words beside it; the Show section's checkboxes and note. */
 /* The panel stops below the top bar (owner review, item 23): its height is the map less the bottom row (the
@@ -1772,6 +1819,21 @@
 
     .mapstudio .mapstudio-topbar[data-search-open="true"] .mapstudio-needs {
         display: none;
+    }
+
+    /* Inside the one top bar the list joins the row below a divider (owner re-test R6): while it is open the field and
+       the bar (its open, hovered grey among them) have square bottom corners, so no rounded corner sits on the list. */
+    .mapstudio .mapstudio-topbar:has(.mapstudio-topbar-panel) .mapstudio-search-field,
+    .mapstudio .mapstudio-topbar:has(.mapstudio-topbar-panel) .mapstudio-needs {
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+
+    .mapstudio .mapstudio-topbar-panel,
+    .mapstudio .mapstudio-needs-panel,
+    .mapstudio .mapstudio-search-panel {
+        border-radius: 0 0 10px 10px;
+        clip-path: none;
     }
 
     .mapstudio .mapstudio-needs-panel {
@@ -2224,6 +2286,7 @@
         right: var(--mapstudio-map-inset);
         bottom: calc(var(--mapstudio-map-inset) + var(--mapstudio-target) + 4px);
         width: auto;
+        max-width: none;
         /* Below the top bar (8 px inset, 48 px, 8 px) and above the row (56 px). */
         max-height: calc(var(--mapstudio-map-height, 100vh) - 56px - 64px);
         border-radius: 14px;
