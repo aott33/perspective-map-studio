@@ -89,6 +89,16 @@ async function clickBetween(page, map, center, zoom) {
 }
 
 /** Each instrument row's name, distance and value, in order. */
+/** The element's text on one line: its height under two of its lines (the card must not wrap it). */
+async function expectOneLine(locator) {
+    const { height, line } = await locator.evaluate((el) => {
+        const style = getComputedStyle(el);
+        const lh = parseFloat(style.lineHeight);
+        return { height: el.getBoundingClientRect().height, line: isFinite(lh) ? lh : parseFloat(style.fontSize) * 1.2 };
+    });
+    expect(height, 'one line, not wrapped').toBeLessThan(line * 1.9);
+}
+
 async function rows(popup) {
     return popup.locator('.mapstudio-popup-instrument').evaluateAll((els) => els.map((e) => [
         e.querySelector('.mapstudio-popup-row-name').textContent,
@@ -195,7 +205,10 @@ editorTest.describe('1440 px', () => {
             await expect(popup.locator('.mapstudio-popup-segment-span')).toHaveText('1.1 to 2.8 km');
             await expect(popup.locator('.mapstudio-popup-segment-line')).toHaveText('398 to 371 psi - drop 27 psi over 1.7 km');
             await expect(popup.locator('[data-part="comms"]')).toHaveAttribute('data-comms', 'ok');
-            await expect(popup.locator('[data-part="comms"] .mapstudio-popup-value')).toHaveText(/^OK - 3 instruments, oldest \d+ (s|min) ago$/);
+            // The short row on one line, the full sentence in its tooltip (owner, 0.3.0 re-test).
+            await expect(popup.locator('[data-part="comms"] .mapstudio-popup-value')).toHaveText(/^OK - 3, oldest \d+ (s|min)$/);
+            await expect(popup.locator('[data-part="comms"]')).toHaveAttribute('title', /^OK - 3 instruments, oldest \d+ (s|min) ago$/);
+            await expectOneLine(popup.locator('[data-part="comms"] .mapstudio-popup-value'));
             await expect(popup.locator('.mapstudio-popup-section-label')).toHaveText('Instruments, CTB1 to SWD1');
             expect(await rows(popup)).toEqual([
                 ['CTB1 outlet', '0 km', '412 psi', 'false'],
@@ -270,7 +283,8 @@ editorTest.describe('1440 px', () => {
             await expect(popup.locator('[data-part="segment"]')).toHaveAttribute('data-stale', 'true');
             await expect(popup.locator('.mapstudio-popup-segment-line')).toHaveText('Stale - drawn dashed until PT-1 updates');
             await expect(popup.locator('[data-part="comms"]')).toHaveAttribute('data-comms', 'lost');
-            await expect(popup.locator('[data-part="comms"] .mapstudio-popup-value')).toHaveText(/^PT-1 comms lost( - last \d+ (s|min) ago)?$/);
+            await expect(popup.locator('[data-part="comms"] .mapstudio-popup-value')).toHaveText('Comms lost - 1 of 3');
+            await expect(popup.locator('[data-part="comms"]')).toHaveAttribute('title', /^Comms lost on 1 of 3 instruments: PT-1(, last \d+ (s|min) ago)?$/);
             await expectSegments(page, {
                 'ctb1|pt1': { stale: true, reason: 'PT-1: comms lost' },
                 'pt1|pt2': { stale: true, reason: 'PT-1: comms lost' },
@@ -359,6 +373,16 @@ editorTest.describe('390 px', () => {
         expect(close.width, 'the close button 44 px').toBeGreaterThanOrEqual(44);
         expect(close.height, 'the close button 44 px').toBeGreaterThanOrEqual(44);
         await shot(page, 'mapstudio-line-popup-390.png');
+        // The comms row fits the phone card on one line; a tap shows its full sentence under it, as the
+        // point card's rows do, and a second tap hides it.
+        const comms = popup.locator('[data-part="comms"]');
+        await expect(comms.locator('.mapstudio-popup-value')).toHaveText(/^OK - 3, oldest \d+ (s|min)$/);
+        await expectOneLine(comms.locator('.mapstudio-popup-value'));
+        await comms.click();
+        await expect(comms).toHaveAttribute('data-note-shown', 'true');
+        await expect(comms.locator('.mapstudio-popup-note')).toHaveText(/^OK - 3 instruments, oldest \d+ (s|min) ago$/);
+        await comms.click();
+        await expect(comms.locator('.mapstudio-popup-note')).toHaveCount(0);
         await popup.locator('.mapstudio-popup-close').click();
         await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
         expect(watched.warnings, 'Map Studio warnings').toEqual([]);

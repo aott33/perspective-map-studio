@@ -49,6 +49,13 @@ interface PointPopupState {
  * Map renders its custom controls and view layer, with `mapItem` and the filled params; a missing
  * or failing view (not found, an error, access denied) falls back to the default popup with one
  * console warning naming the path.
+ *
+ * The view keeps its default width and takes its default height as a minimum only (owner re-test R7): Perspective's
+ * `useDefaultHeight` pins the root to exactly that height, so a view whose content came out a few pixels taller (the
+ * showcase's `Popups/SiteCard`, 128 px of content in a 120 px default) scrolled inside itself under the close row and
+ * its first line could scroll off. With `useDefaultMinHeight` the view's area is its content (never less than its
+ * default height, which keeps a coordinate container's size), below the close row; only past the card's maximum
+ * height does the area under the close row scroll (`.mapstudio-popup-view-body`).
  */
 export class PointPopup extends React.Component<PointPopupProps, PointPopupState> {
     state: PointPopupState = { failed: false };
@@ -90,7 +97,8 @@ export class PointPopup extends React.Component<PointPopupProps, PointPopupState
                     mountPath={mountPath}
                     params={params}
                     useDefaultWidth={true}
-                    useDefaultHeight={true}
+                    useDefaultHeight={false}
+                    useDefaultMinHeight={true}
                     onViewStateChange={this.onViewStateChange}
                 />
                 </div>

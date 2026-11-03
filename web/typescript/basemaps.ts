@@ -30,6 +30,11 @@ export interface RasterSource {
     maxzoom: number;
     /** HTML the attribution control shows, always, for this provider. */
     attribution: string;
+    /**
+     * Who serves the tiles: `osm` for OpenStreetMap's, else the Gateway's `provider` (`mapbox` for Satellite).
+     * Mapbox's tiles bring the Mapbox logo with them (`providerLogo`).
+     */
+    provider: string;
 }
 
 /**
@@ -40,8 +45,43 @@ export const OSM_SOURCE: RasterSource = {
     tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
     tileSize: 256,
     maxzoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
+    provider: 'osm'
 };
+
+/**
+ * The provider whose logo the map shows bottom-right with the attribution, or null (owner decision 2026-11-03): Mapbox's
+ * attribution guide asks maps drawn from Mapbox tiles with another library to show the Mapbox logo and the text
+ * attribution, so the logo shows while Satellite is drawn from a Mapbox source, and only then; None and
+ * OpenStreetMap show none.
+ */
+export function providerLogo(selected: BasemapId | null, source: RasterSource | null): 'mapbox' | null {
+    return selected === 'satellite' && source !== null && source.provider === 'mapbox' ? 'mapbox' : null;
+}
+
+/** The class of the attribution's "Improve this map" link (Mapbox's own name for it; the Gateway's attribution sets it). */
+export const IMPROVE_MAP_CLASS = 'mapbox-improve-map';
+
+/** Round to at most `places` decimals, with no trailing zeros. */
+function rounded(value: number, places: number): string {
+    const f = Math.pow(10, places);
+    return String(Math.round(value * f) / f);
+}
+
+/**
+ * The "Improve this map" link with the map's position, as Mapbox's attribution guide gives it:
+ * `https://apps.mapbox.com/feedback/#/{lng}/{lat}/{zoom}` (the longitude wrapped to -180..180, five decimals,
+ * the zoom two). `href` is the link the attribution came with; any position it carried is replaced. No token is
+ * added: the token stays in the tile URL only.
+ */
+export function feedbackHref(href: string, center: { lng: number; lat: number }, zoom: number): string {
+    const base = href.split('#')[0];
+    let lng = ((center.lng + 180) % 360 + 360) % 360 - 180;
+    if (lng === -180 && center.lng > 0) {
+        lng = 180;
+    }
+    return base + '#/' + rounded(lng, 5) + '/' + rounded(center.lat, 5) + '/' + rounded(zoom, 2);
+}
 
 /**
  * OpenStreetMap drawn quiet (owner review notes item 25): MapLibre's raster paint lowers the tiles'
@@ -163,7 +203,8 @@ export function readBasemapSource(body: unknown): BasemapSourceReplyBody | null 
             tiles: body.tiles as string[],
             tileSize: typeof body.tileSize === 'number' && body.tileSize > 0 ? body.tileSize : 256,
             maxzoom: typeof body.maxzoom === 'number' && body.maxzoom >= 0 ? body.maxzoom : 22,
-            attribution: typeof body.attribution === 'string' ? body.attribution : ''
+            attribution: typeof body.attribution === 'string' ? body.attribution : '',
+            provider: typeof body.provider === 'string' ? body.provider : ''
         }
     };
 }

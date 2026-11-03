@@ -201,5 +201,6 @@ Notes (with the frame rate you saw):
 Put a public `pk.` Mapbox token in `ops/secrets/map_token` (one line) and restart the Gateway (`ops/up.sh --no-build`); no fresh volume or new seed is needed on a stack started after this release's pull. Satellite is offered on the dev project's map (`/`), not the showcase, whose setup offers None and OpenStreetMap.
 
 - [x] Satellite imagery loads, the attribution shows Mapbox, labels and states stay readable over imagery.
+- [ ] With a real token, the Mapbox logo shows bottom-right beside the attribution and the attribution reads "(c) Mapbox (c) OpenStreetMap Improve this map (c) Maxar"; "Improve this map" opens Mapbox's feedback page at the map's place; on a phone the logo sits left of the App Bar toggle and the attribution is one line above it, above the Legend row. Switching to OpenStreetMap or None removes the logo.
 
 Notes:

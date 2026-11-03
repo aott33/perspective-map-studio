@@ -13,6 +13,16 @@ MapLibre GL JS (https://github.com/maplibre/maplibre-gl-js)
     License (Copyright (c) 2020 Mapbox), and the packages it depends on under
     their own licences (listed in web/node_modules after `npm install`).
 
+The Mapbox logo (the wordmark the map shows while the Satellite basemap, Mapbox
+imagery, is drawn, as Mapbox's attribution guide requires) is
+src/css/svg/mapboxgl-ctrl-logo.svg of Mapbox GL JS v1.13.3
+(https://github.com/mapbox/mapbox-gl-js/tree/v1.13.3), inlined unchanged in
+web/typescript/mapboxLogo.ts:
+    BSD 3-Clause License
+    Copyright (c) 2020, Mapbox
+    The Mapbox name and logo are Mapbox's; they are shown to attribute
+    Mapbox's tiles, as Mapbox asks, and imply no endorsement.
+
 Terra Draw (https://github.com/JamesLMilner/terra-draw) and
 terra-draw-maplibre-gl-adapter
     MIT License

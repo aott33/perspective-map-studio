@@ -4,7 +4,8 @@
  * scale bar sitting on the button's bottom edge, and a panel above the button that opens on a click or by
  * keyboard (Enter or Space), closes on Esc (focus back on the button), on a map click and on the button
  * again. The provider's attribution is not here: it is a control of its own, small muted text along the
- * bottom-right edge under the App Bar toggle (MapStudio.tsx, `.maplibregl-ctrl-attrib`). The panel is
+ * bottom-right edge under the App Bar toggle (MapStudio.tsx, `.maplibregl-ctrl-attrib`), and so is the Mapbox
+ * logo while Satellite is drawn (mapboxLogo.ts, MapboxLogoControl). The panel is
  * built from sections, in the map's own words (legend.ts): States first (the alarm glyphs by priority and
  * acknowledgement, comms lost, stale), then the kinds on the map with their glyphs (collapsed to "Kinds (9)"
  * with more than six, a button that opens them), the line looks, the value styles and the area tints a kind

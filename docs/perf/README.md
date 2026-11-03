@@ -7,6 +7,16 @@ One JSON file per release and target, written by `ops/perf.sh` (epic 2 story 17)
 | `0.2.0-dev.json` | the `ops/` dev stack, a 4-CPU agent box with software WebGL | 2026-10-28 UTC; every limit met except `edits.apply` with 50-op batches from 10 editors at once, a miss on that box (the cause and the owner's open decision are in platform-checks.md) |
 | `0.2.0-template.json` | the template's kept 300-pad test stack (8.3.9, the published 0.2.0 through the lock), on the same 4-CPU agent box with software WebGL, phase `main` only | 2026-10-28 UTC, story 13; every limit met except `edits.apply` from 10 editors at once (50-op p95 1,905.7 ms, 1-op p95 384.0 ms), a miss on that box; the idle and 20-session deltas are unavailable (no `nomodule` phase on this target); platform-checks.md "Results (template stack)" |
 
+## Frame rate on a laptop, release to release (R11)
+
+Epic-viewing R11 asks for 60 frames per second when panning and zooming the 30-pad set with live values in a laptop browser, recorded release to release. The agent box draws with software WebGL, so its `frame-rate` numbers above are not this reading; the reading is the owner's, on a laptop with hardware WebGL, and is recorded here for each release (entry 10, a scripted frame-rate story, was dropped on 2026-10-28 and the release story took the reading instead).
+
+| Release | Date | Machine | Browser and GPU | What was read | Reading |
+| --- | --- | --- | --- | --- | --- |
+| 0.3.0 | 2026-11-02 | the owner's laptop, Windows 11 (build 26200), 22 threads, 63 GB RAM, display 1536 by 960 at 2.5x, 60 Hz | Chrome 156, WebGL hardware accelerated through ANGLE on Direct3D 11, the integrated Intel Arc Pro GPU (an NVIDIA RTX 500 Ada laptop GPU present, not used by Chrome), GPU raster on | panning and zooming the dev map as a viewer (its 30-pad set, which links no asset, beside the tracer and L-SWD items whose live values the dev stack pushes) and the showcase, Chrome's frame rendering stats | **60.0 fps**, the display's own 60 Hz ceiling; R11 met on this laptop; the 30 pads themselves carried no live values |
+
+Details: [test-playbook-0.3.0.md](../test-playbook-0.3.0.md), section 12. No laptop reading exists for 0.2.0 (its records are the agent box's software WebGL), so 0.3.0 is the first row; the next release adds its own, on the same laptop where it can, and names the machine where it cannot.
+
 ## Running it
 
 On a laptop with Docker, in this repository:

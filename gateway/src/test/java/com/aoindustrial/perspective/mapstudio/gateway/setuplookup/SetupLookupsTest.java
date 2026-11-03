@@ -193,7 +193,13 @@ class SetupLookupsTest {
         try {
             Fake fake = new Fake();
             fake.namesHang = "Vault";
+            // Two timeouts over the same pools and source: the hung provider's asks give up after
+            // 50 ms (ten of them, so the test stays short), while the healthy lists get the
+            // production timeout to answer in, which a busy shared runner meets (a 50 ms limit
+            // failed once on CI, PR #30). What is proven is unchanged: the hung call holds one
+            // secrets thread and the other lists still answer OK beside it.
             SetupLookups lookups = new SetupLookups(fake, lists, secrets, () -> true, 50);
+            SetupLookups healthy = new SetupLookups(fake, lists, secrets, () -> true, SetupLookups.TIMEOUT_MS);
             for (int i = 0; i < 10; i++) {
                 SetupLists.Part hung = SetupLists.Part.fromJson(lookups.secretNames("Vault"));
                 assertEquals(Status.UNAVAILABLE, hung.status());
@@ -203,13 +209,15 @@ class SetupLookupsTest {
             assertEquals(1, fake.namesAsked.get());
             assertEquals(1, secrets.getActiveCount());
             assertEquals(List.of("api-key", "mapbox-token"),
-                SetupLists.Part.fromJson(lookups.secretNames("Internal")).names());
+                SetupLists.Part.fromJson(healthy.secretNames("Internal")).names());
             for (int i = 0; i < 10; i++) {
-                SetupLists all = SetupLists.fromJson(lookups.lists("default"));
+                SetupLists all = SetupLists.fromJson(healthy.lists("default"));
                 assertEquals(Status.OK, all.connections().status());
                 assertEquals(Status.OK, all.roles().status());
                 assertEquals(Status.OK, all.secretProviders().status());
             }
+            // The hung call was never asked again: two calls in all, it and the one "Internal" ask.
+            assertEquals(2, fake.namesAsked.get());
         } finally {
             never.countDown();
             lists.shutdownNow();
