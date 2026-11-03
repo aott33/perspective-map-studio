@@ -3,7 +3,7 @@
 // the Legend panel bottom-left (the Legend button opens it by click or keyboard, Esc closes it); None
 // draws the blank background; OpenStreetMap and Satellite draw their tiles with the provider's
 // attribution always shown (small muted text along the bottom-right edge, under the App Bar toggle, owner review
-// item 3); the basemap switch exists only when the setup lists more than one basemap and the first listed is the
+// item 3), and with Satellite the Mapbox logo after the scale bar and Mapbox's four links (owner decision 2026-11-03); the basemap switch exists only when the setup lists more than one basemap and the first listed is the
 // default (item 3); the scale bar sits on the Legend button's bottom edge (item 1); the top-right holds one zoom card (plus, the
 // level, minus, Fit, Return) and nothing else, and View mode has no Draw a line; Satellite's tile source comes from the Gateway (basemap.source), its token read from the
 // secret the setup names (ops/secrets/map_token, a generated placeholder that starts with pk.), refused
@@ -54,6 +54,75 @@ async function stubTiles(page, { brokenOsm = false } = {}) {
 
 const button = (page, id) => page.locator('.mapstudio-basemap-button[data-basemap="' + id + '"]');
 const attribution = (page) => page.locator('.maplibregl-ctrl-attrib');
+// The Mapbox logo while Satellite is drawn (owner decision 2026-11-03), in the Legend row after the scale bar.
+const mapboxLogo = (page) => page.locator('.mapstudio-mapbox-logo');
+/** Mapbox's text attribution for satellite (its attribution guide): four links, in this order. */
+const MAPBOX_LINKS = [
+    ['\u00a9 Mapbox', 'https://www.mapbox.com/about/maps/'],
+    ['\u00a9 OpenStreetMap', 'https://www.openstreetmap.org/copyright'],
+    ['Improve this map', /^https:\/\/apps\.mapbox\.com\/feedback\/#\/-?[0-9.]+\/-?[0-9.]+\/[0-9.]+$/],
+    ['\u00a9 Maxar', 'https://www.maxar.com/']
+];
+
+/**
+ * The Mapbox logo and the four links are shown, the logo is Mapbox's own image at its own size and links to Mapbox,
+ * and "Improve this map" carries the map's position (`data-center` and `data-zoom`).
+ */
+async function expectMapboxAttribution(page, map) {
+    await expect(mapboxLogo(page)).toHaveCount(1);
+    await expect(mapboxLogo(page)).toBeVisible();
+    await expect(mapboxLogo(page)).toHaveAttribute('href', 'https://www.mapbox.com/');
+    await expect(mapboxLogo(page)).toHaveAttribute('aria-label', 'Mapbox logo');
+    await expect(map).toHaveAttribute('data-provider-logo', 'mapbox');
+    const img = await mapboxLogo(page).locator('img').evaluate((el) => ({
+        src: el.getAttribute('src'), natural: [el.naturalWidth, el.naturalHeight], filter: getComputedStyle(el).filter,
+        opacity: getComputedStyle(el).opacity, box: [el.getBoundingClientRect().width, el.getBoundingClientRect().height]
+    }));
+    expect(img.src.startsWith('data:image/svg+xml'), 'inlined in the bundle, not loaded from a CDN').toBe(true);
+    expect(img.natural, 'the image decoded').toEqual([88, 23]);
+    expect(img.box, 'its own size').toEqual([88, 23]);
+    expect(img.filter, 'never restyled').toBe('none');
+    expect(img.opacity).toBe('1');
+    const links = attribution(page).locator('a');
+    await expect(links).toHaveCount(MAPBOX_LINKS.length);
+    for (let i = 0; i < MAPBOX_LINKS.length; i++) {
+        await expect(links.nth(i)).toHaveText(MAPBOX_LINKS[i][0]);
+        await expect(links.nth(i)).toHaveAttribute('href', MAPBOX_LINKS[i][1]);
+    }
+    // The feedback link's position is the map's (the guide's #/{lng}/{lat}/{zoom}).
+    const [lng, lat] = (await map.getAttribute('data-center')).split(',').map(Number);
+    const zoom = Number(await map.getAttribute('data-zoom'));
+    await expect.poll(async () => {
+        const at = (await links.nth(2).getAttribute('href')).split('#/')[1].split('/').map(Number);
+        return Math.abs(at[0] - lng) < 1e-4 && Math.abs(at[1] - lat) < 1e-4 && Math.abs(at[2] - zoom) < 0.01;
+    }, { timeout: CHANGE_MS }).toBe(true);
+}
+
+/** The logo sits on the map and covers none of the Legend button, the scale bar, the attribution and the App Bar toggle. */
+async function expectLogoPlaced(page, map) {
+    const mapBox = await map.boundingBox();
+    const logo = await mapboxLogo(page).boundingBox();
+    const legend = await legendButton(page).boundingBox();
+    const scale = await page.locator('.mapstudio-legend-row .maplibregl-ctrl-scale').boundingBox();
+    const attrib = await attribution(page).boundingBox();
+    expect(logo.x, 'on the map').toBeGreaterThanOrEqual(mapBox.x);
+    expect(logo.x + logo.width).toBeLessThanOrEqual(mapBox.x + mapBox.width);
+    expect(logo.y + logo.height).toBeLessThanOrEqual(mapBox.y + mapBox.height);
+    expect(logo.x, 'bottom-left, after the scale bar').toBeGreaterThan(scale.x + scale.width);
+    expect(Math.abs((logo.y + logo.height) - (legend.y + legend.height)), 'on the Legend button\'s bottom edge').toBeLessThanOrEqual(1);
+    for (const [name, other] of [['the Legend button', legend], ['the scale bar', scale], ['the attribution', attrib]]) {
+        expect(overlap(logo, other), 'the logo never covers ' + name).toBe(false);
+    }
+    expect(overlap(attrib, scale), 'the attribution never covers the scale bar').toBe(false);
+    expect(overlap(attrib, legend), 'the attribution never covers the Legend button').toBe(false);
+    expect(attrib.x).toBeGreaterThanOrEqual(mapBox.x);
+    expect(attrib.x + attrib.width).toBeLessThanOrEqual(mapBox.x + mapBox.width);
+    if (await appBarToggle(page).count()) {
+        const toggle = await appBarToggle(page).boundingBox();
+        expect(overlap(logo, toggle), 'the logo never covers the App Bar toggle').toBe(false);
+        expect(overlap(attrib, toggle), 'the attribution never covers the App Bar toggle').toBe(false);
+    }
+}
 const legendButton = (page) => page.locator('.mapstudio-legend-button');
 const legendPanel = (page) => page.locator('.mapstudio-legend-panel');
 // Perspective's App Bar toggle (the page's fixed bottom-right button): the attribution sits under it, never over it.
@@ -110,6 +179,7 @@ test.describe('1440 px', () => {
             await expect(page.locator('.mapstudio-basemap-button')).toHaveCount(3);
             await expect(button(page, 'none')).toHaveAttribute('aria-pressed', 'true');
             await expect(attribution(page)).toHaveClass(/maplibregl-attrib-empty/);
+            await expect(mapboxLogo(page), 'no Mapbox logo with None').toHaveCount(0);
             expect(asked, 'no tile is asked for with None').toEqual([]);
 
             // OpenStreetMap: its tiles and its attribution.
@@ -121,6 +191,9 @@ test.describe('1440 px', () => {
             await expect(attribution(page).locator('a[href="https://www.openstreetmap.org/copyright"]')).toHaveCount(1);
             await expect(map).toHaveAttribute('data-basemap-tiles', 'loaded', { timeout: CHANGE_MS });
             expect(asked.some((u) => OSM_TILES.test(u)), 'OSM tiles asked for').toBe(true);
+            await expect(mapboxLogo(page), 'no Mapbox logo with OpenStreetMap').toHaveCount(0);
+            await expect(map).toHaveAttribute('data-provider-logo', '');
+            await expect(attribution(page)).not.toContainText('Mapbox');
             await shot(page, 'mapstudio-basemap-osm-1440.png');
 
             // Satellite: the Gateway answers the Mapbox source from the setup's secret; the token is only in the tile URL.
@@ -131,6 +204,19 @@ test.describe('1440 px', () => {
             await expect(attribution(page)).toContainText('Maxar');
             await expect(attribution(page)).toContainText('Improve this map');
             await expect(map).toHaveAttribute('data-basemap-tiles', 'loaded', { timeout: CHANGE_MS });
+            // The Mapbox logo and the four links Mapbox's attribution guide asks for (owner decision 2026-11-03).
+            await expectMapboxAttribution(page, map);
+            await expect(attribution(page)).not.toContainText(token);
+            await page.keyboard.press('Escape');
+            await expect(legendPanel(page)).toHaveCount(0);
+            await expectLogoPlaced(page, map);
+            // A move updates "Improve this map" to the new position.
+            await page.locator('.mapstudio-zoom-in').click();
+            await expect(map).toHaveAttribute('data-zoom', '13.00', { timeout: CHANGE_MS });
+            await expectMapboxAttribution(page, map);
+            await page.locator('.mapstudio-zoom-out').click();
+            await expect(map).toHaveAttribute('data-zoom', '12.00', { timeout: CHANGE_MS });
+            await openLegend(page, map);
             const mapboxAsked = asked.filter((u) => MAPBOX_TILES.test(u));
             expect(mapboxAsked.length).toBeGreaterThan(0);
             expect(mapboxAsked[0]).toContain('access_token=' + token);
@@ -148,13 +234,20 @@ test.describe('1440 px', () => {
             const again = await openMap(page, '/');
             await mapLoaded(again);
             await expect(again).toHaveAttribute('data-basemap', 'satellite', { timeout: CHANGE_MS });
+            await expectMapboxAttribution(page, again);
 
-            // Back to None: no tiles, no attribution.
+            // To OpenStreetMap and back to None: the logo leaves with Satellite; no tiles, no attribution.
             await openLegend(page, again);
+            await button(page, 'osm').click();
+            await expect(again).toHaveAttribute('data-basemap', 'osm');
+            await expect(mapboxLogo(page), 'the logo hides when the basemap leaves Satellite').toHaveCount(0);
+            await expect(attribution(page)).toContainText('OpenStreetMap contributors');
+            await expect(attribution(page)).not.toContainText('Mapbox');
             await button(page, 'none').click();
             await expect(again).toHaveAttribute('data-basemap', 'none');
             await expect(again).toHaveAttribute('data-basemap-tiles', 'none');
             await expect(attribution(page)).toHaveClass(/maplibregl-attrib-empty/);
+            await expect(mapboxLogo(page)).toHaveCount(0);
             expect(watched.warnings, 'Map Studio warnings').toEqual([]);
         });
 
@@ -450,4 +543,38 @@ test.describe('390 px', () => {
         }
         await shot(page, 'mapstudio-controls-390.png');
     });
+
+    test('with Satellite the Mapbox logo and its four links fit a phone beside the Legend row, clear of the App Bar toggle',
+        async ({ page, watched }) => {
+            await stubTiles(page);
+            const first = await openMap(page, '/');
+            await mapLoaded(first);
+            // No switch on a phone (item 3): Satellite is the remembered choice, made on a wider screen.
+            await page.evaluate(() => window.localStorage.setItem('mapstudio.basemap.v1', 'satellite'));
+            await page.reload({ waitUntil: 'load' });
+            const map = await openMap(page, '/');
+            await mapLoaded(map);
+            await expect(map).toHaveAttribute('data-basemap', 'satellite', { timeout: CHANGE_MS });
+            await expect(map).toHaveAttribute('data-basemap-tiles', 'loaded', { timeout: CHANGE_MS });
+            await expectMapboxAttribution(page, map);
+            await expectLogoPlaced(page, map);
+            // The four links do not fit beside the row on a phone: the attribution is one line just above the Legend row.
+            const attrib = await attribution(page).boundingBox();
+            const legend = await legendButton(page).boundingBox();
+            expect(attrib.height, 'one line').toBeLessThanOrEqual(16);
+            expect(attrib.y + attrib.height, 'above the Legend row').toBeLessThanOrEqual(legend.y);
+            expect(attrib.x + attrib.width, 'clear of the App Bar corner').toBeLessThanOrEqual(390 - 64);
+            // OpenStreetMap remembered instead: no logo, and the attribution is back along the bottom edge.
+            await page.evaluate(() => window.localStorage.setItem('mapstudio.basemap.v1', 'osm'));
+            await page.reload({ waitUntil: 'load' });
+            const osm = await openMap(page, '/');
+            await mapLoaded(osm);
+            await expect(osm).toHaveAttribute('data-basemap', 'osm', { timeout: CHANGE_MS });
+            await expect(attribution(page)).toContainText('OpenStreetMap contributors');
+            await expect(mapboxLogo(page)).toHaveCount(0);
+            const osmBox = await attribution(page).boundingBox();
+            const mapBox = await osm.boundingBox();
+            expect(osmBox.y + osmBox.height, 'along the bottom edge').toBeGreaterThan(mapBox.y + mapBox.height - 4);
+            expect(watched.warnings).toEqual([]);
+        });
 });
