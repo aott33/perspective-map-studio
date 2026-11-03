@@ -41,6 +41,8 @@ Everyone reads live state from the map (epic-viewing). Contract 0.3.0; project s
 
 - The line popup's comms row, short so it stays on one line at the card's width (owner, 0.3.0 re-test; no wire change): "OK - 3, oldest 39 min", "Comms lost - 1 of 3" (before stale) or "Stale - 1 of 3", the full sentence naming the instruments ("OK - 3 instruments, oldest 39 min ago", "Comms lost on 1 of 3 instruments: PT-1, last 18 min ago") in the row's tooltip and under the row on a tap, as the point card's rows do ([docs/instruments.md](docs/instruments.md)).
 
+- The owner's re-test fixes (backlog story 10, re-test findings R1, R2, R3, R4 (a), R6, R7; no wire change, the contract stays 0.3.0; [docs/test-retest-0.3.0.md](docs/test-retest-0.3.0.md)): the Needs you bar draws its icons again only when its counts or look change, so closing a popup no longer makes them flash (R1); the map's controls (the top bar, the zoom card, the legend row, the attribution and the Mapbox logo) stack above the popup layer, so a card the map carries when it pans slides under them, the phone's sheet staying on top (R2); on a desktop the legend panel is as wide as the search field (300 px, was 208), never wider than the map less the zoom card, so its rows keep to one line, the phone keeping its bottom sheet (R3); the map remembers its place per page for the browser session (centre, zoom, the selected item and its open card, sheet or line popup, in `sessionStorage`) and comes back there when the page opens again, so View alarms and the browser's back keep the operator's spot, a page opened for the first time in a session still opening on its `startingArea` (R4 (a); the alarm view as a popup over the map is backlog story 13, after 0.3.0); while the search results or the Needs you list are open the field's or the bar's bottom corners are square and the list joins it with no gap, rounding again when it closes, on a phone and a desktop (R6); a custom popup view is sized to its content (its default height at least, Perspective's `useDefaultMinHeight`) below Map Studio's close row and scrolls only past the card's maximum height, so the showcase's `Popups/SiteCard` shows no scroll bar and its first line whole, on the card and the phone sheet (R7) ([docs/contract.md](docs/contract.md), "The popup", "Search", "Needs you", "The map's place for the browser session", "The legend's key and toggles").
+
 ### Stories
 
 5. Tracer: live values reach an icon and its default popup.
@@ -58,7 +60,7 @@ Everyone reads live state from the map (epic-viewing). Contract 0.3.0; project s
 11. Refactor sweep.
 13. This release, rehearsed on the `ign-scada-template` test stack with the field simulator's live tags ([docs/template-install.md](docs/template-install.md), "0.3.0 rehearsal"); the frame rate reading of R11 in [docs/perf/README.md](docs/perf/README.md).
 
-With them, backlog story 10: the owner's review notes on the 0.3.0 map (groups a, b and c), the Mapbox logo and attribution with Satellite, and the re-test changes (the line popup's short comms row, the Mapbox logo bottom-right).
+With them, backlog story 10: the owner's review notes on the 0.3.0 map (groups a, b and c), the Mapbox logo and attribution with Satellite, and the re-test changes (the line popup's short comms row, the Mapbox logo bottom-right, and the re-test fixes R1, R2, R3, R4 (a), R6 and R7).
 
 ### Development
 
