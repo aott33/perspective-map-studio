@@ -36,6 +36,9 @@ const SWD = {
     keys: { ctb1: 'swd/ctb1', swd1: 'swd/swd1', line: 'swd/line', pt1: 'swd/pt1', lv1: 'swd/lv1', pt2: 'swd/pt2' }
 };
 
+/** The seed's Tracer line (Point 1 to Point 2, no instruments): its midpoint. */
+const TRACER_MID = [(-104.9903 - 104.975) / 2, (39.7392 + 39.75) / 2];
+
 let ids;
 
 /** Press a /live dev button and return its result (the label changes on every press, ranAt included). */
@@ -171,8 +174,20 @@ editorTest.describe('1440 px', () => {
             expect(cardBox.y, 'the card below the clicked segment').toBeGreaterThan(mapBox.y);
             expect(cardBox.y + cardBox.height, 'the card inside the map').toBeLessThanOrEqual(mapBox.y + mapBox.height);
             expect(await page.locator('.maplibregl-popup').getAttribute('class')).toContain('maplibregl-popup-anchor-top');
+            // The segment, comms and the line's values pinned at the top; only the instrument list scrolls, the
+            // highlighted rows in view (owner review notes item 19).
             expect(await popup.locator('[data-part]').evaluateAll((els) => els.map((e) => e.getAttribute('data-part'))))
-                .toEqual(['header', 'segment', 'comms', 'instruments', 'kpis']);
+                .toEqual(['header', 'segment', 'comms', 'kpis', 'instruments']);
+            const list = popup.locator('.mapstudio-popup-instrument-list');
+            expect(await list.evaluate((e) => getComputedStyle(e).overflowY)).toBe('auto');
+            const listBox = await list.boundingBox();
+            const kpiBox = await popup.locator('.mapstudio-popup-kpi').boundingBox();
+            expect(kpiBox.y + kpiBox.height, 'the line\'s Flow above the instrument list').toBeLessThanOrEqual(listBox.y + 1);
+            for (const id of [ids.pt1, ids.pt2]) {
+                const rowBox = await row(popup, id).boundingBox();
+                expect(rowBox.y, 'the highlighted row ' + id + ' in view').toBeGreaterThanOrEqual(listBox.y - 1);
+                expect(rowBox.y + rowBox.height, 'the highlighted row ' + id + ' in view').toBeLessThanOrEqual(listBox.y + listBox.height + 1);
+            }
             await expect(popup.locator('.mapstudio-popup-name')).toHaveText('L-SWD');
             await expect(popup.locator('.mapstudio-popup-subline')).toHaveText('Gathering line - 6 in, 2.9 km');
             await expect(popup).toHaveAttribute('data-segment', ids.pt1 + '|' + ids.pt2);
@@ -219,6 +234,12 @@ editorTest.describe('1440 px', () => {
             // line kind's setup has no alarms).
             await press(page, 'pt2-pressure-950');
             await expect(row(popup, ids.pt2)).toHaveAttribute('data-alarm', '1:unacked', { timeout: PUSH_MS });
+            // The pinned alarm summary names the instrument in alarm (item 19); none while the line is quiet.
+            const summary = popup.locator('[data-part="alarms"]');
+            await expect(summary).toHaveAttribute('data-alarm', '1:unacked', { timeout: PUSH_MS });
+            await expect(summary.locator('.mapstudio-popup-alarm-words')).toHaveText('1 alarm on the line - PT-2, Priority 1, unacknowledged');
+            expect(await popup.locator('[data-part]').evaluateAll((els) => els.map((e) => e.getAttribute('data-part'))))
+                .toEqual(['header', 'segment', 'comms', 'kpis', 'alarms', 'instruments']);
             await expectSegments(page, {
                 'ctb1|pt1': { preset: 'normal', alarm: '' },
                 'pt1|pt2': { preset: 'fault', alarm: '1:unacked' },
@@ -230,7 +251,9 @@ editorTest.describe('1440 px', () => {
             await expect(liveItem(page, ids.line)).toHaveAttribute('data-alarm', '');
             await press(page, 'pt2-ack');
             await expect(row(popup, ids.pt2)).toHaveAttribute('data-alarm', '1:acked', { timeout: PUSH_MS });
+            await expect(summary.locator('.mapstudio-popup-alarm-words')).toHaveText('1 alarm on the line - PT-2, Priority 1, acknowledged', { timeout: PUSH_MS });
             await press(page, 'pt2-pressure-371');
+            await expect(summary).toHaveCount(0, { timeout: PUSH_MS });
             await expectSegments(page, {
                 'ctb1|pt1': { preset: 'normal', alarm: '' },
                 'pt1|pt2': { preset: 'normal', alarm: '' },
@@ -241,7 +264,9 @@ editorTest.describe('1440 px', () => {
             // the segment box and the comms line say so; the line's own style is stale.
             await press(page, 'pt1-comms-off');
             await expect(row(popup, ids.pt1)).toHaveAttribute('data-stale', 'true', { timeout: PUSH_MS });
-            await expect(row(popup, ids.pt1).locator('.mapstudio-popup-value')).toHaveText('Stale - 398 psi (last)');
+            // Option A (items 13 and 19): the last value with the glyph before it, the reason in the tooltip.
+            await expect(row(popup, ids.pt1).locator('.mapstudio-popup-value')).toHaveText('398 psi');
+            await expect(row(popup, ids.pt1)).toHaveAttribute('title', 'Stale - last value, comms lost');
             await expect(popup.locator('[data-part="segment"]')).toHaveAttribute('data-stale', 'true');
             await expect(popup.locator('.mapstudio-popup-segment-line')).toHaveText('Stale - drawn dashed until PT-1 updates');
             await expect(popup.locator('[data-part="comms"]')).toHaveAttribute('data-comms', 'lost');
@@ -271,6 +296,37 @@ editorTest.describe('1440 px', () => {
             expect(refused.type, JSON.stringify(refused.body)).toBe('error');
             expect(refused.body.code).toBe('invalid');
             expect(refused.body.message).toBe("popup.open's segment needs fromId and toId.");
+            expect(watched.warnings, 'Map Studio warnings').toEqual([]);
+        });
+});
+
+editorTest.describe('1440 px, a line with no instruments', () => {
+    editorTest.use({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+
+    editorTest('the Tracer line\'s popup has no segment block: the header and the line\'s own values only (owner review notes item 17)',
+        async ({ page, watched }) => {
+            const map = await openMap(page, '/live');
+            await mapLoaded(map);
+            await expect(map).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
+            await view(page, map, TRACER_MID, 15);
+            const box = await map.boundingBox();
+            const [x, y] = pagePixel(box, TRACER_MID, TRACER_MID, 15);
+            await page.mouse.click(x, y);
+            const popup = page.locator('.maplibregl-popup .mapstudio-popup--line');
+            await expect(popup).toBeVisible({ timeout: 30_000 });
+            await expect(popup.locator('.mapstudio-popup-name')).toHaveText('Tracer line');
+            const parts = await popup.locator('[data-part]').evaluateAll((els) => els.map((e) => e.getAttribute('data-part')));
+            expect(parts[0]).toBe('header');
+            expect(parts).not.toContain('segment');
+            expect(parts).not.toContain('instruments');
+            expect(parts).toContain('kpis');
+            await expect(popup.locator('.mapstudio-popup-kpi')).toHaveAttribute('data-kpi', 'flow');
+            await expect(popup).toHaveAttribute('data-segment', '');
+            await expect(map).toHaveAttribute('data-segment', '');
+            await expect(map).toHaveAttribute('data-highlighted', '');
+            await expect(map).toHaveAttribute('data-selected', ids.tracerLine);
+            await popup.locator('.mapstudio-popup-close').click();
+            await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
             expect(watched.warnings, 'Map Studio warnings').toEqual([]);
         });
 });

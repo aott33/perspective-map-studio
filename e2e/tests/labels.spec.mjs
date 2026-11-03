@@ -183,6 +183,18 @@ test.describe('1440 px', () => {
             await expect(map).toHaveAttribute('data-selected', ids.sharedB);
             await expect(map).toHaveAttribute('data-pick-open', 'false');
             await expect(page.locator('.mapstudio-return-button')).toBeEnabled();
+            // The popup anchors to the shared marker drawn, the members' centroid (owner review notes item 20).
+            const centre = [(SHARED.a[0] + SHARED.b[0]) / 2, (SHARED.a[1] + SHARED.b[1]) / 2];
+            await expect(map).toHaveAttribute('data-popup-anchor', centre[0].toFixed(6) + ',' + centre[1].toFixed(6));
+            // A site with no data (no asset linked) is neither OK nor known (item 21): no check mark, "No data yet" with
+            // the reason, and the alarm state unknown.
+            await expect(popup.locator('[data-part="comms"]')).toHaveAttribute('data-comms', 'unknown');
+            await expect(popup.locator('[data-part="comms"] .mapstudio-popup-value')).toHaveText(/^No data yet/);
+            await expect(popup.locator('[data-part="comms"] .mapstudio-popup-ok-glyph')).toHaveCount(0);
+            await expect(popup.locator('[data-part="comms"] .mapstudio-popup-state-glyph')).toHaveCount(0);
+            await expect(popup.locator('[data-part="alarms"]')).toHaveAttribute('data-alarm', 'unknown');
+            await expect(popup.locator('[data-part="alarms"]')).toContainText('Alarm state unknown');
+            await expect(popup.locator('[data-part="alarms"] .mapstudio-popup-alarm-glyph--ok')).toHaveCount(0);
             await shot(page, 'mapstudio-shared-1440.png');
 
             // The ground: the selection and the popup go, Return is disabled again.
@@ -190,6 +202,21 @@ test.describe('1440 px', () => {
             await expect(map).toHaveAttribute('data-selected', '');
             await expect(page.locator('.mapstudio-popup--default')).toHaveCount(0);
             await expect(page.locator('.mapstudio-return-button')).toBeDisabled();
+
+            // At zoom 18 the two are more than a marker apart on screen: each draws where it is, with its own
+            // name, and a click opens its own popup anchored at its own place, no pick list (item 20).
+            await view(page, map, SHARED.a, 18);
+            // (data-shared-markers counts the whole map: items other specs draw closer than 10 m still share.)
+            const names18 = async () => (await labels(map)).filter((b) => b.layer === 'mapstudio-items-name').map((b) => b.text);
+            await expect.poll(names18, { timeout: DRAW_MS }).toEqual(expect.arrayContaining(['Shared A', 'Shared B']));
+            expect(await names18()).not.toContain('Shared A and Shared B');
+            await clickAt(page, map, SHARED.a, SHARED.a, 18);
+            await expect(page.locator('.maplibregl-popup .mapstudio-popup--default .mapstudio-popup-name')).toHaveText('Shared A', { timeout: 30_000 });
+            await expect(map).toHaveAttribute('data-pick-open', 'false');
+            await expect(map).toHaveAttribute('data-popup-anchor', SHARED.a[0].toFixed(6) + ',' + SHARED.a[1].toFixed(6));
+            // Back at zoom 15 they share one marker again.
+            await view(page, map, SHARED.a, 15);
+            await expect(map).toHaveAttribute('data-shared-markers', /^[1-9][0-9]*$/, { timeout: DRAW_MS });
         });
 
     test('Return pans back to the selected point; the flow arrow draws on the selected line alone', async ({ page }) => {

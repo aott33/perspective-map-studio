@@ -44,8 +44,18 @@ describe('the map features (epic 3 entry 7)', () => {
         expect(out.points.features).toHaveLength(2);
         const shared = out.points.features.find((f) => f.properties.members === 2)!;
         expect(shared.properties).toMatchObject({ id: 'shared:a,b', name: 'Pad A and Pad B', memberIds: 'a,b', state: 'comms-lost', word: 'Comms lost', kpi: '' });
-        expect(shared.geometry.coordinates).toEqual(A.geometry.coordinates);
+        // The shared marker sits at the members' centroid, and each member's popup anchors there (owner review notes item 20).
+        const a = A.geometry.coordinates as [number, number];
+        const b = B.geometry.coordinates as [number, number];
+        const centre = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        expect(shared.geometry.coordinates).toEqual(centre);
+        expect(out.anchors).toEqual({ a: centre, b: centre });
         expect(out.shared).toBe(1);
+        // At a sharing distance under their 8.6 m (a close zoom, item 20) the two draw as their own markers.
+        const split = buildFeatures([A, B, FAR, L], KINDS, live, null, COLORS, 5);
+        expect(split.points.features).toHaveLength(3);
+        expect(split.shared).toBe(0);
+        expect(split.anchors).toEqual({});
         const far = out.points.features.find((f) => f.properties.id === 'far')!;
         expect(far.properties).toMatchObject({ members: 1, state: 'normal', kpi: '' });
         expect(out.bounds).toEqual([-104.99, 39.74, -104.95, 39.75]);

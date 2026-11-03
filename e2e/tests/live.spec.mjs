@@ -157,9 +157,18 @@ editorTest.describe('1440 px', () => {
             await expect(p1).toHaveAttribute('data-word', 'Comms lost');
             await expect(popup.locator('[data-part="comms"]')).toHaveAttribute('data-comms', 'lost', { timeout: PUSH_MS });
             await expect(popup.locator('[data-part="comms"] .mapstudio-popup-value')).toHaveText(/^Comms lost - /);
+            // Option A (owner review notes items 13 and 15): the hourglass alone before the value, the reason in
+            // plain words in the row's tooltip; the alarm heading keeps its words with the hourglass before them
+            // and says why in its tooltip, never "Stale - ".
             await expect(kpis.nth(0)).toHaveAttribute('data-stale', 'true');
-            await expect(kpis.nth(0).locator('.mapstudio-popup-value')).toHaveText('Stale - 950 psi (comms lost)');
+            await expect(kpis.nth(0).locator('.mapstudio-popup-value')).toHaveText('950 psi');
+            await expect(kpis.nth(0)).toHaveAttribute('title', 'Stale - comms lost');
+            await expect(kpis.nth(0).locator('.mapstudio-popup-state-glyph')).toHaveCount(1);
             await expect(popup.locator('[data-part="alarms"]')).toHaveAttribute('data-stale', 'true');
+            await expect(popup.locator('[data-part="alarms"] .mapstudio-popup-alarm-heading'))
+                .toHaveAttribute('title', /^Alarm state may be out of date: comms lost/);
+            await expect(popup.locator('[data-part="alarms"] .mapstudio-popup-alarm-stale')).toHaveCount(1);
+            await expect(popup.locator('[data-part="alarms"] .mapstudio-popup-alarm-words')).not.toContainText('Stale');
             // The token sits on the value (the word), the label keeping the secondary colour (entry 8, P4).
             const token = await popup.locator('[data-part="comms"] .mapstudio-popup-value').evaluate((el) => {
                 const lost = getComputedStyle(el).color;
@@ -180,6 +189,9 @@ editorTest.describe('1440 px', () => {
             // The alarm clears (pressure below the setpoint): no active alarm, no badge, back to normal.
             await expect(p1).toHaveAttribute('data-state', 'normal', { timeout: INTERVAL_MS });
             await expect(popup.locator('[data-part="alarms"]')).toContainText('No active alarms', { timeout: PUSH_MS });
+            // No check mark before it (option A), and no hourglass while the state is current.
+            await expect(popup.locator('[data-part="alarms"] .mapstudio-popup-alarm-glyph--ok')).toHaveCount(0);
+            await expect(popup.locator('[data-part="alarms"] .mapstudio-popup-alarm-stale')).toHaveCount(0);
 
             await popup.locator('.mapstudio-popup-close').click();
             await expect(page.locator('.mapstudio-popup--default')).toHaveCount(0);

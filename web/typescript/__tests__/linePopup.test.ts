@@ -6,7 +6,7 @@ import { lineNodes, segmentAt, segmentNodes, splitAt } from '../features';
 import { lengthM } from '../geometry';
 import { LinePopup } from '../LinePopup';
 import {
-    PopupNode, distanceText, instrumentsComms, instrumentsHeading, lineSubline, nodeValue, popupInstruments, popupNodes, rowName,
+    PopupNode, distanceText, instrumentsComms, instrumentsHeading, lineAlarms, lineSubline, nodeValue, popupInstruments, popupNodes, rowName,
     segmentWords
 } from '../linePopup';
 import { LIVE_INITIAL, LiveState, LiveValue, KindDisplay } from '../live';
@@ -126,11 +126,53 @@ describe('the line popup\'s words (DESIGN.md line-popup)', () => {
             pt2: { ...LIVE.items.pt2, kpis: { pressure: stale(371, 'Bad_Stale') } },
             pt1: { ...LIVE.items.pt1, alarms: good({ active: 1, unacked: 1, priority: 1 }) } } };
         const s = popupNodes(LINE, ITEMS, KINDS, staleLive, null);
-        expect(nodeValue(s[3])).toMatchObject({ text: 'Stale - 371 psi (last)', stale: true, number: null });
+        // Option A (owner review notes items 13 and 19): the value stays, the hourglass marks it, the reason is the tooltip's.
+        expect(nodeValue(s[3])).toMatchObject({ text: '371 psi', stale: true, number: null, note: 'Stale - last value (Bad_Stale)' });
         expect(nodeValue(s[1]).alarm).toEqual({ priority: 1, unacked: true, active: 1, stale: false });
         const lost: LiveState = { ...LIVE, items: { ...LIVE.items,
             pt1: { ...LIVE.items.pt1, comms: good(false), kpis: { pressure: stale(398, 'comms lost') } } } };
-        expect(nodeValue(popupNodes(LINE, ITEMS, KINDS, lost, null)[1])).toMatchObject({ text: 'Stale - 398 psi (last)', commsLost: true });
+        expect(nodeValue(popupNodes(LINE, ITEMS, KINDS, lost, null)[1]))
+            .toMatchObject({ text: '398 psi', commsLost: true, note: 'Stale - last value, comms lost' });
+        expect(nodeValue(nodes()[0]).note).toBe('');
+    });
+
+    test('the alarm summary names the instrument in the worst alarm, the others after it (owner review notes item 19)', () => {
+        expect(lineAlarms(nodes(), LIVE.items.l, LIVE.display.line)).toBeNull();
+        const one: LiveState = { ...LIVE, items: { ...LIVE.items, pt2: { ...LIVE.items.pt2, alarms: good({ active: 1, unacked: 1, priority: 1 }) } } };
+        expect(lineAlarms(popupNodes(LINE, ITEMS, KINDS, one, null), one.items.l, one.display.line)).toEqual({
+            count: 1, priority: 1, unacked: true, heading: '1 alarm on the line - PT-2, Priority 1, unacknowledged', detail: ''
+        });
+        const two: LiveState = { ...one, items: { ...one.items, pt1: { ...LIVE.items.pt1, alarms: good({ active: 2, unacked: 0, priority: 2 }) } } };
+        expect(lineAlarms(popupNodes(LINE, ITEMS, KINDS, two, null), two.items.l, two.display.line)).toEqual({
+            count: 3, priority: 1, unacked: true, heading: '3 alarms on the line - PT-2, Priority 1, unacknowledged',
+            detail: 'Also: PT-1 priority 2, acknowledged'
+        });
+        // The line's own alarm (its setup turning alarms on) is the worst: the point card's words, the instruments after.
+        const lineDisplay: KindDisplay = { ...LIVE.display.line, alarms: { on: true, count: true, summary: true } };
+        const own: LiveState = { ...two, display: { ...two.display, line: lineDisplay },
+            items: { ...two.items, l: { ...two.items.l, alarms: good({ active: 1, unacked: 1, priority: 1 }) },
+                pt2: { ...LIVE.items.pt2, alarms: good({ active: 1, unacked: 0, priority: 1 }) } } };
+        expect(lineAlarms(popupNodes(LINE, ITEMS, KINDS, own, null), own.items.l, lineDisplay)).toEqual({
+            count: 4, priority: 1, unacked: true, heading: '4 alarms - Priority 1, unacknowledged',
+            detail: 'Also on the line: PT-2 priority 1, acknowledged; PT-1 priority 2, acknowledged'
+        });
+    });
+
+    test('a line with no measuring instrument has no segment box (owner review notes item 17)', () => {
+        const bare = popupNodes({ ...LINE, ends: null }, [LINE], KINDS, LIVE, { fromId: 'start', toId: 'end' });
+        expect(bare.map(rowName)).toEqual(['Line start', 'Line end']);
+        expect(segmentWords(bare, { fromId: 'start', toId: 'end' })).toBeNull();
+        // A valve alone bounds no segment either.
+        const valveOnly = popupNodes({ ...LINE, ends: null }, [LINE, LV1], KINDS, LIVE, { fromId: 'start', toId: 'end' });
+        expect(segmentWords(valveOnly, { fromId: 'start', toId: 'end' })).toBeNull();
+        const html = renderToStaticMarkup(React.createElement(LinePopup, {
+            line: { id: 'l', name: 'Tracer line', kind: 'line', kindName: 'Gathering line', icon: 'pipeline', diameter: null, lengthM: 1800 },
+            display: LIVE.display.line, values: LIVE.items.l, nodes: bare, segment: { fromId: 'start', toId: 'end' }, now: NOW,
+            onClose: () => undefined
+        }));
+        expect(Array.from(html.matchAll(/data-part="([a-z]+)"/g)).map((m) => m[1])).toEqual(['header', 'kpis']);
+        expect(html).toContain('data-segment=""');
+        expect(html).not.toContain('Segment');
     });
 
     test('the segment box: the span and the drop, or the stale line naming the instrument', () => {
@@ -185,8 +227,11 @@ describe('the line popup\'s words (DESIGN.md line-popup)', () => {
             display: LIVE.display.line, values: LIVE.items.l, nodes: nodes(), segment: { fromId: 'pt1', toId: 'pt2' }, now: NOW,
             onClose: () => undefined
         }));
+        // The pinned parts first, the instrument list last and alone scrolling (owner review notes item 19).
         const parts = Array.from(html.matchAll(/data-part="([a-z]+)"/g)).map((m) => m[1]);
-        expect(parts).toEqual(['header', 'segment', 'comms', 'instruments', 'kpis']);
+        expect(parts).toEqual(['header', 'segment', 'comms', 'kpis', 'instruments']);
+        expect(html).toContain('class="mapstudio-popup-pinned"');
+        expect(html).toContain('class="mapstudio-popup-instrument-list"');
         expect(html).toContain('Gathering line - 6 in, 2.9 km');
         expect(html).toContain('Segment PT-1 to PT-2');
         expect(html).toContain('398 to 371 psi - drop 27 psi over 1.7 km');

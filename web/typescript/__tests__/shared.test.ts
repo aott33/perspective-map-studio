@@ -1,5 +1,5 @@
 import { ItemState } from '../live';
-import { SHARED_M, distanceM, groupShared, sharedName, sharedState } from '../shared';
+import { MARKER_APART_PX, SHARED_M, distanceM, groupShared, metresPerPixel, sharedCentre, sharedName, sharedState, sharedWithinM } from '../shared';
 
 const NORMAL: ItemState = { commsLost: false, stale: false, alarm: null, iconKpi: { key: 'p', text: '1 psi', stale: false, hasValue: true }, badge: 'normal' };
 const STALE: ItemState = { ...NORMAL, stale: true, badge: 'stale' };
@@ -31,6 +31,27 @@ describe('shared markers (epic 3 entry 7, the template\'s section 5 item 8)', ()
         expect(groups).toEqual([['a', 'b', 'c', 'd'], ['e']]);
         expect(groupShared([points[0], points[2]]).map((g) => g.map((p) => p.id))).toEqual([['a'], ['c']]);
         expect(groupShared([])).toEqual([]);
+    });
+
+    test('the sharing distance follows the zoom: 20 m until 20 m is more than a marker apart on screen (owner review notes item 20)', () => {
+        expect(MARKER_APART_PX).toBe(44);
+        // MapLibre's 512 px tiles: about 0.23 m per pixel at zoom 18 near 39.76 N.
+        expect(metresPerPixel(18, 39.757)).toBeCloseTo(0.2295, 3);
+        expect(sharedWithinM(12, 39.757)).toBe(20);
+        expect(sharedWithinM(15, 39.757)).toBe(20);
+        expect(sharedWithinM(17, 39.757)).toBe(20);
+        // From zoom 18 two items 15 m apart (the dev map's Shared A and B) are more than 44 px apart: they split.
+        expect(sharedWithinM(18, 39.757)).toBeCloseTo(10.1, 1);
+        expect(sharedWithinM(18, 39.757)).toBeLessThan(15);
+        expect(sharedWithinM(20, 0)).toBeCloseTo(3.3, 1);
+        const a = { id: 'a', name: 'A', lngLat: base };
+        const b = { id: 'b', name: 'B', lngLat: east(base, 15) };
+        expect(groupShared([a, b], sharedWithinM(17, base[1]))).toHaveLength(1);
+        expect(groupShared([a, b], sharedWithinM(18, base[1]))).toHaveLength(2);
+        // The drawn place is the centroid, whatever the order.
+        expect(sharedCentre([a, b])).toEqual(sharedCentre([b, a]));
+        expect(sharedCentre([a, b])[0]).toBeCloseTo((a.lngLat[0] + b.lngLat[0]) / 2, 9);
+        expect(sharedCentre([])).toEqual([0, 0]);
     });
 
     test('the names as one', () => {

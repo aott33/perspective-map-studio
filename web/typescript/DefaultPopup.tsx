@@ -1,6 +1,9 @@
 import * as React from 'react';
-import { ItemValues, KindDisplay, PopupDetail, alarmCountsText, alarmGlyphId, alarmLineText, alarmsText, commsText, itemState } from './live';
-import { Chrome, CloseButton, Glyph, KpiRows } from './popupParts';
+import {
+    ItemValues, KindDisplay, PopupDetail, alarmCountsText, alarmGlyphId, alarmLineText, alarmStaleNote, alarmsText, alarmsUnknown,
+    capitalised, commsText, itemState, qualityWords
+} from './live';
+import { Chrome, CloseButton, Glyph, KpiRows, NoteRow } from './popupParts';
 
 /** What the default popup is opened for: the map item and its kind's icon. */
 export interface DefaultPopupItem {
@@ -36,11 +39,14 @@ export interface DefaultPopupProps {
 
 /**
  * Map Studio's default popup (AD-7, EXPERIENCE.md "Popup card" and "Bottom sheet"; epic 3 entries 5
- * and 8): in order the header (the kind glyph in a disc, the name, the kind as subline, the pop-out
- * page link when it has a value, close), comms with its data age, two to three KPIs, then the alarm
- * block (the counts and the most important alarms in words with their age, from the Gateway's alarm
- * status, and View alarms to the project's alarm page; Map Studio acknowledges nothing). Every state
- * is said in words; a stale value is marked "Stale - " with its reason; the comms-lost word takes the
+ * and 8; the owner's option A, review notes items 13, 15 and 21): in order the header (the kind glyph
+ * in a disc, the name, the kind as subline, the pop-out page link when it has a value, close), comms
+ * with its status and age right-aligned, two to three KPIs (a stale value as the hourglass alone before
+ * the value, the reason in the tooltip; "No data yet" before a value), then the alarm block (the counts
+ * and the most important alarms in words with their age, from the Gateway's alarm status, and View
+ * alarms to the project's alarm page; Map Studio acknowledges nothing; no check mark before "No active
+ * alarms", the hourglass before it while comms are lost or the alarms are stale, since no alarm may
+ * only mean no fresh data; "Alarm state unknown" with no data). The comms-lost word takes the
  * `comms-lost` token through its class; the alarm hue sits on the glyph and the heading only. The
  * parts follow the kind's display: a part turned off is not drawn. Below 768 px the same body is a
  * bottom sheet with a handle, 44 px header buttons and a footer with View alarms (and Edit for
@@ -66,27 +72,30 @@ export class DefaultPopup extends React.Component<DefaultPopupProps> {
         }
         const state = itemState(values, display);
         const slot = values ? values.alarms : undefined;
-        const stale = !!(slot && slot.stale);
+        const unknown = alarmsUnknown(slot);
         const summary = detail && detail.alarms ? detail.alarms : null;
         const alarm = state.alarm;
-        const heading = (stale ? 'Stale - ' : '') + alarmsText(slot);
+        const heading = alarmsText(slot);
+        // The hourglass before the words while the alarm state may be out of date (item 13), its reason in the tooltip.
+        const note = unknown ? (slot ? capitalised(qualityWords(slot.reason !== '' ? slot.reason : slot.quality)) : '') : alarmStaleNote(values, display, now);
+        const stale = !unknown && note !== '';
         const first = summary && summary.list.length > 0 ? summary.list[0] : null;
         const more = alarm ? alarm.active - 1 : 0;
         const counts = summary ? alarmCountsText(summary) : '';
         const viewAlarms = alarm !== null && alarmPage !== null;
         return (
-            <div className={'mapstudio-popup-alarms' + (alarm ? ' mapstudio-popup-alarms--active mapstudio-popup-alarms--p' + alarm.priority : '')}
+            <div className={'mapstudio-popup-alarms' + (alarm ? ' mapstudio-popup-alarms--active mapstudio-popup-alarms--p' + alarm.priority : '')
+                     + (unknown ? ' mapstudio-popup-alarms--unknown' : '')}
                  data-part="alarms"
-                 data-alarm={alarm ? alarm.priority + ':' + (alarm.unacked ? 'unacked' : 'acked') : 'none'}
+                 data-alarm={alarm ? alarm.priority + ':' + (alarm.unacked ? 'unacked' : 'acked') : unknown ? 'unknown' : 'none'}
                  data-alarm-counts={summary ? summary.counts[1] + ',' + summary.counts[2] + ',' + summary.counts[3] : ''}
                  data-alarm-listed={summary ? String(summary.list.length) : ''}
                  data-stale={stale ? 'true' : 'false'}>
-                <div className="mapstudio-popup-alarm-heading">
-                    {alarm
-                        ? <Glyph id={alarmGlyphId(alarm.priority, alarm.unacked)} className="mapstudio-popup-alarm-glyph" size={16} />
-                        : <Chrome name="check" className="mapstudio-popup-alarm-glyph mapstudio-popup-alarm-glyph--ok" />}
+                <NoteRow className="mapstudio-popup-alarm-heading" note={note}>
+                    {alarm ? <Glyph id={alarmGlyphId(alarm.priority, alarm.unacked)} className="mapstudio-popup-alarm-glyph" size={16} /> : null}
+                    {stale ? <Glyph id="stale" className="mapstudio-popup-state-glyph mapstudio-popup-alarm-stale" size={16} /> : null}
                     <span className="mapstudio-popup-alarm-words">{heading}</span>
-                </div>
+                </NoteRow>
                 {alarm && counts !== '' ? <div className="mapstudio-popup-alarm-counts">{counts}</div> : null}
                 {alarm && first ? <div className="mapstudio-popup-alarm-line">{alarmLineText(first, now)}</div> : null}
                 {alarm && !first && summary && summary.reason !== '' ? (
@@ -107,7 +116,8 @@ export class DefaultPopup extends React.Component<DefaultPopupProps> {
         const { item, display, values, now, link, alarmPage, mode, canEdit } = this.props;
         const sheet = mode === 'sheet';
         const state = itemState(values, display);
-        const comms = commsText(values ? values.comms : undefined, now);
+        const problem = values ? values.problems.find((p) => p.slot === 'comms') : undefined;
+        const comms = commsText(values ? values.comms : undefined, now, problem ? problem.reason : '');
         const viewAlarms = state.alarm !== null && alarmPage !== null;
         return (
             <div className={'mapstudio-popup mapstudio-popup--default' + (sheet ? ' mapstudio-popup--sheet' : ' mapstudio-popup--card')}
@@ -130,15 +140,17 @@ export class DefaultPopup extends React.Component<DefaultPopupProps> {
                 </div>
                 <div className="mapstudio-popup-body">
                     {display.comms ? (
-                        <div className={'mapstudio-popup-row mapstudio-popup-comms' + (comms.lost ? ' mapstudio-popup-comms--lost' : '')}
-                             data-part="comms" data-comms={comms.lost ? 'lost' : 'ok'}>
+                        <NoteRow className={'mapstudio-popup-row mapstudio-popup-comms' + (comms.lost ? ' mapstudio-popup-comms--lost' : '')
+                                     + (comms.unknown ? ' mapstudio-popup-comms--unknown' : '')}
+                                 note={comms.code !== '' ? comms.word + (comms.detail ? ' - ' + comms.detail : '') + ' (' + comms.code + ')' : ''}
+                                 data={{ 'data-part': 'comms', 'data-comms': comms.lost ? 'lost' : comms.unknown ? 'unknown' : 'ok', 'data-quality': comms.code }}>
                             <span className="mapstudio-popup-label">Comms</span>
                             <span className="mapstudio-popup-value">
-                                {comms.lost ? <Glyph id="comms-lost" className="mapstudio-popup-state-glyph" size={16} />
+                                {comms.unknown ? null : comms.lost ? <Glyph id="comms-lost" className="mapstudio-popup-state-glyph" size={16} />
                                     : <Chrome name="check" className="mapstudio-popup-state-glyph mapstudio-popup-ok-glyph" />}
                                 {comms.word}{comms.detail ? ' - ' + comms.detail : ''}
                             </span>
-                        </div>
+                        </NoteRow>
                     ) : null}
                     <KpiRows display={display} values={values} />
                     {this.renderAlarms(sheet)}

@@ -10,7 +10,9 @@ import { Kind } from './adapters';
 import { MapItemRecord } from './contract';
 import { LineNode, SegmentRef, lineNodes } from './features';
 import { instrumentsOn, lengthM } from './geometry';
-import { ItemState, ItemValues, KindDisplay, LiveState, LiveValue, ageText, iconKpiOf, itemState, valueText } from './live';
+import {
+    ItemState, ItemValues, KindDisplay, LiveState, LiveValue, ageText, alarmsText, iconKpiOf, itemState, qualityWords, valueText
+} from './live';
 
 /** One row of the instruments list: a node with its words and values. */
 export interface PopupNode extends LineNode {
@@ -58,10 +60,16 @@ export function rowName(node: PopupNode): string {
     return node.name;
 }
 
-/** What a node's value cell says: its icon KPI with the unit, "No value", or the stale form "Stale - 371 psi (last)". */
+/**
+ * What a node's value cell says: its icon KPI with the unit or "No value"; a stale value keeps its text
+ * and is marked by the hourglass alone, the reason in `note` for the tooltip (option A, owner review
+ * notes items 13 and 19): "Stale - last value, comms lost".
+ */
 export interface NodeValue {
     text: string;
     stale: boolean;
+    /** The stale tooltip ("Stale - last value, comms lost"), '' when not stale. */
+    note: string;
     hasValue: boolean;
     /** The number and its unit, for the segment's drop line; null when the value is not a number. */
     number: number | null;
@@ -72,20 +80,80 @@ export interface NodeValue {
     commsLost: boolean;
 }
 
+/** "Stale - last value, comms lost", "Stale - last value (Bad_Stale)", "Stale - no value yet": the row's tooltip in plain words. */
+function staleNote(value: LiveValue, hasValue: boolean): string {
+    const words = qualityWords(value.reason);
+    const code = words !== value.reason && value.reason !== '' ? ' (' + value.reason + ')' : '';
+    const why = words === '' || words === 'stale' ? '' : words;
+    if (!hasValue) {
+        return 'Stale' + (why !== '' ? ' - ' + why : '') + code;
+    }
+    return 'Stale - last value' + (why !== '' ? ', ' + why : '') + code;
+}
+
 export function nodeValue(node: PopupNode): NodeValue {
     const kpi = iconKpiOf(node.display);
     const value: LiveValue | undefined = kpi && node.values ? node.values.kpis[kpi.key] : undefined;
     const state = itemState(node.values, node.display);
     const unit = kpi ? kpi.unit : '';
     if (!kpi || !value) {
-        return { text: 'No value', stale: false, hasValue: false, number: null, unit, t: null, alarm: state.alarm, commsLost: state.commsLost };
+        return { text: 'No value', stale: false, note: '', hasValue: false, number: null, unit, t: null, alarm: state.alarm, commsLost: state.commsLost };
     }
     const hasValue = value.value !== null && value.value !== undefined;
     const number = typeof value.value === 'number' && isFinite(value.value) ? value.value : null;
     const plain = hasValue ? valueText(value, unit) : 'No value';
+    const note = value.stale ? staleNote(value, hasValue) : '';
     return {
-        text: value.stale ? 'Stale - ' + plain + (hasValue ? ' (last)' : '') : plain,
-        stale: value.stale, hasValue, number: value.stale ? null : number, unit, t: value.t, alarm: state.alarm, commsLost: state.commsLost
+        text: plain, stale: value.stale, note, hasValue, number: value.stale ? null : number, unit, t: value.t,
+        alarm: state.alarm, commsLost: state.commsLost
+    };
+}
+
+/**
+ * The line popup's alarm summary (owner review notes item 19): the instruments' active alarms, from
+ * `values.batch` (priority and acknowledgement; the alarm's own words are pushed for the line only),
+ * and the line's own alarms where its setup turns them on. The heading names the instrument in the
+ * worst alarm ("1 alarm on the line - PT-2, Priority 1, unacknowledged"); `detail` lists the others
+ * ("PT-1 priority 2, acknowledged") and the line's own alarm words. Null with no alarm anywhere.
+ */
+export interface LineAlarms {
+    /** The active alarms over the instruments and the line. */
+    count: number;
+    priority: 1 | 2 | 3;
+    unacked: boolean;
+    heading: string;
+    detail: string;
+}
+
+export function lineAlarms(nodes: PopupNode[], values: ItemValues | undefined, display: KindDisplay | undefined): LineAlarms | null {
+    const own = itemState(values, display).alarm;
+    const inAlarm = nodes.filter((n) => n.role === 'instrument' && nodeValue(n).alarm !== null)
+        .map((n) => ({ name: n.name, alarm: nodeValue(n).alarm! }))
+        .sort((a, b) => a.alarm.priority - b.alarm.priority || Number(b.alarm.unacked) - Number(a.alarm.unacked));
+    if (inAlarm.length === 0 && !own) {
+        return null;
+    }
+    const count = inAlarm.reduce((n, i) => n + i.alarm.active, 0) + (own ? own.active : 0);
+    const worst = inAlarm[0];
+    const ack = (unacked: boolean): string => (unacked ? 'unacknowledged' : 'acknowledged');
+    const n = count === 1 ? '1 alarm' : count + ' alarms';
+    if (!worst || (own && (own.priority < worst.alarm.priority || (own.priority === worst.alarm.priority && own.unacked && !worst.alarm.unacked)))) {
+        // The line's own alarm is the worst: the point card's words, the instruments in alarm after it.
+        const rest = inAlarm.map((i) => i.name + ' priority ' + i.alarm.priority + ', ' + ack(i.alarm.unacked)).join('; ');
+        return {
+            count, priority: own!.priority, unacked: own!.unacked,
+            heading: n + ' - Priority ' + own!.priority + ', ' + ack(own!.unacked),
+            detail: rest !== '' ? 'Also on the line: ' + rest : ''
+        };
+    }
+    const others = inAlarm.slice(1).map((i) => i.name + ' priority ' + i.alarm.priority + ', ' + ack(i.alarm.unacked));
+    if (own) {
+        others.push('the line itself: ' + alarmsText(values ? values.alarms : undefined));
+    }
+    return {
+        count, priority: worst.alarm.priority, unacked: worst.alarm.unacked,
+        heading: n + ' on the line - ' + worst.name + ', Priority ' + worst.alarm.priority + ', ' + ack(worst.alarm.unacked),
+        detail: others.length > 0 ? 'Also: ' + others.join('; ') : ''
     };
 }
 
@@ -98,7 +166,8 @@ export interface SegmentWords {
 }
 
 export function segmentWords(nodes: PopupNode[], segment: SegmentRef | null): SegmentWords | null {
-    if (!segment) {
+    if (!segment || !nodes.some((n) => n.role === 'instrument' && n.measures)) {
+        // A line with no measuring instrument has no segment to show (owner review notes item 17).
         return null;
     }
     const from = nodes.find((n) => n.id === segment.fromId);

@@ -629,24 +629,130 @@ export function ageText(t: string | null, now: number): string {
     return Math.round(h / 24) + ' d ago';
 }
 
-/** The comms row of the popup: "OK - 12 s ago", "Comms lost - 3 min ago", "No value yet". */
-export function commsText(comms: LiveValue | undefined, now: number): { word: string; detail: string; lost: boolean } {
+/** What the popup says where a slot has no value yet (owner review notes item 21: neither OK nor known). */
+export const NO_DATA = 'No data yet';
+/** The alarm line with no alarm state to show (item 21). */
+export const ALARM_STATE_UNKNOWN = 'Alarm state unknown';
+
+/** Ignition's quality names an operator may meet, in plain words (owner review notes item 15). */
+const QUALITY_WORDS: Record<string, string> = {
+    Good: '',
+    Good_Unspecified: '',
+    Uncertain: 'uncertain',
+    Uncertain_InitialValue: 'no value yet',
+    Uncertain_LastKnownValue: 'last known value',
+    Uncertain_DataSubNormal: 'data subnormal',
+    Uncertain_EngineeringUnitsExceeded: 'out of range',
+    Uncertain_IncompleteOperation: 'incomplete read',
+    Bad: 'bad quality',
+    Bad_Unspecified: 'bad quality',
+    Bad_NotFound: 'tag not found',
+    Bad_Stale: 'stale',
+    Bad_Disabled: 'tag disabled',
+    Bad_Unsupported: 'read unsupported',
+    Bad_AccessDenied: 'access denied',
+    Bad_ReferenceNotFound: 'reference not found',
+    Bad_Failure: 'read failed',
+    Bad_NotConnected: 'not connected',
+    Bad_TrialExpired: 'trial expired',
+    Bad_LicenseExceeded: 'licence exceeded',
+    Bad_OutOfRange: 'out of range',
+    Bad_ReadOnly: 'read only',
+    Bad_Unauthorized: 'unauthorized',
+    Bad_AggregateNotFound: 'aggregate not found',
+    Bad_DatabaseNotConnected: 'database not connected',
+    Bad_GatewayCommOff: 'gateway comms off',
+    Error: 'error',
+    Error_Configuration: 'configuration error',
+    Error_Exception: 'error',
+    Error_ExpressionEval: 'expression error',
+    Error_TagExecution: 'tag execution error',
+    Error_TypeConversion: 'type conversion error',
+    Error_DatabaseQuery: 'database query error',
+    Error_IO: 'input or output error',
+    Error_TimeoutExpired: 'timed out',
+    Error_ScriptEval: 'script error',
+    Error_CycleDetected: 'cycle detected',
+    Error_InvalidPathSyntax: 'invalid path',
+    Error_Formatting: 'formatting error'
+};
+
+/**
+ * A quality name or a stale reason in plain words (item 15): "Bad_NotFound" is "tag not found", "Good" is
+ * '', a reason the Gateway wrote in words ("comms lost", "no value yet") stays as it is, and a code the
+ * table does not know is split into lower-case words ("Bad_SomethingNew" is "bad, something new"). The
+ * code itself stays in the tooltip and the test attributes.
+ */
+export function qualityWords(quality: string): string {
+    if (quality in QUALITY_WORDS) {
+        return QUALITY_WORDS[quality];
+    }
+    if (!/^[A-Z][A-Za-z0-9]*(_[A-Za-z0-9]+)*$/.test(quality)) {
+        return quality;
+    }
+    return quality.split('_').map((part) => part.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase()).join(', ');
+}
+
+/** The first letter capitalised. */
+export function capitalised(words: string): string {
+    return words === '' ? '' : words.charAt(0).toUpperCase() + words.substring(1);
+}
+
+/**
+ * The tooltip of a stale value, in plain words (items 13 and 15): "Stale - comms lost", "Stale - bad
+ * quality", "Stale - tag not found", or "Stale" with no reason; the quality name after it in brackets
+ * when the reason is a code, so the code is still there for anyone who needs it.
+ */
+export function staleWords(value: LiveValue): string {
+    const words = qualityWords(value.reason);
+    if (words === '') {
+        return 'Stale';
+    }
+    return 'Stale - ' + words + (words !== value.reason && value.reason !== '' ? ' (' + value.reason + ')' : '');
+}
+
+/** The comms row's words: the state, its detail, whether comms are lost, and whether no data has come yet. */
+export interface CommsWords {
+    word: string;
+    detail: string;
+    lost: boolean;
+    /** No comms slot or no value yet: neither OK nor lost (item 21); the row shows no glyph. */
+    unknown: boolean;
+    /** The quality name behind an unknown state (the tooltip and the tests), '' when none. */
+    code: string;
+}
+
+/**
+ * The comms row of the popup: "OK - 12 s ago", "Comms lost - 3 min ago", or "No data yet" with the reason
+ * in plain words ("No data yet - tag not found", items 15 and 21); `problem` is the item's problem for
+ * the comms slot when the Gateway could not resolve it ("no asset is linked"). With no slot, or a slot
+ * that has not delivered yet, the state is unknown (no glyph); a slot the Gateway marked stale with no
+ * value (a tag that is not there) is comms lost, as the marker draws it, with the same words.
+ */
+export function commsText(comms: LiveValue | undefined, now: number, problem = ''): CommsWords {
     if (!comms || comms.value === null || comms.value === undefined) {
-        return { word: 'No value yet', detail: comms && comms.reason ? comms.reason : '', lost: !!comms };
+        const reason = problem !== '' ? problem : comms ? qualityWords(comms.reason !== '' ? comms.reason : comms.quality) : '';
+        const lost = !!comms && comms.stale && reason !== 'no value yet';
+        return { word: NO_DATA, detail: reason === 'no value yet' ? '' : reason, lost, unknown: !lost, code: comms ? comms.quality : '' };
     }
     const lost = comms.stale || comms.value === false;
     const age = ageText(comms.t, now);
-    return { word: lost ? 'Comms lost' : 'OK', detail: age, lost };
+    return { word: lost ? 'Comms lost' : 'OK', detail: age, lost, unknown: false, code: '' };
 }
 
-/** The alarm block's words: "No active alarms", "1 alarm - Priority 1, unacknowledged", "3 alarms - Priority 2, acknowledged". */
+/** True when the alarms slot carries no summary yet: the alarm line says the state is unknown (item 21). */
+export function alarmsUnknown(alarms: LiveValue | undefined): boolean {
+    return !alarms || alarmSummary(alarms.value) === null;
+}
+
+/** The alarm block's words: "No active alarms", "1 alarm - Priority 1, unacknowledged", "3 alarms - Priority 2, acknowledged", "Alarm state unknown". */
 export function alarmsText(alarms: LiveValue | undefined): string {
     if (!alarms) {
-        return 'No value yet';
+        return ALARM_STATE_UNKNOWN;
     }
     const summary = alarmSummary(alarms.value);
     if (!summary) {
-        return alarms.reason ? 'No value yet - ' + alarms.reason : 'No value yet';
+        return ALARM_STATE_UNKNOWN;
     }
     if (summary.active === 0) {
         return 'No active alarms';
@@ -656,9 +762,34 @@ export function alarmsText(alarms: LiveValue | undefined): string {
     return n + ' - ' + priority + ', ' + (summary.unacked > 0 ? 'unacknowledged' : 'acknowledged');
 }
 
-/** "Stale - " before a stale value's text, and the reason after it, as the popup marks stale values. */
+/** "Stale - " before a stale value's text, and the reason after it: the long form a custom view or a log may want. */
 export function staleText(value: LiveValue, text: string): string {
     return value.stale ? 'Stale - ' + text + (value.reason ? ' (' + value.reason + ')' : '') : text;
+}
+
+/**
+ * Why the alarm state may be out of date (item 13), for the hourglass's tooltip before "No active alarms"
+ * or an alarm heading: the alarms are evaluated on the same tags, so no alarm may only mean no fresh data.
+ * "Alarm state may be out of date: comms lost 3 h ago", "...: stale, bad quality"; '' when it is current.
+ */
+export function alarmStaleNote(values: ItemValues | undefined, display: KindDisplay | undefined, now: number): string {
+    if (!values || !display) {
+        return '';
+    }
+    const state = itemState(values, display);
+    const slot = values.alarms;
+    if (!(slot && slot.stale) && !state.commsLost) {
+        return '';
+    }
+    let why: string;
+    if (state.commsLost) {
+        const age = values.comms ? ageText(values.comms.t, now) : '';
+        why = 'comms lost' + (age ? ' ' + age : '');
+    } else {
+        const words = slot ? qualityWords(slot.reason) : '';
+        why = words === '' || words === 'stale' ? 'stale' : 'stale, ' + words;
+    }
+    return 'Alarm state may be out of date: ' + why;
 }
 
 /**

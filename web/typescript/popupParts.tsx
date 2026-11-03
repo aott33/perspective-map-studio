@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ItemValues, KindDisplay, staleText, valueText } from './live';
+import { ItemValues, KindDisplay, LiveValue, NO_DATA, capitalised, qualityWords, staleWords, valueText } from './live';
 
 /**
  * The parts the point popup (DefaultPopup.tsx) and the line popup (LinePopup.tsx) share (epic 3
@@ -44,9 +44,48 @@ export function CloseButton(props: { onClose: () => void }): React.ReactElement 
 }
 
 /**
- * The KPI rows of a popup: the kind display's KPIs that are on, three at most, each with its label,
- * its value in its unit (the icon KPI as the key value), "No value yet" before the first batch, and a
- * stale value marked with the glyph and "Stale - " and its reason.
+ * A row whose state glyph carries a note (the stale reason, a no-data reason) in a tooltip, and shows
+ * the same words under the row on a tap or a click (owner review notes item 13: on a phone a tap on
+ * the icon shows the words the hover shows). The note line is in the DOM only while it is shown.
+ */
+export class NoteRow extends React.Component<{ className: string; note: string; data?: Record<string, string>; children?: React.ReactNode },
+    { shown: boolean }> {
+    state = { shown: false };
+
+    private toggle = (): void => {
+        if (this.props.note !== '') {
+            this.setState((s) => ({ shown: !s.shown }));
+        }
+    };
+
+    render(): React.ReactNode {
+        const { className, note, data, children } = this.props;
+        const shown = this.state.shown && note !== '';
+        return (
+            <div className={className + (note !== '' ? ' mapstudio-popup-row--noted' : '')} {...(data || {})}
+                 title={note !== '' ? note : undefined} onClick={this.toggle} data-note-shown={shown ? 'true' : 'false'}>
+                {children}
+                {shown ? <span className="mapstudio-popup-note">{note}</span> : null}
+            </div>
+        );
+    }
+}
+
+/** The no-data words of a KPI slot with no value: "No data yet", the quality in plain words as the note. */
+function noDataNote(value: LiveValue | undefined): string {
+    if (!value) {
+        return '';
+    }
+    const words = qualityWords(value.reason !== '' ? value.reason : value.quality);
+    return words === '' || words === 'no value yet' ? '' : capitalised(words) + (words !== value.quality ? ' (' + value.quality + ')' : '');
+}
+
+/**
+ * The KPI rows of a popup (option A, owner review notes items 13, 15 and 21): the kind display's KPIs
+ * that are on, three at most, each with its full label and its value in its unit right-aligned (the
+ * icon KPI as the key value); "No data yet" before the first value; a stale value shows the hourglass
+ * alone before the value, the reason in plain words in the row's tooltip ("Stale - comms lost", "Stale -
+ * bad quality") and under the row on a tap. The quality name stays in `data-quality` for tests.
  */
 export function KpiRows(props: { display: KindDisplay; values: ItemValues | undefined }): React.ReactElement | null {
     const kpis = props.display.kpis.filter((k) => k.on).slice(0, 3);
@@ -57,16 +96,21 @@ export function KpiRows(props: { display: KindDisplay; values: ItemValues | unde
         <div className="mapstudio-popup-kpis" data-part="kpis">
             {kpis.map((kpi) => {
                 const value = props.values ? props.values.kpis[kpi.key] : undefined;
-                const text = value ? staleText(value, valueText(value, kpi.unit)) : 'No value yet';
+                const hasValue = !!value && value.value !== null && value.value !== undefined;
+                const text = hasValue ? valueText(value!, kpi.unit) : NO_DATA;
+                const stale = !!value && value.stale && hasValue;
+                const note = stale ? staleWords(value!) : noDataNote(value);
                 return (
-                    <div key={kpi.key} className={'mapstudio-popup-row mapstudio-popup-kpi' + (kpi.icon ? ' mapstudio-popup-kpi--icon' : '')}
-                         data-kpi={kpi.key} data-stale={value && value.stale ? 'true' : 'false'}>
+                    <NoteRow key={kpi.key} note={note}
+                             className={'mapstudio-popup-row mapstudio-popup-kpi' + (kpi.icon ? ' mapstudio-popup-kpi--icon' : '')
+                                 + (hasValue ? '' : ' mapstudio-popup-kpi--none')}
+                             data={{ 'data-kpi': kpi.key, 'data-stale': stale ? 'true' : 'false', 'data-quality': value ? value.quality : '' }}>
                         <span className="mapstudio-popup-label">{kpi.label}</span>
                         <span className="mapstudio-popup-value">
-                            {value && value.stale ? <Glyph id="stale" className="mapstudio-popup-state-glyph" size={16} /> : null}
+                            {stale ? <Glyph id="stale" className="mapstudio-popup-state-glyph" size={16} /> : null}
                             {text}
                         </span>
-                    </div>
+                    </NoteRow>
                 );
             })}
         </div>

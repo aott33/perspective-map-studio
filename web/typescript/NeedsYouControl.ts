@@ -133,6 +133,13 @@ export class NeedsYouControl {
         this.onToggle(true);
     }
 
+    /** Give the bar the focus (Esc on a popup a row opened returns it here, owner review notes item 14). */
+    focusBar(): void {
+        if (this.bar) {
+            this.bar.focus();
+        }
+    }
+
     /** Close the list; with `focusBar` the bar takes the focus back (Esc). */
     close(focusBar: boolean): void {
         if (!this.panel) {
