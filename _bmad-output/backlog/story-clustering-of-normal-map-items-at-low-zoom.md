@@ -40,3 +40,4 @@ How it would work in Map Studio (verified against the code, not built):
 - Open question: Cluster radius and the zoom where clustering stops (a candidate: radius 40 px, none from zoom 14, where names show).
 - Open question: A cluster's click: zoom in to split it (MapLibre's expansion zoom) or list its members first.
 - Open question: Whether lines and instruments hide inside a cluster's area or keep drawing.
+- Decision: 2026-11-03 Owner (re-test R5): the shared marker of items within 20 m draws as a stack (two offset discs with a count, the worst member's state on top) with the same look as a cluster; built together with this story after 0.3.0.
