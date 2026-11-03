@@ -33,10 +33,10 @@ Built (2026-11-02), branch `ccr-e1048b93-r2p8l4-notes-c`, on two agents (the fir
 - Item 7. Built: the tap, meter and valve glyphs redrawn, the 28 px instrument disc, the acknowledged glyphs outlined with a bold "!" (option B; option A rendered beside it, `renders/notes-c/7-glyph-options-3x.png`, for the owner to choose) (commits 2e4eb80, 4bed1f6).
 - Contract wording. Built: "outlined with "!"" in the contract and the legend's States row (commit a5ecace).
 - Item 11. Built: weight from the size alone, the tone with the weight rule (recommended; the alternative rendered, `renders/notes-c/option-11-tone-by-instruments-z15-1440.png`) (commit 2e4eb80).
-- Item 16. Built: the marker image sized from its rings (commit 2e4eb80).
+- Item 16. Built: the marker image sized from its rings, the names keeping clear of the 0.2 footprint (commits 2e4eb80, 24adbae).
 - Item 22. Built: the arrow repeated along the selected line, the legend's Lines row (commits 2e4eb80, 1dc9adb).
 - Item 25. Built: the quiet OpenStreetMap paint and the contrast check over it (commits 1dc9adb, 14dafb9).
-- Item 29. Built: the theme watch and redraw (commit 1dc9adb).
+- Item 29. Built: the theme watch and redraw, a change before the layers are ready applied on load (commits 1dc9adb, 14fd36e).
 - Item 32. Built: the connection chip, the frozen values, the Needs you `unknown` hook, the reload on reconnect (commit 1dc9adb; the e2e spec leaves out the client's own simulated-disconnect console errors, commit after a2817fd). The "no batch for two refresh intervals" trigger is not built: the Gateway sends a batch only when something changed, so a quiet map would read as lost; the client's connection flag is the signal (docs/contract.md says so).
 - Item 4. Built: the dev View page's empty-map line (commit 14dafb9).
 - Item 5. Built: the click echo in Edit mode only (commit 1dc9adb).
@@ -45,3 +45,5 @@ Built (2026-11-02), branch `ccr-e1048b93-r2p8l4-notes-c`, on two agents (the fir
 - Stale-jar build fix. Built: `build/moduleContent` cleared before the structure is assembled; a scratch copy built at 0.3.0-SNAPSHOT then at 0.3.1 without `clean` failed at `:zipModule` before and builds after (commit 2e4eb80; `_bmad-output/deferred-work.md` resolved).
 
 Renders: `_bmad-output/backlog/renders/notes-c/README.md`.
+
+Final verification (2026-11-03, a third agent after a container restart): the first full run on a fresh stack found two product defects and four test defects of this branch, fixed and tested: item 16's grown image hid PT-2's name on L-SWD at zoom 16 (the names now keep clear of the 0.2 footprint, `MARKER_COLLISION_PADDING`, commit 24adbae); item 29 lost a theme change that came before the layers were ready (kept and applied on load, commit 14fd36e); the click-reply regexes held the id as literal text, the lost-connection check counted items with no value, and the tracer spec looked for the dev title on `/edit` and lost its reply locator (commits 1d1dc06, ce1a6cd, 14fd36e; a View-page test on `/` covers items 4 and 5). The whole chain then ran green in one final run.
