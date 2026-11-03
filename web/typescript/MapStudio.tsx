@@ -48,7 +48,7 @@ import { ThemeWatch } from './themeWatch';
 import {
     AREA_DASH, AREA_FILL_OPACITY, AREA_LINE_OPACITY, AREA_LINE_WIDTH, ARROW_IMAGE, CHIP_IMAGE, CHIP_PADDING, CHIP_SIZE, DIMMED_OPACITY, DISC_CENTER,
     FONT_CHIP, FONT_NAME, HALO_WIDTH, KPI_SIZE, KPI_TOP_PX, LINE_CHIP_OFFSET_BADGE_EM, LINE_CHIP_OFFSET_EM, LINE_DASH, LINE_DOT,
-    LINE_HALO_WIDTH, MARKER_IMAGE, MARKER_TOKENS, MarkerColors, NAME_SIZE, NAME_TOP_PX, SpriteSymbol, TEXT_PADDING, ZOOM_DOT, ZOOM_KPI,
+    LINE_HALO_WIDTH, MARKER_COLLISION_PADDING, MARKER_IMAGE, MARKER_TOKENS, MarkerColors, NAME_SIZE, NAME_TOP_PX, SpriteSymbol, TEXT_PADDING, ZOOM_DOT, ZOOM_KPI,
     ZOOM_NAME, imageFor, lineHaloDash, markerProperties, parseSprite, stateWord, textWidthPx
 } from './markers';
 import { PresetPalette, StylePreview, TintPalette } from './StylePreview';
@@ -1348,6 +1348,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         });
         const markerOffset: Expression = ['literal', [MARKER_IMAGE.width / 2 - DISC_CENTER[0], MARKER_IMAGE.height / 2 - DISC_CENTER[1]]];
         const dotOffset: Expression = ['literal', [0, 0]];
+        const markerPadding: Expression = ['literal', MARKER_COLLISION_PADDING];
         const iconOffset = ['step', ['zoom'], ['case', normal, dotOffset, markerOffset], ZOOM_NAME, markerOffset] as unknown as Expression;
         map.addLayer({
             id: LAYER_ITEM_MARKERS,
@@ -1361,8 +1362,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 'icon-offset': iconOffset,
                 'icon-allow-overlap': true,
                 'icon-ignore-placement': false,
-                // The image's own box is what the text keeps clear of; no padding round it.
-                'icon-padding': 0,
+                // The text keeps clear of the marker's footprint (MARKER_COLLISION_PADDING shrinks the image's
+                // box to it, item 16); a dot's own box, no padding.
+                'icon-padding': ['step', ['zoom'], ['case', normal, ['literal', [0]], markerPadding], ZOOM_NAME, markerPadding] as unknown as Expression,
                 // Drawn in rank order with the abnormal ones on top (lower keys draw first).
                 'symbol-sort-key': ['-', 1000, ['get', 'rank']]
             }

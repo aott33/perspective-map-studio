@@ -201,6 +201,18 @@ export const MARKER_IMAGE = { width: MARKER_REACH + BADGE_OFFSET + BADGE_HALO_RA
 /** The disc's centre in the marker image (the point the marker is anchored at). */
 export const DISC_CENTER: [number, number] = [MARKER_REACH, MARKER_REACH];
 /**
+ * The marker's footprint for label placement, from the disc's centre: the disc with its 2 px halo and a
+ * pixel to the left, the badge's halo disc up and down, the image's edge to the right. Item 16 grew
+ * the image so the selection ring is not cut off; the names and KPIs still keep clear of this
+ * footprint only (the one the 0.2 renders and the ER-27 review were placed with), so a crowded line's
+ * instrument names stay placed and only a selected marker's ring may draw over a neighbour's text.
+ */
+export const MARKER_FOOTPRINT = { left: DISC_RADIUS + 2 + 1, up: BADGE_OFFSET + BADGE_HALO_RADIUS, down: BADGE_OFFSET + BADGE_HALO_RADIUS };
+/** The marker layer's icon-padding (CSS order: top, right, bottom, left): negative, the image's box shrunk to MARKER_FOOTPRINT. */
+export const MARKER_COLLISION_PADDING: [number, number, number, number] = [
+    MARKER_FOOTPRINT.up - DISC_CENTER[1], 0, MARKER_FOOTPRINT.down - (MARKER_IMAGE.height - DISC_CENTER[1]), MARKER_FOOTPRINT.left - DISC_CENTER[0]
+];
+/**
  * The dot images: the dot centred in a 44 px square, the template's hit area. The sizes are the
  * owner's (review notes item 6): 14 px from zoom 12 to 14 and 10 px below, each with the 2 px halo in
  * the blank-map token so it reads on any basemap.

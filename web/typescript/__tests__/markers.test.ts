@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { ItemState } from '../live';
 import {
-    ARROW_IMAGE, CHIP_IMAGE, DISC_CENTER, DISC_RADIUS, DOT_IMAGE, DOT_MID, DOT_SMALL, INSTRUMENT_DISC_RADIUS, INSTRUMENT_GLYPH_SIZE, MARKER_IMAGE,
+    ARROW_IMAGE, CHIP_IMAGE, DISC_CENTER, DISC_RADIUS, DOT_IMAGE, DOT_MID, DOT_SMALL, INSTRUMENT_DISC_RADIUS, INSTRUMENT_GLYPH_SIZE, MARKER_COLLISION_PADDING, MARKER_FOOTPRINT, MARKER_IMAGE,
     MARKER_TOKENS, MarkerColors, RANK_ALARM, RANK_COMMS_LOST, RANK_NORMAL,
     BADGE_GLYPH_SIZE, BADGE_HALO_RADIUS, HALO_WIDTH, LINE_DASH, LINE_DOT, LINE_HALO_WIDTH, RANK_SELECTED, RANK_STALE, RANK_STYLE, areaProperties,
     badgeImageId, chipOffsetEm, dotImageId, imageFor, labelRank, lineHaloDash, lineLook,
@@ -300,6 +300,22 @@ describe('marker images', () => {
         expect(markerSvg(markerSpec('well-pad', LOST), {}, COLORS)).toContain('stroke-dasharray');
         expect(DISC_CENTER).toEqual([25, 25]);
         expect(MARKER_IMAGE).toEqual({ width: 61, height: 50 });
+    });
+
+    test('the labels keep clear of the 0.2 footprint, not the grown image (item 16): a crowded line keeps its instrument names', () => {
+        // The image grew to 61 by 50 px for the selection ring; the box the names keep clear of is the disc with
+        // its halo to the left (20 px), the badge's halo up and down (23 px) and the image's edge to the right.
+        expect(MARKER_FOOTPRINT).toEqual({ left: 20, up: 23, down: 23 });
+        expect(MARKER_COLLISION_PADDING).toEqual([-2, 0, -2, -5]);
+        const [top, right, bottom, left] = MARKER_COLLISION_PADDING;
+        expect(DISC_CENTER[0] + left).toBe(MARKER_FOOTPRINT.left);
+        expect(DISC_CENTER[1] + top).toBe(MARKER_FOOTPRINT.up);
+        expect(MARKER_IMAGE.height - DISC_CENTER[1] + bottom).toBe(MARKER_FOOTPRINT.down);
+        expect(right).toBe(0);
+        // The disc, its halo and the badge's halo disc lie inside the footprint; only the selection ring reaches past it.
+        expect(DISC_RADIUS + 2).toBeLessThanOrEqual(MARKER_FOOTPRINT.left);
+        expect(13 + BADGE_HALO_RADIUS).toBeLessThanOrEqual(MARKER_FOOTPRINT.up);
+        expect(DISC_RADIUS + 5 + 2).toBeGreaterThan(MARKER_FOOTPRINT.left);
     });
 
     /** Every circle of a marker SVG as (cx, cy, outer radius): the radius plus half the stroke. */
