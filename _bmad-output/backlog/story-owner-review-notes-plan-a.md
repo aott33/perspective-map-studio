@@ -43,6 +43,18 @@ worktree `/home/user/wt-notes-a`, branch `ccr-e1048b93-r2p8l4-notes-a`, dev stac
 - Added the 0.3.0 CHANGELOG entry and item 27 in EXPERIENCE.md's popup row.
 - Renders: `renders/notes-a/` with its README (items 13, 15, 17, 18, 19, 20, 21, 27).
 
+## Built, per item (the line appended to each item in the notes file)
+
+- Item 13. Built: option A rows (status right-aligned, the hourglass alone before a stale value, full labels, no check before "No active alarms", the hourglass before a stale alarm heading with the reason in its tooltip) in `popupParts.tsx`, `DefaultPopup.tsx` and `live.ts`, commits 0fca147 and 862366f (group a).
+- Item 14. Built: Esc closes the card, the sheet or a pick list and returns the focus to the map, the search field or the Needs you bar that opened it (`MapStudio.tsx`), commits 0fca147 and 151c724 (group a).
+- Item 15. Built: `qualityWords` in `live.ts` gives the popup's comms row, the KPI tooltips and the Needs you list's detail plain words, the code kept in `data-quality` and the tooltip, the bar unchanged, commits 0fca147 and a5299f1 (group a).
+- Item 17. Built: `segmentWords` is null on a line without instruments, so its popup shows no segment block and the map highlights nothing (`linePopup.ts`), commit 0fca147 (group a).
+- Item 18. Built: a pure `placePopup` (`popupPlacement.ts`) puts point and line cards inside the map less the top bar and the zoom card at their own width, panning by any overflow, commits 0fca147, 7e3a668 and 8ccbd24 (group a).
+- Item 19. Built: the line popup pins the header, segment, comms, the line's values and an alarm summary naming the instrument in alarm; only the instrument list scrolls, about four rows (`LinePopup.tsx`, `linePopup.ts`), commits 0fca147 and 862366f (group a).
+- Item 20. Built: a shared marker's popup anchors to the drawn centroid (`data-popup-anchor`) and a group splits once its members are a marker apart on screen, rebuilt on zoom (`shared.ts`, `features.ts`), commits 0fca147 and 6309e3e (group a).
+- Item 21. Built: no data reads "No data yet" and "Alarm state unknown" in the secondary colour with no glyph (`live.ts`, `popupParts.tsx`), commits 0fca147 and aa32513 (group a).
+- Item 27. Built: MapLibre's camera `padding` from the visible area (top bar, zoom card, an open sheet or card, the legend row) on Return, a search choice, a Needs you choice and Fit (`cameraPadding` in `MapStudio.tsx`, `visibleArea` in `popupPlacement.ts`), commit 0fca147 (group a).
+
 ## Status
 
 Built.
