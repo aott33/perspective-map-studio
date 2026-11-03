@@ -6,6 +6,8 @@ Light theme, taken on the group a dev stack (port 9101) with the module built fr
 Desktop renders are 1440 by 900, the phone render 390 by 844. Item 14 (Esc closes the popup) is behaviour
 and has no render; it is covered by `e2e/tests/popup.spec.mjs`.
 
+**After images re-taken on the merged build (groups a, b and c together, 2026-11-03)** on the merge's dev stack (port 9104), with the same names, sizes and states as below, so each pair shows the combined product; the before images are unchanged.
+
 | Item | What | Before | After |
 |---|---|---|---|
 | 13 | Showcase P21, comms lost: option A rows (status right-aligned, the hourglass alone before a stale value, full labels, the hourglass and no check before "No active alarms") | [before](item13-showcase-p21-before.png) | [after](item13-showcase-p21-after.png) |

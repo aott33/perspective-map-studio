@@ -2,6 +2,8 @@
 
 Light theme unless the name says dark. "Before" is the 0.3.0 build the owner tested (the committed docs screenshots at that commit, or a render of that build); "after" is this branch on the dev stack (port 9102). The dev stack has no internet tiles beyond OpenStreetMap's public ones, so the showcase draws on the blank map.
 
+**After images re-taken on the merged build (groups a, b and c together, 2026-11-03)** on the merge's dev stack (port 9104), with the same names, sizes and states as below, so each pair shows the combined product; the before images are unchanged. The item 12 quiet-bell choice pair (no number, "0") is re-taken too.
+
 | Item | Before | After |
 |---|---|---|
 | 1 scale bar bottom-aligned with Legend | before-mapstudio-controls-1440.png (the bar floats 4 px above the button) | item01-03-bottom-edge-1440-after.png, item01-03-bottom-edge-390-after.png |
