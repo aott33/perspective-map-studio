@@ -43,6 +43,12 @@ worktree `/home/user/wt-notes-a`, branch `ccr-e1048b93-r2p8l4-notes-a`, dev stac
 - Added the 0.3.0 CHANGELOG entry and item 27 in EXPERIENCE.md's popup row.
 - Renders: `renders/notes-a/` with its README (items 13, 15, 17, 18, 19, 20, 21, 27).
 
+## Resumed session (the third agent, after a container restart)
+
+- The second agent's last e2e run had four failures (items 14, 15, 18 and 20 checks); its fixes for 14, 15 and 20 were committed after that run started and passed in the next one.
+- The item 18 check failed twice more, both in the test: its bottom-right point sat in the Perspective App Bar toggle's 64 px corner (a click there opens the App Bar), now just above it; and every spot is at zoom 15, so the `view()` wait on `data-labels-zoom` passed before the jump's idle and a click could query the markers where the last placement left them and hit the line under Point 1. The loop now clears the attribute before each jump.
+- Renders: the "after" set and the item 18 Point 1 "before" (the base commit's module) were taken and committed; the README row for it now says what the base shows.
+
 ## Built, per item (the line appended to each item in the notes file)
 
 - Item 13. Built: option A rows (status right-aligned, the hourglass alone before a stale value, full labels, no check before "No active alarms", the hourglass before a stale alarm heading with the reason in its tooltip) in `popupParts.tsx`, `DefaultPopup.tsx` and `live.ts`, commits 0fca147 and 862366f (group a).
