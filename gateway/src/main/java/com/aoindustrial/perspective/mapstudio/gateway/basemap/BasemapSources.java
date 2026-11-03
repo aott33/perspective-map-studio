@@ -38,11 +38,18 @@ public final class BasemapSources {
         "https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg90?access_token=";
     public static final int MAPBOX_TILE_SIZE = 512;
     public static final int MAPBOX_MAXZOOM = 22;
-    /** Mapbox's text attribution for its satellite imagery, with the feedback link Mapbox asks for. */
+    /**
+     * Mapbox's text attribution for its satellite imagery, as its attribution guide asks of maps drawn from Mapbox
+     * tiles with another library (owner decision 2026-11-03): (c) Mapbox, (c) OpenStreetMap, "Improve this map"
+     * (the browser adds the map's position to it, by its class {@code mapbox-improve-map}) and, for satellite,
+     * (c) Maxar, each a link. The browser shows the Mapbox logo beside it while this source is drawn.
+     */
     public static final String MAPBOX_ATTRIBUTION =
-        "&copy; <a href=\"https://www.mapbox.com/about/maps/\" target=\"_blank\" rel=\"noopener\">Mapbox</a> "
-        + "&copy; Maxar "
-        + "<a href=\"https://apps.mapbox.com/feedback/\" target=\"_blank\" rel=\"noopener\">Improve this map</a>";
+        "<a href=\"https://www.mapbox.com/about/maps/\" target=\"_blank\" rel=\"noopener\">&copy; Mapbox</a> "
+        + "<a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener\">&copy; OpenStreetMap</a> "
+        + "<a class=\"mapbox-improve-map\" href=\"https://apps.mapbox.com/feedback/\" target=\"_blank\" rel=\"noopener\">"
+        + "Improve this map</a> "
+        + "<a href=\"https://www.maxar.com/\" target=\"_blank\" rel=\"noopener\">&copy; Maxar</a>";
 
     private final TokenSource tokens;
 

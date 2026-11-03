@@ -72,9 +72,22 @@ class BasemapSourcesTest {
                 r.getAsJsonArray("tiles").get(0).getAsString());
             assertEquals(512, r.get("tileSize").getAsInt());
             assertEquals(22, r.get("maxzoom").getAsInt());
-            assertTrue(r.get("attribution").getAsString().contains("Mapbox"));
-            assertTrue(r.get("attribution").getAsString().contains("Maxar"));
-            assertTrue(r.get("attribution").getAsString().contains("Improve this map"));
+            // Mapbox's attribution guide, for satellite: four links, in this order (owner decision 2026-11-03).
+            String attribution = r.get("attribution").getAsString();
+            String[] links = {
+                "<a href=\"https://www.mapbox.com/about/maps/\" target=\"_blank\" rel=\"noopener\">&copy; Mapbox</a>",
+                "<a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener\">&copy; OpenStreetMap</a>",
+                "<a class=\"mapbox-improve-map\" href=\"https://apps.mapbox.com/feedback/\" target=\"_blank\" rel=\"noopener\">"
+                    + "Improve this map</a>",
+                "<a href=\"https://www.maxar.com/\" target=\"_blank\" rel=\"noopener\">&copy; Maxar</a>"
+            };
+            int at = -1;
+            for (String link : links) {
+                int next = attribution.indexOf(link);
+                assertTrue(next > at, link + " after the one before it in " + attribution);
+                at = next;
+            }
+            assertFalse(attribution.contains(PUBLIC), "the token is in the tile URL only");
             List<String> lines = log.lines(Level.DEBUG);
             assertEquals(1, lines.size(), lines.toString());
             assertTrue(lines.get(0).contains("Internal/map-token"), lines.get(0));

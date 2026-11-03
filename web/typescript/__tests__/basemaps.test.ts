@@ -1,8 +1,9 @@
 import {
-    BASEMAP_STORAGE_KEY, OSM_SOURCE, basemapSourceBody, fallbackBasemap, initialBasemap, offeredBasemaps, offersBasemapSwitch, readBasemapSource,
+    BASEMAP_STORAGE_KEY, IMPROVE_MAP_CLASS, OSM_SOURCE, feedbackHref, providerLogo, basemapSourceBody, fallbackBasemap, initialBasemap, offeredBasemaps, offersBasemapSwitch, readBasemapSource,
     QUIET_RASTER_PAINT, rasterPaint, refusedText, rememberBasemap, rememberedBasemap, tilesFailedText
 } from '../basemaps';
 import { MessageTypes, basemapSource, readReply, replyText } from '../messages';
+import { MAPBOX_LOGO_HEIGHT, MAPBOX_LOGO_HREF, MAPBOX_LOGO_SVG, MAPBOX_LOGO_WIDTH, mapboxLogoDataUrl } from '../mapboxLogo';
 
 const TOKEN = 'pk.eyJ1IjoiZGV2In0.abc';
 const REPLY = {
@@ -63,6 +64,7 @@ describe('the basemaps the setup offers (epic 3 entry 6)', () => {
         expect(OSM_SOURCE.tiles).toEqual(['https://tile.openstreetmap.org/{z}/{x}/{y}.png']);
         expect(OSM_SOURCE.attribution).toContain('openstreetmap.org/copyright');
         expect(OSM_SOURCE.attribution).toContain('OpenStreetMap</a> contributors');
+        expect(OSM_SOURCE.provider).toBe('osm');
     });
 
     test('the status words name the basemap', () => {
@@ -82,10 +84,10 @@ describe('basemap.source and its reply', () => {
     test('a reply is read into a raster source, with defaults for a missing size or zoom', () => {
         expect(readBasemapSource(REPLY)).toEqual({
             basemap: 'satellite', provider: 'mapbox',
-            source: { tiles: REPLY.tiles, tileSize: 512, maxzoom: 22, attribution: REPLY.attribution }
+            source: { tiles: REPLY.tiles, tileSize: 512, maxzoom: 22, attribution: REPLY.attribution, provider: 'mapbox' }
         });
         const bare = readBasemapSource({ basemap: 'satellite', tiles: ['https://x/{z}/{x}/{y}.png'] });
-        expect(bare?.source).toEqual({ tiles: ['https://x/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 22, attribution: '' });
+        expect(bare?.source).toEqual({ tiles: ['https://x/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 22, attribution: '', provider: '' });
         expect(bare?.provider).toBe('');
     });
 
@@ -115,5 +117,48 @@ describe('the basemap switch (owner review, item 3)', () => {
         expect(offersBasemapSwitch(['none', 'osm', 'satellite'])).toBe(true);
         // The setup's first line is the default when the viewer has chosen nothing.
         expect(initialBasemap(['osm', 'none'], null)).toBe('osm');
+    });
+});
+
+describe('the Mapbox logo and attribution while Satellite is drawn (owner decision 2026-11-03)', () => {
+    const satellite = readBasemapSource(REPLY)!.source;
+
+    test('the logo shows with a Mapbox Satellite source only', () => {
+        expect(providerLogo('satellite', satellite)).toBe('mapbox');
+        expect(providerLogo('osm', OSM_SOURCE)).toBeNull();
+        expect(providerLogo('none', null)).toBeNull();
+        expect(providerLogo(null, null)).toBeNull();
+        // Satellite chosen but its source not drawn yet (awaited or refused): no logo.
+        expect(providerLogo('satellite', null)).toBeNull();
+        // A later satellite provider (the architecture's MapTiler switch) brings no Mapbox logo.
+        expect(providerLogo('satellite', { ...satellite, provider: 'maptiler' })).toBeNull();
+    });
+
+    test('"Improve this map" carries the map position as the attribution guide gives it, and no token', () => {
+        expect(IMPROVE_MAP_CLASS).toBe('mapbox-improve-map');
+        expect(feedbackHref('https://apps.mapbox.com/feedback/', { lng: -104.9725, lat: 39.7445 }, 12))
+            .toBe('https://apps.mapbox.com/feedback/#/-104.9725/39.7445/12');
+        // A position it carried is replaced; long decimals are rounded (five for the place, two for the zoom).
+        expect(feedbackHref('https://apps.mapbox.com/feedback/#/1/2/3', { lng: 10.1234567, lat: -45.9876543 }, 15.4567))
+            .toBe('https://apps.mapbox.com/feedback/#/10.12346/-45.98765/15.46');
+        // A longitude past the antimeridian is wrapped.
+        expect(feedbackHref('https://apps.mapbox.com/feedback/', { lng: 190, lat: 0 }, 2)).toBe('https://apps.mapbox.com/feedback/#/-170/0/2');
+        expect(feedbackHref('https://apps.mapbox.com/feedback/', { lng: -190, lat: 0 }, 2)).toBe('https://apps.mapbox.com/feedback/#/170/0/2');
+        expect(feedbackHref('https://apps.mapbox.com/feedback/', { lng: 180, lat: 0 }, 0)).toBe('https://apps.mapbox.com/feedback/#/180/0/0');
+        expect(feedbackHref('https://apps.mapbox.com/feedback/', { lng: 0, lat: 0 }, 0)).not.toContain('access_token');
+    });
+
+    test('the logo is Mapbox\'s own wordmark, unstyled, inlined as a data URL', () => {
+        // mapbox-gl-js v1.13.3 src/css/svg/mapboxgl-ctrl-logo.svg (NOTICE): its size and its own colours.
+        expect(MAPBOX_LOGO_SVG.startsWith('<svg width="88" height="23" viewBox="0 0 88 23"')).toBe(true);
+        expect(MAPBOX_LOGO_WIDTH).toBe(88);
+        expect(MAPBOX_LOGO_HEIGHT).toBe(23);
+        expect(MAPBOX_LOGO_SVG).toContain('fill="#fff"');
+        expect(MAPBOX_LOGO_SVG).toContain('stroke="#000"');
+        expect(MAPBOX_LOGO_SVG).not.toMatch(/var\(|currentColor|https?:\/\/(?!www\.w3\.org)/);
+        expect(MAPBOX_LOGO_HREF).toBe('https://www.mapbox.com/');
+        const url = mapboxLogoDataUrl();
+        expect(url.startsWith('data:image/svg+xml;charset=utf-8,')).toBe(true);
+        expect(decodeURIComponent(url.slice('data:image/svg+xml;charset=utf-8,'.length))).toBe(MAPBOX_LOGO_SVG);
     });
 });

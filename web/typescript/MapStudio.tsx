@@ -80,7 +80,7 @@ import { CameraPadding, PopupAnchor, Rect, cameraPadding, placePopup, placedMaxW
 import { SHARED_M, sharedWithinM } from './shared';
 import { registerTestHook, registerTestView, takeTestReply } from './testHook';
 import { drawColor, themeColor } from './theme';
-import { rasterPaint } from './basemaps';
+import { IMPROVE_MAP_CLASS, feedbackHref, providerLogo, rasterPaint } from './basemaps';
 import { Kind } from './adapters';
 
 /** Must match MapStudioComponent.COMPONENT_ID on the Java side. */
@@ -997,8 +997,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.legendControl.setToggles(this.toggles.lines, this.toggles.names);
         map.addControl(this.legendControl, 'bottom-left');
         // The provider's attribution (R10, always shown with a basemap): small muted text along the bottom-right
-        // edge under the App Bar toggle, never covering it (owner review, item 3).
+        // edge under the App Bar toggle, never covering it (owner review, item 3); on a phone with Satellite it sits
+        // above the Legend row instead (the stylesheet), since Mapbox's four links do not fit beside the row.
         map.addControl(new AttributionControl({ compact: false }), 'bottom-right');
+        // Mapbox's "Improve this map" carries the map's position (its attribution guide): after the control
+        // rebuilds its links (its listeners run first) and after every move.
+        map.on('sourcedata', this.updateFeedbackLinks);
+        map.on('styledata', this.updateFeedbackLinks);
+        map.on('moveend', this.updateFeedbackLinks);
         map.on('error', this.onMapError);
         map.on('idle', this.onMapIdle);
         map.on('moveend', () => this.publishView(map));
@@ -1473,8 +1479,38 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 this.tiles = 'none';
             }
         }
+        // The Mapbox logo beside the scale bar while Satellite is drawn, and only then (owner decision 2026-11-03).
+        const logo = providerLogo(b.selected, b.source);
+        if (this.legendControl) {
+            this.legendControl.setLogo(logo);
+        }
+        if (this.mapContainer) {
+            this.mapContainer.setAttribute('data-provider-logo', logo || '');
+        }
+        this.updateFeedbackLinks();
         this.publishBasemap();
     }
+
+    /** The attribution's "Improve this map" links with the map's centre and zoom (basemaps.ts feedbackHref). */
+    private updateFeedbackLinks = (): void => {
+        const map = this.map;
+        const el = this.mapContainer;
+        if (!map || !el) {
+            return;
+        }
+        const links = el.querySelectorAll<HTMLAnchorElement>('.maplibregl-ctrl-attrib a.' + IMPROVE_MAP_CLASS);
+        if (links.length === 0) {
+            return;
+        }
+        const center = map.getCenter();
+        const zoom = map.getZoom();
+        links.forEach((a) => {
+            const href = feedbackHref(a.getAttribute('href') || '', center, zoom);
+            if (a.getAttribute('href') !== href) {
+                a.setAttribute('href', href);
+            }
+        });
+    };
 
     /** The basemap's state for the control's status line and the e2e suite. */
     private publishBasemap(): void {

@@ -1045,6 +1045,23 @@
     display: none;
 }
 
+/* The Mapbox logo while Satellite is drawn (owner decision 2026-11-03; Mapbox's attribution guide): Mapbox's
+   own wordmark at its own size (88 by 23 px), bottom-left in the Legend row after the scale bar and on the
+   button's bottom edge, never restyled (no filter, no opacity, no colour), so it carries no token. */
+.mapstudio .mapstudio-mapbox-logo {
+    display: block;
+    flex: none;
+    width: 88px;
+    height: 23px;
+    line-height: 0;
+}
+
+.mapstudio .mapstudio-mapbox-logo img {
+    display: block;
+    width: 88px;
+    height: 23px;
+}
+
 .mapstudio .mapstudio-legend-panel {
     display: flex;
     flex-direction: column;
@@ -2143,6 +2160,20 @@
 }
 
 @media (max-width: 767px) {
+    /* Satellite on a phone: Mapbox's four links (about 270 px) do not fit beside the Legend row with the logo, and
+       two lines would reach the App Bar toggle, so the attribution sits on one line just above the Legend row at the
+       left, clear of the toggle's corner (app-bar-clearance 76 px); the row is the 44 px button. */
+    .mapstudio .mapstudio-map[data-provider-logo="mapbox"] .maplibregl-ctrl-bottom-right {
+        left: var(--mapstudio-map-inset);
+        right: auto;
+        bottom: calc(var(--mapstudio-map-inset) + 44px + 6px);
+        max-width: calc(100% - 76px - var(--mapstudio-map-inset));
+    }
+
+    .mapstudio .mapstudio-map[data-provider-logo="mapbox"] .maplibregl-ctrl-bottom-right .maplibregl-ctrl {
+        margin: 0;
+    }
+
     /* The corner spans the map so the sheet can; the row keeps its own width and the App Bar corner stays clear.
        MapLibre gives every control `transform: translate(0)`, which would make the legend control the sheet's
        containing block; none, so the corner is. */
