@@ -22,11 +22,18 @@ Notes (owner, 2026-11-03):
 
 ## 2. Dev map with `/live` (5 min)
 
-- [ ] Point 3: comms reads "No data" (hover for the reason), no check mark, "Alarm state unknown".
-- [ ] **P12 pressure 950**, then **Acknowledge P12**: the badge turns to the outlined triangle with "!"; select Point 1: its rings are not cut off.
-- [ ] Tracer line: its popup has no segment block.
-- [ ] Shared A at zoom 18: two markers; at zoom 16 one marker whose popup points at it.
-- [ ] OpenStreetMap: quieter, labels and lines easy to read. Satellite (with your token): the Mapbox logo bottom-right with the four attribution links (beside them on a wide map; on a phone the logo left of the App Bar toggle and the links one line above it), nothing covering the App Bar toggle, the zoom card or the Legend button.
+- [x] Point 3: comms reads "No data" (hover for the reason), no check mark, "Alarm state unknown".
+- [x] **P12 pressure 950**, then **Acknowledge P12**: the badge turns to the outlined triangle with "!"; select Point 1: its rings are not cut off.
+- [x] Tracer line: its popup has no segment block.
+- [x] Shared A at zoom 18: two markers; at zoom 16 one marker whose popup points at it.
+- [x] OpenStreetMap: quieter, labels and lines easy to read. Satellite (with your token): the Mapbox logo bottom-right with the four attribution links (beside them on a wide map; on a phone the logo left of the App Bar toggle and the links one line above it), nothing covering the App Bar toggle, the zoom card or the Legend button.
+
+Notes (owner, 2026-11-03):
+
+- All as expected; P12 pressure 400 clears the alarm.
+- View alarms leaves the map for the alarm page, and coming back loses the map's place (R4).
+- Close markers could look like a stack (R5).
+- Satellite: the logo and the attribution are both required by Mapbox's guide.
 
 ## 3. Phone, 390 px device mode (4 min)
 
