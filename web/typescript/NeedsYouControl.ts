@@ -25,7 +25,7 @@
  */
 
 import { glyphSvg } from './controls';
-import { EMPTY_SUMMARY, LIST_UNKNOWN, NOTHING_NEEDS_YOU, NeedsYouRow, NeedsYouSummary, RANKED_NOTE, barModel, total } from './needsyou';
+import { EMPTY_SUMMARY, LIST_UNKNOWN, NOTHING_NEEDS_YOU, NeedsYouRow, NeedsYouSummary, RANKED_NOTE, barKey, barModel, total } from './needsyou';
 
 /** The sprite the state and kind glyphs come from, as the default popup draws them (DefaultPopup.tsx). */
 const SPRITE_URL = '/res/mapstudio/icons/mapstudio-icons.svg';
@@ -51,6 +51,8 @@ export class NeedsYouControl {
     private panel: HTMLDivElement | null = null;
     private summary: NeedsYouSummary = EMPTY_SUMMARY;
     private unknown = false;
+    /** What the bar last drew (`barKey`), so it redraws only when its counts or look change (owner re-test R1). */
+    private drawnKey = '';
     private readonly panelId = 'mapstudio-needs-' + Math.random().toString(36).slice(2, 8);
 
     constructor(private readonly onChoose: (row: NeedsYouRow) => void, private readonly onToggle: (open: boolean) => void) {}
@@ -81,6 +83,7 @@ export class NeedsYouControl {
         }
         this.bar = null;
         this.host = null;
+        this.drawnKey = '';
     }
 
     /** The summary of the last batch: the bar follows, and an open list is drawn again. */
@@ -184,6 +187,13 @@ export class NeedsYouControl {
         if (!bar) {
             return;
         }
+        // Only when the counts or the look change (owner re-test R1): the renderer calls this on every draw, a popup
+        // opening or closing among them, and a glyph drawn again flashed while its sprite symbol loaded again.
+        const key = barKey(this.summary, this.unknown);
+        if (key === this.drawnKey) {
+            return;
+        }
+        this.drawnKey = key;
         while (bar.firstChild) {
             bar.removeChild(bar.firstChild);
         }

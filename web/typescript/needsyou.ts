@@ -227,6 +227,17 @@ export function barModel(summary: NeedsYouSummary, unknown: boolean): BarModel {
     return { state: n === 0 ? 'ok' : 'needs', label: summaryText(summary.counts), bell: look.tone, counts };
 }
 
+/**
+ * What the bar draws, as one string (owner re-test R1): the bar redraws its glyphs only when this changes, so a
+ * batch or a popup opening or closing that leaves the counts and the look as they were leaves the bar's nodes in
+ * place (a redrawn `<use>` glyph flashed as it loaded again). Pure.
+ */
+export function barKey(summary: NeedsYouSummary, unknown: boolean): string {
+    const model = barModel(summary, unknown);
+    return [model.state, model.bell, model.label, total(summary.counts), summary.highestPriority,
+        model.counts.map((c) => c.kind + ':' + c.glyph + ':' + c.n).join(',')].join('|');
+}
+
 /** The summary from the loaded items, the kind list and the live state. Pure. */
 export function needsYou(items: readonly MapItemRecord[], kinds: readonly Kind[], live: LiveState, now: number): NeedsYouSummary {
     const kindById = new Map<string, Kind>();

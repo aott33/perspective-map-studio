@@ -42,6 +42,7 @@ import { LegendToggle, legendKey, readToggle, sessionStore, writeToggle } from '
 import { NeedsYouControl } from './NeedsYouControl';
 import { NeedsYouRow, needsYou } from './needsyou';
 import { FIT_PADDING_PX, StartingArea, readStartingArea, startingAreaKey } from './startingArea';
+import { Place, placeKey, readPlace, writePlace } from './place';
 import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, displayShows, freezeLive, iconKpiOf, itemPreset, itemState } from './live';
 import { CONNECTED, ConnectionState, ConnectionWatch, connectionChipText, connectionDetailText } from './connection';
 import { ThemeWatch } from './themeWatch';
@@ -130,6 +131,8 @@ interface OpenPopup {
     openedAt: number;
 }
 
+/** How long a remembered selection waits for its item and the first full batch (owner re-test R4 (a)). */
+const RESTORE_WAIT_MS = 30_000;
 /** How long a custom popup view waits for the popup detail (the base path) before it opens without it. */
 const POPUP_DETAIL_WAIT_MS = 2000;
 /** The sheet keeps the selected marker at least this far above its top edge. */
@@ -911,6 +914,16 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private tiles: 'none' | 'loading' | 'loaded' | 'failed' = 'none';
     /** The starting area last applied (startingAreaKey), so a changed prop moves the map once. */
     private appliedArea = '';
+    /** This map's key in sessionStorage for its place (owner re-test R4 (a), place.ts), set at mount. */
+    private placeKey = '';
+    /** A remembered selection and popup still to put back once its item and its kind's display have arrived. */
+    private restore: Place | null = null;
+    /** When the restore was asked for, so a selection whose item never comes is dropped. */
+    private restoreSince = 0;
+    /** The selection and popup last remembered, so a redraw that changed neither writes nothing. */
+    private savedSelection = '';
+    /** Set as the component unmounts: closing the popup and removing the map then must not overwrite the place. */
+    private unmounting = false;
 
     /** The starting area the prop names; an invalid one is said once, in the console. */
     private startingArea(): StartingArea {
@@ -928,6 +941,16 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         const area = this.startingArea();
         this.appliedArea = startingAreaKey(area) + (readStartingArea(this.props.props.startingArea).problem || '');
+        // The place this page's map had earlier in the browser session (owner re-test R4 (a)): its camera instead of
+        // the starting area, and its selection and open popup put back once the items have come (applyRestore).
+        this.placeKey = placeKey(this.projectName(), typeof window !== 'undefined' ? window.location.pathname : '',
+            String(this.props.store.addressPathString || ''));
+        const place = readPlace(sessionStore(), this.placeKey);
+        if (place) {
+            this.restore = place.selected ? place : null;
+            this.restoreSince = Date.now();
+            this.savedSelection = place.selected ? this.selectionKeyOf(place) : '';
+        }
         const root = this.props.store.element as HTMLElement | undefined;
         // The blank map and the halos are the blank-map token (DESIGN.md basemap-blank, `--neutral-20`).
         const colors = {
@@ -955,9 +978,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     paint: { 'background-color': colors.background }
                 }]
             },
-            ...(area.kind === 'bounds'
-                ? { bounds: area.bounds, fitBoundsOptions: { padding: FIT_PADDING_PX } }
-                : { center: area.center, zoom: area.zoom }),
+            ...(place
+                ? { center: place.center, zoom: place.zoom }
+                : area.kind === 'bounds'
+                    ? { bounds: area.bounds, fitBoundsOptions: { padding: FIT_PADDING_PX } }
+                    : { center: area.center, zoom: area.zoom }),
             attributionControl: false
         });
         // The View-mode controls as designed (epic 3 entry 14, DESIGN.md View mode): one zoom card top-right
@@ -1010,7 +1035,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
         map.on('moveend', this.updateFeedbackLinks);
         map.on('error', this.onMapError);
         map.on('idle', this.onMapIdle);
-        map.on('moveend', () => this.publishView(map));
+        map.on('moveend', () => {
+            this.publishView(map);
+            this.savePlace();
+        });
         map.on('movestart', this.onMoveStart);
         map.on('zoomend', () => this.onZoomEnd(map));
         map.on('load', () => {
@@ -1264,6 +1292,97 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.dropQueuedFeatures();
         this.applyEditing();
         this.applyStartingArea();
+        this.applyRestore();
+        this.saveSelection();
+    }
+
+    /** The project for the place's key, or null when the client does not say. */
+    private projectName(): string | null {
+        const client = clientOf(this.props.store);
+        return client && typeof client.projectName === 'string' && client.projectName !== '' ? client.projectName : null;
+    }
+
+    /** The selection and the open popup as the place keeps them, as one string. */
+    private selectionKeyOf(place: Pick<Place, 'selected' | 'popup' | 'popupAt'>): string {
+        return JSON.stringify([place.selected, place.popup, place.popupAt]);
+    }
+
+    /** The place now: the camera, the selection and whether its popup is open (a pick list is not kept). */
+    private currentPlace(): Place | null {
+        const map = this.map;
+        if (!map) {
+            return null;
+        }
+        const c = map.getCenter();
+        const sel = this.state.selected;
+        const open = this.state.popup;
+        const selected = sel ? { id: sel.id, kind: sel.kind, segment: sel.kind === 'line' && sel.segment ? sel.segment : null } : null;
+        const popup = !!(sel && open && open.point.id === sel.id);
+        return { center: [c.lng, c.lat], zoom: map.getZoom(), selected, popup, popupAt: popup && open && open.line ? open.lngLat : null };
+    }
+
+    /** Remember the place for the browser session (owner re-test R4 (a)); not while a restore is pending or unmounting. */
+    private savePlace(): void {
+        if (this.unmounting || this.restore || !this.placeKey) {
+            return;
+        }
+        const place = this.currentPlace();
+        if (place) {
+            this.savedSelection = this.selectionKeyOf(place);
+            writePlace(sessionStore(), this.placeKey, place);
+        }
+    }
+
+    /** The selection or the popup changed: remember the place (a redraw that changed neither writes nothing). */
+    private saveSelection(): void {
+        if (this.unmounting || this.restore || !this.map) {
+            return;
+        }
+        const place = this.currentPlace();
+        if (place && this.selectionKeyOf(place) !== this.savedSelection) {
+            this.savePlace();
+        }
+    }
+
+    /**
+     * Put the remembered selection and popup back (owner re-test R4 (a)) once the item is on the map and the first
+     * full batch has brought its kind's display: a point's card or sheet opens as a click opens it, a line's popup at
+     * the remembered place on the line, or the item is only selected. The camera came back at mount, so nothing here
+     * moves it but the popup's own placement. An item that is gone, or that has not come within RESTORE_WAIT_MS, is
+     * dropped.
+     */
+    private applyRestore(): void {
+        const restore = this.restore;
+        const delegate = this.props.delegate;
+        if (!restore || !restore.selected || !this.map || !this.itemsReady || !delegate) {
+            return;
+        }
+        const sel = restore.selected;
+        const item = this.liveItem(sel.id);
+        const waited = Date.now() - this.restoreSince > RESTORE_WAIT_MS;
+        if (!item || delegate.live.fulls === 0) {
+            if (waited || (delegate.itemsRevision > 0 && delegate.live.fulls > 0 && !item)) {
+                this.restore = null;
+                console.info('[MapStudio] The remembered selection ' + sel.id + ' is no longer on the map.');
+            }
+            return;
+        }
+        this.restore = null;
+        if (sel.kind === 'point' && item.geometry.type === 'Point') {
+            const at = this.anchorFor(item.id, [item.geometry.coordinates[0], item.geometry.coordinates[1]]);
+            if (restore.popup) {
+                this.openPopup(this.popupPoint(item.id, item.name, item.kind), at);
+            } else {
+                this.setState({ selected: { id: item.id, kind: 'point' }, pick: null });
+            }
+        } else if (sel.kind === 'line' && item.geometry.type === 'LineString') {
+            if (restore.popup && restore.popupAt) {
+                this.openLinePopup(item.id, sel.segment, restore.popupAt);
+            } else {
+                this.selectLine(item.id, sel.segment);
+            }
+        }
+        console.info('[MapStudio] The map\'s place came back: ' + item.name + (restore.popup ? ' with its popup.' : ' selected.'));
     }
 
     /**
@@ -2102,6 +2221,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     }
 
     componentWillUnmount(): void {
+        this.unmounting = true;
         this.stopPopupClock();
         if (typeof window !== 'undefined') {
             window.removeEventListener('storage', this.onStorage);

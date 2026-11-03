@@ -1,7 +1,7 @@
 import { Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import { KindDisplay, LIVE_INITIAL, LiveState, LiveValue } from '../live';
-import { BAR_QUIET, BAR_UNKNOWN, barModel, bellLook, countParts, countText, EMPTY_SUMMARY, needsYou, summaryText, total } from '../needsyou';
+import { BAR_QUIET, BAR_UNKNOWN, barKey, barModel, bellLook, countParts, countText, EMPTY_SUMMARY, needsYou, summaryText, total } from '../needsyou';
 
 const T = '2026-10-28T10:00:00Z';
 const NOW = Date.parse('2026-10-28T10:04:00Z');
@@ -148,5 +148,28 @@ describe('the Needs you summary (epic 3 entry 3)', () => {
         // Unknown: whatever the last summary was, the bar shows no counts.
         expect(barModel(s, true)).toEqual({ state: 'unknown', label: BAR_UNKNOWN, bell: 'none', counts: [{ kind: 'alarm', glyph: 'bell-outline', n: '?' }] });
         expect(BAR_UNKNOWN).toContain('state unknown');
+    });
+});
+
+describe('the bar redraws only when its counts or look change (owner re-test R1)', () => {
+    const summary = (alarm: number, commsLost: number, stale: number, p = 1, unacked = 1) => ({
+        counts: { alarm, commsLost, stale }, rows: [], highestPriority: alarm > 0 ? p : 0, highestUnackedPriority: alarm > 0 ? unacked : 0
+    });
+
+    test('the same counts and look give the same key, whatever the rows (a popup opening or closing redraws the map, not the bar)', () => {
+        const a = summary(1, 1, 1);
+        const b = { ...summary(1, 1, 1), rows: [{ id: 'x' }] as unknown as typeof a.rows };
+        expect(barKey(a, false)).toBe(barKey(b, false));
+        expect(barKey(EMPTY_SUMMARY, false)).toBe(barKey(summary(0, 0, 0), false));
+    });
+
+    test('a changed count, priority, acknowledgement or the unknown state changes the key', () => {
+        const base = barKey(summary(1, 1, 1), false);
+        expect(barKey(summary(2, 1, 1), false)).not.toBe(base);
+        expect(barKey(summary(1, 0, 1), false)).not.toBe(base);
+        expect(barKey(summary(1, 1, 0), false)).not.toBe(base);
+        expect(barKey(summary(1, 1, 1, 2, 2), false)).not.toBe(base);
+        expect(barKey(summary(1, 1, 1, 1, 0), false)).not.toBe(base);
+        expect(barKey(summary(1, 1, 1), true)).not.toBe(base);
     });
 });
