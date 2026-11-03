@@ -50,8 +50,12 @@ Notes (owner, 2026-11-03):
 
 ## 5. By hand only (8 min)
 
-- [ ] Gateway stopped: with a map open, `docker stop <gateway container>`: a chip says the connection is lost, values show as stale, the bell shows "?"; `docker start`: it recovers by itself. Then re-seed.
+- [x] Gateway stopped: with a map open, `docker stop <gateway container>`: a chip says the connection is lost, values show as stale, the bell shows "?"; `docker start`: it recovers by itself. Then re-seed.
 - [ ] Designer, Map Studio Setup: Map token is two labelled rows (provider, secret), saves as before.
-- [ ] After a restart, the showcase still shows SWD1 stale without re-seeding (item 10).
+- [x] After a restart, the showcase still shows SWD1 stale without re-seeding (item 10).
 
 Notes:
+
+- Gateway stopped: the chip "No connection - values from 10:02", every value stale, recovery on start. After the restart the showcase's SWD1 is stale without a re-seed (the dev map's SWD1 is a different item and reads good, as it should).
+- SWD1's custom popup view (`Popups/SiteCard`) shows a scroll bar and its first line is cut off under the close row although the text nearly fits (R7).
+
