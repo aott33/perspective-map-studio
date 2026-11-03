@@ -280,7 +280,8 @@ test.describe('the owner\'s review notes: Esc, plain words, placement and the ca
             'the left edge': [28, box.height / 2],
             'the right edge': [box.width - 28, box.height / 2],
             'the bottom edge': [box.width / 2, box.height - 28],
-            'the bottom-right corner': [box.width - 40, box.height - 40]
+            // Just above the bottom-right 64 px, the Perspective App Bar toggle's corner (a click there opens the App Bar).
+            'the bottom-right corner': [box.width - 40, box.height - 64 - 16]
         };
         for (const [where, at] of Object.entries(spots)) {
             const center = centerFor(box, TRACER.points.p1.lngLat, at, 15);
