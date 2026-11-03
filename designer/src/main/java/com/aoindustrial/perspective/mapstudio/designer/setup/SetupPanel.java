@@ -118,6 +118,12 @@ public final class SetupPanel extends JPanel {
     private final FormParts.Column empty = new FormParts.Column(Theme.FORM_MAX, Theme.TAB_PADDING, 8, 24);
     private final JButton create = new JButton(SetupForm.msg("setup.empty.create"));
 
+    /**
+     * The key of the second map token row (the secret name; item 31). Not a setup field: the value is
+     * {@link SetupForm#TOKEN_SECRET}, and the row takes the token warnings about the name.
+     */
+    static final String TOKEN_SECRET_NAME = SetupForm.TOKEN_SECRET + ".name";
+
     // Fields
     private final Map<String, FormParts.Row> rows = new LinkedHashMap<>();
     private final PickerField connection = new PickerField(this::connectionItems, false);
@@ -134,7 +140,6 @@ public final class SetupPanel extends JPanel {
     private final PickerField alarmPage = new PickerField(this::pageItems, true);
     private final PickerField provider = new PickerField(this::providerItems, false);
     private final PickerField secretName = new PickerField(this::secretNameItems, false);
-    private final FormParts.Flow token = new FormParts.Flow(8, 6);
     private final Timer secretNamesTimer = new Timer(400, e -> loadSecretNames());
 
     // Footer
@@ -286,10 +291,6 @@ public final class SetupPanel extends JPanel {
         for (String b : BASEMAPS) {
             basemapBoxes.put(b, basemapBox(b, SetupForm.msg("setup.basemap." + b)));
         }
-        provider.setFieldWidth(170);
-        secretName.setFieldWidth(202);
-        token.add(provider);
-        token.add(secretName);
 
         form.put(new FormParts.Heading(SetupForm.msg("setup.section.store")), 8);
         form.put(row(SetupForm.CONNECTION, connection, connection.labelTarget(), Theme.FIELD), 8);
@@ -304,12 +305,12 @@ public final class SetupPanel extends JPanel {
         form.put(new FormParts.Heading(SetupForm.msg("setup.section.map")), Theme.SECTION_GAP);
         form.put(row(SetupForm.BASEMAPS, basemaps, basemapBoxes.get("none"), 420), 8);
         form.put(row(SetupForm.ALARM_PAGE, alarmPage, alarmPage.labelTarget(), Theme.FIELD), Theme.ROW_GAP);
-        FormParts.Row tokenRow = row(SetupForm.TOKEN_SECRET, token, provider.labelTarget(), 380);
-        tokenRow.setNote(SetupForm.msg("setup.note.tokenSecret"));
-        secretName.labelTarget().getAccessibleContext().setAccessibleName(SetupForm.msg("setup.label.tokenSecret.name"));
-        provider.labelTarget().getAccessibleContext().setAccessibleName(
-            SetupForm.msg("setup.label.tokenSecret.provider"));
-        form.put(tokenRow, Theme.ROW_GAP);
+        // The map token as two labelled rows (owner review notes item 31): the provider, then the secret
+        // name with the "Names only" line under it; still one setup.json value, tokenSecret <provider>/<name>.
+        form.put(row(SetupForm.TOKEN_SECRET, provider, provider.labelTarget(), Theme.FIELD), 8);
+        FormParts.Row tokenNameRow = row(TOKEN_SECRET_NAME, secretName, secretName.labelTarget(), Theme.FIELD);
+        tokenNameRow.setNote(SetupForm.msg("setup.note.tokenSecret"));
+        form.put(tokenNameRow, Theme.ROW_GAP);
         center.add(formScroll, Mode.EDIT.name());
     }
 
@@ -384,6 +385,12 @@ public final class SetupPanel extends JPanel {
         FormParts.Row r = new FormParts.Row(label, control, width);
         rows.put(field, r);
         return r;
+    }
+
+    /** Whether a token warning is about the secret name ("Name the secret too.", "No secret named ..."). */
+    private static boolean aboutTheSecretName(String text, String[] token) {
+        return text.equals(SetupForm.msg("setup.warning.token.noName"))
+            || text.equals(SetupForm.msg("setup.warning.token.name", token[1], token[0]));
     }
 
     private String help(String field) {
@@ -829,10 +836,18 @@ public final class SetupPanel extends JPanel {
         }
         shownReasons = reasons;
         shownWarnings = warnings;
+        String[] tokenParts = SetupForm.splitToken(now.text(SetupForm.TOKEN_SECRET));
         for (Map.Entry<String, FormParts.Row> e : rows.entrySet()) {
             String field = e.getKey();
             List<String> r = reasons.getOrDefault(field, List.of());
             List<String> w = warnings.getOrDefault(field, List.of());
+            if (field.equals(SetupForm.TOKEN_SECRET) || field.equals(TOKEN_SECRET_NAME)) {
+                // The token's warnings go under the row they are about (item 31): the name's under the
+                // secret row, the rest under the provider row.
+                boolean nameRow = field.equals(TOKEN_SECRET_NAME);
+                w = warnings.getOrDefault(SetupForm.TOKEN_SECRET, List.of()).stream()
+                    .filter(t -> aboutTheSecretName(t, tokenParts) == nameRow).toList();
+            }
             List<FormParts.MessageLine> lines = new ArrayList<>();
             r.forEach(t -> lines.add(new FormParts.MessageLine().set(Theme.Glyph.ERROR, t, Theme.error(), Theme.font())));
             w.forEach(t -> lines.add(new FormParts.MessageLine().set(Theme.Glyph.WARNING, t, Theme.warning(),
@@ -870,7 +885,7 @@ public final class SetupPanel extends JPanel {
 
     private static boolean isPickerField(String field) {
         return field.equals(SetupForm.KINDS_FUNCTION) || field.equals(SetupForm.ASSETS_FUNCTION)
-            || field.equals(SetupForm.ALARM_PAGE) || field.equals(SetupForm.TOKEN_SECRET);
+            || field.equals(SetupForm.ALARM_PAGE) || field.equals(SetupForm.TOKEN_SECRET) || field.equals(TOKEN_SECRET_NAME);
     }
 
     /**
@@ -1167,7 +1182,12 @@ public final class SetupPanel extends JPanel {
         return formScroll;
     }
 
-    /** For tests: the help line under a field, if shown (only Map token has one). */
+    /** For tests: the message lines shown under a row (the warnings a row took; item 31 splits the token's). */
+    String rowMessageText(String field) {
+        return rows.get(field).messages.stream().map(FormParts.MessageLine::text).collect(java.util.stream.Collectors.joining(" "));
+    }
+
+    /** For tests: the help line under a field, if shown (only the Map token secret row has one). */
     String noteText(String field) {
         FormParts.Row r = rows.get(field);
         return r.note.isVisible() ? r.note.text() : "";

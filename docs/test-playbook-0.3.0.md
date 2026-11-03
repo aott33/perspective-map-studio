@@ -25,7 +25,7 @@ A walk through everything 0.3.0 does, in order, on the local development stack. 
 
 - [x] `ops/up.sh` is up (after a version change: `./gradlew clean` first; after a pull that changes the dev Gateway's config: `ops/up.sh --fresh`).
 - [x] Seeded: http://localhost:9088/data/perspective/client/mapstudio-dev/edit, signed in as `mapeditor` (`MAPSTUDIO_EDITOR_PASSWORD` in `.env`), **Seed the dev map** pressed once.
-- [x] After any Gateway restart (for example `ops/up.sh --no-build` for the Mapbox token), press **Seed the dev map** again: memory tags keep their values across a restart but lose the Bad quality that makes SWD1 stale.
+- [x] After any Gateway restart (for example `ops/up.sh --no-build` for the Mapbox token), the showcase page puts SWD1's stale state back as it opens (memory tags keep their values across a restart but lose the Bad quality that makes SWD1 stale; owner review notes item 10), so no re-seed is needed; the dev map's own `/live` states are set again with their buttons.
 - [x] A second browser or a private window for the "viewer" checks (not signed in).
 - [x] The Gateway trial has time left (bottom-right App Bar button, then the session menu); reset it on the Gateway page when it runs out.
 
@@ -90,7 +90,7 @@ Open http://localhost:9088/data/perspective/client/mapstudio-dev/live and sign i
 Values reach the map within the refresh interval (10 s), so give each press a moment.
 
 - [x] **P12 pressure 400 / 950**: Point 1's value changes.
-- [x] At 950, Point 1 raises its "High pressure" alarm: triangle and digit on the marker, Needs you counts it. **Acknowledge P12**: the triangle's sounding mark (a small speaker) becomes "!" and the popup says "acknowledged"; **P12 pressure 400** clears it.
+- [x] At 950, Point 1 raises its "High pressure" alarm: triangle and digit on the marker, Needs you counts it. **Acknowledge P12**: the filled triangle with its sounding mark (a small speaker) becomes the outlined triangle with a bold "!" (item 7) and the popup says "acknowledged"; **P12 pressure 400** clears it.
 - [x] **P12 comms off**: Point 1 shows comms lost in magenta with its chip, Needs you counts it; **P12 comms on** restores it.
 - [x] **P14 pressure bad**: Point 2 goes stale (hourglass, no colour, value marked stale); **P14 pressure good** restores it.
 - [x] **P12 status 0 to 4**: Point 1's style changes (Attention, Warning, Fault rings with words, Out of service faded).

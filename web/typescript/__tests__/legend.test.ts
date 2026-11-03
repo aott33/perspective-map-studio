@@ -32,9 +32,13 @@ describe('the legend key (epic 3 entry 3)', () => {
             { id: 'geofence', name: 'Geofence', icon: 'geofence', draw: 'area' }
         ]);
         expect(key.states).toBe(STATE_ROWS);
-        expect(key.states.map((s) => s.words)).toEqual(['Priority 1 alarm, digit beside', 'Priority 2 alarm', 'Priority 3 alarm', 'Acknowledged',
-            'Comms lost', 'Stale value']);
+        expect(key.states.map((s) => s.words)).toEqual(['Priority 1 alarm, digit beside', 'Priority 2 alarm', 'Priority 3 alarm',
+            'Acknowledged: outlined, with "!"', 'Comms lost', 'Stale value']);
         expect(key.lines).toBe(LINE_ROWS);
+        // Weight by size alone (item 11) and the flow arrow as the drawn direction on the selected line (item 22).
+        expect(key.lines.map((l) => l.words)).toEqual(['Pipeline, weight by size', 'Thin: no size given', 'Dashed: no data or comms lost',
+            'Hue: the highest alarm', 'Selected: arrows show the drawn direction']);
+        expect(key.lines[4]).toMatchObject({ token: 'selection', arrow: true });
         expect(key.styles).toBe(STYLE_ROWS);
         expect(key.styles.map((s) => s.words)).toEqual(['Attention', 'Warning', 'Fault', 'Out of service']);
         expect(key.tints).toEqual([

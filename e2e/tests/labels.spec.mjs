@@ -242,7 +242,13 @@ test.describe('1440 px', () => {
         await expect(map).toHaveAttribute('data-selected', /^[0-9a-f-]{36}$/);
         await expect(map).toHaveAttribute('data-arrow', '1');
         await expect(page.locator('.mapstudio-popup--default')).toHaveCount(0);
+        // The arrow repeats along the selected line every 250 px (owner review notes item 22): at least one at
+        // this zoom, more once the line is longer on screen; the arrow source is the selected line itself.
+        await expect(map).toHaveAttribute('data-arrow-drawn', /^[1-9][0-9]*$/, { timeout: DRAW_MS });
         await shot(page, 'mapstudio-line-selected-1440.png');
+        await view(page, map, TRACER_LINE_MID, 17);
+        await expect.poll(async () => Number(await map.getAttribute('data-arrow-drawn')), { timeout: DRAW_MS }).toBeGreaterThanOrEqual(2);
+        await view(page, map, TRACER.center, 15);
         await clickAt(page, map, GROUND, TRACER.center, 15);
         await expect(map).toHaveAttribute('data-selected', '');
         await expect(map).toHaveAttribute('data-arrow', '0');

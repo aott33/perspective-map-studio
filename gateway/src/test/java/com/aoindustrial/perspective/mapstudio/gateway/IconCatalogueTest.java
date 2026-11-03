@@ -32,7 +32,7 @@ class IconCatalogueTest {
         assertTrue(c.contains(IconCatalogue.FALLBACK));
         assertEquals(30, c.ids().size());
         assertEquals(19, c.kindIcons().size());
-        assertEquals("0.2.0", c.version());
+        assertEquals("0.3.0", c.version());
     }
 
     @Test

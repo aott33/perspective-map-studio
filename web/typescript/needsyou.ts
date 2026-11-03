@@ -59,8 +59,14 @@ export interface NeedsYouSummary {
  */
 export const BAR_QUIET = 'Needs you: nothing needs attention';
 
-/** What the bar says while the state is unknown (the Gateway cannot be reached; group c's hook, item 32). */
+/**
+ * What the bar says while the state is unknown (the Gateway cannot be reached, item 32): the component calls
+ * `NeedsYouControl.setUnknown(true)` while the values shown are frozen.
+ */
 export const BAR_UNKNOWN = 'Needs you: state unknown, no connection to the Gateway';
+
+/** What the opened list says while the state is unknown (item 32): no rows, since the frozen values are not live. */
+export const LIST_UNKNOWN = 'State unknown - no connection to the Gateway';
 
 /** What the list says with nothing to attend to. */
 export const NOTHING_NEEDS_YOU = 'Nothing needs you';

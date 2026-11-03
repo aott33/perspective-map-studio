@@ -239,6 +239,29 @@ test.describe('1440 px, the legend', () => {
 test.describe('1366 px', () => {
     test.use({ viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1 });
 
+    test('the showcase puts its states back as the page opens: SWD1 stale again after what a restart does (item 10)', async ({ page, browser }) => {
+        // A Gateway restart keeps the memory tags' values but not SWD1's Bad quality (owner review notes item 10):
+        // the dev /styles button does the same, then the showcase page's startup script restores it, and the batch
+        // shows SWD1 stale with no re-seed.
+        const context = await signedInContext(browser, EDITOR_USER);
+        try {
+            const editor = await context.newPage();
+            await mapLoaded(await openMap(editor, '/styles'));
+            const out = editor.locator('#mapstudio-styles-result');
+            const before = await out.innerText();
+            await editor.locator('#mapstudio-styles-showcase-swd1-fresh').click();
+            await expect.poll(() => out.innerText(), { timeout: 60_000 }).not.toBe(before);
+            const result = JSON.parse(await out.innerText());
+            expect(result.error, 'the dev button').toBeUndefined();
+            expect(result.quality).toBe('Good');
+        } finally {
+            await context.close();
+        }
+        const map = await openShowcase(page);
+        await expect(liveItem(page, ids.swd1)).toHaveAttribute('data-state', 'stale', { timeout: INTERVAL_MS });
+        await expect(map).toHaveAttribute('data-items-loaded', /^[1-9]/);
+    });
+
     test('P14\'s popup: comms, the three key values and the priority 1 alarm with View alarms', async ({ page, watched }) => {
         const map = await openShowcase(page);
         await componentAlone(page, map);

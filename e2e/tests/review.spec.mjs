@@ -145,7 +145,10 @@ async function contrastCheck(page, theme) {
     for (const [key, value] of Object.entries(values)) {
         expect(value, 'the computed value of ' + TOKENS[key]).toMatch(/^(#[0-9a-f]{3,6}|rgba?\()/i);
     }
-    const result = checkTheme(values);
+    // The raster surface is OpenStreetMap as the map draws it, quiet (owner review notes item 25): the page's paint.
+    const paint = JSON.parse((await page.locator('.mapstudio-map').getAttribute('data-quiet-paint')) || '{}');
+    expect(paint['raster-saturation'], 'the quiet OpenStreetMap paint').toBeLessThan(0);
+    const result = checkTheme(values, paint);
     const table = markdownTable(theme, result);
     const file = docsMode ? path.join(repoRoot, 'docs', 'review-er27-contrast-' + theme + '.md') : path.join(outDir, 'contrast-' + theme + '.md');
     mkdirSync(path.dirname(file), { recursive: true });
@@ -212,6 +215,24 @@ for (const theme of ['light', 'dark']) {
                 await shot(page, 'review-' + theme + '-needs-you-legend-1440.png');
                 expect(watched.warnings, 'Map Studio warnings').toEqual([]);
             });
+
+            if (theme === 'dark') {
+                test('the dark page draws the map dark without a reload: the theme is re-read on the change (item 29)', async ({ page }) => {
+                    // A fresh session starts light; the view's startup script switches the theme after the map mounted
+                    // (the defect of owner review notes item 29: the map kept the light colours until a reload).
+                    const map = await openMap(page, '/dark', SHOWCASE.project);
+                    await expect.poll(() => isDark(page), { timeout: 30_000 }).toBe(true);
+                    await mapLoaded(map);
+                    // The map's blank is the dark token, whether the switch came after the mount (a theme revision,
+                    // the watch) or between the mount and the layers' load (the change kept for the load handler).
+                    const blank = await page.evaluate(() => getComputedStyle(document.querySelector('.mapstudio')).getPropertyValue('--neutral-20').trim());
+                    await expect(map).toHaveAttribute('data-blank', blank, { timeout: 30_000 });
+                    // The markers are drawn again from the dark tokens: the first full batch's items and the labels are back.
+                    await expect(map).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
+                    await labelsPlaced(map, ['P14', 'SWD1']);
+                    await shot(page, 'review-dark-no-reload-1440.png');
+                });
+            }
         });
 
         test.describe('1366 px', () => {

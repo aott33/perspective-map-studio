@@ -1,6 +1,6 @@
 {
     "comment": "Provenance of every Map Studio icon. One entry per file in src/. scripts/icons.mjs checks this list against the files, the licence allow list and NOTICE, and builds the sprite, the catalogue and the contact sheet from it. No icon is derived from any excluded set; see docs/icons.md.",
-    "catalogueVersion": "0.2.0",
+    "catalogueVersion": "0.3.0",
     "fallback": "point",
     "icons": [
         { "id": "well-pad", "label": "Well pad", "group": "kind", "geometry": "point", "origin": "drawn", "licence": "Apache-2.0" },

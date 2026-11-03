@@ -1,5 +1,18 @@
 {
  "custom": {},
+ "events": {
+  "system": {
+   "onStartup": [
+    {
+     "config": {
+      "script": "\t# Dev only (owner review notes item 4): an empty dev map gives no hint how to fill it, so the page's\n\t# line says to seed from /edit while the map store holds no item (system.mapstudio.getMap, the\n\t# scripting API; a viewer may read it). The click hint is the line once items exist.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.dev')\n\ttitle = self.rootContainer.getChild('title')\n\ttry:\n\t\tcount = len(system.mapstudio.getMap('mapstudio-dev'))\n\texcept java.lang.Throwable as ex:\n\t\tlogger.warn('Dev page item count failed: %s' % ex.getClass().getSimpleName())\n\t\treturn\n\texcept Exception as ex:\n\t\tlogger.warn('Dev page item count failed: %s' % type(ex).__name__)\n\t\treturn\n\tif count == 0:\n\t\ttitle.props.text = 'Map Studio: the dev map in View mode. The map has no items yet: open /edit, log in as mapeditor and press Seed the dev map; editing is on /edit.'\n\telse:\n\t\ttitle.props.text = 'Map Studio: the dev map in View mode. Click a point for its popup, a line for the line popup; editing is on /edit.'"
+     },
+     "scope": "G",
+     "type": "script"
+    }
+   ]
+  }
+ },
  "params": {},
  "props": {
   "defaultSize": {
@@ -23,13 +36,14 @@
     "type": "ia.display.label",
     "version": 0,
     "props": {
-     "text": "Map Studio: the dev map in View mode. Click a point for its popup, a line for the line popup; editing is on /edit.",
+     "text": "Map Studio: the dev map in View mode.",
      "style": {
       "padding": "8px 12px"
      }
     },
     "meta": {
-     "name": "title"
+     "name": "title",
+     "domId": "mapstudio-dev-title"
     },
     "position": {
      "basis": "40px",

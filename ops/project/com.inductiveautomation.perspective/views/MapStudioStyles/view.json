@@ -228,6 +228,35 @@
         ]
        }
       }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Showcase SWD1 fresh"
+      },
+      "meta": {
+       "name": "showcaseSwd1Fresh",
+       "domId": "mapstudio-styles-showcase-swd1-fresh"
+      },
+      "position": {
+       "basis": "150px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (owner review notes item 10): what a Gateway restart does to the showcase, SWD1's injection rate back at Good\n\t# quality (the memory tag keeps its value, not the seed's Bad quality), through the project library mapstudio_showcase_seed,\n\t# so e2e/tests/showcase.spec.mjs can check that the showcase page puts its states back as it opens. Showcase demo tags only;\n\t# MapEditor only.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devlive')\n\tout = self.view.rootContainer.getChild('stylesResult')\n\tif not mapstudio_dev.holdsMapEditor(self.session):\n\t\tout.props.text = system.util.jsonEncode({'refused': 'The live buttons write dev tags, so they need the MapEditor role. Sign in as a map editor first.', 'ranAt': system.date.toMillis(system.date.now())})\n\t\treturn\n\ttry:\n\t\tresult = mapstudio_showcase_seed.lose_states()\n\texcept java.lang.Throwable as ex:\n\t\tresult = {'error': ex.getClass().getSimpleName() + ': ' + str(ex.getMessage())}\n\texcept Exception as ex:\n\t\tresult = {'error': str(ex)}\n\tresult['action'] = 'showcase-swd1-fresh'\n\tresult['ranAt'] = system.date.toMillis(system.date.now())\n\tout.props.text = system.util.jsonEncode(result)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
      }
     ]
    },

@@ -25,7 +25,7 @@
  */
 
 import { glyphSvg } from './controls';
-import { EMPTY_SUMMARY, NOTHING_NEEDS_YOU, NeedsYouRow, NeedsYouSummary, RANKED_NOTE, barModel, total } from './needsyou';
+import { EMPTY_SUMMARY, LIST_UNKNOWN, NOTHING_NEEDS_YOU, NeedsYouRow, NeedsYouSummary, RANKED_NOTE, barModel, total } from './needsyou';
 
 /** The sprite the state and kind glyphs come from, as the default popup draws them (DefaultPopup.tsx). */
 const SPRITE_URL = '/res/mapstudio/icons/mapstudio-icons.svg';
@@ -94,7 +94,8 @@ export class NeedsYouControl {
 
     /**
      * The state is unknown (the Gateway cannot be reached, item 32): the bar shows a hollow bell with a question mark
-     * and no counts, `data-state="unknown"`, until `setUnknown(false)`. The summary is kept and shows again then.
+     * and no counts, `data-state="unknown"`, and an open list says so with no rows, until `setUnknown(false)`. The
+     * summary is kept and shows again then.
      */
     setUnknown(unknown: boolean): void {
         if (this.unknown === unknown) {
@@ -102,6 +103,9 @@ export class NeedsYouControl {
         }
         this.unknown = unknown;
         this.renderBar();
+        if (this.panel) {
+            this.renderList();
+        }
     }
 
     isOpen(): boolean {
@@ -210,11 +214,12 @@ export class NeedsYouControl {
         while (panel.firstChild) {
             panel.removeChild(panel.firstChild);
         }
-        const rows = this.summary.rows;
+        // While the state is unknown (item 32) the frozen rows are not listed: they are not live.
+        const rows = this.unknown ? [] : this.summary.rows;
         panel.setAttribute('data-rows', String(rows.length));
         const note = document.createElement('div');
         note.className = 'mapstudio-needs-note';
-        note.textContent = rows.length === 0 ? NOTHING_NEEDS_YOU : RANKED_NOTE;
+        note.textContent = this.unknown ? LIST_UNKNOWN : rows.length === 0 ? NOTHING_NEEDS_YOU : RANKED_NOTE;
         panel.appendChild(note);
         if (rows.length === 0) {
             return;

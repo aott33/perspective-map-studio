@@ -43,6 +43,27 @@ export const OSM_SOURCE: RasterSource = {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
 };
 
+/**
+ * OpenStreetMap drawn quiet (owner review notes item 25): MapLibre's raster paint lowers the tiles'
+ * saturation and contrast and lifts the darks, so roads and labels sit back and the map's own marks
+ * stand out; Satellite is unchanged. The contrast check (e2e/lib/contrast.mjs) applies the same
+ * arithmetic to its light raster sample, so the 3:1 rule is checked against the quiet tile. A per-basemap
+ * setup value, and a viewer setting behind the gear, come after 0.3.0 (backlog story 12).
+ */
+export interface RasterPaint {
+    'raster-saturation'?: number;
+    'raster-contrast'?: number;
+    'raster-brightness-min'?: number;
+    'raster-brightness-max'?: number;
+}
+
+export const QUIET_RASTER_PAINT: RasterPaint = { 'raster-saturation': -0.55, 'raster-contrast': -0.2, 'raster-brightness-min': 0.3 };
+
+/** The raster paint of a basemap: quiet for OpenStreetMap, none for the rest. */
+export function rasterPaint(id: BasemapId | null): RasterPaint {
+    return id === 'osm' ? { ...QUIET_RASTER_PAINT } : {};
+}
+
 /** The key the viewer's last choice is kept under in localStorage (the id only, never a token). */
 export const BASEMAP_STORAGE_KEY = 'mapstudio.basemap.v1';
 
