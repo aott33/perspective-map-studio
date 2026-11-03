@@ -995,3 +995,22 @@ Labels: **[live 8.3.10]** seen on the dev stack above; **[build]** the Gradle, J
 | Engineering review (ER-27), 0.3.0: passed with changes. Accepted: the alarm tokens and badges, comms lost in magenta, stale with no colour, the presets (`warning` and `fault` keep the alarm hues of priorities 2 and 1), the six tints, the line looks per segment, the phone bottom sheet and top bar, the close row above a custom view, and the template checklist's items 1, 3, 5, 7 and 11. Changes asked for, built before the 0.3.0 tag: the acknowledged glyph redrawn to read apart from the unacknowledged one, the wordless Needs you bar with a bell, the legend's Kinds collapsed with many kinds and its panel below the top bar, line weight from the pipe size, a repeated flow arrow, and the point card's option A (`_bmad-output/backlog/story-owner-review-notes-on-the-0-3-0-map.md`, items 7, 11, 12, 13, 22 to 24, 30). Reviewer: the owner, 2026-11-02 ([review-er27.md](review-er27.md)) | **[live 8.3.10]** (the owner on the local dev stack) |
 
 **[not verified]**: the owner's engineering review (ER-27) of the pack, the ticket's hitl step; the renders on a real pointer device and a real phone (Chromium with swiftshader only); a real OpenStreetMap tile under the dark theme (the suite stubs tiles; the raster sample is the style's land colour constant); a host theme that defines the tokens itself (the template's cutover).
+
+## Epic 3 entry 13 - release 0.3.0 rehearsal on the template stack
+
+**Question (entry 13, RELEASING.md "Checks by release type"):** does a 0.3.0 build, installed through `ign-scada-template`'s module lock on its 8.3.9 test stack, draw the field simulator's live state: a pad's alarm on the map, its popup reaching the pad's page in two clicks, a normal field with no hue? **Answer:** yes for every check below; no finding that changes the module. Date: 2026-11-03 (UTC). Steps, commands and screenshots: [template-install.md](template-install.md), "0.3.0 rehearsal".
+
+Label: **[live 8.3.9, rehearsal, throwaway-signed]**, the template's test stack (`ign-og/ignition:8.3.9-modules`, compose project `ign-og-test`) with this branch's 0.3.0 build signed by a throwaway certificate, before the tag. After the tag only the short smoke runs (`ops/release-smoke.sh 0.3.0`, owner step).
+
+| Check | Result |
+| --- | --- |
+| Module on 8.3.9 by the lock | lock entry written with `modl.py`'s own functions, `verify-lock` ok, `fetch` `ok ... 0.3.0 (6 signatures)`; `scripts/test/stack.sh --keep` `test stack: PASS` (47 min, every end-to-end check and the render suite); log `Starting up module ... v0.3.0 (b0)` |
+| Migration on an empty database | schema 1 and 2 applied when the setup appeared; `module_version` `0.3.0` in both rows |
+| Live values from the field simulator | sites with `_Summary` KPIs and Alarm Metrics of the pad folder, P12's wells with `CommsOk`; the three sites Ignition had in alarm (the template's demo states) drawn in alarm, by priority, and every other site and well neutral |
+| A pad's alarm | P12's flare pilot out on the simulator drew the priority 1 glyph 44 s after the fault (30 s RTU poll, 15 s on-delay, 10 s refresh) and cleared within 29 s of the fault's end |
+| Two clicks to the pad's page | the marker opened P12's popup with the alarm in words; its pop-out opened the template's `/pad/Mesa/P12` |
+| Phone | the bottom sheet at 390 px with the same summary |
+| Comms lost | the pad's RTU offline: the four wells drew comms lost within 50 s and normal 10 s after it came back |
+| Log and console | no Map Studio warning or error in the Gateway log, no browser error |
+
+Not covered here: lines and instruments on the template stack (the Rangers' `L-SWD` and `L-GL21` were not drawn), a custom popup view, Satellite, signed-in editing (0.2.0's rehearsal and release covered it), and the published build (the release smoke after the tag).

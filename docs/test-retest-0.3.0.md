@@ -11,6 +11,7 @@ Setup: `git pull`, `./gradlew clean`, `ops/up.sh --fresh`, sign in as `mapeditor
 - [ ] Click P14: option A card (comms right-aligned, values right-aligned, the alarm block). Esc closes it.
 - [ ] Click P21: the hourglass before each value (hover one for the reason), the hourglass before the alarm words.
 - [ ] Click L-SWD near the top of the map: the card stays inside the map, clear of the top bar and the zoom card; only the instrument list scrolls; selected, the arrows repeat along the line.
+- [ ] L-SWD's Comms row is one line, "OK - 3, oldest 39 min" (or "Comms lost - 1 of 3"); hover it for the full sentence, and on the phone tap it to see the sentence under the row.
 - [ ] Legend: stops below the top bar, States first, thin scroll bar; the scale bar sits level with the Legend button; the attribution is small, bottom-right.
 
 ## 2. Dev map with `/live` (5 min)
