@@ -44,7 +44,7 @@ export function mapboxLogoDataUrl(): string {
 
 /**
  * The logo link: an `<a>` to Mapbox with the logo image, named "Mapbox logo" for assistive technology. The
- * caller places it (LegendControl, beside the scale bar).
+ * caller places it (MapboxLogoControl, bottom-right with the attribution).
  */
 export function createMapboxLogo(doc: Document): HTMLAnchorElement {
     const a = doc.createElement('a');
@@ -61,4 +61,29 @@ export function createMapboxLogo(doc: Document): HTMLAnchorElement {
     img.draggable = false;
     a.appendChild(img);
     return a;
+}
+
+/**
+ * The logo as a map control of the bottom-right corner, beside the attribution (owner, 0.3.0 re-test: "all the
+ * logos on the bottom right"; Mapbox's guide allows any corner while the logo is on the map and unstyled). The
+ * map adds it while Satellite is drawn and removes it otherwise; the stylesheet places it (mapstudio.css).
+ */
+export class MapboxLogoControl {
+    private container: HTMLDivElement | null = null;
+
+    onAdd(map: { getContainer(): HTMLElement }): HTMLElement {
+        const doc = map.getContainer().ownerDocument;
+        const div = doc.createElement('div');
+        div.className = 'maplibregl-ctrl mapstudio-mapbox-logo-ctrl';
+        div.appendChild(createMapboxLogo(doc));
+        this.container = div;
+        return div;
+    }
+
+    onRemove(): void {
+        if (this.container && this.container.parentNode) {
+            this.container.parentNode.removeChild(this.container);
+        }
+        this.container = null;
+    }
 }

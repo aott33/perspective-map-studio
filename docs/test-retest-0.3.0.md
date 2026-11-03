@@ -19,7 +19,7 @@ Setup: `git pull`, `./gradlew clean`, `ops/up.sh --fresh`, sign in as `mapeditor
 - [ ] **P12 pressure 950**, then **Acknowledge P12**: the badge turns to the outlined triangle with "!"; select Point 1: its rings are not cut off.
 - [ ] Tracer line: its popup has no segment block.
 - [ ] Shared A at zoom 18: two markers; at zoom 16 one marker whose popup points at it.
-- [ ] OpenStreetMap: quieter, labels and lines easy to read. Satellite (with your token): the Mapbox logo bottom-left beside the scale bar and the four attribution links.
+- [ ] OpenStreetMap: quieter, labels and lines easy to read. Satellite (with your token): the Mapbox logo bottom-right with the four attribution links (beside them on a wide map; on a phone the logo left of the App Bar toggle and the links one line above it), nothing covering the App Bar toggle, the zoom card or the Legend button.
 
 ## 3. Phone, 390 px device mode (4 min)
 

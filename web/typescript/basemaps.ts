@@ -50,7 +50,7 @@ export const OSM_SOURCE: RasterSource = {
 };
 
 /**
- * The provider whose logo the map shows beside the scale bar, or null (owner decision 2026-11-03): Mapbox's
+ * The provider whose logo the map shows bottom-right with the attribution, or null (owner decision 2026-11-03): Mapbox's
  * attribution guide asks maps drawn from Mapbox tiles with another library to show the Mapbox logo and the text
  * attribution, so the logo shows while Satellite is drawn from a Mapbox source, and only then; None and
  * OpenStreetMap show none.

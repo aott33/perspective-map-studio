@@ -1013,6 +1013,20 @@
     right: 0;
     bottom: 0;
     max-width: 100%;
+    /* With Satellite the Mapbox logo joins the attribution here (owner, 0.3.0 re-test: "all the logos on the
+       bottom right"): one row, the logo first, both on the bottom edge. */
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.mapstudio .maplibregl-ctrl-bottom-right .mapstudio-mapbox-logo-ctrl {
+    order: 0;
+}
+
+.mapstudio .maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib {
+    order: 1;
 }
 
 .mapstudio .maplibregl-ctrl-bottom-right .maplibregl-ctrl {
@@ -1046,8 +1060,15 @@
 }
 
 /* The Mapbox logo while Satellite is drawn (owner decision 2026-11-03; Mapbox's attribution guide): Mapbox's
-   own wordmark at its own size (88 by 23 px), bottom-left in the Legend row after the scale bar and on the
-   button's bottom edge, never restyled (no filter, no opacity, no colour), so it carries no token. */
+   own wordmark at its own size (88 by 23 px), bottom-right just left of the attribution on the bottom edge (the
+   attribution's four links, about 270 px, keep it well left of the App Bar toggle), never restyled (no filter,
+   no opacity, no colour), so it carries no token. On a phone, below. */
+.mapstudio .maplibregl-ctrl-bottom-right .mapstudio-mapbox-logo-ctrl {
+    float: none;
+    margin: 0 0 2px 0;
+    line-height: 0;
+}
+
 .mapstudio .mapstudio-mapbox-logo {
     display: block;
     flex: none;
@@ -2160,18 +2181,28 @@
 }
 
 @media (max-width: 767px) {
-    /* Satellite on a phone: Mapbox's four links (about 270 px) do not fit beside the Legend row with the logo, and
-       two lines would reach the App Bar toggle, so the attribution sits on one line just above the Legend row at the
-       left, clear of the toggle's corner (app-bar-clearance 76 px); the row is the 44 px button. */
+    /* Satellite on a phone (owner, 0.3.0 re-test: every logo bottom-right): the logo and Mapbox's four links
+       (about 270 px) do not fit on one line beside the Legend row, and under the App Bar toggle there is room only
+       for the 14 px text, not the 23 px logo. So both stand right-aligned at the App Bar clearance (76 px from the
+       right edge, never under or over the toggle): the logo on the bottom row at the map inset, its bottom on the
+       Legend button's bottom edge and left of the toggle, and the attribution as one line above it, its bottom
+       6 px above the 44 px Legend row, so neither meets the Legend button or the scale bar. */
     .mapstudio .mapstudio-map[data-provider-logo="mapbox"] .maplibregl-ctrl-bottom-right {
-        left: var(--mapstudio-map-inset);
-        right: auto;
-        bottom: calc(var(--mapstudio-map-inset) + 44px + 6px);
+        right: 76px;
+        bottom: var(--mapstudio-map-inset);
         max-width: calc(100% - 76px - var(--mapstudio-map-inset));
+        flex-direction: column;
+        align-items: flex-end;
+        /* 44 px Legend row + 6 px - the logo's 23 px. */
+        gap: 27px;
     }
 
     .mapstudio .mapstudio-map[data-provider-logo="mapbox"] .maplibregl-ctrl-bottom-right .maplibregl-ctrl {
         margin: 0;
+    }
+
+    .mapstudio .mapstudio-map[data-provider-logo="mapbox"] .maplibregl-ctrl-bottom-right .mapstudio-mapbox-logo-ctrl {
+        order: 2;
     }
 
     /* The corner spans the map so the sheet can; the row keeps its own width and the App Bar corner stays clear.

@@ -81,6 +81,7 @@ import { SHARED_M, sharedWithinM } from './shared';
 import { registerTestHook, registerTestView, takeTestReply } from './testHook';
 import { drawColor, themeColor } from './theme';
 import { IMPROVE_MAP_CLASS, feedbackHref, providerLogo, rasterPaint } from './basemaps';
+import { MapboxLogoControl } from './mapboxLogo';
 import { Kind } from './adapters';
 
 /** Must match MapStudioComponent.COMPONENT_ID on the Java side. */
@@ -901,6 +902,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private popupAnchor: PopupAnchor | null = null;
     /** The legend bottom-left, which holds the basemap choice (epic 3 entries 6 and 14), and the basemap revision last drawn. */
     private legendControl: LegendControl | null = null;
+    /** The Mapbox logo control, bottom-right, while Satellite is drawn. */
+    private logoControl: MapboxLogoControl | null = null;
     private drawnBasemap = -1;
     /** The raster source the map holds now (by identity), or null for none. */
     private drawnSource: RasterSource | null = null;
@@ -997,8 +1000,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.legendControl.setToggles(this.toggles.lines, this.toggles.names);
         map.addControl(this.legendControl, 'bottom-left');
         // The provider's attribution (R10, always shown with a basemap): small muted text along the bottom-right
-        // edge under the App Bar toggle, never covering it (owner review, item 3); on a phone with Satellite it sits
-        // above the Legend row instead (the stylesheet), since Mapbox's four links do not fit beside the row.
+        // edge under the App Bar toggle, never covering it (owner review, item 3); with Satellite the Mapbox logo
+        // joins it in that corner (applyBasemap; the stylesheet places both at every width).
         map.addControl(new AttributionControl({ compact: false }), 'bottom-right');
         // Mapbox's "Improve this map" carries the map's position (its attribution guide): after the control
         // rebuilds its links (its listeners run first) and after every move.
@@ -1479,10 +1482,15 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 this.tiles = 'none';
             }
         }
-        // The Mapbox logo beside the scale bar while Satellite is drawn, and only then (owner decision 2026-11-03).
+        // The Mapbox logo while Satellite is drawn, and only then (owner decision 2026-11-03), bottom-right with the
+        // attribution (owner, 0.3.0 re-test: "all the logos on the bottom right").
         const logo = providerLogo(b.selected, b.source);
-        if (this.legendControl) {
-            this.legendControl.setLogo(logo);
+        if (logo === 'mapbox' && !this.logoControl) {
+            this.logoControl = new MapboxLogoControl();
+            map.addControl(this.logoControl, 'bottom-right');
+        } else if (logo !== 'mapbox' && this.logoControl) {
+            map.removeControl(this.logoControl);
+            this.logoControl = null;
         }
         if (this.mapContainer) {
             this.mapContainer.setAttribute('data-provider-logo', logo || '');
@@ -2132,6 +2140,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         this.drawControl = null;
         this.legendControl = null;
+        this.logoControl = null;
         this.zoomControl = null;
         this.searchControl = null;
     }

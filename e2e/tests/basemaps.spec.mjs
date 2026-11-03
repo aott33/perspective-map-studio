@@ -3,7 +3,7 @@
 // the Legend panel bottom-left (the Legend button opens it by click or keyboard, Esc closes it); None
 // draws the blank background; OpenStreetMap and Satellite draw their tiles with the provider's
 // attribution always shown (small muted text along the bottom-right edge, under the App Bar toggle, owner review
-// item 3), and with Satellite the Mapbox logo after the scale bar and Mapbox's four links (owner decision 2026-11-03); the basemap switch exists only when the setup lists more than one basemap and the first listed is the
+// item 3), and with Satellite the Mapbox logo bottom-right with the attribution and Mapbox's four links (owner decision 2026-11-03); the basemap switch exists only when the setup lists more than one basemap and the first listed is the
 // default (item 3); the scale bar sits on the Legend button's bottom edge (item 1); the top-right holds one zoom card (plus, the
 // level, minus, Fit, Return) and nothing else, and View mode has no Draw a line; Satellite's tile source comes from the Gateway (basemap.source), its token read from the
 // secret the setup names (ops/secrets/map_token, a generated placeholder that starts with pk.), refused
@@ -54,7 +54,7 @@ async function stubTiles(page, { brokenOsm = false } = {}) {
 
 const button = (page, id) => page.locator('.mapstudio-basemap-button[data-basemap="' + id + '"]');
 const attribution = (page) => page.locator('.maplibregl-ctrl-attrib');
-// The Mapbox logo while Satellite is drawn (owner decision 2026-11-03), in the Legend row after the scale bar.
+// The Mapbox logo while Satellite is drawn (owner decision 2026-11-03), bottom-right with the attribution (0.3.0 re-test).
 const mapboxLogo = (page) => page.locator('.mapstudio-mapbox-logo');
 /** Mapbox's text attribution for satellite (its attribution guide): four links, in this order. */
 const MAPBOX_LINKS = [
@@ -98,25 +98,47 @@ async function expectMapboxAttribution(page, map) {
     }, { timeout: CHANGE_MS }).toBe(true);
 }
 
-/** The logo sits on the map and covers none of the Legend button, the scale bar, the attribution and the App Bar toggle. */
+/**
+ * The logo and the attribution sit together bottom-right (owner, 0.3.0 re-test: "all the logos on the bottom
+ * right") and cover none of the Legend button, the scale bar, the zoom card, each other and the App Bar toggle.
+ * At 768 px and wider: one row on the bottom edge, the logo just left of the attribution. On a phone: the logo
+ * on the Legend button's bottom edge and the attribution as one line above the Legend row, both right-aligned
+ * at the App Bar clearance (76 px).
+ */
 async function expectLogoPlaced(page, map) {
     const mapBox = await map.boundingBox();
     const logo = await mapboxLogo(page).boundingBox();
     const legend = await legendButton(page).boundingBox();
     const scale = await page.locator('.mapstudio-legend-row .maplibregl-ctrl-scale').boundingBox();
     const attrib = await attribution(page).boundingBox();
-    expect(logo.x, 'on the map').toBeGreaterThanOrEqual(mapBox.x);
-    expect(logo.x + logo.width).toBeLessThanOrEqual(mapBox.x + mapBox.width);
-    expect(logo.y + logo.height).toBeLessThanOrEqual(mapBox.y + mapBox.height);
-    expect(logo.x, 'bottom-left, after the scale bar').toBeGreaterThan(scale.x + scale.width);
-    expect(Math.abs((logo.y + logo.height) - (legend.y + legend.height)), 'on the Legend button\'s bottom edge').toBeLessThanOrEqual(1);
-    for (const [name, other] of [['the Legend button', legend], ['the scale bar', scale], ['the attribution', attrib]]) {
-        expect(overlap(logo, other), 'the logo never covers ' + name).toBe(false);
+    const zoom = await page.locator('.mapstudio-zoom').boundingBox();
+    const right = mapBox.x + mapBox.width;
+    const bottom = mapBox.y + mapBox.height;
+    for (const [name, box] of [['the logo', logo], ['the attribution', attrib]]) {
+        expect(box.x, name + ' on the map').toBeGreaterThanOrEqual(mapBox.x);
+        expect(box.x + box.width, name + ' on the map').toBeLessThanOrEqual(right);
+        expect(box.y + box.height, name + ' on the map').toBeLessThanOrEqual(bottom);
+        expect(box.x, name + ' in the right half').toBeGreaterThan(mapBox.x + mapBox.width / 2 - box.width);
+        expect(box.y, name + ' in the bottom quarter').toBeGreaterThan(mapBox.y + mapBox.height * 0.75);
     }
-    expect(overlap(attrib, scale), 'the attribution never covers the scale bar').toBe(false);
-    expect(overlap(attrib, legend), 'the attribution never covers the Legend button').toBe(false);
-    expect(attrib.x).toBeGreaterThanOrEqual(mapBox.x);
-    expect(attrib.x + attrib.width).toBeLessThanOrEqual(mapBox.x + mapBox.width);
+    if (mapBox.width >= 768) {
+        expect(logo.x + logo.width, 'just left of the attribution').toBeLessThanOrEqual(attrib.x);
+        expect(attrib.x - (logo.x + logo.width), 'beside it').toBeLessThanOrEqual(8);
+        expect(Math.abs((logo.y + logo.height) - (attrib.y + attrib.height)), 'on the same bottom edge').toBeLessThanOrEqual(1);
+        expect(bottom - (attrib.y + attrib.height), 'along the bottom edge').toBeLessThanOrEqual(4);
+    } else {
+        expect(Math.abs((logo.y + logo.height) - (legend.y + legend.height)), 'the logo on the Legend button\'s bottom edge').toBeLessThanOrEqual(1);
+        expect(attrib.height, 'the attribution on one line').toBeLessThanOrEqual(16);
+        expect(attrib.y + attrib.height, 'the attribution above the Legend row').toBeLessThanOrEqual(legend.y);
+        expect(Math.abs((logo.x + logo.width) - (attrib.x + attrib.width)), 'right-aligned together').toBeLessThanOrEqual(1);
+        expect(right - (logo.x + logo.width), 'clear of the App Bar corner').toBeGreaterThanOrEqual(64);
+    }
+    const others = [['the Legend button', legend], ['the scale bar', scale], ['the zoom card', zoom]];
+    for (const [name, other] of others) {
+        expect(overlap(logo, other), 'the logo never covers ' + name).toBe(false);
+        expect(overlap(attrib, other), 'the attribution never covers ' + name).toBe(false);
+    }
+    expect(overlap(logo, attrib), 'the logo and the attribution apart').toBe(false);
     if (await appBarToggle(page).count()) {
         const toggle = await appBarToggle(page).boundingBox();
         expect(overlap(logo, toggle), 'the logo never covers the App Bar toggle').toBe(false);
@@ -544,7 +566,7 @@ test.describe('390 px', () => {
         await shot(page, 'mapstudio-controls-390.png');
     });
 
-    test('with Satellite the Mapbox logo and its four links fit a phone beside the Legend row, clear of the App Bar toggle',
+    test('with Satellite the Mapbox logo and its four links fit a phone bottom-right, clear of the Legend row and the App Bar toggle',
         async ({ page, watched }) => {
             await stubTiles(page);
             const first = await openMap(page, '/');
@@ -558,12 +580,7 @@ test.describe('390 px', () => {
             await expect(map).toHaveAttribute('data-basemap-tiles', 'loaded', { timeout: CHANGE_MS });
             await expectMapboxAttribution(page, map);
             await expectLogoPlaced(page, map);
-            // The four links do not fit beside the row on a phone: the attribution is one line just above the Legend row.
-            const attrib = await attribution(page).boundingBox();
-            const legend = await legendButton(page).boundingBox();
-            expect(attrib.height, 'one line').toBeLessThanOrEqual(16);
-            expect(attrib.y + attrib.height, 'above the Legend row').toBeLessThanOrEqual(legend.y);
-            expect(attrib.x + attrib.width, 'clear of the App Bar corner').toBeLessThanOrEqual(390 - 64);
+            await shot(page, 'mapstudio-basemap-satellite-390.png');
             // OpenStreetMap remembered instead: no logo, and the attribution is back along the bottom edge.
             await page.evaluate(() => window.localStorage.setItem('mapstudio.basemap.v1', 'osm'));
             await page.reload({ waitUntil: 'load' });

@@ -4,8 +4,8 @@
  * scale bar sitting on the button's bottom edge, and a panel above the button that opens on a click or by
  * keyboard (Enter or Space), closes on Esc (focus back on the button), on a map click and on the button
  * again. The provider's attribution is not here: it is a control of its own, small muted text along the
- * bottom-right edge under the App Bar toggle (MapStudio.tsx, `.maplibregl-ctrl-attrib`). While Satellite is
- * drawn, the row ends with the Mapbox logo after the scale bar (`setLogo`; owner decision 2026-11-03). The panel is
+ * bottom-right edge under the App Bar toggle (MapStudio.tsx, `.maplibregl-ctrl-attrib`), and so is the Mapbox
+ * logo while Satellite is drawn (mapboxLogo.ts, MapboxLogoControl). The panel is
  * built from sections, in the map's own words (legend.ts): States first (the alarm glyphs by priority and
  * acknowledgement, comms lost, stale), then the kinds on the map with their glyphs (collapsed to "Kinds (9)"
  * with more than six, a button that opens them), the line looks, the value styles and the area tints a kind
@@ -24,7 +24,6 @@
 import { IControl, Map as MapLibreMap, ScaleControl } from 'maplibre-gl';
 import { BASEMAP_LABELS, BasemapId, offersBasemapSwitch } from './basemaps';
 import { glyphSvg } from './controls';
-import { createMapboxLogo } from './mapboxLogo';
 import { LegendKey, LegendToggle, ZOOM_NOTE, kindsHeading, kindsStartCollapsed } from './legend';
 import { DIMMED_OPACITY } from './markers';
 
@@ -70,9 +69,6 @@ export class LegendControl implements IControl {
     private status: HTMLDivElement | null = null;
     private body: HTMLDivElement | null = null;
     private scale: ScaleControl | null = null;
-    private legendRow: HTMLDivElement | null = null;
-    /** The provider's logo after the scale bar (the Mapbox wordmark while Satellite is drawn), or null. */
-    private logo: HTMLAnchorElement | null = null;
     private phoneQuery: MediaQueryList | null = null;
     /** The viewer's choice for the Kinds section (null: the default for the count of kinds). */
     private kindsOpen: boolean | null = null;
@@ -111,7 +107,6 @@ export class LegendControl implements IControl {
         scale.classList.add('mapstudio-legend-scale');
         row.appendChild(scale);
         container.appendChild(row);
-        this.legendRow = row;
         container.addEventListener('keydown', this.handleKeyDown);
         this.container = container;
         this.button = button;
@@ -135,23 +130,6 @@ export class LegendControl implements IControl {
         }
         this.container = null;
         this.button = null;
-        this.legendRow = null;
-        this.logo = null;
-    }
-
-    /**
-     * The provider's logo in the row after the scale bar, bottom-aligned with the Legend button (owner decision
-     * 2026-11-03): the Mapbox wordmark while Satellite is drawn, nothing otherwise. Bottom-left is where Mapbox's
-     * attribution guide puts it; the row keeps it clear of the button, the scale bar and the App Bar corner.
-     */
-    setLogo(provider: 'mapbox' | null): void {
-        if (provider === 'mapbox' && !this.logo && this.legendRow) {
-            this.logo = createMapboxLogo(this.legendRow.ownerDocument);
-            this.legendRow.appendChild(this.logo);
-        } else if (provider === null && this.logo) {
-            this.logo.remove();
-            this.logo = null;
-        }
     }
 
     isOpen(): boolean {
