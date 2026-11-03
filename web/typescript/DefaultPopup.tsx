@@ -1,7 +1,7 @@
 import * as React from 'react';
 import {
     ItemValues, KindDisplay, PopupDetail, alarmCountsText, alarmGlyphId, alarmLineText, alarmStaleNote, alarmsText, alarmsUnknown,
-    capitalised, commsText, itemState, qualityWords
+    capitalised, commsText, itemState, NO_DATA, qualityWords
 } from './live';
 import { Chrome, CloseButton, Glyph, KpiRows, NoteRow } from './popupParts';
 
@@ -42,7 +42,7 @@ export interface DefaultPopupProps {
  * and 8; the owner's option A, review notes items 13, 15 and 21): in order the header (the kind glyph
  * in a disc, the name, the kind as subline, the pop-out page link when it has a value, close), comms
  * with its status and age right-aligned, two to three KPIs (a stale value as the hourglass alone before
- * the value, the reason in the tooltip; "No data yet" before a value), then the alarm block (the counts
+ * the value, the reason in the tooltip; "No data" before a value), then the alarm block (the counts
  * and the most important alarms in words with their age, from the Gateway's alarm status, and View
  * alarms to the project's alarm page; Map Studio acknowledges nothing; no check mark before "No active
  * alarms", the hourglass before it while comms are lost or the alarms are stale, since no alarm may
@@ -118,6 +118,10 @@ export class DefaultPopup extends React.Component<DefaultPopupProps> {
         const state = itemState(values, display);
         const problem = values ? values.problems.find((p) => p.slot === 'comms') : undefined;
         const comms = commsText(values ? values.comms : undefined, now, problem ? problem.reason : '');
+        // "No data" stays short on the row; its reason and code are in the tooltip (owner, 2026-11-03).
+        const noData = comms.word === NO_DATA;
+        const commsFull = comms.word + (comms.detail ? ' - ' + comms.detail : '') + (comms.code !== '' ? ' (' + comms.code + ')' : '');
+        const commsNote = noData ? (comms.detail !== '' || comms.code !== '' ? commsFull : '') : (comms.code !== '' ? commsFull : '');
         const viewAlarms = state.alarm !== null && alarmPage !== null;
         return (
             <div className={'mapstudio-popup mapstudio-popup--default' + (sheet ? ' mapstudio-popup--sheet' : ' mapstudio-popup--card')}
@@ -142,13 +146,13 @@ export class DefaultPopup extends React.Component<DefaultPopupProps> {
                     {display.comms ? (
                         <NoteRow className={'mapstudio-popup-row mapstudio-popup-comms' + (comms.lost ? ' mapstudio-popup-comms--lost' : '')
                                      + (comms.unknown ? ' mapstudio-popup-comms--unknown' : '')}
-                                 note={comms.code !== '' ? comms.word + (comms.detail ? ' - ' + comms.detail : '') + ' (' + comms.code + ')' : ''}
+                                 note={commsNote}
                                  data={{ 'data-part': 'comms', 'data-comms': comms.lost ? 'lost' : comms.unknown ? 'unknown' : 'ok', 'data-quality': comms.code }}>
                             <span className="mapstudio-popup-label">Comms</span>
                             <span className="mapstudio-popup-value">
                                 {comms.unknown ? null : comms.lost ? <Glyph id="comms-lost" className="mapstudio-popup-state-glyph" size={16} />
                                     : <Chrome name="check" className="mapstudio-popup-state-glyph mapstudio-popup-ok-glyph" />}
-                                {comms.word}{comms.detail ? ' - ' + comms.detail : ''}
+                                {comms.word}{!noData && comms.detail ? ' - ' + comms.detail : ''}
                             </span>
                         </NoteRow>
                     ) : null}

@@ -257,8 +257,8 @@ test.describe('the owner\'s review notes: Esc, plain words, placement and the ca
         const comms = card(page).locator('[data-part="comms"]');
         await expect(comms).toHaveAttribute('data-comms', 'lost');
         await expect(comms).toHaveAttribute('data-quality', 'Bad_NotFound');
-        await expect(comms.locator('.mapstudio-popup-value')).toHaveText('No data yet - the tag was not found');
-        await expect(comms).toHaveAttribute('title', /\(Bad_NotFound\)$/);
+        await expect(comms.locator('.mapstudio-popup-value')).toHaveText('No data');
+        await expect(comms).toHaveAttribute('title', 'No data - the tag was not found (Bad_NotFound)');
         // Its values have never arrived: no "Stale - ... (comms lost)" words, the reason in the tooltip.
         const kpi = card(page).locator('.mapstudio-popup-kpi').first();
         await expect(kpi.locator('.mapstudio-popup-value')).not.toContainText('Stale');

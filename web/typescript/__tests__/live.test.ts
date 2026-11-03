@@ -236,13 +236,13 @@ describe('the popup\'s words', () => {
         expect(commsText(good(true), NOW)).toEqual({ word: 'OK', detail: '12 s ago', lost: false, unknown: false, code: '' });
         expect(commsText(good(false), NOW)).toEqual({ word: 'Comms lost', detail: '12 s ago', lost: true, unknown: false, code: '' });
         expect(commsText(stale(true, 'Bad_Stale', 'Bad_Stale'), NOW).word).toBe('Comms lost');
-        // No data is neither OK nor lost (owner review notes item 21): no glyph, "No data yet", the reason in plain words (item 15).
-        expect(commsText(undefined, NOW)).toEqual({ word: 'No data yet', detail: '', lost: false, unknown: true, code: '' });
+        // No data is neither OK nor lost (owner review notes item 21): no glyph, "No data", the reason in plain words (item 15).
+        expect(commsText(undefined, NOW)).toEqual({ word: 'No data', detail: '', lost: false, unknown: true, code: '' });
         expect(commsText(stale(null, 'no value yet', 'Uncertain_InitialValue'), NOW))
-            .toEqual({ word: 'No data yet', detail: '', lost: false, unknown: true, code: 'Uncertain_InitialValue' });
+            .toEqual({ word: 'No data', detail: '', lost: false, unknown: true, code: 'Uncertain_InitialValue' });
         // A slot the Gateway marked stale with no value (the tag is not there): comms lost, as the marker draws it, in plain words.
         expect(commsText(stale(null, 'Bad_NotFound', 'Bad_NotFound'), NOW))
-            .toEqual({ word: 'No data yet', detail: 'tag not found', lost: true, unknown: false, code: 'Bad_NotFound' });
+            .toEqual({ word: 'No data', detail: 'tag not found', lost: true, unknown: false, code: 'Bad_NotFound' });
         expect(commsText(stale(null, 'Bad_NotFound', 'Bad_NotFound'), NOW, 'the tag was not found').detail).toBe('the tag was not found');
         expect(alarmsText(good({ active: 0, unacked: 0, priority: 0 }))).toBe('No active alarms');
         expect(alarmsText(good({ active: 1, unacked: 1, priority: 1 }))).toBe('1 alarm - Priority 1, unacknowledged');

@@ -186,10 +186,11 @@ test.describe('1440 px', () => {
             // The popup anchors to the shared marker drawn, the members' centroid (owner review notes item 20).
             const centre = [(SHARED.a[0] + SHARED.b[0]) / 2, (SHARED.a[1] + SHARED.b[1]) / 2];
             await expect(map).toHaveAttribute('data-popup-anchor', centre[0].toFixed(6) + ',' + centre[1].toFixed(6));
-            // A site with no data (no asset linked) is neither OK nor known (item 21): no check mark, "No data yet" with
-            // the reason, and the alarm state unknown.
+            // A site with no data (no asset linked) is neither OK nor known (item 21): no check mark, "No data" with
+            // the reason in the tooltip, and the alarm state unknown.
             await expect(popup.locator('[data-part="comms"]')).toHaveAttribute('data-comms', 'unknown');
-            await expect(popup.locator('[data-part="comms"] .mapstudio-popup-value')).toHaveText(/^No data yet/);
+            await expect(popup.locator('[data-part="comms"] .mapstudio-popup-value')).toHaveText('No data');
+            await expect(popup.locator('[data-part="comms"]')).toHaveAttribute('title', /^No data - /);
             await expect(popup.locator('[data-part="comms"] .mapstudio-popup-ok-glyph')).toHaveCount(0);
             await expect(popup.locator('[data-part="comms"] .mapstudio-popup-state-glyph')).toHaveCount(0);
             await expect(popup.locator('[data-part="alarms"]')).toHaveAttribute('data-alarm', 'unknown');

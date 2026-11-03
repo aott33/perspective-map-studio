@@ -71,7 +71,7 @@ export class NoteRow extends React.Component<{ className: string; note: string; 
     }
 }
 
-/** The no-data words of a KPI slot with no value: "No data yet", the quality in plain words as the note. */
+/** The no-data words of a KPI slot with no value: "No data", the quality in plain words as the note. */
 function noDataNote(value: LiveValue | undefined): string {
     if (!value) {
         return '';
@@ -83,7 +83,7 @@ function noDataNote(value: LiveValue | undefined): string {
 /**
  * The KPI rows of a popup (option A, owner review notes items 13, 15 and 21): the kind display's KPIs
  * that are on, three at most, each with its full label and its value in its unit right-aligned (the
- * icon KPI as the key value); "No data yet" before the first value; a stale value shows the hourglass
+ * icon KPI as the key value); "No data" before the first value, the reason in its tooltip; a stale value shows the hourglass
  * alone before the value, the reason in plain words in the row's tooltip ("Stale - comms lost", "Stale -
  * bad quality") and under the row on a tap. The quality name stays in `data-quality` for tests.
  */

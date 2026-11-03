@@ -665,7 +665,7 @@ export function ageText(t: string | null, now: number): string {
 }
 
 /** What the popup says where a slot has no value yet (owner review notes item 21: neither OK nor known). */
-export const NO_DATA = 'No data yet';
+export const NO_DATA = 'No data';
 /** The alarm line with no alarm state to show (item 21). */
 export const ALARM_STATE_UNKNOWN = 'Alarm state unknown';
 
@@ -758,8 +758,9 @@ export interface CommsWords {
 }
 
 /**
- * The comms row of the popup: "OK - 12 s ago", "Comms lost - 3 min ago", or "No data yet" with the reason
- * in plain words ("No data yet - tag not found", items 15 and 21); `problem` is the item's problem for
+ * The comms row of the popup: "OK - 12 s ago", "Comms lost - 3 min ago", or "No data" with the reason
+ * in plain words as its detail ("tag not found", items 15 and 21; the row shows "No data" alone and the
+ * detail in its tooltip, owner 2026-11-03); `problem` is the item's problem for
  * the comms slot when the Gateway could not resolve it ("no asset is linked"). With no slot, or a slot
  * that has not delivered yet, the state is unknown (no glyph); a slot the Gateway marked stale with no
  * value (a tag that is not there) is comms lost, as the marker draws it, with the same words.
