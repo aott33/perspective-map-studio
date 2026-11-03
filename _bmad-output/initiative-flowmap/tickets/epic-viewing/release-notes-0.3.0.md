@@ -1,11 +1,3 @@
-<!--
-Release notes for the GitHub release page of v0.3.0, modelled on the v0.2.0 page (RELEASING.md step 5:
-what the release gives, requirements, upgrade with the warnings first, install and verify, what is not in
-it, a link to the CHANGELOG; every repository link at the tag). On tag day the owner pastes everything
-below the line into the draft release, after filling the two values marked TAG DAY from the release's
-.sha256 asset and the README (the certificate line is unchanged unless the key was rotated).
--->
-
 Map Studio 0.3.0 shows each site's live state on the project map: alarms, comms and a key value on every icon and line, a popup with the alarm summary and a link to the site's page, search, a legend and a Needs you summary of what is in alarm, comms lost or stale. A normal field shows no colour, so what needs attention stands out.
 
 ## What's new
@@ -39,8 +31,8 @@ Map Studio 0.3.0 shows each site's live state on the project map: alarms, comms 
 
 Install `Map-Studio-0.3.0.modl` from the assets below on the Gateway (Platform > Modules), or pin it in a module lock ([how](https://github.com/aott33/perspective-map-studio/blob/v0.3.0/RELEASING.md#installing-through-a-hosts-module-lock)).
 
-- SHA-256: `TAG DAY: the value in Map-Studio-0.3.0.modl.sha256` (also in `Map-Studio-0.3.0.modl.sha256`)
-- Signing certificate SHA-256: `8F:93:FD:5C:B8:D9:C7:9B:E4:14:FD:EC:84:CF:21:26:A2:AC:39:F3:DA:3F:C9:0D:F8:08:0E:EA:5C:4D:38:3D` (TAG DAY: confirm it equals the README line)
+- SHA-256: `dc1475b83c3ecf742047963ec02381cd68c54bf780cbd4599879417d6aa69c11` (also in `Map-Studio-0.3.0.modl.sha256`)
+- Signing certificate SHA-256: `8F:93:FD:5C:B8:D9:C7:9B:E4:14:FD:EC:84:CF:21:26:A2:AC:39:F3:DA:3F:C9:0D:F8:08:0E:EA:5C:4D:38:3D`
 
 ## Not in this release
 
