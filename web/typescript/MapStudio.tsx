@@ -13,7 +13,7 @@ import {
     Size2d
 } from '@inductiveautomation/perspective-client';
 import {
-    ErrorEvent, GeoJSONSource, Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent, Popup, setWorkerUrl
+    AttributionControl, ErrorEvent, GeoJSONSource, Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent, Popup, setWorkerUrl
 } from 'maplibre-gl';
 import type { ExpressionSpecification } from 'maplibre-gl';
 import { TerraDraw, TerraDrawLineStringMode } from 'terra-draw';
@@ -42,11 +42,13 @@ import { LegendToggle, legendKey, readToggle, sessionStore, writeToggle } from '
 import { NeedsYouControl } from './NeedsYouControl';
 import { NeedsYouRow, needsYou } from './needsyou';
 import { FIT_PADDING_PX, StartingArea, readStartingArea, startingAreaKey } from './startingArea';
-import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, displayShows, itemPreset, itemState } from './live';
+import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, displayShows, freezeLive, iconKpiOf, itemPreset, itemState } from './live';
+import { CONNECTED, ConnectionState, ConnectionWatch, connectionChipText, connectionDetailText } from './connection';
+import { ThemeWatch } from './themeWatch';
 import {
     AREA_DASH, AREA_FILL_OPACITY, AREA_LINE_OPACITY, AREA_LINE_WIDTH, ARROW_IMAGE, CHIP_IMAGE, CHIP_PADDING, CHIP_SIZE, DIMMED_OPACITY, DISC_CENTER,
     FONT_CHIP, FONT_NAME, HALO_WIDTH, KPI_SIZE, KPI_TOP_PX, LINE_CHIP_OFFSET_BADGE_EM, LINE_CHIP_OFFSET_EM, LINE_DASH, LINE_DOT,
-    LINE_HALO_WIDTH, MARKER_IMAGE, MARKER_TOKENS, MarkerColors, NAME_SIZE, NAME_TOP_PX, SpriteSymbol, TEXT_PADDING, ZOOM_DOT, ZOOM_KPI,
+    LINE_HALO_WIDTH, MARKER_COLLISION_PADDING, MARKER_IMAGE, MARKER_TOKENS, MarkerColors, NAME_SIZE, NAME_TOP_PX, SpriteSymbol, TEXT_PADDING, ZOOM_DOT, ZOOM_KPI,
     ZOOM_NAME, imageFor, lineHaloDash, markerProperties, parseSprite, stateWord, textWidthPx
 } from './markers';
 import { PresetPalette, StylePreview, TintPalette } from './StylePreview';
@@ -71,11 +73,14 @@ import {
 } from './unsaved';
 import { UnsavedSender } from './unsavedSender';
 import {
-    LINE_POPUP_PX, POPUP_WIDTH_PX, PopupPoint, fillLink, fillParams, isSheetWidth, linePopupPlacement, popupItemView, popupMaxHeight,
-    popupMaxWidth, popupMountPath, popupViewParams
+    LINE_POPUP_PX, POPUP_WIDTH_PX, PopupPoint, fillLink, fillParams, isSheetWidth, popupItemView, popupMaxHeight,
+    popupMountPath, popupViewParams
 } from './popupParams';
+import { CameraPadding, PopupAnchor, Rect, cameraPadding, placePopup, placedMaxWidth } from './popupPlacement';
+import { SHARED_M, sharedWithinM } from './shared';
 import { registerTestHook, registerTestView, takeTestReply } from './testHook';
 import { drawColor, themeColor } from './theme';
+import { rasterPaint } from './basemaps';
 import { Kind } from './adapters';
 
 /** Must match MapStudioComponent.COMPONENT_ID on the Java side. */
@@ -208,6 +213,8 @@ export interface MapStudioDelegateState {
     live: LiveState;
     /** Bumped whenever a batch is applied, so the component knows to redraw the markers. */
     liveRevision: number;
+    /** The Gateway connection (owner review notes item 32): lost, and whether the values shown are frozen. */
+    connection: ConnectionState;
 }
 
 /** `localStorage`, or null when the browser refuses it (a private window, blocked site data). */
@@ -270,6 +277,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private saveBatchId: string | null = null;
     private live: LiveState = LIVE_INITIAL;
     private liveRevision = 0;
+    private connection: ConnectionState = CONNECTED;
+    /** Polls the client's connection flag (item 32): the values freeze while it is lost, the map reloads when it is back. */
+    private connectionWatch: ConnectionWatch;
     private basemap: BasemapState = BASEMAP_INITIAL;
     /** The id of the basemap.source message whose reply is awaited, or null. */
     private basemapPendingId: string | null = null;
@@ -296,6 +306,29 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         if (!storage) {
             this.warnStorage();
         }
+        this.connectionWatch = new ConnectionWatch(() => this.connected(), () => this.onConnectionLost(), () => this.onConnectionBack());
+        this.connectionWatch.start();
+    }
+
+    /**
+     * The client lost the Gateway (item 32, AD-6): every value shown freezes as stale with the reason
+     * "no connection" (the markers, the popup and the lists draw it so), the Needs you summary says the
+     * state is unknown and the chip names the time the values are from. Nothing reads as live.
+     */
+    private onConnectionLost(): void {
+        this.connection = { ...this.connection, lost: true, frozen: true };
+        this.live = freezeLive(this.live);
+        this.liveRevision++;
+        console.info('[MapStudio] No connection to the Gateway: the values shown are frozen as stale.');
+        this.notify();
+    }
+
+    /** The client is back: the map reloads (map.load, then the Gateway's full batch replaces the frozen values). */
+    private onConnectionBack(): void {
+        this.connection = { ...this.connection, lost: false };
+        console.info('[MapStudio] The Gateway connection is back: reloading the map.');
+        this.notify();
+        this.changes.load();
     }
 
     private warnStorage(): void {
@@ -327,7 +360,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             editing: this.store.status === 'unavailable' ? 'off' : 'on',
             storageWarning: this.storageWarning,
             live: this.live,
-            liveRevision: this.liveRevision
+            liveRevision: this.liveRevision,
+            connection: this.connection
         };
     }
 
@@ -438,6 +472,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         }
         this.live = applyBatch(this.live, body);
         this.liveRevision++;
+        // A full batch after a reconnect replaces the frozen values (item 32); the time is the chip's.
+        this.connection = { ...this.connection, valuesAt: Date.now(), frozen: this.connection.frozen && !body.full };
         console.debug('[MapStudio] Live values: ' + (body.full ? 'full, ' : '') + body.items.length + ' item(s) at seq ' + body.seq);
         this.notify();
     }
@@ -494,9 +530,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.sender.storage(key);
     }
 
-    /** Stop the replay and load retry timers (the component unmounted). */
+    /** Stop the replay, load retry and connection timers (the component unmounted). */
     stopReplay(): void {
         this.sender.stop();
+        this.connectionWatch.stop();
         if (this.loadRetryTimer !== null) {
             clearTimeout(this.loadRetryTimer);
             this.loadRetryTimer = null;
@@ -703,6 +740,8 @@ const LAYER_LINE_CHIPS = 'mapstudio-line-chip';
 const LAYER_LINE_BADGES = 'mapstudio-line-badge';
 const LAYER_ITEM_MARKERS = 'mapstudio-items-marker';
 const LAYER_ARROW = 'mapstudio-arrow';
+/** How far apart the flow arrows sit along the selected line (item 22), in px. */
+const ARROW_SPACING_PX = 250;
 /** The served sprite the marker images are drawn from (docs/icons.md). */
 const SPRITE_URL = '/res/mapstudio/icons/mapstudio-icons.svg';
 /** The served glyphs the text layers are set in (web/scripts/glyphs.mjs, docs/icons.md). */
@@ -759,6 +798,10 @@ function markerColors(root: HTMLElement | undefined): MarkerColors {
     };
 }
 
+/** Every token the map draws with (item 29): the marker tokens and the blank map's, the theme watch's snapshot. */
+const THEME_TOKENS: readonly string[] = ['--neutral-20', '--neutral-70', '--label', '--containerRoot', '--container']
+    .concat(...Object.values(MARKER_TOKENS).map((tokens) => tokens.slice()));
+
 /** A style expression as the layer definitions take it (the spec's own type is too narrow for the ones built here). */
 type Expression = ExpressionSpecification;
 
@@ -813,8 +856,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private drawnUnsaved = '';
     /** Terra Draw features of finished lines: removed once queued, as the unsaved layer draws them. */
     private queuedFeatures: Array<string | number> = [];
-    /** The theme colours the marker images are drawn with, read once at mount. */
+    /** The theme colours the marker images are drawn with, read at mount and again on a theme change (item 29). */
     private markerColors: MarkerColors | null = null;
+    /** Re-reads the tokens when the theme changes and redraws (item 29). */
+    private themeWatch: ThemeWatch | null = null;
+    /** How many times the theme was re-read, for tests. */
+    private themeRevision = 0;
+    /** A theme change came before the layers were ready (item 29): applied once they are, not lost. */
+    private themePending = false;
     /** The sprite's symbols once fetched (empty when the fetch failed); null before. */
     private symbols: Record<string, SpriteSymbol> | null = null;
     /** The sprite's fetch, shared by every image asked for before it arrived. */
@@ -841,6 +890,15 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private itemBounds: MapFeatures['bounds'] = null;
     private itemBoundsKey = '';
     private popupClock: ReturnType<typeof setInterval> | null = null;
+    /** Where each member of a shared marker is drawn, by item id (owner review notes item 20): a popup anchors there. */
+    private anchors: Record<string, [number, number]> = {};
+    /** The sharing distance at the map's zoom (item 20) and the one the features were last built with. */
+    private withinM = SHARED_M;
+    private drawnWithinM = SHARED_M;
+    /** What opened the popup (item 14): Esc returns the focus there; null for a click on the map. */
+    private openedBy: 'search' | 'needsyou' | null = null;
+    /** The side the open card's tip is on (item 18), for the camera padding; null while no card is open. */
+    private popupAnchor: PopupAnchor | null = null;
     /** The legend bottom-left, which holds the basemap choice (epic 3 entries 6 and 14), and the basemap revision last drawn. */
     private legendControl: LegendControl | null = null;
     private drawnBasemap = -1;
@@ -877,6 +935,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
         };
         const mc = markerColors(root);
         this.markerColors = mc;
+        // The colours this map was built with, for the e2e suite (item 29); applyTheme updates them.
+        this.mapContainer.setAttribute('data-theme-revision', '0');
+        this.mapContainer.setAttribute('data-blank', colors.background);
         this.makePopup();
         const map = new MapLibreMap({
             container: this.mapContainer,
@@ -935,10 +996,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }, this.onLegendSwitch);
         this.legendControl.setToggles(this.toggles.lines, this.toggles.names);
         map.addControl(this.legendControl, 'bottom-left');
+        // The provider's attribution (R10, always shown with a basemap): small muted text along the bottom-right
+        // edge under the App Bar toggle, never covering it (owner review, item 3).
+        map.addControl(new AttributionControl({ compact: false }), 'bottom-right');
         map.on('error', this.onMapError);
         map.on('idle', this.onMapIdle);
         map.on('moveend', () => this.publishView(map));
         map.on('movestart', this.onMoveStart);
+        map.on('zoomend', () => this.onZoomEnd(map));
         map.on('load', () => {
             const empty = itemsToGeoJson([]);
             map.addSource(SOURCE_ITEM_LINES, { type: 'geojson', data: empty.lines });
@@ -1076,6 +1141,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.applyLayerToggles();
             this.applyBasemap();
             this.drawItems();
+            if (this.themePending) {
+                // The theme changed between the mount's colour read and now (item 29): read and draw again.
+                this.applyTheme();
+            }
             const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
             if (delegate) {
                 delegate.sendMapLoad();
@@ -1096,9 +1165,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
             map.addControl(this.drawControl, 'top-right');
         }
         this.map = map;
+        this.themeWatch = new ThemeWatch(root, THEME_TOKENS, () => this.applyTheme());
+        this.themeWatch.start();
         registerTestView((view) => {
             if (this.map === map) {
-                map.jumpTo({ center: view.center, zoom: view.zoom });
+                // A test's move centres on the whole map: the camera padding of the last choice (item 27) is cleared.
+                map.jumpTo({ center: view.center, zoom: view.zoom, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
             }
         });
         this.applyEditing();
@@ -1117,7 +1189,64 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private publishHeight(): void {
         if (this.mapContainer) {
             this.mapContainer.style.setProperty('--mapstudio-map-height', this.mapContainer.clientHeight + 'px');
+            this.mapContainer.style.setProperty('--mapstudio-map-width', this.mapContainer.clientWidth + 'px');
         }
+    }
+
+    /**
+     * The theme changed after the map mounted (item 29: the `/dark` page's startup script, a session
+     * theme switch): the tokens are read again, every paint colour the layers took at mount is set
+     * again, the marker images are dropped so the resolver draws them in the new colours, and the
+     * features are rebuilt (their line and area colours are resolved token values).
+     */
+    private applyTheme(): void {
+        const map = this.map;
+        const root = this.props.store.element as HTMLElement | undefined;
+        if (!map || !this.itemsReady) {
+            // The watch has taken the new reading already: remember the change for the load handler.
+            this.themePending = true;
+            return;
+        }
+        this.themePending = false;
+        const mc = markerColors(root);
+        this.markerColors = mc;
+        this.themeRevision++;
+        const blank = themeColor(root, '--neutral-20');
+        const setPaint = (layer: string, name: string, value: unknown): void => {
+            if (map.getLayer(layer)) {
+                // The paint property names are the style spec's; the typed overload is too narrow for a name in a variable.
+                (map.setPaintProperty as unknown as (l: string, n: string, v: unknown) => void)(layer, name, value);
+            }
+        };
+        setPaint('background', 'background-color', blank);
+        for (const layer of [LAYER_LINE_HALO, LAYER_LINE_HALO_DASHED, LAYER_LINE_HALO_DOTTED]) {
+            setPaint(layer, 'line-color', mc.halo);
+        }
+        setPaint(LAYER_LINE_CASING, 'line-color', mc.selection);
+        setPaint(LAYER_UNSAVED_LINES, 'line-color', themeColor(root, '--label'));
+        setPaint(LAYER_UNSAVED_POINTS, 'circle-color', blank);
+        setPaint(LAYER_UNSAVED_POINTS, 'circle-stroke-color', themeColor(root, '--label'));
+        setPaint(LAYER_ITEM_KPI, 'text-color', ['case', ['==', ['get', 'kpiStale'], true], mc.textSecondary, mc.glyph]);
+        for (const layer of [LAYER_ITEM_CHIPS, LAYER_ITEM_NAMES, LAYER_LINE_CHIPS]) {
+            setPaint(layer, 'text-color', mc.glyph);
+        }
+        for (const layer of [LAYER_ITEM_KPI, LAYER_ITEM_NAMES]) {
+            setPaint(layer, 'text-halo-color', mc.halo);
+        }
+        // The images were drawn in the old colours: dropped, so the missing-image resolver draws them again.
+        for (const id of Array.from(this.madeImages.keys())) {
+            if (map.hasImage(id)) {
+                map.removeImage(id);
+            }
+        }
+        this.madeImages.clear();
+        this.drawnRevision = -1;
+        this.drawItems();
+        if (this.mapContainer) {
+            this.mapContainer.setAttribute('data-theme-revision', String(this.themeRevision));
+            this.mapContainer.setAttribute('data-blank', blank);
+        }
+        console.info('[MapStudio] The theme changed: the map colours were read again.');
     }
 
     componentDidUpdate(): void {
@@ -1248,6 +1377,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         });
         const markerOffset: Expression = ['literal', [MARKER_IMAGE.width / 2 - DISC_CENTER[0], MARKER_IMAGE.height / 2 - DISC_CENTER[1]]];
         const dotOffset: Expression = ['literal', [0, 0]];
+        const markerPadding: Expression = ['literal', MARKER_COLLISION_PADDING];
         const iconOffset = ['step', ['zoom'], ['case', normal, dotOffset, markerOffset], ZOOM_NAME, markerOffset] as unknown as Expression;
         map.addLayer({
             id: LAYER_ITEM_MARKERS,
@@ -1261,24 +1391,29 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 'icon-offset': iconOffset,
                 'icon-allow-overlap': true,
                 'icon-ignore-placement': false,
-                // The image's own box is what the text keeps clear of; no padding round it.
-                'icon-padding': 0,
+                // The text keeps clear of the marker's footprint (MARKER_COLLISION_PADDING shrinks the image's
+                // box to it, item 16); a dot's own box, no padding.
+                'icon-padding': ['step', ['zoom'], ['case', normal, ['literal', [0]], markerPadding], ZOOM_NAME, markerPadding] as unknown as Expression,
                 // Drawn in rank order with the abnormal ones on top (lower keys draw first).
                 'symbol-sort-key': ['-', 1000, ['get', 'rank']]
             }
         });
+        // The flow arrow repeated along the selected line (item 22): MapLibre lays the arrow image's x axis
+        // along the line every ARROW_SPACING_PX (one at the centre when the line is shorter), in the line's
+        // drawn direction, under the line's chip and badge so the midpoint mark stays on top.
         map.addLayer({
             id: LAYER_ARROW,
             type: 'symbol',
             source: SOURCE_ARROW,
             layout: {
+                'symbol-placement': 'line',
+                'symbol-spacing': ARROW_SPACING_PX,
                 'icon-image': ARROW_IMAGE,
-                'icon-rotate': ['get', 'bearing'],
                 'icon-rotation-alignment': 'map',
                 'icon-allow-overlap': true,
                 'icon-ignore-placement': true
             }
-        });
+        }, LAYER_LINE_CHIPS);
     }
 
     /** A changed startingArea prop moves the map there (once per value). */
@@ -1330,7 +1465,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     maxzoom: b.source.maxzoom,
                     attribution: b.source.attribution
                 });
-                map.addLayer({ id: LAYER_BASEMAP, type: 'raster', source: SOURCE_BASEMAP },
+                // OpenStreetMap drawn quiet (item 25, basemaps.ts rasterPaint); Satellite as it comes.
+                map.addLayer({ id: LAYER_BASEMAP, type: 'raster', source: SOURCE_BASEMAP, paint: rasterPaint(b.selected) },
                     map.getLayer(LAYER_AREA_FILL) ? LAYER_AREA_FILL : undefined);
                 this.tiles = 'loading';
             } else {
@@ -1356,6 +1492,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
         el.setAttribute('data-basemap-offered', b.offered.join(','));
         el.setAttribute('data-basemap-status', status);
         el.setAttribute('data-basemap-tiles', this.tiles);
+        el.setAttribute('data-basemap-paint', JSON.stringify(rasterPaint(b.selected)));
+        // What OpenStreetMap is drawn with whatever the choice (item 25), for the contrast check's quiet raster sample.
+        el.setAttribute('data-quiet-paint', JSON.stringify(rasterPaint('osm')));
     }
 
     /**
@@ -1451,6 +1590,71 @@ export class MapStudio extends Component<Props, MapStudioState> {
         el.setAttribute('data-labels-zoom', map.getZoom().toFixed(2));
     }
 
+    /**
+     * The zoom settled (owner review notes item 20): the sharing distance follows the zoom, so a group
+     * of points splits once its members are a marker apart on screen; the features are rebuilt when it moves.
+     */
+    private onZoomEnd(map: MapLibreMap): void {
+        if (this.map !== map) {
+            return;
+        }
+        const withinM = sharedWithinM(map.getZoom(), map.getCenter().lat);
+        if (withinM !== this.withinM) {
+            this.withinM = withinM;
+            this.drawItems();
+        }
+    }
+
+    /** Where a point item's popup anchors: the marker drawn for it, which for a member of a shared marker is the group's (item 20). */
+    private anchorFor(id: string, lngLat: [number, number]): [number, number] {
+        return this.anchors[id] || lngLat;
+    }
+
+    /** A control's rectangle in map pixels, or null when it is not there. */
+    private controlRect(selector: string): Rect | null {
+        if (!this.map) {
+            return null;
+        }
+        const container = this.map.getContainer();
+        const el = container.querySelector(selector) as HTMLElement | null;
+        if (!el || el.offsetWidth === 0 || el.offsetHeight === 0) {
+            return null;
+        }
+        const base = container.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
+    }
+
+    /**
+     * The camera padding of the moment (item 27): the top bar, the zoom card, the legend row, an open
+     * sheet or card, so a Return, a search choice, a Needs you choice or Fit centres in what a person sees.
+     */
+    private cameraPadding(): CameraPadding {
+        if (!this.map) {
+            return { top: 0, bottom: 0, left: 0, right: 0 };
+        }
+        const container = this.map.getContainer();
+        const sheetEl = this.mapContainer && this.mapContainer.parentElement
+            ? this.mapContainer.parentElement.querySelector('.mapstudio-sheet') as HTMLElement | null : null;
+        let sheet: Rect | null = null;
+        if (sheetEl && sheetEl.offsetHeight > 0) {
+            const base = container.getBoundingClientRect();
+            const r = sheetEl.getBoundingClientRect();
+            sheet = { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
+        }
+        let card: { rect: Rect; anchor: PopupAnchor } | null = null;
+        if (this.popup && this.popup.isOpen() && this.popupAnchor && this.popupContent) {
+            const base = container.getBoundingClientRect();
+            const r = this.popupContent.getBoundingClientRect();
+            card = { rect: { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height }, anchor: this.popupAnchor };
+        }
+        return cameraPadding(container.clientWidth, container.clientHeight, {
+            topBar: this.controlRect('.maplibregl-ctrl-top-left'),
+            zoomCard: this.controlRect('.maplibregl-ctrl-top-right'),
+            bottomRow: this.controlRect('.maplibregl-ctrl-bottom-left')
+        }, sheet, card);
+    }
+
     /** Fit (epic 3 entry 7): the view fits every item's bounds and keeps until the bounds change or the user moves the map. */
     private onFit = (): void => {
         if (!this.map || !this.itemBounds) {
@@ -1461,13 +1665,19 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.publishFit();
     };
 
+    /** Fit bounds inside the visible area (item 27): the fit's own margin plus the camera padding. */
     private fitTo(bounds: [number, number, number, number]): void {
         if (this.map) {
-            this.map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], { padding: FIT_ITEMS_PADDING_PX, animate: false, maxZoom: 16 });
+            const pad = this.cameraPadding();
+            this.map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], {
+                padding: { top: pad.top + FIT_ITEMS_PADDING_PX, bottom: pad.bottom + FIT_ITEMS_PADDING_PX,
+                    left: pad.left + FIT_ITEMS_PADDING_PX, right: pad.right + FIT_ITEMS_PADDING_PX },
+                animate: false, maxZoom: 16
+            });
         }
     }
 
-    /** Return: the map pans to the selected point at the zoom it has, or fits the selected line. */
+    /** Return: the map pans to the selected point at the zoom it has (centred in the visible area, item 27), or fits the selected line. */
     private onReturn = (): void => {
         const selected = this.state.selected;
         const delegate = this.props.delegate;
@@ -1479,7 +1689,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             return;
         }
         if (item.geometry.type === 'Point') {
-            this.map.panTo([item.geometry.coordinates[0], item.geometry.coordinates[1]], { animate: false });
+            const at = this.anchorFor(item.id, [item.geometry.coordinates[0], item.geometry.coordinates[1]]);
+            this.map.jumpTo({ center: at, padding: this.cameraPadding() });
         } else {
             let west = Infinity;
             let south = Infinity;
@@ -1502,11 +1713,13 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * line's popup is entry 2's). The jump is this component's own move, so a kept Fit is ended here.
      */
     private onSearchChoose = (result: SearchResult): void => {
+        this.openedBy = 'search';
         this.goToItem(result.id, 'Search', '(' + result.matched + ')');
     };
 
     /** A Needs you row chosen (entry 3, R15): the same move and selection as a search choice. */
     private onNeedsYouChoose = (row: NeedsYouRow): void => {
+        this.openedBy = 'needsyou';
         this.goToItem(row.id, 'Needs you', '(' + row.state + ')');
         if (this.searchControl) {
             this.searchControl.announce(row.name + ' selected');
@@ -1528,8 +1741,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         this.fitKey = null;
         if (item.geometry.type === 'Point') {
-            const lngLat: [number, number] = [item.geometry.coordinates[0], item.geometry.coordinates[1]];
-            map.jumpTo({ center: lngLat, zoom: Math.max(map.getZoom(), CHOSEN_POINT_ZOOM) });
+            const lngLat = this.anchorFor(item.id, [item.geometry.coordinates[0], item.geometry.coordinates[1]]);
+            // Centred in the visible area, less the top bar, the zoom card and an open sheet or card (item 27).
+            map.jumpTo({ center: lngLat, zoom: Math.max(map.getZoom(), CHOSEN_POINT_ZOOM), padding: this.cameraPadding() });
             // The item with its asset link and properties, so the popup's link and a custom view's params fill (entry 8).
             this.openPopup(this.popupPoint(item.id, item.name, item.kind), lngLat);
             if (store) {
@@ -1656,11 +1870,13 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const selectionKey = selected ? selected.kind + ':' + selected.id : '';
         if (!this.map || !this.itemsReady || !delegate || !this.markerColors
             || (delegate.itemsRevision === this.drawnRevision && delegate.liveRevision === this.drawnLive
-                && selectionKey === this.drawnSelection)) {
+                && selectionKey === this.drawnSelection && this.withinM === this.drawnWithinM)) {
             return;
         }
         const items = delegate.editing === 'off' ? [] : delegate.items;
-        const data = buildFeatures(items, delegate.lists.kinds, delegate.live, selected, this.markerColors);
+        const data = buildFeatures(items, delegate.lists.kinds, delegate.live, selected, this.markerColors, this.withinM);
+        this.anchors = data.anchors;
+        this.drawnWithinM = this.withinM;
         const source = (id: string): GeoJSONSource | undefined => this.map!.getSource(id) as GeoJSONSource | undefined;
         const lines = source(SOURCE_ITEM_LINES);
         const areas = source(SOURCE_ITEM_AREAS);
@@ -1679,6 +1895,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             }
             if (this.needsYouControl) {
                 // The Needs you summary from the same batch the markers draw from (entry 3, AD-6).
+                // While the values are frozen (the connection lost, item 32) the bar shows the state unknown.
+                this.needsYouControl.setUnknown(delegate.connection.frozen);
                 this.needsYouControl.setSummary(needsYou(items, delegate.lists.kinds, delegate.live, Date.now()));
             }
             if (this.legendControl && (delegate.itemsRevision !== this.drawnRevision || delegate.live.fulls !== this.drawnFulls)) {
@@ -1852,6 +2070,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.resizeObserver.disconnect();
             this.resizeObserver = null;
         }
+        if (this.themeWatch) {
+            this.themeWatch.stop();
+            this.themeWatch = null;
+        }
         if (this.mapContainer) {
             this.mapContainer.removeEventListener('keydown', this.onKeyDown, true);
         }
@@ -1991,6 +2213,31 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     };
 
+    /**
+     * Esc anywhere in the component closes the open popup, card, sheet or pick list (owner review notes
+     * item 14) and returns the focus to the map, or to the search field or the Needs you bar that opened
+     * it. The controls that handle Esc themselves (the search list, the Needs you list, the legend) stop
+     * the event before it gets here, and the draw tool's own Esc runs on the map container.
+     */
+    private onRootKeyDown = (ev: React.KeyboardEvent<HTMLDivElement>): void => {
+        if (ev.key !== 'Escape' || ev.defaultPrevented || this.state.drawing) {
+            return;
+        }
+        if (this.state.popup === null && this.state.pick === null) {
+            return;
+        }
+        ev.preventDefault();
+        const openedBy = this.openedBy;
+        this.closePopup();
+        if (openedBy === 'search' && this.searchControl) {
+            this.searchControl.focusInput();
+        } else if (openedBy === 'needsyou' && this.needsYouControl) {
+            this.needsYouControl.focusBar();
+        } else if (this.map) {
+            this.map.getCanvas().focus({ preventScroll: true });
+        }
+    };
+
     private setDrawState(state: DrawState): void {
         this.setState(state);
         if (this.drawControl) {
@@ -2015,6 +2262,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const lngLat: [number, number] = geometry && geometry.type === 'Point'
             ? [geometry.coordinates[0], geometry.coordinates[1]]
             : [ev.lngLat.lng, ev.lngLat.lat];
+        this.openedBy = null;
         this.openPopup(this.popupPoint(pointId, name, kindId), lngLat);
 
         const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
@@ -2108,11 +2356,17 @@ export class MapStudio extends Component<Props, MapStudioState> {
             return;
         }
         const display = delegate.live.display[item.kind];
-        const shows = (display && (!!display.popupView || displayShows(display))) || instrumentsOn(delegate.items, id).length > 0;
+        const instruments = instrumentsOn(delegate.items, id);
+        const shows = (display && (!!display.popupView || displayShows(display))) || instruments.length > 0;
         if (!shows) {
             this.selectLine(id, segment);
             return;
         }
+        if (!instruments.some((i) => iconKpiOf(delegate.live.display[i.kind]) !== null)) {
+            // A line with no measuring instrument has no segment to show or to highlight (owner review notes item 17).
+            segment = null;
+        }
+        this.openedBy = null;
         const store = this.props.store.delegate as MapStudioStoreDelegate | undefined;
         const before = this.state.popup;
         if (before && before.point.id !== id && store) {
@@ -2227,8 +2481,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (!item || item.geometry.type !== 'Point') {
             return;
         }
+        // The popup anchors to the shared marker drawn, not the member's own place (item 20).
         this.openPopup(this.popupPoint(item.id, item.name, item.kind),
-            [item.geometry.coordinates[0], item.geometry.coordinates[1]]);
+            this.anchorFor(item.id, [item.geometry.coordinates[0], item.geometry.coordinates[1]]));
         const store = this.props.store.delegate as MapStudioStoreDelegate | undefined;
         if (store) {
             store.sendPointClick(item.id);
@@ -2290,6 +2545,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (y > limit) {
             this.map.panBy([0, y - limit], { duration: 200 });
         }
+        // The sheet takes the focus as the card does, so Esc reaches the component (item 14) and the keyboard is inside it.
+        sheetEl.focus({ preventScroll: true });
     }
 
     /**
@@ -2319,40 +2576,52 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.popup.on('close', this.onPopupClosed);
     }
 
-    /** Move the popup to the point (after the state that fills its portal has rendered) and open it. */
+    /**
+     * Move the popup to the point (after the state that fills its portal has rendered) and open it,
+     * placed inside the map less the top bar and the zoom card (owner review notes item 18): the card
+     * is measured in the document with the clamp lifted, `placePopup` picks the anchor (above the point
+     * first, so its name label stays clear; else beside, below or a corner), clamps the card to the room
+     * when nothing fits whole, and pans the map by what is still missing. Point and line cards alike.
+     */
     private showPopupAt(lngLat: [number, number], maxPx: number = POPUP_WIDTH_PX): void {
         if (!this.map || !this.popup) {
             return;
         }
-        const at = this.map.project(lngLat);
-        this.popup.setMaxWidth(popupMaxWidth(at.x, this.map.getContainer().clientWidth, maxPx));
+        const map = this.map;
+        const at = map.project(lngLat);
+        const width = map.getContainer().clientWidth;
+        const height = map.getContainer().clientHeight;
+        // The card keeps its own width; near an edge it goes beside the point or on a corner (item 18).
+        this.popup.setMaxWidth(placedMaxWidth(width, maxPx) + 'px');
         if (!this.popup.isOpen()) {
             // The popup joins the map before it is placed: its content rendered already (the portal), but
             // a card measures 0 px tall until the popup's element is in the document (the first line popup
             // of a page opened above its segment and off the map's top with that 0).
-            this.popup.setLngLat(lngLat).addTo(this.map);
+            this.popup.setLngLat(lngLat).addTo(map);
             if (this.popupContent) {
                 this.popupContent.focus({ preventScroll: true });
             }
         }
-        if (maxPx === LINE_POPUP_PX && this.popupContent) {
-            // The line popup (entry 2): above the segment where its card fits, else below, else the side
-            // with more room with the card clamped to it (the body scrolls), so it never leaves the map.
-            // The card is in the document now, so its natural height is measured with the clamp lifted,
-            // then the clamp is set as the card's own token.
+        if (this.popupContent) {
             const content = this.popupContent;
             content.style.setProperty('--mapstudio-popup-max-height', 'none');
             const card = content.firstElementChild as HTMLElement | null;
             const natural = card ? card.offsetHeight : 0;
-            const placement = linePopupPlacement(at.y, this.map.getContainer().clientHeight, natural, POPUP_OFFSET_PX);
+            const cardWidth = card ? card.offsetWidth : Math.min(maxPx, width);
+            const obstacles = [this.controlRect('.maplibregl-ctrl-top-left'), this.controlRect('.maplibregl-ctrl-top-right')]
+                .filter((r): r is Rect => r !== null);
+            const placement = placePopup(at, cardWidth, natural, popupMaxHeight(height), width, height, obstacles, POPUP_OFFSET_PX);
             content.style.setProperty('--mapstudio-popup-max-height', placement.maxHeight + 'px');
             this.popup.options.anchor = placement.anchor;
-        } else if (this.popupContent) {
-            // A point's card (entry 8) keeps MapLibre's own anchoring; its tallest (P3) is 480 px or the
-            // map less 64, the header staying and the body scrolling.
-            this.popupContent.style.setProperty('--mapstudio-popup-max-height',
-                popupMaxHeight(this.map.getContainer().clientHeight) + 'px');
-            this.popup.options.anchor = undefined;
+            this.popupAnchor = placement.anchor;
+            if (this.mapContainer) {
+                this.mapContainer.setAttribute('data-popup-anchor', lngLat[0].toFixed(6) + ',' + lngLat[1].toFixed(6));
+                this.mapContainer.setAttribute('data-popup-side', placement.anchor);
+            }
+            if (placement.shift[0] !== 0 || placement.shift[1] !== 0) {
+                // The card still does not fit: the map pans so the point moves by the shift (the popup moves with it).
+                map.panBy([-placement.shift[0], -placement.shift[1]], { duration: 200 });
+            }
         }
         // setLngLat runs MapLibre's placement again with the anchor chosen and the card at its real size.
         this.popup.setLngLat(lngLat);
@@ -2377,6 +2646,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
      */
     private onPopupClosed = (): void => {
         this.stopPopupClock();
+        this.popupAnchor = null;
+        if (this.mapContainer) {
+            this.mapContainer.setAttribute('data-popup-anchor', '');
+            this.mapContainer.setAttribute('data-popup-side', '');
+        }
         const open = this.state.popup;
         if (open !== null) {
             const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
@@ -2504,7 +2778,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         if (open.sheet) {
             return (
-                <div className="mapstudio-sheet" role="dialog" aria-label={open.point.name} data-point-id={open.point.id}>
+                <div className="mapstudio-sheet" role="dialog" aria-label={open.point.name} data-point-id={open.point.id} tabIndex={-1}>
                     {this.popupContentFor(open)}
                 </div>
             );
@@ -2665,12 +2939,17 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const unsaved = delegate ? delegate.unsaved : [];
         const editing = delegate ? delegate.editing : 'on';
         // The status line stays in the DOM for every state it reports (the save status, a failed load, a
-        // read-only store, unsaved edits, the line tool), but the spike's click echo shows in Edit mode
-        // alone (entry 15, as the line tool since entry 14): View mode shows the map and its controls only.
-        const quiet = !this.props.props.editMode && !pending && drawText === '' && saveText === '' && load.state !== 'failed'
+        // read-only store, unsaved edits, the line tool), but the spike's click echo is dev-page test
+        // output and leaves View mode (owner review notes item 5, after entry 15): it renders in Edit mode
+        // alone, and View mode shows the map and its controls only. The last reply stays readable for the
+        // tests as `data-last-reply` on the map.
+        const echo = this.props.props.editMode;
+        const quiet = !echo && drawText === '' && saveText === '' && load.state !== 'failed'
             && store.status !== 'read-only' && unsaved.length === 0;
+        const connection = delegate ? delegate.connection : CONNECTED;
+        const chipText = connectionChipText(connection);
         return (
-            <div {...this.props.emit({ classes: ['mapstudio'] })}>
+            <div {...this.props.emit({ classes: ['mapstudio'] })} onKeyDown={this.onRootKeyDown}>
                 <div className="mapstudio-map" ref={this.setMapContainer}
                      data-edit-level={delegate && delegate.level ? delegate.level : ''}
                      data-load-state={load.state}
@@ -2683,7 +2962,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
                      data-editing={editing}
                      data-live-seq={delegate ? String(delegate.live.seq) : ''}
                      data-live-full={delegate ? String(delegate.live.fulls) : ''}
+                     data-last-reply={delegate ? delegate.lastReply : ''}
+                     data-connection={connection.lost ? 'lost' : connection.frozen ? 'reloading' : 'ok'}
                      data-pick-open={this.state.pick ? 'true' : 'false'}
+                     data-popup-anchor=""
+                     data-popup-side=""
                      data-segment=""
                      data-highlighted=""
                      data-popup-mode={this.state.popup ? (this.state.popup.sheet ? 'sheet' : 'card') : ''}
@@ -2694,7 +2977,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                      data-pending={pending ? 'true' : 'false'}
                      data-drawing={this.state.drawing ? 'true' : 'false'}
                      data-line-points={this.state.linePoints === null ? '' : String(this.state.linePoints)}>
-                    <div>{pending ? 'Waiting for the Gateway ...' : replyLine}</div>
+                    {echo ? <div>{pending ? 'Waiting for the Gateway ...' : replyLine}</div> : null}
                     {drawText !== '' ? <div className="mapstudio-draw-status">{drawText}</div> : null}
                     {saveText !== '' ? (
                         <div className={'mapstudio-save-status mapstudio-save-status--' + save.state}
@@ -2713,6 +2996,16 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     {this.renderUnsaved(unsaved, delegate ? delegate.level : null,
                         delegate ? delegate.storageWarning : '', delegate ? delegate.sending : [])}
                 </div>
+                {chipText !== '' ? (
+                    // The connection chip (item 32): in words, with the hourglass, over the map under the top bar.
+                    <div className="mapstudio-connection" role="status" title={connectionDetailText(connection)}
+                         data-state={connection.lost ? 'lost' : 'reloading'}>
+                        <svg className="mapstudio-connection-glyph" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                            <use href={SPRITE_URL + '#ms-stale'} />
+                        </svg>
+                        <span>{chipText}</span>
+                    </div>
+                ) : null}
                 {this.renderAdapterStatus(delegate ? delegate.lists : NO_HOST_LISTS)}
                 {delegate ? this.renderLiveState(delegate.live, delegate.lists.kinds) : null}
                 {this.renderStylePanel()}

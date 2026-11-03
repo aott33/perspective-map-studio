@@ -22,7 +22,7 @@ import {
     AreaProperties, LineProperties, MarkerColors, MarkerProperties, areaProperties, badgeImageId, labelRank, lineLook, lineProperties,
     markerProperties, stateWord
 } from './markers';
-import { groupShared, sharedName, sharedState } from './shared';
+import { SHARED_M, groupShared, sharedCentre, sharedName, sharedState } from './shared';
 
 /** A line's midpoint mark: the name chip (with the state word when the line is abnormal) and the alarm badge. */
 export interface LineMarkProperties {
@@ -37,10 +37,9 @@ export interface LineMarkProperties {
     selected: boolean;
 }
 
+/** The selected line's geometry, which the arrow layer repeats the flow arrow along (item 22). */
 export interface ArrowProperties {
     id: string;
-    /** Degrees clockwise from north along the line at the arrow. */
-    bearing: number;
 }
 
 export interface MapFeatures {
@@ -49,12 +48,15 @@ export interface MapFeatures {
     /** The items of area kinds (a line kind with `area: true`), closed, with their category tint (entry 1). */
     areas: FeatureCollection<Polygon, AreaProperties>;
     marks: FeatureCollection<Point, LineMarkProperties>;
-    arrow: FeatureCollection<Point, ArrowProperties>;
+    /** The selected line (one feature, its whole geometry), along which the flow arrow repeats. */
+    arrow: FeatureCollection<LineString, ArrowProperties>;
     /** The items' bounds as "west,south,east,north" (6 decimals), or '' with no item. */
     boundsKey: string;
     bounds: [number, number, number, number] | null;
     /** How many markers stand for two or more items. */
     shared: number;
+    /** Where each member of a shared marker is drawn (the group's centroid), by item id; a popup anchors there (item 20). */
+    anchors: Record<string, [number, number]>;
     /** How many line items the line features stand for (a line with instruments is several features). */
     lineItems: number;
 }
@@ -179,17 +181,19 @@ function pointFeature<P>(coordinates: Position, properties: P): Feature<Point, P
  * The features of the map store's items: points within SHARED_M share one marker with the worst
  * state and the names as one; a selected item takes its ring (a shared marker, when one of its
  * members is selected); lines take their look from their own live state, their `diameter`
- * property (inches) and whether an instrument is attached.
+ * property (inches) and whether an instrument is attached. `withinM` is the sharing distance at the
+ * map's zoom (shared.ts `sharedWithinM`, owner review notes item 20): 20 m until 20 m is more than a
+ * marker apart on screen.
  */
 export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveState, selected: Selection | null,
-                              colors: MarkerColors): MapFeatures {
+                              colors: MarkerColors, withinM: number = SHARED_M): MapFeatures {
     const kindById = new Map<string, Kind>();
     kinds.forEach((k) => kindById.set(k.id, k));
     const points: Array<Feature<Point, MarkerProperties>> = [];
     const lines: Array<Feature<LineString, LineProperties>> = [];
     const areas: Array<Feature<Polygon, AreaProperties>> = [];
     const marks: Array<Feature<Point, LineMarkProperties>> = [];
-    const arrow: Array<Feature<Point, ArrowProperties>> = [];
+    const arrow: Array<Feature<LineString, ArrowProperties>> = [];
     let west = Infinity;
     let south = Infinity;
     let east = -Infinity;
@@ -213,22 +217,27 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
     let lineItems = 0;
 
     const pointItems = live_.filter((i) => i.geometry.type === 'Point');
-    const groups = groupShared(pointItems.map((i) => ({ id: i.id, name: i.name, lngLat: (i.geometry as Point).coordinates as Position })));
+    const groups = groupShared(pointItems.map((i) => ({ id: i.id, name: i.name, lngLat: (i.geometry as Point).coordinates as [number, number] })),
+        withinM);
     let shared = 0;
+    const anchors: Record<string, [number, number]> = {};
     for (const group of groups) {
         const members = group.map((g) => byId.get(g.id)!);
         const first = members[0];
         const kind = kindById.get(first.kind);
         const isSelected = (selected !== null && selected.kind === 'point' && members.some((m) => m.id === selected.id))
             || members.some((m) => highlighted.has(m.id));
-        const coords = (first.geometry as Point).coordinates as Position;
         members.forEach((m) => extend((m.geometry as Point).coordinates as Position));
         if (members.length === 1) {
-            points.push(pointFeature(coords, markerProperties(first.id, first.name, first.kind, kind ? kind.icon : '', stateOf(first),
-                { labelRank: kind ? kind.labelRank : 0, selected: isSelected, instrument: !!(kind && kind.instrument) })));
+            points.push(pointFeature((first.geometry as Point).coordinates as Position,
+                markerProperties(first.id, first.name, first.kind, kind ? kind.icon : '', stateOf(first),
+                    { labelRank: kind ? kind.labelRank : 0, selected: isSelected, instrument: !!(kind && kind.instrument) })));
             continue;
         }
         shared++;
+        // The shared marker sits at the members' centroid, and each member's popup anchors there (item 20).
+        const coords = sharedCentre(group);
+        members.forEach((m) => { anchors[m.id] = coords; });
         const sorted = members.slice().sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
         const state = sharedState(members.map(stateOf));
         const rank = Math.max(...members.map((m) => {
@@ -268,7 +277,7 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
         lineItems++;
         const instruments = instrumentsOn(live_, item.id);
         const diameter = item.properties ? item.properties.diameter : undefined;
-        const look = lineLook(state, diameter, instruments.length > 0);
+        const look = lineLook(state, diameter);
         const nodes = lineNodes(item, instruments, live, coords.length >= 2 ? lengthM(coords) : 0);
         const bounding = segmentNodes(nodes);
         const openSegment = isSelected && selected ? selected.segment || null : null;
@@ -294,7 +303,7 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
                 const from = bounding[i];
                 const to = bounding[i + 1];
                 const slot = graded.find((g) => g.from === from.id && g.to === to.id);
-                const segmentLook = slot && !state.alarm && !state.commsLost ? lineLook(segmentState(slot), diameter, true) : look;
+                const segmentLook = slot && !state.alarm && !state.commsLost ? lineLook(segmentState(slot), diameter) : look;
                 lines.push({
                     type: 'Feature',
                     properties: { ...lineProperties(item.id, item.name, item.kind, segmentLook, colors, isSelected), ...segmentOf(from, to) },
@@ -313,9 +322,9 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
                 selected: isSelected
             }));
             if (isSelected) {
-                // The arrow at the midpoint, or at the three-quarter point when the alarm badge holds the midpoint.
-                const at = look.badge ? alongLine(coords, 0.75) : mid;
-                arrow.push(pointFeature(at.point, { id: item.id, bearing: at.bearing }));
+                // The selected line's geometry: the arrow layer repeats the flow arrow along it in the line's
+                // drawn direction, first vertex to last (item 22), under the midpoint chip and badge.
+                arrow.push({ type: 'Feature', properties: { id: item.id }, geometry: { type: 'LineString', coordinates: coords } });
             }
         }
     }
@@ -329,6 +338,7 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
         boundsKey: bounds ? bounds.map((n) => n.toFixed(6)).join(',') : '',
         bounds,
         shared,
+        anchors,
         lineItems
     };
 }

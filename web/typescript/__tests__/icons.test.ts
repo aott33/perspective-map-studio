@@ -14,12 +14,12 @@ const noticeFile = path.join(repoRoot, 'NOTICE');
 const catalogueFile = path.join(repoRoot, 'common', 'src', 'main', 'resources', 'com', 'aoindustrial',
     'perspective', 'mapstudio', 'common', 'icons.json');
 
-const ICON_COUNT = 28;
+const ICON_COUNT = 30;
 const FR9_AND_OWNER = ['well-pad', 'wellhead', 'tank-battery', 'compressor-station', 'booster-station',
     'meter-station', 'pig-trap', 'line-valve', 'tap', 'rtu', 'pipeline', 'lateral', 'lease-road', 'geofence',
     'region', 'site-footprint', 'swd', 'separator'];
 const STATE_GLYPHS = ['alarm-1-acknowledged', 'alarm-1-rectified', 'alarm-1-unacknowledged', 'alarm-2-acknowledged',
-    'alarm-2-rectified', 'alarm-2-unacknowledged', 'alarm-3', 'comms-lost', 'stale'];
+    'alarm-2-rectified', 'alarm-2-unacknowledged', 'alarm-3', 'bell', 'bell-outline', 'comms-lost', 'stale'];
 
 const STROKED = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
     + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">';

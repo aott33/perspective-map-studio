@@ -5,7 +5,7 @@
    "onStartup": [
     {
      "config": {
-      "script": "\t# Dev only (epic 3 entry 12): the showcase page in the dark Perspective theme, so the engineering\n\t# review pack (docs/review-er27.md, e2e/tests/review.spec.mjs) renders every state in both themes.\n\t# The session keeps the theme; a new session starts light again.\n\tself.session.props.theme = 'dark'"
+      "script": "\t# Dev only (epic 3 entry 12): the showcase page in the dark Perspective theme, so the engineering\n\t# review pack (docs/review-er27.md, e2e/tests/review.spec.mjs) renders every state in both themes.\n\t# The session keeps the theme; a new session starts light again.\n\tself.session.props.theme = 'dark'\n\t# And the states a Gateway restart loses (owner review notes item 10), as the light page does.\n\tmapstudio_showcase.restore_states()"
      },
      "scope": "G",
      "type": "script"

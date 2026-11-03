@@ -35,8 +35,10 @@ export interface LegendStateRow {
 export interface LegendLineRow {
     weight: number;
     dashed: boolean;
-    /** The token class: `line` (the pipeline grey), `lateral` (the thin untapped line) or `alarm-1`. */
+    /** The token class: `line` (the pipeline grey), `lateral` (the thin line with no size), `alarm-1` or `selection`. */
     token: string;
+    /** The selected line's row: the sample carries the flow arrows (item 22). */
+    arrow?: boolean;
     words: string;
 }
 
@@ -61,6 +63,22 @@ export interface LegendKey {
     tints: LegendTintRow[];
 }
 
+/**
+ * The Kinds section starts collapsed ("Kinds (9)") when more than this many kinds are on the map, so the key the
+ * operator needs, the States, is on top and in view (owner review, item 24; "more than about six").
+ */
+export const KINDS_COLLAPSE_OVER = 6;
+
+/** Whether the Kinds section starts collapsed for `count` kinds on the map. */
+export function kindsStartCollapsed(count: number): boolean {
+    return count > KINDS_COLLAPSE_OVER;
+}
+
+/** The Kinds heading: "Kinds", or "Kinds (9)" with the count once there are more than a few. */
+export function kindsHeading(count: number): string {
+    return kindsStartCollapsed(count) ? 'Kinds (' + count + ')' : 'Kinds';
+}
+
 /** The note under the toggles (DESIGN.md legend, the zoom 14 rule). */
 export const ZOOM_NOTE = 'Below zoom 14 sites show as dots';
 
@@ -69,17 +87,22 @@ export const STATE_ROWS: LegendStateRow[] = [
     { glyph: 'alarm-1-unacknowledged', token: 'alarm-1', solid: true, words: 'Priority 1 alarm, digit beside' },
     { glyph: 'alarm-2-unacknowledged', token: 'alarm-2', solid: true, words: 'Priority 2 alarm' },
     { glyph: 'alarm-3', token: 'alarm-3', solid: false, words: 'Priority 3 alarm' },
-    { glyph: 'alarm-1-acknowledged', token: 'alarm-1', solid: false, words: 'Acknowledged' },
+    { glyph: 'alarm-1-acknowledged', token: 'alarm-1', solid: false, words: 'Acknowledged: outlined, with "!"' },
     { glyph: 'comms-lost', token: 'comms-lost', solid: false, words: 'Comms lost' },
     { glyph: 'stale', token: 'stale', solid: false, words: 'Stale value' }
 ];
 
-/** The line rows, fixed (DESIGN.md map-line): weight by size, thin without instruments, dashed, the alarm hue. */
+/**
+ * The line rows, fixed (DESIGN.md map-line; owner review notes items 11 and 22): weight by the pipe size
+ * alone, thin with no size, dashed, the alarm hue, and the flow arrow of the selected line, which
+ * points the way the line was drawn (first vertex to last), not a measured flow.
+ */
 export const LINE_ROWS: LegendLineRow[] = [
     { weight: 4, dashed: false, token: 'line', words: 'Pipeline, weight by size' },
-    { weight: 2, dashed: false, token: 'lateral', words: 'Thin: no instruments' },
+    { weight: 2, dashed: false, token: 'lateral', words: 'Thin: no size given' },
     { weight: 4, dashed: true, token: 'line', words: 'Dashed: no data or comms lost' },
-    { weight: 4, dashed: false, token: 'alarm-1', words: 'Hue: the highest alarm' }
+    { weight: 4, dashed: false, token: 'alarm-1', words: 'Hue: the highest alarm' },
+    { weight: 4, dashed: false, token: 'selection', arrow: true, words: 'Selected: arrows show the drawn direction' }
 ];
 
 /** The value styles a style rule may draw on a point (the line patterns are looks, not states). */

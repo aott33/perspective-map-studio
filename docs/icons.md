@@ -1,6 +1,6 @@
 # Map Studio icons
 
-Map Studio ships one icon set in one minimalist style (epic 2 R9, PRD FR-9, NFR-10, NFR-11): a glyph for each oil and gas kind a project's kind list may name, and the state glyphs the map uses for comms lost, stale values and alarms. A kind names an icon by its id in the kind list's `icon` field. Catalogue version **0.2.0** (versioned with the public contract, NFR-8).
+Map Studio ships one icon set in one minimalist style (epic 2 R9, PRD FR-9, NFR-10, NFR-11): a glyph for each oil and gas kind a project's kind list may name, and the state glyphs the map uses for comms lost, stale values and alarms. A kind names an icon by its id in the kind list's `icon` field. Catalogue version **0.3.0** (versioned with the public contract, NFR-8; 0.3.0 redraws five glyphs, below, and adds no id).
 
 Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway (`inductiveautomation/ignition:8.3.10`); **[unverified]** written but not seen working.
 
@@ -52,10 +52,12 @@ State glyphs (never colour alone: each pairs with a word or a digit). The alarm 
 | `comms-lost` | Comms lost, shown with the words "Comms lost"; no hue | drawn | Apache-2.0 |
 | `stale` | A stale value, shown with the word "stale"; no hue | drawn | Apache-2.0 |
 | `alarm-1-unacknowledged` | Priority 1 (Critical, High), unacknowledged: filled triangle with the unacknowledged (sounding) mark | drawn | Apache-2.0 |
-| `alarm-1-acknowledged` | Priority 1, acknowledged: filled triangle with "!", full strength | drawn | Apache-2.0 |
+| `alarm-1-acknowledged` | Priority 1, acknowledged: the outlined triangle with a bold "!" inside (0.3.0, owner review notes item 7: the filled triangle with "!" differed from the unacknowledged one only by the mark inside at 18 px) | drawn | Apache-2.0 |
 | `alarm-1-rectified` | Priority 1, cleared and not yet acknowledged: filled triangle with a check mark, full strength | drawn | Apache-2.0 |
-| `alarm-2-unacknowledged`, `alarm-2-acknowledged`, `alarm-2-rectified` | Priority 2 (Medium): the same three on a filled circle | drawn | Apache-2.0 |
+| `alarm-2-unacknowledged`, `alarm-2-acknowledged`, `alarm-2-rectified` | Priority 2 (Medium): the same three on a circle, the acknowledged one outlined with "!" as priority 1's (0.3.0) | drawn | Apache-2.0 |
 | `alarm-3` | Priority 3 (Low): an outlined square with "!" in every state; the map fades it once acknowledged | drawn | Apache-2.0 |
+| `bell` | The Needs you bar's alarm count (owner review item 12), solid: an unacknowledged alarm, in the hue of the highest unacknowledged priority. Not a map mark: the triangle with a digit stays the marker's alarm | drawn | Apache-2.0 |
+| `bell-outline` | The same bell hollow: every alarm acknowledged (neutral), or nothing needing attention (grey) | drawn | Apache-2.0 |
 
 The priority digit is a text label beside the glyph, never part of it. Diagnostic alarms never show.
 
@@ -67,6 +69,8 @@ The priority digit is a text label beside the glyph, never part of it. Diagnosti
 - **Triangles in kind icons are not checked by the build.** The build refuses kind icons with a circle or square outline; a triangular kind outline (priority 1's shape) is not detected and stays a review item. Two to look at: `line-valve` is the ISA gate valve bowtie (two triangles on their sides, on a pipe with a stem) and `compressor-station` is a trapezoid; neither is an upright triangle.
 - No other difference is known. The hue tokens (`--st-alarm-n-edge` in the template) are chosen in [review-er27.md](review-er27.md), epic 3 entry 12, which carries the 0.3.0 review of alarm presentation; the contact sheet uses stand-ins.
 
+**For the 0.3.0 engineering review (ER-27), owner review notes item 7:** the acknowledged glyphs of priorities 1 and 2 are now the outlined shape with a bold "!" (the unacknowledged ones stay filled with the sounding mark), so the two states read apart at the map's 18 px; the template's reviewed set keeps a filled acknowledged shape, so this is a departure to review; the alternative, the filled shape with a bigger "!", is rendered beside it in `_bmad-output/backlog/renders/notes-c/` (the owner chooses). The `tap`, `meter-station` and `line-valve` kind glyphs are redrawn as simpler, larger silhouettes (a gauge on a stem over the pipe; a meter box on a stem over the pipe; the gate valve bowtie with its stem and handle, no pipe stubs) and the instrument disc grows from 24 to 28 px with an 18 px glyph, so they read at their drawn size.
+
 **Engineering review (ER-27), 0.2.0: passed.** Reviewer Andy Ott, 2026-10-28. Reviewed: the alarm glyphs and state glyphs on the contact sheet, the differences above, and the `line-valve` and `compressor-station` outlines. No change to the glyph files was asked for. One change for epic-viewing was asked for: comms lost gets a colour when the map draws it (the glyphs are `currentColor`, so no file here changes). That is a deliberate change from the template's reviewed rule ("comms-lost ... never a colour", template `docs/ux.md`) and goes to engineering review again with epic-viewing's hue tokens.
 
 ![Contact sheet at 1440 px](screenshots/icons-contact-sheet-1440.png)
@@ -75,7 +79,7 @@ On a 390 px phone: [icons-contact-sheet-390.png](screenshots/icons-contact-sheet
 
 ## How the map uses them (for epic-viewing)
 
-The owner's decision (2026-10-26): a point map item in its normal state is a **neutral dot** (`point`) below zoom 14 and its **kind glyph** from zoom 14 in, matching the template's reviewed map (PRD FR-34, template `docs/map.md` section 5). Every point keeps a 44 px touch target (24 px with a mouse, NFR-3), whatever the glyph's drawn size, and a 2 px halo in the theme's background token so it reads on light and dark tiles.
+The owner's decision (2026-10-26): a point map item in its normal state is a **neutral dot** below zoom 14 (14 px from zoom 12, 10 px below; owner review notes item 6) and its **kind glyph** from zoom 14 in, matching the template's reviewed map (PRD FR-34, template `docs/map.md` section 5). Every point keeps a 44 px touch target (24 px with a mouse, NFR-3), whatever the glyph's drawn size, and a 2 px halo in the theme's background token so it reads on light and dark tiles.
 
 - Normal: neutral token, no hue (AD-11).
 - Comms lost: a dashed ring and the glyph in the `comms-lost` token (owner, 2026-10-28; `--mapstudio-comms-lost`, falling back to Perspective's `--qual-4`, the magenta family, chosen by entry 12's contrast check: [review-er27.md](review-er27.md), section 1), the `comms-lost` badge, and "Comms lost" under the icon; its values show as stale.

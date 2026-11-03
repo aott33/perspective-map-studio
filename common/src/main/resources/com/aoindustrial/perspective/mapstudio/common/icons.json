@@ -1,5 +1,5 @@
 {
-    "version": "0.2.0",
+    "version": "0.3.0",
     "fallback": "point",
     "icons": [
         {
@@ -115,6 +115,18 @@
             "label": "Point (fallback)",
             "group": "kind",
             "geometry": "point"
+        },
+        {
+            "id": "bell",
+            "label": "Needs you bell, alarms unacknowledged (the bar's count, not a map mark)",
+            "group": "state",
+            "geometry": null
+        },
+        {
+            "id": "bell-outline",
+            "label": "Needs you bell, hollow: every alarm acknowledged, or nothing needs attention",
+            "group": "state",
+            "geometry": null
         },
         {
             "id": "comms-lost",

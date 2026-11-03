@@ -155,56 +155,13 @@ export function isFailedViewState(state: string): boolean {
 /** The popup card's width (DESIGN.md popup-width, D1) and its tallest (popup-max-height), in px. */
 export const POPUP_WIDTH_PX = 320;
 export const POPUP_MAX_HEIGHT_PX = 480;
-/** The narrowest the card gets beside a point at the map's edge. */
-export const POPUP_MIN_PX = 220;
-/** The line popup's width (DESIGN.md line-popup-width; decision D1 keeps it at 350 px). */
+/** The line popup's width (DESIGN.md line-popup-width; decision D1 keeps it at 350 px). Where a card goes,
+ * its width and height on the map: popupPlacement.ts (owner review notes item 18). */
 export const LINE_POPUP_PX = 350;
-/** Margin kept between the popup and the map's edge, in px. */
-const POPUP_EDGE_PX = 16;
 /** The card keeps this much of the map free above and below (P3: min(480, map - 64)). */
 const POPUP_HEIGHT_MARGIN_PX = 64;
-/** A line popup card is never clamped below this: the header and a few rows (entry 2). */
-const POPUP_MIN_HEIGHT_PX = 120;
 /** Below this map width the popup is a bottom sheet (DESIGN.md Phone, EXPERIENCE.md Bottom sheet). */
 export const SHEET_BELOW_PX = 768;
-
-/**
- * The popup's max-width (a CSS length) for a point at `x` px in a map `width` px wide, so a popup
- * opened near a phone's edge stays inside the map: the card's width (`maxPx`, the point card's 320
- * or the line popup's 350) when it fits centred on the point, else the room beside the point down to
- * the narrowest the popup gets, never wider than the map less a margin each side.
- */
-export function popupMaxWidth(x: number, width: number, maxPx: number = POPUP_WIDTH_PX): string {
-    const room = Math.max(0, width - 2 * POPUP_EDGE_PX);
-    const centred = 2 * Math.min(x, width - x) - POPUP_EDGE_PX;
-    const px = Math.min(maxPx, room, Math.max(POPUP_MIN_PX, Math.floor(centred)));
-    return Math.max(px, Math.min(POPUP_MIN_PX, room)) + 'px';
-}
-
-/** Where the line popup goes and how tall it may be (entry 2; the popup review's P3 and P7). */
-export interface PopupPlacement {
-    /** MapLibre's anchor: `bottom` puts the card above the point, `top` below it. */
-    anchor: 'top' | 'bottom';
-    /** The card's max-height in px: the stylesheet's 480, the map less 64, or the room on the chosen side. */
-    maxHeight: number;
-}
-
-/**
- * The line popup's placement for a point `y` px down a map `height` px tall, a card whose content is
- * `cardHeight` px tall and MapLibre's tip `offset`: above the point when the card fits there (the
- * review's preferred side, so the line stays in view), else below when it fits there, else the side
- * with more room, the card clamped to that room so it never leaves the map (its body scrolls) and
- * never taller than 480 px or the map less 64 px.
- */
-export function linePopupPlacement(y: number, height: number, cardHeight: number, offset: number): PopupPlacement {
-    const above = Math.floor(y - offset - POPUP_EDGE_PX);
-    const below = Math.floor(height - y - offset - POPUP_EDGE_PX);
-    const cap = Math.min(POPUP_MAX_HEIGHT_PX, height - POPUP_HEIGHT_MARGIN_PX);
-    const wanted = Math.min(cardHeight, cap);
-    const anchor: 'top' | 'bottom' = wanted <= above ? 'bottom' : wanted <= below ? 'top' : above >= below ? 'bottom' : 'top';
-    const room = anchor === 'bottom' ? above : below;
-    return { anchor, maxHeight: Math.max(POPUP_MIN_HEIGHT_PX, Math.min(cap, room)) };
-}
 
 /** The card's max-height in px for a map `height` px tall: 480, or the map less 64, never under 160. */
 export function popupMaxHeight(height: number): number {

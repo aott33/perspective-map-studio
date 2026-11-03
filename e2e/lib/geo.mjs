@@ -9,6 +9,20 @@ export function project([lng, lat], zoom) {
     return [x, y];
 }
 
+/** The inverse: the lngLat of a Web Mercator pixel at `zoom`. */
+export function unproject([x, y], zoom) {
+    const scale = 512 * Math.pow(2, zoom);
+    const lng = (x / scale) * 360 - 180;
+    const n = Math.PI - (2 * Math.PI * y) / scale;
+    return [lng, (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)))];
+}
+
+/** The centre that puts `lngLat` at the pixel (`px`, `py`) of a map `box` at `zoom` (a point near an edge, owner review notes item 18). */
+export function centerFor(box, lngLat, [px, py], zoom) {
+    const [x, y] = project(lngLat, zoom);
+    return unproject([x - (px - box.width / 2), y - (py - box.height / 2)], zoom);
+}
+
 /** Page pixel of lngLat on a map whose bounding box is `box`, centred on `center` at `zoom`. */
 export function pagePixel(box, lngLat, center, zoom) {
     const [cx, cy] = project(center, zoom);

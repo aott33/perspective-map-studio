@@ -1,6 +1,6 @@
 import {
-    BASEMAP_STORAGE_KEY, OSM_SOURCE, basemapSourceBody, fallbackBasemap, initialBasemap, offeredBasemaps, readBasemapSource,
-    refusedText, rememberBasemap, rememberedBasemap, tilesFailedText
+    BASEMAP_STORAGE_KEY, OSM_SOURCE, basemapSourceBody, fallbackBasemap, initialBasemap, offeredBasemaps, offersBasemapSwitch, readBasemapSource,
+    QUIET_RASTER_PAINT, rasterPaint, refusedText, rememberBasemap, rememberedBasemap, tilesFailedText
 } from '../basemaps';
 import { MessageTypes, basemapSource, readReply, replyText } from '../messages';
 
@@ -44,6 +44,19 @@ describe('the basemaps the setup offers (epic 3 entry 6)', () => {
         expect(() => rememberBasemap(refusing, 'satellite')).not.toThrow();
         expect(rememberedBasemap(refusing)).toBeNull();
         expect(rememberedBasemap(null)).toBeNull();
+    });
+
+    test('OpenStreetMap is drawn quiet, Satellite and None as they come (owner review notes item 25)', () => {
+        const quiet = rasterPaint('osm');
+        expect(quiet).toEqual(QUIET_RASTER_PAINT);
+        expect(quiet['raster-saturation']).toBeLessThan(0);
+        expect(quiet['raster-contrast']).toBeLessThan(0);
+        expect(quiet['raster-brightness-min']).toBeGreaterThan(0);
+        expect(rasterPaint('satellite')).toEqual({});
+        expect(rasterPaint('none')).toEqual({});
+        expect(rasterPaint(null)).toEqual({});
+        // A copy each time, so a layer's paint is never the constant.
+        expect(rasterPaint('osm')).not.toBe(QUIET_RASTER_PAINT);
     });
 
     test('the OpenStreetMap source names its tiles and its attribution', () => {
@@ -91,5 +104,16 @@ describe('basemap.source and its reply', () => {
         expect(text).not.toContain(TOKEN);
         expect(replyText(readReply({ v: 1, type: 'basemap.source.reply', id: 'b2', body: {} })))
             .toBe('Basemap source: unreadable reply');
+    });
+});
+
+describe('the basemap switch (owner review, item 3)', () => {
+    test('a viewer gets a switch only when the setup lists more than one basemap; the first listed is the default', () => {
+        expect(offersBasemapSwitch([])).toBe(false);
+        expect(offersBasemapSwitch(['osm'])).toBe(false);
+        expect(offersBasemapSwitch(['osm', 'none'])).toBe(true);
+        expect(offersBasemapSwitch(['none', 'osm', 'satellite'])).toBe(true);
+        // The setup's first line is the default when the viewer has chosen nothing.
+        expect(initialBasemap(['osm', 'none'], null)).toBe('osm');
     });
 });

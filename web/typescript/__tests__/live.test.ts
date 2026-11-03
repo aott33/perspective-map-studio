@@ -1,6 +1,6 @@
 import {
-    LIVE_INITIAL, LiveValue, ageText, alarmCountsText, alarmLineText, alarmsText, applyBatch, areaTint, commsText, itemState,
-    readKindDisplay, readPopupDetail, readValuesBatch, staleText, valueText
+    LIVE_INITIAL, LiveValue, NO_CONNECTION_REASON, ageText, alarmCountsText, alarmLineText, alarmStaleNote, alarmsText, alarmsUnknown, applyBatch,
+    areaTint, commsText, freezeLive, itemState, qualityWords, readKindDisplay, readPopupDetail, readValuesBatch, staleText, staleWords, valueText
 } from '../live';
 import { readReply } from '../messages';
 
@@ -97,6 +97,36 @@ describe('values.batch reading (epic 3 entry 5)', () => {
         expect(d && d.popupView).toEqual({ path: 'Popups/PadAlarms', params: { padName: '{item.name}' } });
         expect(readKindDisplay({ ...DISPLAY, popupView: { path: '', params: {} } })!.popupView).toBeUndefined();
         expect(readKindDisplay(DISPLAY)!.popupView).toBeUndefined();
+    });
+});
+
+describe('the frozen live state (owner review notes item 32)', () => {
+    test('every KPI, the alarms, the style and the segments go stale with the reason no connection; the comms slot and the values stay', () => {
+        const state = applyBatch(LIVE_INITIAL, { seq: 3, full: true, items: [
+            { ...P1, style: { preset: 'warning', stale: false, reason: '' },
+                segments: [{ from: 'a', to: 'b', preset: 'normal', stale: false, reason: '', alarm: null }] },
+            { id: 'p2', comms: good(false), kpis: { pressure: stale(1, 'comms lost') }, problems: [] }
+        ], kindDisplay: [DISPLAY] });
+        const frozen = freezeLive(state);
+        expect(frozen.seq).toBe(3);
+        expect(frozen.display).toBe(state.display);
+        const p1 = frozen.items.p1;
+        expect(p1.comms).toEqual(good(true));
+        expect(p1.kpis.pressure).toEqual({ ...good(412.456), stale: true, reason: NO_CONNECTION_REASON });
+        expect(p1.kpis.flow).toMatchObject({ value: 80, t: T, stale: true, reason: NO_CONNECTION_REASON });
+        expect(p1.alarms).toMatchObject({ value: { active: 1, unacked: 1, priority: 1 }, stale: true, reason: NO_CONNECTION_REASON });
+        expect(p1.style).toEqual({ preset: 'warning', stale: true, reason: NO_CONNECTION_REASON });
+        expect(p1.segments).toEqual([{ from: 'a', to: 'b', preset: 'normal', stale: true, reason: NO_CONNECTION_REASON, alarm: null }]);
+        // A slot that was stale already keeps its own reason.
+        expect(frozen.items.p2.kpis.pressure).toEqual(stale(1, 'comms lost'));
+        expect(frozen.items.p2.comms).toEqual(good(false));
+        // The item draws stale (the hourglass) with its last alarm, never as live; the style is gone.
+        const drawn = itemState(p1, DISPLAY);
+        expect(drawn).toMatchObject({ stale: true, commsLost: false, badge: 'alarm', preset: 'normal' });
+        expect(drawn.iconKpi).toMatchObject({ text: '412.5 psi', stale: true });
+        // The input is untouched.
+        expect(state.items.p1.kpis.pressure.stale).toBe(false);
+        expect(freezeLive(LIVE_INITIAL)).toEqual(LIVE_INITIAL);
     });
 });
 
@@ -203,18 +233,50 @@ describe('the popup\'s words', () => {
         expect(ageText('2026-10-28T08:00:00Z', NOW)).toBe('2 h ago');
         expect(ageText('2026-10-25T08:00:00Z', NOW)).toBe('3 d ago');
         expect(ageText(null, NOW)).toBe('');
-        expect(commsText(good(true), NOW)).toEqual({ word: 'OK', detail: '12 s ago', lost: false });
-        expect(commsText(good(false), NOW)).toEqual({ word: 'Comms lost', detail: '12 s ago', lost: true });
+        expect(commsText(good(true), NOW)).toEqual({ word: 'OK', detail: '12 s ago', lost: false, unknown: false, code: '' });
+        expect(commsText(good(false), NOW)).toEqual({ word: 'Comms lost', detail: '12 s ago', lost: true, unknown: false, code: '' });
         expect(commsText(stale(true, 'Bad_Stale', 'Bad_Stale'), NOW).word).toBe('Comms lost');
-        expect(commsText(undefined, NOW)).toEqual({ word: 'No value yet', detail: '', lost: false });
-        expect(commsText(stale(null, 'no value yet', 'Uncertain_InitialValue'), NOW)).toEqual({ word: 'No value yet', detail: 'no value yet', lost: true });
+        // No data is neither OK nor lost (owner review notes item 21): no glyph, "No data", the reason in plain words (item 15).
+        expect(commsText(undefined, NOW)).toEqual({ word: 'No data', detail: '', lost: false, unknown: true, code: '' });
+        expect(commsText(stale(null, 'no value yet', 'Uncertain_InitialValue'), NOW))
+            .toEqual({ word: 'No data', detail: '', lost: false, unknown: true, code: 'Uncertain_InitialValue' });
+        // A slot the Gateway marked stale with no value (the tag is not there): comms lost, as the marker draws it, in plain words.
+        expect(commsText(stale(null, 'Bad_NotFound', 'Bad_NotFound'), NOW))
+            .toEqual({ word: 'No data', detail: 'tag not found', lost: true, unknown: false, code: 'Bad_NotFound' });
+        expect(commsText(stale(null, 'Bad_NotFound', 'Bad_NotFound'), NOW, 'the tag was not found').detail).toBe('the tag was not found');
         expect(alarmsText(good({ active: 0, unacked: 0, priority: 0 }))).toBe('No active alarms');
         expect(alarmsText(good({ active: 1, unacked: 1, priority: 1 }))).toBe('1 alarm - Priority 1, unacknowledged');
         expect(alarmsText(good({ active: 3, unacked: 0, priority: 2 }))).toBe('3 alarms - Priority 2, acknowledged');
-        expect(alarmsText(undefined)).toBe('No value yet');
-        expect(alarmsText(stale(null, 'comms lost'))).toBe('No value yet - comms lost');
+        expect(alarmsText(undefined)).toBe('Alarm state unknown');
+        expect(alarmsText(stale(null, 'comms lost'))).toBe('Alarm state unknown');
+        expect(alarmsUnknown(undefined)).toBe(true);
+        expect(alarmsUnknown(stale(null, 'comms lost'))).toBe(true);
+        expect(alarmsUnknown(good({ active: 0, unacked: 0, priority: 0 }))).toBe(false);
         expect(staleText(stale(1, 'comms lost'), '1 psi')).toBe('Stale - 1 psi (comms lost)');
         expect(staleText(good(1), '1 psi')).toBe('1 psi');
+    });
+
+    test('quality codes in plain words, the stale tooltip and the alarm note (owner review notes items 13 and 15)', () => {
+        expect(qualityWords('Good')).toBe('');
+        expect(qualityWords('Bad_NotFound')).toBe('tag not found');
+        expect(qualityWords('Bad_Stale')).toBe('stale');
+        expect(qualityWords('Bad')).toBe('bad quality');
+        expect(qualityWords('Uncertain_InitialValue')).toBe('no value yet');
+        expect(qualityWords('Bad_SomethingNew')).toBe('bad, something new');
+        expect(qualityWords('comms lost')).toBe('comms lost');
+        expect(qualityWords('')).toBe('');
+        expect(staleWords(stale(1, 'comms lost', 'Good'))).toBe('Stale - comms lost');
+        expect(staleWords(stale(1, 'Bad', 'Bad'))).toBe('Stale - bad quality (Bad)');
+        expect(staleWords(stale(1, 'Bad_NotFound', 'Bad_NotFound'))).toBe('Stale - tag not found (Bad_NotFound)');
+        expect(staleWords(stale(1, '', 'Bad'))).toBe('Stale');
+        // The alarm note: comms lost with its age, or the alarms slot's own reason; '' when the state is current.
+        const base = { id: 'p', kpis: {}, problems: [] };
+        expect(alarmStaleNote({ ...base, comms: good(false), alarms: stale({ active: 0, unacked: 0, priority: 0 }, 'comms lost') }, DISPLAY, NOW))
+            .toBe('Alarm state may be out of date: comms lost 12 s ago');
+        expect(alarmStaleNote({ ...base, comms: good(true), alarms: stale({ active: 1, unacked: 1, priority: 1 }, 'Bad', 'Bad') }, DISPLAY, NOW))
+            .toBe('Alarm state may be out of date: stale, bad quality');
+        expect(alarmStaleNote({ ...base, comms: good(true), alarms: good({ active: 0, unacked: 0, priority: 0 }) }, DISPLAY, NOW)).toBe('');
+        expect(alarmStaleNote(undefined, DISPLAY, NOW)).toBe('');
     });
 
     test('an alarm in words with its source and age, and the counts by priority (entry 8)', () => {

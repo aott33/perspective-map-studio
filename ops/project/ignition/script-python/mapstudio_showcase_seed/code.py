@@ -292,3 +292,23 @@ def run(project=PROJECT, actor=ACTOR, api=None, make_id=seed_id):
     result = mapstudio_seed.run(project, actor, api, make_id, seed=seed_items(make_id), kind_setups=KIND_SETUPS)
     result['tags'] = set_states()
     return result
+
+
+def lose_states():
+    """
+    What a Gateway restart does to the showcase (owner review notes item 10): SWD1's injection rate
+    back at Good quality (a memory tag keeps its value across a restart, not the seed's Bad quality),
+    so e2e/tests/showcase.spec.mjs can check that the showcase page restores it as it opens
+    (mapstudio_showcase.restore_states in the showcase project). Returns {quality} or {error}.
+    """
+    logger = _logger()
+    result = {}
+    try:
+        result['quality'] = _write(SHOWCASE_PREFIX + STALE_TAG, 4200.0)
+    except java.lang.Throwable as ex:
+        result['error'] = ex.getMessage()
+        logger.warn('Showcase state not lost: %s' % ex.getClass().getSimpleName())
+    except Exception as ex:
+        result['error'] = str(ex)
+        logger.warn('Showcase state not lost: %s' % type(ex).__name__)
+    return result

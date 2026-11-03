@@ -283,7 +283,8 @@ class SetupPanelTest {
             assertFalse(panel.hasMark(f), f);
         }
         assertEquals("", panel.footerText());
-        assertEquals("Names only - the Designer never reads the token.", panel.noteText(SetupForm.TOKEN_SECRET));
+        assertEquals("Names only - the Designer never reads the token.", panel.noteText(SetupPanel.TOKEN_SECRET_NAME));
+        assertEquals("", panel.noteText(SetupForm.TOKEN_SECRET));
         assertEquals("", panel.noteText(SetupForm.CONNECTION));
         assertEquals(SetupForm.msg("setup.help.connection"), panel.label(SetupForm.CONNECTION).getToolTipText());
         assertEquals("Edit everything: drawing, kinds, import. Roles of the identity provider default, compared exactly.",
@@ -397,6 +398,15 @@ class SetupPanelTest {
     void theTokenIsAProviderAndASecretName() {
         SetupPanel panel = panel(null);
         panel.show(SetupForm.fromJson(VALID), false, "");
+        // Two labelled rows (owner review notes item 31): the provider, then the secret with the note under it.
+        assertEquals("Map token provider", panel.label(SetupForm.TOKEN_SECRET).getText());
+        assertEquals("Map token secret", panel.label(SetupPanel.TOKEN_SECRET_NAME).getText());
+        assertEquals("", panel.noteText(SetupForm.TOKEN_SECRET));
+        assertEquals("Names only - the Designer never reads the token.", panel.noteText(SetupPanel.TOKEN_SECRET_NAME));
+        layout(panel, 1176, 790);
+        assertTrue(panel.rowBounds(SetupPanel.TOKEN_SECRET_NAME).y > panel.rowBounds(SetupForm.TOKEN_SECRET).y,
+            "the secret row sits under the provider row");
+        assertEquals(panel.rowBounds(SetupForm.TOKEN_SECRET).x, panel.rowBounds(SetupPanel.TOKEN_SECRET_NAME).x);
         panel.pickProvider("Internal");
         panel.typeSecretName("mapbox-token");
         assertEquals("Internal/mapbox-token", panel.current().text(SetupForm.TOKEN_SECRET));
@@ -404,11 +414,24 @@ class SetupPanelTest {
         panel.typeSecretName("mapbox");
         assertEquals("No secret named mapbox in Internal. It is saved as typed.",
             panel.warningText(SetupForm.TOKEN_SECRET));
+        // The warning about the name sits under the secret row, and the provider row keeps nothing.
+        assertEquals("No secret named mapbox in Internal. It is saved as typed.", panel.rowMessageText(SetupPanel.TOKEN_SECRET_NAME));
+        assertEquals("", panel.rowMessageText(SetupForm.TOKEN_SECRET));
+        assertTrue(panel.hasMark(SetupPanel.TOKEN_SECRET_NAME));
+        assertFalse(panel.hasMark(SetupForm.TOKEN_SECRET));
+        panel.typeProvider("Nope");
+        assertEquals("Nope is not a secret provider of this Gateway. It is saved as typed.", panel.rowMessageText(SetupForm.TOKEN_SECRET));
         // A story 7 value with no "/" is the secret name, with a warning; an unchanged value keeps its bytes.
         SetupForm story7 = SetupForm.fromJson(VALID.replace("}}", "}, \"tokenSecret\": \"mapbox-token\"}"));
         panel.show(story7, false, "");
         assertEquals("Name the secret provider too.", panel.warningText(SetupForm.TOKEN_SECRET));
+        assertEquals("Name the secret provider too.", panel.rowMessageText(SetupForm.TOKEN_SECRET));
+        assertEquals("", panel.rowMessageText(SetupPanel.TOKEN_SECRET_NAME));
         assertEquals(story7, panel.current());
+        // A provider with no name: the warning under the secret row.
+        panel.show(SetupForm.fromJson(VALID.replace("}}", "}, \"tokenSecret\": \"Internal/\"}")), false, "");
+        assertEquals("Name the secret too.", panel.rowMessageText(SetupPanel.TOKEN_SECRET_NAME));
+        assertEquals("", panel.rowMessageText(SetupForm.TOKEN_SECRET));
         SetupForm slash = SetupForm.fromJson(VALID.replace("}}", "}, \"tokenSecret\": \"/odd\"}"));
         panel.show(slash, false, "");
         assertEquals(slash, panel.current());

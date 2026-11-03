@@ -64,6 +64,31 @@ export function over(color, opacity, background) {
  */
 export const OSM_LAND = '#F2EFE9';
 
+/**
+ * The raster sample after MapLibre's raster paint (owner review notes item 25: OpenStreetMap drawn quiet):
+ * the arithmetic of MapLibre GL JS's raster fragment shader, in its order, saturation then contrast then
+ * brightness, per channel in 0 to 1 **[observed in maplibre-gl 4.x raster.fragment.glsl]**: the
+ * saturation factor is `1 - 1 / (1.001 - s)` for s > 0 and `-s` otherwise, applied as
+ * `c += (average - c) * factor`; the contrast factor is `1 / (1 - k)` for k > 0 and `1 + k` otherwise,
+ * applied as `(c - 0.5) * factor + 0.5`; brightness remaps 0..1 onto min..max. `paint` holds any of
+ * `raster-saturation`, `raster-contrast`, `raster-brightness-min` and `raster-brightness-max`.
+ */
+export function quietColor(color, paint) {
+    const [r, g, b] = parseColor(color);
+    let c = [r / 255, g / 255, b / 255];
+    const s = paint['raster-saturation'] || 0;
+    const k = paint['raster-contrast'] || 0;
+    const lo = paint['raster-brightness-min'] === undefined ? 0 : paint['raster-brightness-min'];
+    const hi = paint['raster-brightness-max'] === undefined ? 1 : paint['raster-brightness-max'];
+    const saturation = s > 0 ? 1 - 1 / (1.001 - s) : -s;
+    const average = (c[0] + c[1] + c[2]) / 3;
+    c = c.map((v) => v + (average - v) * saturation);
+    const contrast = k > 0 ? 1 / (1 - k) : 1 + k;
+    c = c.map((v) => (v - 0.5) * contrast + 0.5);
+    c = c.map((v) => lo + (hi - lo) * Math.min(1, Math.max(0, v)));
+    return hex(c.map((v) => Math.min(255, Math.max(0, v * 255))));
+}
+
 /** The three surfaces a mark is checked against: the blank map, the panel surface and the light raster. */
 export const SURFACES = ['blank', 'panel', 'raster'];
 
@@ -141,12 +166,14 @@ export const MARKS = [
 ];
 
 /**
- * The check of one theme: `values` maps each key of TOKENS to its computed colour. Returns
+ * The check of one theme: `values` maps each key of TOKENS to its computed colour, `paint` the raster
+ * paint OpenStreetMap is drawn with (the page's `data-quiet-paint`; none for the plain tile). Returns
  * {surfaces: {blank, panel, raster}, marks: [{id, words, state, token, color, ratios: {surface: ratio}, counted: {surface: bool}, pass}]}
  * where `pass` is false when a state mark is under MINIMUM on a counted surface.
  */
-export function checkTheme(values) {
-    const surfaces = { blank: hex(parseColor(values.blank)), panel: hex(parseColor(values.panel)), raster: OSM_LAND };
+export function checkTheme(values, paint = {}) {
+    // The raster surface is the OpenStreetMap land colour as the map draws it: quiet, with the paint the page names (item 25).
+    const surfaces = { blank: hex(parseColor(values.blank)), panel: hex(parseColor(values.panel)), raster: quietColor(OSM_LAND, paint) };
     const marks = MARKS.map((mark) => {
         const color = hex(parseColor(values[mark.token]));
         const ratios = {};

@@ -9,9 +9,45 @@ import { ItemState } from './live';
 
 /** The distance within which points share one marker, in metres (the template's SHARED_M). */
 export const SHARED_M = 20;
+/**
+ * Members this far apart on screen draw as their own markers (owner review notes item 20): the marker's
+ * 44 px hit area, so a close zoom shows each item where it is (two items 15 m apart split from zoom 18).
+ */
+export const MARKER_APART_PX = 44;
 const EARTH_RADIUS_M = 6371008.8;
 /** Metres per degree of latitude, for the sweep's window. */
 const M_PER_DEG_LAT = (Math.PI / 180) * EARTH_RADIUS_M;
+/** The equator's length in metres, for the ground distance a pixel covers. */
+const EQUATOR_M = 2 * Math.PI * EARTH_RADIUS_M;
+
+/** The ground distance one screen pixel covers at a zoom and latitude, in metres (MapLibre's 512 px tiles). */
+export function metresPerPixel(zoom: number, lat: number): number {
+    return (EQUATOR_M * Math.cos((lat * Math.PI) / 180)) / (512 * Math.pow(2, zoom));
+}
+
+/**
+ * The distance within which points share one marker at a zoom (item 20): 20 m, or less once 20 m is more
+ * than a marker apart on screen, so a group splits as the user zooms in. Rounded to a tenth of a metre, so
+ * a redraw happens only when the value moves.
+ */
+export function sharedWithinM(zoom: number, lat: number): number {
+    const apart = MARKER_APART_PX * metresPerPixel(zoom, lat);
+    return Math.round(Math.min(SHARED_M, apart) * 10) / 10;
+}
+
+/** The place a shared marker is drawn at: the members' centroid, the same whatever the store's order (item 20). */
+export function sharedCentre(points: Array<{ lngLat: [number, number] }>): [number, number] {
+    if (points.length === 0) {
+        return [0, 0];
+    }
+    let lng = 0;
+    let lat = 0;
+    for (const p of points) {
+        lng += p.lngLat[0];
+        lat += p.lngLat[1];
+    }
+    return [lng / points.length, lat / points.length];
+}
 
 export interface SharedPoint {
     id: string;

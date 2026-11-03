@@ -7,11 +7,27 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
 import { TRACER, pagePixel } from '../lib/geo.mjs';
-import { EDITOR_USER, VERTEX_PAUSE_MS, editorTest, ensureSeeded, expect, loadedCounts, nextFrames, openMap, test } from './fixtures.mjs';
+import { EDITOR_USER, VERTEX_PAUSE_MS, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, nextFrames, openMap, test } from './fixtures.mjs';
 
 let seed;
 test.beforeAll(async ({ browser }) => {
     seed = await ensureSeeded(browser);
+});
+
+// The dev View page (owner review notes items 4 and 5): with items in the store its line is the click hint (the
+// view's startup script counts them; the empty-map hint to seed from /edit is in the item 4 render), and a click
+// round trip shows no echo in View mode, only the map's `data-last-reply`.
+editorTest('the dev View page: the click hint with items, and no click echo in View mode', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const map = await openMap(page, '/');
+    await mapLoaded(map);
+    await expect(page.locator('#mapstudio-dev-title')).toContainText('Click a point for its popup', { timeout: 15_000 });
+    const box = await map.boundingBox();
+    const p1 = seed.ids[TRACER.points.p1.key];
+    const [x, y] = pagePixel(box, TRACER.points.p1.lngLat, TRACER.center, TRACER.zoom);
+    await page.mouse.click(x, y);
+    await expect(map).toHaveAttribute('data-last-reply', new RegExp('Gateway received click on ' + p1), { timeout: 15_000 });
+    await expect(page.locator('.mapstudio-reply')).not.toContainText('Gateway received click');
 });
 
 for (const [width, height] of [[1440, 900], [390, 844]]) {
@@ -35,8 +51,10 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             // One round trip: click p1, the Gateway answers in the envelope.
             const [x, y] = pagePixel(box, TRACER.points.p1.lngLat, TRACER.center, TRACER.zoom);
             await page.mouse.click(x, y);
+            // The click echo is dev-page output in Edit mode (owner review notes item 5); the map's `data-last-reply` holds it too.
             const reply = page.locator('.mapstudio-reply');
             await expect(reply).toContainText('Gateway received click on ' + p1, { timeout: 15_000 });
+            await expect(map).toHaveAttribute('data-last-reply', new RegExp('Gateway received click on ' + p1));
 
             // The click also opens the default popup from the pad kind setup (a card at 1440 px, a
             // bottom sheet at 390 px; epic 3 entry 8 retired the spike's popupView prop).

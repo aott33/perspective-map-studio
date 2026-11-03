@@ -2,7 +2,9 @@
 // designed (entry 14, R5). On the dev Gateway: the setup offers None, OpenStreetMap and Satellite in
 // the Legend panel bottom-left (the Legend button opens it by click or keyboard, Esc closes it); None
 // draws the blank background; OpenStreetMap and Satellite draw their tiles with the provider's
-// attribution always shown beside the Legend button; the top-right holds one zoom card (plus, the
+// attribution always shown (small muted text along the bottom-right edge, under the App Bar toggle, owner review
+// item 3); the basemap switch exists only when the setup lists more than one basemap and the first listed is the
+// default (item 3); the scale bar sits on the Legend button's bottom edge (item 1); the top-right holds one zoom card (plus, the
 // level, minus, Fit, Return) and nothing else, and View mode has no Draw a line; Satellite's tile source comes from the Gateway (basemap.source), its token read from the
 // secret the setup names (ops/secrets/map_token, a generated placeholder that starts with pk.), refused
 // in plain words when the secret is not a public token, is missing or is not named; the token never
@@ -54,6 +56,13 @@ const button = (page, id) => page.locator('.mapstudio-basemap-button[data-basema
 const attribution = (page) => page.locator('.maplibregl-ctrl-attrib');
 const legendButton = (page) => page.locator('.mapstudio-legend-button');
 const legendPanel = (page) => page.locator('.mapstudio-legend-panel');
+// Perspective's App Bar toggle (the page's fixed bottom-right button): the attribution sits under it, never over it.
+const appBarToggle = (page) => page.locator('.bar-reveal');
+
+/** The rectangles of two boxes overlap (by more than a pixel each way). */
+function overlap(a, b) {
+    return a.x + a.width > b.x + 1 && b.x + b.width > a.x + 1 && a.y + a.height > b.y + 1 && b.y + b.height > a.y + 1;
+}
 
 /** Open the Legend panel (entry 14), where the basemap choice lives; it stays open until Esc, the button or a map click. */
 async function openLegend(page, map) {
@@ -202,6 +211,29 @@ test.describe('1440 px', () => {
                 // Remembered osm is still offered, so it stays the choice.
                 await expect(map).toHaveAttribute('data-basemap', 'osm');
 
+                // A setup that lists one basemap: the basemap is the project's setting, so a viewer has no switch (the
+                // Basemap section is absent) and the one listed is drawn, whatever this browser chose before (item 3).
+                writeSetup({ ...good, basemaps: ['none'] });
+                await scanProject();
+                await page.reload({ waitUntil: 'load' });
+                map = await openMap(page, '/');
+                await mapLoaded(map);
+                await expect(map).toHaveAttribute('data-basemap-offered', 'none');
+                await expect(map).toHaveAttribute('data-basemap', 'none');
+                await openLegend(page, map);
+                await expect(page.locator('.mapstudio-basemap-button')).toHaveCount(0);
+                await expect(page.locator('.mapstudio-legend-section--basemap')).toHaveCount(0);
+                expect(await legendPanel(page).locator('.mapstudio-legend-heading').allTextContents()).not.toContain('Basemap');
+                // The first listed is the default: with the order reversed and nothing chosen, OpenStreetMap is drawn.
+                await page.evaluate(() => window.localStorage.removeItem('mapstudio.basemap.v1'));
+                writeSetup({ ...good, basemaps: ['osm'] });
+                await scanProject();
+                await page.reload({ waitUntil: 'load' });
+                map = await openMap(page, '/');
+                await mapLoaded(map);
+                await expect(map).toHaveAttribute('data-basemap', 'osm', { timeout: CHANGE_MS });
+                await expect(page.locator('.mapstudio-basemap-button')).toHaveCount(0);
+
                 const lines = await logLines('MapStudio.basemap', Date.parse(run.moduleStartupTime) - 1000);
                 expect(lines.some((l) => l.includes('MapStudioFiles/pg_password')), lines.join('\n')).toBe(true);
                 for (const line of lines) {
@@ -258,18 +290,28 @@ test.describe('1440 px', () => {
             const buttonBox = await legendButton(page).boundingBox();
             const scaleBox = await row.locator('.maplibregl-ctrl-scale').boundingBox();
             expect(scaleBox.x, 'the scale bar beside the Legend button').toBeGreaterThan(buttonBox.x + buttonBox.width);
+            // On the button's bottom edge, not floating above it (item 1).
+            expect(Math.abs((scaleBox.y + scaleBox.height) - (buttonBox.y + buttonBox.height)), 'the scale bar bottom-aligned with the Legend button')
+                .toBeLessThanOrEqual(1);
+            // The attribution is not in the row any more.
+            await expect(row.locator('.maplibregl-ctrl-attrib')).toHaveCount(0);
             // By keyboard: Enter on the button opens the panel with focus inside; Esc closes it and returns the focus.
             await legendButton(page).focus();
             await page.keyboard.press('Enter');
             await expect(legendPanel(page)).toBeVisible();
             await expect(map).toHaveAttribute('data-legend-open', 'true');
             await expect(legendButton(page)).toHaveAttribute('aria-expanded', 'true');
-            // The key's sections come first (entry 3); the Basemap section is the last, and the first control took the focus.
+            // The key's sections come first, States first (item 24); the Basemap section is the last (the setup lists three), and the
+            // first control took the focus.
+            await expect(legendPanel(page).locator('.mapstudio-legend-heading').first()).toHaveText('States');
             await expect(legendPanel(page).locator('.mapstudio-legend-heading').last()).toHaveText('Basemap');
             await expect(page.locator('.mapstudio-basemap-button')).toHaveCount(3);
             await expect(page.locator('.mapstudio-legend-toggle[data-toggle="lines"]')).toBeFocused();
             const panelBox = await legendPanel(page).boundingBox();
             expect(panelBox.y + panelBox.height, 'the panel opens above the button').toBeLessThanOrEqual(buttonBox.y + 1);
+            // It stops below the top bar (item 23): the search field's bottom edge, on a map as short as the viewport.
+            const topBar = await page.locator('.mapstudio-topbar-row').boundingBox();
+            expect(panelBox.y, 'the panel stops below the top bar').toBeGreaterThanOrEqual(topBar.y + topBar.height);
             await page.keyboard.press('Escape');
             await expect(legendPanel(page)).toHaveCount(0);
             await expect(map).toHaveAttribute('data-legend-open', 'false');
@@ -283,10 +325,19 @@ test.describe('1440 px', () => {
             const box = await map.boundingBox();
             await page.mouse.click(box.x + box.width / 2, box.y + 80);
             await expect(legendPanel(page)).toHaveCount(0);
-            // The bottom-right corner is the Perspective App Bar toggle's at every width.
+            // The bottom-right corner is the Perspective App Bar toggle's at every width: the controls keep clear of it,
+            // and the attribution (small muted text along the bottom edge, item 3) sits under the toggle, never over it.
             const corner = { x: box.x + box.width - 64, y: box.y + box.height - 64 };
-            for (const b of [await zoom.boundingBox(), await legendButton(page).boundingBox(), scaleBox, await attribution(page).boundingBox()]) {
+            for (const b of [await zoom.boundingBox(), await legendButton(page).boundingBox(), scaleBox]) {
                 expect(b.x + b.width > corner.x && b.y + b.height > corner.y, 'nothing in the bottom-right corner').toBe(false);
+            }
+            const attribBox = await attribution(page).boundingBox();
+            expect(attribBox.x + attribBox.width, 'the attribution along the bottom-right edge').toBeGreaterThan(box.x + box.width - 16);
+            expect(attribBox.y + attribBox.height, 'inside the map').toBeLessThanOrEqual(box.y + box.height + 0.5);
+            expect(attribBox.height, 'small').toBeLessThanOrEqual(16);
+            expect(await attribution(page).evaluate((el) => parseFloat(getComputedStyle(el).fontSize)), 'small text').toBeLessThanOrEqual(11);
+            if (await appBarToggle(page).count()) {
+                expect(overlap(attribBox, await appBarToggle(page).boundingBox()), 'the attribution never covers the App Bar toggle').toBe(false);
             }
             await expect(map).toHaveAttribute('data-basemap-tiles', 'loaded', { timeout: CHANGE_MS });
             await shot(page, 'mapstudio-controls-1440.png');
@@ -328,33 +379,74 @@ test.describe('390 px', () => {
         const map = await openMap(page, '/');
         await mapLoaded(map);
         await expect(page.locator('.mapstudio-draw-button')).toHaveCount(0);
-        await openLegend(page, map);
-        await button(page, 'osm').click();
-        await expect(map).toHaveAttribute('data-basemap', 'osm');
+        // The basemap is the project's setting; the dev setup lists three, so the sheet below has no switch on a phone
+        // and the choice is made on a wider screen or is remembered (item 3): choose OpenStreetMap through the component.
+        await page.evaluate(() => window.localStorage.setItem('mapstudio.basemap.v1', 'osm'));
+        await page.reload({ waitUntil: 'load' });
+        const phoneMap = await openMap(page, '/');
+        await mapLoaded(phoneMap);
+        await expect(phoneMap).toHaveAttribute('data-basemap', 'osm', { timeout: CHANGE_MS });
         await expect(attribution(page)).toContainText('OpenStreetMap contributors');
-        await expect(map).toHaveAttribute('data-basemap-tiles', 'loaded', { timeout: CHANGE_MS });
-        // Every control button is a 44 px touch target (DESIGN.md target-touch), the panel's included.
+        await expect(phoneMap).toHaveAttribute('data-basemap-tiles', 'loaded', { timeout: CHANGE_MS });
+        const legend = await legendButton(page).boundingBox();
+        const scale = await page.locator('.maplibregl-ctrl-scale').boundingBox();
+        expect(Math.abs((scale.y + scale.height) - (legend.y + legend.height)), 'the scale bar bottom-aligned with the Legend button (390)')
+            .toBeLessThanOrEqual(1);
+        await legendButton(page).click();
+        await expect(legendPanel(page)).toBeVisible();
+        // A bottom sheet like the popups (item 2): 8 px from the sides, above the Legend row, below the top bar, a handle and
+        // a 44 px Close; Show (the Lines and Names toggles) first; the key in two columns; no Basemap section at all.
+        await expect(legendPanel(page)).toHaveClass(/mapstudio-legend-panel--sheet/);
+        const mapBox = await phoneMap.boundingBox();
+        const panel = await legendPanel(page).boundingBox();
+        expect(Math.round(panel.x - mapBox.x), 'the sheet 8 px from the left').toBe(8);
+        expect(Math.round(mapBox.x + mapBox.width - (panel.x + panel.width)), 'the sheet 8 px from the right').toBe(8);
+        expect(panel.y + panel.height, 'above the Legend row').toBeLessThanOrEqual(legend.y + 1);
+        const bar = await page.locator('.mapstudio-topbar').boundingBox();
+        expect(panel.y, 'the sheet stops below the top bar').toBeGreaterThanOrEqual(bar.y + bar.height);
+        await expect(legendPanel(page).locator('.mapstudio-legend-handle')).toBeVisible();
+        const close = await legendPanel(page).locator('.mapstudio-legend-close').boundingBox();
+        expect(Math.min(close.width, close.height), 'a 44 px Close').toBeGreaterThanOrEqual(44);
+        const headings = await legendPanel(page).locator('.mapstudio-legend-heading').allTextContents();
+        expect(headings[0], 'Show first').toBe('Show');
+        expect(headings).not.toContain('Basemap');
+        await expect(page.locator('.mapstudio-basemap-button')).toHaveCount(0);
+        await expect(legendPanel(page).locator('.mapstudio-legend-toggle')).toHaveCount(2);
+        const showBox = await legendPanel(page).locator('.mapstudio-legend-section--show').boundingBox();
+        const statesBox = await legendPanel(page).locator('.mapstudio-legend-section--states').boundingBox();
+        expect(showBox.y, 'Show above the key').toBeLessThan(statesBox.y);
+        // Two columns: the key's sections start at two different x (the first of each column).
+        const xs = await legendPanel(page).locator('.mapstudio-legend-columns .mapstudio-legend-section').evaluateAll(
+            (els) => els.map((el) => Math.round(el.getBoundingClientRect().x)));
+        expect(new Set(xs).size, 'the key in two columns').toBe(2);
+        // The sheet scrolls inside: every Show checkbox is reachable and the body is the scroller.
+        const scrolls = await legendPanel(page).locator('.mapstudio-legend-body').evaluate((el) => getComputedStyle(el).overflowY);
+        expect(scrolls).toBe('auto');
+        // Every control button is a 44 px touch target (DESIGN.md target-touch), the sheet's included.
         for (const b of await page.locator('.mapstudio .maplibregl-ctrl button').all()) {
             const r = await b.boundingBox();
             expect(Math.min(r.width, r.height), (await b.getAttribute('aria-label')) || (await b.textContent())).toBeGreaterThanOrEqual(44);
         }
         const zoom = await page.locator('.mapstudio-zoom').boundingBox();
-        const panel = await legendPanel(page).boundingBox();
         const attrib = await attribution(page).boundingBox();
         for (const box of [zoom, panel, attrib]) {
             expect(box.x).toBeGreaterThanOrEqual(0);
             expect(box.x + box.width).toBeLessThanOrEqual(390);
         }
         await shot(page, 'mapstudio-basemap-390.png');
-        await page.keyboard.press('Escape');
+        // The Close button closes it and the Legend button has the focus.
+        await legendPanel(page).locator('.mapstudio-legend-close').click();
         await expect(legendPanel(page)).toHaveCount(0);
-        const legend = await legendButton(page).boundingBox();
-        const scale = await page.locator('.maplibregl-ctrl-scale').boundingBox();
-        // The bottom-right 64 px corner is the Perspective App Bar toggle's (DESIGN.md).
+        await expect(legendButton(page)).toBeFocused();
+        // The bottom-right 64 px corner is the Perspective App Bar toggle's (DESIGN.md): the controls keep clear of it and the
+        // attribution sits under the toggle (item 3).
         const corner = { x: 390 - 64, y: 844 - 64 };
-        for (const box of [zoom, legend, scale, attrib]) {
+        for (const box of [zoom, legend, scale]) {
             const inCorner = box.x + box.width > corner.x && box.y + box.height > corner.y;
             expect(inCorner, 'nothing in the bottom-right corner').toBe(false);
+        }
+        if (await appBarToggle(page).count()) {
+            expect(overlap(attrib, await appBarToggle(page).boundingBox()), 'the attribution never covers the App Bar toggle').toBe(false);
         }
         await shot(page, 'mapstudio-controls-390.png');
     });

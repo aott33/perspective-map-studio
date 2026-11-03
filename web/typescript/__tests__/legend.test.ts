@@ -1,7 +1,7 @@
 import { Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import { KindDisplay } from '../live';
-import { LINE_ROWS, STATE_ROWS, STYLE_ROWS, TOGGLE_KEYS, ToggleStore, legendKey, readToggle, writeToggle } from '../legend';
+import { KINDS_COLLAPSE_OVER, LINE_ROWS, STATE_ROWS, STYLE_ROWS, TOGGLE_KEYS, ToggleStore, kindsHeading, kindsStartCollapsed, legendKey, readToggle, writeToggle } from '../legend';
 
 const PAD: Kind = { id: 'pad', name: 'Well pad', geometry: 'point', icon: 'well-pad', labelRank: 10, fields: [] };
 const SWD: Kind = { id: 'swd', name: 'SWD', geometry: 'point', icon: 'swd', labelRank: 8, fields: [] };
@@ -32,9 +32,13 @@ describe('the legend key (epic 3 entry 3)', () => {
             { id: 'geofence', name: 'Geofence', icon: 'geofence', draw: 'area' }
         ]);
         expect(key.states).toBe(STATE_ROWS);
-        expect(key.states.map((s) => s.words)).toEqual(['Priority 1 alarm, digit beside', 'Priority 2 alarm', 'Priority 3 alarm', 'Acknowledged',
-            'Comms lost', 'Stale value']);
+        expect(key.states.map((s) => s.words)).toEqual(['Priority 1 alarm, digit beside', 'Priority 2 alarm', 'Priority 3 alarm',
+            'Acknowledged: outlined, with "!"', 'Comms lost', 'Stale value']);
         expect(key.lines).toBe(LINE_ROWS);
+        // Weight by size alone (item 11) and the flow arrow as the drawn direction on the selected line (item 22).
+        expect(key.lines.map((l) => l.words)).toEqual(['Pipeline, weight by size', 'Thin: no size given', 'Dashed: no data or comms lost',
+            'Hue: the highest alarm', 'Selected: arrows show the drawn direction']);
+        expect(key.lines[4]).toMatchObject({ token: 'selection', arrow: true });
         expect(key.styles).toBe(STYLE_ROWS);
         expect(key.styles.map((s) => s.words)).toEqual(['Attention', 'Warning', 'Fault', 'Out of service']);
         expect(key.tints).toEqual([
@@ -66,5 +70,16 @@ describe('the legend key (epic 3 entry 3)', () => {
         const refusing: ToggleStore = { getItem: () => { throw new Error('no'); }, setItem: () => { throw new Error('no'); } };
         expect(readToggle(refusing, 'names')).toBe(true);
         expect(() => writeToggle(refusing, 'names', false)).not.toThrow();
+    });
+});
+
+describe('the Kinds section (owner review, item 24)', () => {
+    test('starts collapsed with more than six kinds on the map, and says how many', () => {
+        expect(KINDS_COLLAPSE_OVER).toBe(6);
+        expect(kindsStartCollapsed(6)).toBe(false);
+        expect(kindsStartCollapsed(7)).toBe(true);
+        expect(kindsHeading(3)).toBe('Kinds');
+        expect(kindsHeading(6)).toBe('Kinds');
+        expect(kindsHeading(9)).toBe('Kinds (9)');
     });
 });

@@ -2,10 +2,11 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { ItemState } from '../live';
 import {
-    ARROW_IMAGE, CHIP_IMAGE, DISC_CENTER, DOT_IMAGE, MARKER_IMAGE, MARKER_TOKENS, MarkerColors, RANK_ALARM, RANK_COMMS_LOST, RANK_NORMAL,
+    ARROW_IMAGE, CHIP_IMAGE, DISC_CENTER, DISC_RADIUS, DOT_IMAGE, DOT_MID, DOT_SMALL, INSTRUMENT_DISC_RADIUS, INSTRUMENT_GLYPH_SIZE, MARKER_COLLISION_PADDING, MARKER_FOOTPRINT, MARKER_IMAGE,
+    MARKER_TOKENS, MarkerColors, RANK_ALARM, RANK_COMMS_LOST, RANK_NORMAL,
     BADGE_GLYPH_SIZE, BADGE_HALO_RADIUS, HALO_WIDTH, LINE_DASH, LINE_DOT, LINE_HALO_WIDTH, RANK_SELECTED, RANK_STALE, RANK_STYLE, areaProperties,
     badgeImageId, chipOffsetEm, dotImageId, imageFor, labelRank, lineHaloDash, lineLook,
-    lineProperties, lineSampleSvg, lineWeight, markerImageId, markerProperties, markerSpec, markerSvg, parseImageId, parseSprite, stateWord,
+    lineProperties, lineSampleSvg, lineWeight, markerImageId, markerProperties, markerSpec, markerSvg, parseImageId, parseSprite, pipeSize, stateWord,
     textWidthPx, tintSampleSvg
 } from '../markers';
 
@@ -55,8 +56,11 @@ describe('marker properties and image ids (epic 3 entries 5 and 7)', () => {
         expect(tap.marker).toMatch(/,true\]$/);
         expect(parseImageId(tap.marker.replace(',true]', ',false]'))).toBeNull();
         expect(props.marker).not.toContain('psi');
-        expect(props.dotMid).toBe(dotImageId(11, false));
-        expect(props.dotSmall).toBe(dotImageId(7, false));
+        // The dots below zoom 14 (owner review notes item 6): 14 px from zoom 12, 10 px below it.
+        expect(DOT_MID).toBe(14);
+        expect(DOT_SMALL).toBe(10);
+        expect(props.dotMid).toBe(dotImageId(DOT_MID, false));
+        expect(props.dotSmall).toBe(dotImageId(DOT_SMALL, false));
         expect(props.rank).toBe(RANK_NORMAL + 89);
         expect(markerProperties('p1', 'Point 1', 'pad', '', NORMAL).marker).toContain('"point"');
         // No value yet: no KPI line on the map (the popup says "No value").
@@ -104,7 +108,7 @@ describe('marker properties and image ids (epic 3 entries 5 and 7)', () => {
         const props = markerProperties('shared:a,b', 'A and B', 'pad', 'well-pad', STALE, { members: ['a', 'b'], selected: true });
         expect(props).toMatchObject({ members: 2, memberIds: 'a,b', kpi: '', word: 'Stale', selected: true, rank: RANK_SELECTED });
         expect(parseImageId(props.marker)).toMatchObject({ kind: 'marker', spec: { selected: true } });
-        expect(markerProperties('p', 'P', 'pad', 'well-pad', NORMAL, { selected: true }).dotMid).toBe(dotImageId(11, true));
+        expect(markerProperties('p', 'P', 'pad', 'well-pad', NORMAL, { selected: true }).dotMid).toBe(dotImageId(DOT_MID, true));
     });
 
     test('the chip sits right of the name by the name\'s width from the bundled font\'s advances', () => {
@@ -155,7 +159,7 @@ describe('line looks (DESIGN.md map-line)', () => {
         expect((dots[7] as [string, number[]])[1][1] * 8).toBeCloseTo(LINE_DOT[1] * 6, 9);
     });
 
-    test('weight by pipe size with an instrument on the line, thin and neutral without', () => {
+    test('weight by pipe size alone (owner review notes item 11); thin in the lateral tone with no size', () => {
         expect(lineWeight(2)).toBe(3);
         expect(lineWeight(4)).toBe(3);
         expect(lineWeight(6)).toBe(4);
@@ -164,25 +168,39 @@ describe('line looks (DESIGN.md map-line)', () => {
         expect(lineWeight('12')).toBe(6);
         expect(lineWeight(undefined)).toBe(3);
         expect(lineWeight('x')).toBe(3);
-        expect(lineLook(NORMAL, 6, true)).toEqual({ weight: 4, hue: '', dashed: false, dotted: false, dimmed: false, badge: '', priority: 0, solid: false });
-        expect(lineLook(NORMAL, 6, false)).toMatchObject({ weight: 2, hue: '', dashed: false });
+        expect(pipeSize(6)).toBe(6);
+        expect(pipeSize('6')).toBe(6);
+        for (const none of [undefined, null, '', ' ', 'x', 0, -2, NaN, true]) {
+            expect(pipeSize(none)).toBeNull();
+        }
+        // A size sets the weight whether or not an instrument sits on the line (L-GL21, 4 in, no instrument: 3 px).
+        expect(lineLook(NORMAL, 6)).toEqual({ weight: 4, hue: '', dashed: false, dotted: false, dimmed: false, badge: '', priority: 0, solid: false });
+        expect(lineLook(NORMAL, 4)).toMatchObject({ weight: 3 });
+        expect(lineProperties('l', 'L', 'line', lineLook(NORMAL, 4), COLORS, false).color).toBe(COLORS.line);
+        // No size: the thin 2 px line in the lateral tone (a lateral, or a line whose diameter is unknown).
+        expect(lineLook(NORMAL, undefined)).toMatchObject({ weight: 2, hue: '', dashed: false });
+        expect(lineLook(NORMAL, '')).toMatchObject({ weight: 2 });
+        expect(lineProperties('l', 'L', 'line', lineLook(NORMAL, undefined), COLORS, false).color).toBe(COLORS.chipEdge);
+        // A state draws on the thin line as on any other.
+        expect(lineLook(STALE, null)).toMatchObject({ weight: 2, dashed: true });
+        expect(lineLook(ALARM, null)).toMatchObject({ weight: 2, hue: 'alarm-1' });
     });
 
     test('a value style on a line: the hue and word, the dashed and dotted patterns, the dimmed fade; an alarm wins; stale drops it (entry 1)', () => {
-        expect(lineLook({ ...NORMAL, preset: 'attention' }, 6, true)).toMatchObject({ hue: 'attention', dashed: false, dotted: false, dimmed: false });
-        expect(lineLook({ ...NORMAL, preset: 'fault' }, 6, true)).toMatchObject({ hue: 'fault' });
-        expect(lineLook({ ...NORMAL, preset: 'dashed' }, 6, true)).toMatchObject({ hue: '', dashed: true, dotted: false });
-        expect(lineLook({ ...NORMAL, preset: 'dotted' }, 6, true)).toMatchObject({ hue: '', dashed: false, dotted: true });
-        expect(lineLook({ ...NORMAL, preset: 'dimmed' }, 6, true)).toMatchObject({ hue: '', dimmed: true });
-        expect(lineLook({ ...NORMAL, preset: 'solid' }, 6, true)).toMatchObject({ hue: '', dashed: false, dotted: false, dimmed: false });
-        const alarmed = lineLook({ ...ALARM, preset: 'warning' }, 6, true);
+        expect(lineLook({ ...NORMAL, preset: 'attention' }, 6)).toMatchObject({ hue: 'attention', dashed: false, dotted: false, dimmed: false });
+        expect(lineLook({ ...NORMAL, preset: 'fault' }, 6)).toMatchObject({ hue: 'fault' });
+        expect(lineLook({ ...NORMAL, preset: 'dashed' }, 6)).toMatchObject({ hue: '', dashed: true, dotted: false });
+        expect(lineLook({ ...NORMAL, preset: 'dotted' }, 6)).toMatchObject({ hue: '', dashed: false, dotted: true });
+        expect(lineLook({ ...NORMAL, preset: 'dimmed' }, 6)).toMatchObject({ hue: '', dimmed: true });
+        expect(lineLook({ ...NORMAL, preset: 'solid' }, 6)).toMatchObject({ hue: '', dashed: false, dotted: false, dimmed: false });
+        const alarmed = lineLook({ ...ALARM, preset: 'warning' }, 6);
         expect(alarmed).toMatchObject({ hue: 'alarm-1', badge: 'alarm-1-unacknowledged' });
         // Stale or comms lost: dashed in the pipeline grey, the style gone.
-        expect(lineLook({ ...STALE, preset: 'fault' }, 6, true)).toMatchObject({ hue: '', dashed: true, dotted: false });
-        expect(lineLook({ ...LOST, preset: 'dotted' }, 6, true)).toMatchObject({ hue: '', dashed: true, dotted: false });
-        const props = lineProperties('l', 'L', 'line', lineLook({ ...NORMAL, preset: 'warning' }, 6, true), COLORS, false);
+        expect(lineLook({ ...STALE, preset: 'fault' }, 6)).toMatchObject({ hue: '', dashed: true, dotted: false });
+        expect(lineLook({ ...LOST, preset: 'dotted' }, 6)).toMatchObject({ hue: '', dashed: true, dotted: false });
+        const props = lineProperties('l', 'L', 'line', lineLook({ ...NORMAL, preset: 'warning' }, 6), COLORS, false);
         expect(props).toMatchObject({ color: COLORS.warning, hue: 'warning', dotted: false, dimmed: false });
-        expect(lineProperties('l', 'L', 'line', lineLook({ ...NORMAL, preset: 'attention' }, 6, true), COLORS, false).color).toBe(COLORS.attention);
+        expect(lineProperties('l', 'L', 'line', lineLook({ ...NORMAL, preset: 'attention' }, 6), COLORS, false).color).toBe(COLORS.attention);
         expect(stateWord({ ...NORMAL, preset: 'fault' })).toBe('Fault');
         expect(stateWord({ ...NORMAL, preset: 'dimmed' })).toBe('Out of service');
         expect(stateWord({ ...NORMAL, preset: 'dotted' })).toBe('');
@@ -195,12 +213,12 @@ describe('line looks (DESIGN.md map-line)', () => {
 
     test('hue only from alarms with the badge at the midpoint; dashed for comms lost or stale', () => {
         const alarm2: ItemState = { ...ALARM, alarm: { priority: 2, unacked: true, active: 2, stale: false } };
-        expect(lineLook(alarm2, 10, true)).toEqual({ weight: 6, hue: 'alarm-2', dashed: false, dotted: false, dimmed: false, badge: 'alarm-2-unacknowledged', priority: 2, solid: true });
-        expect(lineLook(LOST, 10, true)).toMatchObject({ hue: '', dashed: true, badge: '' });
-        expect(lineLook(STALE, 10, true)).toMatchObject({ hue: '', dashed: true });
-        const props = lineProperties('l', 'L', 'line', lineLook(alarm2, 10, true), COLORS, true);
+        expect(lineLook(alarm2, 10)).toEqual({ weight: 6, hue: 'alarm-2', dashed: false, dotted: false, dimmed: false, badge: 'alarm-2-unacknowledged', priority: 2, solid: true });
+        expect(lineLook(LOST, 10)).toMatchObject({ hue: '', dashed: true, badge: '' });
+        expect(lineLook(STALE, 10)).toMatchObject({ hue: '', dashed: true });
+        const props = lineProperties('l', 'L', 'line', lineLook(alarm2, 10), COLORS, true);
         expect(props).toEqual({ id: 'l', name: 'L', kind: 'line', weight: 6, color: COLORS.alarm[1], hue: 'alarm-2', dashed: false, dotted: false, dimmed: false, selected: true });
-        expect(lineProperties('l', 'L', 'line', lineLook(LOST, 10, true), COLORS, false).color).toBe(COLORS.line);
+        expect(lineProperties('l', 'L', 'line', lineLook(LOST, 10), COLORS, false).color).toBe(COLORS.line);
     });
 });
 
@@ -233,7 +251,7 @@ describe('marker images', () => {
         expect(lost).toContain('M3 3l18 18');
 
         // The badge is the state glyph itself in its token on a halo disc, 18 px, never a disc of its own
-        // (entry 15, DESIGN.md alarm-glyph): the acknowledged glyph is the hollow one.
+        // (entry 15, DESIGN.md alarm-glyph): the acknowledged glyph is the outlined one with "!" (item 7).
         const alarm = markerSvg(markerSpec('well-pad', ALARM), symbols, COLORS);
         expect(alarm).toContain('color="' + COLORS.alarm[0] + '"');
         expect(alarm).toContain('fill="' + COLORS.alarm[0] + '"');
@@ -246,6 +264,9 @@ describe('marker images', () => {
         expect(acked).toContain('color="' + COLORS.alarm[0] + '"');
         expect(acked).toContain(symbols['alarm-1-acknowledged'].inner.slice(0, 30));
         expect(acked).not.toContain('stroke="' + COLORS.alarm[0] + '"');
+        // The acknowledged glyph is stroked (outlined), the unacknowledged one filled, so they read apart at 18 px (item 7).
+        expect(symbols['alarm-1-acknowledged'].attributes).toContain('stroke="currentColor"');
+        expect(symbols['alarm-1-unacknowledged'].attributes).toContain('fill="currentColor"');
 
         const selected = markerSvg(markerSpec('well-pad', NORMAL, true), symbols, COLORS);
         expect(selected).toContain('stroke="' + COLORS.selection + '"');
@@ -277,7 +298,58 @@ describe('marker images', () => {
         const unknown = markerSvg(markerSpec('nope', NORMAL), symbols, COLORS);
         expect(unknown).toContain(symbols.point.inner.slice(0, 20));
         expect(markerSvg(markerSpec('well-pad', LOST), {}, COLORS)).toContain('stroke-dasharray');
-        expect(DISC_CENTER).toEqual([20, 23]);
+        expect(DISC_CENTER).toEqual([25, 25]);
+        expect(MARKER_IMAGE).toEqual({ width: 61, height: 50 });
+    });
+
+    test('the labels keep clear of the 0.2 footprint, not the grown image (item 16): a crowded line keeps its instrument names', () => {
+        // The image grew to 61 by 50 px for the selection ring; the box the names keep clear of is the disc with
+        // its halo to the left (20 px), the badge's halo up and down (23 px) and the image's edge to the right.
+        expect(MARKER_FOOTPRINT).toEqual({ left: 20, up: 23, down: 23 });
+        expect(MARKER_COLLISION_PADDING).toEqual([-2, 0, -2, -5]);
+        const [top, right, bottom, left] = MARKER_COLLISION_PADDING;
+        expect(DISC_CENTER[0] + left).toBe(MARKER_FOOTPRINT.left);
+        expect(DISC_CENTER[1] + top).toBe(MARKER_FOOTPRINT.up);
+        expect(MARKER_IMAGE.height - DISC_CENTER[1] + bottom).toBe(MARKER_FOOTPRINT.down);
+        expect(right).toBe(0);
+        // The disc, its halo and the badge's halo disc lie inside the footprint; only the selection ring reaches past it.
+        expect(DISC_RADIUS + 2).toBeLessThanOrEqual(MARKER_FOOTPRINT.left);
+        expect(13 + BADGE_HALO_RADIUS).toBeLessThanOrEqual(MARKER_FOOTPRINT.up);
+        expect(DISC_RADIUS + 5 + 2).toBeGreaterThan(MARKER_FOOTPRINT.left);
+    });
+
+    /** Every circle of a marker SVG as (cx, cy, outer radius): the radius plus half the stroke. */
+    function circles(svg: string): Array<[number, number, number]> {
+        const out: Array<[number, number, number]> = [];
+        const re = /<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"([^>]*)>/g;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(svg)) !== null) {
+            const w = /stroke-width="([\d.]+)"/.exec(m[4]);
+            out.push([Number(m[1]), Number(m[2]), Number(m[3]) + (w ? Number(w[1]) / 2 : 0)]);
+        }
+        return out;
+    }
+
+    test('the marker image holds every ring it draws (owner review notes item 16): selected, in alarm, with a style ring', () => {
+        // The 56 by 46 px image clipped the selection ring at the top and left; the image is sized from the rings.
+        for (const spec of [markerSpec('well-pad', { ...ALARM, preset: 'warning' }, true), markerSpec('well-pad', LOST, true),
+            markerSpec('well-pad', { ...STALE, preset: 'fault' }, true), markerSpec('tap', ALARM, true, true)]) {
+            const svg = markerSvg(spec, symbols, COLORS);
+            const found = circles(svg);
+            expect(found.length).toBeGreaterThanOrEqual(3);
+            for (const [cx, cy, r] of found) {
+                expect(cx - r).toBeGreaterThanOrEqual(0);
+                expect(cy - r).toBeGreaterThanOrEqual(0);
+                expect(cx + r).toBeLessThanOrEqual(MARKER_IMAGE.width);
+                expect(cy + r).toBeLessThanOrEqual(MARKER_IMAGE.height);
+            }
+            // The selection ring outside the disc, the badge's halo disc top-right of it.
+            expect(svg).toContain('r="' + ((spec.instrument ? INSTRUMENT_DISC_RADIUS : DISC_RADIUS) + 5) + '"');
+            expect(svg).toContain('cx="' + (DISC_CENTER[0] + 13) + '" cy="' + (DISC_CENTER[1] - 13) + '" r="' + BADGE_HALO_RADIUS + '"');
+        }
+        // The instrument's disc and glyph (item 7): 28 px with an 18 px glyph.
+        expect(INSTRUMENT_DISC_RADIUS).toBe(14);
+        expect(markerSvg(markerSpec('tap', NORMAL, false, true), symbols, COLORS)).toContain('scale(' + (INSTRUMENT_GLYPH_SIZE / 24) + ')');
     });
 
     test('the line and tint samples of the preview draw the preset looks from token values only', () => {
@@ -293,11 +365,14 @@ describe('marker images', () => {
     });
 
     test('the dot, the badge, the chip and the arrow images', () => {
-        const dot = imageFor(dotImageId(11, false), symbols, COLORS)!;
+        const dot = imageFor(dotImageId(DOT_MID, false), symbols, COLORS)!;
         expect(dot).toMatchObject({ width: DOT_IMAGE, height: DOT_IMAGE });
-        expect(dot.svg).toContain('r="5.5"');
+        expect(dot.svg).toContain('r="7"');
+        // The halo in the blank-map token round the dot (item 6), 2 px.
+        expect(dot.svg).toContain('stroke="' + COLORS.halo + '" stroke-width="' + HALO_WIDTH + '"');
         expect(dot.svg).not.toContain(COLORS.selection);
-        expect(imageFor(dotImageId(7, true), symbols, COLORS)!.svg).toContain(COLORS.selection);
+        expect(imageFor(dotImageId(DOT_SMALL, true), symbols, COLORS)!.svg).toContain(COLORS.selection);
+        expect(imageFor(dotImageId(DOT_SMALL, false), symbols, COLORS)!.svg).toContain('r="5"');
         allowedPaints(dot.svg);
 
         const badge = imageFor(badgeImageId('alarm-3', 3, true), symbols, COLORS)!;
@@ -312,6 +387,8 @@ describe('marker images', () => {
 
         const arrow = imageFor(ARROW_IMAGE, symbols, COLORS)!;
         expect(arrow.svg).toContain(COLORS.selection);
+        // The chevron points right, along the image's x axis, which MapLibre's line placement lays along the line (item 22).
+        expect(arrow.svg).toContain('d="M19 11 L6 18 L10 11 L6 4 Z"');
         allowedPaints(arrow.svg);
         expect(imageFor('other', symbols, COLORS)).toBeNull();
     });

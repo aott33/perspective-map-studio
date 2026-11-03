@@ -44,23 +44,37 @@ describe('the map features (epic 3 entry 7)', () => {
         expect(out.points.features).toHaveLength(2);
         const shared = out.points.features.find((f) => f.properties.members === 2)!;
         expect(shared.properties).toMatchObject({ id: 'shared:a,b', name: 'Pad A and Pad B', memberIds: 'a,b', state: 'comms-lost', word: 'Comms lost', kpi: '' });
-        expect(shared.geometry.coordinates).toEqual(A.geometry.coordinates);
+        // The shared marker sits at the members' centroid, and each member's popup anchors there (owner review notes item 20).
+        const a = A.geometry.coordinates as [number, number];
+        const b = B.geometry.coordinates as [number, number];
+        const centre = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        expect(shared.geometry.coordinates).toEqual(centre);
+        expect(out.anchors).toEqual({ a: centre, b: centre });
         expect(out.shared).toBe(1);
+        // At a sharing distance under their 8.6 m (a close zoom, item 20) the two draw as their own markers.
+        const split = buildFeatures([A, B, FAR, L], KINDS, live, null, COLORS, 5);
+        expect(split.points.features).toHaveLength(3);
+        expect(split.shared).toBe(0);
+        expect(split.anchors).toEqual({});
         const far = out.points.features.find((f) => f.properties.id === 'far')!;
         expect(far.properties).toMatchObject({ members: 1, state: 'normal', kpi: '' });
         expect(out.bounds).toEqual([-104.99, 39.74, -104.95, 39.75]);
         expect(out.boundsKey).toBe('-104.990000,39.740000,-104.950000,39.750000');
     });
 
-    test('a line takes its weight from its size only with an instrument on it, the thin lateral look without', () => {
-        // Untapped: 2 px in the lateral tone (DESIGN.md map-line lateral, entry 15).
+    test('a line takes its weight from its size alone (item 11); with no size the thin lateral look', () => {
+        // L-1 is 10 in with no instrument: 6 px in the pipeline tone, as with one.
         const none = buildFeatures([L], KINDS, LIVE_INITIAL, null, COLORS);
-        expect(none.lines.features[0].properties).toMatchObject({ id: 'l', weight: 2, color: 'c', dashed: false, selected: false });
+        expect(none.lines.features[0].properties).toMatchObject({ id: 'l', weight: 6, color: 'l', dashed: false, selected: false });
         expect(none.marks.features[0].properties).toMatchObject({ id: 'l', label: 'L-1', badge: '' });
         expect(none.arrow.features).toHaveLength(0);
         const tap = item('t', 'tap', 'T', { type: 'Point', coordinates: [-104.97, 39.745] }, { attachment: { lineId: 'l', distanceM: 100 } });
         const tapped = buildFeatures([L, tap], KINDS, LIVE_INITIAL, null, COLORS);
         expect(tapped.lines.features[0].properties.weight).toBe(6);
+        // No diameter: 2 px in the lateral tone (DESIGN.md map-line lateral, entry 15), instruments or not.
+        const unsized = { ...L, properties: {} };
+        expect(buildFeatures([unsized], KINDS, LIVE_INITIAL, null, COLORS).lines.features[0].properties).toMatchObject({ weight: 2, color: 'c' });
+        expect(buildFeatures([unsized, tap], KINDS, LIVE_INITIAL, null, COLORS).lines.features[0].properties).toMatchObject({ weight: 2, color: 'c' });
     });
 
     test('a line in alarm takes the hue and its badge at the midpoint; comms lost dashes it; the selected line gets the arrow', () => {
@@ -72,17 +86,17 @@ describe('the map features (epic 3 entry 7)', () => {
         const out = buildFeatures([L], KINDS, live, { id: 'l', kind: 'line' }, COLORS);
         expect(out.lines.features[0].properties).toMatchObject({ color: 'a2', hue: 'alarm-2', dashed: false, selected: true });
         expect(out.marks.features[0].properties).toMatchObject({ badge: badgeImageId('alarm-2-unacknowledged', 2, true), rank: RANK_SELECTED, selected: true });
-        // The badge holds the midpoint, so the arrow sits at the three-quarter point.
+        // The arrow source is the selected line's geometry: the arrow layer repeats the arrow along it (item 22).
         expect(out.arrow.features).toHaveLength(1);
-        const q = alongLine(L.geometry.coordinates as Array<[number, number]>, 0.75);
-        expect(out.arrow.features[0].geometry.coordinates).toEqual(q.point);
-        expect(out.arrow.features[0].properties.bearing).toBeCloseTo(q.bearing, 6);
+        expect(out.arrow.features[0].geometry).toEqual(L.geometry);
+        expect(out.arrow.features[0].properties).toEqual({ id: 'l' });
 
         const lost: LiveState = { ...live, items: { l: { id: 'l', comms: value(false), kpis: {}, problems: [] } } };
         const dashed = buildFeatures([L], KINDS, lost, { id: 'l', kind: 'line' }, COLORS);
-        expect(dashed.lines.features[0].properties).toMatchObject({ color: 'c', dashed: true });
+        expect(dashed.lines.features[0].properties).toMatchObject({ color: 'l', dashed: true });
         expect(dashed.marks.features[0].properties.label).toBe('L-1 Comms lost');
-        expect(dashed.arrow.features[0].geometry.coordinates).toEqual(alongLine(L.geometry.coordinates as Array<[number, number]>, 0.5).point);
+        expect(dashed.arrow.features[0].geometry.coordinates).toEqual(L.geometry.coordinates);
+        expect(buildFeatures([L], KINDS, lost, null, COLORS).arrow.features).toHaveLength(0);
     });
 
     test('a selected point takes its ring and the first rank; a shared marker is selected through a member', () => {
@@ -120,7 +134,7 @@ describe('the map features (epic 3 entry 7)', () => {
         const far = out.points.features.find((f) => f.properties.id === 'far')!.properties;
         expect(far).toMatchObject({ state: 'stale', word: 'Stale' });
         expect(far.marker).toContain('"normal"]');
-        expect(out.lines.features[0].properties).toMatchObject({ id: 'l', dotted: true, dashed: false, dimmed: false, color: 'c' });
+        expect(out.lines.features[0].properties).toMatchObject({ id: 'l', dotted: true, dashed: false, dimmed: false, color: 'l' });
         // The area: a closed ring in its tint, no line feature, counted in the bounds.
         expect(out.lines.features).toHaveLength(1);
         expect(out.areas.features).toHaveLength(1);
