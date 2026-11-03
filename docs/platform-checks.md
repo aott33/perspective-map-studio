@@ -1010,6 +1010,7 @@ Label: **[live 8.3.9, rehearsal, throwaway-signed]**, the template's test stack 
 | A pad's alarm | P12's flare pilot out on the simulator drew the priority 1 glyph 44 s after the fault (30 s RTU poll, 15 s on-delay, 10 s refresh) and cleared within 29 s of the fault's end |
 | Two clicks to the pad's page | the marker opened P12's popup with the alarm in words; its pop-out opened the template's `/pad/Mesa/P12` |
 | Phone | the bottom sheet at 390 px with the same summary |
+| `ops/release-smoke.sh 0.3.0` after the tag (owner's laptop, 2026-11-03) | passed with `--image inductiveautomation/ignition:8.3.9`, **1 min 13 s**, 6 checks: the published SHA-256 `dc1475b8...6aa69c11` (1961944 bytes), `modl-verify.sh` (certificate as the README), the Gateway RUNNING with the bundle served, the module ACTIVE at 0.3.0, a line saved in one browser on a second browser's map after 3 ms, `module_version` 0.3.0 on both schema rows. The default image failed twice: the smoke picks the template's `ign-og/ignition:8.3.9-modules` when present, and that image already bakes Map Studio in (the template's lock pins 0.1.0), so Ignition stopped at start with `IllegalStateException: Duplicate key com.aoindustrial.perspective.mapstudio` (reproduced on the agent box); the fix is backlog story 15's follow-up **[live 8.3.9, plain image]** |
 | Comms lost | the pad's RTU offline: the four wells drew comms lost within 50 s and normal 10 s after it came back |
 | Log and console | no Map Studio warning or error in the Gateway log, no browser error |
 

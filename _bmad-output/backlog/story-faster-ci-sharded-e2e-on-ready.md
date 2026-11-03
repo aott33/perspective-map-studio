@@ -31,3 +31,4 @@ PR #33's Playwright job hit its 30-minute limit (118 tests, 30.4 min; raised to 
 
 - Decision: 2026-11-03 Owner ("agree with A and B, do it after the tag").
 - Note: the repository is public, so GitHub-hosted runner minutes are free; the change is for wall time and feedback speed.
+- Follow-up (2026-11-03, the 0.3.0 release smoke): `ops/release-smoke.sh` picks `ign-og/ignition:8.3.9-modules` when present, but that image bakes Map Studio in (the template's lock), so the Gateway stops with a duplicate module id; the smoke must use an image without Map Studio (or remove the baked one from its container), `--keep` must keep the stack on a failure too (today only on a pass), and its "docker logs" hint must name the Gateway container. Built in this story's pull request.
