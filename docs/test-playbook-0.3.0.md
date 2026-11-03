@@ -36,9 +36,9 @@ Pages used below. Dev project: `/` (View), `/edit` (editing and the seed), `/liv
 On the showcase page, http://localhost:9088/data/perspective/client/mapstudio-showcase (not the dev map at `.../mapstudio-dev/`, which has its own P14 and SWD1 but no P21 and no showcase states), at a laptop size.
 
 - [x] The map opens on the Mesa field at zoom 15 (by design: the showcase's starting area; the dev map opens at zoom 12), no test buttons, nothing in the bottom-right but Perspective's App Bar button.
-- [x] Sites are neutral discs with their kind's glyph and name; a value under the name from zoom 15 (zoom out one step: values go, names stay; below zoom 14 normal sites become small dots).
+- [x] Sites are neutral discs with their kind's glyph and name; a value under the name from zoom 15 (zoom out one step: values go, names stay; below zoom 14 normal sites become dots with a thin halo, 14 px down to zoom 12 and 10 px below, item 6).
 - [x] P14 shows a red priority 1 alarm triangle with its digit; P21 a magenta comms-lost glyph, dashed ring and "Comms lost" chip; SWD1 the hourglass and "Stale" chip, no colour.
-- [x] The geofence is a dashed outline; lines are grey, weight by size, with name chips.
+- [x] The geofence is a dashed outline; lines are grey, weight by their pipe size alone (a line with no size is the thin 2 px line, item 11), with name chips.
 - [x] Nothing reads as an alarm that is not one (the review's question).
 
 Notes:
@@ -49,9 +49,9 @@ Notes:
 
 ## 2. Search and Needs you (top-left)
 
-- [x] Type "p1" in search: matching sites list as you type; arrows and Enter choose one; the map zooms to it and selects it; Esc clears.
+- [x] Type "p1" in search (the field reads "Search assets"): matching sites list as you type; arrows and Enter choose one; the map zooms to it and selects it; Esc clears. The chevron in the field (or ArrowDown) opens every item in one alphabetical list, and typing filters it (item 8).
 - [x] Search by an asset name (for example a pad's asset) finds the site linked to it.
-- [x] Needs you reads "Needs you 3: 1 alarm, 1 comms lost, 1 stale" (or the current counts).
+- [x] The Needs you bar has no words (item 12): a bell with the alarm count in the hue of the highest unacknowledged priority, then the comms-lost glyph and its count, then the hourglass and its count; its hover title reads "Needs you 3: 1 alarm, 1 comms lost, 1 stale" (or the current counts). With nothing needing you it is a grey bell alone; when every alarm is acknowledged the bell is neutral and hollow. The hover keeps the bar's background, over any basemap (item 9).
 - [x] Open it: alarms first by priority, then comms lost, then stale; each row in words with its age; choosing a row zooms to and selects that site; Esc closes and returns focus.
 - [x] Keyboard only: Tab reaches search, Needs you, the zoom card and Legend in a sensible order.
 
@@ -65,11 +65,11 @@ Notes:
 
 Click P14.
 
-- [x] Card order: kind glyph and name, subline, pop-out (page link) and close; Comms with its age; 2 to 3 values; the alarm block with "View alarms".
+- [x] Card order: kind glyph and name, subline, pop-out (page link) and close; Comms with its status and age right-aligned; 2 to 3 values (a stale one shows the hourglass alone before it, the reason in its tooltip); the alarm block with "View alarms" ("No active alarms" has no check mark; item 13 option A). The card stays inside the map, clear of the top bar and the zoom card (item 18).
 - [x] Padding even on both sides, nothing cut off, nothing from the map showing through.
 - [x] The pop-out icon opens the site's page (`/site/P14` on the showcase); **View alarms** opens the alarm page with the built-in alarm table.
 - [x] Values update while the card is open (on the dev map use `/live`: "P12 pressure 400" / "950" with Point 1's card open).
-- [ ] A click on empty map closes the card (works); Esc closes it (fails: item 14).
+- [ ] A click on empty map closes the card; Esc closes it too and returns the focus to the map (item 14).
 
 Notes:
 
@@ -92,7 +92,7 @@ Values reach the map within the refresh interval (10 s), so give each press a mo
 - [x] **P12 pressure 400 / 950**: Point 1's value changes.
 - [x] At 950, Point 1 raises its "High pressure" alarm: triangle and digit on the marker, Needs you counts it. **Acknowledge P12**: the filled triangle with its sounding mark (a small speaker) becomes the outlined triangle with a bold "!" (item 7) and the popup says "acknowledged"; **P12 pressure 400** clears it.
 - [x] **P12 comms off**: Point 1 shows comms lost in magenta with its chip, Needs you counts it; **P12 comms on** restores it.
-- [x] **P14 pressure bad**: Point 2 goes stale (hourglass, no colour, value marked stale); **P14 pressure good** restores it.
+- [x] **P14 pressure bad**: Point 2 goes stale (hourglass, no colour; in the card the hourglass before the value, "Bad quality" in its tooltip, item 15); **P14 pressure good** restores it.
 - [x] **P12 status 0 to 4**: Point 1's style changes (Attention, Warning, Fault rings with words, Out of service faded).
 - [x] **L3 flow 20 / 120 / 300**: the Tracer line's look follows its Bands rule.
 - [x] An alarm always draws over a style; stale drops the style until a fresh value.
@@ -111,8 +111,8 @@ On the dev map (`/`), find L-SWD (CTB1 to SWD1) or on the showcase.
 - [x] PT-1, LV-1 and PT-2 sit at their places on the line.
 - [x] Click the line between PT-1 and PT-2: the line popup opens at "Segment PT-1 to PT-2", lists the instruments in order with distances and values, and highlights the two ends on the map and in the list.
 - [x] `/live` **PT1 comms off**: the segments either side of PT-1 dash; **PT2 pressure 500**: the segments either side of PT-2 show attention; **PT2 pressure 950** raises PT-2's alarm at its place on the line.
-- [x] A selected line shows the flow arrow; only the selected one.
-- [x] Two sites within 20 m (Shared A and Shared B on the dev map) are one marker that opens a pick list.
+- [x] A selected line shows the flow arrow repeated along it (about every 250 px, one on a short line), pointing the way the line was drawn; only the selected one (item 22).
+- [x] Two sites within 20 m (Shared A and Shared B on the dev map) are one marker that opens a pick list; zoomed in until they are a marker apart (about zoom 18) they draw as two markers, and a popup points at the marker drawn (item 20).
 
 Notes:
 
@@ -125,8 +125,8 @@ Notes:
 
 - [x] Zoom card top-right: plus, the zoom level, minus, Fit (fits the field), Return (disabled with nothing selected; recentres on a selection).
 - [x] Legend bottom-left: opens and closes by click, Enter/Space and Esc; the key matches what the map draws; Lines and Names toggles hide and show, and are remembered when the page reloads.
-- [x] Basemaps: None, OpenStreetMap (real tiles here), Satellite (needs a Mapbox token, below); attribution shown.
-- [ ] Labels stay readable over OpenStreetMap (halos), lines stay visible. (Fine over Satellite, hard over OpenStreetMap: item 25, a quiet OpenStreetMap.)
+- [x] Basemaps: the first basemap the setup lists is the default, and the legend's Basemap section is there only when the setup lists more than one (item 3; the dev map lists None, OpenStreetMap and Satellite, which needs a Mapbox token, below); OpenStreetMap is drawn quiet (item 25); the attribution is small muted text along the bottom-right edge under the App Bar button.
+- [ ] Labels stay readable over the quiet OpenStreetMap (halos), lines stay visible (item 25).
 
 Notes:
 
@@ -139,7 +139,7 @@ Your phone (see `docs/development.md` for binding the Gateway to your LAN) or th
 - [x] One top bar: search and Needs you; it expands on tap.
 - [x] Tapping a site opens a bottom sheet (handle, close, values, alarm block, View alarms), clear of the App Bar button; no pointer.
 - [x] Every button is comfortably tappable (44 px).
-- [ ] The legend, the zoom card and the attribution fit without covering what you need.
+- [ ] The legend opens as a bottom sheet (Show first, the key in two columns, no basemap section, items 2 and 3); an open search or Needs you list draws over the zoom card (item 26); the attribution sits under the App Bar button; nothing covers what you need.
 
 Notes:
 
@@ -155,7 +155,7 @@ Notes:
 
 ## 9. Dark theme and the review states
 
-- [x] Showcase `/dark` (reload once after it opens, item 29): the same map in Perspective's dark theme; every state still reads (magenta comms lost, alarm hues, chips).
+- [x] Showcase `/dark`: the same map in Perspective's dark theme with no reload (item 29: the map redraws when the theme changes); every state still reads (magenta comms lost, alarm hues, chips).
 - [x] `/styles`, **Showcase review alarms / stale / off**: the showcase shows every alarm priority and acknowledgement state, the stale states, then quiet again. Compare with `docs/review-er27.md` while you do the ER-27 review.
 
 Notes:
@@ -167,7 +167,7 @@ Notes:
 
 Open the Designer on the dev project, Project Browser, **Map Studio Setup**.
 
-- [x] Database connection, roles, kind and asset functions, refresh interval, basemaps, alarm page and map token read sensibly and save; a change applies without a Gateway restart.
+- [x] Database connection, roles, kind and asset functions, refresh interval, basemaps, alarm page and the two map token rows (**Map token provider**, **Map token secret**, item 31) read sensibly and save; a change applies without a Gateway restart.
 - [ ] A wrong value (an unknown role, an empty connection) is explained beside its field.
 
 Notes:
@@ -176,10 +176,10 @@ Notes:
 
 ## 11. When things go wrong
 
-- [x] `/adapters` (signed in): **Adapter: empty / broken / slow / incomplete** each give a plain-words status in the result line at the bottom of the page (the map itself shows no status in 0.3.0: showing it to people is epic-editing's; the map keeps drawing from the last good list); **Adapter: ok** recovers. **Adapter: unknown icon** draws that kind as a plain point.
+- [x] `/adapters` (signed in): **Adapter: empty / broken / slow / incomplete** each give a plain-words status in the dev page's own result line at the bottom of the page (not the map's line, which no longer echoes clicks in View mode, item 5; the map itself shows no adapter status in 0.3.0: showing it to people is epic-editing's; the map keeps drawing from the last good list); **Adapter: ok** recovers. **Adapter: unknown icon** draws that kind as a plain point.
 - [x] Two windows on `/edit`: draw a line in one (the spike's "Draw a line", Enter to finish); it shows in the other within seconds, with no reload.
 - [x] A viewer (not signed in) cannot save: drawing is not offered on `/`.
-- [ ] Stop the Gateway (`docker stop` the `ms-...` container) with a map open: the map says so in words and shows nothing stale as current; start it again: the map recovers.
+- [ ] Stop the Gateway (`docker stop` the `ms-...` container) with a map open: within a few seconds a chip under the top bar reads "No connection - values from 14:02" (the time of the last values), every value draws stale (the hourglass, no style; an alarm keeps its badge) and the Needs you bar turns to a hollow grey bell with "?" and no counts (its title "Needs you: state unknown, no connection to the Gateway"; the opened list says the state is unknown and lists nothing); start it again: the chip reads "Reconnected, reloading" until the fresh values arrive, then goes, and the bar counts again (item 32).
 
 Notes:
 
