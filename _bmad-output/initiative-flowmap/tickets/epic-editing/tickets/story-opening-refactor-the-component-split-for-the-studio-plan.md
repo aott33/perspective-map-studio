@@ -3,14 +3,14 @@ title: 'Opening refactor: the component split for the studio'
 type: 'refactor'
 ticket: '1'
 created: '2026-11-03'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '2d646c1c8464dc49ed66eb2b07a1f629504c3cc7'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/handoff-epic-4.md', '{project-root}/docs/architecture.md', '{project-root}/docs/development.md']
 ---
