@@ -2816,7 +2816,11 @@
    groups (Select; the kind buttons; Point, Line, Area; Snap) are divided by thin rules (DESIGN.md draw-toolbar). */
 .mapstudio-toolbar-float {
     position: absolute;
-    top: var(--mapstudio-map-inset);
+    /* Under the View-mode top bar's row (the search field, 40 px, and the Needs you bar) while entry 2 keeps that
+       bar over the map in Edit mode: with the kind buttons and Snap (entry 4) the toolbar no longer fits beside
+       it at 1366 px with the properties panel docked. Entry 7 moves the search into the Items list, and the toolbar
+       then takes the top row as DESIGN.md draws it. */
+    top: calc(var(--mapstudio-map-inset) + 40px + 8px);
     left: 50%;
     z-index: 6;
     display: flex;
@@ -2829,6 +2833,11 @@
 
 .mapstudio-toolbar-float > * {
     pointer-events: auto;
+}
+
+/* The connection chip (item 32) sits under the toolbar and its pill while the studio is on. */
+.mapstudio--editing .mapstudio-connection {
+    top: 136px;
 }
 
 .mapstudio-toolbar-float--paused .mapstudio-toolbar {

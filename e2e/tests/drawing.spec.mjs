@@ -53,7 +53,7 @@ async function pixelNow(map, lngLat) {
     return pagePixel(box, lngLat, center, zoom);
 }
 
-/** A page pixel `dx` from the map's centre and `fromTop` below its top edge now (under the toolbar and the pill, clear of the controls). */
+/** A page pixel `dx` from the map's centre and `fromTop` below its top edge now (under the top bar, the toolbar and its pill, clear of the controls). */
 async function spot(map, dx, fromTop) {
     const box = await map.boundingBox();
     return [box.x + box.width / 2 + dx, box.y + fromTop];
@@ -120,7 +120,7 @@ test.describe('1366 px', () => {
             await expect(bar).toHaveAttribute('data-reason', 'A line needs two points');
             await page.waitForTimeout(VERTEX_PAUSE_MS);
             // Away from every item nothing is within reach.
-            const clear = await spot(map, 0, 140);
+            const clear = await spot(map, 0, 175);
             await page.mouse.move(clear[0], clear[1]);
             await expect(bar).toHaveAttribute('data-snap-target', '');
             [x, y] = await pixelNow(map, SWD1);
@@ -232,9 +232,9 @@ test.describe('1366 px', () => {
             const bar = page.locator('.mapstudio-drawing-bar');
             await expect(bar.locator('.mapstudio-drawing-title')).toHaveText('New geofence');
             // A triangle on the clear ground north of the tracer's points (under the toolbar and its pill).
-            const a = await spot(map, -150, 200);
-            const b = await spot(map, 0, 120);
-            const c = await spot(map, 150, 200);
+            const a = await spot(map, -150, 235);
+            const b = await spot(map, 0, 155);
+            const c = await spot(map, 150, 235);
             await page.mouse.click(a[0], a[1]);
             await expect(bar).toHaveAttribute('data-points', '1');
             await expect(bar).toHaveAttribute('data-reason', 'An area needs three points');
@@ -274,8 +274,8 @@ test.describe('1366 px', () => {
             await expect(map).toHaveAttribute('data-tool', 'line');
             await expect(map).toHaveAttribute('data-tool-kind', '');
             const bar = page.locator('.mapstudio-drawing-bar');
-            const a = await spot(map, -100, 180);
-            const b = await spot(map, 100, 180);
+            const a = await spot(map, -100, 215);
+            const b = await spot(map, 100, 215);
             await page.mouse.click(a[0], a[1]);
             await expect(bar).toHaveAttribute('data-points', '1');
             await expect(bar).toHaveAttribute('data-valid', 'false');
@@ -327,10 +327,10 @@ test.describe('1366 px', () => {
             await expect(page.locator('.mapstudio-pill')).toHaveText('Draw a geofence - click to add points, double-click to close');
             const bar = page.locator('.mapstudio-drawing-bar');
             // A bow tie: the edge a to b crosses the edge c to d.
-            const a = await spot(map, -120, 120);
-            const b = await spot(map, 120, 200);
-            const c = await spot(map, 120, 120);
-            const d = await spot(map, -120, 200);
+            const a = await spot(map, -120, 155);
+            const b = await spot(map, 120, 235);
+            const c = await spot(map, 120, 155);
+            const d = await spot(map, -120, 235);
             for (const [i, p] of [a, b, c].entries()) {
                 await page.mouse.click(p[0], p[1]);
                 await expect(bar).toHaveAttribute('data-points', String(i + 1));
@@ -376,7 +376,7 @@ test.describe('1366 px', () => {
         await expect(page.locator('.mapstudio-tool--kind[data-kind="line"]')).toHaveAttribute('aria-pressed', 'false');
         await expect(page.locator('.mapstudio-pill')).toHaveText('Draw a gathering line - click to add points, Enter to finish');
         const bar = page.locator('.mapstudio-drawing-bar');
-        for (const [i, [dx, fromTop]] of [[-140, 200], [0, 120], [140, 200]].entries()) {
+        for (const [i, [dx, fromTop]] of [[-140, 235], [0, 155], [140, 235]].entries()) {
             const p = await spot(map, dx, fromTop);
             await page.mouse.click(p[0], p[1]);
             await expect(bar).toHaveAttribute('data-points', String(i + 1));
