@@ -1,11 +1,12 @@
 /**
- * Saving the dev line tool's finished line through the write path (AD-2, AD-10)
- * and drawing the map store's items. Pure functions only, unit tested in node;
- * the component and its delegate hold the state.
+ * Saving through the write path (AD-2, AD-10): the dev line tool's finished line, the studio's point
+ * placed by one click, a finished field's update (epic 4 entry 2), the save state and its words, and
+ * drawing the map store's items. Pure functions only, unit tested in node; the component and its
+ * delegate hold the state.
  */
 
 import type { Feature, FeatureCollection, LineString, Point } from 'geojson';
-import { EditBatch, MapItemRecord } from './contract';
+import { EditBatch, MapItemData, MapItemRecord } from './contract';
 import { ErrorBody, newMessageId } from './messages';
 
 /**
@@ -43,6 +44,34 @@ export function lineCreateBatch(itemId: string, batchId: string, coordinates: Ar
     };
 }
 
+/** A coordinate as the map store keeps it: 6 decimals (docs/contract.md, the map item record). */
+export function roundCoordinate(n: number): number {
+    return Math.round(n * 1e6) / 1e6;
+}
+
+/**
+ * One `edits.apply` batch creating one point map item at baseVersion 0 (epic 4 entry 2: the Point
+ * tool's click saves at once as the kind list's first point kind, with the kind's name as the
+ * placeholder name; the kind picker is entry 4's).
+ */
+export function pointCreateBatch(itemId: string, batchId: string, kind: string, name: string, lngLat: [number, number]): EditBatch {
+    return {
+        batchId,
+        ops: [{
+            op: 'create',
+            entity: 'item',
+            id: itemId,
+            baseVersion: 0,
+            data: { kind, name, geometry: { type: 'Point', coordinates: [roundCoordinate(lngLat[0]), roundCoordinate(lngLat[1])] } }
+        }]
+    };
+}
+
+/** One `edits.apply` batch updating the top-level fields `data` carries on one map item at its stored version. */
+export function updateBatch(itemId: string, batchId: string, baseVersion: number, data: MapItemData): EditBatch {
+    return { batchId, ops: [{ op: 'update', entity: 'item', id: itemId, baseVersion, data }] };
+}
+
 /** The save state the component shows next to the drawing status. */
 export type SaveState =
     | { state: 'idle' }
@@ -67,6 +96,24 @@ export function saveStatusText(save: SaveState): string {
             return 'Not saved: the store is unreachable. The line is kept here and saves when it is back.';
         default:
             return '';
+    }
+}
+
+/**
+ * The studio's save status words (EXPERIENCE.md Save status, DESIGN.md save-status; epic 4 entry 2):
+ * "Saved" with nothing pending, "Saving..." while a batch is out, and a problem in words on its own.
+ * The spike's status line keeps `saveStatusText`.
+ */
+export function saveStatusWords(save: SaveState): string {
+    switch (save.state) {
+        case 'saving':
+            return 'Saving...';
+        case 'refused':
+            return 'Not saved - ' + save.message;
+        case 'unsent':
+            return 'Not saved - store unreachable; the edit is kept here and saves when it is back';
+        default:
+            return 'Saved';
     }
 }
 

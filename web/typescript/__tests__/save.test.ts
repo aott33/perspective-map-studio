@@ -6,8 +6,12 @@ import {
     lineCreateBatch,
     lineName,
     newId,
+    pointCreateBatch,
     refusedSave,
+    roundCoordinate,
     saveStatusText,
+    saveStatusWords,
+    updateBatch,
     withItem
 } from '../save';
 
@@ -65,5 +69,32 @@ describe('drawing the store items', () => {
         const b = item('b', { type: 'Point', coordinates: [1, 1] });
         const a2 = { ...a, version: 2 };
         expect(withItem([a, b], a2)).toEqual([b, a2]);
+    });
+});
+
+describe('the studio\'s saves (epic 4 entry 2)', () => {
+    test('a placed point is one create at baseVersion 0 as the kind with the placeholder name, to 6 decimals', () => {
+        expect(pointCreateBatch('i', 'b', 'pad', 'Well pad', [-104.97251234567, 39.7445987654])).toEqual({
+            batchId: 'b',
+            ops: [{ op: 'create', entity: 'item', id: 'i', baseVersion: 0,
+                data: { kind: 'pad', name: 'Well pad', geometry: { type: 'Point', coordinates: [-104.972512, 39.744599] } } }]
+        });
+        expect(roundCoordinate(1.23456789)).toBe(1.234568);
+    });
+
+    test('a finished field is one update at the stored version carrying only that field', () => {
+        expect(updateBatch('i', 'b', 3, { name: 'P31' })).toEqual({
+            batchId: 'b', ops: [{ op: 'update', entity: 'item', id: 'i', baseVersion: 3, data: { name: 'P31' } }]
+        });
+        expect(updateBatch('i', 'b', 4, { assetId: null }).ops[0].data).toEqual({ assetId: null });
+    });
+
+    test('the panel header\'s words: Saved, Saving..., a problem on its own', () => {
+        expect(saveStatusWords(SAVE_IDLE)).toBe('Saved');
+        expect(saveStatusWords({ state: 'saved', itemId: 'a', version: 2 })).toBe('Saved');
+        expect(saveStatusWords({ state: 'saving', itemId: 'a' })).toBe('Saving...');
+        expect(saveStatusWords(refusedSave('a', { code: 'conflict', message: 'P31 was changed by mapoperator at 14:02 UTC since you loaded it. Nothing in this save was written.' })))
+            .toBe('Not saved - P31 was changed by mapoperator at 14:02 UTC since you loaded it. Nothing in this save was written.');
+        expect(saveStatusWords({ state: 'unsent', itemId: 'a', code: 'timeout' })).toMatch(/^Not saved - store unreachable/);
     });
 });
