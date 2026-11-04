@@ -3,7 +3,7 @@ title: "Tracer: Edit mode's docked studio, one pad added, linked, undone and see
 type: 'feature'
 ticket: '2'
 created: '2026-11-04'
-status: 'in-review'
+status: 'built'
 baseline_revision: 'ce177bf9db9ce1a7543df4966693d6d52f126f76'
 route: 'full'
 route_source: 'auto'
@@ -99,6 +99,8 @@ context: ['{project-root}/_bmad-output/handoff-epic-4.md', '{project-root}/docs/
 - The dev Gateway's trial (implementer, 2026-11-04): a `ops/up.sh` restart inside the two-hour trial window resets the trial to the time that was left, not to two hours (the Gateway log: "Trial time reset. Time remaining = 1785" after the fourth restage), and the trial then expired in the middle of the first whole-suite run ("Trial expired" at 06:49:46), from which point every editor test timed out on the sign-in (ten failures in `tags`, `tracer`, `unsaved` and `writepath`, all environmental). `ops/perf.sh` already reads `GET /data/api/v1/trial` for `trialSecondsLeft`; a whole-suite run after several restages needs `ops/up.sh --fresh` (fresh volumes, a full trial) first, which is how the final run below was made.
 - The Gateway's `SetupLookupsTest.aHungSecretProviderHoldsOneThreadAndNeverTheOtherLists` failed once in `ops/up.sh`'s build while the Playwright suite ran on the same box (a timing test on a hung provider; nothing under `gateway/` changed in this entry) and passed on the next build.
 - Commits (planner): one commit per milestone on the current branch, never a push; each message ends with the two trailer lines the session's attribution reminder gives (`Co-Authored-By` and `Claude-Session`); the configured git identity as it is (no `-c user.name` or `-c user.email`); no em dashes and no model identifier anywhere in files or messages apart from that trailer; never a bare `git stash`.
+
+- Results after the review's patch (main session, 2026-11-04, commit 707e4b9): `cd web && npx tsc --noEmit && npx jest` clean, 38 suites, 326 tests; `./gradlew clean build --offline` BUILD SUCCESSFUL; `check-contract-versions.sh` OK at 0.4.0 and `test-contract-versions.sh` OK; `MapStudio.js` 1,391,392 bytes, `MapStudio.css` 119,210; the whole e2e suite on a fresh stack (`ops/up.sh --fresh`): 129 tests, 120 passed, 7 skipped, 2 failed in 26.6 minutes, the two being the review 390 px test in both themes with Perspective's "No Connection to Gateway" banner in each snapshot (the environment flake of deferred-work.md, entry 1), which then passed alone in both themes (4.6 s and 6.3 s). Every other test, `studio.spec.mjs`'s four included, passed on the patched build.
 
 ## Plan Change Log
 
