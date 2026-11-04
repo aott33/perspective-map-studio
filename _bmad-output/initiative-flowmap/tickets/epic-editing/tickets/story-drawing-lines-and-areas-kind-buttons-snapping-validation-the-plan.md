@@ -87,6 +87,12 @@ context: ['{project-root}/_bmad-output/handoff-epic-4.md', '{project-root}/docs/
 
 ## Plan Change Log
 
+- 2026-11-04 (implementer): the toolbar sits on the row under the View-mode top bar (the search field and the Needs you bar) while entry 2 keeps that bar over the map in Edit mode: with the kind buttons and Snap it is about 330 px wide, more than the room beside the bar at 1366 px with the properties panel docked (718 px of map); the connection chip moves under it. DESIGN.md's top row holds the toolbar once entry 7 moves the search into the Items list (one CSS value). Hiding the top bar in Edit mode was not taken: `needsyou`, `search`, `popup`, `review` and `connection` use it on `/edit` as the editor.
+- 2026-11-04 (implementer): the drawing bar shows as soon as the Line or Area tool is in hand, not only after the first vertex, because the matrix's snap indicator ("Snap to CTB1 - click to connect") must name the target before the first click; with no vertex it reads "Click the map to add the first point" and Finish is inert. The tool stays in hand after a finish, as the Point tool does.
+- 2026-11-04 (implementer): the specs that drew at 390 px (`store`, `unsaved`, `changes`) draw at 1366 px on the same page and return to 390 px for the kept state, the screenshot and the reload, since no tool shows below 768 px; `tracer`'s 390 px line goes through the test hook and is asserted drawn from `map.changed`, its Esc and two-vertex finish kept at 1440 px. The phone touch probe became the Legend sheet (open and close by touch alone).
+- 2026-11-04 (implementer): the first whole-suite run found the studio vanishing while the store is unreachable (a failed load nulls the delegate's level; the spike's button had masked it); the component keeps the level last reported so the studio stays and the toolbar pauses. Recorded in `docs/platform-checks.md`.
+- 2026-11-04 (implementer): the commits are grouped by what compiles rather than one per milestone: the toggle, the specs, the tools, the drawing bar, snapping and the toast share `editing.ts` and `MapStudio.tsx` (one commit), the floating end mark (one), the drawing spec and the docs (one), the toolbar's row and the platform checks (one), the outage fix (one).
+
 ## Review Triage Log
 
 ## Design Notes
