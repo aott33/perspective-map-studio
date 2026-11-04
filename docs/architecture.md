@@ -38,6 +38,23 @@ So when you add a feature, ask: does the browser need to decide this, or the Gat
 
 `web/`, `gateway/` and `designer/` may depend on `common/`. `web/` and `gateway/` never depend on each other's internals.
 
+Inside `web/typescript` the component is split by concern (epic 4 entry 1), so a studio story finds its module and the component itself stays thin wiring:
+
+| Module | What it owns |
+| --- | --- |
+| `MapStudio.tsx` | The component: its props and state (the draw state, the popup, the selection and the studio model), `componentDidMount`, `componentDidUpdate` and `componentWillUnmount` as the wiring of the modules below, `render`, and `MapStudioMeta` |
+| `MapStudioStoreDelegate.ts` | The browser side of the component delegate: the messages, the items and their changes, the unsaved queue and its sender, the live values, the connection watch, the basemap choice; `notify()` to `mapStateToProps` is its one flow to the component |
+| `mapLayers.ts` | The map's drawing: the source and layer ids, the sprite and glyph URLs, the theme tokens and colours, the map on its blank style, the item, unsaved and text layers, the basemap layer, the theme repaint, the legend's layer toggles, the labels published for the suite |
+| `viewControls.ts` | The View-mode controls' wiring: the zoom card, the search field with the Needs you bar, the legend and the attribution in one function returning the handles; the Mapbox logo while Satellite is drawn |
+| `camera.ts` | The camera and the place: the starting area, the remembered place and its restore, the camera padding, Fit and Return, a search or Needs you choice, the view and readiness attributes |
+| `itemsLayer.ts` | The items on the map: the sources filled when a revision changed (the gating stays the component's), the unsaved items, the sprite and the marker images, the item counts for the suite |
+| `basemapLayer.ts` | The basemap under the items: the delegate's choice drawn, its tiles' state, the provider's links and logo, the basemap attributes |
+| `selection.tsx` | The selection and the popups: a click on the map, the MapLibre popup and the bottom sheet, their placement and content, the pick list, Esc, the selection attributes |
+| `editing.ts` | The spike's line tool: Terra Draw, the Draw a line toggle, a finished line saved and its drawn copy dropped, Escape |
+| `studio.ts` | The studio's mode and selection model, pure: View or Edit, the tool in hand, the selected ids; `fromProps` reads `editMode` once at mount, and the component derives today's editing, drawing and selection from it |
+
+The DOM-bound modules take the component as their host (each names the fields and callbacks it reads in a `*Host` interface); the pure modules beside them (`draw.ts`, `features.ts`, `live.ts`, `markers.ts`, `place.ts`, `startingArea.ts`, `popupPlacement.ts`, `unsaved.ts`, `unsavedSender.ts`, `changes.ts` and the rest) are unit tested in node.
+
 ## How a save works
 
 Every change, from a dragged vertex to a 120-pad import, is one **batch of edits** (AD-2):
