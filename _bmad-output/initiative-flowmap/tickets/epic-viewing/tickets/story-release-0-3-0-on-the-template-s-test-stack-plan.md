@@ -10,11 +10,7 @@ route_source: 'invocation'
 risk: 'medium'
 review: 'none'
 review_source: 'invocation'
-context:
-  - '{project-root}/RELEASING.md'
-  - '{project-root}/docs/template-install.md'
-  - '{project-root}/docs/perf/README.md'
-  - '{project-root}/_bmad-output/initiative-flowmap/tickets/epic-viewing/epic-viewing.md'
+context: ['{project-root}/RELEASING.md', '{project-root}/docs/template-install.md', '{project-root}/docs/perf/README.md', '{project-root}/_bmad-output/initiative-flowmap/tickets/epic-viewing/epic-viewing.md']
 ---
 
 # Release 0.3.0 on the template's test stack (epic-viewing entry 13)

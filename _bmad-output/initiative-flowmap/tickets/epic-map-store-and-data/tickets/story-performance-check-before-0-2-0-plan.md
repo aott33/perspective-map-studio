@@ -12,8 +12,7 @@ review: 'quick'
 review_source: 'coordinator'
 lenses_ran: ['quick']
 review_loop_iteration: 0
-context:
-  - '{project-root}/docs/platform-checks.md'
+context: ['{project-root}/docs/platform-checks.md']
 ---
 
 <frozen-after-approval reason="human-owned intent - do not modify unless human renegotiates">

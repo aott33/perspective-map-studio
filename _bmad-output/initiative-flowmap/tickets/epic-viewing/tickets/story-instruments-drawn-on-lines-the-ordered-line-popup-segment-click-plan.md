@@ -12,12 +12,7 @@ review: 'quick'
 review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
-context:
-  - '{project-root}/_bmad-output/handoff-epic-3.md'
-  - '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md'
-  - '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/review-popup-and-marker-info.md'
-  - '{project-root}/docs/contract.md'
-  - '{project-root}/docs/kind-setup.md'
+context: ['{project-root}/_bmad-output/handoff-epic-3.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/review-popup-and-marker-info.md', '{project-root}/docs/contract.md', '{project-root}/docs/kind-setup.md']
 ---
 
 <frozen-after-approval reason="human-owned intent - do not modify unless human renegotiates">

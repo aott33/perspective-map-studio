@@ -12,9 +12,7 @@ review: 'quick'
 review_source: 'pinned'
 lenses_ran: [quick]
 review_loop_iteration: 0
-context:
-  - '{project-root}/_bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md'
-  - '{project-root}/docs/platform-checks.md'
+context: ['{project-root}/_bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md', '{project-root}/docs/platform-checks.md']
 ---
 
 <frozen-after-approval reason="human-owned intent - do not modify unless human renegotiates">

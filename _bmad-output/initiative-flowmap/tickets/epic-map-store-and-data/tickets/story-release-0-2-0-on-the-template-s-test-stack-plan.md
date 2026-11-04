@@ -12,10 +12,7 @@ review: 'quick'
 review_source: 'invocation'
 lenses_ran: ['quick']
 review_loop_iteration: 1
-context:
-  - '{project-root}/RELEASING.md'
-  - '{project-root}/docs/template-install.md'
-  - '{project-root}/_bmad-output/initiative-flowmap/tickets/epic-module-foundation/tickets/story-install-through-the-template-s-module-lock-plan.md'
+context: ['{project-root}/RELEASING.md', '{project-root}/docs/template-install.md', '{project-root}/_bmad-output/initiative-flowmap/tickets/epic-module-foundation/tickets/story-install-through-the-template-s-module-lock-plan.md']
 ---
 
 <frozen-after-approval reason="human-owned intent - do not modify unless human renegotiates">
