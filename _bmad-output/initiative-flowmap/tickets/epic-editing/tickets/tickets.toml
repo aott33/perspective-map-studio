@@ -1,0 +1,204 @@
+# Epic 4 stories in build order. Table order is build order; ids are permanent.
+# Refined and planned 2026-11-03 (owner, "agree with all recommendations"); covers cite this epic's Requirements.
+# Entry 1 splits the component first; entry 2 is the tracer bullet. Two lanes after it: the studio
+# (4, 5, 9; 6, 12, 13; 7, 8; 10) and the page and place features (14, 15, 16); 11 reads the edit record.
+# Entry 3 is the short UX update the new pieces wait on (7, 9, 11, 15, 16). 17 sweeps, 18 releases 0.4.0.
+# Cross-epic prerequisites are pinned on the entries that need them ("2.n", "3.n").
+
+[[entry]]
+id = 1
+type = "story"
+title = "Opening refactor: the component split for the studio"
+description = "Cleanup before the studio (owner, 2026-11-03): MapStudio.tsx holds the store delegate and the component in one 3,207-line file, and this epic adds a rail, a list, a properties panel, the Kinds screen, the tag browser, the draw toolbar, an undo stack and a Recent changes dock. Splits the delegate from the component into their own modules, lifts the View-mode controls' wiring and the map's drawing into named modules, and adds one mode and selection model (View or Edit, the current tool, the selected ids) that the studio's surfaces will read, with no change in behaviour: every e2e and unit test passes unchanged, the bundle stays within 2 percent of 0.3.0's size, and the contract is untouched. Scope is the split only; anything found that needs a feature goes to deferred-work.md."
+verify = "The e2e suite and the web unit tests pass unchanged on the dev stack; the bundle size is within 2 percent of 0.3.0's; the contract docs and mapstudio.props.json are unchanged; MapStudio.tsx is under 800 lines and the delegate is its own module."
+covers = []
+after = ["3.11"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 2
+type = "story"
+title = "Tracer: Edit mode's docked studio, one pad added, linked, undone and seen by the page"
+description = "The thinnest path through every layer editing touches (AD-2, AD-9, AD-10). First, a short live check on the dev 8.3 Gateway of three Perspective SDK claims (NFR-7), recorded in docs/platform-checks.md: a component event declared in the descriptor reaches a Perspective event script, a prop written by the component reaches a page binding, and whether the client store exposes the session props to a component. Then: the Edit switch top-right, shown only at level full, and the editMode prop made bidirectional (the switch writes it, a changed value switches the mode; a user without the role stays in View mode); the mode rail (View, Items, Kinds, Layers, the last two as empty surfaces until their stories); a first item list, every live item in one group with its state badge from the batch; the properties panel's Details tab with name, kind, the location and the asset picker (link and unlink; the linked item's icon and popup work at once), each field saving when finished through edits.apply; the floating toolbar with Select and a generic Point tool and the mode pill naming the mode; a point placed by a click then dragged to fine-tune; Undo and Redo in the panel header naming the step, over one undo stack per session that sends the reverse batch for a saved edit; the save status Saved and Saving...; and, as the SDK proof, the selectedItem prop written on selection with onItemSelected fired carrying the AD-7 object. Everything else (lines, snapping, the Style tab, the dock, the Kinds screen) is its own entry. The owner sees the studio run on the dev stack (a hitl step)."
+verify = "On the dev Gateway as mapeditor at 1366 px: the Edit switch opens the studio and a viewer never sees it; a page with editMode true opens in Edit mode and writing the prop false returns to View mode; a pad added by a click, named and linked saves (map.changed in a second browser within a few seconds), its icon shows the kind setup's live values, and Undo removes it with the reverse batch saved; a Perspective event script on onItemSelected logs the clicked item and a label bound to selectedItem follows the selection; the three SDK checks are recorded in docs/platform-checks.md; e2e and unit tests pass."
+covers = ["R17", "R20", "R21"]
+after = [1, "2.3", "2.8", "3.14"]
+hitl = true
+risk = "high"
+
+[[entry]]
+id = 3
+type = "story"
+title = "UX update for the new pieces: the dock, the instrument tool, the selection pill, you are here and Directions"
+description = "The short workshop the owner asked for (owner, 2026-11-03), run with bmad-ux on this epic and landing in its folder; the 2026-10-27 key screens 4 to 9 stand for everything else. Designs, with renders and contact sheets for each choice: the Recent changes dock on the map's right edge with rows expanding to who, what, when, before, after and Revert (replacing the spine's floating card); the instrument tool as the fourth generic tool and its enabled and disabled looks; the \"N selected\" mode pill with Box select and lasso; the you-are-here marker (dot, accuracy ring, heading) in a token no state uses, with its legend word and the Locate me button in the zoom card and its three reasons in words; the Directions button in the popup card and the phone sheet; Nearest to me in the search list and the distance on Needs you rows. Updates EXPERIENCE.md (Recent changes, Floating draw toolbar, Multi-select, Popup card, Search, Needs you) and DESIGN.md (components and tokens) so the spines stay the truth. The owner picks from the contact sheets (a hitl step)."
+verify = "The epic folder holds the renders and contact sheets; EXPERIENCE.md and DESIGN.md carry the chosen designs with no [ASSUMPTION] left on these pieces; the owner's picks are recorded as dated decisions in the epic's Notes."
+covers = []
+after = []
+hitl = true
+risk = "low"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Drawing lines and areas: kind buttons, snapping, validation, the drawing bar, Esc and keyboard"
+description = "The toolbar's Line and Area tools and the kind buttons (the kind list's first kinds, up to three; the generic tools pick the kind in the form after), each item drawn vertex by vertex with no drag, finished by double-click, Enter or Finish, Backspace removing the last vertex, Esc cancelling to Select; the drawing bar bottom-centre with the points, the length and whether the start is snapped or floating; the Snap toggle off by default, with the indicator naming the target when on, snapped and floating ends drawn apart and the snap stored in ends (AD-19); validation while drawing (a self-intersecting area, a line under two vertices) in plain words beside the item; the mode pill for every tool; and the toast with Undo after an add (the Undo bar component, which entry 10 gives its timing). Phone widths get no tools (below 768 px)."
+verify = "On the dev Gateway: a pipeline drawn from CTB1 to SWD1 with Snap on stores both ends and draws them snapped, the same with Snap off stores null ends and draws them floating; a self-intersecting geofence and a one-vertex line are flagged before Finish and cannot finish; Enter, double-click and Finish each end a line, Backspace drops the last vertex, Esc cancels and the pill reads Select; every step works by keyboard and by clicks with no drag; at 390 px no toolbar shows; e2e at 1366 px passes."
+covers = ["R1", "R6", "R8", "R11"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Change geometry and delete: move, vertices, split, non-drag ways, duplicate, add another like this, shortcuts"
+description = "Dragging a point or a vertex, the midpoint handle to insert, delete a vertex, split a line at a point into two lines keeping kind, properties and ends (the shared geometry module re-attaching each instrument to the part it sits on, AD-19), and moving a map item that lines snap to carrying their ends in the same batch; every drag with a non-drag way: Move then tap, or typed values in Details; Delete with no confirmation and one undo restoring the item with its link and properties (a line with its instruments in one step); \"Add another like this\" and duplicate from the panel footer (kind and properties copied, not name, location or link); the ? panel listing every shortcut; and Undo refused in a toast, naming who, when another editor changed the item since (AD-2)."
+verify = "On the dev Gateway: a lateral's vertex dragged, a vertex inserted at a midpoint and one deleted each save and undo; L-SWD split between PT-1 and PT-2 gives two lines with PT-1 on the first and PT-2 on the second at distances from each part's start; moving CTB1 moves the snapped line end with it in one batch; Move then tap moves a point with no drag and a typed latitude and longitude moves it too; Delete then Undo restores a line with its two instruments; Add another like this opens the form prefilled without the link; ? lists the shortcuts; an undo of an item another session changed is refused naming that user; unit tests of the split and e2e pass."
+covers = ["R7", "R9", "R10"]
+after = [4]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 6
+type = "story"
+title = "The item form: kind fields, required marks, prefill, the place check, duplicate names and unknown kinds"
+description = "The Details tab complete: the kind's form fields typed per the kind list, required fields marked and the missing ones named, each field saved when finished, the last values prefilled per kind except name, location and link; the location row with the place line, typed latitude and longitude as the backup to click then drag (with the hint), swapped or out-of-range values flagged, Zoom to location; the offline place check (country, state or province, city) from Natural Earth admin boundaries and GeoNames cities served by the module as a static asset within a few megabytes and loaded on first use, with the attributions in NOTICE and the legend (owner, 2026-11-03); a name already used on another asset underlined in red with a tooltip; an item whose asset vanished shown unlinked with the reason and one whose kind left the list as Unknown kind, both kept; and the adapter's status in words in the form and the Kinds screen when the asset list is empty or incomplete (R13 consumed)."
+verify = "On the dev Gateway: a required field left empty is named and the item still saves what it has; reopening the form for a pad prefills the last operator but not the name; typing 32.7 and -103.1 shows Lea County, New Mexico, US and Zoom to location goes there; -103.1 and 32.7 is flagged as swapped; a second P14 on another asset is underlined with the tooltip; switching the dev adapter to incomplete shows the status words in the form; the place check data is under the budget and its attributions are listed; unit tests of the lookup and e2e pass."
+covers = ["R3", "R12", "R13"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "The item list as designed, the first-run checklist, the layout at 1366 and below 1280"
+description = "The list grouped by place from the linked asset's base path (field, site, what is on it; Field-wide; Not linked; Just added; owner, 2026-11-03), needs-attention first with the All normal divider, Sort by (needs attention, place, kind, name, last changed, the last from a changed {actor, at} that map.load.reply gains at the phone and full levels, additive), the Filter button with the kind chips, search within the list, the footer with Add item and the unlinked count opening the unlinked list, each row's state badge live, a row selecting, panning and opening properties, Layers as the basemap switch; the first-run checklist on an empty map (Set up your kinds, Add or import items opening the add tools, Check the operator view; ticked when done; Hide checklist) and the viewer's note; the layout at 1440 and 1366 px (opening properties keeps the selection in view), the list collapsing to a button below about 1280 px, nothing bottom-right."
+verify = "On the dev 30-pad set at 1440, 1366 and 1200 px: P14-2H lists under P14 under Mesa field, L-SWD under Field-wide, an unlinked pad under Not linked and a pad added this session under Just added; a pad in alarm heads the list and Sort by name reorders; the Filter chip Well pad keeps only pads; the footer counts the unlinked and lists them; clicking a row pans to the item with properties open and the selection in view; at 1200 px the list is a button; an empty dev map shows the checklist and Open Kinds ticks its step when a kind setup is saved; a viewer sees the note; Sort by last changed follows the edit record's actor and time; e2e at the three widths passes."
+covers = ["R2", "R19", "R20"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 8
+type = "story"
+title = "Selecting several: checkboxes, Shift-click, Select all, Box select, lasso, the N selected pill, delete as one step"
+description = "Multi-select built here, the bulk form left to epic-import-export (owner, 2026-11-03): the list's checkboxes, Shift-click ranges, Select all in Mesa field, in filter and in a group; on the map Box select and Alt for a lasso, Shift-click adding; the mode pill reading \"N selected - Shift-click to add\" as entry 3 designed it; Clear dropping the selection; Delete of several items as one batch and one undo step (lines with their instruments); the selection kept when the rail switches surface and cleared by a click on empty map. The properties panel shows a count and the bulk form's place while several are selected, with the words that the bulk form arrives with import and bulk edit."
+verify = "On the dev Gateway at 1366 px: Shift-click selects a range in the list and Select all in filter selects every pad; a box over the route selects its pads and Alt drags a lasso; the pill reads the count; Delete removes them in one batch and one Undo restores all; the selection survives a switch to Kinds and back; e2e passes."
+covers = ["R19"]
+after = [5, 7, 3]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 9
+type = "story"
+title = "The add-instrument tool: placed on a line by click or typed distance, moved only along it"
+description = "The fourth generic tool (owner, 2026-11-03; its looks from entry 3), enabled with a line selected: the editor picks an instrument kind (tap, meter, line valve) and places it by clicking the line (the pill reading \"Add an instrument on L-SWD - click the line or type its distance\") or by typing its distance along the line in Details; the instrument moves only along the line, by dragging (the shared geometry module projecting the pointer onto the line) or a typed distance, never off it (WCAG 2.5.7); its attachment {lineId, distanceM} and point are written in one op (AD-19) and the store's checks apply; moving, reshaping or splitting the line keeps its instruments (entry 5's batches) and deleting the line deletes them with one undo restoring both; the drawn instrument and its segment look are epic-viewing entry 2's. Snapping to vertices never applies to an instrument."
+verify = "On the dev Gateway with L-SWD: a tap added by clicking the line at PT-1's spot stores its distanceM within 1 m of the click's projection and a typed 1143 moves it there; dragging it stays on the line and a drag off the line projects back; a meter added at 2841 lists in the line popup in order; reshaping the line keeps both at their nearest places; deleting L-SWD removes both and one Undo restores all three; an instrument placed on a non-line is refused in words; unit tests of the projection and e2e pass."
+covers = ["R16"]
+after = [5, 3, "2.14", "3.2"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 10
+type = "story"
+title = "Save states and the unsaved list: the conflict card, the store unreachable and busy banners, the second tab's replay"
+description = "The save status complete (EXPERIENCE.md Save and store states): Saved, Saving..., Not saved with the reason on its own row; the conflict card showing who changed what and when and the editor's own change kept, with both choices \"Use <name>'s version\" (drops mine) and \"Apply mine on top\" (re-sends mine on the new version; owner, 2026-11-03); the save banner top-centre for store unreachable (edits kept on this computer, the toolbar faded and taking no input, live values still updating, Try again, Show my N edits opening the unsaved list) and for busy (nothing saved, the change kept here, Try again, Discard my change); the unsaved list from the status; a tab that learns another tab's unsent batch from a storage event arming the 15 s replay timer as well (deferred from 0.2.0); the edits of a tab closed mid-way replayed when it opens again; toasts with Undo 6 s, paused on hover or focus, never bottom-right."
+verify = "On the dev Gateway with two browsers: both edit P14 and the second gets the conflict card naming the first; Use theirs drops the change and Apply mine on top saves it at the new version; stopping PostgreSQL shows the banner, fades the toolbar, keeps two edits in the unsaved list and saves them when it is back; the busy reply shows its banner and Discard removes the change; a batch queued in one tab replays from a second tab within 15 s with no reload; a toast pauses while hovered; unit tests of the status and e2e pass."
+covers = ["R26"]
+after = [2, 4, "2.8"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 11
+type = "story"
+title = "Recent changes: the edit record read, the right-hand dock and Revert"
+description = "Owner, 2026-11-03 (initiative R45; architecture AD-2, AD-3, AD-8; review note 5). On the Gateway, migration 0003 adds to the edit record what each op changed, the changed fields before and after, written by the write service in the same transaction; a new edits.history request {before?, limit} and reply {entries: [{seq, batchId, actor, at, source, ops: [{op, entity, id, name, kind, before, after}]}]} in common/ and the delegate, newest first in pages of 50, full and phone levels only (a viewer is refused role and never learns names, as map.changed rules), documented in contract.md; rows from before the migration carry no before and after. In the browser, the Recent changes dock on the map's right edge as entry 3 designed it, opened from the save status, with the next undo step named at the top with an Undo button, rows of who, what in a sentence and when, expanding to the values before and after, and Revert per change, another editor's included: Revert builds the reverse batch from the row and saves it like any edit, refused saying who changed it when the item changed since; a bulk change or an import reverts as one step; the dock stays open while editing and new changes land at the top from map.changed."
+verify = "On the dev Gateway: two editors move P14 and P31; the dock lists both newest first with who and when, expanding to the old and new coordinates; Revert on the other editor's change moves P31 back and a second browser sees it; Revert after a later change of P31 is refused naming the editor; an import-sized batch reverts as one row; a viewer's edits.history is refused role; rows seeded before the migration show without Revert; Gateway tests of the migration and the page cursor, and e2e, pass."
+covers = ["R18"]
+after = [2, 3, "2.2", "2.4"]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 12
+type = "story"
+title = "The Kinds screen: sections, the preview item, style rules and tints, popup view and link, overrides with Reset"
+description = "The Kinds surface listing only the kinds the project defines (read-only from the adapter, with its status in words), each opening its setup in the sections Icon, Key values (up to 4 rows with path, switch, Icon value star, Used by style rule tag), Comms, Alarms, Popup (parts in the fixed order, the link, the custom popup view path and params in R39's three forms, the placeholder picker from the closed list) and Style rule (States, Bands or Expression on a key value or a tag, or a line's instruments; each case to a preset with the embedded preview tile; an area kind's category tints); the preview item chosen in the header, the style rule previewing on it on the map with a Preview word; each path's resolve note from tags.resolve; saves as kindSetup ops through edits.apply with the Gateway's refusal reasons shown beside the field; the kind header counting overrides. The Style tab on one item: icon, size, label and the style rule with \"Edit the kind's rule\", a per-item override replacing the whole rule, marked Override with Reset, unchanged values From kind; the Details tab's Live now block from the kind with per-item path overrides. Typed paths only; the tag browser is entry 13."
+verify = "On the dev Gateway: a Well pad setup saved from the screen changes every pad's icon KPI within one refresh interval and a pad's override of its comms path shows Override and resets to the kind's; a Bands rule set on Pressure with its presets previews each band on P14 and draws on the map; a geofence kind's tints save and draw; a param named mapItem and a mixed placeholder param are refused with the Gateway's words beside the field; the kind list with the dev adapter set to incomplete shows the status; the Expression type parses live or is refused with the reason; e2e kindsetup and unit tests pass."
+covers = ["R4", "R5", "R15"]
+after = [2, 6, "2.9", "3.1"]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 13
+type = "story"
+title = "The tag browser: one tree for every tag pick, asset-relative paths, the shared-tag warning, overrides and keyboard"
+description = "Map Studio's own tag browser as DESIGN.md draws it (owner, 2026-10-27 and 2026-11-03): a floating card beside the panel it opened from, the For line, the Provider select from tags.browse's providers with the default marked and first, the tree of one provider loaded a level at a time with name, type and data type, the asset folder row marked and its rows guided; in a kind's setup opened at the preview item's asset folder with the P14 folder button to return; a pick inside converted by tags.resolve to {asset.path}/... with Resolves for N of M <kinds> listing the items it fails for, a pick outside stored as the full path with the shared-tag note in the warning token kept on the row; on an item's override opened at that item's own asset folder (the default provider's root when unlinked) and storing the full path; a popup param pick inside the folder giving {asset.path}/<suffix>; the Path field converting typed paths the same way; Use this tag inert until a tag is picked, a folder never a pick; the loading, empty folder and unreachable provider states with the Path field still usable; the tree keyboard-only as a tree (Up, Down, Right, Left, Enter). On the Gateway, the kind setup save rule aligned to TagPaths (refusing // and [ in a suffix) after a check that every stored setup of the dev and template seeds passes it, reported, never rewritten."
+verify = "On the dev Gateway as mapeditor: the browser opens at [default]Mesa/P14 expanded with Pressure listed as Float8; picking Pressure writes {asset.path}/Pressure with Resolves for 2 of 3 well pads naming P15; picking [default]Plant/AmbientTemp writes the full path with the warning and the row keeps its tag; on P14's override the pick stores the full path marked Override; the provider select lists a second provider and browses it; a stopped tag provider shows the unreachable state and a typed path still converts; the tree is driven by keyboard only to a pick; a viewer's browse is refused before any tag is read; a seeded setup with a double slash is reported by the check and the save now refuses it; e2e tags and unit tests pass."
+covers = ["R4"]
+after = [12, "2.15"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 14
+type = "story"
+title = "Selection, viewport and popup events to the page, and contract 0.4.0"
+description = "Initiative R48 and R49 (gap review item 1; AD-7, AD-9, AD-20): the bidirectional selectedItem prop complete (an id written by the page selects, moves to and opens the item's popup as a click does, a pick-list group or a line with its segment handled, an unknown id clearing the selection with one console warning), onItemSelected on every change with the AD-7 object (null when cleared); the read-only viewport prop {center, zoom, bounds} written once per move end, and onViewportChanged, onPopupOpen {itemId, segment} and onPopupClose fired for the page; editMode's bidirectional behaviour documented; the events declared in the descriptor with their schemas so the Designer lists them; contract.md's props and a new events section at 0.4.0, check-contract-versions.sh and the dev project's /events page showing each event's last payload. Never per frame: the frame rate of R37 holds."
+verify = "On the dev Gateway: a Perspective table beside the map selects P14 on the map by writing selectedItem and a map click selects a row through onItemSelected; writing a line's id opens its popup; a pan fires one onViewportChanged at its end with the bounds, none during the move; opening and closing a popup fires the two events with the segment for a line; the Designer's component events list shows the four; the contract docs read 0.4.0 and the version check passes; e2e at 1366 and 390 px passes."
+covers = ["R17", "R21", "R22"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 15
+type = "story"
+title = "You are here and Locate me from the page's geolocation binding"
+description = "Initiative R50 (gap review item 2; owner, 2026-11-03): the userLocation prop in the closed list, in the shape of the session's geolocation property (enabled, permissionGranted, data with latitude, longitude, accuracy, altitude, heading, speed, timestamp) so the page binds it to session.props.geolocation in one binding; the map draws a you-are-here marker as entry 3 designed it (a distinct dot, its accuracy ring at the map's scale and, when given, its heading) in a token no state uses, with its word in the legend's States, never a map item, never in Needs you, the list, the export or the batch; Locate me in the zoom card moves the map to it and is disabled with the reason in words (off in the session, permission not granted, no fix yet); the module reads nothing of the session itself and never calls the browser's geolocation API; docs/contract.md and the dev project's /locate page with the session's geolocation turned on. The marker's look goes to entry 18's ER-27 review."
+verify = "On the dev Gateway with the session's geolocation enabled on the /locate page in a browser granting permission: the marker draws at the device's position with its ring and Locate me centres on it; with permission denied the marker is absent and the button says so; with enabled false the button says it is off in the session; the marker is absent from the list, Needs you and the export; no geolocation call appears in the module's code; e2e with a mocked position at 1366 and 390 px passes."
+covers = ["R23"]
+after = [14, 3, "3.14"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 16
+type = "story"
+title = "Directions in the popup and the sheet, Nearest to me in search, the distance on Needs you rows"
+description = "Initiative R51 and R52 (gap review item 2; owner, 2026-11-03): the directions prop {enabled, urlTemplate} in the closed list; with it on, a Directions button in the popup card and the phone's bottom sheet for a point, as entry 3 designed it, (absent for a line or an area) opening the device's maps app at the item's coordinates with its name, a geo: URI on Android, Apple Maps on iOS, Google Maps on a desktop, or the template with {lat}, {lng} and {name} filled, in a new tab or the app, with nothing sent to any service by Map Studio; with a position known from userLocation, Nearest to me in the search field's list (the nearest items with their distance, chosen like any result) and the distance from the user on every Needs you row, the ranking by state unchanged; distances geodesic from the shared geometry module in the project's unit (km or mi from the setup's region, metres under 1 km); docs and the dev pages updated. The distance rows go to entry 18's ER-27 review with the marker."
+verify = "On the dev Gateway: with directions on, P14's popup and its 390 px sheet show Directions and the link is the platform's URI with P14's coordinates and name, a template fills the three placeholders, and L-SWD's popup shows none; with a mocked position search lists Nearest to me with distances in order and choosing one zooms to it; every Needs you row shows its distance and the order is still by state; with no position neither appears; e2e at 1366 and 390 px passes."
+covers = ["R24", "R25"]
+after = [15, "3.8", "3.9", "3.3"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 17
+type = "story"
+title = "Refactor sweep"
+description = "Cleanup only, scoped at its start from the plans and review findings entries 2 to 16 deferred: duplication between the studio's surfaces, the mode and selection model's leftovers, test helpers, the contract docs' wording, and the WCAG checks folded into one accessibility pass of every tool and panel by keyboard at 1366 and 1440 px (R14's evidence for entry 18). Scope pushed out of another story is a new entry, never this one."
+verify = "Every e2e and unit test passes; the keyboard-only pass of every tool, the list, the panel, the Kinds screen and the tag browser is recorded in docs/platform-checks.md with the contrast readings in both themes; no behaviour or contract change."
+covers = ["R14"]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 18
+type = "story"
+title = "Release 0.4.0: the ER-27 item, the 30-minute test and the template's test stack"
+description = "The epic's release per RELEASING.md's checks by release type, a minor release: the ER-27 engineering review of the you-are-here marker and the distance on Needs you rows (the owner reviews, a hitl step), the owner's 30-minute test with an admin new to the Mesa field laying it out with the tools alone, every item linked (prd SM-2, a hitl step, the playbook kept to what changed), the rehearsal on the template's test stack with a throwaway-signed build, the performance run (the write path and the bundle changed), the version to 0.4.0 with CHANGELOG and contract 0.4.0, the owner's tag, the signed release and the smoke after it (its template-image fault from backlog story 15 fixed first); the template stays on 0.1.0 until the cut-over."
+verify = "docs/review-er27.md records the marker and the distance rows passed; the 30-minute test's time and the tester's notes are in the playbook; the rehearsal and the perf run are in docs/platform-checks.md with a pass; v0.4.0 is published with its SHA-256 and the certificate as the README; ops/release-smoke.sh 0.4.0 passes against it."
+covers = ["R14"]
+after = [17]
+hitl = true
+risk = "medium"
