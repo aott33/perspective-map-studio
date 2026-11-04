@@ -96,7 +96,7 @@ export interface MapStudioState extends DrawState {
     selected: Selection | null;
     /**
      * The studio's mode, tool and selection (epic 4 entry 1, studio.ts), which the studio's surfaces read; kept in
-     * lock-step with `drawing` and `selected` through drawingState and selectionState, and read for the mode.
+     * lock-step with `drawing` and `selected` through drawingState and selectionState (functional setState), and read for the mode.
      */
     studio: StudioState;
 }
@@ -490,14 +490,17 @@ export class MapStudio extends Component<Props, MapStudioState> {
     onDrawFinish = (id: string | number, context: { mode: string; action: string }): void => editing.onDrawFinish(this, id, context);
     onKeyDown = (ev: KeyboardEvent): void => editing.onKeyDown(this, ev);
 
-    /** A draw state with the studio model that goes with it: the line tool in hand while drawing (studio.ts). */
-    drawingState(state: DrawState): Pick<MapStudioState, 'drawing' | 'linePoints' | 'studio'> {
-        return { ...state, studio: pickTool(this.state.studio, state.drawing ? 'line' : null) };
+    /**
+     * A draw state with the studio model that goes with it: the line tool in hand while drawing (studio.ts). Built
+     * from the state being updated (`prev` of a functional setState), so writes batched into one update compose.
+     */
+    drawingState(prev: Readonly<MapStudioState>, state: DrawState): Pick<MapStudioState, 'drawing' | 'linePoints' | 'studio'> {
+        return { ...state, studio: pickTool(prev.studio, state.drawing ? 'line' : null) };
     }
 
-    /** A selection with the studio model that goes with it: the item's id selected, or nothing (studio.ts). */
-    selectionState(selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio'> {
-        return { selected, studio: selected ? select(this.state.studio, selected.id) : clearSelection(this.state.studio) };
+    /** A selection with the studio model that goes with it: the item's id selected, or nothing (studio.ts); from `prev` as above. */
+    selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio'> {
+        return { selected, studio: selected ? select(prev.studio, selected.id) : clearSelection(prev.studio) };
     }
 
     /** Esc closes the open popup, card, sheet or pick list and returns the focus (item 14; selection.tsx). */

@@ -6,7 +6,7 @@
  * behaviour from the spike; it belongs to Edit mode alone (the component adds the control there).
  * DOM-bound (Terra Draw, the map container's keydown); every function takes the component as its host
  * (EditingHost names the fields and callbacks it reads), and the state is the component's: the
- * DrawState and the studio model (studio.ts) are written together through its `drawingState`.
+ * DrawState and the studio model (studio.ts) are written together through its `drawingState`, in a functional setState.
  */
 
 import { Map as MapLibreMap } from 'maplibre-gl';
@@ -22,7 +22,8 @@ import { drawColor } from './theme';
 export interface EditingHost {
     readonly props: Readonly<Props>;
     readonly state: Readonly<MapStudioState>;
-    setState<K extends keyof MapStudioState>(state: Pick<MapStudioState, K>, callback?: () => void): void;
+    setState<K extends keyof MapStudioState>(
+        state: Pick<MapStudioState, K> | ((prev: Readonly<MapStudioState>) => Pick<MapStudioState, K>), callback?: () => void): void;
     mapContainer: HTMLDivElement | null;
     /** Terra Draw, the Draw a line toggle (Edit mode alone) and the drawn features queued for the unsaved layer. */
     draw: TerraDraw | null;
@@ -31,8 +32,8 @@ export interface EditingHost {
     /** The component's stable callbacks Terra Draw's finish event and the container's keydown take. */
     onDrawFinish: (id: string | number, context: { mode: string; action: string }) => void;
     onKeyDown: (ev: KeyboardEvent) => void;
-    /** A draw state with the studio model that goes with it (studio.ts), for setState. */
-    drawingState(state: DrawState): Pick<MapStudioState, 'drawing' | 'linePoints' | 'studio'>;
+    /** A draw state with the studio model that goes with it (studio.ts), built from the pending state, for a functional setState. */
+    drawingState(prev: Readonly<MapStudioState>, state: DrawState): Pick<MapStudioState, 'drawing' | 'linePoints' | 'studio'>;
     /** A finished line is queued and drawn from the unsaved layer: remove Terra Draw's copy of it (itemsLayer.ts). */
     dropQueuedFeatures(): void;
 }
@@ -129,7 +130,7 @@ export function onKeyDown(host: EditingHost, ev: KeyboardEvent): void {
 }
 
 export function setDrawState(host: EditingHost, state: DrawState): void {
-    host.setState(host.drawingState(state));
+    host.setState((prev) => host.drawingState(prev, state));
     if (host.drawControl) {
         host.drawControl.setPressed(state.drawing);
     }

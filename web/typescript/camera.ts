@@ -39,7 +39,8 @@ export type Bounds = [number, number, number, number];
 export interface CameraHost {
     readonly props: Readonly<Props>;
     readonly state: Readonly<MapStudioState>;
-    setState<K extends keyof MapStudioState>(state: Pick<MapStudioState, K>, callback?: () => void): void;
+    setState<K extends keyof MapStudioState>(
+        state: Pick<MapStudioState, K> | ((prev: Readonly<MapStudioState>) => Pick<MapStudioState, K>), callback?: () => void): void;
     map: MapLibreMap | null;
     mapContainer: HTMLDivElement | null;
     /** The MapLibre popup and its content, measured for the camera padding; the side its tip is on. */
@@ -67,8 +68,8 @@ export interface CameraHost {
     searchControl: SearchControl | null;
     liveItem(id: string): MapItemRecord | undefined;
     anchorFor(id: string, lngLat: [number, number]): [number, number];
-    /** A selection with the studio model that goes with it (studio.ts), for setState. */
-    selectionState(selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio'>;
+    /** A selection with the studio model that goes with it (studio.ts), built from the pending state, for a functional setState. */
+    selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio'>;
     /** The selection and popups (selection.tsx), which a restore or a choice opens as a click does. */
     openPopup(point: PopupPoint, lngLat: [number, number]): void;
     popupPoint(id: string, name: string, kind: string): PopupPoint;
@@ -199,7 +200,7 @@ export function applyRestore(host: CameraHost): void {
         if (restore.popup) {
             host.openPopup(host.popupPoint(item.id, item.name, item.kind), at);
         } else {
-            host.setState({ ...host.selectionState({ id: item.id, kind: 'point' }), pick: null });
+            host.setState((prev) => ({ ...host.selectionState(prev, { id: item.id, kind: 'point' }), pick: null }));
         }
     } else if (sel.kind === 'line' && item.geometry.type === 'LineString') {
         if (restore.popup && restore.popupAt) {
