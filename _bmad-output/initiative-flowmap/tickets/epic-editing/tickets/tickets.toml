@@ -2,7 +2,8 @@
 # Refined and planned 2026-11-03 (owner, "agree with all recommendations"); covers cite this epic's Requirements.
 # Entry 1 splits the component first; entry 2 is the tracer bullet. Two lanes after it: the studio
 # (4, 5, 9; 6, 12, 13; 7, 8; 10) and the page and place features (14, 15, 16); 11 reads the edit record.
-# Entry 3 is the short UX update the new pieces wait on (8, 9, 11, 15, 16). Entry 2 bumps the contract to 0.4.0; 7, 11, 14, 15 and 16 add to it. 17 sweeps, 18 releases 0.4.0.
+# Entry 3 is the short UX update the new pieces wait on (8, 9, 11, 15, 16). Entry 2 bumps the contract to 0.4.0; 7, 11, 14, 15, 16 and 19 add to it.
+# Entry 19 (units, owner 2026-11-03) follows 16 and precedes the sweep. Approved 2026-11-03; entry 1 started. 17 sweeps, 18 releases 0.4.0.
 # Cross-epic prerequisites are pinned on the entries that need them ("2.n", "3.n").
 
 [[entry]]
@@ -174,10 +175,21 @@ risk = "medium"
 id = 16
 type = "story"
 title = "Directions in the popup and the sheet, Nearest to me in search, the distance on Needs you rows"
-description = "Initiative R51 and R52 (gap review item 2; owner, 2026-11-03): the directions prop {enabled, urlTemplate} in the closed list; with it on, a Directions button in the popup card and the phone's bottom sheet for a point, as entry 3 designed it, (absent for a line or an area) opening the device's maps app at the item's coordinates with its name, a geo: URI on Android, Apple Maps on iOS, Google Maps on a desktop, or the template with {lat}, {lng} and {name} filled, in a new tab or the app, with nothing sent to any service by Map Studio; with a position known from userLocation, Nearest to me in the search field's list (the ten nearest items with their distance, chosen like any result) and the distance from the user on every Needs you row, the ranking by state unchanged; distances geodesic from the shared geometry module, in miles for a browser locale of en-US and kilometres otherwise, feet or metres under one unit (an Assumption in the epic's Notes until the owner confirms); the prop added to contract 0.4.0 and the dev pages updated. The distance rows go to entry 18's ER-27 review with the marker."
+description = "Initiative R51 and R52 (gap review item 2; owner, 2026-11-03): the directions prop {enabled, urlTemplate} in the closed list; with it on, a Directions button in the popup card and the phone's bottom sheet for a point, as entry 3 designed it, (absent for a line or an area) opening the device's maps app at the item's coordinates with its name, a geo: URI on Android, Apple Maps on iOS, Google Maps on a desktop, or the template with {lat}, {lng} and {name} filled, in a new tab or the app, with nothing sent to any service by Map Studio; with a position known from userLocation, Nearest to me in the search field's list (the ten nearest items with their distance, chosen like any result) and the distance from the user on every Needs you row, the ranking by state unchanged; distances geodesic from the shared geometry module, in miles for a browser locale of en-US and kilometres otherwise, feet or metres under one unit (the fallback; entry 19 adds the units setting); the prop added to contract 0.4.0 and the dev pages updated. The distance rows go to entry 18's ER-27 review with the marker."
 verify = "On the dev Gateway: with directions on, P14's popup and its 390 px sheet show Directions and the link is the platform's URI with P14's coordinates and name, a template fills the three placeholders, and L-SWD's popup shows none; with a mocked position search lists Nearest to me with distances in order and choosing one zooms to it; every Needs you row shows its distance and the order is still by state; with no position neither appears; e2e at 1366 and 390 px passes."
 covers = ["R24", "R25"]
 after = [15, "3.8", "3.9", "3.3"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 19
+type = "story"
+title = "Units: the setup's default and Edit mode's display setting for every distance the map shows"
+description = "Owner, 2026-11-03 (R27): one units setting behind every distance Map Studio shows. The project setup gains units (auto, metric or us; default auto, the browser's locale, miles for en-US and kilometres otherwise), which takes the setup to schema 2 (an optional field; a schema 1 file still reads as auto; a schema 2 file is refused by a 0.3.0 Gateway as any newer schema is, docs/setup.md), with a Units row in the Designer form's Map section (epic 2 entry 16's form, which then reads schema 1 and 2 and writes 2) and docs/setup.md and setup-editor.md updated. The map store's project row gains settings (the next migration number) holding Edit mode's override, saved through edits.apply as a new entity settings with id units and data {system, labels} (labels short for symbols such as km and mi, long for words), full editing only, versioned like a kind setup, carried in map.load.reply and map.changed so every open map re-renders at once (added to contract 0.4.0). Edit mode's Layers surface gains a Units row (system: From setup, Metric, US; labels: Short, Long) saved on change. One formatter in the shared geometry module renders every distance from the setting: the line popup's length, instrument distances and segment span, the drawing bar's length, the typed distance along a line in Details (typed in the shown unit, stored in metres), Nearest to me, the Needs you rows and the phone move card, feet or metres under one unit. Nothing stored changes unit: the store keeps metres."
+verify = "On the dev Gateway: with the setup at us the line popup reads 1.8 mi and PT-1 at 0.7 mi, the drawing bar counts in miles and a typed 3750 ft stores 1143 m; a schema 1 setup still loads and reads as auto; the Designer form shows the Units row and saves schema 2, and a 0.3.0 Gateway refuses that file in words; in Edit mode switching Units to Metric re-renders every distance in a second open browser without a reload and a viewer's map follows; Long labels read kilometres; a phone editor's or a viewer's settings save is refused role; an unknown system or label is refused in words; unit tests of the formatter and e2e pass."
+covers = ["R25", "R27"]
+after = [16, "2.16", "3.2"]
 hitl = false
 risk = "medium"
 
@@ -188,7 +200,7 @@ title = "Refactor sweep"
 description = "Cleanup only, scoped at its start from the plans and review findings entries 2 to 16 deferred: duplication between the studio's surfaces, the mode and selection model's leftovers, test helpers, the contract docs' wording, and the WCAG checks folded into one accessibility pass of every tool and panel by keyboard at 1366 and 1440 px (R14's evidence for entry 18). Scope pushed out of another story is a new entry, never this one."
 verify = "Every e2e and unit test passes; the keyboard-only pass of every tool, the list, the panel, the Kinds screen and the tag browser is recorded in docs/platform-checks.md with the contrast readings in both themes; no behaviour or contract change."
 covers = ["R14"]
-after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19]
 hitl = false
 risk = "low"
 
