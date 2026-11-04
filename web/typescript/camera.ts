@@ -14,7 +14,7 @@
 import { Map as MapLibreMap, Popup } from 'maplibre-gl';
 import type { MapStudioState, Props } from './MapStudio';
 import { MapItemRecord } from './contract';
-import { MapFeatures, SegmentRef } from './features';
+import { MapFeatures, SegmentRef, Selection } from './features';
 import { StartCamera } from './mapLayers';
 import { MapStudioStoreDelegate } from './MapStudioStoreDelegate';
 import { NeedsYouRow } from './needsyou';
@@ -67,6 +67,8 @@ export interface CameraHost {
     searchControl: SearchControl | null;
     liveItem(id: string): MapItemRecord | undefined;
     anchorFor(id: string, lngLat: [number, number]): [number, number];
+    /** A selection with the studio model that goes with it (studio.ts), for setState. */
+    selectionState(selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio'>;
     /** The selection and popups (selection.tsx), which a restore or a choice opens as a click does. */
     openPopup(point: PopupPoint, lngLat: [number, number]): void;
     popupPoint(id: string, name: string, kind: string): PopupPoint;
@@ -197,7 +199,7 @@ export function applyRestore(host: CameraHost): void {
         if (restore.popup) {
             host.openPopup(host.popupPoint(item.id, item.name, item.kind), at);
         } else {
-            host.setState({ selected: { id: item.id, kind: 'point' }, pick: null });
+            host.setState({ ...host.selectionState({ id: item.id, kind: 'point' }), pick: null });
         }
     } else if (sel.kind === 'line' && item.geometry.type === 'LineString') {
         if (restore.popup && restore.popupAt) {

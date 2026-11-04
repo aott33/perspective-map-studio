@@ -21,7 +21,7 @@ import type { MapStudioState, Props } from './MapStudio';
 import { MapStudioStoreDelegate } from './MapStudioStoreDelegate';
 import { MapItemRecord } from './contract';
 import { DefaultPopup } from './DefaultPopup';
-import { SegmentRef } from './features';
+import { SegmentRef, Selection } from './features';
 import { lengthM } from './geometry';
 import { instrumentsOn } from './geometry';
 import { LegendControl } from './LegendControl';
@@ -93,6 +93,8 @@ export interface SelectionHost {
     legendControl: LegendControl | null;
     liveItem(id: string): MapItemRecord | undefined;
     anchorFor(id: string, lngLat: [number, number]): [number, number];
+    /** A selection with the studio model that goes with it (studio.ts), for setState. */
+    selectionState(selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio'>;
     /** A control's rectangle in map pixels (camera.ts), for the card's placement. */
     controlRect(selector: string): Rect | null;
     /** The component's stable callbacks: the popups' close and page link, the pick list's row, MapLibre's close event. */
@@ -220,7 +222,7 @@ export function onMapClick(host: SelectionHost, ev: MapMouseEvent): void {
 /** A line clicked: selected (casing, flow arrow, Return), the popup closed. */
 export function selectLine(host: SelectionHost, id: string, segment: SegmentRef | null = null): void {
     closePopup(host);
-    host.setState({ selected: { id, kind: 'line', segment }, pick: null });
+    host.setState({ ...host.selectionState({ id, kind: 'line', segment }), pick: null });
     console.info('[MapStudio] Line ' + id + ' selected.');
 }
 
@@ -264,7 +266,7 @@ export function openLinePopup(host: SelectionHost, id: string, segment: SegmentR
     const now = Date.now();
     host.setState({
         popup: { point: { ...popupPoint(host, id, item.name, item.kind) }, lngLat, line: true, segment, sheet: false, openedAt: now },
-        pick: null, selected: { id, kind: 'line', segment }, clock: now
+        pick: null, ...host.selectionState({ id, kind: 'line', segment }), clock: now
     }, () => showPopupAt(host, lngLat, LINE_POPUP_PX));
     console.info('[MapStudio] Line ' + id + ' selected' + (segment ? ' at ' + segment.fromId + ' to ' + segment.toId : '') + '.');
 }
@@ -273,7 +275,7 @@ export function openLinePopup(host: SelectionHost, id: string, segment: SegmentR
 export function clearSelection(host: SelectionHost): void {
     closePopup(host);
     if (host.state.selected !== null || host.state.pick !== null) {
-        host.setState({ selected: null, pick: null });
+        host.setState({ ...host.selectionState(null), pick: null });
     }
 }
 
@@ -348,7 +350,7 @@ export function openPick(host: SelectionHost, memberIds: string, lngLat: [number
         store.sendPopupClose(before.point.id);
     }
     stopPopupClock(host);
-    host.setState({ popup: null, pick: { rows, lngLat }, selected: null }, () => showPopupAt(host, lngLat));
+    host.setState({ popup: null, pick: { rows, lngLat }, ...host.selectionState(null) }, () => showPopupAt(host, lngLat));
 }
 
 /** A row of the pick list: what a click on that item's own marker does. */
@@ -378,7 +380,7 @@ export function openPopup(host: SelectionHost, point: PopupPoint, lngLat: [numbe
     if (!hasPopupContent(host, point)) {
         // No parts and no view: no popup (FR-4); the item is selected all the same.
         closePopup(host);
-        host.setState({ pick: null, selected: { id: point.id, kind: 'point' } });
+        host.setState({ pick: null, ...host.selectionState({ id: point.id, kind: 'point' }) });
         return;
     }
     const delegate = host.props.store.delegate as MapStudioStoreDelegate | undefined;
@@ -400,7 +402,7 @@ export function openPopup(host: SelectionHost, point: PopupPoint, lngLat: [numbe
     startPopupClock(host);
     const now = Date.now();
     host.setState({ popup: { point, lngLat, line: false, segment: null, sheet, openedAt: now }, pick: null,
-        selected: { id: point.id, kind: 'point' }, clock: now },
+        ...host.selectionState({ id: point.id, kind: 'point' }), clock: now },
     () => (sheet ? showSheetFor(host, lngLat) : showPopupAt(host, lngLat)));
 }
 
@@ -535,7 +537,7 @@ export function onPopupClosed(host: SelectionHost): void {
         }
     }
     if (open !== null || host.state.pick !== null) {
-        host.setState({ popup: null, pick: null, selected: null });
+        host.setState({ popup: null, pick: null, ...host.selectionState(null) });
     }
 }
 

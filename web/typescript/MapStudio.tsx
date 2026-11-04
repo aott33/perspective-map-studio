@@ -10,22 +10,12 @@ import {
     Size2d
 } from '@inductiveautomation/perspective-client';
 import { ErrorEvent, Map as MapLibreMap, MapMouseEvent, Popup, setWorkerUrl } from 'maplibre-gl';
-import { TerraDraw, TerraDrawLineStringMode } from 'terra-draw';
-import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
+import { TerraDraw } from 'terra-draw';
 import { DrawControl } from './DrawControl';
-import {
-    DRAW_IDLE,
-    DRAW_MODE_LINE,
-    DRAW_MODE_OFF,
-    DrawState,
-    cancelDrawing,
-    drawStatusText,
-    finishLine,
-    startDrawing
-} from './draw';
+import { DRAW_IDLE, DrawState, drawStatusText } from './draw';
 import { EditLevel, MapItemRecord } from './contract';
 import { AdapterStatus, HostLists, NO_HOST_LISTS } from './adapters';
-import { BasemapId, RasterSource, tilesFailedText } from './basemaps';
+import { BasemapId, RasterSource } from './basemaps';
 import { LegendControl } from './LegendControl';
 import { LegendToggle, readToggle, sessionStore, writeToggle } from './legend';
 import { NeedsYouControl } from './NeedsYouControl';
@@ -48,14 +38,12 @@ import { PopupPoint } from './popupParams';
 import { PopupAnchor, Rect } from './popupPlacement';
 import { SHARED_M } from './shared';
 import { registerTestView } from './testHook';
-import { drawColor } from './theme';
-import { IMPROVE_MAP_CLASS, feedbackHref, providerLogo, rasterPaint } from './basemaps';
 import { MapboxLogoControl } from './mapboxLogo';
 import {
-    SOURCE_BASEMAP, SPRITE_URL, THEME_TOKENS, addItemLayers, addPointerCursor, addTextLayers, addUnsavedLayers, applyLayerToggles, applyThemePaint,
-    blankColors, createMap, markerColors, publishLabels, setBasemapLayer
+    SPRITE_URL, THEME_TOKENS, addItemLayers, addPointerCursor, addTextLayers, addUnsavedLayers, applyLayerToggles, applyThemePaint, blankColors,
+    createMap, markerColors, publishLabels
 } from './mapLayers';
-import { addViewControls, applyProviderLogo } from './viewControls';
+import { addViewControls } from './viewControls';
 import { Kind } from './adapters';
 import { MapStudioDelegateState, MapStudioStoreDelegate, clientOf } from './MapStudioStoreDelegate';
 import * as camera from './camera';
@@ -63,6 +51,10 @@ import { Bounds } from './camera';
 import * as items from './itemsLayer';
 import * as selection from './selection';
 import type { OpenPick, OpenPopup } from './selection';
+import * as editing from './editing';
+import * as basemap from './basemapLayer';
+import { TilesState } from './basemapLayer';
+import { StudioState, clearSelection, fromProps, isEditing, pickTool, select } from './studio';
 
 /** Must match MapStudioComponent.COMPONENT_ID on the Java side. */
 export const COMPONENT_TYPE = 'ao.mapstudio';
@@ -102,6 +94,11 @@ export interface MapStudioState extends DrawState {
     pick: OpenPick | null;
     /** The selected map item (epic 3 entry 7): the clicked point or line; a tap on the ground clears it. */
     selected: Selection | null;
+    /**
+     * The studio's mode, tool and selection (epic 4 entry 1, studio.ts), which the studio's surfaces read; kept in
+     * lock-step with `drawing` and `selected` through drawingState and selectionState, and read for the mode.
+     */
+    studio: StudioState;
 }
 
 export type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
@@ -112,13 +109,15 @@ export type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
  * `point.click` through the delegate; the reply is shown as text over the map.
  */
 export class MapStudio extends Component<Props, MapStudioState> {
-    state: MapStudioState = { ...DRAW_IDLE, popup: null, clock: Date.now(), pick: null, selected: null };
+    state: MapStudioState = {
+        ...DRAW_IDLE, popup: null, clock: Date.now(), pick: null, selected: null, studio: fromProps(this.props.props.editMode)
+    };
 
     mapContainer: HTMLDivElement | null = null;
     map: MapLibreMap | null = null;
     private resizeObserver: ResizeObserver | null = null;
     draw: TerraDraw | null = null;
-    private drawControl: DrawControl | null = null;
+    drawControl: DrawControl | null = null;
     /** The MapLibre popup, created once and moved between points; its content is a React portal. */
     popup: Popup | null = null;
     /** The DOM node the popup shows; React renders PointPopup into it through a portal. */
@@ -179,12 +178,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /** The legend bottom-left, which holds the basemap choice (epic 3 entries 6 and 14), and the basemap revision last drawn. */
     legendControl: LegendControl | null = null;
     /** The Mapbox logo control, bottom-right, while Satellite is drawn. */
-    private logoControl: MapboxLogoControl | null = null;
-    private drawnBasemap = -1;
+    logoControl: MapboxLogoControl | null = null;
+    drawnBasemap = -1;
     /** The raster source the map holds now (by identity), or null for none. */
-    private drawnSource: RasterSource | null = null;
+    drawnSource: RasterSource | null = null;
     /** The drawn basemap's tiles: none (no source), loading, loaded (the map went idle) or failed (a tile error). */
-    private tiles: 'none' | 'loading' | 'loaded' | 'failed' = 'none';
+    tiles: TilesState = 'none';
     /** The starting area last applied (startingAreaKey), so a changed prop moves the map once. */
     appliedArea = '';
     /** This map's key in sessionStorage for its place (owner re-test R4 (a), place.ts), set at mount. */
@@ -248,7 +247,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
             addTextLayers(map, mc);
             this.itemsReady = true;
             this.applyLayerToggles();
-            this.applyBasemap();
+            basemap.applyBasemap(this);
             this.drawItems();
             if (this.themePending) {
                 // The theme changed between the mount's colour read and now (item 29): read and draw again.
@@ -260,13 +259,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
             }
             map.on('click', this.onMapClick);
             addPointerCursor(map);
-            this.startTerraDraw(map, root);
+            editing.startTerraDraw(this, map, root);
             // Readiness for the e2e suite: set once the map has gone idle with
             // its sources and layers added.
             map.once('idle', () => camera.publishReadiness(this, map));
         });
-        // The spike's line tool belongs to Edit mode alone (entry 14): the dev page /edit sets the prop.
-        if (this.props.props.editMode) {
+        // The spike's line tool belongs to Edit mode alone (entry 14): the dev page /edit sets the prop, read once
+        // into the studio model (studio.ts fromProps).
+        if (isEditing(this.state.studio)) {
             this.drawControl = new DrawControl(this.toggleDrawing);
             map.addControl(this.drawControl, 'top-right');
         }
@@ -279,7 +279,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 map.jumpTo({ center: view.center, zoom: view.zoom, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
             }
         });
-        this.applyEditing();
+        editing.applyEditing(this);
         if (typeof window !== 'undefined') {
             window.addEventListener('storage', this.onStorage);
         }
@@ -329,10 +329,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
     }
 
     componentDidUpdate(): void {
-        this.applyBasemap();
+        basemap.applyBasemap(this);
         this.drawItems();
         this.dropQueuedFeatures();
-        this.applyEditing();
+        editing.applyEditing(this);
         camera.applyStartingArea(this);
         camera.applyRestore(this);
         camera.saveSelection(this);
@@ -344,103 +344,15 @@ export class MapStudio extends Component<Props, MapStudioState> {
         return client && typeof client.projectName === 'string' && client.projectName !== '' ? client.projectName : null;
     }
 
-    /**
-     * Put the delegate's basemap under the items (epic 3 entry 6): the raster source and layer of the
-     * chosen basemap, none for None; the control's buttons and status; the attributes tests read.
-     */
-    private applyBasemap(): void {
-        const delegate = this.props.delegate;
-        const map = this.map;
-        if (!map || !this.itemsReady || !delegate || delegate.basemap.revision === this.drawnBasemap) {
-            return;
-        }
-        const b = delegate.basemap;
-        this.drawnBasemap = b.revision;
-        if (this.legendControl) {
-            this.legendControl.setOffered(b.offered);
-            this.legendControl.setSelected(b.selected);
-        }
-        if (b.source !== this.drawnSource) {
-            // Only a changed source touches the map: a status-only change (a refusal) keeps the tiles.
-            this.drawnSource = b.source;
-            setBasemapLayer(map, b.source, b.selected);
-            this.tiles = b.source ? 'loading' : 'none';
-        }
-        // The Mapbox logo while Satellite is drawn, and only then (viewControls.ts applyProviderLogo).
-        const logo = providerLogo(b.selected, b.source);
-        this.logoControl = applyProviderLogo(map, this.logoControl, logo);
-        if (this.mapContainer) {
-            this.mapContainer.setAttribute('data-provider-logo', logo || '');
-        }
-        this.updateFeedbackLinks();
-        this.publishBasemap();
-    }
-
-    /** The attribution's "Improve this map" links with the map's centre and zoom (basemaps.ts feedbackHref). */
-    private updateFeedbackLinks = (): void => {
-        const map = this.map;
-        const el = this.mapContainer;
-        if (!map || !el) {
-            return;
-        }
-        const links = el.querySelectorAll<HTMLAnchorElement>('.maplibregl-ctrl-attrib a.' + IMPROVE_MAP_CLASS);
-        if (links.length === 0) {
-            return;
-        }
-        const center = map.getCenter();
-        const zoom = map.getZoom();
-        links.forEach((a) => {
-            const href = feedbackHref(a.getAttribute('href') || '', center, zoom);
-            if (a.getAttribute('href') !== href) {
-                a.setAttribute('href', href);
-            }
-        });
-    };
-
-    /** The basemap's state for the control's status line and the e2e suite. */
-    private publishBasemap(): void {
-        const delegate = this.props.delegate;
-        const el = this.mapContainer;
-        if (!delegate || !el) {
-            return;
-        }
-        const b = delegate.basemap;
-        const status = b.status !== '' ? b.status : this.tiles === 'failed' && b.selected ? tilesFailedText(b.selected) : '';
-        if (this.legendControl) {
-            this.legendControl.setStatus(status);
-        }
-        el.setAttribute('data-basemap', b.selected || '');
-        el.setAttribute('data-basemap-offered', b.offered.join(','));
-        el.setAttribute('data-basemap-status', status);
-        el.setAttribute('data-basemap-tiles', this.tiles);
-        el.setAttribute('data-basemap-paint', JSON.stringify(rasterPaint(b.selected)));
-        // What OpenStreetMap is drawn with whatever the choice (item 25), for the contrast check's quiet raster sample.
-        el.setAttribute('data-quiet-paint', JSON.stringify(rasterPaint('osm')));
-    }
-
-    /**
-     * A MapLibre error: a basemap tile that did not load (a blocked network, a site without internet)
-     * is said once in words and at info, never as a browser error; anything else is an error as before
-     * (with no listener MapLibre would write it to console.error itself).
-     */
-    private onMapError = (ev: ErrorEvent & { sourceId?: string }): void => {
-        if (ev.sourceId === SOURCE_BASEMAP) {
-            if (this.tiles !== 'failed') {
-                this.tiles = 'failed';
-                const selected = this.props.delegate ? this.props.delegate.basemap.selected : null;
-                console.info('[MapStudio] ' + (selected ? tilesFailedText(selected) : 'Basemap tiles are not loading.'));
-                this.publishBasemap();
-            }
-            return;
-        }
-        console.error(ev.error);
-    };
+    /** The attribution's "Improve this map" links with the map's position, and a tile that did not load (basemapLayer.ts). */
+    private updateFeedbackLinks = (): void => basemap.updateFeedbackLinks(this);
+    private onMapError = (ev: ErrorEvent & { sourceId?: string }): void => basemap.onMapError(this, ev);
 
     /** The map went idle with the basemap's tiles in: loaded, unless one failed. The labels drawn are published. */
     private onMapIdle = (): void => {
         if (this.tiles === 'loading') {
             this.tiles = 'loaded';
-            this.publishBasemap();
+            basemap.publishBasemap(this);
         }
         this.publishLabels();
     };
@@ -522,18 +434,6 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     };
 
-    /** The draw tool is off while map.load says the store is unreachable; a drawing in progress is cancelled. */
-    private applyEditing(): void {
-        const off = !!this.props.delegate && this.props.delegate.editing === 'off';
-        if (this.drawControl) {
-            this.drawControl.setDisabled(off);
-        }
-        if (off && this.state.drawing && this.draw) {
-            this.draw.setMode(DRAW_MODE_OFF);
-            this.setDrawState(cancelDrawing());
-        }
-    }
-
     /** The delegate's items into the sources when their revisions changed, then the unsaved items (itemsLayer.ts). */
     drawItems(): void { items.drawItems(this); }
 
@@ -585,93 +485,23 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.searchControl = null;
     }
 
-    /**
-     * Terra Draw on the MapLibre adapter, started after the map's own layers so
-     * its `td-*` layers draw above them. It idles in the `static` mode and only
-     * the toggle enters `linestring`, so the point click round trip keeps the
-     * map's clicks while the tool is off. Styles come from theme tokens
-     * converted to hex (AD-11); a token that does not resolve leaves that key
-     * to the library default, with one warning from drawColor.
-     */
-    private startTerraDraw(map: MapLibreMap, root: HTMLElement | undefined): void {
-        const line = drawColor(root, ['--label', '--neutral-70']);
-        const outline = drawColor(root, ['--neutral-20', '--containerRoot', '--container']);
-        const styles: { [key: string]: string | number } = {
-            lineStringWidth: 4,
-            closingPointWidth: 6,
-            closingPointOutlineWidth: 2
-        };
-        if (line) {
-            styles.lineStringColor = line;
-            styles.closingPointColor = line;
-        }
-        if (outline) {
-            styles.closingPointOutlineColor = outline;
-        }
-        const draw = new TerraDraw({
-            adapter: new TerraDrawMapLibreGLAdapter({ map }),
-            modes: [new TerraDrawLineStringMode({ styles })]
-        });
-        draw.on('finish', this.onDrawFinish);
-        draw.start();
-        this.draw = draw;
-        if (this.mapContainer) {
-            // Capture phase, so Escape leaves the tool even after Terra Draw has
-            // cleaned up its provisional line.
-            this.mapContainer.addEventListener('keydown', this.onKeyDown, true);
-        }
+    /** The spike's line tool (editing.ts): the Draw a line toggle, Terra Draw's finish and the container's Escape. */
+    private toggleDrawing = (): void => editing.toggleDrawing(this);
+    onDrawFinish = (id: string | number, context: { mode: string; action: string }): void => editing.onDrawFinish(this, id, context);
+    onKeyDown = (ev: KeyboardEvent): void => editing.onKeyDown(this, ev);
+
+    /** A draw state with the studio model that goes with it: the line tool in hand while drawing (studio.ts). */
+    drawingState(state: DrawState): Pick<MapStudioState, 'drawing' | 'linePoints' | 'studio'> {
+        return { ...state, studio: pickTool(this.state.studio, state.drawing ? 'line' : null) };
     }
 
-    private toggleDrawing = (): void => {
-        if (!this.draw || (this.props.delegate && this.props.delegate.editing === 'off')) {
-            return;
-        }
-        if (this.state.drawing) {
-            this.draw.setMode(DRAW_MODE_OFF);
-            this.setDrawState(cancelDrawing());
-        } else {
-            this.draw.setMode(DRAW_MODE_LINE);
-            this.setDrawState(startDrawing());
-        }
-    };
-
-    private onDrawFinish = (id: string | number, context: { mode: string; action: string }): void => {
-        if (!this.draw || context.mode !== DRAW_MODE_LINE) {
-            return;
-        }
-        const feature = this.draw.getSnapshotFeature(id);
-        const geometry = feature ? feature.geometry : undefined;
-        const points = geometry && geometry.type === 'LineString' ? geometry.coordinates.length : 0;
-        this.draw.setMode(DRAW_MODE_OFF);
-        this.setDrawState(finishLine(points));
-        console.info('[MapStudio] Line drawn with Terra Draw: ' + points + ' points, id ' + id);
-        // Save the finished line through the write path (edits.apply); the Gateway checks the role.
-        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
-        if (delegate && geometry && geometry.type === 'LineString') {
-            const coordinates = geometry.coordinates.map((c) => [c[0], c[1]] as [number, number]);
-            delegate.sendLineCreate(coordinates);
-            this.queuedFeatures.push(id);
-            // After Terra Draw's finish handler has returned; componentDidUpdate may do it first.
-            setTimeout(() => this.dropQueuedFeatures(), 0);
-        }
-    };
-
-    private onKeyDown = (ev: KeyboardEvent): void => {
-        if (ev.key === 'Escape' && this.state.drawing && this.draw) {
-            this.draw.setMode(DRAW_MODE_OFF);
-            this.setDrawState(cancelDrawing());
-        }
-    };
+    /** A selection with the studio model that goes with it: the item's id selected, or nothing (studio.ts). */
+    selectionState(selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio'> {
+        return { selected, studio: selected ? select(this.state.studio, selected.id) : clearSelection(this.state.studio) };
+    }
 
     /** Esc closes the open popup, card, sheet or pick list and returns the focus (item 14; selection.tsx). */
     private onRootKeyDown = (ev: React.KeyboardEvent<HTMLDivElement>): void => selection.onRootKeyDown(this, ev);
-
-    private setDrawState(state: DrawState): void {
-        this.setState(state);
-        if (this.drawControl) {
-            this.drawControl.setPressed(state.drawing);
-        }
-    }
 
     /** A click on the map (selection.tsx): a marker's popup or pick list, a line's popup, or the ground clearing the selection. */
     private onMapClick = (ev: MapMouseEvent): void => selection.onMapClick(this, ev);
@@ -848,7 +678,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         // output and leaves View mode (owner review notes item 5, after entry 15): it renders in Edit mode
         // alone, and View mode shows the map and its controls only. The last reply stays readable for the
         // tests as `data-last-reply` on the map.
-        const echo = this.props.props.editMode;
+        const echo = isEditing(this.state.studio);
         const quiet = !echo && drawText === '' && saveText === '' && load.state !== 'failed'
             && store.status !== 'read-only' && unsaved.length === 0;
         const connection = delegate ? delegate.connection : CONNECTED;
