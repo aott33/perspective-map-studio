@@ -39,7 +39,7 @@ import { PickList, PickRow } from './PickList';
 import { PointPopup } from './PointPopup';
 import {
     LINE_POPUP_PX, MAP_ITEM_PARAM, POPUP_WIDTH_PX, PopupPoint, fillLink, fillParams, isSheetWidth, popupItemView, popupMaxHeight, popupMountPath,
-    popupViewParams
+    popupViewParams, sheetBasisWidth
 } from './popupParams';
 import { PopupAnchor, Rect, placePopup, placedMaxWidth } from './popupPlacement';
 import { SearchControl } from './SearchControl';
@@ -400,9 +400,10 @@ export function openPopup(host: SelectionHost, point: PopupPoint, lngLat: [numbe
     if (delegate && (!before || before.point.id !== point.id)) {
         delegate.sendPopupOpen(point.id);
     }
-    // Below 768 px the popup is a bottom sheet in the component (DESIGN.md Phone); the MapLibre
-    // popup, if a card was open, goes without its close event (the state below replaces it).
-    const sheet = isSheetWidth(host.map.getContainer().clientWidth);
+    // Below 768 px (the viewport's width, as the stylesheet's phone rules read it: a map docked beside the studio's
+    // panels is narrower than that on a laptop, epic 4 entry 2) the popup is a bottom sheet in the component
+    // (DESIGN.md Phone); the MapLibre popup, if a card was open, goes without its close event (the state below replaces it).
+    const sheet = isSheetWidth(sheetBasisWidth(host.map.getContainer()));
     if (sheet && host.popup && host.popup.isOpen()) {
         host.popup.off('close', host.onPopupClosed);
         host.popup.remove();

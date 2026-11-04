@@ -45,8 +45,11 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             const p1 = seed.ids[TRACER.points.p1.key];
             const box = await map.boundingBox();
             expect(box, 'map container has a bounding box').not.toBeNull();
-            // The component fills the width of the viewport.
-            expect(Math.abs(box.width - width)).toBeLessThanOrEqual(1);
+            // The component fills the width of the viewport; at 1440 px the map is docked beside the studio's rail and
+            // list (epic 4 entry 2: 72 and 280 px, the editor's /edit page opens in Edit mode), at 390 px the studio never shows.
+            const root = await page.locator('.mapstudio').boundingBox();
+            expect(Math.abs(root.width - width)).toBeLessThanOrEqual(1);
+            expect(Math.round(box.width)).toBe(width === 1440 ? width - 72 - 280 : width);
 
             // One round trip: click p1, the Gateway answers in the envelope.
             const [x, y] = pagePixel(box, TRACER.points.p1.lngLat, TRACER.center, TRACER.zoom);

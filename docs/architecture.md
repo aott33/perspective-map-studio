@@ -50,8 +50,12 @@ Inside `web/typescript` the component is split by concern (epic 4 entry 1), so a
 | `itemsLayer.ts` | The items on the map: the sources filled when a revision changed (the gating stays the component's), the unsaved items, the sprite and the marker images, the item counts for the suite |
 | `basemapLayer.ts` | The basemap under the items: the delegate's choice drawn, its tiles' state, the provider's links and logo, the basemap attributes |
 | `selection.tsx` | The selection and the popups: a click on the map, the MapLibre popup and the bottom sheet, their placement and content, the pick list, Esc, the selection attributes |
-| `editing.ts` | The spike's line tool: Terra Draw, the Draw a line toggle, a finished line saved and its drawn copy dropped, Escape |
-| `studio.ts` | The studio's mode and selection model, pure: View or Edit, the tool in hand, the selected ids; `fromProps` reads `editMode` once at mount, and the component derives today's editing, drawing and selection from it |
+| `editing.ts` | The drawing tools: Terra Draw with the line mode (the spike's Draw a line toggle, a finished line saved and its drawn copy dropped) and the point mode (entry 2's Point tool: a click saves a create at once, a drag of the pin saves an update), Escape |
+| `studio.ts` | The studio's mode, tool, surface and selection model, pure: View or Edit, the tool in hand (the line tool, the Point tool), the rail's surface, the selected ids, and the mode pill's words; `fromProps` reads `editMode` at mount and the component follows the Edit switch and the prop both ways at level `full` (entry 2) |
+| `studio/` | The studio's React surfaces (entry 2): `Rail.tsx` (View, Items, Kinds, Layers), `ItemList.tsx` (the docked list with the panel header: the map's name, Undo, Redo, the save status), `PropertiesPanel.tsx` (Details: name, kind, latitude and longitude, the asset picker, each field saved when finished), `DrawToolbar.tsx` (Select, Point and the mode pill), `ChromeGlyph.tsx` |
+| `EditSwitch.ts` | The Edit switch, a MapLibre control top-right above the zoom card, shown at level `full`; the component writes `editMode` back when it is flipped |
+| `undoStack.ts` | The undo stack, pure: one step per saved edit with the batch, the records before it and the reply's versions; undo and redo build the reverse batch (undo.ts) rebased to each record's current version, and the delegate sends it through the same queue |
+| `itemList.ts` | The item list's rows, pure: every live item by name with its kind glyph and its worst live state as a badge |
 
 The DOM-bound modules take the component as their host (each names the fields and callbacks it reads in a `*Host` interface); the pure modules beside them (`draw.ts`, `features.ts`, `live.ts`, `markers.ts`, `place.ts`, `startingArea.ts`, `popupPlacement.ts`, `unsaved.ts`, `unsavedSender.ts`, `changes.ts` and the rest) are unit tested in node.
 

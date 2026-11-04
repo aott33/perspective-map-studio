@@ -35,7 +35,7 @@ import { SearchResult } from './search';
 import { STORE_UNKNOWN, storeStateAttribute, storeStatusText } from './storeState';
 import { SAVE_IDLE, saveStatusText } from './save';
 import { UnsavedEntry, entryText, summaryText, unsavedItems } from './unsaved';
-import { PopupPoint, isSheetWidth } from './popupParams';
+import { PopupPoint, isSheetWidth, sheetBasisWidth } from './popupParams';
 import { PopupAnchor, Rect } from './popupPlacement';
 import { SHARED_M } from './shared';
 import { registerTestView } from './testHook';
@@ -427,7 +427,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         const delegate = this.props.delegate;
         const level = delegate ? delegate.level : null;
-        if (level === 'full' && !this.editSwitch && !isSheetWidth(map.getContainer().clientWidth)) {
+        if (level === 'full' && !this.editSwitch && !isSheetWidth(sheetBasisWidth(map.getContainer()))) {
             this.editSwitch = new EditSwitch(this.onEditSwitch);
             map.addControl(this.editSwitch, 'top-right');
             const el = this.editSwitch.element();

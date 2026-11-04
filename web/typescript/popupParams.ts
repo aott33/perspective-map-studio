@@ -172,3 +172,13 @@ export function popupMaxHeight(height: number): number {
 export function isSheetWidth(width: number): boolean {
     return width < SHEET_BELOW_PX;
 }
+
+/**
+ * The width the sheet decision reads (epic 4 entry 2): the viewport's, as the stylesheet's phone rules
+ * do, since a map docked beside the studio's panels is narrower than 768 px on a laptop (718 px at 1366
+ * with the properties panel open, DESIGN.md Layout & Spacing) and is still a desktop map; the map's own
+ * width where there is no window.
+ */
+export function sheetBasisWidth(container: HTMLElement): number {
+    return typeof window !== 'undefined' && window.innerWidth > 0 ? window.innerWidth : container.clientWidth;
+}

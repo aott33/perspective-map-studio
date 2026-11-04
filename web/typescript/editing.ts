@@ -209,10 +209,12 @@ export function onDrawFinish(host: EditingHost, id: string | number, context: { 
 }
 
 /**
- * The Point tool's finish (entry 2): a click placed a pin (`draw`), saved at once as the kind list's
- * first point kind with the kind's name as its placeholder, selected, and Details opens with Name
- * focused; a drag end (any other action) moved a placed pin, saved as one update of its item's
- * geometry. The pin stays on the map for more fine-tuning while the tool is in hand.
+ * The Point tool's finish (entry 2): a click placed a pin, saved at once as the kind list's first
+ * point kind with the kind's name as its placeholder, selected, and Details opens with Name focused;
+ * a drag end moved a placed pin, saved as one update of its item's geometry. The two are told apart
+ * by the feature's id, not the finish's action: Terra Draw 1.38.0's point mode reports a drag end as
+ * `draw` too (seen live, docs/platform-checks.md "Epic 4 entry 2"). The pin stays on the map for more
+ * fine-tuning while the tool is in hand.
  */
 function onPointFinish(host: EditingHost, id: string | number, action: string): void {
     const draw = host.draw;
@@ -228,6 +230,12 @@ function onPointFinish(host: EditingHost, id: string | number, action: string): 
     const lngLat: [number, number] = [geometry.coordinates[0], geometry.coordinates[1]];
     if (!delegate) {
         console.warn('[MapStudio] No delegate; the placed point was not saved.');
+        return;
+    }
+    const moved = host.placedPoints.get(id);
+    if (moved) {
+        console.info('[MapStudio] Pin dragged (' + action + '): ' + moved + ' to ' + lngLat[0].toFixed(6) + ', ' + lngLat[1].toFixed(6));
+        delegate.moveItem(moved, lngLat);
         return;
     }
     if (action === 'draw') {
@@ -246,13 +254,7 @@ function onPointFinish(host: EditingHost, id: string | number, action: string): 
         host.closePopup();
         host.setState((prev) => ({ ...host.selectionState(prev, { id: itemId, kind: 'point' }), pick: null }));
         console.info('[MapStudio] Point placed with the Point tool: ' + itemId + ' at ' + lngLat[0].toFixed(6) + ', ' + lngLat[1].toFixed(6));
-        return;
     }
-    const itemId = host.placedPoints.get(id);
-    if (!itemId) {
-        return;
-    }
-    delegate.moveItem(itemId, lngLat);
 }
 
 /** Escape on the map container leaves the tool in hand (the popup's Esc is selection.tsx's). */
