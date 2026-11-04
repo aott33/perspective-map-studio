@@ -291,6 +291,17 @@ test.describe('1366 px', () => {
             await page.waitForTimeout(VERTEX_PAUSE_MS);
             await expect(bar).toHaveAttribute('data-points', '1');
             await expect(bar.locator('.mapstudio-drawing-hint')).toHaveText('A line needs two points');
+            // A key typed in a field inside the map container (the search field) stays the field's: Backspace there
+            // removes the letter, not the vertex.
+            const search = page.locator('.mapstudio-search-input');
+            await search.click();
+            await page.keyboard.type('x');
+            await expect(search).toHaveValue('x');
+            await page.keyboard.press('Backspace');
+            await expect(search).toHaveValue('');
+            await expect(bar).toHaveAttribute('data-points', '1');
+            await expect(map).toHaveAttribute('data-tool', 'line');
+            await page.locator('.maplibregl-canvas').focus();
             // Backspace removes the last vertex: the count follows down to none, the tool still in hand.
             await page.keyboard.press('Backspace');
             await expect(bar).toHaveAttribute('data-points', '0');

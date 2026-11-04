@@ -479,13 +479,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
 
     /**
      * The mode set by the Edit switch, the rail's View (both write the prop back) or the page's prop write (not
-     * written back): leaving puts every tool down and keeps the selection; entering opens Items.
+     * written back): leaving puts every tool down, drops a toast still showing (it would come back with a fresh
+     * timer and a stale message when Edit mode is entered again) and keeps the selection; entering opens Items.
      */
     private setEditMode(on: boolean, writeProp: boolean): void {
         if (!on) {
             editing.putToolDown(this);
         }
-        this.setState((prev) => ({ studio: on ? enterEdit(prev.studio) : leaveEdit(prev.studio) }));
+        this.setState((prev) => ({ studio: on ? enterEdit(prev.studio) : leaveEdit(prev.studio), toast: on ? prev.toast : null }));
         if (writeProp) {
             try {
                 this.props.store.props.write('editMode', on);

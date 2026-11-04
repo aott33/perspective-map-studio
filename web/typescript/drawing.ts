@@ -27,7 +27,10 @@ export interface Drawing {
     reason: string;
 }
 
-/** Terra Draw's reason for a ring or a line whose edges cross (ValidationReasons.ValidationReasonFeatureSelfIntersects). */
+/**
+ * Terra Draw's reason for an area's ring whose edges cross (ValidationReasons.ValidationReasonFeatureSelfIntersects); the
+ * check runs for the Area tool only (editing.ts): a line's rule is the two-vertex floor, and a line may cross itself.
+ */
 export const REASON_SELF_INTERSECTS = 'Feature intersects itself';
 
 /** Whether a studio tool draws vertex by vertex. */

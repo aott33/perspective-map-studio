@@ -203,6 +203,10 @@ describe('the tools, the kinds per geometry and the kind buttons (entry 4)', () 
         expect(toolKind(KINDS, 'line', null)).toBe(LINE);
         expect(toolKind(KINDS, 'area', null)).toBe(FENCE);
         expect(toolKind(KINDS, 'point', null)).toBe(PAD);
+        // A second point kind among the buttons (DESIGN.md: Well pad, Tank battery, Pipeline) saves its own kind, not the first.
+        const TANK: Kind = { id: 'tank', name: 'Tank battery', geometry: 'point', icon: 'tank', labelRank: 8, fields: [] };
+        expect(toolKind([PAD, TANK, PIPE], 'point', 'tank')).toBe(TANK);
+        expect(toolKind([PAD, TANK, PIPE], 'point', null)).toBe(PAD);
         expect(toolKind(KINDS, 'line', 'pipeline')).toBe(PIPE);
         expect(toolKind(KINDS, 'area', 'easement')).toBe(EASEMENT);
         expect(toolKind(KINDS, 'line', 'geofence')).toBe(LINE);

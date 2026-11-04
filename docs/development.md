@@ -24,7 +24,7 @@ Layout:
 | `common/` | component descriptor, props schema (`mapstudio.props.json`), the message contract (`Messages.java`) |
 | `gateway/` | gateway hook and the component model delegate (`MapStudioDelegate`); `system.mapstudio` script functions are declared and documented in `common/` (`MapStudioScriptModule` and its `.properties`: `getMap`, `applyEdits`, `refreshAdapters`, `ping`) and run in `gateway/.../script/` |
 | `designer/` | the Designer palette entry |
-| `web/` | the TypeScript and React component, MapLibre map, Terra Draw line tool (`DrawControl.tsx`, `draw.ts`), message client (`messages.ts`), the point popup (`DefaultPopup.tsx`, `PointPopup.tsx`, `popupParams.ts`) and their tests |
+| `web/` | the TypeScript and React component, MapLibre map, the Terra Draw drawing tools (`editing.ts`, `drawing.ts`, `studio/DrawToolbar.tsx`, `studio/DrawingBar.tsx`), message client (`messages.ts`), the point popup (`DefaultPopup.tsx`, `PointPopup.tsx`, `popupParams.ts`) and their tests |
 | `e2e/` | the Playwright suite (pinned `@playwright/test`): smoke tests at 1440 and 390 px, the popup checks and the spike's measures |
 | `ops/` | the local development Gateway (Docker) and its `mapstudio-dev` project (`MapStudioDev` at `/`, `MapStudioEdit` at `/edit` with the script checks and the seed button, `MapStudioAdapters`, `MapStudioLive` at `/live`, the alarm page `MapStudioAlarms` at `/alarms/:item` and the pad page `MapStudioPad` at `/pad/:name` (where the popup's View alarms and page link land), the example custom popup view `Popups/PadAlarms`; project libraries `mapstudio_dev`, the dev kind and asset adapter and the dev views' role check, and `mapstudio_seed`, the dev seed) |
 | `docs/` | contributor architecture, the platform checks and screenshots |

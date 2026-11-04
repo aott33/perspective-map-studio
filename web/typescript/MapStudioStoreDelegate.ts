@@ -26,7 +26,6 @@ import { SegmentRef } from './features';
 import { STORE_UNKNOWN, StoreState, storeStateFromError, storeStateFromLoad, storeStateFromSaveError } from './storeState';
 import { SAVE_IDLE, SaveState, lineCreateBatch, newId, pointCreateBatch, refusedSave, roundCoordinate, updateBatch } from './save';
 import { Kind } from './adapters';
-import { pointKind } from './studio';
 import { UNDO_EMPTY, UndoStack, failPending, finishPending, pushStep, startRedo, startUndo, stepLabel } from './undoStack';
 import {
     KeyValueStore, REPLAY_INTERVAL_MS, STORAGE_WARNING, UnsavedEntry, UnsavedQueue, UnsavedReason, isBusy, isTransient, reasonFromError,
@@ -504,16 +503,11 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     }
 
     /**
-     * The Point tool's click (entry 2): one create of the kind list's first point kind at the clicked place,
-     * named after the kind (the placeholder the editor renames), saved at once. Returns the new item's id,
-     * or null when the kind list has no point kind (one console line; nothing is sent).
+     * The Point tool's click (entries 2 and 4): one create of `kind` (the kind a kind button fixed, else the kind
+     * list's first point kind; the tool resolves it, editing.ts) at the clicked place, named after the kind (the
+     * placeholder the editor renames), saved at once. Returns the new item's id.
      */
-    createPoint(lngLat: [number, number]): string | null {
-        const kind = pointKind(this.lists.kinds);
-        if (!kind) {
-            console.warn('[MapStudio] The Point tool has no kind to add: the kind list has no point kind.');
-            return null;
-        }
+    createPoint(lngLat: [number, number], kind: Kind): string {
         const itemId = newId();
         this.sendBatch(pointCreateBatch(itemId, newId(), kind.id, kind.name, lngLat), itemId, stepLabel('add', kind.name));
         return itemId;

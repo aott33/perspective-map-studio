@@ -5,7 +5,8 @@
  * (entry 4) are Terra Draw's line and polygon modes: vertex by vertex with no drag, finished by a double-click,
  * Enter or the drawing bar's Finish (the mode's finish key on the map's canvas), Backspace removing the last
  * vertex (the mode's own `undo`), Esc cancelling to Select; the library's `validation` hook refuses a finish
- * with too few vertices or crossing edges (Terra Draw's self-intersection check) and the bar says why; its
+ * with too few vertices (two for a line, three for an area) or an area whose edges cross (Terra Draw's
+ * self-intersection check; a line may cross itself, as the library allows) and the bar says why; its
  * `snapping.toCustom` callback, while the Snap toggle is on, lands a vertex on the nearest map item or line
  * vertex within reach (geometry.ts) and the target is remembered per vertex, so the saved line's `ends`
  * come from the snaps and never from the coordinates (AD-19). A finished line or area is saved at once
@@ -30,7 +31,7 @@ import { MapStudioStoreDelegate } from './MapStudioStoreDelegate';
 import { Drawing, DrawingTool, REASON_SELF_INTERSECTS, addedText, drawingEnds, isDrawingTool, minVertices, startDrawing, withVertices } from './drawing';
 import { Selection } from './features';
 import { SnapTarget, nearestSnap, snapDistanceM, snapTargets } from './geometry';
-import { StudioTool, isDrawing, isPlacing, pointKind, toolKind } from './studio';
+import { StudioTool, isDrawing, isPlacing, toolKind } from './studio';
 import { drawColor } from './theme';
 
 /** Terra Draw's mode names: idle, and the three tools'. */
@@ -302,24 +303,26 @@ function samePlace(a: [number, number], b: [number, number]): boolean {
     return a[0] === b[0] && a[1] === b[1];
 }
 
-/** Terra Draw's self-intersection check on the vertices placed so far (an area's ring closed): its reason, or ''. */
+/**
+ * Terra Draw's self-intersection check on an area's ring as placed so far (closed): its reason, or ''. An area only
+ * (R11, the plan's matrix): a line's rule is the two-vertex floor, and a line whose edges cross (a looping flowline)
+ * is the editor's to draw, as Terra Draw's line mode allows.
+ */
 function crossingReason(tool: DrawingTool, vertices: Array<[number, number]>): string {
-    if (vertices.length < minVertices(tool)) {
+    if (tool !== 'area' || vertices.length < minVertices(tool)) {
         return '';
     }
-    const geometry = tool === 'area'
-        ? { type: 'Polygon' as const, coordinates: [vertices.concat([vertices[0]])] }
-        : { type: 'LineString' as const, coordinates: vertices };
+    const geometry = { type: 'Polygon' as const, coordinates: [vertices.concat([vertices[0]])] };
     const result = ValidateNotSelfIntersecting({ id: 'drawing', type: 'Feature', geometry, properties: {} } as GeoJSONStoreFeatures);
     return result.valid ? '' : result.reason || REASON_SELF_INTERSECTS;
 }
 
 /**
  * Terra Draw's validation hook for the line and polygon modes. A provisional update (the pointer moving) is
- * always valid. A committed vertex is always accepted, so the editor sees the drawing as placed, but the
- * vertices so far are checked for crossing edges (ValidateNotSelfIntersecting) and the reason is kept for
- * the bar. A finish is refused with too few vertices or crossing edges (the finish then does nothing until
- * Backspace or another vertex fixes it), with the reason in Terra Draw's words.
+ * always valid. A committed vertex is always accepted, so the editor sees the drawing as placed, but an area's
+ * ring so far is checked for crossing edges (ValidateNotSelfIntersecting) and the reason is kept for the bar. A
+ * finish is refused with too few vertices (two for a line, three for an area) or, for an area, crossing edges
+ * (the finish then does nothing until Backspace or another vertex fixes it), with the reason in Terra Draw's words.
  */
 function validateDrawing(host: EditingHost, feature: GeoJSONStoreFeatures, updateType: string): { valid: boolean; reason?: string } {
     const geometry = feature.geometry;
@@ -477,8 +480,11 @@ function onPointFinish(host: EditingHost, id: string | number, action: string): 
         return;
     }
     if (action === 'draw') {
-        const itemId = delegate.createPoint(lngLat);
-        if (itemId === null) {
+        // The kind as the Line tool resolves it: the kind button's, else the kind list's first point kind.
+        const kinds = host.props.delegate ? host.props.delegate.lists.kinds : [];
+        const kind = toolKind(kinds, 'point', host.state.studio.toolKind);
+        if (!kind) {
+            console.warn('[MapStudio] The Point tool has no kind to add: the kind list has no point kind.');
             try {
                 draw.removeFeatures([id]);
             } catch (err) {
@@ -486,10 +492,10 @@ function onPointFinish(host: EditingHost, id: string | number, action: string): 
             }
             return;
         }
+        const itemId = delegate.createPoint(lngLat, kind);
         host.placedPoints.set(id, itemId);
         host.focusNameId = itemId;
-        const kind = host.props.delegate ? pointKind(host.props.delegate.lists.kinds) : null;
-        host.toastFor = { itemId, message: addedText(kind ? kind.name : 'Point') };
+        host.toastFor = { itemId, message: addedText(kind.name) };
         // The new item takes the selection (an open popup goes); its Details open beside the map.
         host.closePopup();
         host.setState((prev) => ({ ...host.selectionState(prev, { id: itemId, kind: 'point' }), pick: null, panel: itemId }));
@@ -497,11 +503,25 @@ function onPointFinish(host: EditingHost, id: string | number, action: string): 
     }
 }
 
+/** Whether a key event's target takes typed text (the search field is a MapLibre control inside the map container). */
+function inField(ev: KeyboardEvent): boolean {
+    const target = ev.target as HTMLElement | null;
+    if (!target || typeof target.tagName !== 'string') {
+        return false;
+    }
+    const tag = target.tagName.toUpperCase();
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable === true;
+}
+
 /**
  * Keys on the map container (capture phase): Escape puts the tool in hand down, cancelling a drawing in progress
- * (the popup's Esc is selection.tsx's); Backspace while drawing removes the last vertex (the mode's undo).
+ * (the popup's Esc is selection.tsx's); Backspace while drawing removes the last vertex (the mode's undo). A key
+ * typed in a field inside the container (the search field) stays the field's.
  */
 export function onKeyDown(host: EditingHost, ev: KeyboardEvent): void {
+    if (inField(ev)) {
+        return;
+    }
     if (ev.key === 'Escape') {
         if (isDrawing(host.state.studio) || isPlacing(host.state.studio)) {
             putToolDown(host);
