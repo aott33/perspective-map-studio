@@ -11,7 +11,7 @@ import {
     PropertyTree,
     Size2d
 } from '@inductiveautomation/perspective-client';
-import { ErrorEvent, GeoJSONSource, Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent, Popup, setWorkerUrl } from 'maplibre-gl';
+import { ErrorEvent, Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent, Popup, setWorkerUrl } from 'maplibre-gl';
 import { TerraDraw, TerraDrawLineStringMode } from 'terra-draw';
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import { DrawControl } from './DrawControl';
@@ -29,48 +29,50 @@ import { EditLevel, MapItemRecord } from './contract';
 import { AdapterStatus, HostLists, NO_HOST_LISTS } from './adapters';
 import { BasemapId, RasterSource, tilesFailedText } from './basemaps';
 import { LegendControl } from './LegendControl';
-import { LegendToggle, legendKey, readToggle, sessionStore, writeToggle } from './legend';
+import { LegendToggle, readToggle, sessionStore, writeToggle } from './legend';
 import { NeedsYouControl } from './NeedsYouControl';
-import { NeedsYouRow, needsYou } from './needsyou';
-import { FIT_PADDING_PX, StartingArea, readStartingArea, startingAreaKey } from './startingArea';
-import { Place, placeKey, readPlace, writePlace } from './place';
+import { NeedsYouRow } from './needsyou';
+import { readStartingArea, startingAreaKey } from './startingArea';
+import { Place } from './place';
 import { LiveState, displayShows, iconKpiOf, itemPreset, itemState } from './live';
 import { CONNECTED, connectionChipText, connectionDetailText } from './connection';
 import { ThemeWatch } from './themeWatch';
-import { MarkerColors, SpriteSymbol, imageFor, markerProperties, parseSprite, stateWord } from './markers';
+import { MarkerColors, SpriteSymbol, markerProperties, stateWord } from './markers';
 import { PresetPalette, StylePreview, TintPalette } from './StylePreview';
-import { MapFeatures, SegmentRef, Selection, buildFeatures } from './features';
+import { MapFeatures, SegmentRef, Selection } from './features';
 import { LinePopup } from './LinePopup';
 import { popupInstruments, popupNodes } from './linePopup';
 import { instrumentsOn, lengthM } from './geometry';
 import { ZoomControl } from './ZoomControl';
 import { SearchControl } from './SearchControl';
-import { CHOSEN_POINT_ZOOM, SearchResult, buildEntries } from './search';
+import { SearchResult } from './search';
 import { PickList, PickRow } from './PickList';
 import { DefaultPopup } from './DefaultPopup';
 import { STORE_UNKNOWN, storeStateAttribute, storeStatusText } from './storeState';
 import { PointPopup } from './PointPopup';
-import { SAVE_IDLE, itemsToGeoJson, saveStatusText } from './save';
-import { UnsavedEntry, entryText, summaryText, unsavedItems } from './unsaved';
+import { SAVE_IDLE, saveStatusText } from './save';
+import { UnsavedEntry, entryText, summaryText } from './unsaved';
 import {
     LINE_POPUP_PX, POPUP_WIDTH_PX, PopupPoint, fillLink, fillParams, isSheetWidth, popupItemView, popupMaxHeight,
     popupMountPath, popupViewParams
 } from './popupParams';
-import { CameraPadding, PopupAnchor, Rect, cameraPadding, placePopup, placedMaxWidth } from './popupPlacement';
-import { SHARED_M, sharedWithinM } from './shared';
+import { PopupAnchor, Rect, placePopup, placedMaxWidth } from './popupPlacement';
+import { SHARED_M } from './shared';
 import { registerTestView } from './testHook';
 import { drawColor } from './theme';
 import { IMPROVE_MAP_CLASS, feedbackHref, providerLogo, rasterPaint } from './basemaps';
 import { MapboxLogoControl } from './mapboxLogo';
 import {
-    LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED, LAYER_ITEM_MARKERS, SOURCE_ARROW, SOURCE_BASEMAP, SOURCE_ITEM_AREAS,
-    SOURCE_ITEM_LINES, SOURCE_ITEM_POINTS, SOURCE_LINE_MARKS, SOURCE_UNSAVED_LINES, SOURCE_UNSAVED_POINTS, SPRITE_URL, THEME_TOKENS, addItemLayers,
+    LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED, LAYER_ITEM_MARKERS, SOURCE_BASEMAP, SPRITE_URL, THEME_TOKENS, addItemLayers,
     addPointerCursor, addTextLayers, addUnsavedLayers, applyLayerToggles, applyThemePaint, blankColors, createMap, markerColors, publishLabels,
     setBasemapLayer
 } from './mapLayers';
 import { addViewControls, applyProviderLogo } from './viewControls';
 import { Kind } from './adapters';
 import { MapStudioDelegateState, MapStudioStoreDelegate, clientOf } from './MapStudioStoreDelegate';
+import * as camera from './camera';
+import { Bounds } from './camera';
+import * as items from './itemsLayer';
 
 /** Must match MapStudioComponent.COMPONENT_ID on the Java side. */
 export const COMPONENT_TYPE = 'ao.mapstudio';
@@ -118,8 +120,6 @@ interface OpenPopup {
     openedAt: number;
 }
 
-/** How long a remembered selection waits for its item and the first full batch (owner re-test R4 (a)). */
-const RESTORE_WAIT_MS = 30_000;
 /** How long a custom popup view waits for the popup detail (the base path) before it opens without it. */
 const POPUP_DETAIL_WAIT_MS = 2000;
 /** The sheet keeps the selected marker at least this far above its top edge. */
@@ -131,7 +131,7 @@ interface OpenPick {
     lngLat: [number, number];
 }
 
-interface MapStudioState extends DrawState {
+export interface MapStudioState extends DrawState {
     popup: OpenPopup | null;
     /** Bumped every few seconds while the popup is open, so its data ages move. */
     clock: number;
@@ -141,10 +141,8 @@ interface MapStudioState extends DrawState {
     selected: Selection | null;
 }
 
-type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
+export type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
 
-/** Fit's padding round every item (px). */
-const FIT_ITEMS_PADDING_PX = 48;
 /** The popup's offset from the point: the disc radius and the ring, so the tip touches the disc. */
 const POPUP_OFFSET_PX = 22;
 /** How often an open popup's data ages are redrawn. */
@@ -159,26 +157,26 @@ export class MapStudio extends Component<Props, MapStudioState> {
     state: MapStudioState = { ...DRAW_IDLE, popup: null, clock: Date.now(), pick: null, selected: null };
 
     mapContainer: HTMLDivElement | null = null;
-    private map: MapLibreMap | null = null;
+    map: MapLibreMap | null = null;
     private resizeObserver: ResizeObserver | null = null;
-    private draw: TerraDraw | null = null;
+    draw: TerraDraw | null = null;
     private drawControl: DrawControl | null = null;
     /** The MapLibre popup, created once and moved between points; its content is a React portal. */
-    private popup: Popup | null = null;
+    popup: Popup | null = null;
     /** The DOM node the popup shows; React renders PointPopup into it through a portal. */
-    private popupContent: HTMLDivElement | null = null;
+    popupContent: HTMLDivElement | null = null;
     /** Whether the items sources exist (after the map's load). */
-    private itemsReady = false;
+    itemsReady = false;
     /** The items revision last drawn. */
-    private drawnRevision = -1;
+    drawnRevision = -1;
     /** Whether the e2e item counts were asked for (after the first loaded items are drawn). */
-    private itemCountsAsked = false;
+    itemCountsAsked = false;
     /** The unsaved and items revisions last drawn into the unsaved sources. */
-    private drawnUnsaved = '';
+    drawnUnsaved = '';
     /** Terra Draw features of finished lines: removed once queued, as the unsaved layer draws them. */
-    private queuedFeatures: Array<string | number> = [];
+    queuedFeatures: Array<string | number> = [];
     /** The theme colours the marker images are drawn with, read at mount and again on a theme change (item 29). */
-    private markerColors: MarkerColors | null = null;
+    markerColors: MarkerColors | null = null;
     /** Re-reads the tokens when the theme changes and redraws (item 29). */
     private themeWatch: ThemeWatch | null = null;
     /** How many times the theme was re-read, for tests. */
@@ -186,42 +184,42 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /** A theme change came before the layers were ready (item 29): applied once they are, not lost. */
     private themePending = false;
     /** The sprite's symbols once fetched (empty when the fetch failed); null before. */
-    private symbols: Record<string, SpriteSymbol> | null = null;
+    symbols: Record<string, SpriteSymbol> | null = null;
     /** The sprite's fetch, shared by every image asked for before it arrived. */
-    private sprite: Promise<Record<string, SpriteSymbol>> | null = null;
+    sprite: Promise<Record<string, SpriteSymbol>> | null = null;
     /** The images made or being made, by id, so an id is drawn once. */
-    private madeImages = new Map<string, Promise<void>>();
+    madeImages = new Map<string, Promise<void>>();
     /** The live revision last drawn into the markers. */
-    private drawnLive = -1;
+    drawnLive = -1;
     /** The full batches applied when the legend's key was last built (the kind display changes only on a full batch). */
-    private drawnFulls = -1;
+    drawnFulls = -1;
     /** The selection last drawn (its id and kind), so a changed selection redraws the sources once. */
-    private drawnSelection = '';
+    drawnSelection = '';
     /** The zoom card with Fit and Return (epic 3 entries 7 and 14). */
-    private zoomControl: ZoomControl | null = null;
+    zoomControl: ZoomControl | null = null;
     /** The search field top-left, the View-mode top bar (epic 3 entry 9). */
-    private searchControl: SearchControl | null = null;
+    searchControl: SearchControl | null = null;
     /** The Needs you bar in the top bar's row and its ranked list (epic 3 entry 3). */
-    private needsYouControl: NeedsYouControl | null = null;
+    needsYouControl: NeedsYouControl | null = null;
     /** The legend's Lines and Names toggles (entry 3), remembered per browser session. */
     private toggles: Record<LegendToggle, boolean> = { lines: readToggle(sessionStore(), 'lines'), names: readToggle(sessionStore(), 'names') };
     /** The items' bounds key Fit keeps by, or null while Fit is not in force. */
-    private fitKey: string | null = null;
+    fitKey: string | null = null;
     /** The items' bounds last drawn, for Fit. */
-    private itemBounds: MapFeatures['bounds'] = null;
-    private itemBoundsKey = '';
+    itemBounds: MapFeatures['bounds'] = null;
+    itemBoundsKey = '';
     private popupClock: ReturnType<typeof setInterval> | null = null;
     /** Where each member of a shared marker is drawn, by item id (owner review notes item 20): a popup anchors there. */
-    private anchors: Record<string, [number, number]> = {};
+    anchors: Record<string, [number, number]> = {};
     /** The sharing distance at the map's zoom (item 20) and the one the features were last built with. */
-    private withinM = SHARED_M;
-    private drawnWithinM = SHARED_M;
+    withinM = SHARED_M;
+    drawnWithinM = SHARED_M;
     /** What opened the popup (item 14): Esc returns the focus there; null for a click on the map. */
-    private openedBy: 'search' | 'needsyou' | null = null;
+    openedBy: 'search' | 'needsyou' | null = null;
     /** The side the open card's tip is on (item 18), for the camera padding; null while no card is open. */
-    private popupAnchor: PopupAnchor | null = null;
+    popupAnchor: PopupAnchor | null = null;
     /** The legend bottom-left, which holds the basemap choice (epic 3 entries 6 and 14), and the basemap revision last drawn. */
-    private legendControl: LegendControl | null = null;
+    legendControl: LegendControl | null = null;
     /** The Mapbox logo control, bottom-right, while Satellite is drawn. */
     private logoControl: MapboxLogoControl | null = null;
     private drawnBasemap = -1;
@@ -230,44 +228,27 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /** The drawn basemap's tiles: none (no source), loading, loaded (the map went idle) or failed (a tile error). */
     private tiles: 'none' | 'loading' | 'loaded' | 'failed' = 'none';
     /** The starting area last applied (startingAreaKey), so a changed prop moves the map once. */
-    private appliedArea = '';
+    appliedArea = '';
     /** This map's key in sessionStorage for its place (owner re-test R4 (a), place.ts), set at mount. */
-    private placeKey = '';
+    placeKey = '';
     /** A remembered selection and popup still to put back once its item and its kind's display have arrived. */
-    private restore: Place | null = null;
+    restore: Place | null = null;
     /** When the restore was asked for, so a selection whose item never comes is dropped. */
-    private restoreSince = 0;
+    restoreSince = 0;
     /** The selection and popup last remembered, so a redraw that changed neither writes nothing. */
-    private savedSelection = '';
+    savedSelection = '';
     /** Set as the component unmounts: closing the popup and removing the map then must not overwrite the place. */
-    private unmounting = false;
-
-    /** The starting area the prop names; an invalid one is said once, in the console. */
-    private startingArea(): StartingArea {
-        const read = readStartingArea(this.props.props.startingArea);
-        const key = startingAreaKey(read.area) + (read.problem || '');
-        if (read.problem && key !== this.appliedArea) {
-            console.warn('[MapStudio] ' + read.problem);
-        }
-        return read.area;
-    }
+    unmounting = false;
 
     componentDidMount(): void {
         if (!this.mapContainer) {
             return;
         }
-        const area = this.startingArea();
+        const area = camera.startingArea(this);
         this.appliedArea = startingAreaKey(area) + (readStartingArea(this.props.props.startingArea).problem || '');
         // The place this page's map had earlier in the browser session (owner re-test R4 (a)): its camera instead of
         // the starting area, and its selection and open popup put back once the items have come (applyRestore).
-        this.placeKey = placeKey(this.projectName(), typeof window !== 'undefined' ? window.location.pathname : '',
-            String(this.props.store.addressPathString || ''));
-        const place = readPlace(sessionStore(), this.placeKey);
-        if (place) {
-            this.restore = place.selected ? place : null;
-            this.restoreSince = Date.now();
-            this.savedSelection = place.selected ? this.selectionKeyOf(place) : '';
-        }
+        const place = camera.rememberedPlace(this, this.projectName());
         const root = this.props.store.element as HTMLElement | undefined;
         // The blank map and the halos are the blank-map token (DESIGN.md basemap-blank, `--neutral-20`).
         const colors = blankColors(root);
@@ -277,11 +258,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.mapContainer.setAttribute('data-theme-revision', '0');
         this.mapContainer.setAttribute('data-blank', colors.background);
         this.makePopup();
-        const map = createMap(this.mapContainer, colors.background, place
-            ? { center: place.center, zoom: place.zoom }
-            : area.kind === 'bounds'
-                ? { bounds: area.bounds, fitBoundsOptions: { padding: FIT_PADDING_PX } }
-                : { center: area.center, zoom: area.zoom });
+        const map = createMap(this.mapContainer, colors.background, camera.startCamera(place, area));
         // The View-mode controls (epic 3 entry 14; viewControls.ts): the zoom card, the search field with the
         // Needs you bar, the legend and the attribution, wired to this component's callbacks.
         const controls = addViewControls(map, this, this.toggles);
@@ -297,18 +274,18 @@ export class MapStudio extends Component<Props, MapStudioState> {
         map.on('error', this.onMapError);
         map.on('idle', this.onMapIdle);
         map.on('moveend', () => {
-            this.publishView(map);
-            this.savePlace();
+            camera.publishView(this, map);
+            camera.savePlace(this);
         });
         map.on('movestart', this.onMoveStart);
-        map.on('zoomend', () => this.onZoomEnd(map));
+        map.on('zoomend', () => items.onZoomEnd(this, map));
         map.on('load', () => {
             // The sources and layers (mapLayers.ts): the items, then the unsaved and text layers over them.
             addItemLayers(map, mc);
             // MapLibre awaits the resolver's promise before it treats an image as missing, so the
             // images drawn from the sprite are in place when the symbols are laid out.
-            map.setMissingStyleImageResolver((id) => this.makeImage(id));
-            this.loadSprite();
+            map.setMissingStyleImageResolver((id) => items.makeImage(this, id));
+            items.loadSprite(this);
             addUnsavedLayers(map, colors);
             addTextLayers(map, mc);
             this.itemsReady = true;
@@ -328,7 +305,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.startTerraDraw(map, root);
             // Readiness for the e2e suite: set once the map has gone idle with
             // its sources and layers added.
-            map.once('idle', () => this.publishReadiness(map));
+            map.once('idle', () => camera.publishReadiness(this, map));
         });
         // The spike's line tool belongs to Edit mode alone (entry 14): the dev page /edit sets the prop.
         if (this.props.props.editMode) {
@@ -384,13 +361,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.themeRevision++;
         const blank = applyThemePaint(map, root, mc);
         // The images were drawn in the old colours: dropped, so the missing-image resolver draws them again.
-        for (const id of Array.from(this.madeImages.keys())) {
-            if (map.hasImage(id)) {
-                map.removeImage(id);
-            }
-        }
-        this.madeImages.clear();
-        this.drawnRevision = -1;
+        items.dropImages(this, map);
         this.drawItems();
         if (this.mapContainer) {
             this.mapContainer.setAttribute('data-theme-revision', String(this.themeRevision));
@@ -404,114 +375,15 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.drawItems();
         this.dropQueuedFeatures();
         this.applyEditing();
-        this.applyStartingArea();
-        this.applyRestore();
-        this.saveSelection();
+        camera.applyStartingArea(this);
+        camera.applyRestore(this);
+        camera.saveSelection(this);
     }
 
     /** The project for the place's key, or null when the client does not say. */
     private projectName(): string | null {
         const client = clientOf(this.props.store);
         return client && typeof client.projectName === 'string' && client.projectName !== '' ? client.projectName : null;
-    }
-
-    /** The selection and the open popup as the place keeps them, as one string. */
-    private selectionKeyOf(place: Pick<Place, 'selected' | 'popup' | 'popupAt'>): string {
-        return JSON.stringify([place.selected, place.popup, place.popupAt]);
-    }
-
-    /** The place now: the camera, the selection and whether its popup is open (a pick list is not kept). */
-    private currentPlace(): Place | null {
-        const map = this.map;
-        if (!map) {
-            return null;
-        }
-        const c = map.getCenter();
-        const sel = this.state.selected;
-        const open = this.state.popup;
-        const selected = sel ? { id: sel.id, kind: sel.kind, segment: sel.kind === 'line' && sel.segment ? sel.segment : null } : null;
-        const popup = !!(sel && open && open.point.id === sel.id);
-        return { center: [c.lng, c.lat], zoom: map.getZoom(), selected, popup, popupAt: popup && open && open.line ? open.lngLat : null };
-    }
-
-    /** Remember the place for the browser session (owner re-test R4 (a)); not while a restore is pending or unmounting. */
-    private savePlace(): void {
-        if (this.unmounting || this.restore || !this.placeKey) {
-            return;
-        }
-        const place = this.currentPlace();
-        if (place) {
-            this.savedSelection = this.selectionKeyOf(place);
-            writePlace(sessionStore(), this.placeKey, place);
-        }
-    }
-
-    /** The selection or the popup changed: remember the place (a redraw that changed neither writes nothing). */
-    private saveSelection(): void {
-        if (this.unmounting || this.restore || !this.map) {
-            return;
-        }
-        const place = this.currentPlace();
-        if (place && this.selectionKeyOf(place) !== this.savedSelection) {
-            this.savePlace();
-        }
-    }
-
-    /**
-     * Put the remembered selection and popup back (owner re-test R4 (a)) once the item is on the map and the first
-     * full batch has brought its kind's display: a point's card or sheet opens as a click opens it, a line's popup at
-     * the remembered place on the line, or the item is only selected. The camera came back at mount, so nothing here
-     * moves it but the popup's own placement. An item that is gone, or that has not come within RESTORE_WAIT_MS, is
-     * dropped.
-     */
-    private applyRestore(): void {
-        const restore = this.restore;
-        const delegate = this.props.delegate;
-        if (!restore || !restore.selected || !this.map || !this.itemsReady || !delegate) {
-            return;
-        }
-        const sel = restore.selected;
-        const item = this.liveItem(sel.id);
-        const waited = Date.now() - this.restoreSince > RESTORE_WAIT_MS;
-        if (!item || delegate.live.fulls === 0) {
-            if (waited || (delegate.itemsRevision > 0 && delegate.live.fulls > 0 && !item)) {
-                this.restore = null;
-                console.info('[MapStudio] The remembered selection ' + sel.id + ' is no longer on the map.');
-            }
-            return;
-        }
-        this.restore = null;
-        if (sel.kind === 'point' && item.geometry.type === 'Point') {
-            const at = this.anchorFor(item.id, [item.geometry.coordinates[0], item.geometry.coordinates[1]]);
-            if (restore.popup) {
-                this.openPopup(this.popupPoint(item.id, item.name, item.kind), at);
-            } else {
-                this.setState({ selected: { id: item.id, kind: 'point' }, pick: null });
-            }
-        } else if (sel.kind === 'line' && item.geometry.type === 'LineString') {
-            if (restore.popup && restore.popupAt) {
-                this.openLinePopup(item.id, sel.segment, restore.popupAt);
-            } else {
-                this.selectLine(item.id, sel.segment);
-            }
-        }
-        console.info('[MapStudio] The map\'s place came back: ' + item.name + (restore.popup ? ' with its popup.' : ' selected.'));
-    }
-
-    /** A changed startingArea prop moves the map there (once per value). */
-    private applyStartingArea(): void {
-        const read = readStartingArea(this.props.props.startingArea);
-        const key = startingAreaKey(read.area) + (read.problem || '');
-        if (!this.map || key === this.appliedArea) {
-            return;
-        }
-        const area = this.startingArea();
-        this.appliedArea = key;
-        if (area.kind === 'bounds') {
-            this.map.fitBounds(area.bounds, { padding: FIT_PADDING_PX, animate: false });
-        } else {
-            this.map.jumpTo({ center: area.center, zoom: area.zoom });
-        }
     }
 
     /**
@@ -616,12 +488,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     };
 
     /** A move the user began (a drag, a wheel, a zoom button) ends a kept Fit; a programmatic one does not. */
-    private onMoveStart = (ev: { originalEvent?: unknown }): void => {
-        if (ev && ev.originalEvent && this.fitKey !== null) {
-            this.fitKey = null;
-            this.publishFit();
-        }
-    };
+    private onMoveStart = (ev: { originalEvent?: unknown }): void => camera.onMoveStart(this, ev);
 
     /** For the e2e suite: the labels MapLibre drew, with their boxes (mapLayers.ts publishLabels). */
     private publishLabels(): void {
@@ -633,182 +500,24 @@ export class MapStudio extends Component<Props, MapStudioState> {
         publishLabels(map, el);
     }
 
-    /**
-     * The zoom settled (owner review notes item 20): the sharing distance follows the zoom, so a group
-     * of points splits once its members are a marker apart on screen; the features are rebuilt when it moves.
-     */
-    private onZoomEnd(map: MapLibreMap): void {
-        if (this.map !== map) {
-            return;
-        }
-        const withinM = sharedWithinM(map.getZoom(), map.getCenter().lat);
-        if (withinM !== this.withinM) {
-            this.withinM = withinM;
-            this.drawItems();
-        }
-    }
-
     /** Where a point item's popup anchors: the marker drawn for it, which for a member of a shared marker is the group's (item 20). */
-    private anchorFor(id: string, lngLat: [number, number]): [number, number] {
+    anchorFor(id: string, lngLat: [number, number]): [number, number] {
         return this.anchors[id] || lngLat;
     }
 
-    /** A control's rectangle in map pixels, or null when it is not there. */
-    private controlRect(selector: string): Rect | null {
-        if (!this.map) {
-            return null;
-        }
-        const container = this.map.getContainer();
-        const el = container.querySelector(selector) as HTMLElement | null;
-        if (!el || el.offsetWidth === 0 || el.offsetHeight === 0) {
-            return null;
-        }
-        const base = container.getBoundingClientRect();
-        const r = el.getBoundingClientRect();
-        return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
-    }
+    /** A control's rectangle in map pixels, or null when it is not there (camera.ts). */
+    controlRect(selector: string): Rect | null { return camera.controlRect(this, selector); }
 
-    /**
-     * The camera padding of the moment (item 27): the top bar, the zoom card, the legend row, an open
-     * sheet or card, so a Return, a search choice, a Needs you choice or Fit centres in what a person sees.
-     */
-    private cameraPadding(): CameraPadding {
-        if (!this.map) {
-            return { top: 0, bottom: 0, left: 0, right: 0 };
-        }
-        const container = this.map.getContainer();
-        const sheetEl = this.mapContainer && this.mapContainer.parentElement
-            ? this.mapContainer.parentElement.querySelector('.mapstudio-sheet') as HTMLElement | null : null;
-        let sheet: Rect | null = null;
-        if (sheetEl && sheetEl.offsetHeight > 0) {
-            const base = container.getBoundingClientRect();
-            const r = sheetEl.getBoundingClientRect();
-            sheet = { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
-        }
-        let card: { rect: Rect; anchor: PopupAnchor } | null = null;
-        if (this.popup && this.popup.isOpen() && this.popupAnchor && this.popupContent) {
-            const base = container.getBoundingClientRect();
-            const r = this.popupContent.getBoundingClientRect();
-            card = { rect: { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height }, anchor: this.popupAnchor };
-        }
-        return cameraPadding(container.clientWidth, container.clientHeight, {
-            topBar: this.controlRect('.maplibregl-ctrl-top-left'),
-            zoomCard: this.controlRect('.maplibregl-ctrl-top-right'),
-            bottomRow: this.controlRect('.maplibregl-ctrl-bottom-left')
-        }, sheet, card);
-    }
+    /** Fit and Return (epic 3 entry 7; camera.ts): the zoom card's buttons. */
+    onFit = (): void => camera.onFit(this);
+    onReturn = (): void => camera.onReturn(this);
 
-    /** Fit (epic 3 entry 7): the view fits every item's bounds and keeps until the bounds change or the user moves the map. */
-    onFit = (): void => {
-        if (!this.map || !this.itemBounds) {
-            return;
-        }
-        this.fitKey = this.itemBoundsKey;
-        this.fitTo(this.itemBounds);
-        this.publishFit();
-    };
+    /** Fit bounds inside the visible area (item 27; camera.ts). */
+    fitTo(bounds: Bounds): void { camera.fitTo(this, bounds); }
 
-    /** Fit bounds inside the visible area (item 27): the fit's own margin plus the camera padding. */
-    private fitTo(bounds: [number, number, number, number]): void {
-        if (this.map) {
-            const pad = this.cameraPadding();
-            this.map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], {
-                padding: { top: pad.top + FIT_ITEMS_PADDING_PX, bottom: pad.bottom + FIT_ITEMS_PADDING_PX,
-                    left: pad.left + FIT_ITEMS_PADDING_PX, right: pad.right + FIT_ITEMS_PADDING_PX },
-                animate: false, maxZoom: 16
-            });
-        }
-    }
-
-    /** Return: the map pans to the selected point at the zoom it has (centred in the visible area, item 27), or fits the selected line. */
-    onReturn = (): void => {
-        const selected = this.state.selected;
-        const delegate = this.props.delegate;
-        if (!this.map || !selected || !delegate) {
-            return;
-        }
-        const item = this.liveItem(selected.id);
-        if (!item) {
-            return;
-        }
-        if (item.geometry.type === 'Point') {
-            const at = this.anchorFor(item.id, [item.geometry.coordinates[0], item.geometry.coordinates[1]]);
-            this.map.jumpTo({ center: at, padding: this.cameraPadding() });
-        } else {
-            let west = Infinity;
-            let south = Infinity;
-            let east = -Infinity;
-            let north = -Infinity;
-            for (const [x, y] of item.geometry.coordinates) {
-                west = Math.min(west, x);
-                east = Math.max(east, x);
-                south = Math.min(south, y);
-                north = Math.max(north, y);
-            }
-            this.fitTo([west, south, east, north]);
-        }
-    };
-
-    /**
-     * A search result chosen (entry 9, R4): the map zooms to the item and selects it as a click on it
-     * does. A point is shown at zoom 15 at least (its glyph, name and icon KPI all draw there), its
-     * popup opened and the point click sent; a line or an area is fitted and selected (no popup: a
-     * line's popup is entry 2's). The jump is this component's own move, so a kept Fit is ended here.
-     */
-    onSearchChoose = (result: SearchResult): void => {
-        this.openedBy = 'search';
-        this.goToItem(result.id, 'Search', '(' + result.matched + ')');
-    };
-
-    /** A Needs you row chosen (entry 3, R15): the same move and selection as a search choice. */
-    onNeedsYouChoose = (row: NeedsYouRow): void => {
-        this.openedBy = 'needsyou';
-        this.goToItem(row.id, 'Needs you', '(' + row.state + ')');
-        if (this.searchControl) {
-            this.searchControl.announce(row.name + ' selected');
-        }
-    };
-
-    /** Zoom to a map item and select it as a click on it does (the search's and the Needs you list's choice). */
-    private goToItem(id: string, via: string, how: string): void {
-        const map = this.map;
-        const delegate = this.props.delegate;
-        const store = this.props.store.delegate as MapStudioStoreDelegate | undefined;
-        if (!map || !delegate) {
-            return;
-        }
-        const item = this.liveItem(id);
-        if (!item) {
-            console.info('[MapStudio] The ' + via + ' choice ' + id + ' is no longer on the map.');
-            return;
-        }
-        this.fitKey = null;
-        if (item.geometry.type === 'Point') {
-            const lngLat = this.anchorFor(item.id, [item.geometry.coordinates[0], item.geometry.coordinates[1]]);
-            // Centred in the visible area, less the top bar, the zoom card and an open sheet or card (item 27).
-            map.jumpTo({ center: lngLat, zoom: Math.max(map.getZoom(), CHOSEN_POINT_ZOOM), padding: this.cameraPadding() });
-            // The item with its asset link and properties, so the popup's link and a custom view's params fill (entry 8).
-            this.openPopup(this.popupPoint(item.id, item.name, item.kind), lngLat);
-            if (store) {
-                store.sendPointClick(item.id);
-            }
-        } else {
-            let west = Infinity;
-            let south = Infinity;
-            let east = -Infinity;
-            let north = -Infinity;
-            for (const [x, y] of item.geometry.coordinates) {
-                west = Math.min(west, x);
-                east = Math.max(east, x);
-                south = Math.min(south, y);
-                north = Math.max(north, y);
-            }
-            this.fitTo([west, south, east, north]);
-            this.selectLine(item.id);
-        }
-        this.publishFit();
-        console.info('[MapStudio] ' + via + ': ' + item.name + ' chosen ' + how + '.');
-    }
+    /** A search result or a Needs you row chosen (entries 9 and 3; camera.ts goToItem). */
+    onSearchChoose = (result: SearchResult): void => camera.onSearchChoose(this, result);
+    onNeedsYouChoose = (row: NeedsYouRow): void => camera.onNeedsYouChoose(this, row);
 
     /** The legend's basemap choice (epic 3 entry 6): the delegate selects it and remembers it. */
     onBasemapChoose = (id: BasemapId): void => {
@@ -842,16 +551,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     }
 
-    private publishFit(): void {
-        if (this.zoomControl) {
-            this.zoomControl.setFit(this.itemBounds !== null, this.fitKey !== null);
-        }
-        if (this.mapContainer) {
-            this.mapContainer.setAttribute('data-fit', this.fitKey !== null ? 'kept' : 'off');
-        }
-    }
+    /** Fit's state for the zoom card and the e2e suite (camera.ts). */
+    publishFit(): void { camera.publishFit(this); }
 
-    private publishSelection(): void {
+    publishSelection(): void {
         const selected = this.state.selected;
         if (this.zoomControl) {
             this.zoomControl.setReturn(selected !== null);
@@ -864,17 +567,6 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.mapContainer.setAttribute('data-segment', segment ? segment.fromId + '|' + segment.toId : '');
             this.mapContainer.setAttribute('data-highlighted', segment ? segment.fromId + ',' + segment.toId : '');
         }
-    }
-
-    /** The view for the e2e suite: the centre and zoom the map is at. */
-    private publishView(map: MapLibreMap): void {
-        const el = this.mapContainer;
-        if (!el || this.map !== map) {
-            return;
-        }
-        const c = map.getCenter();
-        el.setAttribute('data-center', c.lng.toFixed(5) + ',' + c.lat.toFixed(5));
-        el.setAttribute('data-zoom', map.getZoom().toFixed(2));
     }
 
     private onStorage = (ev: StorageEvent): void => {
@@ -896,203 +588,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     }
 
-    /**
-     * Put the delegate's items into the items sources when they changed; none while map.load
-     * says the store is unreachable (nothing stale drawn as current). Then the unsaved items.
-     */
-    private drawItems(): void {
-        this.drawUnsaved();
-        const delegate = this.props.delegate;
-        const selected = this.state.selected;
-        const selectionKey = selected ? selected.kind + ':' + selected.id : '';
-        if (!this.map || !this.itemsReady || !delegate || !this.markerColors
-            || (delegate.itemsRevision === this.drawnRevision && delegate.liveRevision === this.drawnLive
-                && selectionKey === this.drawnSelection && this.withinM === this.drawnWithinM)) {
-            return;
-        }
-        const items = delegate.editing === 'off' ? [] : delegate.items;
-        const data = buildFeatures(items, delegate.lists.kinds, delegate.live, selected, this.markerColors, this.withinM);
-        this.anchors = data.anchors;
-        this.drawnWithinM = this.withinM;
-        const source = (id: string): GeoJSONSource | undefined => this.map!.getSource(id) as GeoJSONSource | undefined;
-        const lines = source(SOURCE_ITEM_LINES);
-        const areas = source(SOURCE_ITEM_AREAS);
-        const points = source(SOURCE_ITEM_POINTS);
-        const marks = source(SOURCE_LINE_MARKS);
-        const arrow = source(SOURCE_ARROW);
-        if (lines && areas && points && marks && arrow) {
-            lines.setData(data.lines);
-            areas.setData(data.areas);
-            points.setData(data.points);
-            marks.setData(data.marks);
-            arrow.setData(data.arrow);
-            if (this.searchControl && delegate.itemsRevision !== this.drawnRevision) {
-                // The search's entries follow the items (entry 9): names, kinds and the linked assets' names.
-                this.searchControl.setEntries(buildEntries(items, delegate.lists.kinds, delegate.lists.assetNames));
-            }
-            if (this.needsYouControl) {
-                // The Needs you summary from the same batch the markers draw from (entry 3, AD-6).
-                // While the values are frozen (the connection lost, item 32) the bar shows the state unknown.
-                this.needsYouControl.setUnknown(delegate.connection.frozen);
-                this.needsYouControl.setSummary(needsYou(items, delegate.lists.kinds, delegate.live, Date.now()));
-            }
-            if (this.legendControl && (delegate.itemsRevision !== this.drawnRevision || delegate.live.fulls !== this.drawnFulls)) {
-                // The legend's key follows the kinds on the map and the kind display of the last full batch (entry 3).
-                this.legendControl.setKey(legendKey(items, delegate.lists.kinds, delegate.live.display));
-                this.drawnFulls = delegate.live.fulls;
-            }
-            this.drawnRevision = delegate.itemsRevision;
-            this.drawnLive = delegate.liveRevision;
-            this.drawnSelection = selectionKey;
-            this.itemBounds = data.bounds;
-            this.itemBoundsKey = data.boundsKey;
-            if (this.mapContainer) {
-                // The map items drawn (a shared marker counts its members), as the suite has always read it.
-                this.mapContainer.setAttribute('data-items-loaded', String(data.lineItems + data.areas.features.length
-                    + data.points.features.reduce((n, f) => n + f.properties.members, 0)));
-                this.mapContainer.setAttribute('data-shared-markers', String(data.shared));
-                this.mapContainer.setAttribute('data-arrow', String(data.arrow.features.length));
-                // The areas and their tints (entry 1), for tests: id, tint name and the resolved colour.
-                this.mapContainer.setAttribute('data-areas', JSON.stringify(data.areas.features.map((f) => ({
-                    id: f.properties.id, tint: f.properties.tint, color: f.properties.color
-                }))));
-            }
-            this.publishSelection();
-            // A kept Fit follows a change of the items' bounds (a new item outside them), nothing else.
-            if (this.fitKey !== null && this.fitKey !== data.boundsKey && data.bounds) {
-                this.fitKey = data.boundsKey;
-                this.fitTo(data.bounds);
-            }
-            this.publishFit();
-            if (!this.itemCountsAsked && delegate.load.state === 'loaded') {
-                // The first map.load's items, counted back from MapLibre once it has gone idle with them.
-                this.itemCountsAsked = true;
-                const map = this.map;
-                map.once('idle', () => this.publishItemCounts(map));
-            }
-        }
-    }
+    /** The delegate's items into the sources when their revisions changed, then the unsaved items (itemsLayer.ts). */
+    drawItems(): void { items.drawItems(this); }
 
-    /** The queued items, dashed, leaving out any the store already draws (saved in another tab). */
-    private drawUnsaved(): void {
-        const delegate = this.props.delegate;
-        if (!this.map || !this.itemsReady || !delegate
-            || delegate.unsavedRevision + ':' + delegate.itemsRevision === this.drawnUnsaved) {
-            return;
-        }
-        const stored = new Set(delegate.items.filter((i) => i.version > 0).map((i) => i.id));
-        const data = itemsToGeoJson(unsavedItems(delegate.unsaved).filter((i) => !stored.has(i.id)));
-        const lines = this.map.getSource(SOURCE_UNSAVED_LINES) as GeoJSONSource | undefined;
-        const points = this.map.getSource(SOURCE_UNSAVED_POINTS) as GeoJSONSource | undefined;
-        if (lines && points) {
-            lines.setData(data.lines);
-            points.setData(data.points);
-            this.drawnUnsaved = delegate.unsavedRevision + ':' + delegate.itemsRevision;
-            if (this.mapContainer) {
-                // For tests: the features put into the unsaved sources (dashed lines and points).
-                this.mapContainer.setAttribute('data-unsaved-drawn',
-                    String(data.lines.features.length + data.points.features.length));
-            }
-        }
-    }
-
-    /** A finished line is queued and drawn from the unsaved layer: remove Terra Draw's copy of it. */
-    private dropQueuedFeatures(): void {
-        if (!this.draw || this.queuedFeatures.length === 0) {
-            return;
-        }
-        const ids = this.queuedFeatures;
-        this.queuedFeatures = [];
-        for (const id of ids) {
-            try {
-                this.draw.removeFeatures([id]);
-            } catch (err) {
-                console.info('[MapStudio] The drawn copy of a queued line was already gone.');
-            }
-        }
-    }
-
-    /** Fetch the sprite once; an image asked for meanwhile waits for it (a failed fetch draws the markers without glyphs). */
-    private loadSprite(): Promise<Record<string, SpriteSymbol>> {
-        if (this.sprite) {
-            return this.sprite;
-        }
-        if (typeof fetch !== 'function') {
-            this.sprite = Promise.resolve({});
-            return this.sprite;
-        }
-        this.sprite = fetch(SPRITE_URL).then((res) => {
-            if (!res.ok) {
-                throw new Error('HTTP ' + res.status);
-            }
-            return res.text();
-        }).then((text) => {
-            this.symbols = parseSprite(text);
-            return this.symbols;
-        }).catch((err) => {
-            console.warn('[MapStudio] The icon sprite could not be loaded (' + String(err && err.message ? err.message : err)
-                + '); markers draw without glyphs.');
-            this.symbols = {};
-            return this.symbols;
-        });
-        return this.sprite;
-    }
-
-    /**
-     * MapLibre asked for an image it does not have (the missing image resolver): draw it from the
-     * sprite and the theme tokens at the device pixel ratio and add it. The promise settles once the
-     * image is in the map (MapLibre waits for it before laying the symbols out); a second ask for the
-     * same id shares the first's promise.
-     */
-    private makeImage(id: string): Promise<void> {
-        const map = this.map;
-        const colors = this.markerColors;
-        if (!map || !colors) {
-            return Promise.resolve();
-        }
-        const made = this.madeImages.get(id);
-        if (made) {
-            return made;
-        }
-        const promise = this.loadSprite().then((symbols) => new Promise<void>((resolve) => {
-            const spec = imageFor(id, symbols, colors);
-            if (!spec || this.map !== map) {
-                resolve();
-                return;
-            }
-            const ratio = typeof window !== 'undefined' && window.devicePixelRatio ? Math.min(3, window.devicePixelRatio) : 1;
-            const image = new Image();
-            image.onload = () => {
-                if (this.map === map) {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = Math.round(spec.width * ratio);
-                    canvas.height = Math.round(spec.height * ratio);
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-                        const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                        if (!map.hasImage(id)) {
-                            const scale = (n: number): number => Math.round(n * ratio);
-                            map.addImage(id, data, {
-                                pixelRatio: ratio,
-                                ...(spec.content ? { content: spec.content.map(scale) as [number, number, number, number] } : {}),
-                                ...(spec.stretchX ? { stretchX: spec.stretchX.map(([a, b]) => [scale(a), scale(b)] as [number, number]) } : {}),
-                                ...(spec.stretchY ? { stretchY: spec.stretchY.map(([a, b]) => [scale(a), scale(b)] as [number, number]) } : {})
-                            });
-                        }
-                    }
-                }
-                resolve();
-            };
-            image.onerror = () => {
-                console.warn('[MapStudio] A marker image could not be drawn.');
-                resolve();
-            };
-            image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(spec.svg);
-        }));
-        this.madeImages.set(id, promise);
-        return promise;
-    }
+    /** A finished line is queued and drawn from the unsaved layer: remove Terra Draw's copy of it (itemsLayer.ts). */
+    dropQueuedFeatures(): void { items.dropQueuedFeatures(this); }
 
     componentWillUnmount(): void {
         this.unmounting = true;
@@ -1174,41 +674,6 @@ export class MapStudio extends Component<Props, MapStudioState> {
             // cleaned up its provisional line.
             this.mapContainer.addEventListener('keydown', this.onKeyDown, true);
         }
-    }
-
-    /** For the e2e suite: tell a test the map is drawn (its first idle, sources and layers added). */
-    private publishReadiness(map: MapLibreMap): void {
-        const el = this.mapContainer;
-        if (!el || this.map !== map) {
-            return;
-        }
-        this.publishView(map);
-        el.setAttribute('data-map-ready', 'true');
-    }
-
-    /**
-     * For the e2e suite: the point and line items of the first map.load, read back from
-     * MapLibre's own item sources (querySourceFeatures, unique by the feature's id
-     * property) after the map went idle with them, so they prove the items reached the
-     * map. Only features in the loaded tiles count, so on a small viewport some may not.
-     */
-    private publishItemCounts(map: MapLibreMap): void {
-        const el = this.mapContainer;
-        if (!el || this.map !== map) {
-            return;
-        }
-        const count = (source: string): number => {
-            const ids = new Set<string>();
-            for (const f of map.querySourceFeatures(source)) {
-                const id = f.properties ? f.properties.id : undefined;
-                if (typeof id === 'string') {
-                    ids.add(id);
-                }
-            }
-            return ids.size;
-        };
-        el.setAttribute('data-points-loaded', String(count(SOURCE_ITEM_POINTS)));
-        el.setAttribute('data-lines-loaded', String(count(SOURCE_ITEM_LINES)));
     }
 
     private toggleDrawing = (): void => {
@@ -1375,7 +840,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     };
 
     /** A line clicked: selected (casing, flow arrow, Return), the popup closed. */
-    private selectLine(id: string, segment: SegmentRef | null = null): void {
+    selectLine(id: string, segment: SegmentRef | null = null): void {
         this.closePopup();
         this.setState({ selected: { id, kind: 'line', segment }, pick: null });
         console.info('[MapStudio] Line ' + id + ' selected.');
@@ -1387,7 +852,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * {itemId, segment}. A line whose kind shows nothing and that carries no instrument is only
      * selected, as before.
      */
-    private openLinePopup(id: string, segment: SegmentRef | null, lngLat: [number, number]): void {
+    openLinePopup(id: string, segment: SegmentRef | null, lngLat: [number, number]): void {
         const delegate = this.props.delegate;
         const item = this.liveItem(id);
         if (!this.map || !delegate || !item || item.geometry.type !== 'LineString') {
@@ -1427,7 +892,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     }
 
     /** The map item with this id that is on the map (not deleted), or undefined. */
-    private liveItem(id: string): MapItemRecord | undefined {
+    liveItem(id: string): MapItemRecord | undefined {
         const delegate = this.props.delegate;
         return delegate ? delegate.items.find((i) => i.id === id && !i.deleted) : undefined;
     }
@@ -1444,7 +909,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * The map item the popup is opened for: the clicked feature's id, name and kind, with the asset
      * link and the properties from the item record (what the placeholders fill from, entry 8).
      */
-    private popupPoint(id: string, name: string, kind: string): PopupPoint {
+    popupPoint(id: string, name: string, kind: string): PopupPoint {
         const item = this.liveItem(id);
         return {
             id, name: item ? item.name : name, kind: item ? item.kind : kind,
@@ -1534,7 +999,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * filled by React through a portal in render(), so the embedded project
      * view stays in this component's React tree.
      */
-    private openPopup(point: PopupPoint, lngLat: [number, number]): void {
+    openPopup(point: PopupPoint, lngLat: [number, number]): void {
         if (!this.map) {
             return;
         }
@@ -1942,7 +1407,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         const symbols = this.symbols || {};
         if (this.symbols === null) {
-            this.loadSprite().then(() => this.forceUpdate());
+            items.loadSprite(this).then(() => this.forceUpdate());
         }
         const kinds = delegate.lists.kinds;
         const previews = kinds
