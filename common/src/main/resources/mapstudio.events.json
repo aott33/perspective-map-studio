@@ -1,0 +1,57 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "description": "The event object of onItemSelected (epic 4 entry 2, docs/contract.md): the selected map item as the AD-7 map item object, or null when the selection was cleared.",
+  "properties": {
+    "item": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "The selected map item, or null when nothing is selected: the record's id, name, kind, assetId and properties, the linked asset's basePath (null without an asset), the resolved alarmsPath (null until the item's popup detail has been pushed), and its live values {comms, kpis, alarms} as the last values.batch carried them; a line adds its instruments in order and the open segment.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The map item's id."
+        },
+        "name": {
+          "type": "string",
+          "description": "The map item's name."
+        },
+        "kind": {
+          "type": "string",
+          "description": "The kind id from the project's kind list."
+        },
+        "assetId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The linked asset's id, or null."
+        },
+        "properties": {
+          "type": "object",
+          "description": "The map item's properties (the kind's form fields)."
+        },
+        "basePath": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The linked asset's base tag path, or null."
+        },
+        "alarmsPath": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The resolved alarms path, or null."
+        },
+        "values": {
+          "type": "object",
+          "description": "The live values: comms, kpis (by key) and alarms, each a LiveValue or null."
+        }
+      }
+    }
+  }
+}

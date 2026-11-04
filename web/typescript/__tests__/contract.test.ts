@@ -19,9 +19,9 @@ const ITEM = {
     deleted: false
 };
 
-describe('the 0.3.0 contract (0.2.0 plus epic 3 entry 5)', () => {
+describe('the 0.4.0 contract (0.3.0 plus epic 4 entry 2)', () => {
     test('version, codes and types match common/', () => {
-        expect(CONTRACT_VERSION).toBe('0.3.0');
+        expect(CONTRACT_VERSION).toBe('0.4.0');
         expect(MessageTypes.VALUES_BATCH).toBe('values.batch');
         expect(MessageTypes.POPUP_OPEN).toBe('popup.open');
         expect(MessageTypes.POPUP_CLOSE).toBe('popup.close');

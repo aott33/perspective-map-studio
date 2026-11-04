@@ -23,7 +23,7 @@ public final class Messages {
     public static final int VERSION = 1;
 
     /** Public contract version these shapes belong to (AD-9); 0.3.0 is epic-viewing's (unreleased). */
-    public static final String CONTRACT_VERSION = "0.3.0";
+    public static final String CONTRACT_VERSION = "0.4.0";
 
     /** Model event name the envelope travels under, browser to Gateway and back. */
     public static final String EVENT_NAME = "mapstudio.message";

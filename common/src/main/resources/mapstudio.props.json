@@ -98,8 +98,16 @@
     },
     "editMode": {
       "type": "boolean",
-      "description": "Open the component in Edit mode (epic 3 entry 14, docs/contract.md). Today Edit mode holds the spike's Draw a line tool alone, which View mode never shows; epic-editing builds the studio behind it. The dev project's /edit page sets it; off by default.",
+      "description": "Edit mode, both ways (epic 4 entry 2, docs/contract.md). True opens the studio for a session with the full editing role; the Edit switch on the map writes the value back, so a binding follows the mode, and a value the page writes after the component mounted enters or leaves Edit mode. A session without the full editing role stays in View mode and the value is left as written. Off by default.",
       "default": false
+    },
+    "selectedItem": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The selected map item's id, written by the component on every selection change (epic 4 entry 2, docs/contract.md): a marker click, a list row, a search or Needs you choice sets it, a tap on the ground clears it to null. Read it from a binding or the onItemSelected event; a value the page writes is not read yet (entry 14).",
+      "default": null
     },
     "style": {
       "$ref": "urn:ignition-schema:schemas/style-properties.schema.json",

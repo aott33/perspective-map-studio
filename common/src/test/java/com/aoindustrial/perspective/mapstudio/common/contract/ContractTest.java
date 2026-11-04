@@ -34,7 +34,7 @@ class ContractTest {
         assertTrue(Messages.OUTBOUND_TYPES.containsAll(
             Set.of("map.load.reply", "edits.apply.reply", "map.changed", "error", "tags.browse.reply",
                 "tags.resolve.reply", "values.batch", "basemap.source.reply")));
-        assertEquals("0.3.0", Messages.CONTRACT_VERSION);
+        assertEquals("0.4.0", Messages.CONTRACT_VERSION);
         assertEquals(1, Messages.VERSION);
     }
 
