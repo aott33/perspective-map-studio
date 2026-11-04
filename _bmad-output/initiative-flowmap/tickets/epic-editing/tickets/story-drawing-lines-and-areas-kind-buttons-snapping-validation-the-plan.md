@@ -3,14 +3,14 @@ title: "Drawing lines and areas: kind buttons, snapping, validation, the drawing
 type: 'feature'
 ticket: '4'
 created: '2026-11-04'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: 'b06a5ee1c4418e579190f9429a44d0604b5f5e0e'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/handoff-epic-4.md', '{project-root}/docs/contract.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md']
 ---
