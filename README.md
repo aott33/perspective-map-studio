@@ -16,10 +16,10 @@ The map pictures are Map Studio itself, rendered from the development stack's sh
 
 | | |
 |---|---|
-| ![The map with a site's popup](docs/screenshots/showcase-view-desktop-popup-1366.png) | **Live state on the map.** Each site is a neutral disc with its kind's glyph and name; colour appears only when something needs you, always with a glyph and words ("Comms lost", "Stale", an alarm triangle with its priority). Click a site for its popup: comms with data age, key values, and its alarms with a button to your alarm page. Search and the Needs you summary sit along the top. |
-| ![A pipeline with its instruments](docs/screenshots/showcase-line-instruments-1366.png) | **Pipelines and their instruments.** Pressure taps, meters and line valves sit at their place on the line. Click a segment to see the instruments in order with their live values. |
-| ![The map on a phone](docs/screenshots/showcase-phone-sheet-390.png) | **Made for phones too.** At 390 px the popup becomes a bottom sheet with large touch targets. |
-| ![Map Studio Setup in the Designer](docs/screenshots/setup-editor-normal.png) | **One setup per project, in the Designer.** Pick the database connection, who can edit, where your kinds and assets come from, and the basemaps. Changes apply with no Gateway restart. |
+| [![The map with a site's popup](docs/screenshots/showcase-view-desktop-popup-1366.png)](docs/screenshots/showcase-view-desktop-popup-1366.png) | **Live state on the map.** Each site is a neutral disc with its kind's glyph and name; colour appears only when something needs you, always with a glyph and words ("Comms lost", "Stale", an alarm triangle with its priority). Click a site for its popup: comms with data age, key values, and its alarms with a button to your alarm page. Search and the Needs you summary sit along the top. |
+| [![A pipeline with its instruments](docs/screenshots/showcase-line-instruments-1366.png)](docs/screenshots/showcase-line-instruments-1366.png) | **Pipelines and their instruments.** Pressure taps, meters and line valves sit at their place on the line. Click a segment to see the instruments in order with their live values. |
+| [![The map on a phone](docs/screenshots/showcase-phone-sheet-390.png)](docs/screenshots/showcase-phone-sheet-390.png) | **Made for phones too.** At 390 px the popup becomes a bottom sheet with large touch targets. |
+| [![Map Studio Setup in the Designer](docs/screenshots/setup-editor-normal.png)](docs/screenshots/setup-editor-normal.png) | **One setup per project, in the Designer.** Pick the database connection, who can edit, where your kinds and assets come from, and the basemaps. Changes apply with no Gateway restart. |
 
 ## What it does
 
