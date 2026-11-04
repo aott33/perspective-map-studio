@@ -280,7 +280,7 @@ export function fitTo(host: CameraHost, bounds: Bounds): void {
 }
 
 /** The bounds of a line's coordinates, for a fit. */
-function boundsOf(coordinates: number[][]): Bounds {
+export function boundsOf(coordinates: number[][]): Bounds {
     let west = Infinity;
     let south = Infinity;
     let east = -Infinity;

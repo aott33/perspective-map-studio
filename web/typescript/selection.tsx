@@ -5,7 +5,10 @@
  * portal (a card, or below 768 px a point's bottom sheet in the component, epic 3 entry 8), its
  * placement inside the map (item 18, popupPlacement.ts), the content a popup shows (the kind setup's
  * custom view, the default popup or the line popup, AD-7), the Esc that closes it (item 14), the
- * popup.open and popup.close the Gateway is told, and the selection attributes the e2e suite reads.
+ * popup.open and popup.close the Gateway is told, the selection attributes the e2e suite reads, and
+ * (epic 4 entry 2, contract 0.4.0) the page's window on the selection: `selectedItem` written to the
+ * component's props and `onItemSelected` fired with the AD-7 map item object on every selection
+ * change, in `publishSelection`, which every selection path reaches.
  * DOM-bound (the popup's element is measured, the sheet is focused); every function takes the
  * component as its host (SelectionHost names the fields and callbacks it reads), and the component
  * keeps the state: `popup`, `pick` and `selected` are its React state, written here through its
@@ -28,12 +31,14 @@ import { LegendControl } from './LegendControl';
 import { LinePopup } from './LinePopup';
 import { popupInstruments, popupNodes } from './linePopup';
 import { displayShows, iconKpiOf, itemState } from './live';
+import { isPlacing } from './studio';
+import { unsavedItems } from './unsaved';
 import { LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED, LAYER_ITEM_MARKERS } from './mapLayers';
 import { NeedsYouControl } from './NeedsYouControl';
 import { PickList, PickRow } from './PickList';
 import { PointPopup } from './PointPopup';
 import {
-    LINE_POPUP_PX, POPUP_WIDTH_PX, PopupPoint, fillLink, fillParams, isSheetWidth, popupItemView, popupMaxHeight, popupMountPath,
+    LINE_POPUP_PX, MAP_ITEM_PARAM, POPUP_WIDTH_PX, PopupPoint, fillLink, fillParams, isSheetWidth, popupItemView, popupMaxHeight, popupMountPath,
     popupViewParams
 } from './popupParams';
 import { PopupAnchor, Rect, placePopup, placedMaxWidth } from './popupPlacement';
@@ -88,6 +93,8 @@ export interface SelectionHost {
     popupAnchor: PopupAnchor | null;
     /** What opened the popup (item 14): Esc returns the focus there; null for a click on the map. */
     openedBy: 'search' | 'needsyou' | null;
+    /** The selection last written to the page (the item's id, '' for none), so a redraw with the same selection writes nothing. */
+    publishedSelection: string;
     zoomControl: ZoomControl | null;
     searchControl: SearchControl | null;
     needsYouControl: NeedsYouControl | null;
@@ -131,8 +138,8 @@ export function onRootKeyDown(host: SelectionHost, ev: React.KeyboardEvent<HTMLD
 }
 
 export function onPointClick(host: SelectionHost, ev: MapLayerMouseEvent): void {
-    if (host.state.drawing) {
-        // The click belongs to the line being drawn.
+    if (host.state.drawing || isPlacing(host.state.studio)) {
+        // The click belongs to the line being drawn, or to the Point tool.
         return;
     }
     const feature = ev.features && ev.features[0];
@@ -166,7 +173,8 @@ export function onPointClick(host: SelectionHost, ev: MapLayerMouseEvent): void 
  * another point has just moved.
  */
 export function onMapClick(host: SelectionHost, ev: MapMouseEvent): void {
-    if (host.state.drawing || !host.map) {
+    if (host.state.drawing || isPlacing(host.state.studio) || !host.map) {
+        // The line tool or the Point tool (entry 2) owns the click.
         return;
     }
     // A click on the map closes the legend panel (entry 14) and the Needs you list (entry 3).
@@ -668,7 +676,13 @@ export function renderPopup(host: SelectionHost): React.ReactNode {
     return ReactDOM.createPortal(popupContentFor(host, open), host.popupContent);
 }
 
-/** The selection for the zoom card's Return and the e2e suite: the id and kind, and an open segment's ends (entry 2). */
+/** The event the component fires on every selection change (MapStudioComponent.EVENT_ITEM_SELECTED, contract 0.4.0). */
+export const ITEM_SELECTED_EVENT = 'onItemSelected';
+
+/**
+ * The selection for the zoom card's Return and the e2e suite: the id and kind, and an open segment's ends (entry 2);
+ * and for the page (epic 4 entry 2): `selectedItem` written and `onItemSelected` fired once per change.
+ */
 export function publishSelection(host: SelectionHost): void {
     const selected = host.state.selected;
     if (host.zoomControl) {
@@ -682,4 +696,67 @@ export function publishSelection(host: SelectionHost): void {
         host.mapContainer.setAttribute('data-segment', segment ? segment.fromId + '|' + segment.toId : '');
         host.mapContainer.setAttribute('data-highlighted', segment ? segment.fromId + ',' + segment.toId : '');
     }
+    const key = selected ? selected.id : '';
+    if (host.publishedSelection !== key) {
+        host.publishedSelection = key;
+        publishToPage(host, selected ? selected.id : null);
+    }
+}
+
+/**
+ * The page's window on the selection (epic 4 entry 2, contract 0.4.0, AD-7): the `selectedItem` prop
+ * written through the component's property tree (a binding on the page follows it) and the
+ * `onItemSelected` component event fired with `{item}`, the AD-7 map item object or null when the
+ * selection was cleared. Both at every level: a viewer's page may follow the selection too. The
+ * page-to-component direction (the page writing `selectedItem`) is entry 14's: the component never
+ * reads the prop back into its model, so its own write coming back changes nothing.
+ */
+function publishToPage(host: SelectionHost, id: string | null): void {
+    const store = host.props.store;
+    const item = id !== null ? itemFor(host, id) : undefined;
+    const payload = item ? selectedItemObject(host, item) : null;
+    try {
+        store.props.write('selectedItem', id);
+    } catch (err) {
+        console.warn('[MapStudio] The selectedItem prop could not be written: ' + (err instanceof Error ? err.message : String(err)));
+    }
+    try {
+        store.componentEvents.fireComponentEvent(ITEM_SELECTED_EVENT, { item: payload });
+    } catch (err) {
+        console.warn('[MapStudio] The onItemSelected event could not be fired: ' + (err instanceof Error ? err.message : String(err)));
+    }
+    console.debug('[MapStudio] Selection published to the page: ' + (id === null ? 'none' : id));
+}
+
+/** The map item on the map, or the one this page has placed and not yet saved (the Point tool's create in flight). */
+function itemFor(host: SelectionHost, id: string): MapItemRecord | undefined {
+    const live = host.liveItem(id);
+    if (live) {
+        return live;
+    }
+    const delegate = host.props.delegate;
+    return delegate ? unsavedItems(delegate.unsaved).find((i) => i.id === id) : undefined;
+}
+
+/**
+ * The AD-7 map item object for the page (the same a custom popup view gets as `mapItem`, popupParams.ts):
+ * the record's id, name, kind, assetId and properties, `basePath` from the popup detail when the item's
+ * popup is open, else from the asset list (level `phone` or `full`), `alarmsPath` from the popup detail
+ * (null until it was pushed), the last batch's values, and for a line its instruments and open segment.
+ */
+export function selectedItemObject(host: SelectionHost, item: MapItemRecord): Record<string, unknown> {
+    const delegate = host.props.delegate;
+    const point: PopupPoint = popupPoint(host, item.id, item.name, item.kind);
+    if (item.geometry.type === 'LineString' && delegate) {
+        const selected = host.state.selected;
+        const segment = selected && selected.id === item.id && selected.segment ? selected.segment : null;
+        const nodes = popupNodes(item, delegate.items, delegate.lists.kinds, delegate.live, segment);
+        point.instruments = popupInstruments(nodes);
+        point.segment = segment;
+    }
+    const pushed = delegate && delegate.live.popup && delegate.live.popup.itemId === item.id ? delegate.live.popup.detail : null;
+    const asset = delegate && delegate.lists.assets && item.assetId !== null ? delegate.lists.assets.find((a) => a.id === item.assetId) : undefined;
+    const detail = pushed ? pushed : { basePath: asset ? asset.basePath : null, alarmsPath: null };
+    const values = delegate ? delegate.live.items[item.id] : undefined;
+    return popupViewParams(null, point, detail, values)[MAP_ITEM_PARAM] as Record<string, unknown>;
 }

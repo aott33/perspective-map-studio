@@ -4,13 +4,16 @@
  * `mapStateToProps` (`MapStudioDelegateState`, with the revisions the component redraws by). It owns the
  * messages, the items and their changes (changes.ts), the unsaved queue and its sender (unsaved.ts,
  * unsavedSender.ts), the live values (live.ts), the connection watch (connection.ts) and the basemap
- * choice (basemaps.ts). `notify()` is the only flow to the component; the component calls the public
- * `send*`, `selectBasemap`, `retryUnsaved`, `discardUnsaved`, `onStorage` and `stopReplay`.
+ * choice (basemaps.ts), and from epic 4 entry 2 the studio's saves (`sendBatch`, which every tool, every
+ * finished field and the undo stack share) and the undo stack itself (undoStack.ts: one step per saved
+ * edit, the reverse batch sent through the same queue). `notify()` is the only flow to the component;
+ * the component calls the public `send*`, `createPoint`, `renameItem`, `moveItem`, `linkItem`, `undo`,
+ * `redo`, `selectBasemap`, `retryUnsaved`, `discardUnsaved`, `onStorage` and `stopReplay`.
  */
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
 import { MapChanges, MapChangedBody } from './changes';
-import { EditLevel, MapItemRecord } from './contract';
+import { EditBatch, EditLevel, MapItemData, MapItemRecord } from './contract';
 import { HostLists, NO_HOST_LISTS } from './adapters';
 import { MESSAGE_EVENT, Reply, basemapSource, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText } from './messages';
 import {
@@ -21,7 +24,9 @@ import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, freezeLive } from
 import { CONNECTED, ConnectionState, ConnectionWatch } from './connection';
 import { SegmentRef } from './features';
 import { STORE_UNKNOWN, StoreState, storeStateFromError, storeStateFromLoad, storeStateFromSaveError } from './storeState';
-import { SAVE_IDLE, SaveState, lineCreateBatch, newId, refusedSave } from './save';
+import { DEV_LINE_KIND, SAVE_IDLE, SaveState, lineCreateBatch, newId, pointCreateBatch, refusedSave, roundCoordinate, updateBatch } from './save';
+import { pointKind } from './studio';
+import { UNDO_EMPTY, UndoStack, failPending, finishPending, pushStep, startRedo, startUndo, stepLabel } from './undoStack';
 import {
     KeyValueStore, REPLAY_INTERVAL_MS, STORAGE_WARNING, UnsavedEntry, UnsavedQueue, UnsavedReason, isBusy, reasonFromError,
     savedRecords, storageKey
@@ -94,6 +99,8 @@ export interface MapStudioDelegateState {
     liveRevision: number;
     /** The Gateway connection (owner review notes item 32): lost, and whether the values shown are frozen. */
     connection: ConnectionState;
+    /** The undo stack of this session's saved edits (epic 4 entry 2, undoStack.ts). */
+    undo: UndoStack;
 }
 
 /** `localStorage`, or null when the browser refuses it (a private window, blocked site data). */
@@ -165,6 +172,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     /** The satellite source once the Gateway answered it (its tile URL holds the token): memory only. */
     private satelliteSource: RasterSource | null = null;
     private storage: KeyValueStore | null;
+    /** The undo stack (entry 2): one step per saved edit of this session, the reverse sent through the same queue. */
+    private undoStack: UndoStack = UNDO_EMPTY;
+    /** The label and the records before each batch sent by a tool or a field, until its reply makes it a step. */
+    private pendingSteps = new Map<string, { label: string; before: MapItemRecord[] }>();
 
     constructor(componentStore: AbstractUIElementStore) {
         super(componentStore);
@@ -240,7 +251,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             storageWarning: this.storageWarning,
             live: this.live,
             liveRevision: this.liveRevision,
-            connection: this.connection
+            connection: this.connection,
+            undo: this.undoStack
         };
     }
 
@@ -386,10 +398,124 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         const itemId = newId();
         const now = new Date();
         const batch = lineCreateBatch(itemId, newId(), coordinates, now);
+        const kind = this.lists.kinds.find((k) => k.id === DEV_LINE_KIND);
+        this.sendBatch(batch, itemId, stepLabel('add', kind ? kind.name : DEV_LINE_KIND), now);
+        return itemId;
+    }
+
+    /**
+     * One save for every tool, every finished field and the undo stack (epic 4 entry 2, AD-2, AD-10):
+     * the batch is queued (localStorage) before it is sent, the save status says Saving... for `itemId`,
+     * and when the reply says saved the batch joins the undo stack as one step named `label` with the
+     * records as they were before it (the stack's `before`, what the reverse is built from). The Gateway
+     * is called when an edit is finished, never per click or drag frame.
+     */
+    sendBatch(batch: EditBatch, itemId: string, label: string, now: Date = new Date()): void {
+        this.pendingSteps.set(batch.batchId, { label, before: this.recordsFor(batch) });
         this.save = { state: 'saving', itemId };
         this.saveBatchId = batch.batchId;
         this.sender.enqueueAndSend(batch, now);
+        this.notify();
+    }
+
+    /** The stored records of the batch's map items as they are now (a create's id is absent). */
+    private recordsFor(batch: EditBatch): MapItemRecord[] {
+        return this.changes.state.items.filter((r) => batch.ops.some((op) => op.entity === 'item' && op.id === r.id));
+    }
+
+    /** The stored record of a live map item, or undefined (not loaded, deleted, or the create still in flight). */
+    private storedRecord(id: string): MapItemRecord | undefined {
+        return this.changes.state.items.find((i) => i.id === id && !i.deleted && i.version > 0);
+    }
+
+    /**
+     * The Point tool's click (entry 2): one create of the kind list's first point kind at the clicked place,
+     * named after the kind (the placeholder the editor renames), saved at once. Returns the new item's id,
+     * or null when the kind list has no point kind (one console line; nothing is sent).
+     */
+    createPoint(lngLat: [number, number]): string | null {
+        const kind = pointKind(this.lists.kinds);
+        if (!kind) {
+            console.warn('[MapStudio] The Point tool has no kind to add: the kind list has no point kind.');
+            return null;
+        }
+        const itemId = newId();
+        this.sendBatch(pointCreateBatch(itemId, newId(), kind.id, kind.name, lngLat), itemId, stepLabel('add', kind.name));
         return itemId;
+    }
+
+    /** A finished Name field (entry 2): one update at the stored version, the step "rename <new name>". */
+    renameItem(id: string, name: string): void {
+        this.sendUpdate(id, { name }, stepLabel('rename', name));
+    }
+
+    /** A moved point (the pin's drag end, or typed latitude and longitude): one update of its geometry, "move <name>". */
+    moveItem(id: string, lngLat: [number, number]): void {
+        const item = this.storedRecord(id);
+        if (!item) {
+            console.info('[MapStudio] The move of ' + id + ' waits: the item has no stored version yet.');
+            return;
+        }
+        // The map store keeps 6 decimals (docs/contract.md): the batch carries the pin's or the field's place rounded.
+        const geometry: MapItemData['geometry'] = { type: 'Point', coordinates: [roundCoordinate(lngLat[0]), roundCoordinate(lngLat[1])] };
+        this.sendBatch(updateBatch(id, newId(), item.version, { geometry }), id, stepLabel('move', item.name));
+    }
+
+    /** The asset picker (entry 2): one update of `assetId` (null to unlink), "link <name>" or "unlink <name>". */
+    linkItem(id: string, assetId: string | null): void {
+        const item = this.storedRecord(id);
+        this.sendUpdate(id, { assetId }, stepLabel(assetId === null ? 'unlink' : 'link', item ? item.name : id));
+    }
+
+    private sendUpdate(id: string, data: MapItemData, label: string): void {
+        const item = this.storedRecord(id);
+        if (!item) {
+            console.info('[MapStudio] The change to ' + id + ' waits: the item has no stored version yet.');
+            return;
+        }
+        this.sendBatch(updateBatch(id, newId(), item.version, data), id, label);
+    }
+
+    /** Undo the last saved edit of this session (entry 2): its reverse batch, at the record's current version, through the queue. */
+    undo(): void {
+        const started = startUndo(this.undoStack, newId(), this.changes.state.items);
+        if (!started) {
+            console.info('[MapStudio] Nothing to undo, or a reverse is still being saved.');
+            return;
+        }
+        this.sendReverse(started);
+    }
+
+    /** Redo the last undone edit: the reverse of its undo, through the queue. */
+    redo(): void {
+        const started = startRedo(this.undoStack, newId(), this.changes.state.items);
+        if (!started) {
+            console.info('[MapStudio] Nothing to redo, or a reverse is still being saved.');
+            return;
+        }
+        this.sendReverse(started);
+    }
+
+    private sendReverse(started: { stack: UndoStack; batch: EditBatch }): void {
+        this.undoStack = started.stack;
+        const itemId = started.batch.ops.length > 0 ? started.batch.ops[0].id : '';
+        this.save = { state: 'saving', itemId };
+        this.saveBatchId = started.batch.batchId;
+        this.sender.enqueueAndSend(started.batch, new Date());
+        this.notify();
+    }
+
+    /** A batch saved: a tool's or a field's becomes a step; the pending reverse settles its step and moves the cursor. */
+    private settleUndo(batchId: string, results: Array<{ entity: string; id: string; version: number }>, batch: EditBatch | null): void {
+        const pending = this.pendingSteps.get(batchId);
+        if (pending) {
+            this.pendingSteps.delete(batchId);
+            if (batch) {
+                this.undoStack = pushStep(this.undoStack, { label: pending.label, batch, before: pending.before, results });
+            }
+            return;
+        }
+        this.undoStack = finishPending(this.undoStack, batchId, results);
     }
 
     /** Try again: a refused entry becomes unsent and the queue replays now. */
@@ -566,13 +692,33 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
                         this.itemsRevision++;
                     }
                 }
+                // An update's new version (a rename, a move, a link, a reverse) reaches the drawn record here,
+                // ahead of the Gateway's map.changed, so the next field saves at the right version.
+                for (const op of outcome.entry.batch.ops) {
+                    const result = reply.body.results.find((r) => r.entity === 'item' && r.id === op.id);
+                    const drawn = this.changes.state.items.find((i) => i.id === op.id);
+                    if (op.op === 'update' && op.entity === 'item' && result && drawn && drawn.version < result.version) {
+                        if (this.changes.saved({ ...drawn, ...(op.data || {}), version: result.version } as MapItemRecord)) {
+                            this.itemsRevision++;
+                        }
+                    } else if (op.op === 'delete' && op.entity === 'item' && result && drawn && !drawn.deleted) {
+                        if (this.changes.saved({ ...drawn, version: result.version, deleted: true })) {
+                            this.itemsRevision++;
+                        }
+                    }
+                }
             }
+            this.settleUndo(reply.body.batchId, reply.body.results, outcome.entry ? outcome.entry.batch : null);
             if (shown && this.save.state !== 'idle') {
                 const itemId = this.save.itemId;
                 const result = reply.body.results.find((r) => r.id === itemId);
                 this.save = { state: 'saved', itemId, version: result ? result.version : 1 };
             }
         } else if (reply.kind === 'error') {
+            if (outcome.kind === 'failed') {
+                this.pendingSteps.delete(outcome.batchId);
+                this.undoStack = failPending(this.undoStack, outcome.batchId);
+            }
             if (shown && this.save.state !== 'idle') {
                 this.save = refusedSave(this.save.itemId, reply.body);
             }

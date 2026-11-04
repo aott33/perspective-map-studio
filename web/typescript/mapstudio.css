@@ -2369,3 +2369,627 @@
         visibility: hidden;
     }
 }
+
+/* ---- Epic 4 entry 2: the docked studio (DESIGN.md Layout & Spacing, Elevation, mode-rail, Panel header,
+   list-row, state-badge, properties-panel, panel-tabs, draw-toolbar, mode-pill, editing-switch, save-status;
+   EXPERIENCE.md Component Patterns). The component is a flex row: the rail, the docked list panel and the
+   properties panel (each flat on the component, a 1 px divider, no shadow), then the stage, which holds the map
+   and everything that floats over it. In View mode the stage is the whole component, so nothing View mode draws
+   moves. Widths: rail 72 px; the list 256 px and the panel 320 px at 1366, 280 and 340 from 1440 (DESIGN.md
+   spacing). Below 768 px the studio never shows (phone widths keep View mode, entry 6). Token colours only (AD-11). */
+.mapstudio {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    --mapstudio-rail-width: 72px;
+    --mapstudio-list-width: 256px;
+    --mapstudio-panel-width: 320px;
+    --mapstudio-divider: var(--neutral-30, var(--border));
+    --mapstudio-secondary: var(--neutral-70, var(--label--disabled));
+    --mapstudio-selection-tint: color-mix(in srgb, var(--callToAction) 12%, transparent);
+}
+
+@media (min-width: 1440px) {
+    .mapstudio {
+        --mapstudio-list-width: 280px;
+        --mapstudio-panel-width: 340px;
+    }
+}
+
+.mapstudio-stage {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+}
+
+/* The mode rail: View, Items, Kinds, Layers stacked, a glyph over a tiny label; the active one on the hover surface, bold. */
+.mapstudio-rail {
+    display: flex;
+    flex: 0 0 var(--mapstudio-rail-width);
+    flex-direction: column;
+    gap: 4px;
+    box-sizing: border-box;
+    width: var(--mapstudio-rail-width);
+    padding: 8px 6px;
+    border-right: 1px solid var(--mapstudio-divider);
+    background: var(--mapstudio-surface);
+    color: var(--label);
+}
+
+.mapstudio-rail-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 52px;
+    padding: 6px 0;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--mapstudio-secondary);
+    font: inherit;
+    font-size: 11px;
+    line-height: 1.3;
+    cursor: pointer;
+}
+
+.mapstudio-rail-item:hover {
+    background: var(--mapstudio-hover);
+}
+
+.mapstudio-rail-item:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -2px;
+}
+
+.mapstudio-rail-item--active {
+    background: var(--mapstudio-hover);
+    color: var(--label);
+    font-weight: 600;
+}
+
+.mapstudio-rail-glyph {
+    width: 22px;
+    height: 22px;
+}
+
+/* The docked list panel and the empty surfaces: a header with the map's name, Undo, Redo and the save status, then the rows. */
+.mapstudio-dock {
+    display: flex;
+    flex: 0 0 var(--mapstudio-list-width);
+    flex-direction: column;
+    box-sizing: border-box;
+    width: var(--mapstudio-list-width);
+    min-height: 0;
+    border-right: 1px solid var(--mapstudio-divider);
+    background: var(--mapstudio-surface);
+    color: var(--label);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.mapstudio-dock-header {
+    flex: 0 0 auto;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid var(--mapstudio-divider);
+}
+
+.mapstudio-dock-title-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 32px;
+}
+
+.mapstudio-dock-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mapstudio-dock-button {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--label);
+    cursor: pointer;
+}
+
+.mapstudio-dock-button:hover:not(:disabled) {
+    background: var(--mapstudio-hover);
+}
+
+.mapstudio-dock-button:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -2px;
+}
+
+.mapstudio-dock-button:disabled {
+    color: var(--label--disabled);
+    cursor: not-allowed;
+}
+
+/* The save status beside Undo and Redo: small secondary words; a problem on its own row with the warning glyph's tone. */
+.mapstudio-panel-save {
+    flex: 0 0 auto;
+    margin-left: 4px;
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.mapstudio-panel-save--saving {
+    color: var(--label--disabled);
+}
+
+.mapstudio-panel-save--row {
+    display: block;
+    margin: 6px 0 0;
+    padding: 6px 8px;
+    border-left: 3px solid var(--mapstudio-warning);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--mapstudio-warning) 10%, var(--mapstudio-surface));
+    color: var(--label);
+    font-weight: 600;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-dock-note,
+.mapstudio-list-empty {
+    padding: 12px;
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
+}
+
+.mapstudio-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 6px 6px 76px;
+    overflow-y: auto;
+}
+
+/* A row: the kind glyph, the name, the state badge right-aligned; selected on the selection tint with a 3 px inset edge. */
+.mapstudio-list-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 30px;
+    padding: 2px 8px 2px 6px;
+    border: none;
+    border-left: 3px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--label);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.mapstudio-list-row:hover {
+    background: var(--mapstudio-hover);
+}
+
+.mapstudio-list-row:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -2px;
+}
+
+.mapstudio-list-row--selected {
+    background: var(--mapstudio-selection-tint);
+    border-left-color: var(--callToAction);
+}
+
+.mapstudio-list-kind-glyph {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    color: var(--mapstudio-secondary);
+}
+
+.mapstudio-list-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The state badge: the alarm glyph with its digit in the priority token, Comms lost in its token, Stale in the text
+   colour, Unlinked as the word on a pill; never a coloured dot alone. */
+.mapstudio-badge {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    line-height: 1.2;
+    color: var(--mapstudio-secondary);
+    white-space: nowrap;
+}
+
+.mapstudio-badge-glyph {
+    flex: 0 0 auto;
+}
+
+.mapstudio-badge-digit {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.mapstudio-badge-glyph--p1,
+.mapstudio-badge[data-priority="1"] .mapstudio-badge-digit {
+    color: var(--mapstudio-alarm-1);
+}
+
+.mapstudio-badge-glyph--p2,
+.mapstudio-badge[data-priority="2"] .mapstudio-badge-digit {
+    color: var(--mapstudio-alarm-2);
+}
+
+.mapstudio-badge-glyph--p3,
+.mapstudio-badge[data-priority="3"] .mapstudio-badge-digit {
+    color: var(--mapstudio-alarm-3);
+}
+
+.mapstudio-badge-glyph--comms-lost {
+    color: var(--mapstudio-comms-lost);
+}
+
+.mapstudio-badge-glyph--stale {
+    color: var(--label);
+}
+
+.mapstudio-badge--unlinked {
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--mapstudio-hover);
+    color: var(--label);
+}
+
+/* The properties panel: the header as the popup card's, the Details tab underlined in the attention token, the fields. */
+.mapstudio-panel {
+    display: flex;
+    flex: 0 0 var(--mapstudio-panel-width);
+    flex-direction: column;
+    box-sizing: border-box;
+    width: var(--mapstudio-panel-width);
+    min-height: 0;
+    border-right: 1px solid var(--mapstudio-divider);
+    background: var(--mapstudio-surface);
+    color: var(--label);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.mapstudio-panel-header {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 8px 8px 16px;
+}
+
+.mapstudio-panel-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 16px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--mapstudio-divider);
+}
+
+.mapstudio-panel-tab {
+    padding: 6px 0 8px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--mapstudio-secondary);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.mapstudio-panel-tab--active {
+    border-bottom-color: var(--mapstudio-attention);
+    color: var(--label);
+    font-weight: 600;
+}
+
+.mapstudio-panel-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 8px 16px 76px;
+    overflow-y: auto;
+}
+
+.mapstudio-panel-note {
+    margin: 4px 0 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--mapstudio-hover);
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
+}
+
+.mapstudio-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--mapstudio-divider);
+}
+
+.mapstudio-field:last-child {
+    border-bottom: none;
+}
+
+.mapstudio-field-label,
+.mapstudio-field-sublabel {
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
+}
+
+.mapstudio-field-text {
+    min-height: 20px;
+}
+
+.mapstudio-field-pair {
+    display: flex;
+    gap: 8px;
+}
+
+.mapstudio-field-half {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.mapstudio-field-hint {
+    min-height: 1em;
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+}
+
+.mapstudio-input {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--neutral-40, var(--border));
+    border-radius: 6px;
+    background: var(--mapstudio-surface);
+    color: var(--label);
+    font: inherit;
+    font-size: 13px;
+}
+
+.mapstudio-input:focus {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -1px;
+}
+
+.mapstudio-input[aria-invalid="true"] {
+    border-color: var(--mapstudio-warning);
+}
+
+.mapstudio-field-pair .mapstudio-field-asset {
+    flex: 1 1 auto;
+}
+
+.mapstudio-button {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--neutral-40, var(--border));
+    border-radius: 6px;
+    background: var(--mapstudio-surface);
+    color: var(--label);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.mapstudio-button:hover {
+    background: var(--mapstudio-hover);
+}
+
+.mapstudio-button:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: 2px;
+}
+
+/* The floating draw toolbar top-centre over the map, the mode pill under it: floating, so the one soft shadow;
+   above the popup layer with the other controls (owner re-test R2). Paused, it fades and takes no input. */
+.mapstudio-toolbar-float {
+    position: absolute;
+    top: var(--mapstudio-map-inset);
+    left: 50%;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.mapstudio-toolbar-float > * {
+    pointer-events: auto;
+}
+
+.mapstudio-toolbar-float--paused .mapstudio-toolbar {
+    opacity: 0.42;
+    pointer-events: none;
+}
+
+.mapstudio-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 10px;
+    background: var(--mapstudio-surface);
+    color: var(--label);
+    box-shadow: var(--mapstudio-float-shadow);
+}
+
+.mapstudio-tool {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--label);
+    cursor: pointer;
+}
+
+.mapstudio-tool:hover:not(:disabled) {
+    background: var(--mapstudio-hover);
+}
+
+.mapstudio-tool:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -2px;
+}
+
+.mapstudio-tool--active {
+    background: var(--mapstudio-selection-tint);
+    color: var(--callToAction);
+}
+
+.mapstudio-toolbar-divider {
+    width: 1px;
+    height: 20px;
+    margin: 0 2px;
+    background: var(--mapstudio-divider);
+}
+
+.mapstudio-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(var(--mapstudio-map-width, 100vw) - 2 * var(--mapstudio-map-inset) - 2 * var(--mapstudio-target) - 24px);
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--mapstudio-surface);
+    color: var(--neutral-80, var(--label));
+    box-shadow: var(--mapstudio-float-shadow);
+    font-size: 12px;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mapstudio-pill-glyph {
+    flex: 0 0 auto;
+}
+
+/* The Edit switch top-right above the zoom card: a glyph, the word and a switch track; on, the track takes the attention token. */
+.mapstudio .mapstudio-edit-switch {
+    border-radius: 10px;
+    background: var(--mapstudio-surface);
+    box-shadow: var(--mapstudio-float-shadow);
+    overflow: hidden;
+}
+
+.mapstudio .mapstudio-edit-switch-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+    height: 36px;
+    padding: 0 10px 0 10px;
+    border: none;
+    background: var(--mapstudio-surface);
+    color: var(--label);
+    font: inherit;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.mapstudio .maplibregl-ctrl .mapstudio-edit-switch-button:hover:not(:disabled) {
+    background: var(--mapstudio-hover);
+}
+
+.mapstudio .mapstudio-edit-switch-button:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -2px;
+}
+
+.mapstudio .mapstudio-edit-switch-glyph {
+    display: inline-flex;
+}
+
+.mapstudio .mapstudio-edit-switch-track {
+    position: relative;
+    display: inline-block;
+    box-sizing: border-box;
+    width: 30px;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--neutral-40, var(--border));
+    transition: background 120ms;
+}
+
+.mapstudio .mapstudio-edit-switch-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    background: var(--mapstudio-surface);
+    transition: left 120ms;
+}
+
+.mapstudio .mapstudio-edit-switch-button[data-on="true"] .mapstudio-edit-switch-track {
+    background: var(--mapstudio-attention);
+}
+
+.mapstudio .mapstudio-edit-switch-button[data-on="true"] .mapstudio-edit-switch-thumb {
+    left: 16px;
+}
+
+/* Phone widths keep View mode (entry 6): none of the studio shows below 768 px. */
+@media (max-width: 767px) {
+    .mapstudio-rail,
+    .mapstudio-dock,
+    .mapstudio-panel,
+    .mapstudio-toolbar-float,
+    .mapstudio .mapstudio-edit-switch {
+        display: none;
+    }
+}
