@@ -82,17 +82,33 @@ function recordsOf(records: MapItemRecord[], batch: EditBatch): MapItemRecord[] 
 }
 
 /**
- * The reverse at each record's current version: `reverseBatch` bases an op on the version the step's
- * reply gave, but a later step (or its undo) may have moved the record on, and the Gateway compares
- * `baseVersion` with the stored version. A record not among `records` keeps the reply's version (a
- * deleted map item the delegate dropped: its tombstone's version is the delete's reply version).
+ * The version this session's own last step gave a map item: the highest over the stack's replies (the create's,
+ * the latest own update's or reverse's), or null for an id none of them wrote.
  */
-export function rebase(batch: EditBatch, records: MapItemRecord[]): EditBatch {
+export function ownVersion(stack: UndoStack, id: string): number | null {
+    let own: number | null = null;
+    for (const step of stack.steps) {
+        for (const r of step.results) {
+            if (r.entity === 'item' && r.id === id && (own === null || r.version > own)) {
+                own = r.version;
+            }
+        }
+    }
+    return own;
+}
+
+/**
+ * The reverse at the version this session's own last step gave each record (FR-17): `reverseBatch` bases an op on
+ * its step's own reply, but a later own step (or its undo) may have moved the record on. Never a version another
+ * session produced: when another editor changed the item since, the stored version is past the own one and the
+ * Gateway refuses the reverse `conflict`, naming who changed it, instead of saving over their change.
+ */
+export function rebase(batch: EditBatch, stack: UndoStack): EditBatch {
     return {
         batchId: batch.batchId,
         ops: batch.ops.map((op) => {
-            const current = records.find((r) => r.id === op.id);
-            return current ? { ...op, baseVersion: current.version } : op;
+            const own = ownVersion(stack, op.id);
+            return own === null ? op : { ...op, baseVersion: own };
         })
     };
 }
@@ -106,7 +122,7 @@ function start(stack: UndoStack, direction: 'undo' | 'redo', batchId: string, re
     }
     let batch: EditBatch;
     try {
-        batch = rebase(reverseBatch(batchId, step.before, step.batch, step.results), records);
+        batch = rebase(reverseBatch(batchId, step.before, step.batch, step.results), stack);
     } catch (err) {
         return null;
     }

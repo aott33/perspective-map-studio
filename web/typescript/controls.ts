@@ -40,6 +40,8 @@ export const GLYPH_PATHS = {
     pointer: 'M5 3l14 8-6 1.5-1.5 6z',
     /** Pin: the Point tool. */
     pin: 'M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12zM12 11a2 2 0 1 0 0-4a2 2 0 1 0 0 4',
+    /** Line: the line tool in the mode pill (the spike's toggle draws its own 16 px polyline). */
+    line: 'M3 18l5-9 5 6 8-11',
     /** Undo and Redo: an arrow curling back, and forward. */
     undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
     redo: 'M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3'

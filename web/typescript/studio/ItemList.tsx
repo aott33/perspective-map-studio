@@ -22,6 +22,8 @@ export interface ItemListProps {
     /** "Undo: add Well pad", or '' with nothing to undo (the button is then disabled). */
     undoLabel: string;
     redoLabel: string;
+    /** The map store is unreachable (map.load): Undo and Redo take no input, as the toolbar does. */
+    paused: boolean;
     onSelect: (id: string) => void;
     onUndo: () => void;
     onRedo: () => void;
@@ -61,14 +63,14 @@ export function ItemList(props: ItemListProps): React.ReactElement {
             <header className="mapstudio-dock-header">
                 <div className="mapstudio-dock-title-row">
                     <h2 className="mapstudio-dock-title">{props.title}</h2>
-                    <button type="button" className="mapstudio-dock-button mapstudio-undo" disabled={props.undoLabel === ''}
-                            title={props.undoLabel || 'Nothing to undo'} aria-label={props.undoLabel || 'Undo'} data-step={props.undoLabel}
-                            onClick={props.onUndo}>
+                    <button type="button" className="mapstudio-dock-button mapstudio-undo" disabled={props.paused || props.undoLabel === ''}
+                            title={props.paused ? 'Paused - the map store is unreachable' : props.undoLabel || 'Nothing to undo'}
+                            aria-label={props.undoLabel || 'Undo'} data-step={props.undoLabel} onClick={props.onUndo}>
                         <ChromeGlyph name="undo" />
                     </button>
-                    <button type="button" className="mapstudio-dock-button mapstudio-redo" disabled={props.redoLabel === ''}
-                            title={props.redoLabel || 'Nothing to redo'} aria-label={props.redoLabel || 'Redo'} data-step={props.redoLabel}
-                            onClick={props.onRedo}>
+                    <button type="button" className="mapstudio-dock-button mapstudio-redo" disabled={props.paused || props.redoLabel === ''}
+                            title={props.paused ? 'Paused - the map store is unreachable' : props.redoLabel || 'Nothing to redo'}
+                            aria-label={props.redoLabel || 'Redo'} data-step={props.redoLabel} onClick={props.onRedo}>
                         <ChromeGlyph name="redo" />
                     </button>
                     {problem ? null : (
@@ -85,20 +87,23 @@ export function ItemList(props: ItemListProps): React.ReactElement {
                     </div>
                 ) : null}
             </header>
-            <div className="mapstudio-list" role="list" data-rows={String(props.rows.length)}>
-                {props.rows.length === 0 ? <div className="mapstudio-list-empty">No items yet - items you add are listed here.</div> : null}
+            {props.rows.length === 0 ? <div className="mapstudio-list-empty">No items yet - items you add are listed here.</div> : null}
+            <ul className="mapstudio-list" data-rows={String(props.rows.length)}>
                 {props.rows.map((row) => (
-                    <button type="button" key={row.id} role="listitem"
-                            className={'mapstudio-list-row' + (props.selectedId === row.id ? ' mapstudio-list-row--selected' : '')}
-                            data-item-id={row.id} data-kind={row.kindId} data-state={row.badge} aria-current={props.selectedId === row.id ? 'true' : undefined}
-                            title={row.name + ' - ' + row.kindName + (row.words ? ' - ' + row.words : '')}
-                            onClick={() => props.onSelect(row.id)}>
-                        {row.icon !== '' ? <Glyph id={row.icon} className="mapstudio-list-kind-glyph" size={18} /> : <span className="mapstudio-list-kind-glyph" />}
-                        <span className="mapstudio-list-name">{row.name}</span>
-                        <Badge row={row} />
-                    </button>
+                    // A list item holding the button, so assistive technology hears both the list and a button (R14).
+                    <li key={row.id} className="mapstudio-list-item">
+                        <button type="button"
+                                className={'mapstudio-list-row' + (props.selectedId === row.id ? ' mapstudio-list-row--selected' : '')}
+                                data-item-id={row.id} data-kind={row.kindId} data-state={row.badge} aria-current={props.selectedId === row.id ? 'true' : undefined}
+                                title={row.name + ' - ' + row.kindName + (row.words ? ' - ' + row.words : '')}
+                                onClick={() => props.onSelect(row.id)}>
+                            {row.icon !== '' ? <Glyph id={row.icon} className="mapstudio-list-kind-glyph" size={18} /> : <span className="mapstudio-list-kind-glyph" />}
+                            <span className="mapstudio-list-name">{row.name}</span>
+                            <Badge row={row} />
+                        </button>
+                    </li>
                 ))}
-            </div>
+            </ul>
         </section>
     );
 }

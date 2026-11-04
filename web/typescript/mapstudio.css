@@ -2562,8 +2562,15 @@
 .mapstudio-list {
     flex: 1 1 auto;
     min-height: 0;
+    margin: 0;
     padding: 6px 6px 76px;
     overflow-y: auto;
+    list-style: none;
+}
+
+.mapstudio-list-item {
+    margin: 0;
+    padding: 0;
 }
 
 /* A row: the kind glyph, the name, the state badge right-aligned; selected on the selection tint with a 3 px inset edge. */

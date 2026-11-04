@@ -26,7 +26,7 @@ export function DrawToolbar(props: { tool: StudioTool | null; pill: string; paus
                 </button>
             </div>
             <div className="mapstudio-pill" role="status" data-tool={props.tool || 'select'}>
-                <ChromeGlyph name={placing ? 'pin' : props.tool === 'line' ? 'pointer' : 'pointer'} className="mapstudio-pill-glyph" size={16} />
+                <ChromeGlyph name={placing ? 'pin' : props.tool === 'line' ? 'line' : 'pointer'} className="mapstudio-pill-glyph" size={16} />
                 <span className="mapstudio-pill-words">{props.paused ? 'Paused - the map store is unreachable' : props.pill}</span>
             </div>
         </div>

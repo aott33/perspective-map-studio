@@ -11,11 +11,13 @@ import { ChromeGlyph } from './ChromeGlyph';
  * subline, the Details tab, then Name, Kind (read-only text in this slice), Location (latitude and
  * longitude, typed, the non-drag way to place a point) and the asset link (the kind's assets, Unlink).
  * Every field saves when it is finished (blur or Enter) through the component's callbacks, one
- * batch each. A field finished while the item's create is still being saved (no stored version yet,
- * the pad just placed with the cursor already in Name) is held and sent once the version arrives.
- * The Style tab, the kind's form fields, the place check, the page link and the Live now block are
- * later entries. The panel is keyed by the item's id, so its drafts start from the record; a new
- * version of the record (a save, an undo, another editor's change) resets them.
+ * batch each; a field finished while the item's create is still being saved (the pad just placed with
+ * the cursor already in Name) goes to the delegate like any other, which sends it right after the
+ * create's reply at the right version. The Style tab, the kind's form fields, the place check, the page
+ * link and the Live now block are later entries. The panel is keyed by the item's id, so its drafts
+ * start from the record; a new version of the record (a save, an undo, another editor's change) resets
+ * the fields the user has not touched and keeps a draft being typed. While map.load says the store is
+ * unreachable the fields are paused, as the toolbar is.
  */
 export interface PropertiesPanelProps {
     item: MapItemRecord;
@@ -24,8 +26,10 @@ export interface PropertiesPanelProps {
     assets: Asset[];
     /** The linked asset's name, or null when none or not in the list. */
     assetName: string | null;
-    /** The item's create is still being saved (no stored version yet): a finished field waits for it. */
+    /** The item's create is still being saved (no stored version yet): a finished field goes right after it. */
     pending: boolean;
+    /** The map store is unreachable (map.load): the fields take no input, as the toolbar does. */
+    paused: boolean;
     /** Open with the cursor in Name (the pad just placed; owner decision, 2026-11-04). */
     autoFocusName: boolean;
     onNameFocused: () => void;
@@ -57,16 +61,8 @@ export function readCoordinate(text: string, limit: number): number | null {
     return text.trim() !== '' && Number.isFinite(n) && Math.abs(n) <= limit ? n : null;
 }
 
-/** A field finished while the create was in flight, sent once the item has a version. */
-interface Held {
-    name?: string;
-    lngLat?: [number, number];
-    assetId?: string | null;
-}
-
 export class PropertiesPanel extends React.Component<PropertiesPanelProps, Drafts> {
     private nameInput: HTMLInputElement | null = null;
-    private held: Held = {};
 
     constructor(props: PropertiesPanelProps) {
         super(props);
@@ -78,16 +74,20 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
     }
 
     componentDidUpdate(prev: PropertiesPanelProps): void {
-        if (prev.item.id !== this.props.item.id || prev.item.version !== this.props.item.version) {
-            // The record moved on (this field's save, an undo, another editor): the drafts follow it, a held draft excepted.
-            const drafts = draftsOf(this.props.item);
-            if (this.held.name !== undefined) {
-                drafts.name = this.held.name;
+        if (prev.item.id !== this.props.item.id) {
+            this.setState(draftsOf(this.props.item));
+        } else if (prev.item.version !== this.props.item.version) {
+            // The record moved on (this field's save, a drag's move, an undo, another editor): a field the user has not
+            // touched (its draft is the previous record's value) follows it; a draft being typed keeps its keystrokes.
+            const before = draftsOf(prev.item);
+            const after = draftsOf(this.props.item);
+            const next: Partial<Drafts> = {};
+            for (const field of ['name', 'lat', 'lng'] as const) {
+                if (this.state[field] === before[field]) {
+                    next[field] = after[field];
+                }
             }
-            this.setState(drafts);
-        }
-        if (prev.pending && !this.props.pending) {
-            this.sendHeld();
+            this.setState(next as Pick<Drafts, keyof Drafts>);
         }
         if (!prev.autoFocusName && this.props.autoFocusName) {
             this.focusName();
@@ -102,33 +102,14 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         }
     }
 
-    /** The fields finished while the create was being saved, now that the item has a version. */
-    private sendHeld(): void {
-        const held = this.held;
-        this.held = {};
-        if (held.name !== undefined && held.name !== this.props.item.name) {
-            this.props.onRename(held.name);
-        }
-        if (held.lngLat !== undefined) {
-            this.props.onMove(held.lngLat);
-        }
-        if (held.assetId !== undefined && held.assetId !== this.props.item.assetId) {
-            this.props.onLink(held.assetId);
-        }
-    }
-
     private setNameInput = (el: HTMLInputElement | null): void => {
         this.nameInput = el;
     };
 
     private commitName = (): void => {
         const name = this.state.name.trim();
-        if (name === '' || name === this.props.item.name) {
+        if (name === '' || name === this.props.item.name || this.props.paused) {
             this.setState({ name: this.props.item.name });
-            return;
-        }
-        if (this.props.pending) {
-            this.held.name = name;
             return;
         }
         this.props.onRename(name);
@@ -145,11 +126,7 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
             return;
         }
         const [oldLng, oldLat] = item.geometry.coordinates;
-        if (roundCoordinate(lat) === roundCoordinate(oldLat) && roundCoordinate(lng) === roundCoordinate(oldLng)) {
-            return;
-        }
-        if (this.props.pending) {
-            this.held.lngLat = [lng, lat];
+        if (roundCoordinate(lat) === roundCoordinate(oldLat) && roundCoordinate(lng) === roundCoordinate(oldLng) || this.props.paused) {
             return;
         }
         this.props.onMove([lng, lat]);
@@ -170,32 +147,24 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
 
     private onAssetChange = (ev: React.ChangeEvent<HTMLSelectElement>): void => {
         const value = ev.target.value;
-        const assetId = value === '' ? null : value;
-        if (this.props.pending) {
-            this.held.assetId = assetId;
-            return;
-        }
-        this.props.onLink(assetId);
+        this.props.onLink(value === '' ? null : value);
     };
 
     private onUnlink = (): void => {
-        if (this.props.pending) {
-            this.held.assetId = null;
-            return;
-        }
         this.props.onLink(null);
     };
 
     render(): React.ReactElement {
-        const { item, kind, assets, assetName, pending } = this.props;
+        const { item, kind, assets, assetName, pending, paused } = this.props;
         const point = item.geometry.type === 'Point';
         const kindName = kind ? kind.name : item.kind;
-        const assetId = this.held.assetId !== undefined ? this.held.assetId : item.assetId;
+        const assetId = item.assetId;
         const subline = kindName + ' - ' + (item.assetId === null ? 'not linked' : 'linked to ' + (assetName || item.assetId));
         const latProblem = this.state.lat !== '' && readCoordinate(this.state.lat, 90) === null;
         const lngProblem = this.state.lng !== '' && readCoordinate(this.state.lng, 180) === null;
         return (
-            <section className="mapstudio-panel" aria-label={item.name} data-item-id={item.id} data-pending={pending ? 'true' : 'false'}>
+            <section className="mapstudio-panel" aria-label={item.name} data-item-id={item.id} data-pending={pending ? 'true' : 'false'}
+                     data-paused={paused ? 'true' : 'false'}>
                 <header className="mapstudio-panel-header">
                     <span className="mapstudio-popup-disc">
                         {kind && kind.icon !== '' ? <Glyph id={kind.icon} className="mapstudio-popup-glyph" size={18} /> : null}
@@ -212,10 +181,11 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                     <button type="button" role="tab" aria-selected="true" className="mapstudio-panel-tab mapstudio-panel-tab--active">Details</button>
                 </div>
                 <div className="mapstudio-panel-body" role="tabpanel">
-                    {pending ? <div className="mapstudio-panel-note" role="status">Saving the new item... a field you finish now saves right after it.</div> : null}
+                    {paused ? <div className="mapstudio-panel-note" role="status">Paused - the map store is unreachable</div>
+                        : pending ? <div className="mapstudio-panel-note" role="status">Saving the new item... a field you finish now saves right after it.</div> : null}
                     <label className="mapstudio-field">
                         <span className="mapstudio-field-label">Name</span>
-                        <input ref={this.setNameInput} className="mapstudio-input mapstudio-field-name" type="text" value={this.state.name}
+                        <input ref={this.setNameInput} className="mapstudio-input mapstudio-field-name" type="text" value={this.state.name} disabled={paused}
                                onChange={(ev) => this.setState({ name: ev.target.value })} onBlur={this.commitName} onKeyDown={this.onKey('name')} />
                     </label>
                     <div className="mapstudio-field">
@@ -229,13 +199,13 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                                 <label className="mapstudio-field-half">
                                     <span className="mapstudio-field-sublabel">Latitude</span>
                                     <input className="mapstudio-input mapstudio-field-lat" type="number" step="any" inputMode="decimal" value={this.state.lat}
-                                           aria-invalid={latProblem} onChange={(ev) => this.setState({ lat: ev.target.value })}
+                                           disabled={paused} aria-invalid={latProblem} onChange={(ev) => this.setState({ lat: ev.target.value })}
                                            onBlur={this.commitLocation} onKeyDown={this.onKey('lat')} />
                                 </label>
                                 <label className="mapstudio-field-half">
                                     <span className="mapstudio-field-sublabel">Longitude</span>
                                     <input className="mapstudio-input mapstudio-field-lng" type="number" step="any" inputMode="decimal" value={this.state.lng}
-                                           aria-invalid={lngProblem} onChange={(ev) => this.setState({ lng: ev.target.value })}
+                                           disabled={paused} aria-invalid={lngProblem} onChange={(ev) => this.setState({ lng: ev.target.value })}
                                            onBlur={this.commitLocation} onKeyDown={this.onKey('lng')} />
                                 </label>
                             </div>
@@ -252,14 +222,14 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                         <label className="mapstudio-field-label" htmlFor={'mapstudio-asset-' + item.id}>Asset</label>
                         <div className="mapstudio-field-pair">
                             <select id={'mapstudio-asset-' + item.id} className="mapstudio-input mapstudio-field-asset" value={assetId === null ? '' : assetId}
-                                    onChange={this.onAssetChange}>
+                                    disabled={paused} onChange={this.onAssetChange}>
                                 <option value="">Not linked</option>
                                 {assetId !== null && !assets.some((a) => a.id === assetId)
                                     ? <option value={assetId}>{assetId} (not in the asset list)</option> : null}
                                 {assets.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                             </select>
                             {assetId !== null ? (
-                                <button type="button" className="mapstudio-button mapstudio-field-unlink" onClick={this.onUnlink}>Unlink</button>
+                                <button type="button" className="mapstudio-button mapstudio-field-unlink" disabled={paused} onClick={this.onUnlink}>Unlink</button>
                             ) : null}
                         </div>
                         <span className="mapstudio-field-hint">

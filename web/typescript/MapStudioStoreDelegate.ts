@@ -28,8 +28,8 @@ import { DEV_LINE_KIND, SAVE_IDLE, SaveState, lineCreateBatch, newId, pointCreat
 import { pointKind } from './studio';
 import { UNDO_EMPTY, UndoStack, failPending, finishPending, pushStep, startRedo, startUndo, stepLabel } from './undoStack';
 import {
-    KeyValueStore, REPLAY_INTERVAL_MS, STORAGE_WARNING, UnsavedEntry, UnsavedQueue, UnsavedReason, isBusy, reasonFromError,
-    savedRecords, storageKey
+    KeyValueStore, REPLAY_INTERVAL_MS, STORAGE_WARNING, UnsavedEntry, UnsavedQueue, UnsavedReason, isBusy, isTransient, reasonFromError,
+    savedRecords, storageKey, unsavedItems
 } from './unsaved';
 import { UnsavedSender } from './unsavedSender';
 import { registerTestHook, takeTestReply } from './testHook';
@@ -176,6 +176,13 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private undoStack: UndoStack = UNDO_EMPTY;
     /** The label and the records before each batch sent by a tool or a field, until its reply makes it a step. */
     private pendingSteps = new Map<string, { label: string; before: MapItemRecord[] }>();
+    /**
+     * One send at a time per map item (entry 2): the batch in flight for an item (its create included), and behind it
+     * the batches waiting their turn, each sent right after the reply with its baseVersion set from the reply's
+     * version, so consecutive edits of one item inside one reply window never carry a stale baseVersion.
+     */
+    private inFlightByItem = new Map<string, string>();
+    private heldByItem = new Map<string, Array<{ batch: EditBatch; label: string | null }>>();
 
     constructor(componentStore: AbstractUIElementStore) {
         super(componentStore);
@@ -411,11 +418,72 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * is called when an edit is finished, never per click or drag frame.
      */
     sendBatch(batch: EditBatch, itemId: string, label: string, now: Date = new Date()): void {
-        this.pendingSteps.set(batch.batchId, { label, before: this.recordsFor(batch) });
+        this.dispatch(batch, itemId, label, now);
+    }
+
+    /**
+     * Send a batch for an item now, or hold it while another batch of the item is in flight (the one send at a
+     * time per item): a held batch goes right after that reply, rebased to the reply's version (releaseFlight). A
+     * `label` makes the saved batch an undo step; null is a reverse, which the stack settles itself.
+     */
+    private dispatch(batch: EditBatch, itemId: string, label: string | null, now: Date): void {
+        if (this.inFlightByItem.has(itemId)) {
+            const held = this.heldByItem.get(itemId) || [];
+            held.push({ batch, label });
+            this.heldByItem.set(itemId, held);
+            this.save = { state: 'saving', itemId };
+            this.notify();
+            console.info('[MapStudio] Batch ' + batch.batchId + ' waits its turn on ' + itemId + ' (' + held.length + ' waiting).');
+            return;
+        }
+        if (label !== null) {
+            this.pendingSteps.set(batch.batchId, { label, before: this.recordsFor(batch) });
+        }
+        this.inFlightByItem.set(itemId, batch.batchId);
         this.save = { state: 'saving', itemId };
         this.saveBatchId = batch.batchId;
         this.sender.enqueueAndSend(batch, now);
         this.notify();
+    }
+
+    /**
+     * The batch in flight for an item is done: saved (`results`), with the next held batch sent at the reply's
+     * version; or given up (a final refusal, a discard: `results` null), with the held batches dropped, since each
+     * would be refused the same way (one console line names them).
+     */
+    private releaseFlight(batchId: string, results: Array<{ entity: string; id: string; version: number }> | null): void {
+        for (const [itemId, flight] of Array.from(this.inFlightByItem.entries())) {
+            if (flight !== batchId) {
+                continue;
+            }
+            this.inFlightByItem.delete(itemId);
+            const held = this.heldByItem.get(itemId) || [];
+            this.heldByItem.delete(itemId);
+            if (held.length === 0) {
+                continue;
+            }
+            if (results === null) {
+                console.info('[MapStudio] ' + held.length + ' edit(s) waiting on ' + itemId + ' dropped: its save was refused or discarded.');
+                continue;
+            }
+            const [next, ...rest] = held;
+            if (rest.length > 0) {
+                this.heldByItem.set(itemId, rest);
+            }
+            const rebased: EditBatch = {
+                batchId: next.batch.batchId,
+                ops: next.batch.ops.map((op) => {
+                    const result = results.find((r) => r.entity === op.entity && r.id === op.id);
+                    return result ? { ...op, baseVersion: result.version } : op;
+                })
+            };
+            if (next.label === null) {
+                // A reverse: the stack holds the batch by its id; the rebased ops go to the Gateway.
+                this.undoStack = this.undoStack.pending && this.undoStack.pending.batch.batchId === rebased.batchId
+                    ? { ...this.undoStack, pending: { ...this.undoStack.pending, batch: rebased } } : this.undoStack;
+            }
+            this.dispatch(rebased, itemId, next.label, new Date());
+        }
     }
 
     /** The stored records of the batch's map items as they are now (a create's id is absent). */
@@ -426,6 +494,14 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     /** The stored record of a live map item, or undefined (not loaded, deleted, or the create still in flight). */
     private storedRecord(id: string): MapItemRecord | undefined {
         return this.changes.state.items.find((i) => i.id === id && !i.deleted && i.version > 0);
+    }
+
+    /**
+     * The record an edit is built on: the stored one, else the one this page has queued and not yet saved (the
+     * Point tool's create in flight, version 0): its update is held and rebased when the create's reply comes.
+     */
+    private knownRecord(id: string): MapItemRecord | undefined {
+        return this.storedRecord(id) || unsavedItems(this.unsaved.list()).find((i) => i.id === id);
     }
 
     /**
@@ -451,9 +527,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
     /** A moved point (the pin's drag end, or typed latitude and longitude): one update of its geometry, "move <name>". */
     moveItem(id: string, lngLat: [number, number]): void {
-        const item = this.storedRecord(id);
+        const item = this.knownRecord(id);
         if (!item) {
-            console.info('[MapStudio] The move of ' + id + ' waits: the item has no stored version yet.');
+            console.info('[MapStudio] The move of ' + id + ' was dropped: the item is not on the map.');
             return;
         }
         // The map store keeps 6 decimals (docs/contract.md): the batch carries the pin's or the field's place rounded.
@@ -463,20 +539,20 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
     /** The asset picker (entry 2): one update of `assetId` (null to unlink), "link <name>" or "unlink <name>". */
     linkItem(id: string, assetId: string | null): void {
-        const item = this.storedRecord(id);
+        const item = this.knownRecord(id);
         this.sendUpdate(id, { assetId }, stepLabel(assetId === null ? 'unlink' : 'link', item ? item.name : id));
     }
 
     private sendUpdate(id: string, data: MapItemData, label: string): void {
-        const item = this.storedRecord(id);
+        const item = this.knownRecord(id);
         if (!item) {
-            console.info('[MapStudio] The change to ' + id + ' waits: the item has no stored version yet.');
+            console.info('[MapStudio] The change to ' + id + ' was dropped: the item is not on the map.');
             return;
         }
         this.sendBatch(updateBatch(id, newId(), item.version, data), id, label);
     }
 
-    /** Undo the last saved edit of this session (entry 2): its reverse batch, at the record's current version, through the queue. */
+    /** Undo the last saved edit of this session (entry 2): its reverse batch, at this session's own version of the record, through the queue. */
     undo(): void {
         const started = startUndo(this.undoStack, newId(), this.changes.state.items);
         if (!started) {
@@ -499,10 +575,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private sendReverse(started: { stack: UndoStack; batch: EditBatch }): void {
         this.undoStack = started.stack;
         const itemId = started.batch.ops.length > 0 ? started.batch.ops[0].id : '';
-        this.save = { state: 'saving', itemId };
-        this.saveBatchId = started.batch.batchId;
-        this.sender.enqueueAndSend(started.batch, new Date());
-        this.notify();
+        this.dispatch(started.batch, itemId, null, new Date());
     }
 
     /** A batch saved: a tool's or a field's becomes a step; the pending reverse settles its step and moves the cursor. */
@@ -523,11 +596,21 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.sender.retry(batchId);
     }
 
-    /** Discard: the entry leaves storage and the map, and is never sent again (not while in flight). */
+    /** Discard: the entry leaves storage and the map, and is never sent again (not while in flight); the queue gave it up. */
     discardUnsaved(batchId: string): void {
         if (!this.sender.discard(batchId)) {
             console.info('[MapStudio] Batch ' + batchId + ' is being sent; Discard waits for its answer.');
+            return;
         }
+        this.giveUp(batchId);
+        this.notify();
+    }
+
+    /** The queue gave a batch up (a final refusal, a discard): no step comes of it, a pending reverse is let go, its item's turn moves on. */
+    private giveUp(batchId: string): void {
+        this.pendingSteps.delete(batchId);
+        this.undoStack = failPending(this.undoStack, batchId);
+        this.releaseFlight(batchId, null);
     }
 
     /** A `storage` event: another tab may have changed this queue. */
@@ -714,10 +797,13 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
                 const result = reply.body.results.find((r) => r.id === itemId);
                 this.save = { state: 'saved', itemId, version: result ? result.version : 1 };
             }
+            this.releaseFlight(reply.body.batchId, reply.body.results);
         } else if (reply.kind === 'error') {
-            if (outcome.kind === 'failed') {
-                this.pendingSteps.delete(outcome.batchId);
-                this.undoStack = failPending(this.undoStack, outcome.batchId);
+            // A transient refusal (store unreachable, busy, read-only, no answer) keeps the batch queued and replaying,
+            // so its step and its item's turn stay pending until the replay saves or the user discards it; a final
+            // one (conflict, role, invalid) is the queue giving the batch up.
+            if (outcome.kind === 'failed' && !isTransient(outcome.reason.code)) {
+                this.giveUp(outcome.batchId);
             }
             if (shown && this.save.state !== 'idle') {
                 this.save = refusedSave(this.save.itemId, reply.body);

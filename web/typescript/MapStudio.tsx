@@ -344,8 +344,13 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /** The map's height as a CSS variable, so a floating panel (the legend, entry 3) never grows past the map. */
     private publishHeight(): void {
         if (this.mapContainer) {
-            this.mapContainer.style.setProperty('--mapstudio-map-height', this.mapContainer.clientHeight + 'px');
-            this.mapContainer.style.setProperty('--mapstudio-map-width', this.mapContainer.clientWidth + 'px');
+            // On the map and on the stage beside it, so what floats over the map in the stage (the pill, entry 2) reads them too.
+            for (const el of [this.mapContainer, this.mapContainer.parentElement]) {
+                if (el) {
+                    el.style.setProperty('--mapstudio-map-height', this.mapContainer.clientHeight + 'px');
+                    el.style.setProperty('--mapstudio-map-width', this.mapContainer.clientWidth + 'px');
+                }
+            }
         }
     }
 
@@ -402,7 +407,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const delegate = this.props.delegate;
         const level = delegate ? delegate.level : null;
         const editing = isEditing(this.state.studio);
-        if (level !== null && level !== 'full') {
+        if ((level !== null && level !== 'full') || this.phoneWidth()) {
+            // A phone or viewer session (and phone widths, which keep View mode) stays in View mode, the prop as written.
             if (editing) {
                 this.setEditMode(false, false);
             }
@@ -444,7 +450,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         const delegate = this.props.delegate;
         const level = delegate ? delegate.level : null;
-        if (level === 'full' && !this.editSwitch && !isSheetWidth(sheetBasisWidth(map.getContainer()))) {
+        if (level === 'full' && !this.editSwitch && !this.phoneWidth()) {
             this.editSwitch = new EditSwitch(this.onEditSwitch);
             map.addControl(this.editSwitch, 'top-right');
             const el = this.editSwitch.element();
@@ -733,10 +739,18 @@ export class MapStudio extends Component<Props, MapStudioState> {
         return delegate ? unsavedItems(delegate.unsaved).find((i) => i.id === id) : undefined;
     }
 
-    /** Whether the studio's surfaces show: Edit mode at level full (entry 2). */
+    /** Whether the studio's surfaces show: Edit mode at level full (entry 2), never at phone widths (which keep View mode). */
     studioOn(): boolean {
         const delegate = this.props.delegate;
-        return isEditing(this.state.studio) && !!delegate && delegate.level === 'full';
+        return isEditing(this.state.studio) && !!delegate && delegate.level === 'full' && !this.phoneWidth();
+    }
+
+    /** Below 768 px (the viewport's width, as the stylesheet's phone rules read it): no studio, no switch, View mode kept. */
+    private phoneWidth(): boolean {
+        if (this.mapContainer) {
+            return isSheetWidth(sheetBasisWidth(this.mapContainer));
+        }
+        return typeof window !== 'undefined' && window.innerWidth > 0 ? isSheetWidth(window.innerWidth) : false;
     }
 
     /** The Edit switch (entry 2) and the rail's View: the mode, written back to the editMode prop. */
@@ -972,6 +986,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                       save={delegate.save}
                       undoLabel={undoLabel(delegate.undo)}
                       redoLabel={redoLabel(delegate.undo)}
+                      paused={delegate.editing === 'off'}
                       onSelect={this.onRowSelect}
                       onUndo={this.onUndo}
                       onRedo={this.onRedo} />
@@ -994,6 +1009,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              assets={assets.filter((a) => a.kind === item.kind)}
                              assetName={linked ? linked.name : null}
                              pending={item.version === 0}
+                             paused={delegate.editing === 'off'}
                              autoFocusName={this.focusNameId === item.id}
                              onNameFocused={this.onNameFocused}
                              onClose={this.onPanelClose}

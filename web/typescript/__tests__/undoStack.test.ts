@@ -1,8 +1,8 @@
 // The undo stack (epic 4 entry 2): one step per saved edit, last first, each reversed at its current version.
 import { EditBatch, MapItemRecord } from '../contract';
 import {
-    UNDO_EMPTY, UndoStack, canRedo, canUndo, failPending, finishPending, pushStep, rebase, redoLabel, startRedo, startUndo, stepLabel,
-    undoLabel
+    UNDO_EMPTY, UndoStack, canRedo, canUndo, failPending, finishPending, ownVersion, pushStep, rebase, redoLabel, startRedo, startUndo,
+    stepLabel, undoLabel
 } from '../undoStack';
 
 const PAD = '33333333-3333-4333-8333-333333333333';
@@ -47,7 +47,7 @@ describe('the stack and its labels', () => {
 });
 
 describe('undo, last first, each at the record\'s current version', () => {
-    test('the link, then the name, then the pad, each a reverse batch rebased to the stored version', () => {
+    test('the link, then the name, then the pad, each a reverse batch at the version this session last gave the item', () => {
         let stack = threeSteps();
         const current3 = pad(3, { name: 'P31', assetId: 'P12' });
         const undo1 = startUndo(stack, 'u1', [current3]);
@@ -170,11 +170,24 @@ describe('a reverse in flight, refused, or overtaken', () => {
         expect(startUndo(stack, 'u', [pad(2)])).toBeNull();
     });
 
-    test('rebase takes each record\'s current version and leaves an absent one alone', () => {
+    test('rebase takes the version this session\'s own steps last gave each item and leaves an unknown one alone', () => {
+        const stack = threeSteps();
         const batch: EditBatch = { batchId: 'x', ops: [
             { op: 'update', entity: 'item', id: PAD, baseVersion: 1, data: { name: 'a' } },
             { op: 'delete', entity: 'item', id: 'other', baseVersion: 9 }] };
-        expect(rebase(batch, [pad(7)]).ops.map((op) => op.baseVersion)).toEqual([7, 9]);
+        expect(ownVersion(stack, PAD)).toBe(3);
+        expect(ownVersion(stack, 'other')).toBeNull();
+        expect(rebase(batch, stack).ops.map((op) => op.baseVersion)).toEqual([3, 9]);
+    });
+
+    test('another editor\'s later version is never the base (FR-17): the reverse keeps the own one, for the Gateway to refuse conflict', () => {
+        const stack = threeSteps();
+        // mapoperator moved the pad on to version 7 since this session's link (version 3): the records say 7.
+        const theirs = pad(7, { name: 'P31', assetId: 'P12', geometry: { type: 'Point', coordinates: [-104.9, 39.7] } });
+        const undo = startUndo(stack, 'u1', [theirs]);
+        expect(undo!.batch.ops[0].baseVersion).toBe(3);
+        // The records before the reverse are still taken from what is on the map, for a later redo.
+        expect(undo!.stack.pending!.before).toEqual([theirs]);
     });
 
     test('never mutates the stack it is given', () => {

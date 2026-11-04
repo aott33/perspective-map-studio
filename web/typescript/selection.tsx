@@ -124,10 +124,19 @@ export interface SelectionHost {
  * the event before it gets here, and the draw tool's own Esc runs on the map container.
  */
 export function onRootKeyDown(host: SelectionHost, ev: React.KeyboardEvent<HTMLDivElement>): void {
-    if (ev.key !== 'Escape' || ev.defaultPrevented || host.state.drawing) {
+    if (ev.key !== 'Escape' || ev.defaultPrevented || host.state.drawing || isPlacing(host.state.studio)) {
+        // A tool in hand takes Esc on the map container (editing.ts); a field's own Esc stops before here.
         return;
     }
     if (host.state.popup === null && host.state.pick === null) {
+        if (host.state.panel !== null) {
+            // The Details panel closes with close or Esc (EXPERIENCE.md Properties panel, epic 4 entry 2): the selection goes.
+            ev.preventDefault();
+            clearSelection(host);
+            if (host.map) {
+                host.map.getCanvas().focus({ preventScroll: true });
+            }
+        }
         return;
     }
     ev.preventDefault();
