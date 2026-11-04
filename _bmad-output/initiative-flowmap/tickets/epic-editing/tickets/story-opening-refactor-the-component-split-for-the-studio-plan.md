@@ -3,7 +3,7 @@ title: 'Opening refactor: the component split for the studio'
 type: 'refactor'
 ticket: '1'
 created: '2026-11-03'
-status: 'in-review'
+status: 'built'
 baseline_revision: '2d646c1c8464dc49ed66eb2b07a1f629504c3cc7'
 route: 'full'
 route_source: 'auto'
@@ -116,3 +116,7 @@ Move, do not rewrite: each module takes the map and the component's callbacks as
 - The browser criterion (a viewer opens the dev map, an editor opens `/edit`, draws a line and presses Esc, a popup opens and closes, the attributes and the hook read as before) is covered by the suite on the refactored bundle: `tracer.spec.mjs` (the View page with no echo and no tool; `/edit`, the round trip, a drawn line), `popup.spec.mjs` (Esc closes the card and returns the focus, item 14; the 390 px sheet), `basemaps.spec.mjs` (the View-mode controls, no Draw a line), `linepopup.spec.mjs`, `search.spec.mjs`, `needsyou.spec.mjs`, `review.spec.mjs` (the theme re-read, item 29), and every spec's `send` through `window.__mapStudioTest`.
 - Not verified: a person in a browser (the suite's assertions stand in, as the plan's route allows); `toggleSelect` of the model has no caller yet (unit tested only).
 - The dev stack is left running for the review (`ops/down.sh` stops it).
+
+**Results after the review's patch (main session, 2026-11-04, commit ec3d544):**
+- `cd web && npx tsc --noEmit && npx jest`: clean; 36 suites, 305 tests. `./gradlew clean build`: BUILD SUCCESSFUL. `check-contract-versions.sh`: OK. The forbidden paths' diff since the baseline: empty. `MapStudio.tsx`: 780 lines. Bundle: `MapStudio.js` 1,351,327 bytes (850 fewer than the baseline's 1,352,177, -0.063 percent), `MapStudio.css` 108,962 (identical).
+- The e2e suite on the restaged bundle: 125 tests, 117 passed, 7 skipped, 1 failed in 27.9 minutes: `review.spec.mjs` "light theme, 390 px, the one top bar with the Needs you list, P14's bottom sheet and SWD1's custom view sheet", whose page snapshot at the failure shows Perspective's own "No Connection to Gateway" banner and P14's sheet restored, so the client lost its websocket mid-test and the map came back to its remembered place; the Gateway log holds only the ordinary session closes. The same test rerun alone on the patched bundle passed its first repeats and failed later ones (4 of 6, serial, one worker), and on the 0.3.0 baseline bundle built in a clean worktree and staged on the same stack it did the same (5 of 6, the fifth repeat failing with the identical error), so the drop is environmental and pre-existing on this box, not this change's; recorded in deferred-work.md. The container itself restarted once during these reruns.
