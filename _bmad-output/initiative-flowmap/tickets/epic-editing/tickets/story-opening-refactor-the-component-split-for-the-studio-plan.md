@@ -1,0 +1,88 @@
+---
+title: 'Opening refactor: the component split for the studio'
+type: 'refactor'
+ticket: '1'
+created: '2026-11-03'
+status: 'draft'
+baseline_revision: ''
+route: 'full'
+route_source: 'auto'
+risk: 'medium'
+review: ''
+review_source: ''
+lenses_ran: []
+review_loop_iteration: 0
+context: ['{project-root}/_bmad-output/handoff-epic-4.md', '{project-root}/docs/architecture.md', '{project-root}/docs/development.md']
+---
+
+<frozen-after-approval reason="human-owned intent - do not modify unless human renegotiates">
+
+## Intent
+
+**Problem:** `web/typescript/MapStudio.tsx` is 3,207 lines holding the Perspective store delegate (453 lines) and the React component (2,341 lines, with popups and selection alone about 540), and epic 4 adds a rail, an item list, a properties panel, the Kinds screen, the tag browser, a draw toolbar, an undo stack and a Recent changes dock on top of it. Every studio story would collide in one file.
+
+**Approach:** Split the file into modules by concern with no change in behaviour, and add one small pure mode and selection model (View or Edit, the current tool, the selected ids) that the component holds and the studio's surfaces will read. Every e2e and unit test passes unchanged; the contract, CSS, data attributes and test hook do not move.
+
+## Boundaries & Constraints
+
+**Always:** Keep every `data-*` attribute, class name, DOM order and `window.__mapStudioTest*` hook exactly as today (e2e reads them). Keep the one delegate-to-component interface: `notify()` to `mapStateToProps` with the same fields and revisions, and the same delegate methods the component calls. Keep `index.ts`'s exports (`MapStudio`, `MapStudioMeta`, the style preview exports). Follow the existing module pattern: pure functions unit tested in node where no DOM or MapLibre is needed, DOM-bound modules with a header comment saying what they own. Commit at each milestone (the delegate out, the map setup out, the popups out, the model in). No em dashes anywhere.
+
+**Never:** Change any message, prop, event, the contract docs, `mapstudio.props.json`, `mapstudio.css`, anything under `e2e/`, `common/` or `gateway/`. Add a dependency. Change what the map draws, when it redraws (the revision gating), or the spike's Draw a line behaviour. Fix a bug or add a feature found on the way: record it in `_bmad-output/deferred-work.md` instead. Let the production bundle grow past 2 percent of the baseline's bytes.
+
+</frozen-after-approval>
+
+## Code Map
+
+- `web/typescript/MapStudio.tsx` -- the whole thing today: imports 1-86; `MapStudioProps`, `MapStudioState` (extends `DrawState`), `BasemapState`, `MapStudioDelegateState`, `browserStorage`, `clientOf` 100-254; `MapStudioStoreDelegate` 256-708 (messages, `MapChanges`, unsaved queue and sender, live, connection, basemap; `handleEvent` 581-621; `notify()` is the only flow to the component); component constants 710-835 (layer ids, sprite and glyph URLs, `markerColors`, `THEME_TOKENS`, `chipOffsetExpression`, `LabelBox`); `MapStudio` 841-3181; `MapStudioMeta` 3183-3207.
+- Component concerns, by line: map creation, controls and layers in `componentDidMount` 938-1223 and `addTextLayers` 1398-1545, `applyTheme` 1239-1287, unmount 2223-2266; starting area, place memory and restore 929, 1300-1386, 1548-1561; basemap 1567-1688; labels and toggles 1704-1754, 1939-1969; zoom card and camera 1777-1870, 1971-2004; search and Needs you choices 1878-1931; items drawing and marker images 2029-2123, 2142-2221; drawing 2014, 2126, 2276-2303, 2340-2411; selection, popups and pick list 2413-2955; keyboard 2374-2404; unsaved and status render 2006, 3027-3056, 3095-3180; readiness and test attributes 2306-2338, 2961-3024, 3063-3089.
+- `web/typescript/index.ts` -- the only importer (`MapStudio`, `MapStudioMeta`); registers the component; re-exports `StylePreview`, `PresetPalette`, `TintPalette`. Keep its imports working.
+- Controls already in their own modules and wired from `componentDidMount` 992-1030 with constructor callbacks and setters: `ZoomControl.ts`, `SearchControl.ts`, `NeedsYouControl.ts`, `LegendControl.ts`, `DrawControl.tsx`, `mapboxLogo.ts`. Reuse as they are.
+- Pure modules the component already delegates to (keep, do not fold back): `draw.ts` (`DrawState`), `features.ts` (`Selection`, `SegmentRef`), `live.ts`, `markers.ts`, `search.ts`, `needsyou.ts`, `place.ts`, `startingArea.ts`, `basemaps.ts`, `unsaved.ts`, `unsavedSender.ts` (already pulled out of the delegate, the pattern to follow), `changes.ts`, `connection.ts`, `popupPlacement.ts`, `linePopup.ts`, `popupParams.ts`, `theme.ts`, `themeWatch.ts`.
+- `web/typescript/testHook.ts` -- `window.__mapStudioTest.send` and `__mapStudioTestView`; registered by the delegate's constructor. Unchanged.
+- `web/jest.config.js`, `web/tsconfig.test.json` -- node tests under `typescript/__tests__/*.test.ts`; no test imports `MapStudio.tsx`. New model tests go here.
+- `web/webpack.config.js` -- entry `typescript/index.ts`, output `web/build/generated-resources/mounted/MapStudio.js` and `.css`; the bundle baseline is a production build at `baseline_revision` (0.3.0's docs run recorded `MapStudio.js` 1,319,758 bytes, `docs/spike-measures.json`).
+- `_bmad-output/initiative-flowmap/tickets/epic-viewing/tickets/story-refactor-sweep-plan.md` -- the last sweep's conventions: `liveItem(id)`, `displayShows`, `popupParts.tsx`; "exports used only in their module stay".
+
+## Tasks & Acceptance
+
+**Execution:**
+- [ ] `web/typescript/MapStudioStoreDelegate.ts` -- move `MapStudioStoreDelegate`, `MapStudioDelegateState`, `BasemapState`, `BASEMAP_INITIAL`, `browserStorage` and `clientOf` here unchanged -- the delegate becomes its own module (first milestone, commit).
+- [ ] `web/typescript/mapLayers.ts` -- move the layer and source ids, sprite and glyph URLs, `markerColors`, `THEME_TOKENS`, `chipOffsetExpression`, `LabelBox`, the load handler's sources and layers (1044-1198) and `addTextLayers` into functions taking the map -- the map's drawing, out of the component.
+- [ ] `web/typescript/viewControls.ts` -- move the construction and wiring of the zoom card, search, Needs you, legend and Mapbox logo controls (992-1030 and their setters) into one function returning the handles -- the View-mode controls' wiring in one place.
+- [ ] `web/typescript/camera.ts` -- move `controlRect`, `cameraPadding`, `onFit`, `fitTo`, `onReturn`, `publishFit`, `publishView`, the starting area, place memory and restore helpers -- camera and place in one module.
+- [ ] `web/typescript/itemsLayer.ts` -- move `drawItems`, `drawUnsaved`, `dropQueuedFeatures`, `loadSprite`, `makeImage`, `publishItemCounts` -- the items on the map, with the revision gating kept as is.
+- [ ] `web/typescript/selection.tsx` -- move `onPointClick`, `onMapClick`, `selectLine`, `openLinePopup`, the pick list and popup opening, closing and rendering (2413-2955) into a module the component delegates to -- the largest block, a milestone commit of its own.
+- [ ] `web/typescript/editing.ts` -- move `startTerraDraw`, `applyEditing`, `toggleDrawing`, `onDrawFinish`, `setDrawState` and the Esc handling of drawing -- the spike's line tool, unchanged in behaviour.
+- [ ] `web/typescript/studio.ts` -- new, pure: `StudioState {mode: 'view' | 'edit', tool, selected: string[]}` with `enterEdit`, `leaveEdit`, `pickTool`, `select`, `toggleSelect`, `clearSelection` and `fromProps(editMode)`; the component holds it in state and derives today's `editing`, `drawing` and `selected` from it -- the model the studio's surfaces will read.
+- [ ] `web/typescript/__tests__/studio.test.ts` -- unit tests of every transition and of the derivation matching today's `editMode` and selection behaviour.
+- [ ] `web/typescript/MapStudio.tsx` -- what remains: props, state, `componentDidMount` and `componentWillUnmount` as thin wiring of the modules above, `render`, `MapStudioMeta`; under 800 lines.
+- [ ] `docs/architecture.md` -- the contributor guide's `web/` layout updated with the new modules in one short table -- so the next story finds them.
+
+**Acceptance Criteria:**
+- Given the dev stack with the 30-pad seed, when the whole e2e suite runs on the refactored bundle, then every test passes with no edit under `e2e/`.
+- Given the web unit tests, when `jest` runs, then every existing test passes unchanged and the new `studio.test.ts` passes.
+- Given a production build at `baseline_revision` and one at the result, when the bytes of `MapStudio.js` and `MapStudio.css` are compared, then each is within 2 percent of its baseline.
+- Given `git diff baseline_revision`, when the changed paths are listed, then none is under `e2e/`, `common/`, `gateway/`, `docs/contract.md` or `mapstudio.css`, and `mapstudio.props.json` is unchanged.
+- Given `web/typescript/MapStudio.tsx` after the split, when its lines are counted, then it is under 800 and the delegate lives in its own module.
+- Given the dev map in a browser, when a viewer opens it, an editor opens `/edit`, draws a line and presses Esc, and a popup opens and closes, then every `data-*` attribute, class name and the test hook read as before.
+
+## Implementation Notes
+
+## Plan Change Log
+
+## Review Triage Log
+
+## Design Notes
+
+Move, do not rewrite: each module takes the map and the component's callbacks as arguments or as a small context object, and the component keeps owning the state so `setState` and the revision gating (`drawnRevision`, `drawnLive`, `drawnUnsaved`, `drawnBasemap`, `drawnFulls`) stay where they are. A moved method keeps its name so `git log -L` and the e2e comments still point at it. The model's `fromProps` reads `editMode` once at mount, as today (entry 14 makes it bidirectional later).
+
+## Verification
+
+**Commands:**
+- `cd web && npx tsc --noEmit && npx jest` -- expected: clean types, every test green including `studio.test.ts`.
+- `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew clean build` -- expected: BUILD SUCCESSFUL (the first run in this container fetches Gradle and the dependencies; later runs may add `--offline`).
+- `stat -c %s web/build/generated-resources/mounted/MapStudio.js web/build/generated-resources/mounted/MapStudio.css` at `baseline_revision` and after -- expected: each within 2 percent.
+- `ops/up.sh` then `cd e2e && PW_CHROMIUM_PATH=/opt/pw-browsers/chromium npm test` -- expected: the whole suite green (about 30 minutes; the first run pulls the Gateway and PostgreSQL images).
+- `bash scripts/ci/check-contract-versions.sh` -- expected: pass, nothing changed.
+- `git diff --stat <baseline_revision> -- e2e common gateway docs/contract.md web/typescript/mapstudio.css common/src/main/resources/mapstudio.props.json` -- expected: empty.
+- `wc -l web/typescript/MapStudio.tsx` -- expected: under 800.
