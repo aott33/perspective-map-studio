@@ -1,6 +1,6 @@
 ---
 title: 'Hue tokens and the engineering review pack'
-type: 'story'
+type: 'feature'
 ticket: '12'
 created: '2026-10-29'
 status: 'built'

@@ -1,6 +1,6 @@
 ---
 title: 'Showcase page and View mode polish to the mockups'
-type: 'story'
+type: 'feature'
 ticket: '15'
 created: '2026-10-29'
 status: 'built'
