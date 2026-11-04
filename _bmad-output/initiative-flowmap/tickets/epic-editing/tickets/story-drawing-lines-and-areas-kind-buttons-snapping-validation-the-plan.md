@@ -3,7 +3,7 @@ title: "Drawing lines and areas: kind buttons, snapping, validation, the drawing
 type: 'feature'
 ticket: '4'
 created: '2026-11-04'
-status: 'in-review'
+status: 'built'
 baseline_revision: 'b06a5ee1c4418e579190f9429a44d0604b5f5e0e'
 route: 'full'
 route_source: 'auto'
@@ -92,6 +92,8 @@ context: ['{project-root}/_bmad-output/handoff-epic-4.md', '{project-root}/docs/
 - 2026-11-04 (implementer): the specs that drew at 390 px (`store`, `unsaved`, `changes`) draw at 1366 px on the same page and return to 390 px for the kept state, the screenshot and the reload, since no tool shows below 768 px; `tracer`'s 390 px line goes through the test hook and is asserted drawn from `map.changed`, its Esc and two-vertex finish kept at 1440 px. The phone touch probe became the Legend sheet (open and close by touch alone).
 - 2026-11-04 (implementer): the first whole-suite run found the studio vanishing while the store is unreachable (a failed load nulls the delegate's level; the spike's button had masked it); the component keeps the level last reported so the studio stays and the toolbar pauses. Recorded in `docs/platform-checks.md`.
 - 2026-11-04 (implementer): the commits are grouped by what compiles rather than one per milestone: the toggle, the specs, the tools, the drawing bar, snapping and the toast share `editing.ts` and `MapStudio.tsx` (one commit), the floating end mark (one), the drawing spec and the docs (one), the toolbar's row and the platform checks (one), the outage fix (one).
+
+- 2026-11-04 (coordinator, after the review): the five patches (the point kind button's own kind, keys typed in the search field, the self-intersection check for the Area tool only, the toast dropped when Edit mode is left, the two docs lines) verified on the patched tree: `tsc` clean, 346 Jest tests green, Gradle build green offline, both contract checks OK at 0.4.0, the plan's greps empty, and the whole e2e suite on a fresh dev stack 129 passed, 7 skipped, 0 failed in 30.7 min (the review 390 px flake did not show).
 
 ## Review Triage Log
 
