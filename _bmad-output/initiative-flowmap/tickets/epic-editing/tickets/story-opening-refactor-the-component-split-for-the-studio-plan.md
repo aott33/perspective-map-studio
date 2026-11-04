@@ -3,8 +3,8 @@ title: 'Opening refactor: the component split for the studio'
 type: 'refactor'
 ticket: '1'
 created: '2026-11-03'
-status: 'ready-for-dev'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: '4d75bd66645effa97ce2ebf77051e7afa8b2e285'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
@@ -67,6 +67,9 @@ context: ['{project-root}/_bmad-output/handoff-epic-4.md', '{project-root}/docs/
 - Given the dev map in a browser, when a viewer opens it, an editor opens `/edit`, draws a line and presses Esc, and a popup opens and closes, then every `data-*` attribute, class name and the test hook read as before.
 
 ## Implementation Notes
+
+- Environment (planner, 2026-11-03): a fresh container. Java 17 is at `/usr/lib/jvm/java-17-openjdk-amd64` (installed today; Gradle's toolchain wants it). The Docker daemon was started by hand (`dockerd`, log in the session scratchpad) and has no images yet: `ops/up.sh` pulls `inductiveautomation/ignition:8.3.10` and `postgres:16-alpine` on first use and reads an optional git-ignored `.env` (defaults in `ops/lib.sh`); if `docker info` fails after a container restart, start `dockerd` again. `web/node_modules` and `e2e/node_modules` are installed; Chromium for Playwright is at `/opt/pw-browsers/chromium` (never run `playwright install`). The first Gradle run fetches Gradle 9.8 and the dependencies through the proxy, so no `--offline` that time.
+- Commits (planner): one commit per milestone on the current branch, never a push; each commit message ends with the two trailer lines `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` and `Claude-Session: https://claude.ai/code/session_01F9eVq2qqbKx1YxrgoxuWT6`; no em dashes and no model identifier anywhere in files or messages apart from that trailer; never a bare `git stash`.
 
 ## Plan Change Log
 
