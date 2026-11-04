@@ -255,7 +255,7 @@
   },
   "phone": {
     "label": "measured",
-    "method": "Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the dev map at / with the seeded items (the line-tool probe on /edit, where Edit mode holds the tool); each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device's touch handling is unverified. Pan and pinch are read from the point's page position worked out from the map's reported data-center and data-zoom (entry 8: the phone popup is a sheet with no tip).",
+    "method": "Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the dev map at / with the seeded items (no drawing tool shows below 768 px since epic 4 entry 4, so the Legend sheet is the touch probe); each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device's touch handling is unverified. Pan and pinch are read from the point's page position worked out from the map's reported data-center and data-zoom (entry 8: the phone popup is a sheet with no tip).",
     "env": {
       "chromium": "153.0.8010.12",
       "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
@@ -307,9 +307,9 @@
         "detail": "the point's distance from the pinch centre grew by a factor of 2.34 for a CDP pinch of scale 2 (needs over 1.5)"
       },
       {
-        "check": "line-tool-finishes-by-touch-alone",
+        "check": "legend-opens-and-closes-by-touch-alone",
         "ok": true,
-        "detail": "data-line-points after two vertex taps and a repeat tap on the last, on /edit: '2' (whether Terra Draw finishes this way on touch is the thing probed)"
+        "detail": "data-legend-open 'true' after a tap on the 94x44 Legend button and 'false' after a tap on the sheet's 44x44 Close, on / (whether a touch alone drives the sheet is the thing probed)"
       },
       {
         "check": "no-console-or-page-errors",

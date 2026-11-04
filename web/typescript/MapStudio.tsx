@@ -266,6 +266,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
     savedSelection = '';
     /** Set as the component unmounts: closing the popup and removing the map then must not overwrite the place. */
     unmounting = false;
+    /**
+     * The level map.load last reported (entry 4): a failed load (the store unreachable) leaves the delegate's level
+     * unknown, and the studio of a session known to be full then stays, paused, as EXPERIENCE.md's Store unreachable
+     * state draws it (the toolbar fades), instead of vanishing until the store is back.
+     */
+    lastLevel: EditLevel | null = null;
 
     componentDidMount(): void {
         if (!this.mapContainer) {
@@ -408,6 +414,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
     }
 
     componentDidUpdate(prevProps: Readonly<Props>): void {
+        if (this.props.delegate && this.props.delegate.level !== null) {
+            this.lastLevel = this.props.delegate.level;
+        }
         this.applyEditMode(prevProps);
         this.applyStudioControls();
         this.dropDeadSelection();
@@ -763,10 +772,18 @@ export class MapStudio extends Component<Props, MapStudioState> {
         return delegate ? unsavedItems(delegate.unsaved).find((i) => i.id === id) : undefined;
     }
 
-    /** Whether the studio's surfaces show: Edit mode at level full (entry 2), never at phone widths (which keep View mode). */
+    /**
+     * Whether the studio's surfaces show: Edit mode at level full (entry 2), never at phone widths (which keep View
+     * mode). While a failed load leaves the level unknown (the store unreachable), the level last reported counts, so
+     * the studio of a full session stays and pauses rather than vanishing (entry 4).
+     */
     studioOn(): boolean {
         const delegate = this.props.delegate;
-        return isEditing(this.state.studio) && !!delegate && delegate.level === 'full' && !this.phoneWidth();
+        if (!delegate) {
+            return false;
+        }
+        const level = delegate.level !== null ? delegate.level : this.lastLevel;
+        return isEditing(this.state.studio) && level === 'full' && !this.phoneWidth();
     }
 
     /** Below 768 px (the viewport's width, as the stylesheet's phone rules read it): no studio, no switch, View mode kept. */
