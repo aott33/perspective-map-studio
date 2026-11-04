@@ -3,8 +3,8 @@ title: "Drawing lines and areas: kind buttons, snapping, validation, the drawing
 type: 'feature'
 ticket: '4'
 created: '2026-11-04'
-status: 'draft'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: 'b06a5ee1c4418e579190f9429a44d0604b5f5e0e'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
@@ -80,6 +80,10 @@ context: ['{project-root}/_bmad-output/handoff-epic-4.md', '{project-root}/docs/
 - Given the whole e2e suite, when it runs on the dev stack, then every spec passes with its expectations kept and no `.mapstudio-draw-button` remains anywhere.
 
 ## Implementation Notes
+
+- Decision (owner, 2026-11-04, approving the plan): no UX workshop for this entry; the toolbar, pill, drawing bar, snap indicator and toast follow DESIGN.md and EXPERIENCE.md as written; the floating end's mark is shown to the owner in the renders before and after.
+- Environment (planner, 2026-11-04): Java 17 at `/usr/lib/jvm/java-17-openjdk-amd64`; the Gradle cache is warm (`--offline` works); `web/node_modules` and `e2e/node_modules` installed; Chromium at `/opt/pw-browsers/chromium` (never `playwright install`). Docker was started by hand (`dockerd`; if `docker info` fails after a container restart, start it again the same way, logging to the session scratchpad); the images are pulled and the dev stack (compose project `ms-2a5e1993`, port 9088) is up with entry 2's build staged; `ops/up.sh --fresh` rebuilds, restages and restarts it with a fresh trial (a restart inside the trial window keeps only the time left, so use `--fresh` before a whole-suite run). The e2e review test at 390 px can fail once on this box with "No Connection to Gateway" (deferred-work.md, entry 1); rerun it alone. Entry 2's notes record Terra Draw's point mode reporting a drag end as `action: 'draw'`.
+- Commits (planner): one commit per milestone on the current branch, never a push; each message ends with the two trailer lines the session's attribution reminder gives (`Co-Authored-By` and `Claude-Session`); the configured git identity as it is (no `-c user.name` or `-c user.email`); no em dashes and no model identifier anywhere in files or messages apart from that trailer; never a bare `git stash`.
 
 ## Plan Change Log
 
