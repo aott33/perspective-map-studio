@@ -462,7 +462,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.applySpikeTool();
     }
 
-    /** The spike's Draw a line toggle follows the editMode prop at every level (0.3.0; entry 4's toolbar replaces it). */
+    /**
+     * The spike's Draw a line toggle follows the editMode prop at every level (0.3.0; entry 4's toolbar replaces it).
+     * Top-left under the search row since entry 2: the designed top-right column holds the Edit switch above the zoom
+     * card and is full at 1366 (DESIGN.md Layout & Spacing), and under that column on the dev page at 390 px the toggle
+     * sat where the unsaved spec's second vertex lands once the page's labels took their room.
+     */
     private applySpikeTool(): void {
         const map = this.map;
         if (!map) {
@@ -471,7 +476,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const wanted = this.props.props.editMode;
         if (wanted && !this.drawControl) {
             this.drawControl = new DrawControl(this.toggleDrawing);
-            map.addControl(this.drawControl, 'top-right');
+            map.addControl(this.drawControl, 'top-left');
             editing.applyEditing(this);
         } else if (!wanted && this.drawControl) {
             if (this.state.drawing) {

@@ -350,10 +350,10 @@ test.describe('1366 px', () => {
             await expectPageSelection(page, p2, 'Point 2', 'pad');
             expect(Math.round((await page.locator('.mapstudio-panel').boundingBox()).width)).toBe(320);
             await shot(page, 'mapstudio-studio-details-1366.png');
-            // A marker click (the popup opens as in View mode): the map's view is put back first, since the row panned it,
-            // and the stage has the width the docked panel leaves it.
+            // A marker click (the popup opens as in View mode): p1 at the map's centre at zoom 15, where it is a full disc
+            // (at zoom 12 it is a dot the Tracer line's name chip can displace, so a click there can land on the line).
             await expectStageWidth(map, STAGE_WITH_PANEL);
-            await view(page, map, TRACER.center, TRACER.zoom);
+            await view(page, map, TRACER.points.p1.lngLat, 15);
             const [x, y] = await pixelNow(map, TRACER.points.p1.lngLat);
             await page.mouse.click(x, y);
             await expect(map).toHaveAttribute('data-selected', p1);
