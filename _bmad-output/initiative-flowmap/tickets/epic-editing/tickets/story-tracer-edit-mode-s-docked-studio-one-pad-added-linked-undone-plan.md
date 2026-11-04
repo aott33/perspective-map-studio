@@ -3,8 +3,8 @@ title: "Tracer: Edit mode's docked studio, one pad added, linked, undone and see
 type: 'feature'
 ticket: '2'
 created: '2026-11-04'
-status: 'draft'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: 'ce177bf9db9ce1a7543df4966693d6d52f126f76'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
@@ -83,6 +83,10 @@ context: ['{project-root}/_bmad-output/handoff-epic-4.md', '{project-root}/docs/
 - Given `docs/platform-checks.md`, when the "Epic 4 entry 2" section is read, then the three SDK checks carry a live verdict with the Gateway version.
 
 ## Implementation Notes
+
+- Decision (owner, 2026-11-04, approving the plan after the product team's room): undo is one step per saved edit, last first, nothing grouped; the click saves the pad and a fine-tune drag saves an update; the mode pill names the kind; the component's own prop write coming back never re-enters the model; the plan stays whole. When the first pad lands and Details opens, the cursor is already in Name.
+- Environment (planner, 2026-11-04): Java 17 at `/usr/lib/jvm/java-17-openjdk-amd64`; the Gradle cache is warm (`--offline` works); `web/node_modules` and `e2e/node_modules` installed; Chromium at `/opt/pw-browsers/chromium` (never `playwright install`). Docker was started by hand (`dockerd`; if `docker info` fails after a container restart, start it again the same way, logging to the session scratchpad); the images are pulled and the dev stack (compose project `ms-2a5e1993`, port 9088) is up with entry 1's module staged; `ops/up.sh` rebuilds, restages and restarts it. The e2e review test at 390 px can fail once on this box with "No Connection to Gateway" (deferred-work.md, entry 1); rerun it alone.
+- Commits (planner): one commit per milestone on the current branch, never a push; each message ends with the two trailer lines the session's attribution reminder gives (`Co-Authored-By` and `Claude-Session`); the configured git identity as it is (no `-c user.name` or `-c user.email`); no em dashes and no model identifier anywhere in files or messages apart from that trailer; never a bare `git stash`.
 
 ## Plan Change Log
 
