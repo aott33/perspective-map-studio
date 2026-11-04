@@ -3,14 +3,14 @@ title: "Tracer: Edit mode's docked studio, one pad added, linked, undone and see
 type: 'feature'
 ticket: '2'
 created: '2026-11-04'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: 'ce177bf9db9ce1a7543df4966693d6d52f126f76'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/handoff-epic-4.md', '{project-root}/docs/contract.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md']
 ---
