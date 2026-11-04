@@ -157,3 +157,24 @@ describe('the map features (epic 3 entry 7)', () => {
         expect(mid.bearing).toBeCloseTo(0, 3);
     });
 });
+
+describe('the floating ends of the selected line (epic 4 entry 4)', () => {
+    const snapped = item('snapped', 'line', 'L-2', { type: 'LineString', coordinates: [[-104.99, 39.74], [-104.95, 39.75]] },
+        { ends: { start: { itemId: 'a' }, end: { itemId: 'far' } } });
+    const half = item('half', 'line', 'L-3', { type: 'LineString', coordinates: [[-104.99, 39.74], [-104.95, 39.75]] }, { ends: { start: { itemId: 'a' } } });
+
+    test('a selected line with both ends floating takes a mark at each; a snapped end takes none; nothing while unselected', () => {
+        const none = buildFeatures([A, FAR, L, snapped, half], KINDS, LIVE_INITIAL, null, COLORS);
+        expect(none.ends.features).toEqual([]);
+        const floating = buildFeatures([A, FAR, L, snapped, half], KINDS, LIVE_INITIAL, { id: 'l', kind: 'line' }, COLORS);
+        expect(floating.ends.features.map((f) => f.properties)).toEqual([{ id: 'l', role: 'start' }, { id: 'l', role: 'end' }]);
+        expect(floating.ends.features[0].geometry.coordinates).toEqual([-104.99, 39.74]);
+        expect(floating.ends.features[1].geometry.coordinates).toEqual([-104.95, 39.75]);
+        const both = buildFeatures([A, FAR, L, snapped, half], KINDS, LIVE_INITIAL, { id: 'snapped', kind: 'line' }, COLORS);
+        expect(both.ends.features).toEqual([]);
+        const one = buildFeatures([A, FAR, L, snapped, half], KINDS, LIVE_INITIAL, { id: 'half', kind: 'line' }, COLORS);
+        expect(one.ends.features.map((f) => f.properties)).toEqual([{ id: 'half', role: 'end' }]);
+        // A point's selection marks no line end.
+        expect(buildFeatures([A, FAR, L], KINDS, LIVE_INITIAL, { id: 'a', kind: 'point' }, COLORS).ends.features).toEqual([]);
+    });
+});

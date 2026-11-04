@@ -39,6 +39,12 @@ export const LAYER_ITEM_LINES_DOTTED = 'mapstudio-items-line-dotted';
 /** Each line's midpoint mark (its name chip and alarm badge) and the selected line's flow arrow (features.ts). */
 export const SOURCE_LINE_MARKS = 'mapstudio-line-marks';
 export const SOURCE_ARROW = 'mapstudio-arrow';
+/** The selected line's floating ends (epic 4 entry 4): a small ring in the selection token at each end that snaps to nothing. */
+export const SOURCE_LINE_ENDS = 'mapstudio-line-ends';
+export const LAYER_LINE_ENDS = 'mapstudio-line-ends';
+/** The floating end's mark: its radius and ring, in px. */
+export const END_MARK_RADIUS = 4.5;
+export const END_MARK_RING = 2;
 /** The lines: the selection casing under them, dashed (comms lost, stale, no data) and solid, weight and hue per feature. */
 export const LAYER_LINE_CASING = 'mapstudio-items-line-casing';
 /** The halo under every line in the blank-map token (entry 12, markers.ts LINE_HALO_WIDTH), one layer per pattern. */
@@ -200,6 +206,7 @@ export function addItemLayers(map: MapLibreMap, mc: MarkerColors): void {
     map.addSource(SOURCE_ITEM_POINTS, { type: 'geojson', data: empty.points });
     map.addSource(SOURCE_LINE_MARKS, { type: 'geojson', data: empty.points });
     map.addSource(SOURCE_ARROW, { type: 'geojson', data: empty.points });
+    map.addSource(SOURCE_LINE_ENDS, { type: 'geojson', data: empty.points });
     // The areas (entry 1, AD-11): a low-saturation fill in the category tint and a firmer
     // outline, under every line and point; a tint is never on a point or a line. An area with
     // no tint is its dashed outline alone in the lateral tone (DESIGN.md: the geofence outline;
@@ -300,6 +307,19 @@ export function addItemLayers(map: MapLibreMap, mc: MarkerColors): void {
         filter: solidFilter,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'weight'], 'line-opacity': dimmed }
+    });
+    // The selected line's floating ends (entry 4; DESIGN.md Map line, EXPERIENCE.md Snap): a small ring in
+    // the selection token on the halo fill, over the line; a snapped end has its item's marker instead.
+    map.addLayer({
+        id: LAYER_LINE_ENDS,
+        type: 'circle',
+        source: SOURCE_LINE_ENDS,
+        paint: {
+            'circle-radius': END_MARK_RADIUS,
+            'circle-color': mc.halo,
+            'circle-stroke-color': mc.selection,
+            'circle-stroke-width': END_MARK_RING
+        }
     });
 }
 
@@ -538,6 +558,8 @@ export function applyThemePaint(map: MapLibreMap, root: HTMLElement | undefined,
         setPaint(layer, 'line-color', mc.halo);
     }
     setPaint(LAYER_LINE_CASING, 'line-color', mc.selection);
+    setPaint(LAYER_LINE_ENDS, 'circle-color', mc.halo);
+    setPaint(LAYER_LINE_ENDS, 'circle-stroke-color', mc.selection);
     setPaint(LAYER_UNSAVED_LINES, 'line-color', themeColor(root, '--label'));
     setPaint(LAYER_UNSAVED_POINTS, 'circle-color', blank);
     setPaint(LAYER_UNSAVED_POINTS, 'circle-stroke-color', themeColor(root, '--label'));
@@ -559,7 +581,7 @@ export function applyThemePaint(map: MapLibreMap, root: HTMLElement | undefined,
  */
 export function applyLayerToggles(map: MapLibreMap, toggles: Record<LegendToggle, boolean>): void {
     const lineLayers = [LAYER_LINE_CASING, LAYER_LINE_HALO_DASHED, LAYER_LINE_HALO_DOTTED, LAYER_LINE_HALO, LAYER_ITEM_LINES_DASHED,
-        LAYER_ITEM_LINES_DOTTED, LAYER_ITEM_LINES, LAYER_LINE_BADGES, LAYER_ARROW];
+        LAYER_ITEM_LINES_DOTTED, LAYER_ITEM_LINES, LAYER_LINE_ENDS, LAYER_LINE_BADGES, LAYER_ARROW];
     const nameLayers = [LAYER_ITEM_NAMES, LAYER_ITEM_CHIPS, LAYER_ITEM_KPI];
     const set = (layer: string, visible: boolean): void => {
         if (map.getLayer(layer)) {

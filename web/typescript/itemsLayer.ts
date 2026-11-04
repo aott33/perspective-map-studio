@@ -18,8 +18,8 @@ import { Place } from './place';
 import { LegendControl } from './LegendControl';
 import { legendKey } from './legend';
 import {
-    SOURCE_ARROW, SOURCE_ITEM_AREAS, SOURCE_ITEM_LINES, SOURCE_ITEM_POINTS, SOURCE_LINE_MARKS, SOURCE_UNSAVED_LINES, SOURCE_UNSAVED_POINTS,
-    SPRITE_URL
+    SOURCE_ARROW, SOURCE_ITEM_AREAS, SOURCE_ITEM_LINES, SOURCE_ITEM_POINTS, SOURCE_LINE_ENDS, SOURCE_LINE_MARKS, SOURCE_UNSAVED_LINES,
+    SOURCE_UNSAVED_POINTS, SPRITE_URL
 } from './mapLayers';
 import { MarkerColors, SpriteSymbol, imageFor, parseSprite } from './markers';
 import { NeedsYouControl } from './NeedsYouControl';
@@ -100,12 +100,14 @@ export function drawItems(host: ItemsHost): void {
     const points = source(SOURCE_ITEM_POINTS);
     const marks = source(SOURCE_LINE_MARKS);
     const arrow = source(SOURCE_ARROW);
-    if (lines && areas && points && marks && arrow) {
+    const ends = source(SOURCE_LINE_ENDS);
+    if (lines && areas && points && marks && arrow && ends) {
         lines.setData(data.lines);
         areas.setData(data.areas);
         points.setData(data.points);
         marks.setData(data.marks);
         arrow.setData(data.arrow);
+        ends.setData(data.ends);
         if (host.searchControl && delegate.itemsRevision !== host.drawnRevision) {
             // The search's entries follow the items (entry 9): names, kinds and the linked assets' names.
             host.searchControl.setEntries(buildEntries(items, delegate.lists.kinds, delegate.lists.assetNames));
@@ -132,6 +134,8 @@ export function drawItems(host: ItemsHost): void {
                 + data.points.features.reduce((n, f) => n + f.properties.members, 0)));
             host.mapContainer.setAttribute('data-shared-markers', String(data.shared));
             host.mapContainer.setAttribute('data-arrow', String(data.arrow.features.length));
+            // The selected line's floating ends drawn with the mark (entry 4): 0, 1 or 2, '' with no line selected.
+            host.mapContainer.setAttribute('data-floating-ends', data.arrow.features.length > 0 ? String(data.ends.features.length) : '');
             // The areas and their tints (entry 1), for tests: id, tint name and the resolved colour.
             host.mapContainer.setAttribute('data-areas', JSON.stringify(data.areas.features.map((f) => ({
                 id: f.properties.id, tint: f.properties.tint, color: f.properties.color

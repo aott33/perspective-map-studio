@@ -42,6 +42,16 @@ export interface ArrowProperties {
     id: string;
 }
 
+/**
+ * A floating end of the selected line (epic 4 entry 4; DESIGN.md Map line, EXPERIENCE.md Snap: snapped and
+ * floating ends look different): a small mark in the selection token at an end that snaps to nothing, none
+ * at a snapped one, whose item's marker already stands there. Read from `ends`, never from the coordinates (AD-19).
+ */
+export interface EndProperties {
+    id: string;
+    role: 'start' | 'end';
+}
+
 export interface MapFeatures {
     points: FeatureCollection<Point, MarkerProperties>;
     lines: FeatureCollection<LineString, LineProperties>;
@@ -50,6 +60,8 @@ export interface MapFeatures {
     marks: FeatureCollection<Point, LineMarkProperties>;
     /** The selected line (one feature, its whole geometry), along which the flow arrow repeats. */
     arrow: FeatureCollection<LineString, ArrowProperties>;
+    /** The selected line's floating ends (entry 4), one mark each; none for an area or a snapped end. */
+    ends: FeatureCollection<Point, EndProperties>;
     /** The items' bounds as "west,south,east,north" (6 decimals), or '' with no item. */
     boundsKey: string;
     bounds: [number, number, number, number] | null;
@@ -194,6 +206,7 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
     const areas: Array<Feature<Polygon, AreaProperties>> = [];
     const marks: Array<Feature<Point, LineMarkProperties>> = [];
     const arrow: Array<Feature<LineString, ArrowProperties>> = [];
+    const ends: Array<Feature<Point, EndProperties>> = [];
     let west = Infinity;
     let south = Infinity;
     let east = -Infinity;
@@ -325,6 +338,14 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
                 // The selected line's geometry: the arrow layer repeats the flow arrow along it in the line's
                 // drawn direction, first vertex to last (item 22), under the midpoint chip and badge.
                 arrow.push({ type: 'Feature', properties: { id: item.id }, geometry: { type: 'LineString', coordinates: coords } });
+                // Its floating ends take a mark (entry 4): an end that snaps to an item has that item's marker there.
+                const lineEnds = item.ends || {};
+                if (!lineEnds.start) {
+                    ends.push(pointFeature(coords[0], { id: item.id, role: 'start' }));
+                }
+                if (!lineEnds.end) {
+                    ends.push(pointFeature(coords[coords.length - 1], { id: item.id, role: 'end' }));
+                }
             }
         }
     }
@@ -335,6 +356,7 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
         areas: { type: 'FeatureCollection', features: areas },
         marks: { type: 'FeatureCollection', features: marks },
         arrow: { type: 'FeatureCollection', features: arrow },
+        ends: { type: 'FeatureCollection', features: ends },
         boundsKey: bounds ? bounds.map((n) => n.toFixed(6)).join(',') : '',
         bounds,
         shared,
