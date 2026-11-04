@@ -102,7 +102,12 @@ export interface SelectionHost {
     liveItem(id: string): MapItemRecord | undefined;
     anchorFor(id: string, lngLat: [number, number]): [number, number];
     /** A selection with the studio model that goes with it (studio.ts), built from the pending state, for a functional setState. */
-    selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio'>;
+    selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio' | 'panel'>;
+    /** Whether the studio's surfaces show (epic 4 entry 2): an open card is then placed again when the stage or its content changes. */
+    studioOn(): boolean;
+    /** Watches the card's content size, and the size it was last placed at. */
+    popupSizeObserver: ResizeObserver | null;
+    placedCardSize: string;
     /** A control's rectangle in map pixels (camera.ts), for the card's placement. */
     controlRect(selector: string): Rect | null;
     /** The component's stable callbacks: the popups' close and page link, the pick list's row, MapLibre's close event. */
@@ -462,6 +467,46 @@ export function makePopup(host: SelectionHost): void {
     });
     host.popup.setDOMContent(host.popupContent);
     host.popup.on('close', host.onPopupClosed);
+    if (typeof ResizeObserver !== 'undefined') {
+        // A card whose content grows after it was placed (a custom view that loads, entry 2) is placed again in Edit mode,
+        // on the next frame: a placement sets the content's max height, and a size change inside the observer's own
+        // delivery is the browser's "ResizeObserver loop" error.
+        let scheduled = false;
+        host.popupSizeObserver = new ResizeObserver(() => {
+            if (scheduled) {
+                return;
+            }
+            scheduled = true;
+            requestAnimationFrame(() => {
+                scheduled = false;
+                onPopupResized(host);
+            });
+        });
+        host.popupSizeObserver.observe(host.popupContent);
+    }
+}
+
+/** The card's content changed size: placed again when it differs from the size it was placed at (studio on, a card open). */
+function onPopupResized(host: SelectionHost): void {
+    const open = host.state.popup;
+    if (!open || open.sheet || !host.popupContent || !host.popup || !host.popup.isOpen() || !host.studioOn()) {
+        return;
+    }
+    const card = host.popupContent.firstElementChild as HTMLElement | null;
+    const size = card ? card.offsetWidth + 'x' + card.offsetHeight : '';
+    if (size === '' || size === host.placedCardSize) {
+        return;
+    }
+    showPopupAt(host, open.lngLat, open.line ? LINE_POPUP_PX : POPUP_WIDTH_PX);
+}
+
+/** The stage resized (a panel docked or left, epic 4 entry 2): an open card is placed again in the map's new room. */
+export function replacePopup(host: SelectionHost): void {
+    const open = host.state.popup;
+    if (!open || open.sheet || !host.popup || !host.popup.isOpen()) {
+        return;
+    }
+    showPopupAt(host, open.lngLat, open.line ? LINE_POPUP_PX : POPUP_WIDTH_PX);
 }
 
 /**
@@ -496,7 +541,9 @@ export function showPopupAt(host: SelectionHost, lngLat: [number, number], maxPx
         const card = content.firstElementChild as HTMLElement | null;
         const natural = card ? card.offsetHeight : 0;
         const cardWidth = card ? card.offsetWidth : Math.min(maxPx, width);
-        const obstacles = [host.controlRect('.maplibregl-ctrl-top-left'), host.controlRect('.maplibregl-ctrl-top-right')]
+        // The top bar, the zoom card and, in Edit mode, the floating draw toolbar and its pill (epic 4 entry 2).
+        const obstacles = [host.controlRect('.maplibregl-ctrl-top-left'), host.controlRect('.maplibregl-ctrl-top-right'),
+            host.controlRect('.mapstudio-toolbar-float')]
             .filter((r): r is Rect => r !== null);
         const placement = placePopup(at, cardWidth, natural, popupMaxHeight(height), width, height, obstacles, POPUP_OFFSET_PX);
         content.style.setProperty('--mapstudio-popup-max-height', placement.maxHeight + 'px');
@@ -513,6 +560,10 @@ export function showPopupAt(host: SelectionHost, lngLat: [number, number], maxPx
     }
     // setLngLat runs MapLibre's placement again with the anchor chosen and the card at its real size.
     host.popup.setLngLat(lngLat);
+    if (host.popupContent) {
+        const placed = host.popupContent.firstElementChild as HTMLElement | null;
+        host.placedCardSize = placed ? placed.offsetWidth + 'x' + placed.offsetHeight : '';
+    }
 }
 
 export function startPopupClock(host: SelectionHost): void {

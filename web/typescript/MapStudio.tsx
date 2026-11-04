@@ -107,6 +107,12 @@ export interface MapStudioState extends DrawState {
     /** The selected map item (epic 3 entry 7): the clicked point or line; a tap on the ground clears it. */
     selected: Selection | null;
     /**
+     * The item whose Details panel is docked beside the map (epic 4 entry 2): opened by the studio's own actions, a
+     * list row or the Point tool's placement, never by a marker click or a restored popup, whose card keeps the map's
+     * room (opening properties from the map and keeping the selection in view is entry 7's); null when none.
+     */
+    panel: string | null;
+    /**
      * The studio's mode, tool, surface and selection (epic 4 entries 1 and 2, studio.ts), which the studio's surfaces read;
      * kept in lock-step with `drawing` and `selected` through drawingState, pointToolState and selectionState (functional setState).
      */
@@ -136,7 +142,7 @@ function clientLocationWords(store: AbstractUIElementStore): string {
  */
 export class MapStudio extends Component<Props, MapStudioState> {
     state: MapStudioState = {
-        ...DRAW_IDLE, popup: null, clock: Date.now(), pick: null, selected: null, studio: fromProps(this.props.props.editMode)
+        ...DRAW_IDLE, popup: null, clock: Date.now(), pick: null, selected: null, panel: null, studio: fromProps(this.props.props.editMode)
     };
 
     mapContainer: HTMLDivElement | null = null;
@@ -150,6 +156,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
     popup: Popup | null = null;
     /** The DOM node the popup shows; React renders PointPopup into it through a portal. */
     popupContent: HTMLDivElement | null = null;
+    /** Watches the card's content size (entry 2): a custom view that grows after the card was placed is placed again. */
+    popupSizeObserver: ResizeObserver | null = null;
+    /** The card's size when it was last placed, so the watch re-places it only on a real change. */
+    placedCardSize = '';
     /** Whether the items sources exist (after the map's load). */
     itemsReady = false;
     /** The items revision last drawn. */
@@ -319,7 +329,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
 
         this.publishHeight();
         if (typeof ResizeObserver !== 'undefined') {
-            this.resizeObserver = new ResizeObserver(() => { map.resize(); this.publishHeight(); });
+            this.resizeObserver = new ResizeObserver(() => {
+                map.resize();
+                this.publishHeight();
+                // The stage grew or shrank (a panel docked or left, entry 2): an open card is placed again in the new room.
+                if (this.studioOn()) {
+                    selection.replacePopup(this);
+                }
+            });
             this.resizeObserver.observe(this.mapContainer);
         }
     }
@@ -602,6 +619,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.draw.stop();
             this.draw = null;
         }
+        if (this.popupSizeObserver) {
+            this.popupSizeObserver.disconnect();
+            this.popupSizeObserver = null;
+        }
         if (this.popup) {
             this.popup.off('close', this.onPopupClosed);
             this.popup.remove();
@@ -643,9 +664,16 @@ export class MapStudio extends Component<Props, MapStudioState> {
         return { drawing: false, linePoints: prev.linePoints, studio: pickTool(prev.studio, on ? 'point' : null) };
     }
 
-    /** A selection with the studio model that goes with it: the item's id selected, or nothing (studio.ts); from `prev` as above. */
-    selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio'> {
-        return { selected, studio: selected ? select(prev.studio, selected.id) : clearSelection(prev.studio) };
+    /**
+     * A selection with the studio model that goes with it: the item's id selected, or nothing (studio.ts); from `prev` as
+     * above. The Details panel stays only for the item it is open for; a row click or a placement sets it after this.
+     */
+    selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio' | 'panel'> {
+        return {
+            selected,
+            studio: selected ? select(prev.studio, selected.id) : clearSelection(prev.studio),
+            panel: selected !== null && prev.panel === selected.id ? prev.panel : null
+        };
     }
 
     /**
@@ -701,7 +729,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     }
 
     /** Whether the studio's surfaces show: Edit mode at level full (entry 2). */
-    private studioOn(): boolean {
+    studioOn(): boolean {
         const delegate = this.props.delegate;
         return isEditing(this.state.studio) && !!delegate && delegate.level === 'full';
     }
@@ -721,11 +749,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
         selection.closePopup(this);
         this.fitKey = null;
         if (item.geometry.type === 'Point') {
-            this.setState((prev) => ({ ...this.selectionState(prev, { id, kind: 'point' }), pick: null }));
+            this.setState((prev) => ({ ...this.selectionState(prev, { id, kind: 'point' }), pick: null, panel: id }));
             const at = this.anchorFor(id, [item.geometry.coordinates[0], item.geometry.coordinates[1]]);
             map.easeTo({ center: at, padding: camera.cameraPadding(this), duration: 300 });
         } else {
             this.selectLine(id);
+            this.setState({ panel: id });
             this.fitTo(camera.boundsOf(item.geometry.coordinates));
         }
         this.publishFit();
@@ -947,7 +976,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /** The properties panel for the selected item (entry 2): Details, keyed by the item so its drafts start from the record. */
     private renderPanel(delegate: MapStudioDelegateState): React.ReactNode {
         const selected = this.state.selected;
-        const item = selected ? this.itemFor(selected.id) : undefined;
+        const item = selected && this.state.panel === selected.id ? this.itemFor(selected.id) : undefined;
         if (!item) {
             return null;
         }

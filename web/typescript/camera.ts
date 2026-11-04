@@ -218,7 +218,9 @@ export function controlRect(host: CameraHost, selector: string): Rect | null {
         return null;
     }
     const container = host.map.getContainer();
-    const el = container.querySelector(selector) as HTMLElement | null;
+    // A MapLibre control sits inside the map's element; the studio's floating toolbar (epic 4 entry 2) beside it in the stage.
+    const stage = container.parentElement;
+    const el = (container.querySelector(selector) || (stage ? stage.querySelector(selector) : null)) as HTMLElement | null;
     if (!el || el.offsetWidth === 0 || el.offsetHeight === 0) {
         return null;
     }

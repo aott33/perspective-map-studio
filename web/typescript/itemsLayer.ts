@@ -14,6 +14,7 @@ import { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 import { TerraDraw } from 'terra-draw';
 import type { MapStudioState, Props } from './MapStudio';
 import { MapFeatures, buildFeatures } from './features';
+import { Place } from './place';
 import { LegendControl } from './LegendControl';
 import { legendKey } from './legend';
 import {
@@ -57,6 +58,8 @@ export interface ItemsHost {
     itemBounds: MapFeatures['bounds'];
     itemBoundsKey: string;
     fitKey: string | null;
+    /** A remembered selection still to put back (camera.ts applyRestore), or null; the item counts wait for it. */
+    restore: Place | null;
     /** The sprite's symbols once fetched (empty when the fetch failed), its fetch, and the images made, by id. */
     symbols: Record<string, SpriteSymbol> | null;
     sprite: Promise<Record<string, SpriteSymbol>> | null;
@@ -294,6 +297,16 @@ export function dropImages(host: ItemsHost, map: MapLibreMap): void {
 export function publishItemCounts(host: ItemsHost, map: MapLibreMap): void {
     const el = host.mapContainer;
     if (!el || host.map !== map) {
+        return;
+    }
+    const canvas = map.getCanvas();
+    const container = map.getContainer();
+    if (host.restore !== null || canvas.clientWidth !== container.clientWidth || canvas.clientHeight !== container.clientHeight) {
+        // A remembered selection is still to come back (owner re-test R4 (a)), and in Edit mode its properties panel
+        // docks beside the map and resizes it (epic 4 entry 2): the counts, which a test takes as "drawn and settled",
+        // wait for the idle after it is put back or dropped and after the canvas matches its container again (every
+        // values batch and every resize redraws, so an idle follows).
+        map.once('idle', () => publishItemCounts(host, map));
         return;
     }
     const count = (source: string): number => {

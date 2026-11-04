@@ -50,7 +50,7 @@ export interface EditingHost {
     /** The Point tool picked up or put down (and the line tool cancelled) with the studio model, from the pending state. */
     pointToolState(prev: Readonly<MapStudioState>, on: boolean): Pick<MapStudioState, 'drawing' | 'linePoints' | 'studio'>;
     /** A selection with the studio model that goes with it (studio.ts), from the pending state. */
-    selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio'>;
+    selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio' | 'panel'>;
     /** Close the open popup, card or sheet (selection.tsx): a placed point takes the selection. */
     closePopup: () => void;
     /** A finished line is queued and drawn from the unsaved layer: remove Terra Draw's copy of it (itemsLayer.ts). */
@@ -252,7 +252,7 @@ function onPointFinish(host: EditingHost, id: string | number, action: string): 
         host.focusNameId = itemId;
         // The new item takes the selection (an open popup goes); its Details open beside the map.
         host.closePopup();
-        host.setState((prev) => ({ ...host.selectionState(prev, { id: itemId, kind: 'point' }), pick: null }));
+        host.setState((prev) => ({ ...host.selectionState(prev, { id: itemId, kind: 'point' }), pick: null, panel: itemId }));
         console.info('[MapStudio] Point placed with the Point tool: ' + itemId + ' at ' + lngLat[0].toFixed(6) + ', ' + lngLat[1].toFixed(6));
     }
 }

@@ -357,16 +357,23 @@ test.describe('1366 px', () => {
             const [x, y] = await pixelNow(map, TRACER.points.p1.lngLat);
             await page.mouse.click(x, y);
             await expect(map).toHaveAttribute('data-selected', p1);
-            await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', p1);
-            // The popup is the card, as in View mode: the sheet is the phone's, not a narrow map's (the stage is 718 px here).
+            // A marker click selects and opens the popup as in View mode; Details stays the list's and the Point tool's
+            // (opening properties from the map and keeping the selection in view is entry 7's), so the panel for Point 2 goes.
+            await expect(page.locator('.mapstudio-panel')).toHaveCount(0);
             await expect(map).toHaveAttribute('data-popup-mode', 'card');
             await expect(page.locator('.maplibregl-popup .mapstudio-popup--default')).toHaveAttribute('data-point-id', p1, { timeout: 30_000 });
             await expectPageSelection(page, p1, 'Point 1', 'pad');
-            // The ground (clear of every item and the open card): the selection, the panel and the page's labels clear.
+            // The card sits inside the map, which grew back to the list's width when the panel went.
+            await expectStageWidth(map, 1366 - 72 - 256);
+            const cardBox = await page.locator('.maplibregl-popup-content').boundingBox();
+            const mapBox = await map.boundingBox();
+            expect(cardBox.x).toBeGreaterThanOrEqual(mapBox.x - 1);
+            expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(mapBox.x + mapBox.width + 1);
+            // The ground (clear of every item and the open card): the selection, the popup and the page's labels clear.
             const ground = await groundSpot(page, map);
             await page.mouse.click(ground[0], ground[1]);
             await expect(map).toHaveAttribute('data-selected', '');
-            await expect(page.locator('.mapstudio-panel')).toHaveCount(0);
+            await expect(map).toHaveAttribute('data-popup-mode', '');
             await expectPageSelection(page, null);
             // The Point tool in hand, Esc on the map puts it down; the Select tool does too.
             await page.locator('.mapstudio-tool--point').click();
