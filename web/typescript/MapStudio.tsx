@@ -1,17 +1,15 @@
 import * as React from 'react';
-import * as ReactDOM from 'react-dom';
 import {
     AbstractUIElementStore,
     Component,
     ComponentMeta,
     ComponentProps,
     ComponentStoreDelegate,
-    PageStore,
     PComponent,
     PropertyTree,
     Size2d
 } from '@inductiveautomation/perspective-client';
-import { ErrorEvent, Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent, Popup, setWorkerUrl } from 'maplibre-gl';
+import { ErrorEvent, Map as MapLibreMap, MapMouseEvent, Popup, setWorkerUrl } from 'maplibre-gl';
 import { TerraDraw, TerraDrawLineStringMode } from 'terra-draw';
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import { DrawControl } from './DrawControl';
@@ -34,38 +32,28 @@ import { NeedsYouControl } from './NeedsYouControl';
 import { NeedsYouRow } from './needsyou';
 import { readStartingArea, startingAreaKey } from './startingArea';
 import { Place } from './place';
-import { LiveState, displayShows, iconKpiOf, itemPreset, itemState } from './live';
+import { LiveState, itemPreset, itemState } from './live';
 import { CONNECTED, connectionChipText, connectionDetailText } from './connection';
 import { ThemeWatch } from './themeWatch';
 import { MarkerColors, SpriteSymbol, markerProperties, stateWord } from './markers';
 import { PresetPalette, StylePreview, TintPalette } from './StylePreview';
 import { MapFeatures, SegmentRef, Selection } from './features';
-import { LinePopup } from './LinePopup';
-import { popupInstruments, popupNodes } from './linePopup';
-import { instrumentsOn, lengthM } from './geometry';
 import { ZoomControl } from './ZoomControl';
 import { SearchControl } from './SearchControl';
 import { SearchResult } from './search';
-import { PickList, PickRow } from './PickList';
-import { DefaultPopup } from './DefaultPopup';
 import { STORE_UNKNOWN, storeStateAttribute, storeStatusText } from './storeState';
-import { PointPopup } from './PointPopup';
 import { SAVE_IDLE, saveStatusText } from './save';
 import { UnsavedEntry, entryText, summaryText } from './unsaved';
-import {
-    LINE_POPUP_PX, POPUP_WIDTH_PX, PopupPoint, fillLink, fillParams, isSheetWidth, popupItemView, popupMaxHeight,
-    popupMountPath, popupViewParams
-} from './popupParams';
-import { PopupAnchor, Rect, placePopup, placedMaxWidth } from './popupPlacement';
+import { PopupPoint } from './popupParams';
+import { PopupAnchor, Rect } from './popupPlacement';
 import { SHARED_M } from './shared';
 import { registerTestView } from './testHook';
 import { drawColor } from './theme';
 import { IMPROVE_MAP_CLASS, feedbackHref, providerLogo, rasterPaint } from './basemaps';
 import { MapboxLogoControl } from './mapboxLogo';
 import {
-    LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED, LAYER_ITEM_MARKERS, SOURCE_BASEMAP, SPRITE_URL, THEME_TOKENS, addItemLayers,
-    addPointerCursor, addTextLayers, addUnsavedLayers, applyLayerToggles, applyThemePaint, blankColors, createMap, markerColors, publishLabels,
-    setBasemapLayer
+    SOURCE_BASEMAP, SPRITE_URL, THEME_TOKENS, addItemLayers, addPointerCursor, addTextLayers, addUnsavedLayers, applyLayerToggles, applyThemePaint,
+    blankColors, createMap, markerColors, publishLabels, setBasemapLayer
 } from './mapLayers';
 import { addViewControls, applyProviderLogo } from './viewControls';
 import { Kind } from './adapters';
@@ -73,6 +61,8 @@ import { MapStudioDelegateState, MapStudioStoreDelegate, clientOf } from './MapS
 import * as camera from './camera';
 import { Bounds } from './camera';
 import * as items from './itemsLayer';
+import * as selection from './selection';
+import type { OpenPick, OpenPopup } from './selection';
 
 /** Must match MapStudioComponent.COMPONENT_ID on the Java side. */
 export const COMPONENT_TYPE = 'ao.mapstudio';
@@ -104,33 +94,6 @@ export interface MapStudioProps {
     editMode: boolean;
 }
 
-/**
- * The popup that is open: the clicked point (or line, entry 2) with its map coordinates, as a card or
- * a bottom sheet (a point's below 768 px, entry 8), and for a line the clicked segment.
- */
-interface OpenPopup {
-    point: PopupPoint;
-    lngLat: [number, number];
-    /** A line's popup (entry 2): the line popup at the clicked segment, always a card. */
-    line: boolean;
-    segment: SegmentRef | null;
-    /** Below 768 px a point's popup is a bottom sheet in the component, not a MapLibre popup (epic 3 entry 8). */
-    sheet: boolean;
-    /** When it opened (the clock), so a custom view waits briefly for the popup detail before it fills its params. */
-    openedAt: number;
-}
-
-/** How long a custom popup view waits for the popup detail (the base path) before it opens without it. */
-const POPUP_DETAIL_WAIT_MS = 2000;
-/** The sheet keeps the selected marker at least this far above its top edge. */
-const SHEET_CLEARANCE_PX = 48;
-
-/** The pick list a shared marker opened (epic 3 entry 7): its rows at the marker's place. */
-interface OpenPick {
-    rows: PickRow[];
-    lngLat: [number, number];
-}
-
 export interface MapStudioState extends DrawState {
     popup: OpenPopup | null;
     /** Bumped every few seconds while the popup is open, so its data ages move. */
@@ -142,11 +105,6 @@ export interface MapStudioState extends DrawState {
 }
 
 export type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
-
-/** The popup's offset from the point: the disc radius and the ring, so the tip touches the disc. */
-const POPUP_OFFSET_PX = 22;
-/** How often an open popup's data ages are redrawn. */
-const POPUP_CLOCK_MS = 5000;
 
 /**
  * The Map Studio component: a MapLibre map on a blank style that draws the
@@ -208,7 +166,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /** The items' bounds last drawn, for Fit. */
     itemBounds: MapFeatures['bounds'] = null;
     itemBoundsKey = '';
-    private popupClock: ReturnType<typeof setInterval> | null = null;
+    popupClock: ReturnType<typeof setInterval> | null = null;
     /** Where each member of a shared marker is drawn, by item id (owner review notes item 20): a popup anchors there. */
     anchors: Record<string, [number, number]> = {};
     /** The sharing distance at the map's zoom (item 20) and the one the features were last built with. */
@@ -257,7 +215,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         // The colours this map was built with, for the e2e suite (item 29); applyTheme updates them.
         this.mapContainer.setAttribute('data-theme-revision', '0');
         this.mapContainer.setAttribute('data-blank', colors.background);
-        this.makePopup();
+        selection.makePopup(this);
         const map = createMap(this.mapContainer, colors.background, camera.startCamera(place, area));
         // The View-mode controls (epic 3 entry 14; viewControls.ts): the zoom card, the search field with the
         // Needs you bar, the legend and the attribution, wired to this component's callbacks.
@@ -554,20 +512,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /** Fit's state for the zoom card and the e2e suite (camera.ts). */
     publishFit(): void { camera.publishFit(this); }
 
-    publishSelection(): void {
-        const selected = this.state.selected;
-        if (this.zoomControl) {
-            this.zoomControl.setReturn(selected !== null);
-        }
-        if (this.mapContainer) {
-            this.mapContainer.setAttribute('data-selected', selected ? selected.id : '');
-            this.mapContainer.setAttribute('data-selected-kind', selected ? selected.kind : '');
-            // The open segment of a selected line and the instruments highlighted at its ends (entry 2).
-            const segment = selected && selected.kind === 'line' && selected.segment ? selected.segment : null;
-            this.mapContainer.setAttribute('data-segment', segment ? segment.fromId + '|' + segment.toId : '');
-            this.mapContainer.setAttribute('data-highlighted', segment ? segment.fromId + ',' + segment.toId : '');
-        }
-    }
+    /** The selection's attributes and the zoom card's Return (selection.tsx). */
+    publishSelection(): void { selection.publishSelection(this); }
 
     private onStorage = (ev: StorageEvent): void => {
         const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
@@ -596,7 +542,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
 
     componentWillUnmount(): void {
         this.unmounting = true;
-        this.stopPopupClock();
+        selection.stopPopupClock(this);
         if (typeof window !== 'undefined') {
             window.removeEventListener('storage', this.onStorage);
         }
@@ -717,30 +663,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     };
 
-    /**
-     * Esc anywhere in the component closes the open popup, card, sheet or pick list (owner review notes
-     * item 14) and returns the focus to the map, or to the search field or the Needs you bar that opened
-     * it. The controls that handle Esc themselves (the search list, the Needs you list, the legend) stop
-     * the event before it gets here, and the draw tool's own Esc runs on the map container.
-     */
-    private onRootKeyDown = (ev: React.KeyboardEvent<HTMLDivElement>): void => {
-        if (ev.key !== 'Escape' || ev.defaultPrevented || this.state.drawing) {
-            return;
-        }
-        if (this.state.popup === null && this.state.pick === null) {
-            return;
-        }
-        ev.preventDefault();
-        const openedBy = this.openedBy;
-        this.closePopup();
-        if (openedBy === 'search' && this.searchControl) {
-            this.searchControl.focusInput();
-        } else if (openedBy === 'needsyou' && this.needsYouControl) {
-            this.needsYouControl.focusBar();
-        } else if (this.map) {
-            this.map.getCanvas().focus({ preventScroll: true });
-        }
-    };
+    /** Esc closes the open popup, card, sheet or pick list and returns the focus (item 14; selection.tsx). */
+    private onRootKeyDown = (ev: React.KeyboardEvent<HTMLDivElement>): void => selection.onRootKeyDown(this, ev);
 
     private setDrawState(state: DrawState): void {
         this.setState(state);
@@ -749,548 +673,25 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     }
 
-    private onPointClick = (ev: MapLayerMouseEvent): void => {
-        if (this.state.drawing) {
-            // The click belongs to the line being drawn.
-            return;
-        }
-        const feature = ev.features && ev.features[0];
-        const pointId = feature && feature.properties ? feature.properties.id : undefined;
-        if (typeof pointId !== 'string') {
-            return;
-        }
-        const kindId = feature && feature.properties && typeof feature.properties.kind === 'string' ? feature.properties.kind : '';
-        const name = feature && feature.properties && typeof feature.properties.name === 'string'
-            ? feature.properties.name : '';
-        const geometry = feature ? feature.geometry : undefined;
-        const lngLat: [number, number] = geometry && geometry.type === 'Point'
-            ? [geometry.coordinates[0], geometry.coordinates[1]]
-            : [ev.lngLat.lng, ev.lngLat.lat];
-        this.openedBy = null;
-        this.openPopup(this.popupPoint(pointId, name, kindId), lngLat);
+    /** A click on the map (selection.tsx): a marker's popup or pick list, a line's popup, or the ground clearing the selection. */
+    private onMapClick = (ev: MapMouseEvent): void => selection.onMapClick(this, ev);
 
-        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
-        if (!delegate) {
-            console.warn('[MapStudio] No delegate; the click on ' + pointId + ' was not sent.');
-            return;
-        }
-        delegate.sendPointClick(pointId);
-    };
+    /** The selection and the popups (selection.tsx), which the camera's restore and choices open as a click does. */
+    selectLine(id: string, segment: SegmentRef | null = null): void { selection.selectLine(this, id, segment); }
+    openLinePopup(id: string, segment: SegmentRef | null, lngLat: [number, number]): void { selection.openLinePopup(this, id, segment, lngLat); }
+    openPopup(point: PopupPoint, lngLat: [number, number]): void { selection.openPopup(this, point, lngLat); }
+    popupPoint(id: string, name: string, kind: string): PopupPoint { return selection.popupPoint(this, id, name, kind); }
 
-    /**
-     * A click on the map: a marker opens its popup (a shared marker its pick list) and selects the
-     * item; a line selects it (its casing and flow arrow); the ground clears the selection and
-     * closes the popup (the template's docs/map.md section 5 item 9). MapLibre's own closeOnClick
-     * is not used: it runs after the layer click handler and would close the popup that a click on
-     * another point has just moved.
-     */
-    private onMapClick = (ev: MapMouseEvent): void => {
-        if (this.state.drawing || !this.map) {
-            return;
-        }
-        // A click on the map closes the legend panel (entry 14) and the Needs you list (entry 3).
-        if (this.legendControl && this.legendControl.isOpen()) {
-            this.legendControl.close(false);
-        }
-        if (this.needsYouControl && this.needsYouControl.isOpen()) {
-            this.needsYouControl.close(false);
-        }
-        const map = this.map;
-        const onPoint = map.queryRenderedFeatures(ev.point, { layers: [LAYER_ITEM_MARKERS] });
-        if (onPoint.length > 0) {
-            // A click on a marker: the point click round trip and the popup, once. A marker image is
-            // wider than its disc, so when two markers overlap the click goes to the point whose
-            // position is nearest to it, not to whichever MapLibre lists first.
-            let nearest = onPoint[0];
-            let best = Number.POSITIVE_INFINITY;
-            for (const f of onPoint) {
-                const g = f.geometry;
-                if (!g || g.type !== 'Point') {
-                    continue;
-                }
-                const p = map.project([g.coordinates[0], g.coordinates[1]]);
-                const d = (p.x - ev.point.x) * (p.x - ev.point.x) + (p.y - ev.point.y) * (p.y - ev.point.y);
-                if (d < best) {
-                    best = d;
-                    nearest = f;
-                }
-            }
-            const props = (nearest.properties || {}) as Record<string, unknown>;
-            if (Number(props.members) > 1 && nearest.geometry.type === 'Point') {
-                this.openPick(String(props.memberIds || ''), [nearest.geometry.coordinates[0], nearest.geometry.coordinates[1]]);
-                return;
-            }
-            this.onPointClick({ ...ev, features: [nearest] } as MapLayerMouseEvent);
-            return;
-        }
-        const pad = 4;
-        const onLine = map.queryRenderedFeatures(
-            [[ev.point.x - pad, ev.point.y - pad], [ev.point.x + pad, ev.point.y + pad]],
-            { layers: [LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED] });
-        const lineProps = onLine.length > 0 && onLine[0].properties ? onLine[0].properties : null;
-        const lineId = lineProps ? lineProps.id : undefined;
-        if (typeof lineId === 'string') {
-            // The clicked feature is one segment of the line (features.ts): its from and to name the popup's segment.
-            const segment: SegmentRef | null = lineProps && typeof lineProps.from === 'string' && typeof lineProps.to === 'string'
-                ? { fromId: lineProps.from, toId: lineProps.to } : null;
-            this.openLinePopup(lineId, segment, [ev.lngLat.lng, ev.lngLat.lat]);
-            return;
-        }
-        this.clearSelection();
-    };
-
-    /** A line clicked: selected (casing, flow arrow, Return), the popup closed. */
-    selectLine(id: string, segment: SegmentRef | null = null): void {
-        this.closePopup();
-        this.setState({ selected: { id, kind: 'line', segment }, pick: null });
-        console.info('[MapStudio] Line ' + id + ' selected.');
-    }
-
-    /**
-     * A line clicked (entry 2, AD-7): its default popup at the clicked segment, the line selected with
-     * that segment (the instruments at its ends highlighted), the Gateway told with popup.open
-     * {itemId, segment}. A line whose kind shows nothing and that carries no instrument is only
-     * selected, as before.
-     */
-    openLinePopup(id: string, segment: SegmentRef | null, lngLat: [number, number]): void {
-        const delegate = this.props.delegate;
-        const item = this.liveItem(id);
-        if (!this.map || !delegate || !item || item.geometry.type !== 'LineString') {
-            this.selectLine(id, segment);
-            return;
-        }
-        const display = delegate.live.display[item.kind];
-        const instruments = instrumentsOn(delegate.items, id);
-        const shows = (display && (!!display.popupView || displayShows(display))) || instruments.length > 0;
-        if (!shows) {
-            this.selectLine(id, segment);
-            return;
-        }
-        if (!instruments.some((i) => iconKpiOf(delegate.live.display[i.kind]) !== null)) {
-            // A line with no measuring instrument has no segment to show or to highlight (owner review notes item 17).
-            segment = null;
-        }
-        this.openedBy = null;
-        const store = this.props.store.delegate as MapStudioStoreDelegate | undefined;
-        const before = this.state.popup;
-        if (before && before.point.id !== id && store) {
-            store.sendPopupClose(before.point.id);
-        }
-        if (store) {
-            // A new segment of the same line is a new popup.open too: the Gateway keeps the latest.
-            store.sendPopupOpen(id, segment);
-        }
-        this.startPopupClock();
-        // The line popup is a card at every width (entry 2's placement; the bottom sheet is a point's,
-        // entry 8), so a point's open sheet simply gives way to it.
-        const now = Date.now();
-        this.setState({
-            popup: { point: { ...this.popupPoint(id, item.name, item.kind) }, lngLat, line: true, segment, sheet: false, openedAt: now },
-            pick: null, selected: { id, kind: 'line', segment }, clock: now
-        }, () => this.showPopupAt(lngLat, LINE_POPUP_PX));
-        console.info('[MapStudio] Line ' + id + ' selected' + (segment ? ' at ' + segment.fromId + ' to ' + segment.toId : '') + '.');
-    }
+    /** The stable callbacks the popups, the pick list and MapLibre's close event take (selection.tsx). */
+    closePopup = (): void => selection.closePopup(this);
+    navigate = (path: string): void => selection.navigate(this, path);
+    onPick = (id: string): void => selection.onPick(this, id);
+    onPopupClosed = (): void => selection.onPopupClosed(this);
 
     /** The map item with this id that is on the map (not deleted), or undefined. */
     liveItem(id: string): MapItemRecord | undefined {
         const delegate = this.props.delegate;
         return delegate ? delegate.items.find((i) => i.id === id && !i.deleted) : undefined;
-    }
-
-    /** The ground tapped: the selection and the popup go. */
-    private clearSelection(): void {
-        this.closePopup();
-        if (this.state.selected !== null || this.state.pick !== null) {
-            this.setState({ selected: null, pick: null });
-        }
-    }
-
-    /**
-     * The map item the popup is opened for: the clicked feature's id, name and kind, with the asset
-     * link and the properties from the item record (what the placeholders fill from, entry 8).
-     */
-    popupPoint(id: string, name: string, kind: string): PopupPoint {
-        const item = this.liveItem(id);
-        return {
-            id, name: item ? item.name : name, kind: item ? item.kind : kind,
-            assetId: item ? item.assetId : null, properties: item ? item.properties : {}
-        };
-    }
-
-    /**
-     * Close the open popup, card or sheet (every popup's own close button, the default popup's, the
-     * line popup's and the custom view's row): the MapLibre popup's close event does the rest for a
-     * card (onPopupClosed); a sheet has no MapLibre popup, so its state goes here.
-     */
-    private closePopup = (): void => {
-        if (this.popup && this.popup.isOpen()) {
-            this.popup.remove();
-            return;
-        }
-        if (this.state.popup !== null && this.state.popup.sheet) {
-            this.onPopupClosed();
-        }
-    };
-
-    /**
-     * Open a page of the project (the popup's pop-out link, View alarms): the Perspective client's
-     * own history, so the session stays and the page's URL params fill from the path (a filled
-     * link is checked to be a page path before it gets here, popupParams.ts). A failure is one
-     * console warning; nothing else happens.
-     */
-    private navigate = (path: string): void => {
-        try {
-            const client = this.props.store.view.page.parent as unknown as { history?: { push?: (p: string) => void } };
-            if (client && client.history && typeof client.history.push === 'function') {
-                client.history.push(path);
-                return;
-            }
-            console.warn('[MapStudio] The page ' + path + ' could not be opened: the session has no history.');
-        } catch (err) {
-            console.warn('[MapStudio] The page ' + path + ' could not be opened: ' + (err instanceof Error ? err.message : String(err)));
-        }
-    };
-
-    /** A shared marker clicked (epic 3 entry 7): the pick list of its members opens in the popup. */
-    private openPick(memberIds: string, lngLat: [number, number]): void {
-        const delegate = this.props.delegate;
-        if (!delegate) {
-            return;
-        }
-        const rows: PickRow[] = [];
-        for (const id of memberIds.split(',')) {
-            const item = this.liveItem(id);
-            if (!item) {
-                continue;
-            }
-            const kind = delegate.lists.kinds.find((k) => k.id === item.kind);
-            const state = itemState(delegate.live.items[item.id], delegate.live.display[item.kind]);
-            rows.push({ id: item.id, name: item.name, kindName: kind ? kind.name : item.kind, state: state.badge });
-        }
-        if (rows.length === 0) {
-            return;
-        }
-        const before = this.state.popup;
-        const store = this.props.store.delegate as MapStudioStoreDelegate | undefined;
-        if (before && store) {
-            store.sendPopupClose(before.point.id);
-        }
-        this.stopPopupClock();
-        this.setState({ popup: null, pick: { rows, lngLat }, selected: null }, () => this.showPopupAt(lngLat));
-    }
-
-    /** A row of the pick list: what a click on that item's own marker does. */
-    private onPick = (id: string): void => {
-        const item = this.liveItem(id);
-        if (!item || item.geometry.type !== 'Point') {
-            return;
-        }
-        // The popup anchors to the shared marker drawn, not the member's own place (item 20).
-        this.openPopup(this.popupPoint(item.id, item.name, item.kind),
-            this.anchorFor(item.id, [item.geometry.coordinates[0], item.geometry.coordinates[1]]));
-        const store = this.props.store.delegate as MapStudioStoreDelegate | undefined;
-        if (store) {
-            store.sendPointClick(item.id);
-        }
-    };
-
-    /**
-     * Open (or move) the MapLibre popup at a point. The popup's DOM node is
-     * filled by React through a portal in render(), so the embedded project
-     * view stays in this component's React tree.
-     */
-    openPopup(point: PopupPoint, lngLat: [number, number]): void {
-        if (!this.map) {
-            return;
-        }
-        if (!this.hasPopupContent(point)) {
-            // No parts and no view: no popup (FR-4); the item is selected all the same.
-            this.closePopup();
-            this.setState({ pick: null, selected: { id: point.id, kind: 'point' } });
-            return;
-        }
-        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
-        const before = this.state.popup;
-        if (before && before.point.id !== point.id && delegate) {
-            delegate.sendPopupClose(before.point.id);
-        }
-        if (delegate && (!before || before.point.id !== point.id)) {
-            delegate.sendPopupOpen(point.id);
-        }
-        // Below 768 px the popup is a bottom sheet in the component (DESIGN.md Phone); the MapLibre
-        // popup, if a card was open, goes without its close event (the state below replaces it).
-        const sheet = isSheetWidth(this.map.getContainer().clientWidth);
-        if (sheet && this.popup && this.popup.isOpen()) {
-            this.popup.off('close', this.onPopupClosed);
-            this.popup.remove();
-            this.popup.on('close', this.onPopupClosed);
-        }
-        this.startPopupClock();
-        const now = Date.now();
-        this.setState({ popup: { point, lngLat, line: false, segment: null, sheet, openedAt: now }, pick: null,
-            selected: { id: point.id, kind: 'point' }, clock: now },
-        () => (sheet ? this.showSheetFor(lngLat) : this.showPopupAt(lngLat)));
-    }
-
-    /** The sheet is in the DOM: pan the map so the item stays above it (its selection ring visible). */
-    private showSheetFor(lngLat: [number, number]): void {
-        if (!this.map || !this.mapContainer) {
-            return;
-        }
-        const sheetEl = this.mapContainer.parentElement
-            ? this.mapContainer.parentElement.querySelector('.mapstudio-sheet') as HTMLElement | null : null;
-        if (!sheetEl) {
-            return;
-        }
-        const height = this.map.getContainer().clientHeight;
-        const sheetTop = height - sheetEl.offsetHeight - (parseFloat(getComputedStyle(sheetEl).bottom) || 0);
-        const y = this.map.project(lngLat).y;
-        const limit = sheetTop - SHEET_CLEARANCE_PX;
-        if (y > limit) {
-            this.map.panBy([0, y - limit], { duration: 200 });
-        }
-        // The sheet takes the focus as the card does, so Esc reaches the component (item 14) and the keyboard is inside it.
-        sheetEl.focus({ preventScroll: true });
-    }
-
-    /**
-     * The MapLibre popup, made once at mount so render() has its portal target from the first popup
-     * state on: MapLibre picks the popup's anchor from its content's size when it is placed, so the
-     * content must be in the DOM before showPopupAt runs (a popup placed empty stayed centred on
-     * its point and ran off a phone's edge once the content came).
-     */
-    private makePopup(): void {
-        this.popupContent = document.createElement('div');
-        this.popupContent.className = 'mapstudio-popup-root';
-        // The card takes the focus itself when it opens (showPopupAt), so the keyboard is inside it (Tab
-        // reaches the page link and close) and no button wears a focus ring on a click (entry 15).
-        this.popupContent.tabIndex = -1;
-        this.popup = new Popup({
-            // The close button is the popup's own, in its header (entry 8, UX review P1).
-            closeButton: false,
-            closeOnClick: false,
-            closeOnMove: false,
-            focusAfterOpen: false,
-            // MapLibre writes maxWidth as an inline style on the popup, so the
-            // phone cap lives here, not in the stylesheet.
-            maxWidth: 'calc(100vw - 32px)',
-            offset: POPUP_OFFSET_PX
-        });
-        this.popup.setDOMContent(this.popupContent);
-        this.popup.on('close', this.onPopupClosed);
-    }
-
-    /**
-     * Move the popup to the point (after the state that fills its portal has rendered) and open it,
-     * placed inside the map less the top bar and the zoom card (owner review notes item 18): the card
-     * is measured in the document with the clamp lifted, `placePopup` picks the anchor (above the point
-     * first, so its name label stays clear; else beside, below or a corner), clamps the card to the room
-     * when nothing fits whole, and pans the map by what is still missing. Point and line cards alike.
-     */
-    private showPopupAt(lngLat: [number, number], maxPx: number = POPUP_WIDTH_PX): void {
-        if (!this.map || !this.popup) {
-            return;
-        }
-        const map = this.map;
-        const at = map.project(lngLat);
-        const width = map.getContainer().clientWidth;
-        const height = map.getContainer().clientHeight;
-        // The card keeps its own width; near an edge it goes beside the point or on a corner (item 18).
-        this.popup.setMaxWidth(placedMaxWidth(width, maxPx) + 'px');
-        if (!this.popup.isOpen()) {
-            // The popup joins the map before it is placed: its content rendered already (the portal), but
-            // a card measures 0 px tall until the popup's element is in the document (the first line popup
-            // of a page opened above its segment and off the map's top with that 0).
-            this.popup.setLngLat(lngLat).addTo(map);
-            if (this.popupContent) {
-                this.popupContent.focus({ preventScroll: true });
-            }
-        }
-        if (this.popupContent) {
-            const content = this.popupContent;
-            content.style.setProperty('--mapstudio-popup-max-height', 'none');
-            const card = content.firstElementChild as HTMLElement | null;
-            const natural = card ? card.offsetHeight : 0;
-            const cardWidth = card ? card.offsetWidth : Math.min(maxPx, width);
-            const obstacles = [this.controlRect('.maplibregl-ctrl-top-left'), this.controlRect('.maplibregl-ctrl-top-right')]
-                .filter((r): r is Rect => r !== null);
-            const placement = placePopup(at, cardWidth, natural, popupMaxHeight(height), width, height, obstacles, POPUP_OFFSET_PX);
-            content.style.setProperty('--mapstudio-popup-max-height', placement.maxHeight + 'px');
-            this.popup.options.anchor = placement.anchor;
-            this.popupAnchor = placement.anchor;
-            if (this.mapContainer) {
-                this.mapContainer.setAttribute('data-popup-anchor', lngLat[0].toFixed(6) + ',' + lngLat[1].toFixed(6));
-                this.mapContainer.setAttribute('data-popup-side', placement.anchor);
-            }
-            if (placement.shift[0] !== 0 || placement.shift[1] !== 0) {
-                // The card still does not fit: the map pans so the point moves by the shift (the popup moves with it).
-                map.panBy([-placement.shift[0], -placement.shift[1]], { duration: 200 });
-            }
-        }
-        // setLngLat runs MapLibre's placement again with the anchor chosen and the card at its real size.
-        this.popup.setLngLat(lngLat);
-    }
-
-    private startPopupClock(): void {
-        if (this.popupClock === null) {
-            this.popupClock = setInterval(() => this.setState({ clock: Date.now() }), POPUP_CLOCK_MS);
-        }
-    }
-
-    private stopPopupClock(): void {
-        if (this.popupClock !== null) {
-            clearInterval(this.popupClock);
-            this.popupClock = null;
-        }
-    }
-
-    /**
-     * MapLibre closed the popup (close button, map click): unmount the view, tell the Gateway, clear the
-     * selection (a point's, and from entry 2 a line's, whose popup the selection opened with).
-     */
-    private onPopupClosed = (): void => {
-        this.stopPopupClock();
-        this.popupAnchor = null;
-        if (this.mapContainer) {
-            this.mapContainer.setAttribute('data-popup-anchor', '');
-            this.mapContainer.setAttribute('data-popup-side', '');
-        }
-        const open = this.state.popup;
-        if (open !== null) {
-            const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
-            if (delegate) {
-                delegate.sendPopupClose(open.point.id);
-            }
-        }
-        if (open !== null || this.state.pick !== null) {
-            this.setState({ popup: null, pick: null, selected: null });
-        }
-    };
-
-    /**
-     * What the open popup shows (AD-7, epic 3 entry 8): the kind setup's custom popup view when it
-     * names one, with `mapItem` and its params filled from the item (a missing or failing view
-     * falls back to the default popup); else Map Studio's default popup when the kind's display
-     * shows something; else nothing (no parts, no popup: FR-4, the item is only selected).
-     */
-    private popupContentFor(open: OpenPopup): React.ReactNode {
-        const store = this.props.store;
-        const delegate = this.props.delegate;
-        if (!delegate) {
-            return null;
-        }
-        const kindId = open.point.kind || '';
-        const display = delegate.live.display[kindId];
-        const kind = delegate.lists.kinds.find((k) => k.id === kindId);
-        const live = delegate.live.popup && delegate.live.popup.itemId === open.point.id ? delegate.live.popup.detail : null;
-        const item = popupItemView(open.point, live ? live.basePath : null);
-        const values = delegate.live.items[open.point.id];
-        let point = open.point;
-        let lineDefault: (() => React.ReactNode) | null = null;
-        if (open.line) {
-            // A line (entry 2): its default popup with the instruments in order, and for a custom view
-            // the map item object carrying them and the open segment (AD-7).
-            const line = this.liveItem(open.point.id);
-            const nodes = line ? popupNodes(line, delegate.items, delegate.lists.kinds, delegate.live, open.segment) : [];
-            point = { ...open.point, instruments: popupInstruments(nodes), segment: open.segment };
-            if (line && line.geometry.type === 'LineString') {
-                const coords = line.geometry.coordinates;
-                lineDefault = (): React.ReactNode => (
-                    <LinePopup
-                        key={'line|' + open.point.id}
-                        line={{ id: line.id, name: line.name, kind: line.kind, kindName: kind ? kind.name : line.kind,
-                            icon: kind ? kind.icon : 'pipeline', diameter: line.properties ? line.properties.diameter : undefined,
-                            lengthM: coords.length >= 2 ? lengthM(coords) : 0 }}
-                        display={display}
-                        values={values}
-                        nodes={nodes}
-                        segment={open.segment}
-                        now={this.state.clock}
-                        onClose={this.closePopup}
-                    />
-                );
-            }
-            if (!display || !display.popupView) {
-                return lineDefault ? lineDefault() : null;
-            }
-        }
-        if (!display) {
-            return null;
-        }
-        const defaultPopup = lineDefault || ((): React.ReactNode => (displayShows(display) ? (
-            <DefaultPopup
-                key={'default|' + open.point.id}
-                item={{ id: open.point.id, name: open.point.name, kind: kindId,
-                    kindName: kind ? kind.name : kindId, icon: kind ? kind.icon : '' }}
-                display={display}
-                values={values}
-                detail={live}
-                now={this.state.clock}
-                link={fillLink(display.link, item)}
-                alarmPage={fillLink(delegate.alarmPage, item)}
-                mode={open.sheet ? 'sheet' : 'card'}
-                canEdit={false}
-                onClose={this.closePopup}
-                onNavigate={this.navigate}
-            />
-        ) : null));
-        if (!display.popupView) {
-            return defaultPopup();
-        }
-        // The custom view: its params may need the base path, which the open's push brings within a
-        // moment; the view waits for it (an empty card meanwhile), but not forever.
-        if (!live && this.state.clock - open.openedAt < POPUP_DETAIL_WAIT_MS) {
-            return <div className="mapstudio-popup mapstudio-popup--waiting" data-point-id={open.point.id} />;
-        }
-        const mountPath = popupMountPath(store.viewMountPath, store.addressPathString);
-        const path = display.popupView.path;
-        return (
-            <PointPopup
-                key={PageStore.instanceKeyFor(path, mountPath) + '|' + open.point.id}
-                clientStore={store.view.page.parent}
-                parent={store}
-                path={path}
-                params={popupViewParams(fillParams(display.popupView.params, item), point, live, values)}
-                mountPath={mountPath}
-                pointId={open.point.id}
-                fallback={defaultPopup}
-                mode={open.sheet ? 'sheet' : 'card'}
-                onClose={this.closePopup}
-            />
-        );
-    }
-
-    /** True when a popup would show something for the point (its kind's display is known and shows a part or a view). */
-    private hasPopupContent(point: PopupPoint): boolean {
-        const delegate = this.props.delegate;
-        const display = delegate ? delegate.live.display[point.kind || ''] : undefined;
-        return !!display && (!!display.popupView || displayShows(display));
-    }
-
-    /**
-     * The popup's content in its place: the pick list or the card in the MapLibre popup (a portal
-     * into its DOM node), or the bottom sheet in the component below 768 px.
-     */
-    private renderPopup(): React.ReactNode {
-        const pick = this.state.pick;
-        if (pick && this.popupContent) {
-            return ReactDOM.createPortal(<PickList rows={pick.rows} onPick={this.onPick} />, this.popupContent);
-        }
-        const open = this.state.popup;
-        if (!open) {
-            return null;
-        }
-        if (open.sheet) {
-            return (
-                <div className="mapstudio-sheet" role="dialog" aria-label={open.point.name} data-point-id={open.point.id} tabIndex={-1}>
-                    {this.popupContentFor(open)}
-                </div>
-            );
-        }
-        if (!this.popupContent) {
-            return null;
-        }
-        return ReactDOM.createPortal(this.popupContentFor(open), this.popupContent);
     }
 
     /**
@@ -1513,7 +914,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 {this.renderAdapterStatus(delegate ? delegate.lists : NO_HOST_LISTS)}
                 {delegate ? this.renderLiveState(delegate.live, delegate.lists.kinds) : null}
                 {this.renderStylePanel()}
-                {this.renderPopup()}
+                {selection.renderPopup(this)}
             </div>
         );
     }
