@@ -52,24 +52,51 @@ export const WARNING_SETTLE_MS = 500;
 export const VERTEX_PAUSE_MS = 300;
 
 /**
- * Draw the tracer's two-point line with the spike "Draw a line" tool, `dy`
- * pixels below the map's centre offsets (unsaved.spec draws 200 px above, dy -200,
- * so its dashed line is not hidden under a saved one), and wait for the reply.
+ * Draw the tracer's two-point line with the toolbar's Line tool (epic 4 entry 4: Edit mode at level `full`, 768 px
+ * and wider), `dy` pixels below the map's centre offsets (unsaved.spec draws 200 px above, dy -200, so its dashed
+ * line is not hidden under a saved one), finished with Enter, and wait until the save was sent (the dev status
+ * line shows it: saving, saved, refused or unsent). The tool stays in hand after the finish, so a second line
+ * needs no click on the tool. A viewer's or a phone editor's line, where no tool shows, goes through the test
+ * hook instead (`hookLineBatch`).
  */
 export async function drawLine(page, map, { dy = 0 } = {}) {
     const box = await map.boundingBox();
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
     const [a, b] = TRACER.drawOffsets.map(([ox, oy]) => [cx + ox, cy + oy + dy]);
-    const reply = page.locator('.mapstudio-reply');
-    await page.locator('.mapstudio-draw-button').click();
-    await expect(reply).toHaveAttribute('data-drawing', 'true');
+    if ((await map.getAttribute('data-tool')) !== 'line') {
+        await page.locator('.mapstudio-tool--line').click();
+    }
+    await expect(map).toHaveAttribute('data-tool', 'line');
+    const bar = page.locator('.mapstudio-drawing-bar');
+    await expect(bar).toHaveAttribute('data-points', '0');
     await page.mouse.click(a[0], a[1]);
+    await expect(bar).toHaveAttribute('data-points', '1');
     await page.waitForTimeout(VERTEX_PAUSE_MS);
     await page.mouse.click(b[0], b[1]);
+    await expect(bar).toHaveAttribute('data-points', '2');
     await page.waitForTimeout(VERTEX_PAUSE_MS);
     await page.keyboard.press('Enter');
-    await expect(reply).toHaveAttribute('data-line-points', '2');
+    await expect(bar).toHaveAttribute('data-points', '0');
+    await page.locator('.mapstudio-save-status').waitFor({ state: 'attached' });
+}
+
+/**
+ * One `edits.apply` batch creating a two-vertex line of the dev kind `line` on the tracer's first and third
+ * points, `dLat` degrees north, for the test hook (`send`): the component's real session path, so the Gateway
+ * judges it from the session user's roles as it judges a tool's save.
+ */
+export function hookLineBatch(name, dLat = 0) {
+    return {
+        batchId: randomUUID(),
+        ops: [{
+            op: 'create', entity: 'item', id: randomUUID(), baseVersion: 0,
+            data: {
+                kind: 'line', name,
+                geometry: { type: 'LineString', coordinates: [TRACER.points.p1.lngLat, TRACER.points.p3.lngLat].map(([lng, lat]) => [lng, lat + dLat]) }
+            }
+        }]
+    };
 }
 
 /**

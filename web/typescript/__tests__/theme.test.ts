@@ -1,11 +1,4 @@
 import { drawColor, toHexColor } from '../theme';
-import {
-    DRAW_IDLE,
-    cancelDrawing,
-    drawStatusText,
-    finishLine,
-    startDrawing
-} from '../draw';
 
 describe('toHexColor', () => {
     test('six digit hex passes through, lower cased', () => {
@@ -44,26 +37,5 @@ describe('drawColor with no resolvable token (I/O matrix: token missing)', () =>
         } finally {
             warn.mockRestore();
         }
-    });
-});
-
-describe('draw status text (I/O matrix)', () => {
-    test('idle shows nothing, so the reply text shows', () => {
-        expect(drawStatusText(DRAW_IDLE)).toBe('');
-    });
-
-    test('toggle on names the mode in words', () => {
-        expect(drawStatusText(startDrawing())).toBe('Drawing a line: click to add points, Enter to finish');
-    });
-
-    test('a finished line reports its points and the tool is off', () => {
-        const state = finishLine(2);
-        expect(state.drawing).toBe(false);
-        expect(drawStatusText(state)).toBe('Line drawn with 2 points');
-    });
-
-    test('cancel returns to idle', () => {
-        expect(cancelDrawing()).toEqual(DRAW_IDLE);
-        expect(drawStatusText(cancelDrawing())).toBe('');
     });
 });

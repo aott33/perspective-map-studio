@@ -10,7 +10,7 @@
 // Skipped in the plain suite (no scenario set). Screenshots at 1440 and 390 px (AD-15).
 
 import { gatewayUrl } from '../lib/env.mjs';
-import { drawLine, expect, shot as sharedShot, test } from './fixtures.mjs';
+import { expect, hookLineBatch, send, shot as sharedShot, test } from './fixtures.mjs';
 
 const SCENARIO = process.env.MAPSTUDIO_STORE_SCENARIO ?? '';
 // ops/store-checks.sh sets 0 for a second run of a scenario, so the screenshots show the first.
@@ -67,7 +67,8 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             // kept, is unsaved.spec.mjs ("a map.load that fails after the map loaded").
             await expect(map).toHaveAttribute('data-items-loaded', '0');
             await expect(map).toHaveAttribute('data-editing', 'off');
-            await expect(page.locator('.mapstudio-draw-button')).toBeDisabled();
+            // This anonymous viewer has no tool at all (epic 4 entry 4); the paused toolbar of an editor is unsaved.spec.mjs's.
+            await expect(page.locator('.mapstudio-toolbar')).toHaveCount(0);
             await shot(page, `mapstudio-store-unavailable-${width}.png`);
         });
 
@@ -82,12 +83,12 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             await expect(page.locator('.mapstudio-store-status')).toHaveText('Map store: read only. ' + reason);
 
             // The store state is checked before the role (story 1's order), so this anonymous
-            // viewer's save is refused read-only, not role.
-            await drawLine(page, map);
-            const save = page.locator('.mapstudio-save-status');
-            await expect(save).toHaveAttribute('data-save-state', 'refused', { timeout: 30_000 });
-            await expect(save).toHaveAttribute('data-code', 'read-only');
-            await expect(save).toContainText('Not saved: ' + reason);
+            // viewer's save is refused read-only, not role. No tool shows at level none (epic 4
+            // entry 4): the line goes through the test hook, the component's real session path.
+            const reply = await send(page, 'edits.apply', hookLineBatch('Read-only line'));
+            expect(reply.type).toBe('error');
+            expect(reply.body.code).toBe('read-only');
+            expect(reply.body.message).toBe(reason);
             await shot(page, `mapstudio-store-readonly-${width}.png`);
 
             expect(await getMapResult(page)).toEqual({ count: before, readOnly: reason });

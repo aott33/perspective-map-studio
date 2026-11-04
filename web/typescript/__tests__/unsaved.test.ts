@@ -33,7 +33,7 @@ const KEY = storageKey('mapstudio-dev', 'mapeditor');
 const T0 = new Date('2026-10-27T10:00:00Z');
 
 function line(n: number): EditBatch {
-    return lineCreateBatch('item-' + n, 'batch-' + n, [[n, 0], [n, 1]], T0);
+    return lineCreateBatch('item-' + n, 'batch-' + n, 'line', 'Line ' + n, [[n, 0], [n, 1]], null);
 }
 
 function queue(store: FakeStore = new FakeStore(), warn: () => void = () => undefined): UnsavedQueue {

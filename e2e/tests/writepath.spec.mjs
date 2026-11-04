@@ -9,7 +9,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
 import {
-    EDITOR_USER, OPERATOR_USER, drawLine, editorTest, expect, mapLoaded, nextFrames, openMap, send, signedInContext, watch
+    EDITOR_USER, OPERATOR_USER, editorTest, expect, hookLineBatch, mapLoaded, nextFrames, openMap, send, signedInContext, watch
 } from './fixtures.mjs';
 
 /** Send the same edits.apply body twice at once from the page. */
@@ -159,12 +159,11 @@ editorTest.describe('write path', () => {
             const operator = await openOperator(browser);
             try {
                 const op = operator.page;
-                // A drawn line is a create: refused on the Gateway with the phone role's words.
-                await drawLine(op, operator.map);
-                const status = op.locator('.mapstudio-save-status');
-                await expect(status).toHaveAttribute('data-save-state', 'refused', { timeout: 30_000 });
-                await expect(status).toHaveAttribute('data-code', 'role');
-                await expect(status).toContainText('Not saved: Phone editing may move a point');
+                // A phone editor's line is a create: refused on the Gateway with the phone role's words. No tool shows at level
+                // phone (epic 4 entry 4), so it goes through the test hook, the component's real session path.
+                await expect(op.locator('.mapstudio-toolbar')).toHaveCount(0);
+                const refusedLine = expectRefused(await send(op, 'edits.apply', hookLineBatch('Phone drawn line')), 'role');
+                expect(refusedLine.message).toMatch(/^Phone editing may move a point/);
                 await nextFrames(op);
                 mkdirSync(screenshotDir, { recursive: true });
                 await op.screenshot({ path: path.join(screenshotDir, 'mapstudio-store-phone-390.png'), fullPage: false });

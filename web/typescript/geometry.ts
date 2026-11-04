@@ -183,3 +183,74 @@ export function lineDeleteBatch(batchId: string, line: MapItemRecord, items: Map
     }
     return { batchId, ops };
 }
+
+/**
+ * Snapping while a line or an area is drawn (epic 4 entry 4; EXPERIENCE.md Snap, AD-19): the places a
+ * vertex may land on, the nearest one within reach of the pointer, and the `ends` the saved line
+ * carries for the items its first and last vertex snapped to. The snap target is remembered when the
+ * vertex is placed (editing.ts) and `ends` come from those targets, never from the coordinates.
+ */
+
+/** A place a vertex may snap to: a point map item at its position, or one vertex of a line map item. */
+export interface SnapTarget {
+    itemId: string;
+    name: string;
+    position: Position;
+}
+
+/** How near the pointer must be, in screen pixels at the map's zoom, for a target to take the vertex. */
+export const SNAP_PX = 20;
+
+/** Web Mercator's world width in metres at the equator (MapLibre's 512 px tiles). */
+const EARTH_CIRCUMFERENCE_M = 40075016.686;
+
+/** The snap distance in metres: SNAP_PX screen pixels at the zoom and latitude (512 px tiles). */
+export function snapDistanceM(zoom: number, lat: number, px: number = SNAP_PX): number {
+    const metresPerPixel = (EARTH_CIRCUMFERENCE_M * Math.cos((lat * Math.PI) / 180)) / (512 * Math.pow(2, zoom));
+    return px * metresPerPixel;
+}
+
+/**
+ * Every snap target of the live map items: each point item once, then each vertex of each line item, each in
+ * item order. The points come first so a point item wins a tie with a line vertex at the same place (a line
+ * whose end snaps to a pad has a vertex on the pad): the item at that place is what `ends` names.
+ */
+export function snapTargets(items: MapItemRecord[]): SnapTarget[] {
+    const points: SnapTarget[] = [];
+    const vertices: SnapTarget[] = [];
+    for (const item of items) {
+        if (item.deleted) {
+            continue;
+        }
+        if (item.geometry.type === 'Point') {
+            points.push({ itemId: item.id, name: item.name, position: [item.geometry.coordinates[0], item.geometry.coordinates[1]] });
+        } else {
+            for (const c of item.geometry.coordinates) {
+                vertices.push({ itemId: item.id, name: item.name, position: [c[0], c[1]] });
+            }
+        }
+    }
+    return points.concat(vertices);
+}
+
+/** The nearest target within `withinM` metres of a position (the first of equally near ones), or null when none is that near. */
+export function nearestSnap(targets: SnapTarget[], at: Position, withinM: number): SnapTarget | null {
+    let best: SnapTarget | null = null;
+    let bestM = withinM;
+    for (const target of targets) {
+        const m = target.position[0] === at[0] && target.position[1] === at[1] ? 0 : lengthM([target.position, at]);
+        if (best === null ? m <= bestM : m < bestM) {
+            best = target;
+            bestM = m;
+        }
+    }
+    return best;
+}
+
+/** The saved line's `ends` from the targets its first and last vertex snapped to (null for either floating end); null with both floating. */
+export function endsFrom(start: SnapTarget | null, end: SnapTarget | null): MapItemRecord['ends'] {
+    if (start === null && end === null) {
+        return null;
+    }
+    return { ...(start ? { start: { itemId: start.itemId } } : {}), ...(end ? { end: { itemId: end.itemId } } : {}) };
+}

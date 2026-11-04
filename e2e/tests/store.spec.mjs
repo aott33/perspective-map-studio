@@ -1,9 +1,12 @@
 // The map store tracer (epic-map-store-and-data, entry 1): a map editor's line is
 // saved through edits.apply and drawn from map.load after a reload; a viewer's
 // save is refused on the Gateway; system.mapstudio saves through the same write
-// service. Screenshots at 1440 and 390 px for the docs (AD-15).
+// service. Screenshots at 1440 and 390 px for the docs (AD-15). Since epic 4 entry 4 the
+// editor draws with the toolbar's Line tool, which shows at level full and 768 px and wider,
+// so the editor's page is opened wide enough to draw and the viewer's line goes through the
+// test hook (the component's real session path, judged on the Gateway from the session's roles).
 
-import { EDITOR_USER, drawLine, editorTest, expect, mapLoaded, openMap, shot, test } from './fixtures.mjs';
+import { EDITOR_USER, drawLine, editorTest, expect, hookLineBatch, mapLoaded, openMap, send, shot, test } from './fixtures.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -13,6 +16,10 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
 
         editorTest('a map editor saves a line and it comes back from the map store after a reload', async ({ page }) => {
             // Signed in by the global setup (lib/editorAuth.mjs): the password never passes through this test.
+            if (width < 768) {
+                // No drawing tool below 768 px (epic 4 entry 4): the line is drawn at a laptop width and the phone width comes back for the reload.
+                await page.setViewportSize({ width: 1366, height: 768 });
+            }
             let map = await openMap(page, '/edit');
             await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
             const before = await mapLoaded(map);
@@ -25,6 +32,9 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             await expect(status).toContainText('Saved as version 1');
             expect(await status.getAttribute('data-item-id')).toMatch(UUID);
             await expect(map).toHaveAttribute('data-items-loaded', String(before + 1));
+            if (width < 768) {
+                await page.setViewportSize({ width, height });
+            }
             await shot(page, `mapstudio-store-editor-${width}.png`);
 
             // Drawn from map.load after a reload, not from the browser's memory.
@@ -37,18 +47,17 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
         });
 
         test('a viewer\'s save is refused on the Gateway and nothing is written', async ({ page }) => {
-            // On /edit, where Edit mode holds the spike's tool (epic 3 entry 14); the anonymous viewer is still a viewer there.
+            // On /edit, where Edit mode holds the tools (epic 3 entry 14, epic 4 entry 4); the anonymous viewer is still a viewer
+            // there: no studio and no tool at level none, so the line goes through the test hook and the Gateway refuses it.
             let map = await openMap(page, '/edit');
             const before = await mapLoaded(map);
             await expect(map).toHaveAttribute('data-edit-level', 'none');
+            await expect(page.locator('.mapstudio-toolbar')).toHaveCount(0);
 
-            await drawLine(page, map);
-            const status = page.locator('.mapstudio-save-status');
-            await expect(status).toHaveAttribute('data-save-state', 'refused', { timeout: 30_000 });
-            await expect(status).toHaveAttribute('data-code', 'role');
-            await expect(status).toContainText('Not saved: You do not have a role that lets you change the map.');
-            // The drawing status still says what was drawn; the line stays on the map as not saved.
-            await expect(page.locator('.mapstudio-draw-status')).toContainText('Line drawn with 2 points');
+            const reply = await send(page, 'edits.apply', hookLineBatch('Viewer line'));
+            expect(reply.type).toBe('error');
+            expect(reply.body.code).toBe('role');
+            expect(reply.body.message).toMatch(/^You do not have a role that lets you change the map\./);
             await expect(map).toHaveAttribute('data-items-loaded', String(before));
             await shot(page, `mapstudio-store-viewer-${width}.png`);
 

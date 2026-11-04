@@ -7,8 +7,8 @@
  * choice (basemaps.ts), and from epic 4 entry 2 the studio's saves (`sendBatch`, which every tool, every
  * finished field and the undo stack share) and the undo stack itself (undoStack.ts: one step per saved
  * edit, the reverse batch sent through the same queue). `notify()` is the only flow to the component;
- * the component calls the public `send*`, `createPoint`, `renameItem`, `moveItem`, `linkItem`, `undo`,
- * `redo`, `selectBasemap`, `retryUnsaved`, `discardUnsaved`, `onStorage` and `stopReplay`.
+ * the component calls the public `send*`, `createPoint`, `createLine`, `renameItem`, `moveItem`, `linkItem`,
+ * `setKind`, `undo`, `redo`, `selectBasemap`, `retryUnsaved`, `discardUnsaved`, `onStorage` and `stopReplay`.
  */
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
@@ -24,7 +24,8 @@ import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, freezeLive } from
 import { CONNECTED, ConnectionState, ConnectionWatch } from './connection';
 import { SegmentRef } from './features';
 import { STORE_UNKNOWN, StoreState, storeStateFromError, storeStateFromLoad, storeStateFromSaveError } from './storeState';
-import { DEV_LINE_KIND, SAVE_IDLE, SaveState, lineCreateBatch, newId, pointCreateBatch, refusedSave, roundCoordinate, updateBatch } from './save';
+import { SAVE_IDLE, SaveState, lineCreateBatch, newId, pointCreateBatch, refusedSave, roundCoordinate, updateBatch } from './save';
+import { Kind } from './adapters';
 import { pointKind } from './studio';
 import { UNDO_EMPTY, UndoStack, failPending, finishPending, pushStep, startRedo, startUndo, stepLabel } from './undoStack';
 import {
@@ -398,15 +399,13 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     }
 
     /**
-     * Save a finished line as one new map item (edits.apply with one create op). The batch is
-     * queued (localStorage) before it is sent, and stays queued until its reply or a Discard.
+     * A finished line or area (epic 4 entry 4): one create of `kind` at the drawn vertices (an area's ring
+     * unclosed), named after the kind (the placeholder the editor renames), with the `ends` its first and
+     * last vertex snapped to, saved at once through the queue. Returns the new item's id.
      */
-    sendLineCreate(coordinates: Array<[number, number]>): string {
+    createLine(coordinates: Array<[number, number]>, kind: Kind, ends: MapItemRecord['ends']): string {
         const itemId = newId();
-        const now = new Date();
-        const batch = lineCreateBatch(itemId, newId(), coordinates, now);
-        const kind = this.lists.kinds.find((k) => k.id === DEV_LINE_KIND);
-        this.sendBatch(batch, itemId, stepLabel('add', kind ? kind.name : DEV_LINE_KIND), now);
+        this.sendBatch(lineCreateBatch(itemId, newId(), kind.id, kind.name, coordinates, ends), itemId, stepLabel('add', kind.name));
         return itemId;
     }
 
@@ -541,6 +540,15 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     linkItem(id: string, assetId: string | null): void {
         const item = this.knownRecord(id);
         this.sendUpdate(id, { assetId }, stepLabel(assetId === null ? 'unlink' : 'link', item ? item.name : id));
+    }
+
+    /** The Kind select in Details (entry 4): one update of `kind` to another kind of the item's geometry, "edit <name>". */
+    setKind(id: string, kind: string): void {
+        const item = this.knownRecord(id);
+        if (item && item.kind === kind) {
+            return;
+        }
+        this.sendUpdate(id, { kind }, stepLabel('edit', item ? item.name : id));
     }
 
     private sendUpdate(id: string, data: MapItemData, label: string): void {

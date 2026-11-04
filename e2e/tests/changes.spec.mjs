@@ -59,6 +59,11 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
                 // A marker that a page navigation or reload would lose.
                 await viewer.evaluate(() => { window.__mapStudioChangesMarker = 'kept'; });
 
+                if (width < 768) {
+                    // No drawing tool below 768 px (epic 4 entry 4): the editor draws at a laptop width; the viewer and the
+                    // phone editor, whose maps the change reaches, keep this width.
+                    await page.setViewportSize({ width: 1366, height: 768 });
+                }
                 const editorMap = await openMap(page, '/edit');
                 await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
                 const editorBefore = await mapLoaded(editorMap);

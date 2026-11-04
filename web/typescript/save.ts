@@ -1,33 +1,32 @@
 /**
- * Saving through the write path (AD-2, AD-10): the dev line tool's finished line, the studio's point
- * placed by one click, a finished field's update (epic 4 entry 2), the save state and its words, and
- * drawing the map store's items. Pure functions only, unit tested in node; the component and its
- * delegate hold the state.
+ * Saving through the write path (AD-2, AD-10): the studio's point placed by one click, a line or an
+ * area finished vertex by vertex (epic 4 entry 4), a finished field's update (epic 4 entry 2), the save
+ * state and its words, and drawing the map store's items. Pure functions only, unit tested in node;
+ * the component and its delegate hold the state.
  */
 
 import type { Feature, FeatureCollection, LineString, Point } from 'geojson';
 import { EditBatch, MapItemData, MapItemRecord } from './contract';
 import { ErrorBody, newMessageId } from './messages';
 
-/**
- * The kind the dev line tool saves its lines as. Fixed until epic-editing's tools
- * pick a kind from the kind list (entry 9 validates kinds).
- */
-export const DEV_LINE_KIND = 'line';
-
 /** A UUID v4 for a new map item or batch (AD-10: ids are created in the browser). */
 export function newId(): string {
     return newMessageId();
 }
 
-/** The name the dev line tool gives a new line: "Line HH:mm:ss" (UTC). */
-export function lineName(now: Date): string {
-    return 'Line ' + now.toISOString().slice(11, 19);
+/** A coordinate as the map store keeps it: 6 decimals (docs/contract.md, the map item record). */
+export function roundCoordinate(n: number): number {
+    return Math.round(n * 1e6) / 1e6;
 }
 
-/** One `edits.apply` batch creating one line map item at baseVersion 0. */
-export function lineCreateBatch(itemId: string, batchId: string, coordinates: Array<[number, number]>,
-                                now: Date): EditBatch {
+/**
+ * One `edits.apply` batch creating one line map item at baseVersion 0 (epic 4 entry 4): a finished line or
+ * area saved at once as `kind` with the kind's name as the placeholder name, its vertices to 6 decimals
+ * (an area's ring unclosed, AD-20), and the `ends` its first and last vertex snapped to (null when both
+ * float, AD-19: stored, never inferred from the coordinates).
+ */
+export function lineCreateBatch(itemId: string, batchId: string, kind: string, name: string, coordinates: Array<[number, number]>,
+                                ends: MapItemRecord['ends']): EditBatch {
     return {
         batchId,
         ops: [{
@@ -36,17 +35,13 @@ export function lineCreateBatch(itemId: string, batchId: string, coordinates: Ar
             id: itemId,
             baseVersion: 0,
             data: {
-                kind: DEV_LINE_KIND,
-                name: lineName(now),
-                geometry: { type: 'LineString', coordinates: coordinates.map(([x, y]) => [x, y] as [number, number]) }
+                kind,
+                name,
+                geometry: { type: 'LineString', coordinates: coordinates.map(([x, y]) => [roundCoordinate(x), roundCoordinate(y)] as [number, number]) },
+                ...(ends === null ? {} : { ends })
             }
         }]
     };
-}
-
-/** A coordinate as the map store keeps it: 6 decimals (docs/contract.md, the map item record). */
-export function roundCoordinate(n: number): number {
-    return Math.round(n * 1e6) / 1e6;
 }
 
 /**
@@ -83,7 +78,7 @@ export type SaveState =
 
 export const SAVE_IDLE: SaveState = { state: 'idle' };
 
-/** The words for a save state; '' when idle. */
+/** The words for a save state on the dev status line (`.mapstudio-save-status`, which the e2e suite reads); '' when idle. */
 export function saveStatusText(save: SaveState): string {
     switch (save.state) {
         case 'saving':
@@ -102,7 +97,7 @@ export function saveStatusText(save: SaveState): string {
 /**
  * The studio's save status words (EXPERIENCE.md Save status, DESIGN.md save-status; epic 4 entry 2):
  * "Saved" with nothing pending, "Saving..." while a batch is out, and a problem in words on its own.
- * The spike's status line keeps `saveStatusText`.
+ * The dev status line keeps `saveStatusText`.
  */
 export function saveStatusWords(save: SaveState): string {
     switch (save.state) {

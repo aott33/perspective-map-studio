@@ -1,10 +1,8 @@
 import { MapItemRecord } from '../contract';
 import {
-    DEV_LINE_KIND,
     SAVE_IDLE,
     itemsToGeoJson,
     lineCreateBatch,
-    lineName,
     newId,
     pointCreateBatch,
     refusedSave,
@@ -21,25 +19,35 @@ function item(id: string, geometry: MapItemRecord['geometry'], deleted = false):
     return { id, kind: 'line', name: id, geometry, properties: {}, assetId: null, overrides: {}, ends: null, attachment: null, version: 1, deleted };
 }
 
-describe('saving a drawn line', () => {
-    test('one create op at baseVersion 0 with a new UUID, the dev kind and the GeoJSON line', () => {
-        const now = new Date('2026-10-26T21:05:09Z');
+describe('saving a drawn line (epic 4 entry 4)', () => {
+    test('one create op at baseVersion 0 with a new UUID, the kind, its name as the placeholder, the vertices to 6 decimals and the ends', () => {
         const itemId = newId();
         const batchId = newId();
         expect(itemId).toMatch(UUID);
-        const batch = lineCreateBatch(itemId, batchId, [[-104.99, 39.74], [-104.98, 39.75]], now);
+        const ends = { start: { itemId: 'ctb1' }, end: { itemId: 'swd1' } };
+        const batch = lineCreateBatch(itemId, batchId, 'line', 'Gathering line', [[-104.9912345678, 39.74], [-104.98, 39.7500000049]], ends);
         expect(batch).toEqual({
             batchId,
             ops: [{
                 op: 'create', entity: 'item', id: itemId, baseVersion: 0,
                 data: {
-                    kind: DEV_LINE_KIND,
-                    name: 'Line 21:05:09',
-                    geometry: { type: 'LineString', coordinates: [[-104.99, 39.74], [-104.98, 39.75]] }
+                    kind: 'line',
+                    name: 'Gathering line',
+                    geometry: { type: 'LineString', coordinates: [[-104.991235, 39.74], [-104.98, 39.75]] },
+                    ends
                 }
             }]
         });
-        expect(lineName(now)).toBe('Line 21:05:09');
+    });
+
+    test('a line with both ends floating carries no ends field (null is never sent); an area is the ring unclosed', () => {
+        const batch = lineCreateBatch('i', 'b', 'geofence', 'Geofence', [[-104.99, 39.74], [-104.98, 39.745], [-104.97, 39.74]], null);
+        expect(batch.ops[0].data).toEqual({
+            kind: 'geofence', name: 'Geofence', geometry: { type: 'LineString', coordinates: [[-104.99, 39.74], [-104.98, 39.745], [-104.97, 39.74]] }
+        });
+        expect('ends' in batch.ops[0].data!).toBe(false);
+        const start = lineCreateBatch('i', 'b', 'line', 'Gathering line', [[0, 0], [1, 1]], { start: { itemId: 'a' } });
+        expect(start.ops[0].data!.ends).toEqual({ start: { itemId: 'a' } });
     });
 
     test('the status words for each save state', () => {

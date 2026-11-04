@@ -1,13 +1,16 @@
 // The tracer view at 1440 and 390 px: the seeded map items (epic 2 story 11), the round
 // trip, the popup view and a drawn line; one screenshot per width for the docs (AD-15).
-// On the dev editing page /edit as the map editor (epic 3 entry 14): the spike's Draw a line
-// tool is Edit mode's (the editMode prop) and View mode never shows it.
+// On the dev editing page /edit as the map editor (epic 3 entry 14, epic 4 entry 4): the
+// toolbar's Line tool is Edit mode's at level full and 768 px and wider, so the line is drawn
+// with it at 1440 px and goes through the test hook at 390 px, where no tool shows.
 
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
 import { TRACER, pagePixel } from '../lib/geo.mjs';
-import { EDITOR_USER, VERTEX_PAUSE_MS, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, nextFrames, openMap, test } from './fixtures.mjs';
+import {
+    EDITOR_USER, VERTEX_PAUSE_MS, drawLine, editorTest, ensureSeeded, expect, hookLineBatch, loadedCounts, mapLoaded, nextFrames, openMap, send, test
+} from './fixtures.mjs';
 
 let seed;
 test.beforeAll(async ({ browser }) => {
@@ -69,32 +72,40 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             await popup.locator('.mapstudio-popup-close').click();
             await expect(page.locator('.mapstudio-popup--default')).toHaveCount(0);
 
-            // Escape cancels a drawing: one vertex, then nothing is drawn.
-            const cx = box.x + box.width / 2;
-            const cy = box.y + box.height / 2;
-            const [a, b] = TRACER.drawOffsets.map(([dx, dy]) => [cx + dx, cy + dy]);
-            // Edit mode's tool (the editMode prop on /edit); View mode's pages have none (basemaps.spec.mjs).
-            const toggle = page.locator('.mapstudio-draw-button');
-            await expect(toggle).toBeVisible();
-            await toggle.click();
-            await expect(reply).toHaveAttribute('data-drawing', 'true');
-            await page.mouse.click(a[0], a[1]);
-            await page.waitForTimeout(VERTEX_PAUSE_MS);
-            await page.keyboard.press('Escape');
-            await expect(reply).toHaveAttribute('data-drawing', 'false');
-            await expect(reply).toHaveAttribute('data-line-points', '');
-            await expect(page.locator('.mapstudio-draw-button[aria-pressed="true"]')).toHaveCount(0);
+            const before = Number(await map.getAttribute('data-items-loaded'));
+            if (width >= 768) {
+                // Escape cancels a drawing: one vertex, then nothing is drawn and the pill reads Select.
+                const cx = box.x + box.width / 2;
+                const cy = box.y + box.height / 2;
+                const [a] = TRACER.drawOffsets.map(([dx, dy]) => [cx + dx, cy + dy]);
+                await expect(page.locator('.mapstudio-toolbar')).toBeVisible();
+                await page.locator('.mapstudio-tool--line').click();
+                await expect(map).toHaveAttribute('data-tool', 'line');
+                const bar = page.locator('.mapstudio-drawing-bar');
+                await page.mouse.click(a[0], a[1]);
+                await expect(bar).toHaveAttribute('data-points', '1');
+                await page.waitForTimeout(VERTEX_PAUSE_MS);
+                await page.keyboard.press('Escape');
+                await expect(bar).toHaveCount(0);
+                await expect(map).toHaveAttribute('data-tool', '');
+                await expect(page.locator('.mapstudio-pill')).toHaveText('Select');
+                await expect(page.locator('.mapstudio-tool--line')).toHaveAttribute('aria-pressed', 'false');
+                await expect(map).toHaveAttribute('data-items-loaded', String(before));
 
-            // A two-vertex line finished with Enter.
-            await toggle.click();
-            await expect(reply).toHaveAttribute('data-drawing', 'true');
-            await page.mouse.click(a[0], a[1]);
-            await page.waitForTimeout(VERTEX_PAUSE_MS);
-            await page.mouse.click(b[0], b[1]);
-            await page.waitForTimeout(VERTEX_PAUSE_MS);
-            await page.keyboard.press('Enter');
-            await expect(reply).toHaveAttribute('data-line-points', '2');
-            await expect(reply.locator('.mapstudio-draw-status')).toContainText('Line drawn with 2 points');
+                // A two-vertex line finished with Enter: saved at once, selected, its two vertices in the map store.
+                await drawLine(page, map);
+                await expect(page.locator('.mapstudio-save-status')).toHaveAttribute('data-save-state', 'saved', { timeout: 30_000 });
+                await expect(map).toHaveAttribute('data-items-loaded', String(before + 1), { timeout: 15_000 });
+                const lineId = await map.getAttribute('data-selected');
+                const saved = (await send(page, 'map.load', {})).body.items.find((i) => i.id === lineId);
+                expect(saved.geometry.coordinates).toHaveLength(2);
+            } else {
+                // No tool below 768 px: the line goes through the test hook (the component's real session path) and is drawn from map.changed.
+                await expect(page.locator('.mapstudio-toolbar')).toHaveCount(0);
+                const reply = await send(page, 'edits.apply', hookLineBatch('Tracer phone line', 0.004));
+                expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
+                await expect(map).toHaveAttribute('data-items-loaded', String(before + 1), { timeout: 15_000 });
+            }
             // Let the map draw the finished line: two frame boundaries, not a time.
             await nextFrames(page);
 

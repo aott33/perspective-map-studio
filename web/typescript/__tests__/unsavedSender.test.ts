@@ -30,7 +30,7 @@ const BUSY: UnsavedReason = {
 const CONFLICT: UnsavedReason = { code: 'conflict', message: 'Changed by mapoperator.', changedBy: 'mapoperator' };
 
 function line(n: number): EditBatch {
-    return lineCreateBatch('item-' + n, 'batch-' + n, [[n, 0], [n, 1]], T0);
+    return lineCreateBatch('item-' + n, 'batch-' + n, 'line', 'Line ' + n, [[n, 0], [n, 1]], null);
 }
 
 /** A sender on a fake store with a host that records what it fires. */

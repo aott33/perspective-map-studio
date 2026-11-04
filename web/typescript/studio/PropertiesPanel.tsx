@@ -6,13 +6,14 @@ import { roundCoordinate } from '../save';
 import { ChromeGlyph } from './ChromeGlyph';
 
 /**
- * The docked properties panel's Details tab (epic 4 entry 2; DESIGN.md Properties panel and tabs,
- * EXPERIENCE.md Properties panel, Place a point): the header with the kind glyph, the name and the
- * subline, the Details tab, then Name, Kind (read-only text in this slice), Location (latitude and
- * longitude, typed, the non-drag way to place a point) and the asset link (the kind's assets, Unlink).
- * Every field saves when it is finished (blur or Enter) through the component's callbacks, one
- * batch each; a field finished while the item's create is still being saved (the pad just placed with
- * the cursor already in Name) goes to the delegate like any other, which sends it right after the
+ * The docked properties panel's Details tab (epic 4 entries 2 and 4; DESIGN.md Properties panel and tabs,
+ * EXPERIENCE.md Properties panel, Place a point, Draw): the header with the kind glyph, the name and the
+ * subline, the Details tab, then Name, Kind (a select of the kinds with the item's geometry, so a line or
+ * area drawn with a generic tool takes its kind here; the Gateway accepts a kind of the same geometry),
+ * Location (latitude and longitude, typed, the non-drag way to place a point) and the asset link (the kind's
+ * assets, Unlink). Every field saves when it is finished (blur, Enter or a choice) through the component's
+ * callbacks, one batch each; a field finished while the item's create is still being saved (the item just
+ * added with the cursor already in Name) goes to the delegate like any other, which sends it right after the
  * create's reply at the right version. The Style tab, the kind's form fields, the place check, the page
  * link and the Live now block are later entries. The panel is keyed by the item's id, so its drafts
  * start from the record; a new version of the record (a save, an undo, another editor's change) resets
@@ -22,6 +23,8 @@ import { ChromeGlyph } from './ChromeGlyph';
 export interface PropertiesPanelProps {
     item: MapItemRecord;
     kind: Kind | undefined;
+    /** The kinds with the item's geometry (a line kind, areas included, for a LineString), for the Kind select. */
+    kinds: Kind[];
     /** The kind's assets from the asset list (level `phone` or `full`), for the picker. */
     assets: Asset[];
     /** The linked asset's name, or null when none or not in the list. */
@@ -37,6 +40,7 @@ export interface PropertiesPanelProps {
     onRename: (name: string) => void;
     onMove: (lngLat: [number, number]) => void;
     onLink: (assetId: string | null) => void;
+    onKind: (kindId: string) => void;
 }
 
 interface Drafts {
@@ -150,12 +154,19 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         this.props.onLink(value === '' ? null : value);
     };
 
+    private onKindChange = (ev: React.ChangeEvent<HTMLSelectElement>): void => {
+        const value = ev.target.value;
+        if (value !== '' && value !== this.props.item.kind && !this.props.paused) {
+            this.props.onKind(value);
+        }
+    };
+
     private onUnlink = (): void => {
         this.props.onLink(null);
     };
 
     render(): React.ReactElement {
-        const { item, kind, assets, assetName, pending, paused } = this.props;
+        const { item, kind, kinds, assets, assetName, pending, paused } = this.props;
         const point = item.geometry.type === 'Point';
         const kindName = kind ? kind.name : item.kind;
         const assetId = item.assetId;
@@ -188,9 +199,13 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                         <input ref={this.setNameInput} className="mapstudio-input mapstudio-field-name" type="text" value={this.state.name} disabled={paused}
                                onChange={(ev) => this.setState({ name: ev.target.value })} onBlur={this.commitName} onKeyDown={this.onKey('name')} />
                     </label>
-                    <div className="mapstudio-field">
-                        <span className="mapstudio-field-label">Kind</span>
-                        <span className="mapstudio-field-text mapstudio-field-kind">{kindName}</span>
+                    <div className="mapstudio-field mapstudio-field--kind">
+                        <label className="mapstudio-field-label" htmlFor={'mapstudio-kind-' + item.id}>Kind</label>
+                        <select id={'mapstudio-kind-' + item.id} className="mapstudio-input mapstudio-field-kind" value={item.kind} disabled={paused}
+                                onChange={this.onKindChange}>
+                            {!kinds.some((k) => k.id === item.kind) ? <option value={item.kind}>{item.kind} (not in the kind list)</option> : null}
+                            {kinds.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+                        </select>
                     </div>
                     <div className="mapstudio-field mapstudio-field--location">
                         <span className="mapstudio-field-label">Location</span>

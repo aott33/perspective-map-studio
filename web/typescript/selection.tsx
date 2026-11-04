@@ -31,7 +31,6 @@ import { LegendControl } from './LegendControl';
 import { LinePopup } from './LinePopup';
 import { popupInstruments, popupNodes } from './linePopup';
 import { displayShows, iconKpiOf, itemState } from './live';
-import { isPlacing } from './studio';
 import { unsavedItems } from './unsaved';
 import { LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED, LAYER_ITEM_MARKERS } from './mapLayers';
 import { NeedsYouControl } from './NeedsYouControl';
@@ -124,7 +123,7 @@ export interface SelectionHost {
  * the event before it gets here, and the draw tool's own Esc runs on the map container.
  */
 export function onRootKeyDown(host: SelectionHost, ev: React.KeyboardEvent<HTMLDivElement>): void {
-    if (ev.key !== 'Escape' || ev.defaultPrevented || host.state.drawing || isPlacing(host.state.studio)) {
+    if (ev.key !== 'Escape' || ev.defaultPrevented || host.state.studio.tool !== null) {
         // A tool in hand takes Esc on the map container (editing.ts); a field's own Esc stops before here.
         return;
     }
@@ -152,8 +151,8 @@ export function onRootKeyDown(host: SelectionHost, ev: React.KeyboardEvent<HTMLD
 }
 
 export function onPointClick(host: SelectionHost, ev: MapLayerMouseEvent): void {
-    if (host.state.drawing || isPlacing(host.state.studio)) {
-        // The click belongs to the line being drawn, or to the Point tool.
+    if (host.state.studio.tool !== null) {
+        // The click belongs to the tool in hand (the Point, Line or Area tool).
         return;
     }
     const feature = ev.features && ev.features[0];
@@ -187,8 +186,8 @@ export function onPointClick(host: SelectionHost, ev: MapLayerMouseEvent): void 
  * another point has just moved.
  */
 export function onMapClick(host: SelectionHost, ev: MapMouseEvent): void {
-    if (host.state.drawing || isPlacing(host.state.studio) || !host.map) {
-        // The line tool or the Point tool (entry 2) owns the click.
+    if (host.state.studio.tool !== null || !host.map) {
+        // A tool in hand (the Point, Line or Area tool; entries 2 and 4) owns the click.
         return;
     }
     // A click on the map closes the legend panel (entry 14) and the Needs you list (entry 3).

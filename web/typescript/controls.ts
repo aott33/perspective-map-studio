@@ -40,8 +40,14 @@ export const GLYPH_PATHS = {
     pointer: 'M5 3l14 8-6 1.5-1.5 6z',
     /** Pin: the Point tool. */
     pin: 'M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12zM12 11a2 2 0 1 0 0-4a2 2 0 1 0 0 4',
-    /** Line: the line tool in the mode pill (the spike's toggle draws its own 16 px polyline). */
+    /** Line: the Line tool. */
     line: 'M3 18l5-9 5 6 8-11',
+    /** Area: the Area tool, an open ring of vertices (entry 4). */
+    area: 'M5 8l7-4 7 5-2 8-9 3-5-5z M5 8h.01M12 4h.01M19 9h.01M17 17h.01M8 20h.01',
+    /** Magnet: the Snap toggle (DESIGN.md Floating draw toolbar; entry 4). */
+    magnet: 'M6 3v9a6 6 0 0 0 12 0V3M6 3h4v9a2 2 0 0 0 4 0V3h4M6 7h4M14 7h4',
+    /** Check: the toast's mark after an add (DESIGN.md toast-undo-bar; entry 4). */
+    check: 'M5 13l4 4L19 7',
     /** Undo and Redo: an arrow curling back, and forward. */
     undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
     redo: 'M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3'

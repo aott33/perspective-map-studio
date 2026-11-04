@@ -5,8 +5,8 @@ import { join } from 'path';
 
 import { MapItemRecord } from '../contract';
 import {
-    Position, instrumentsOn, lengthM, lineDeleteBatch, lineGeometryBatch, lineMoveBatch, lineSplitBatch, pointAt,
-    project, round1, round6
+    Position, SNAP_PX, endsFrom, instrumentsOn, lengthM, lineDeleteBatch, lineGeometryBatch, lineMoveBatch, lineSplitBatch, nearestSnap, pointAt,
+    project, round1, round6, snapDistanceM, snapTargets
 } from '../geometry';
 
 interface Vectors {
@@ -189,5 +189,56 @@ describe('one batch for a line and its instruments', () => {
 
     test('a point is not a line', () => {
         expect(() => lineMoveBatch('b6', ITEMS[0], [0, 0], ITEMS)).toThrow('is not a line');
+    });
+});
+
+describe('snapping (epic 4 entry 4, AD-19)', () => {
+    const CTB1 = record('c1', 'pad', 'CTB1', { type: 'Point', coordinates: [-105.012, 39.7262] }, 1);
+    const SWD1 = record('s1', 'pad', 'SWD1', { type: 'Point', coordinates: [-104.983671, 39.715476] }, 1);
+    const GONE = { ...record('g', 'pad', 'Gone', { type: 'Point', coordinates: [-105.0, 39.72] }, 2), deleted: true };
+
+    test('the targets are every point item once, then every vertex of every line, each in item order, deleted ones left out', () => {
+        const targets = snapTargets([CTB1, GONE, LINE, SWD1]);
+        expect(targets.map((t) => t.itemId)).toEqual(['c1', 's1', LINE_ID, LINE_ID, LINE_ID]);
+        expect(targets[0]).toEqual({ itemId: 'c1', name: 'CTB1', position: [-105.012, 39.7262] });
+        expect(targets[3]).toEqual({ itemId: LINE_ID, name: 'L-SWD', position: SWD[1] });
+        expect(snapTargets([])).toEqual([]);
+    });
+
+    test('a point item wins a tie with a line vertex at its place (the line that snaps to a pad has a vertex on it)', () => {
+        const onPad = record('pad', 'pad', 'CTB1', { type: 'Point', coordinates: SWD[0] }, 1);
+        const targets = snapTargets([LINE, onPad]);
+        expect(nearestSnap(targets, SWD[0], 100)!.itemId).toBe('pad');
+        expect(nearestSnap(targets, [SWD[0][0] + 0.0002, SWD[0][1]], 100)!.itemId).toBe('pad');
+    });
+
+    test('the snap distance is SNAP_PX screen pixels at the zoom and latitude (512 px tiles)', () => {
+        expect(SNAP_PX).toBe(20);
+        // At zoom 13 and 39.7 degrees north one pixel is about 7.35 m.
+        expect(snapDistanceM(13, 39.72)).toBeGreaterThan(140);
+        expect(snapDistanceM(13, 39.72)).toBeLessThan(150);
+        expect(snapDistanceM(14, 39.72)).toBeCloseTo(snapDistanceM(13, 39.72) / 2, 6);
+        expect(snapDistanceM(13, 0)).toBeGreaterThan(snapDistanceM(13, 39.72));
+        expect(snapDistanceM(13, 39.72, 10)).toBeCloseTo(snapDistanceM(13, 39.72) / 2, 6);
+    });
+
+    test('the nearest target within reach takes the vertex; none when every target is further', () => {
+        const targets = snapTargets([CTB1, SWD1]);
+        // 100 m east of CTB1 (about 0.00117 degrees of longitude at this latitude).
+        const near: Position = [-105.012 + 0.00117, 39.7262];
+        expect(nearestSnap(targets, near, 150)).toBe(targets[0]);
+        expect(nearestSnap(targets, near, 50)).toBeNull();
+        expect(nearestSnap(targets, [-105.012, 39.7262], 1)).toBe(targets[0]);
+        // Between the two, nearer SWD1.
+        expect(nearestSnap(targets, [-104.99, 39.718], 1000)).toBe(targets[1]);
+        expect(nearestSnap([], near, 1000)).toBeNull();
+    });
+
+    test('the saved ends come from the targets the first and last vertex snapped to, null with both floating', () => {
+        const [c1, s1] = snapTargets([CTB1, SWD1]);
+        expect(endsFrom(c1, s1)).toEqual({ start: { itemId: 'c1' }, end: { itemId: 's1' } });
+        expect(endsFrom(c1, null)).toEqual({ start: { itemId: 'c1' } });
+        expect(endsFrom(null, s1)).toEqual({ end: { itemId: 's1' } });
+        expect(endsFrom(null, null)).toBeNull();
     });
 });

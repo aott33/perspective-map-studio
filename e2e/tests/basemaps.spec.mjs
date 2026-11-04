@@ -375,7 +375,7 @@ test.describe('1440 px', () => {
         expect(watched.warnings).toEqual([]);
     });
 
-    test('the View-mode controls as designed: one zoom card top-right, the Legend bottom-left by click and keyboard, no Draw a line',
+    test('the View-mode controls as designed: one zoom card top-right, the Legend bottom-left by click and keyboard, no drawing toolbar',
         async ({ page }) => {
             await stubTiles(page);
             const map = await openMap(page, '/');
@@ -389,7 +389,7 @@ test.describe('1440 px', () => {
             await expect(zoom.locator('.mapstudio-zoom-out')).toHaveAttribute('aria-label', 'Zoom out');
             await expect(zoom.locator('.mapstudio-fit-button')).toHaveAttribute('aria-label', 'Fit the map to every item');
             await expect(zoom.locator('.mapstudio-return-button')).toBeDisabled();
-            await expect(page.locator('.mapstudio-draw-button'), 'View mode has no Draw a line').toHaveCount(0);
+            await expect(page.locator('.mapstudio-toolbar'), 'View mode has no drawing toolbar').toHaveCount(0);
             await zoom.locator('.mapstudio-zoom-in').click();
             await expect(map).toHaveAttribute('data-zoom', '13.00', { timeout: CHANGE_MS });
             await expect(zoom.locator('.mapstudio-zoom-level')).toHaveText('z 13');
@@ -493,7 +493,7 @@ test.describe('390 px', () => {
         await stubTiles(page);
         const map = await openMap(page, '/');
         await mapLoaded(map);
-        await expect(page.locator('.mapstudio-draw-button')).toHaveCount(0);
+        await expect(page.locator('.mapstudio-toolbar')).toHaveCount(0);
         // The basemap is the project's setting; the dev setup lists three, so the sheet below has no switch on a phone
         // and the choice is made on a wider screen or is remembered (item 3): choose OpenStreetMap through the component.
         await page.evaluate(() => window.localStorage.setItem('mapstudio.basemap.v1', 'osm'));

@@ -360,31 +360,28 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
         return { ok: ratio !== null && ratio > 1.5, detail: `the point's distance from the pinch centre grew by a factor of ${ratio} for a CDP pinch of scale 2 (needs over 1.5)` };
     });
 
-    await probe('line-tool-finishes-by-touch-alone', async () => {
-        // The spike's line tool is Edit mode's (epic 3 entry 14): a second page on the dev editing page /edit.
-        const edit = await context.newPage();
-        const editMap = await openMap(edit, '/edit');
-        await mapLoaded(editMap);
-        const editBox = await editMap.boundingBox();
-        const editReply = edit.locator('.mapstudio-reply');
-        const cx = editBox.x + editBox.width / 2;
-        const cy = editBox.y + editBox.height / 2;
-        const [a, b] = TRACER.drawOffsets.map(([dx, dy]) => [cx + dx, cy + dy + 140]);
-        await edit.touchscreen.tap(...(await edit.locator('.mapstudio-draw-button').evaluate((el) => {
+    await probe('legend-opens-and-closes-by-touch-alone', async () => {
+        // No drawing tool below 768 px (epic 4 entry 4: the tools show at level full and 768 px and wider), so the
+        // phone's 44 px control a touch alone must work is the Legend button, whose sheet closes from its 44 px Close.
+        const centre = async (locator) => locator.evaluate((el) => {
             const r = el.getBoundingClientRect();
-            return [r.x + r.width / 2, r.y + r.height / 2];
-        })));
-        await expect(editReply).toHaveAttribute('data-drawing', 'true', { timeout: 5_000 });
-        // Terra Draw shows no state between vertex taps; the pause only keeps two taps from reading as a double tap.
-        await edit.touchscreen.tap(a[0], a[1]);
-        await edit.waitForTimeout(300);
-        await edit.touchscreen.tap(b[0], b[1]);
-        await edit.waitForTimeout(300);
-        // No Enter key on a phone: tapping the last vertex again is the touch way to finish.
-        await edit.touchscreen.tap(b[0], b[1]);
-        const points = await until(() => editReply.getAttribute('data-line-points'), (p) => p === '2', 3000);
-        await edit.close();
-        return { ok: points === '2', detail: `data-line-points after two vertex taps and a repeat tap on the last, on /edit: '${points}' (whether Terra Draw finishes this way on touch is the thing probed)` };
+            return [r.x + r.width / 2, r.y + r.height / 2, Math.round(r.width), Math.round(r.height)];
+        });
+        const [bx, by, bw, bh] = await centre(page.locator('.mapstudio-legend-button'));
+        await page.touchscreen.tap(bx, by);
+        const opened = await until(() => map.getAttribute('data-legend-open'), (v) => v === 'true', 5000);
+        let closeSize = 'no close';
+        let closed = opened;
+        if (opened === 'true') {
+            const [cx2, cy2, cw, ch] = await centre(page.locator('.mapstudio-legend-panel .mapstudio-legend-close'));
+            closeSize = cw + 'x' + ch;
+            await page.touchscreen.tap(cx2, cy2);
+            closed = await until(() => map.getAttribute('data-legend-open'), (v) => v === 'false', 5000);
+        }
+        return {
+            ok: opened === 'true' && closed === 'false' && Math.min(bw, bh) >= 44,
+            detail: `data-legend-open '${opened}' after a tap on the ${bw}x${bh} Legend button and '${closed}' after a tap on the sheet's ${closeSize} Close, on / (whether a touch alone drives the sheet is the thing probed)`
+        };
     });
 
     await probe('no-console-or-page-errors', async () => ({
@@ -395,7 +392,7 @@ test('what breaks on a 390 px phone', async ({ browser }) => {
     await context.close();
     m.phone = {
         label: 'measured',
-        method: 'Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the dev map at / with the seeded items (the line-tool probe on /edit, where Edit mode holds the tool); each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device\'s touch handling is unverified. Pan and pinch are read from the point\'s page position worked out from the map\'s reported data-center and data-zoom (entry 8: the phone popup is a sheet with no tip).',
+        method: 'Chromium with isMobile and hasTouch at 390x844 (device scale factor 2) on the dev map at / with the seeded items (no drawing tool shows below 768 px since epic 4 entry 4, so the Legend sheet is the touch probe); each probe records ok and a detail, and a failed probe is a finding, not a test failure. Touch moves go through CDP Input.dispatchTouchEvent and Input.synthesizePinchGesture; whether they match a real device\'s touch handling is unverified. Pan and pinch are read from the point\'s page position worked out from the map\'s reported data-center and data-zoom (entry 8: the phone popup is a sheet with no tip).',
         env: envFor('390x844'),
         deviceScaleFactor: 2,
         findings,

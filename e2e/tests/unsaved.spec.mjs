@@ -120,6 +120,11 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             async ({ page, context }) => {
                 const gate = { drop: false, dropped: 0, dropChanged: 0, failLoad: null, failedLoads: 0 };
                 await routeSockets(context, gate);
+                if (width < 768) {
+                    // No drawing tool below 768 px (epic 4 entry 4): the line is drawn at a laptop width, and the phone
+                    // width comes back for the kept state, its screenshot and the reopen.
+                    await page.setViewportSize({ width: 1366, height: 768 });
+                }
                 let map = await openMap(page, '/edit');
                 const before = await mapLoaded(map);
                 await expect(map).toHaveAttribute('data-edit-level', 'full');
@@ -129,6 +134,9 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
                 await drawLine(page, map, { dy: -200 });
                 // Written before the send, so it is in storage at once.
                 await expect.poll(async () => (await storedQueue(page)).length).toBe(1);
+                if (width < 768) {
+                    await page.setViewportSize({ width, height });
+                }
                 const row = page.locator('.mapstudio-unsaved-row');
                 // Unsent from the start; the reason arrives when the 15 s reply timer runs out.
                 await expect(row).toHaveAttribute('data-code', 'timeout', { timeout: UNSENT_TIMEOUT_MS });
@@ -267,16 +275,17 @@ editorTest.describe('a map.load that fails after the map loaded', () => {
             await expect(map).toHaveAttribute('data-editing', 'on');
             await expect(map).toHaveAttribute('data-items-loaded', String(before + 1));
             await expect(map).toHaveAttribute('data-edit-level', 'full');
-            await expect(page.locator('.mapstudio-draw-button')).toBeEnabled();
+            await expect(page.locator('.mapstudio-tool--line')).toBeEnabled();
 
             // The timed retry (15 s) loads again, now answered store-unreachable: no store item is
-            // drawn as current, the draw tool is off, and the queued line is still drawn as unsaved.
+            // drawn as current, the tools are paused, and the queued line is still drawn as unsaved.
             gate.failLoad = 'down';
             await expect.poll(() => gate.failedLoads, { timeout: 30_000 }).toBe(2);
             await expect(map).toHaveAttribute('data-store-state', 'unavailable');
             await expect(map).toHaveAttribute('data-items-loaded', '0');
             await expect(map).toHaveAttribute('data-editing', 'off');
-            await expect(page.locator('.mapstudio-draw-button')).toBeDisabled();
+            await expect(page.locator('.mapstudio-toolbar-float')).toHaveClass(/mapstudio-toolbar-float--paused/);
+            await expect(page.locator('.mapstudio-tool--line')).toBeDisabled();
             await expect(map).toHaveAttribute('data-unsaved-count', '1');
             await expect(map).toHaveAttribute('data-unsaved-drawn', '1');
             await expect(page.locator('.mapstudio-load-status')).toContainText('store-unreachable: The map store is unavailable (test).');
@@ -290,7 +299,7 @@ editorTest.describe('a map.load that fails after the map loaded', () => {
             await expect(map).toHaveAttribute('data-editing', 'on');
             await expect(map).toHaveAttribute('data-unsaved-count', '0', { timeout: 30_000 });
             await expect(map).toHaveAttribute('data-items-loaded', String(before + 4));
-            await expect(page.locator('.mapstudio-draw-button')).toBeEnabled();
+            await expect(page.locator('.mapstudio-tool--line')).toBeEnabled();
         });
 });
 

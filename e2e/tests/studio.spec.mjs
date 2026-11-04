@@ -155,7 +155,7 @@ test.describe('1366 px', () => {
         await expect(page.locator('.mapstudio-dock--items')).toBeVisible();
         await shot(page, 'mapstudio-studio-1366.png');
 
-        // Off: View mode, the studio gone, the prop written back so the page's label follows; the spike's tool goes with the prop.
+        // Off: View mode, the studio gone, the prop written back so the page's label follows; the tools go with the studio.
         await sw.click();
         await expect(map).toHaveAttribute('data-mode', 'view');
         await expect(page.locator('.mapstudio-rail')).toHaveCount(0);
@@ -164,7 +164,7 @@ test.describe('1366 px', () => {
         await expect(sw).toHaveAttribute('aria-checked', 'false');
         await expect(sw).toContainText('Edit map');
         await expect(page.locator('#mapstudio-dev-editmode')).toHaveText('editMode: false', { timeout: REPLY_MS });
-        await expect(page.locator('.mapstudio-draw-button')).toHaveCount(0);
+        await expect(page.locator('.mapstudio-tool--line')).toHaveCount(0);
         const full = await map.boundingBox();
         expect(Math.abs(full.width - 1366)).toBeLessThanOrEqual(1);
         await shot(page, 'mapstudio-studio-view-1366.png');
@@ -174,7 +174,7 @@ test.describe('1366 px', () => {
         await sw.click();
         await expect(map).toHaveAttribute('data-mode', 'edit');
         await expect(page.locator('#mapstudio-dev-editmode')).toHaveText('editMode: true', { timeout: REPLY_MS });
-        await expect(page.locator('.mapstudio-draw-button')).toBeVisible();
+        await expect(page.locator('.mapstudio-tool--line')).toBeVisible();
         await page.locator('.mapstudio-rail-item[data-surface="view"]').click();
         await expect(map).toHaveAttribute('data-mode', 'view');
         await expect(page.locator('#mapstudio-dev-editmode')).toHaveText('editMode: false', { timeout: REPLY_MS });
@@ -240,7 +240,9 @@ test.describe('1366 px', () => {
             const name = page.locator('.mapstudio-field-name');
             await expect(name).toBeFocused();
             await expect(name).toHaveValue('Well pad');
-            await expect(page.locator('.mapstudio-field-kind')).toHaveText('Well pad');
+            // The Kind row is a select of the point kinds (entry 4), the pad kind chosen.
+            await expect(page.locator('.mapstudio-field-kind')).toHaveValue('pad');
+            await expect(page.locator('.mapstudio-field-kind option:checked')).toHaveText('Well pad');
             const status = page.locator('.mapstudio-panel-save');
             await expect(status).toHaveAttribute('data-save-state', 'saved', { timeout: 30_000 });
             await expect(status).toHaveText('Saved');

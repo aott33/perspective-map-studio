@@ -218,38 +218,6 @@
     border-top: 1px solid var(--border);
 }
 
-/* The line tool toggle (Edit mode only, the editMode prop): a glyph and the mode's name in words. */
-.mapstudio .mapstudio-draw-button {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    box-sizing: border-box;
-    width: auto;
-    height: var(--mapstudio-target);
-    padding: 0 10px;
-    border: none;
-    background: var(--mapstudio-surface);
-    color: var(--label);
-    font: inherit;
-    font-size: 12px;
-    line-height: 1;
-    cursor: pointer;
-}
-
-.mapstudio .mapstudio-draw-button:hover {
-    background: var(--mapstudio-hover);
-}
-
-.mapstudio .mapstudio-draw-button--on {
-    background: var(--callToActionHighlight);
-    color: var(--callToAction);
-    box-shadow: inset 0 0 0 1px var(--callToAction);
-}
-
-.mapstudio .mapstudio-draw-glyph {
-    flex: 0 0 auto;
-}
-
 /* The point popup (AD-7, epic 3 entry 8; DESIGN.md popup-card and bottom-sheet, the UX review's P1 to
    P8 and Phone): one opaque surface above every map layer and control, 320 px wide (popup-width, D1),
    at most 480 px tall or the map less 64 (popup-max-height, set as --mapstudio-popup-max-height from
@@ -804,12 +772,6 @@
 
 .mapstudio-unsaved-row button:disabled {
     color: var(--label--disabled);
-    cursor: not-allowed;
-}
-
-.mapstudio .mapstudio-draw-button:disabled {
-    color: var(--label--disabled);
-    background: var(--mapstudio-surface);
     cursor: not-allowed;
 }
 
@@ -2830,8 +2792,28 @@
     outline-offset: 2px;
 }
 
+/* The primary button (DESIGN.md: the selection token is the primary button): the drawing bar's Finish. */
+.mapstudio-button--primary {
+    border-color: var(--callToAction);
+    background: var(--callToAction);
+    color: var(--mapstudio-surface);
+}
+
+.mapstudio-button--primary:hover:not(:disabled) {
+    background: var(--callToAction);
+    filter: brightness(1.08);
+}
+
+.mapstudio-button:disabled {
+    color: var(--label--disabled);
+    background: var(--mapstudio-surface);
+    border-color: var(--neutral-40, var(--border));
+    cursor: not-allowed;
+}
+
 /* The floating draw toolbar top-centre over the map, the mode pill under it: floating, so the one soft shadow;
-   above the popup layer with the other controls (owner re-test R2). Paused, it fades and takes no input. */
+   above the popup layer with the other controls (owner re-test R2). Paused, it fades and takes no input. Its
+   groups (Select; the kind buttons; Point, Line, Area; Snap) are divided by thin rules (DESIGN.md draw-toolbar). */
 .mapstudio-toolbar-float {
     position: absolute;
     top: var(--mapstudio-map-inset);
@@ -2894,11 +2876,178 @@
     color: var(--callToAction);
 }
 
+/* A kind button draws its kind's glyph from the sprite in the text colour; the Snap toggle is a glyph and a word. */
+.mapstudio-tool-kind-glyph {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+
+.mapstudio-tool--snap {
+    width: auto;
+    padding: 0 8px 0 6px;
+    gap: 4px;
+}
+
+.mapstudio-tool-word {
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
 .mapstudio-toolbar-divider {
     width: 1px;
     height: 20px;
     margin: 0 2px;
     background: var(--mapstudio-divider);
+}
+
+/* The drawing bar bottom-centre while a line or an area is drawn (DESIGN.md Drawing bar): the kind glyph,
+   "New pipeline", the progress, the snapping state, the finish hint or what keeps it from finishing, Cancel and
+   Finish; above the dev status line and the legend row, never in the bottom-right corner. Floating, so the one
+   soft shadow; above the popup layer with the controls. */
+.mapstudio-drawing-bar {
+    position: absolute;
+    left: 50%;
+    bottom: 100px;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-sizing: border-box;
+    max-width: calc(var(--mapstudio-map-width, 100vw) - 2 * var(--mapstudio-map-inset) - 2 * var(--mapstudio-target) - 24px);
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: var(--mapstudio-surface);
+    color: var(--label);
+    box-shadow: var(--mapstudio-float-shadow);
+    font-size: 12px;
+    line-height: 1.3;
+    transform: translateX(-50%);
+}
+
+.mapstudio-drawing-glyph {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: var(--mapstudio-blank);
+    color: var(--neutral-80, var(--label));
+}
+
+.mapstudio-drawing-kind-glyph {
+    display: block;
+    width: 18px;
+    height: 18px;
+}
+
+.mapstudio-drawing-words {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 10px;
+    row-gap: 2px;
+    min-width: 0;
+}
+
+.mapstudio-drawing-title {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.mapstudio-drawing-progress,
+.mapstudio-drawing-snap,
+.mapstudio-drawing-hint {
+    color: var(--neutral-70, var(--label--disabled));
+    white-space: nowrap;
+}
+
+/* The snap indicator while a target is within reach takes the selection token (DESIGN.md Colors: the snap indicator). */
+.mapstudio-drawing-snap--target {
+    color: var(--callToAction);
+    font-weight: 600;
+}
+
+/* What keeps the drawing from finishing, in words with the warning glyph's hue and never the hue alone. */
+.mapstudio-drawing-hint--problem {
+    color: var(--mapstudio-warning);
+    font-weight: 600;
+}
+
+.mapstudio-drawing-cancel,
+.mapstudio-drawing-finish {
+    flex: 0 0 auto;
+}
+
+/* The toast and Undo bar bottom-centre after an add (DESIGN.md toast-undo-bar): a dark bar in the attention token
+   with the panel surface for its text, a check, the message and Undo; never in the bottom-right corner. */
+.mapstudio-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 100px;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-sizing: border-box;
+    max-width: calc(var(--mapstudio-map-width, 100vw) - 2 * var(--mapstudio-map-inset) - 2 * var(--mapstudio-target) - 24px);
+    padding: 8px 10px 8px 12px;
+    border-radius: 8px;
+    background: var(--mapstudio-attention);
+    color: var(--mapstudio-surface);
+    box-shadow: var(--mapstudio-float-shadow);
+    font-size: 13px;
+    line-height: 1.3;
+    transform: translateX(-50%);
+}
+
+/* Above the drawing bar while a drawing tool is still in hand. */
+.mapstudio-toast--above {
+    bottom: 160px;
+}
+
+.mapstudio-toast-glyph {
+    flex: 0 0 auto;
+}
+
+.mapstudio-toast-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mapstudio-toast-undo {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--mapstudio-surface);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--mapstudio-surface);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.mapstudio-toast-undo:hover:not(:disabled) {
+    background: var(--mapstudio-surface);
+    color: var(--mapstudio-attention);
+}
+
+.mapstudio-toast-undo:focus-visible {
+    outline: 2px solid var(--mapstudio-surface);
+    outline-offset: 2px;
+}
+
+.mapstudio-toast-undo:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .mapstudio-pill {
@@ -2990,12 +3139,14 @@
     left: 16px;
 }
 
-/* Phone widths keep View mode (entry 6): none of the studio shows below 768 px. */
+/* Phone widths keep View mode (entry 6): none of the studio shows below 768 px, the drawing bar and the toast included. */
 @media (max-width: 767px) {
     .mapstudio-rail,
     .mapstudio-dock,
     .mapstudio-panel,
     .mapstudio-toolbar-float,
+    .mapstudio-drawing-bar,
+    .mapstudio-toast,
     .mapstudio .mapstudio-edit-switch {
         display: none;
     }

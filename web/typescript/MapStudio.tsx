@@ -10,9 +10,9 @@ import {
     Size2d
 } from '@inductiveautomation/perspective-client';
 import { ErrorEvent, Map as MapLibreMap, MapMouseEvent, Popup, setWorkerUrl } from 'maplibre-gl';
-import { TerraDraw } from 'terra-draw';
-import { DrawControl } from './DrawControl';
-import { DRAW_IDLE, DrawState, drawStatusText } from './draw';
+import { TerraDraw, TerraDrawLineStringMode, TerraDrawPolygonMode } from 'terra-draw';
+import { Drawing, isDrawingTool } from './drawing';
+import { SnapTarget } from './geometry';
 import { EditLevel, MapItemRecord } from './contract';
 import { AdapterStatus, HostLists, NO_HOST_LISTS } from './adapters';
 import { BasemapId, RasterSource } from './basemaps';
@@ -53,10 +53,11 @@ import * as items from './itemsLayer';
 import * as selection from './selection';
 import type { OpenPick, OpenPopup } from './selection';
 import * as editing from './editing';
+import type { PendingToast } from './editing';
 import * as basemap from './basemapLayer';
 import { TilesState } from './basemapLayer';
 import {
-    StudioState, StudioSurface, clearSelection, enterEdit, fromProps, isEditing, leaveEdit, pickTool, pillText, pointKind, select, showSurface
+    StudioState, StudioSurface, StudioTool, clearSelection, enterEdit, fromProps, isEditing, leaveEdit, pickTool, pillText, select, showSurface, toolKind
 } from './studio';
 import { listRows } from './itemList';
 import { redoLabel, undoLabel } from './undoStack';
@@ -64,6 +65,8 @@ import { Rail } from './studio/Rail';
 import { ItemList } from './studio/ItemList';
 import { PropertiesPanel } from './studio/PropertiesPanel';
 import { DrawToolbar } from './studio/DrawToolbar';
+import { DrawingBar } from './studio/DrawingBar';
+import { Toast } from './studio/Toast';
 
 /** Must match MapStudioComponent.COMPONENT_ID on the Java side. */
 export const COMPONENT_TYPE = 'ao.mapstudio';
@@ -91,14 +94,28 @@ export interface MapStudioProps {
     /**
      * Edit mode, both ways (epic 3 entry 14, epic 4 entry 2): the studio at level `full`, entered at mount and
      * when the page writes true after it, left when the page writes false; the Edit switch writes it back. The
-     * spike's Draw a line tool and its echo line follow the prop alone, as in 0.3.0, until entry 4's toolbar.
+     * dev click echo in the status line follows the prop alone.
      */
     editMode: boolean;
     /** The selected map item's id, which the component writes (epic 4 entry 2); never read back into the model (entry 14's). */
     selectedItem: string | null;
 }
 
-export interface MapStudioState extends DrawState {
+/** The toast after an add (studio/Toast.tsx): its words and a key that remounts it, so a new toast starts its own timer. */
+export interface ToastState {
+    message: string;
+    key: number;
+}
+
+export interface MapStudioState {
+    /** The line or area being drawn vertex by vertex (epic 4 entry 4, drawing.ts), or null. */
+    drawing: Drawing | null;
+    /** The Snap toggle (EXPERIENCE.md Snap): off by default. */
+    snap: boolean;
+    /** The name of the snap target within reach of the pointer while the toggle is on, or ''. */
+    snapHint: string;
+    /** The toast shown after an add, or null. */
+    toast: ToastState | null;
     popup: OpenPopup | null;
     /** Bumped every few seconds while the popup is open, so its data ages move. */
     clock: number;
@@ -113,8 +130,8 @@ export interface MapStudioState extends DrawState {
      */
     panel: string | null;
     /**
-     * The studio's mode, tool, surface and selection (epic 4 entries 1 and 2, studio.ts), which the studio's surfaces read;
-     * kept in lock-step with `drawing` and `selected` through drawingState, pointToolState and selectionState (functional setState).
+     * The studio's mode, tool, surface and selection (epic 4 entries 1, 2 and 4, studio.ts), which the studio's surfaces read;
+     * kept in lock-step with `drawing` and `selected` through drawingState, toolState and selectionState (functional setState).
      */
     studio: StudioState;
 }
@@ -142,14 +159,23 @@ function clientLocationWords(store: AbstractUIElementStore): string {
  */
 export class MapStudio extends Component<Props, MapStudioState> {
     state: MapStudioState = {
-        ...DRAW_IDLE, popup: null, clock: Date.now(), pick: null, selected: null, panel: null, studio: fromProps(this.props.props.editMode)
+        drawing: null, snap: false, snapHint: '', toast: null, popup: null, clock: Date.now(), pick: null, selected: null, panel: null,
+        studio: fromProps(this.props.props.editMode)
     };
 
     mapContainer: HTMLDivElement | null = null;
     map: MapLibreMap | null = null;
     private resizeObserver: ResizeObserver | null = null;
     draw: TerraDraw | null = null;
-    drawControl: DrawControl | null = null;
+    /** Terra Draw's line and polygon modes (entry 4), kept for Backspace (the mode's undo). */
+    lineMode: TerraDrawLineStringMode | null = null;
+    areaMode: TerraDrawPolygonMode | null = null;
+    /** The add whose save the toast waits on (editing.ts), or null. */
+    toastFor: PendingToast | null = null;
+    /** The snap targets as last read from the items, the snapping callback's last offer and the validation's last reason (editing.ts). */
+    snapCache: { revision: number; targets: SnapTarget[] } | null = null;
+    lastSnap: SnapTarget | null = null;
+    drawingReason = '';
     /** The Edit switch top-right (entry 2), added once map.load says the level is full; null otherwise. */
     editSwitch: EditSwitch | null = null;
     /** The MapLibre popup, created once and moved between points; its content is a React portal. */
@@ -311,9 +337,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
             map.once('idle', () => camera.publishReadiness(this, map));
         });
         this.map = map;
-        // The spike's line tool follows the editMode prop (entry 14, 0.3.0's behaviour at every level); the Edit switch
-        // and the studio wait for map.load's level (applyStudioControls, componentDidUpdate).
-        this.applySpikeTool();
+        // The Edit switch and the studio wait for map.load's level (applyStudioControls, componentDidUpdate).
         this.themeWatch = new ThemeWatch(root, THEME_TOKENS, () => this.applyTheme());
         this.themeWatch.start();
         registerTestView((view) => {
@@ -391,9 +415,33 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.drawItems();
         this.dropQueuedFeatures();
         editing.applyEditing(this);
+        this.applyToast();
         camera.applyStartingArea(this);
         camera.applyRestore(this);
         camera.saveSelection(this);
+    }
+
+    /**
+     * The toast after an add (entry 4; EXPERIENCE.md Toast / Undo bar): once the delegate's save status says the
+     * added item is saved, "Pipeline added and saved" with Undo; a refusal or a queued save shows none (the save
+     * status says what happened), and the add is forgotten either way.
+     */
+    private applyToast(): void {
+        const delegate = this.props.delegate;
+        const waiting = this.toastFor;
+        if (!delegate || !waiting) {
+            return;
+        }
+        const save = delegate.save;
+        if (save.state === 'idle' || save.itemId !== waiting.itemId) {
+            return;
+        }
+        if (save.state === 'saved') {
+            this.toastFor = null;
+            this.setState({ toast: { message: waiting.message, key: Date.now() } });
+        } else if (save.state === 'refused' || save.state === 'unsent') {
+            this.toastFor = null;
+        }
     }
 
     /**
@@ -464,32 +512,6 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         if (this.editSwitch) {
             this.editSwitch.setOn(isEditing(this.state.studio));
-        }
-        this.applySpikeTool();
-    }
-
-    /**
-     * The spike's Draw a line toggle follows the editMode prop at every level (0.3.0; entry 4's toolbar replaces it).
-     * Top-left under the search row since entry 2: the designed top-right column holds the Edit switch above the zoom
-     * card and is full at 1366 (DESIGN.md Layout & Spacing), and under that column on the dev page at 390 px the toggle
-     * sat where the unsaved spec's second vertex lands once the page's labels took their room.
-     */
-    private applySpikeTool(): void {
-        const map = this.map;
-        if (!map) {
-            return;
-        }
-        const wanted = this.props.props.editMode;
-        if (wanted && !this.drawControl) {
-            this.drawControl = new DrawControl(this.toggleDrawing);
-            map.addControl(this.drawControl, 'top-left');
-            editing.applyEditing(this);
-        } else if (!wanted && this.drawControl) {
-            if (this.state.drawing) {
-                editing.putToolDown(this);
-            }
-            map.removeControl(this.drawControl);
-            this.drawControl = null;
         }
     }
 
@@ -630,6 +652,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.draw.stop();
             this.draw = null;
         }
+        this.lineMode = null;
+        this.areaMode = null;
         if (this.popupSizeObserver) {
             this.popupSizeObserver.disconnect();
             this.popupSizeObserver = null;
@@ -647,7 +671,6 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.needsYouControl.unmount();
             this.needsYouControl = null;
         }
-        this.drawControl = null;
         this.editSwitch = null;
         this.legendControl = null;
         this.logoControl = null;
@@ -655,24 +678,25 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.searchControl = null;
     }
 
-    /** The spike's line tool (editing.ts): the Draw a line toggle, Terra Draw's finish and the container's Escape. */
-    private toggleDrawing = (): void => editing.toggleDrawing(this);
+    /** The tools (editing.ts): Terra Draw's finish and change events and the container's Escape and Backspace. */
     onDrawFinish = (id: string | number, context: { mode: string; action: string }): void => editing.onDrawFinish(this, id, context);
+    onDrawChange = (ids: Array<string | number>, type: string): void => editing.onDrawChange(this, ids, type);
     onKeyDown = (ev: KeyboardEvent): void => editing.onKeyDown(this, ev);
 
     /**
-     * A draw state with the studio model that goes with it: the line tool in hand while drawing (studio.ts), the Point
-     * tool kept when the line tool only turns off. Built from the state being updated (`prev` of a functional setState),
-     * so writes batched into one update compose.
+     * The drawing in progress (entry 4, drawing.ts), or none. Built from the state being updated (`prev` of a
+     * functional setState), so writes batched into one update compose.
      */
-    drawingState(prev: Readonly<MapStudioState>, state: DrawState): Pick<MapStudioState, 'drawing' | 'linePoints' | 'studio'> {
-        const tool = state.drawing ? 'line' : prev.studio.tool === 'line' ? null : prev.studio.tool;
-        return { ...state, studio: pickTool(prev.studio, tool) };
+    drawingState(_prev: Readonly<MapStudioState>, drawing: Drawing | null): Pick<MapStudioState, 'drawing'> {
+        return { drawing };
     }
 
-    /** The Point tool picked up (the line tool cancelled) or put down, with the studio model (entry 2); from `prev` as above. */
-    pointToolState(prev: Readonly<MapStudioState>, on: boolean): Pick<MapStudioState, 'drawing' | 'linePoints' | 'studio'> {
-        return { drawing: false, linePoints: prev.linePoints, studio: pickTool(prev.studio, on ? 'point' : null) };
+    /**
+     * A tool picked up, with the kind a kind button fixed (null for a generic tool), or put down with null, with the studio
+     * model (studio.ts); a drawing in progress goes with the tool before it. From `prev` as above.
+     */
+    toolState(prev: Readonly<MapStudioState>, tool: StudioTool | null, kindId: string | null): Pick<MapStudioState, 'drawing' | 'snapHint' | 'studio'> {
+        return { drawing: null, snapHint: '', studio: pickTool(prev.studio, tool, kindId) };
     }
 
     /**
@@ -808,9 +832,30 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     };
 
-    /** The toolbar (entry 2): Select puts every tool down; Point picks the Point tool up. */
+    /** The toolbar (entries 2 and 4): Select puts every tool down; a tool or kind button picks its tool up; Snap toggles. */
     onSelectTool = (): void => editing.putToolDown(this);
-    onPointTool = (): void => editing.pickPointTool(this);
+    onTool = (tool: StudioTool, kindId: string | null): void => editing.pickTool(this, tool, kindId);
+    onSnap = (): void => editing.toggleSnap(this);
+
+    /** The drawing bar (entry 4): Finish as Enter, Cancel as Esc. */
+    onFinishDrawing = (): void => editing.finishDrawing(this);
+    onCancelDrawing = (): void => editing.cancelDrawing(this);
+
+    /** The toast's Undo is the undo stack's last step; the toast goes with it, or on its own after its time. */
+    onToastUndo = (): void => {
+        this.setState({ toast: null });
+        this.onUndo();
+    };
+    onToastClose = (): void => this.setState({ toast: null });
+
+    /** The Kind select in Details (entry 4): one update of `kind` to a kind of the item's geometry. */
+    onKind = (kindId: string): void => {
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        const selected = this.state.selected;
+        if (delegate && selected) {
+            delegate.setKind(selected.id, kindId);
+        }
+    };
 
     /** Undo and Redo (entry 2): the delegate sends the reverse batch; a placed pin would be stale, so it goes. */
     onUndo = (): void => {
@@ -1002,10 +1047,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         const assets = delegate.lists.assets || [];
         const linked = item.assetId !== null ? assets.find((a) => a.id === item.assetId) : undefined;
+        const geometry = item.geometry.type === 'Point' ? 'point' : 'line';
         return (
             <PropertiesPanel key={item.id}
                              item={item}
                              kind={delegate.lists.kinds.find((k) => k.id === item.kind)}
+                             kinds={delegate.lists.kinds.filter((k) => k.geometry === geometry)}
                              assets={assets.filter((a) => a.kind === item.kind)}
                              assetName={linked ? linked.name : null}
                              pending={item.version === 0}
@@ -1015,7 +1062,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              onClose={this.onPanelClose}
                              onRename={this.onRename}
                              onMove={this.onMove}
-                             onLink={this.onLink} />
+                             onLink={this.onLink}
+                             onKind={this.onKind} />
         );
     }
 
@@ -1026,7 +1074,6 @@ export class MapStudio extends Component<Props, MapStudioState> {
     render(): React.ReactNode {
         const delegate = this.props.delegate;
         const pending = !!(delegate && delegate.pendingId);
-        const drawText = drawStatusText(this.state);
         const replyLine = delegate && delegate.lastReply ? delegate.lastReply : 'Click a point.';
         const save = delegate ? delegate.save : SAVE_IDLE;
         const saveText = saveStatusText(save);
@@ -1035,18 +1082,21 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const unsaved = delegate ? delegate.unsaved : [];
         const editing = delegate ? delegate.editing : 'on';
         // The status line stays in the DOM for every state it reports (the save status, a failed load, a
-        // read-only store, unsaved edits, the line tool), but the spike's click echo is dev-page test
-        // output and leaves View mode (owner review notes item 5, after entry 15): it renders where the
-        // editMode prop is true, as the spike's tool does, and View mode shows the map and its controls only.
-        // The last reply stays readable for the tests as `data-last-reply` on the map.
+        // read-only store, unsaved edits), but the spike's click echo is dev-page test output and leaves
+        // View mode (owner review notes item 5, after entry 15): it renders where the editMode prop is true,
+        // and View mode shows the map and its controls only. The last reply stays readable for the tests as
+        // `data-last-reply` on the map.
         const echo = this.props.props.editMode;
-        const quiet = !echo && drawText === '' && saveText === '' && load.state !== 'failed'
-            && store.status !== 'read-only' && unsaved.length === 0;
+        const quiet = !echo && saveText === '' && load.state !== 'failed' && store.status !== 'read-only' && unsaved.length === 0;
         const connection = delegate ? delegate.connection : CONNECTED;
         const chipText = connectionChipText(connection);
         // The studio's surfaces dock beside the map in Edit mode at level full (entry 2; the stage is the map's room).
         const studioOn = this.studioOn();
         const studio = this.state.studio;
+        const kinds = delegate ? delegate.lists.kinds : [];
+        // The kind the tool in hand adds (entry 4): the kind button's, else the first of the tool's geometry.
+        const inHand = studio.tool !== null ? toolKind(kinds, studio.tool, studio.toolKind) : null;
+        const drawing = this.state.drawing;
         return (
             <div {...this.props.emit({ classes: studioOn ? ['mapstudio', 'mapstudio--editing'] : ['mapstudio'] })} onKeyDown={this.onRootKeyDown}>
                 {studioOn ? <Rail surface={studio.surface} onView={this.onRailView} onSurface={this.onRailSurface} /> : null}
@@ -1059,6 +1109,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                          data-studio={studioOn ? 'on' : 'off'}
                          data-surface={studio.surface}
                          data-tool={studio.tool || ''}
+                         data-tool-kind={studio.toolKind || ''}
+                         data-snap={this.state.snap ? 'on' : 'off'}
                          data-load-state={load.state}
                          data-store-seq={delegate && delegate.seq !== null ? String(delegate.seq) : ''}
                          data-map-reloads={delegate ? String(delegate.reloads) : '0'}
@@ -1081,11 +1133,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                          data-search-open="false"
                          data-needs-open="false" />
                     <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '') + (quiet ? ' mapstudio-reply--quiet' : '')}
-                         data-pending={pending ? 'true' : 'false'}
-                         data-drawing={this.state.drawing ? 'true' : 'false'}
-                         data-line-points={this.state.linePoints === null ? '' : String(this.state.linePoints)}>
+                         data-pending={pending ? 'true' : 'false'}>
                         {echo ? <div>{pending ? 'Waiting for the Gateway ...' : replyLine}</div> : null}
-                        {drawText !== '' ? <div className="mapstudio-draw-status">{drawText}</div> : null}
                         {saveText !== '' ? (
                             <div className={'mapstudio-save-status mapstudio-save-status--' + save.state}
                                  data-save-state={save.state}
@@ -1115,10 +1164,31 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     ) : null}
                     {studioOn && delegate ? (
                         <DrawToolbar tool={studio.tool}
-                                     pill={pillText(studio.tool, pointKind(delegate.lists.kinds))}
+                                     toolKind={studio.toolKind}
+                                     kinds={kinds}
+                                     snap={this.state.snap}
+                                     pill={pillText(studio.tool, inHand)}
                                      paused={editing === 'off'}
                                      onSelect={this.onSelectTool}
-                                     onPoint={this.onPointTool} />
+                                     onTool={this.onTool}
+                                     onSnap={this.onSnap} />
+                    ) : null}
+                    {studioOn && delegate && isDrawingTool(studio.tool) ? (
+                        <DrawingBar tool={studio.tool}
+                                    drawing={drawing}
+                                    kind={inHand}
+                                    snap={this.state.snap}
+                                    snapHint={this.state.snapHint}
+                                    onCancel={this.onCancelDrawing}
+                                    onFinish={this.onFinishDrawing} />
+                    ) : null}
+                    {studioOn && delegate && this.state.toast ? (
+                        <Toast key={this.state.toast.key}
+                               message={this.state.toast.message}
+                               undoLabel={editing === 'off' ? '' : undoLabel(delegate.undo)}
+                               above={isDrawingTool(studio.tool)}
+                               onUndo={this.onToastUndo}
+                               onClose={this.onToastClose} />
                     ) : null}
                     {this.renderStylePanel()}
                     {selection.renderPopup(this)}
