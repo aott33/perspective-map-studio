@@ -4,7 +4,7 @@ type: 'refactor'
 ticket: '1'
 created: '2026-11-03'
 status: 'in-progress'
-baseline_revision: '4d75bd66645effa97ce2ebf77051e7afa8b2e285'
+baseline_revision: '2d646c1c8464dc49ed66eb2b07a1f629504c3cc7'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
@@ -75,6 +75,8 @@ context: ['{project-root}/_bmad-output/handoff-epic-4.md', '{project-root}/docs/
 - Beyond the plan's list (implementer): `basemapLayer.ts` (applyBasemap, updateFeedbackLinks, publishBasemap, onMapError) was needed to get the component under 800 lines (777); `onMapIdle`, `applyTheme`, `applyLayerToggles`, `publishLabels` and the four render helpers (adapter status, live state, unsaved, style panel) stay in the component as thin wiring or render. The only non-moves: `boundsOf(coordinates)` in `camera.ts` replaces the loop `onReturn` and `goToItem` each carried (the same arithmetic); `createMap` and `startCamera` name the map construction and its first camera; `dropImages` names applyTheme's image drop; `blankColors` names the mount's four-token read (its `line` token, `--neutral-70`, was unused before and is unused now).
 - The model as wired (implementer): `MapStudioState.studio` is initialised from `editMode` in the state initialiser (once, as the plan says); the Draw a line control is added and the echo line rendered when `isEditing(studio)` (the component read the prop live in `render` before, a difference only if the prop changed after mount, which no page does); `drawingState(state)` and `selectionState(selected)` on the component write the `DrawState` or the `Selection` together with the model (`pickTool`, `select`, `clearSelection`), and every `selected` write in `selection.tsx` and `camera.ts` goes through `selectionState`, so `state.drawing === isDrawing(studio)` and `state.selected?.id === selectedId(studio)` hold at every render. `pickTool` leaves a View-mode state unchanged (View mode has no tool); `toggleSelect` is for the studio's multi-select and has no caller yet.
 - Bundle (implementer): production `webpack --mode production` at the baseline gave `MapStudio.js` 1,352,177 bytes and `MapStudio.css` 108,962; after the split 1,351,289 (888 bytes fewer, -0.066 percent) and 108,962 (identical).
+
+- Baseline (main session, 2026-11-04): the branch's commits were rewritten to the repository's Claude identity at the owner's request; the baseline commit `4d75bd6` became `2d646c1` with the same tree and message, and the frontmatter follows it.
 
 ## Plan Change Log
 
