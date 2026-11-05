@@ -8,6 +8,11 @@
  * moved it on), Redo the reverse of the last undone one; when the reverse saves, the step keeps its
  * label and takes the reverse as its batch, so each direction is the other's reverse and the cursor
  * `done` moves. Pure functions only, unit tested in node; the delegate holds the stack and sends.
+ *
+ * Entry 23 (owner, 2026-11-05, R28): Undo and Redo are the toolbar's, and a chevron beside Undo opens the
+ * history, the last ten done steps newest first with how long ago each was saved (`undoHistory`, `agoText`).
+ * Choosing one undoes it and every later step as a run of single undos (`startRun`, `runAfterSave`): still one
+ * reverse batch per step, the next sent only after the last saved, never grouped (the 2026-11-04 rule).
  */
 
 import { EditBatch, MapItemRecord } from './contract';
@@ -29,6 +34,11 @@ export interface UndoStep {
     before: MapItemRecord[];
     /** The reply's versions, what reverseBatch bases the reverse on. */
     results: SaveResult[];
+    /**
+     * When the step's batch was saved (epoch ms, entry 23): the edit's save, then each undo's or redo's, so a done step
+     * reads in the history as how long ago it was done (a step redone reads as the redo).
+     */
+    at: number;
 }
 
 /** The reverse batch in flight for a step (its index), with the records before it, until its reply. */
@@ -144,11 +154,11 @@ export function startRedo(stack: UndoStack, batchId: string, records: MapItemRec
 }
 
 /**
- * The pending reverse saved: the step takes the reverse as its batch (with the records before it and
- * the reply's versions) and the cursor moves, so the next undo or redo reverses it again. A reply for
- * another batch changes nothing.
+ * The pending reverse saved at `at`: the step takes the reverse as its batch (with the records before it,
+ * the reply's versions and the time) and the cursor moves, so the next undo or redo reverses it again. A
+ * reply for another batch changes nothing.
  */
-export function finishPending(stack: UndoStack, batchId: string, results: SaveResult[]): UndoStack {
+export function finishPending(stack: UndoStack, batchId: string, results: SaveResult[], at: number = Date.now()): UndoStack {
     const pending = stack.pending;
     if (!pending || pending.batch.batchId !== batchId) {
         return stack;
@@ -158,7 +168,7 @@ export function finishPending(stack: UndoStack, batchId: string, results: SaveRe
         return { ...stack, pending: null };
     }
     const steps = stack.steps.slice();
-    steps[pending.index] = { label: step.label, batch: pending.batch, before: pending.before, results };
+    steps[pending.index] = { label: step.label, batch: pending.batch, before: pending.before, results, at };
     return { steps, done: pending.direction === 'undo' ? pending.index : pending.index + 1, pending: null };
 }
 
@@ -173,4 +183,83 @@ export function failPending(stack: UndoStack, batchId: string): UndoStack {
 /** The words of a step: what was done to which item ("add Well pad", "move P31", "rename P31", "link P31", "edit P31" for a kind change). */
 export function stepLabel(action: 'add' | 'move' | 'rename' | 'link' | 'unlink' | 'edit', name: string): string {
     return action + ' ' + name;
+}
+
+/** How many steps the history lists (owner, 2026-11-05: "the last 10 actions"). */
+export const HISTORY_SIZE = 10;
+
+/** One row of the history: a done step, newest first. */
+export interface HistoryRow {
+    label: string;
+    /** When the step was saved (epoch ms). */
+    at: number;
+    /** How many single undos choosing this row makes: this step and every later one (1 for the newest). */
+    count: number;
+}
+
+/**
+ * The history the chevron beside Undo opens (entry 23): the last ten done steps of this session, newest first,
+ * each with the number of undos choosing it makes. Undone steps (Redo's) are not listed; a step whose reverse is
+ * in flight still is, until its reply moves the cursor.
+ */
+export function undoHistory(stack: UndoStack): HistoryRow[] {
+    const rows: HistoryRow[] = [];
+    for (let i = stack.done - 1; i >= 0 && rows.length < HISTORY_SIZE; i--) {
+        const step = stack.steps[i];
+        rows.push({ label: step.label, at: step.at, count: stack.done - i });
+    }
+    return rows;
+}
+
+/** How long ago a step was saved, as the history says it: "just now" under a minute, "4 min ago", "2 h ago". */
+export function agoText(at: number, now: number): string {
+    const seconds = Math.max(0, Math.floor((now - at) / 1000));
+    if (seconds < 60) {
+        return 'just now';
+    }
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) {
+        return minutes + ' min ago';
+    }
+    return Math.floor(minutes / 60) + ' h ago';
+}
+
+/**
+ * The history's footer: with a row marked (the pointer on it, or the keyboard's focus) how many changes choosing it
+ * undoes ("Click to undo back to here: undoes 3 changes", the owner's mock); with none marked how to use it; while a
+ * reverse is being saved, that it is (the rows take no choice meanwhile).
+ */
+export function historyFooterText(count: number, busy: boolean): string {
+    if (busy) {
+        return 'Undoing...';
+    }
+    if (count < 1) {
+        return 'Click a step to undo back to it';
+    }
+    return 'Click to undo back to here: undoes ' + count + (count === 1 ? ' change' : ' changes');
+}
+
+/**
+ * An undo-to-here run (entry 23): the single undos still to send. The delegate sends the first at once and each next one
+ * only after the last reverse saved; a refusal or another edit ends it.
+ */
+export interface UndoRun {
+    left: number;
+}
+
+/**
+ * The run for a history row chosen: `count` single undos (the chosen step and every later one), at most the done steps
+ * and the history's ten; null with nothing to undo, a reverse already in flight, or a count that is not a whole number
+ * from 1.
+ */
+export function startRun(stack: UndoStack, count: number): UndoRun | null {
+    if (!canUndo(stack) || !Number.isInteger(count) || count < 1) {
+        return null;
+    }
+    return { left: Math.min(count, stack.done, HISTORY_SIZE) };
+}
+
+/** One reverse of the run saved: the run with one undo fewer to send, or null when that was its last. */
+export function runAfterSave(run: UndoRun): UndoRun | null {
+    return run.left > 1 ? { left: run.left - 1 } : null;
 }

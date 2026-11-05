@@ -1,8 +1,9 @@
 // The undo stack (epic 4 entry 2): one step per saved edit, last first, each reversed at its current version.
+// Entry 23: the history (the last ten done steps, newest first, with how long ago) and the undo-to-here run.
 import { EditBatch, MapItemRecord } from '../contract';
 import {
-    UNDO_EMPTY, UndoStack, canRedo, canUndo, failPending, finishPending, ownVersion, pushStep, rebase, redoLabel, startRedo, startUndo,
-    stepLabel, undoLabel
+    HISTORY_SIZE, UNDO_EMPTY, UndoStack, agoText, canRedo, canUndo, failPending, finishPending, historyFooterText, ownVersion, pushStep, rebase,
+    redoLabel, runAfterSave, startRedo, startRun, startUndo, stepLabel, undoHistory, undoLabel
 } from '../undoStack';
 
 const PAD = '33333333-3333-4333-8333-333333333333';
@@ -17,12 +18,18 @@ const CREATE: EditBatch = { batchId: 'b1', ops: [{ op: 'create', entity: 'item',
 const RENAME: EditBatch = { batchId: 'b2', ops: [{ op: 'update', entity: 'item', id: PAD, baseVersion: 1, data: { name: 'P31' } }] };
 const LINK: EditBatch = { batchId: 'b3', ops: [{ op: 'update', entity: 'item', id: PAD, baseVersion: 2, data: { assetId: 'P12' } }] };
 
+/** When the tracer's saves were made (epoch ms): a minute apart. */
+const T0 = Date.UTC(2026, 10, 5, 14, 0, 0);
+const MIN = 60_000;
+
 /** The tracer's three saves: the pad added, renamed, linked. */
 function threeSteps(): UndoStack {
-    let stack = pushStep(UNDO_EMPTY, { label: stepLabel('add', 'Well pad'), batch: CREATE, before: [], results: [{ entity: 'item', id: PAD, version: 1 }] });
-    stack = pushStep(stack, { label: stepLabel('rename', 'P31'), batch: RENAME, before: [pad(1)], results: [{ entity: 'item', id: PAD, version: 2 }] });
+    let stack = pushStep(UNDO_EMPTY, { label: stepLabel('add', 'Well pad'), batch: CREATE, before: [], results: [{ entity: 'item', id: PAD, version: 1 }],
+        at: T0 });
+    stack = pushStep(stack, { label: stepLabel('rename', 'P31'), batch: RENAME, before: [pad(1)], results: [{ entity: 'item', id: PAD, version: 2 }],
+        at: T0 + MIN });
     stack = pushStep(stack, { label: stepLabel('link', 'P31'), batch: LINK, before: [pad(2, { name: 'P31' })],
-        results: [{ entity: 'item', id: PAD, version: 3 }] });
+        results: [{ entity: 'item', id: PAD, version: 3 }], at: T0 + 2 * MIN });
     return stack;
 }
 
@@ -109,7 +116,7 @@ describe('undo, last first, each at the record\'s current version', () => {
         const moved: EditBatch = { batchId: 'm', ops: [{ op: 'update', entity: 'item', id: PAD, baseVersion: 1,
             data: { geometry: { type: 'Point', coordinates: [-104.9, 39.7] } } }] };
         let stack = pushStep(UNDO_EMPTY, { label: stepLabel('move', 'Well pad'), batch: moved, before: [pad(1)],
-            results: [{ entity: 'item', id: PAD, version: 2 }] });
+            results: [{ entity: 'item', id: PAD, version: 2 }], at: T0 });
         const undo = startUndo(stack, 'u', [pad(2, { geometry: { type: 'Point', coordinates: [-104.9, 39.7] } })]);
         expect(undo!.batch.ops[0]).toEqual({ op: 'update', entity: 'item', id: PAD, baseVersion: 2,
             data: { geometry: { type: 'Point', coordinates: [-104.97, 39.74] } } });
@@ -148,25 +155,27 @@ describe('a reverse in flight, refused, or overtaken', () => {
         expect(redoLabel(stack)).toBe('Redo: link P31');
         const move: EditBatch = { batchId: 'm', ops: [{ op: 'update', entity: 'item', id: PAD, baseVersion: 4,
             data: { geometry: { type: 'Point', coordinates: [-104.9, 39.7] } } }] };
-        stack = pushStep(stack, { label: 'move P31', batch: move, before: [pad(4, { name: 'P31' })], results: [{ entity: 'item', id: PAD, version: 5 }] });
+        stack = pushStep(stack, { label: 'move P31', batch: move, before: [pad(4, { name: 'P31' })], results: [{ entity: 'item', id: PAD, version: 5 }], at: T0 });
         expect(stack.steps.map((s) => s.label)).toEqual(['add Well pad', 'rename P31', 'move P31']);
         expect(redoLabel(stack)).toBe('');
         expect(undoLabel(stack)).toBe('Undo: move P31');
 
         const redoing = startRedo(finishPending(startUndo(stack, 'u2', [pad(5, { name: 'P31' })])!.stack, 'u2',
             [{ entity: 'item', id: PAD, version: 6 }]), 'r1', [pad(6, { name: 'P31' })]);
-        const overtaken = pushStep(redoing!.stack, { label: 'rename P32', batch: RENAME, before: [pad(6)], results: [{ entity: 'item', id: PAD, version: 7 }] });
+        const overtaken = pushStep(redoing!.stack, { label: 'rename P32', batch: RENAME, before: [pad(6)], results: [{ entity: 'item', id: PAD, version: 7 }],
+            at: T0 });
         expect(overtaken.pending).toBeNull();
         expect(overtaken.steps.map((s) => s.label)).toEqual(['add Well pad', 'rename P31', 'rename P32']);
         expect(finishPending(overtaken, 'r1', [{ entity: 'item', id: PAD, version: 8 }])).toBe(overtaken);
 
         const undoing = startUndo(overtaken, 'u3', [pad(7)]);
-        const pushedWhileUndoing = pushStep(undoing!.stack, { label: 'link P32', batch: LINK, before: [pad(7)], results: [{ entity: 'item', id: PAD, version: 8 }] });
+        const pushedWhileUndoing = pushStep(undoing!.stack, { label: 'link P32', batch: LINK, before: [pad(7)], results: [{ entity: 'item', id: PAD, version: 8 }],
+            at: T0 });
         expect(pushedWhileUndoing.pending).toEqual(undoing!.stack.pending);
     });
 
     test('a step whose reverse cannot be built (its record is gone) is refused, not sent wrong', () => {
-        const stack = pushStep(UNDO_EMPTY, { label: 'rename P31', batch: RENAME, before: [], results: [{ entity: 'item', id: PAD, version: 2 }] });
+        const stack = pushStep(UNDO_EMPTY, { label: 'rename P31', batch: RENAME, before: [], results: [{ entity: 'item', id: PAD, version: 2 }], at: T0 });
         expect(startUndo(stack, 'u', [pad(2)])).toBeNull();
     });
 
@@ -195,7 +204,114 @@ describe('a reverse in flight, refused, or overtaken', () => {
         const copy = JSON.parse(JSON.stringify(stack));
         const started = startUndo(stack, 'u1', [pad(3, { name: 'P31', assetId: 'P12' })]);
         finishPending(started!.stack, 'u1', [{ entity: 'item', id: PAD, version: 4 }]);
-        pushStep(stack, { label: 'x', batch: RENAME, before: [], results: [] });
+        pushStep(stack, { label: 'x', batch: RENAME, before: [], results: [], at: T0 });
         expect(stack).toEqual(copy);
+    });
+});
+
+describe('the history: the last ten done steps, newest first, with how long ago (entry 23)', () => {
+    test('three saved edits list newest first, each with the undos choosing it makes and its time', () => {
+        const rows = undoHistory(threeSteps());
+        expect(rows).toEqual([
+            { label: 'link P31', at: T0 + 2 * MIN, count: 1 },
+            { label: 'rename P31', at: T0 + MIN, count: 2 },
+            { label: 'add Well pad', at: T0, count: 3 }
+        ]);
+        expect(undoHistory(UNDO_EMPTY)).toEqual([]);
+    });
+
+    test('only done steps are listed: an undone one is Redo\'s; a step whose reverse is in flight stays until it saves', () => {
+        const stack = threeSteps();
+        const started = startUndo(stack, 'u1', [pad(3, { name: 'P31', assetId: 'P12' })]);
+        expect(undoHistory(started!.stack).map((r) => r.label)).toEqual(['link P31', 'rename P31', 'add Well pad']);
+        const undone = finishPending(started!.stack, 'u1', [{ entity: 'item', id: PAD, version: 4 }], T0 + 5 * MIN);
+        expect(undoHistory(undone).map((r) => [r.label, r.count])).toEqual([['rename P31', 1], ['add Well pad', 2]]);
+        // Redone, the step is done again from the redo's time.
+        const redo = startRedo(undone, 'r1', [pad(4, { name: 'P31' })]);
+        const redone = finishPending(redo!.stack, 'r1', [{ entity: 'item', id: PAD, version: 5 }], T0 + 7 * MIN);
+        expect(undoHistory(redone)[0]).toEqual({ label: 'link P31', at: T0 + 7 * MIN, count: 1 });
+    });
+
+    test('at most ten rows, the newest ten', () => {
+        let stack = UNDO_EMPTY;
+        for (let i = 1; i <= 12; i++) {
+            stack = pushStep(stack, { label: 'rename P' + i, batch: RENAME, before: [pad(i)], results: [{ entity: 'item', id: PAD, version: i + 1 }],
+                at: T0 + i * MIN });
+        }
+        const rows = undoHistory(stack);
+        expect(HISTORY_SIZE).toBe(10);
+        expect(rows).toHaveLength(10);
+        expect(rows[0]).toEqual({ label: 'rename P12', at: T0 + 12 * MIN, count: 1 });
+        expect(rows[9]).toEqual({ label: 'rename P3', at: T0 + 3 * MIN, count: 10 });
+    });
+
+    test('how long ago: just now under a minute, then minutes, then hours', () => {
+        expect(agoText(T0, T0)).toBe('just now');
+        expect(agoText(T0, T0 + 59_999)).toBe('just now');
+        expect(agoText(T0, T0 + MIN)).toBe('1 min ago');
+        expect(agoText(T0, T0 + 25 * MIN + 30_000)).toBe('25 min ago');
+        expect(agoText(T0, T0 + 59 * MIN)).toBe('59 min ago');
+        expect(agoText(T0, T0 + 60 * MIN)).toBe('1 h ago');
+        expect(agoText(T0, T0 + 150 * MIN)).toBe('2 h ago');
+        // A clock that went back reads as just now, never a negative age.
+        expect(agoText(T0, T0 - 5 * MIN)).toBe('just now');
+    });
+
+    test('the footer counts the marked rows as the mock says it, and says when an undo is being saved', () => {
+        expect(historyFooterText(3, false)).toBe('Click to undo back to here: undoes 3 changes');
+        expect(historyFooterText(1, false)).toBe('Click to undo back to here: undoes 1 change');
+        expect(historyFooterText(0, false)).toBe('Click a step to undo back to it');
+        expect(historyFooterText(2, true)).toBe('Undoing...');
+    });
+});
+
+describe('undo to here: a run of single undos (entry 23)', () => {
+    test('the second newest chosen is a run of two; each saved reverse leaves one fewer, the last ends it', () => {
+        const stack = threeSteps();
+        const run = startRun(stack, 2);
+        expect(run).toEqual({ left: 2 });
+        const next = runAfterSave(run!);
+        expect(next).toEqual({ left: 1 });
+        expect(runAfterSave(next!)).toBeNull();
+    });
+
+    test('never more than the done steps or the history\'s ten; nothing with nothing to undo, a reverse in flight, or a bad count', () => {
+        const stack = threeSteps();
+        expect(startRun(stack, 5)).toEqual({ left: 3 });
+        let many = UNDO_EMPTY;
+        for (let i = 1; i <= 12; i++) {
+            many = pushStep(many, { label: 'rename P' + i, batch: RENAME, before: [pad(i)], results: [{ entity: 'item', id: PAD, version: i + 1 }], at: T0 });
+        }
+        expect(startRun(many, 12)).toEqual({ left: 10 });
+        expect(startRun(UNDO_EMPTY, 1)).toBeNull();
+        expect(startRun(stack, 0)).toBeNull();
+        expect(startRun(stack, -1)).toBeNull();
+        expect(startRun(stack, 1.5)).toBeNull();
+        const inFlight = startUndo(stack, 'u1', [pad(3, { name: 'P31', assetId: 'P12' })])!.stack;
+        expect(startRun(inFlight, 2)).toBeNull();
+    });
+
+    test('the run\'s steps are the single undos, in order, one reverse batch each, each at the version the last one gave', () => {
+        // The second newest chosen out of three: the link's reverse, then the name's; the pad stays.
+        let stack = threeSteps();
+        let run = startRun(stack, 2);
+        const sent: EditBatch[] = [];
+        const records: MapItemRecord[][] = [[pad(3, { name: 'P31', assetId: 'P12' })], [pad(4, { name: 'P31' })]];
+        let version = 4;
+        while (run !== null) {
+            const started = startUndo(stack, 'u' + version, records[sent.length]);
+            sent.push(started!.batch);
+            stack = finishPending(started!.stack, 'u' + version, [{ entity: 'item', id: PAD, version }], T0 + version * MIN);
+            version++;
+            run = runAfterSave(run);
+        }
+        expect(sent).toEqual([
+            { batchId: 'u4', ops: [{ op: 'update', entity: 'item', id: PAD, baseVersion: 3, data: { assetId: null } }] },
+            { batchId: 'u5', ops: [{ op: 'update', entity: 'item', id: PAD, baseVersion: 4, data: { name: 'Well pad' } }] }
+        ]);
+        expect(stack.done).toBe(1);
+        expect(undoLabel(stack)).toBe('Undo: add Well pad');
+        // Redo then redoes one.
+        expect(redoLabel(stack)).toBe('Redo: rename P31');
     });
 });

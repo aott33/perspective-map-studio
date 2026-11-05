@@ -8,7 +8,8 @@
  * finished field and the undo stack share) and the undo stack itself (undoStack.ts: one step per saved
  * edit, the reverse batch sent through the same queue). `notify()` is the only flow to the component;
  * the component calls the public `send*`, `createPoint`, `createLine`, `renameItem`, `moveItem`, `linkItem`,
- * `setKind`, `undo`, `redo`, `selectBasemap`, `retryUnsaved`, `discardUnsaved`, `onStorage` and `stopReplay`.
+ * `setKind`, `undo`, `redo`, `undoTo`, `selectBasemap`, `retryUnsaved`, `discardUnsaved`, `onStorage` and `stopReplay`.
+ * From entry 23 `undoTo` runs the history's undo-to-here as single undos, each sent after the last reverse saved.
  */
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
@@ -26,7 +27,9 @@ import { SegmentRef } from './features';
 import { STORE_UNKNOWN, StoreState, storeStateFromError, storeStateFromLoad, storeStateFromSaveError } from './storeState';
 import { SAVE_IDLE, SaveState, lineCreateBatch, newId, pointCreateBatch, refusedSave, roundCoordinate, updateBatch } from './save';
 import { Kind } from './adapters';
-import { UNDO_EMPTY, UndoStack, failPending, finishPending, pushStep, startRedo, startUndo, stepLabel } from './undoStack';
+import {
+    UNDO_EMPTY, UndoRun, UndoStack, failPending, finishPending, pushStep, runAfterSave, startRedo, startRun, startUndo, stepLabel
+} from './undoStack';
 import {
     KeyValueStore, REPLAY_INTERVAL_MS, STORAGE_WARNING, UnsavedEntry, UnsavedQueue, UnsavedReason, isBusy, isTransient, reasonFromError,
     savedRecords, storageKey, unsavedItems
@@ -174,6 +177,11 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private storage: KeyValueStore | null;
     /** The undo stack (entry 2): one step per saved edit of this session, the reverse sent through the same queue. */
     private undoStack: UndoStack = UNDO_EMPTY;
+    /**
+     * The history's undo-to-here in progress (entry 23, owner 2026-11-05), or null: the single undos still to send, the
+     * next one only after the last reverse saved; a refusal of its reverse or another edit ends it.
+     */
+    private undoRun: UndoRun | null = null;
     /** The label and the records before each batch sent by a tool or a field, until its reply makes it a step. */
     private pendingSteps = new Map<string, { label: string; before: MapItemRecord[] }>();
     /**
@@ -416,6 +424,11 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * is called when an edit is finished, never per click or drag frame.
      */
     sendBatch(batch: EditBatch, itemId: string, label: string, now: Date = new Date()): void {
+        if (this.undoRun !== null) {
+            // Another edit ends an undo-to-here run (entry 23): the reverse in flight settles, no next one is sent.
+            this.undoRun = null;
+            console.info('[MapStudio] Undo to here stopped: another edit was made.');
+        }
         this.dispatch(batch, itemId, label, now);
     }
 
@@ -556,12 +569,51 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
     /** Undo the last saved edit of this session (entry 2): its reverse batch, at this session's own version of the record, through the queue. */
     undo(): void {
-        const started = startUndo(this.undoStack, newId(), this.changes.state.items);
-        if (!started) {
+        if (!this.undoNext()) {
             console.info('[MapStudio] Nothing to undo, or a reverse is still being saved.');
+        }
+    }
+
+    /**
+     * Undo to here (entry 23, the history's row chosen; owner 2026-11-05): the chosen step and every later one, `count` in
+     * all, as a run of single undos in order, newest first. Each is one reverse batch through the queue, as `undo` sends
+     * it, and the next goes only once the last saved (`continueRun`); the run stops at the first refusal (its reason on
+     * the save status row, as for any undo), at a step whose reverse cannot be built, or when another edit is made.
+     */
+    undoTo(count: number): void {
+        const run = startRun(this.undoStack, count);
+        if (!run) {
+            console.info('[MapStudio] Nothing to undo back to, or a reverse is still being saved.');
             return;
         }
+        this.undoRun = run;
+        console.info('[MapStudio] Undoing ' + run.left + ' step(s), one at a time.');
+        if (!this.undoNext()) {
+            this.undoRun = null;
+        }
+    }
+
+    /** The next single undo: its reverse built and sent; false with nothing to undo, one in flight, or a reverse that cannot be built. */
+    private undoNext(): boolean {
+        const started = startUndo(this.undoStack, newId(), this.changes.state.items);
+        if (!started) {
+            return false;
+        }
         this.sendReverse(started);
+        return true;
+    }
+
+    /** A reverse of the run saved: one fewer to go, and the next sent now, after the save (entry 23). */
+    private continueRun(): void {
+        const run = this.undoRun ? runAfterSave(this.undoRun) : null;
+        this.undoRun = run;
+        if (run === null) {
+            return;
+        }
+        if (!this.undoNext()) {
+            this.undoRun = null;
+            console.info('[MapStudio] Undo to here stopped: the next step cannot be undone.');
+        }
     }
 
     /** Redo the last undone edit: the reverse of its undo, through the queue. */
@@ -586,11 +638,11 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         if (pending) {
             this.pendingSteps.delete(batchId);
             if (batch) {
-                this.undoStack = pushStep(this.undoStack, { label: pending.label, batch, before: pending.before, results });
+                this.undoStack = pushStep(this.undoStack, { label: pending.label, batch, before: pending.before, results, at: Date.now() });
             }
             return;
         }
-        this.undoStack = finishPending(this.undoStack, batchId, results);
+        this.undoStack = finishPending(this.undoStack, batchId, results, Date.now());
     }
 
     /** Try again: a refused entry becomes unsent and the queue replays now. */
@@ -608,11 +660,24 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.notify();
     }
 
-    /** The queue gave a batch up (a final refusal, a discard): no step comes of it, a pending reverse is let go, its item's turn moves on. */
+    /**
+     * The queue gave a batch up (a final refusal, a discard): no step comes of it, a pending reverse is let go (and an
+     * undo-to-here run with it, entry 23: the refusal stops it, its reason on the save status row), its item's turn moves on.
+     */
     private giveUp(batchId: string): void {
         this.pendingSteps.delete(batchId);
+        if (this.undoRun !== null && this.isPendingUndo(batchId)) {
+            this.undoRun = null;
+            console.info('[MapStudio] Undo to here stopped: the undo of batch ' + batchId + ' was refused or discarded.');
+        }
         this.undoStack = failPending(this.undoStack, batchId);
         this.releaseFlight(batchId, null);
+    }
+
+    /** Whether `batchId` is the undo in flight (the reverse the stack waits on). */
+    private isPendingUndo(batchId: string): boolean {
+        const pending = this.undoStack.pending;
+        return pending !== null && pending.direction === 'undo' && pending.batch.batchId === batchId;
     }
 
     /** A `storage` event: another tab may have changed this queue. */
@@ -771,6 +836,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         }
         const shown = outcome.batchId === this.saveBatchId && this.save.state !== 'idle';
         if (reply.kind === 'edits.apply.reply' && outcome.kind === 'saved') {
+            // The undo a run waits on (entry 23): read before the stack settles it.
+            const runStep = this.undoRun !== null && this.isPendingUndo(reply.body.batchId);
             if (outcome.entry) {
                 for (const record of savedRecords(outcome.entry.batch, reply.body.results)) {
                     if (this.changes.saved(record)) {
@@ -800,6 +867,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
                 this.save = { state: 'saved', itemId, version: result ? result.version : 1 };
             }
             this.releaseFlight(reply.body.batchId, reply.body.results);
+            if (runStep) {
+                // After the save status and the item's turn moved on, so the next reverse starts its own Saving...
+                this.continueRun();
+            }
         } else if (reply.kind === 'error') {
             // A transient refusal (store unreachable, busy, read-only, no answer) keeps the batch queued and replaying,
             // so its step and its item's turn stay pending until the replay saves or the user discards it; a final
