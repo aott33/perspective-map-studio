@@ -84,6 +84,13 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 ## Review Triage Log
 
+Quick lens, 2026-11-05: 2 findings; high 0, medium 1, low 1, false 0, maybe-false 0.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| The dock's legend is torn down and drawn again on every saved edit and every full values batch, even with the same key (`LegendControl.ts` `setKey` calls `fillAll` unconditionally; `itemsLayer.ts` calls `setKey` whenever `itemsRevision` or `live.fulls` moves) | medium | `setKey` stores and redraws with no comparison; the status region is appended empty and then filled, so a standing basemap status is announced again after each edit, a focused control is focused again, and a press spanning a rebuild loses its click. Before entry 22 only an open floating panel redrew; the dock stays in view while editing | patch: redraw only when the key changed; the status filled before it is appended |
+| `EXPERIENCE.md` line 23 still says Layers offers only the basemaps, against line 54 and the owner's 2026-11-05 decision this entry builds | low | The "spines win" list names the Show toggles in Layers as a mock that is wrong; the coordinator's decision edit changed line 54 and missed line 23 | patch: line 23 brought in line with the decision |
+
 ## Verification
 
 **Commands:**
