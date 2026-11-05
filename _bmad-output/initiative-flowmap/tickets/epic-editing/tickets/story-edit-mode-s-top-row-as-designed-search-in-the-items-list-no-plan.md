@@ -55,12 +55,12 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `web/typescript/mapstudio.css` -- the top bar hidden under `.mapstudio--editing`; the toolbar at the map inset; the chip under the pill; the field's style from tokens.
-- [ ] `web/typescript/itemList.ts` + `__tests__/itemList.test.ts` -- `ListRow` gains the asset name; a pure row filter (name, kind name, asset name; order kept; empty query keeps all), tested for case and accents, each field and no match.
-- [ ] `web/typescript/studio/ItemList.tsx` -- the field under the header (search glyph, "Search items", an accessible name, Clear while it holds text, Esc empties it and goes no further), rows filtered, "No matches"; `data-rows` counts the rows shown.
-- [ ] `web/typescript/MapStudio.tsx` -- asset names to the rows; entering Edit mode closes the View search's and Needs you's lists.
-- [ ] `e2e/tests/studio.spec.mjs` -- the matrix at 1366 and 1440 px as the map editor with properties docked (boxes for the toolbar, the switch and the zoom card); `drawing.spec.mjs` -- its field step types in the list's field.
-- [ ] `docs/contract.md`, `CHANGELOG.md` -- the top row, the hidden top bar, the list's search and its hooks; `E2E_DOCS=1` runs of the two specs rewrite the Edit-mode renders.
+- [x] `web/typescript/mapstudio.css` -- the top bar hidden under `.mapstudio--editing`; the toolbar at the map inset; the chip under the pill; the field's style from tokens.
+- [x] `web/typescript/itemList.ts` + `__tests__/itemList.test.ts` -- `ListRow` gains the asset name; a pure row filter (name, kind name, asset name; order kept; empty query keeps all), tested for case and accents, each field and no match.
+- [x] `web/typescript/studio/ItemList.tsx` -- the field under the header (search glyph, "Search items", an accessible name, Clear while it holds text, Esc empties it and goes no further), rows filtered, "No matches"; `data-rows` counts the rows shown.
+- [x] `web/typescript/MapStudio.tsx` -- asset names to the rows; entering Edit mode closes the View search's and Needs you's lists.
+- [x] `e2e/tests/studio.spec.mjs` -- the matrix at 1366 and 1440 px as the map editor with properties docked (boxes for the toolbar, the switch and the zoom card); `drawing.spec.mjs` -- its field step types in the list's field.
+- [x] `docs/contract.md`, `CHANGELOG.md` -- the top row, the hidden top bar, the list's search and its hooks; `E2E_DOCS=1` runs of the two specs rewrite the Edit-mode renders.
 
 **Acceptance Criteria:**
 - Given the dev Gateway as `mapeditor` at 1366 and 1440 px, when the matrix runs in `studio.spec.mjs`, then each row holds.
@@ -72,6 +72,15 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 - Planner, 2026-11-05: the environment, commit and identity rules are entry 4's plan's (Docker started by hand after a restart, `ops/up.sh --fresh` before a whole-suite run, the two trailer lines, no em dashes, no model identifier, never a bare `git stash`, never a push).
 
 ## Plan Change Log
+
+- 2026-11-05 (implementer): no change to the frozen intent. Readings and small additions, for the reviewer:
+  - The View-mode lists close as the studio comes on, whatever brought it (`MapStudio.tsx` `applyTopBar` in `componentDidUpdate`, comparing `studioOn()` with its last value), not in `setEditMode` alone: the page's `editMode` write and the level arriving reach the same rule. `openedBy` is cleared with them, so Esc on a popup the View search opened before Edit mode never hands the focus to the hidden field. The search keeps its text (`SearchControl.close`), its list closed.
+  - `web/typescript/camera.ts` (not in the Code Map, one line): the camera padding takes the toolbar's float (the toolbar and its pill) where the top-left corner is empty, so a row pick in Edit mode still centres below the top row, as it centred below the top bar before; View mode reads the top bar as before.
+  - The field sits inside the list header after the title row (and after a save problem's row), the header's rule under it, as key screen 4 draws it. Esc with text empties it and stops there; Esc in the empty field goes on to the root and closes Details as before (EXPERIENCE.md Properties panel). The text is `ItemList`'s own state, so it starts empty whenever the list mounts (entering Edit mode, the rail's Items after Kinds or Layers).
+  - The matrix's chip row simulates a lost connection with the client's own `__client.simulateLostConnection` (as `connection.spec.mjs` does, its "Simulated disconnect" console errors filtered for that test only). The "list open on entry" row presses the switch from a script for the search's list, since a real click blurs the field and closes the list on its own; the Needs you list is closed by the real click's path.
+  - Measured on the dev stack with the properties panel docked: the toolbar is 348 px wide and ends 48 px before the Editing switch at 1366 px (718 px of map), 63 px at 1440 px (748 px); the chip's top is the inset plus the toolbar, the gap and the pill, plus 10 px. `drawing.spec.mjs`'s ground spots stay where entry 4 moved them (still under the toolbar and its pill); its field step types in the list's field. `docs/platform-checks.md`'s entry 4 row on the toolbar's row points at the new contract paragraph, and `docs/architecture.md`'s module table names the list's search.
+  - After the first whole-suite run (a follow-up commit): as the studio comes on, an element of the hidden top bar holding the focus gives it up, so a key typed after the page's prop turned Edit mode on cannot open a list behind the bar (the spec types one and sees nothing open); the field is 36 px tall so its Clear keeps the 32 px mouse target (DESIGN.md target-mouse), which the spec checks.
+- 2026-11-05 (implementer, verification): `tsc --noEmit` clean and 351 Jest tests green; `./gradlew clean build --offline` BUILD SUCCESSFUL; `check-contract-versions.sh` OK at 0.4.0. Whole suite on a fresh dev stack at commit 9584995: 135 passed, 7 skipped, 1 failed, the review 390 px light-theme test with "No Connection to Gateway" (the known flake), which passed rerun alone. After the follow-up (commit b148a6b), `ops/up.sh --fresh` and the whole suite again: 136 passed, 7 skipped, 0 failed in 26.7 min. `E2E_DOCS=1` runs of `studio.spec.mjs` and `drawing.spec.mjs` (18 passed) rewrote the Edit-mode renders. Left for the owner: comparing the renders with key screen 4.
 
 ## Review Triage Log
 
