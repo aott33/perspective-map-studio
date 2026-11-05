@@ -3,14 +3,14 @@ title: "The status box retired: problems on the save status row in Edit mode and
 type: 'feature'
 ticket: '24'
 created: '2026-11-05'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '831291aab17dbf5bf38d387905d36288ada2b0d8'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
