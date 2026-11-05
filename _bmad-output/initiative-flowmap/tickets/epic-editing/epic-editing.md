@@ -98,6 +98,7 @@ A map editor new to the Mesa demo field lays it out with the tools alone in unde
 
 ## Notes
 
+- Decision: 2026-11-05 Owner ("B", after a contact sheet of entry 4's Edit-mode chrome: as shipped, the design as written, and an Atlist-like single bar): Edit mode's top row follows DESIGN.md as written, entry 21, built next: the View-mode search and the Needs you bar leave the map in Edit mode, the Items list takes the Search items field, and the toolbar with its pill takes the top row beside the Editing switch. Entry 4 had put the toolbar on a second row under the kept View-mode bar as an implementer's judgement call and the owner was not happy with the layout; from here a layout that departs from DESIGN.md or the key screens is shown to the owner as renders and decided before it is built, never taken as a judgement call. The Legend button over the map in Edit mode is not settled by the design and stays as it is until the owner says otherwise.
 - Decision: 2026-10-26 Names, licence (Apache-2.0) and the Alarm Metrics answer are recorded in the initiative's Notes and apply here.
 - Waits on epic-map-store-and-data because: saving, roles and the asset list.
 - Waits on epic-viewing because: the map view to draw on.

@@ -5,6 +5,7 @@
 # Entry 3 is the short UX update the new pieces wait on (8, 9, 11, 15, 16). Entry 2 bumps the contract to 0.4.0; 7, 11, 14, 15, 16 and 19 add to it.
 # Entries 19 and 20 (units, owner 2026-11-03) follow 16 and precede the sweep. Approved 2026-11-03; entry 1 started. 17 sweeps, 18 releases 0.4.0.
 # Cross-epic prerequisites are pinned on the entries that need them ("2.n", "3.n").
+# Entry 21 (owner, 2026-11-05, option B of the layout review after entry 4): Edit mode's top row as DESIGN.md draws it, ahead of 5; entry 7 builds on its list header.
 
 [[entry]]
 id = 1
@@ -51,6 +52,17 @@ hitl = false
 risk = "medium"
 
 [[entry]]
+id = 21
+type = "story"
+title = "Edit mode's top row as designed: search in the Items list, no Needs you over the map, the toolbar beside the Editing switch"
+description = "Option B of the owner's layout review after entry 4 (2026-11-05, a contact sheet of the Edit-mode chrome at 1366 px): in Edit mode the View-mode search field and the Needs you bar leave the map (both stay in View mode and at phone widths, which keep View mode); the Items list takes a Search items field under its header (DESIGN.md key screen 4), typing filters the rows by name, kind or linked asset, Esc or its clear button empties it, and a row picked from the filtered list selects, pans and opens Details as any row does; the floating toolbar and its mode pill move up to the top row, centred over the map beside the Editing switch and zoom (DESIGN.md Edit mode, Direction A: that row is full at 1366 px and nothing more goes on it), the connection chip under them; the specs that use the search or Needs you on the editor page run them in View mode with their expectations kept. Sort by, Filter, the grouping by place and the rest of the list stay entry 7's."
+verify = "On the dev Gateway at 1440 and 1366 px as the map editor: in Edit mode no search field or Needs you bar shows over the map and the toolbar sits on the top row beside the Editing switch, clear of it with the properties panel docked; Search items filters the list as typed and a picked row selects, pans and opens Details; Esc empties it; leaving Edit mode brings the View-mode search and Needs you back; at 390 px View mode keeps its top bar; the whole e2e suite passes with its expectations kept."
+covers = ["R19", "R20"]
+after = [4]
+hitl = false
+risk = "low"
+
+[[entry]]
 id = 5
 type = "story"
 title = "Change geometry and delete: move, vertices, split, non-drag ways, duplicate, add another like this, shortcuts"
@@ -76,10 +88,10 @@ risk = "medium"
 id = 7
 type = "story"
 title = "The item list as designed, the first-run checklist, the layout at 1366 and below 1280"
-description = "The list grouped by place from the linked asset's base path (field, site, what is on it; Field-wide; Not linked; Just added; owner, 2026-11-03), needs-attention first with the All normal divider, Sort by (needs attention, place, kind, name, last changed, the last from a changed {actor, at} that map.load.reply gains at the phone and full levels, added to contract 0.4.0), the Filter button with the kind chips, search within the list, the footer with Add item and the unlinked count opening the unlinked list, each row's state badge live, a row selecting, panning and opening properties, Layers as the basemap switch; the first-run checklist on an empty map (Set up your kinds, Add or import items opening the add tools, Check the operator view; ticked when done; Hide checklist) and the viewer's note; the layout at 1440 and 1366 px (opening properties keeps the selection in view, and from here a marker click in Edit mode opens Details beside the popup's place, where entry 2 left it opening the popup as View mode does; owner, 2026-11-04), the list collapsing to a button below about 1280 px, nothing bottom-right."
+description = "The list grouped by place from the linked asset's base path (field, site, what is on it; Field-wide; Not linked; Just added; owner, 2026-11-03), needs-attention first with the All normal divider, Sort by (needs attention, place, kind, name, last changed, the last from a changed {actor, at} that map.load.reply gains at the phone and full levels, added to contract 0.4.0), the Filter button with the kind chips, search within the list (its Search items field arrives with entry 21; here it searches the grouped list), the footer with Add item and the unlinked count opening the unlinked list, each row's state badge live, a row selecting, panning and opening properties, Layers as the basemap switch; the first-run checklist on an empty map (Set up your kinds, Add or import items opening the add tools, Check the operator view; ticked when done; Hide checklist) and the viewer's note; the layout at 1440 and 1366 px (opening properties keeps the selection in view, and from here a marker click in Edit mode opens Details beside the popup's place, where entry 2 left it opening the popup as View mode does; owner, 2026-11-04), the list collapsing to a button below about 1280 px, nothing bottom-right."
 verify = "On the dev 30-pad set at 1440, 1366 and 1200 px: P14-2H lists under P14 under Mesa field, L-SWD under Field-wide, an unlinked pad under Not linked and a pad added this session under Just added; a pad in alarm heads the list and Sort by name reorders; the Filter chip Well pad keeps only pads; the footer counts the unlinked and lists them; clicking a row pans to the item with properties open and the selection in view; at 1200 px the list is a button; an empty dev map shows the checklist, Open Kinds opens the surface and the step ticks once a kind setup exists (saved through system.mapstudio.applyEdits until entry 12); a viewer sees the note; Sort by last changed follows the edit record's actor and time; e2e at the three widths passes."
 covers = ["R2", "R19", "R20"]
-after = [2]
+after = [2, 21]
 hitl = false
 risk = "medium"
 
@@ -211,7 +223,7 @@ title = "Refactor sweep"
 description = "Cleanup only, scoped at its start from the plans and review findings entries 2 to 16 deferred: duplication between the studio's surfaces, the mode and selection model's leftovers, test helpers, the contract docs' wording, and the WCAG checks folded into one accessibility pass of every tool and panel by keyboard at 1366 and 1440 px (R14's evidence for entry 18). Scope pushed out of another story is a new entry, never this one."
 verify = "Every e2e and unit test passes; the keyboard-only pass of every tool, the list, the panel, the Kinds screen and the tag browser is recorded in docs/platform-checks.md with the contrast readings in both themes; no behaviour or contract change."
 covers = ["R14"]
-after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 20]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 20, 21]
 hitl = false
 risk = "low"
 
