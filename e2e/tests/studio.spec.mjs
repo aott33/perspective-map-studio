@@ -542,9 +542,13 @@ test.describe('1366 px, Undo and its history on the toolbar', () => {
             await expect(undo).toHaveAttribute('aria-label', 'Undo: add Gathering line');
             await expect(redo).toHaveAttribute('title', 'Nothing to redo');
 
-            // The history: the three steps newest first, each with how long ago; the newest row marked as it opens.
+            // The history: the three steps newest first, each with how long ago. Opened by the pointer, the focus stays on the
+            // chevron and nothing is marked until a row is hovered.
             await chevron.click();
             await expect(list).toBeVisible();
+            await expect(chevron).toBeFocused();
+            await expect(list).toHaveAttribute('data-marked', '0');
+            await expect(footer).toHaveText('Click a step to undo back to it');
             await expect(list.locator('.mapstudio-undo-history-title')).toHaveText('Undo history');
             await expect(list.locator('.mapstudio-undo-history-label')).toHaveText(['add Gathering line', 'rename P41', 'add Well pad']);
             await expect(list.locator('.mapstudio-undo-history-ago')).toHaveText(['just now', 'just now', 'just now']);

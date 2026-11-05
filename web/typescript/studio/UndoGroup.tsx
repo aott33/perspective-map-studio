@@ -20,8 +20,9 @@ const TICK_MS = 15_000;
  * newer row, and the footer counts them ("Click to undo back to here: undoes 3 changes"); choosing one (a click, Enter
  * or Space) undoes it and every later step, which the delegate does as single undos one after another (`onUndoTo`).
  * With nothing to undo the list says "Nothing to undo"; while a reverse is being saved the rows take no choice. A menu
- * button: Enter, Space or Down opens it on the newest row, Up on the oldest; Up and Down move (wrapping), Home and End
- * jump, Esc closes it and Tab too, both returning the focus to the chevron; a press outside closes it. The list opens
+ * button: Enter, Space or Down opens it on the newest row, Up on the oldest (a pointer opens it with the focus left on
+ * the chevron); Up and Down move (wrapping), Home and End jump, Esc closes it and Tab too, both returning the focus to
+ * the chevron; a press outside closes it. The list opens
  * left-aligned with Undo, as the mock draws it, and moves left as far as it must to stay inside the map and clear of
  * the zoom card (with Details docked at 1366 px the map is 718 px wide). Paused (the store unreachable), every button
  * takes no input and says so on hover.
@@ -173,11 +174,15 @@ export class UndoGroup extends React.Component<UndoGroupProps, UndoGroupState> {
         }
     }
 
-    private onChevronClick = (): void => {
+    /**
+     * A press opens or closes the list. Enter or Space (a click with no pointer, `detail` 0) puts the focus on the newest
+     * row, as a menu button does; a pointer leaves the focus on the chevron, and hovering marks the rows.
+     */
+    private onChevronClick = (ev: React.MouseEvent<HTMLButtonElement>): void => {
         if (this.state.open) {
             this.close(false);
         } else {
-            this.openList('first');
+            this.openList(ev.detail === 0 ? 'first' : null);
         }
     };
 
@@ -289,10 +294,8 @@ export class UndoGroup extends React.Component<UndoGroupProps, UndoGroupState> {
         }
     }
 
-    private onHover = (index: number): void => {
-        this.mark(index);
-        this.focusRow(index);
-    };
+    /** The pointer on a row marks it and every newer row; the focus stays where it is (the keyboard's own). */
+    private onHover = (index: number): void => this.mark(index);
 
     private onFocusRow = (index: number): void => this.mark(index);
 
