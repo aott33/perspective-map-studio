@@ -20,43 +20,13 @@
     outline: none;
 }
 
-.mapstudio-reply {
-    position: absolute;
-    left: 8px;
-    right: 56px;
-    /* Above the legend row (bottom-left, epic 3 entry 14), which must stay visible; the row wraps to
-       two lines on a phone. */
-    bottom: 56px;
-    padding: 6px 10px;
-    border: 1px solid var(--border);
-    border-radius: var(--borderRadius);
-    background: var(--mapstudio-surface);
-    color: var(--label);
-    font-size: 13px;
-    line-height: 1.4;
-    overflow-wrap: anywhere;
-    pointer-events: none;
-}
-
-@media (max-width: 767px) {
-    .mapstudio-reply {
-        bottom: 96px;
-    }
-}
-
-.mapstudio-reply--pending {
-    color: var(--label--disabled);
-}
-
-/* View mode with nothing to report (the spike's click echo alone): the line stays in the DOM, unseen. */
-.mapstudio-reply--quiet {
-    display: none;
-}
-
-/* The connection chip (owner review notes item 32): in words with the hourglass, centred under the top bar,
-   on the panel surface with the attention token as its edge; never colour alone. Above the map and its
-   map, under the controls and an open popup's sheet (owner re-test R2: the controls stack above the popup layer). */
-.mapstudio .mapstudio-connection {
+/* The top-centre chip (owner review notes item 32; epic 4 entry 24): one problem in words, with the hourglass for no
+   connection and the cloud for the map store or the edits kept here, centred under the top bar, on the panel surface
+   with the attention token as its edge; never colour alone. As wide as its words, up to 560 px and clear of the zoom card
+   on both sides, wrapping to two lines at most (the rest cut, its full words its title, so it takes the pointer for the
+   tooltip). Above the map, under the controls and an open popup's sheet (owner re-test R2: the controls stack above the
+   popup layer). The spike's status box over the map's bottom edge is gone (entry 24). */
+.mapstudio .mapstudio-chip {
     position: absolute;
     top: 64px;
     left: 50%;
@@ -65,30 +35,40 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    max-width: calc(100% - 24px);
+    box-sizing: border-box;
+    width: max-content;
+    max-width: min(560px, calc(100% - 2 * (var(--mapstudio-target) + 2 * var(--mapstudio-map-inset))));
     padding: 6px 12px;
     border: 1px solid var(--mapstudio-attention, var(--neutral-90, var(--label)));
-    border-radius: 999px;
+    border-radius: 16px;
     background: var(--mapstudio-surface);
     color: var(--label);
     font-size: 13px;
     font-weight: 600;
     line-height: 1.3;
-    white-space: nowrap;
-    pointer-events: none;
+    text-align: center;
+    cursor: default;
 }
 
-.mapstudio .mapstudio-connection-glyph {
+.mapstudio .mapstudio-chip-glyph {
     flex: none;
     color: var(--label);
 }
 
+.mapstudio .mapstudio-chip-text {
+    display: -webkit-box;
+    min-width: 0;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+}
+
 @media (max-width: 767px) {
-    .mapstudio .mapstudio-connection {
+    .mapstudio .mapstudio-chip {
         top: 68px;
         font-size: 12px;
-        white-space: normal;
-        text-align: center;
     }
 }
 
@@ -713,67 +693,6 @@
     font-size: 14px;
 }
 
-
-/* Save state of a drawn line, in words (AD-11: no colour of its own; a refusal is said, not coloured). */
-.mapstudio-save-status--saving {
-    color: var(--label--disabled);
-}
-
-.mapstudio-save-status--refused,
-.mapstudio-load-status,
-.mapstudio-store-status {
-    font-weight: 600;
-}
-
-/* Unsaved edits (epic 2 story 8): said in words, styled from tokens only (AD-11). The reply
-   box ignores the pointer; the list takes it back for its buttons. */
-.mapstudio-unsaved {
-    margin-top: 4px;
-    max-height: 40vh;
-    overflow-y: auto;
-    pointer-events: auto;
-}
-
-.mapstudio-unsaved-summary,
-.mapstudio-unsaved-warning {
-    font-weight: 600;
-}
-
-.mapstudio-unsaved-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 8px;
-    padding: 2px 0;
-    border-top: 1px dashed var(--border);
-}
-
-.mapstudio-unsaved-text {
-    flex: 1 1 160px;
-}
-
-.mapstudio-unsaved-row--refused .mapstudio-unsaved-text {
-    font-weight: 600;
-}
-
-.mapstudio-unsaved-row button {
-    padding: 2px 8px;
-    border: 1px solid var(--border);
-    border-radius: var(--borderRadius);
-    background: var(--mapstudio-surface);
-    color: var(--label);
-    font-size: 12px;
-    cursor: pointer;
-}
-
-.mapstudio-unsaved-row button:hover:not(:disabled) {
-    background: var(--mapstudio-hover);
-}
-
-.mapstudio-unsaved-row button:disabled {
-    color: var(--label--disabled);
-    cursor: not-allowed;
-}
 
 /* The hue tokens (epic 3 entries 5, 1 and 12; AD-11; docs/review-er27.md, the engineering review
    pack). Each is a theme token the host project may define on .mapstudio (the ign-scada-template
@@ -2503,7 +2422,9 @@
 }
 
 .mapstudio-panel-save--row {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
     margin: 6px 0 0;
     padding: 6px 8px;
     border-left: 3px solid var(--mapstudio-warning);
@@ -2513,6 +2434,130 @@
     font-weight: 600;
     white-space: normal;
     overflow-wrap: anywhere;
+}
+
+/* Each problem on its own line (entry 24), worst first, a thin rule in the warning tone between them. */
+.mapstudio-panel-problem + .mapstudio-panel-problem {
+    padding-top: 4px;
+    border-top: 1px solid color-mix(in srgb, var(--mapstudio-warning) 30%, transparent);
+}
+
+/* The edits waiting: the line is a button that opens them under the row, a chevron at its end (turned while open). */
+.mapstudio-panel-problem--edits {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 24px;
+    margin: 0;
+    padding: 2px 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.mapstudio-panel-problem--edits:hover .mapstudio-panel-problem-text {
+    text-decoration: underline;
+}
+
+.mapstudio-panel-problem--edits:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: 2px;
+}
+
+.mapstudio-panel-problem-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.mapstudio-panel-problem-chevron {
+    flex: none;
+    margin-top: 1px;
+}
+
+.mapstudio-panel-problem--open .mapstudio-panel-problem-chevron {
+    transform: rotate(180deg);
+}
+
+/* The edits waiting, opened under the save status row (entry 24): each in words with Try again (once it has a reason) and
+   Discard, then Hide; the list scrolls inside the header past about five rows so the item list keeps its room. */
+.mapstudio-unsaved {
+    display: flex;
+    flex-direction: column;
+    margin-top: 6px;
+    border: 1px solid var(--mapstudio-divider);
+    border-radius: 6px;
+    background: var(--mapstudio-surface);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.mapstudio-unsaved-list {
+    max-height: 260px;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+    scrollbar-width: thin;
+    scrollbar-color: var(--mapstudio-scroll-thumb) transparent;
+}
+
+.mapstudio-unsaved-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border-bottom: 1px solid var(--mapstudio-divider);
+}
+
+.mapstudio-unsaved-text {
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-unsaved-row--refused .mapstudio-unsaved-text {
+    font-weight: 600;
+}
+
+.mapstudio-unsaved-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.mapstudio-unsaved-button {
+    box-sizing: border-box;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--mapstudio-surface);
+    color: var(--label);
+    font: inherit;
+    cursor: pointer;
+}
+
+.mapstudio-unsaved-button:hover:not(:disabled) {
+    background: var(--mapstudio-hover);
+}
+
+.mapstudio-unsaved-button:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: 1px;
+}
+
+.mapstudio-unsaved-button:disabled {
+    color: var(--label--disabled);
+    cursor: not-allowed;
+}
+
+.mapstudio-unsaved-hide {
+    align-self: flex-end;
+    margin: 8px;
 }
 
 /* The Search items field under the title row (entry 21, DESIGN.md key screen 4): the input's look (`.mapstudio-input`),
@@ -2902,9 +2947,9 @@
     pointer-events: auto;
 }
 
-/* The connection chip (item 32) sits under the toolbar (36 px) while the studio is on, 10 px clear of it (entry 23: no
-   pill between them). */
-.mapstudio--editing .mapstudio-connection {
+/* The chip (item 32), in Edit mode the connection's alone (entry 24), sits under the toolbar (36 px) while the studio is
+   on, 10 px clear of it (entry 23: no pill between them). */
+.mapstudio--editing .mapstudio-chip {
     top: calc(var(--mapstudio-map-inset) + 36px + 10px);
 }
 
@@ -2935,7 +2980,7 @@
         top: calc(var(--mapstudio-map-inset) + 40px + 8px);
     }
 
-    .mapstudio--editing .mapstudio-connection {
+    .mapstudio--editing .mapstudio-chip {
         top: calc(var(--mapstudio-map-inset) + 40px + 8px + 36px + 10px);
     }
 }

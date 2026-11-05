@@ -2,7 +2,7 @@
  * The map store's state as this browser knows it (epic 2 story 5): ready, read
  * only (a newer schema or a standby Gateway; the reason in plain words), or
  * unavailable. Pure, unit tested in node; the component writes it to
- * `data-store-state` on the map container and shows the reason.
+ * `data-store-state` (and the reason to `data-store-reason`) on the map container and says the reason in words (problems.ts).
  */
 
 import { ErrorCodes, MapLoadReplyBody } from './contract';
@@ -52,7 +52,7 @@ export function storeStateAttribute(state: StoreState): string {
     return state.status === 'unknown' ? '' : state.status;
 }
 
-/** The status line under the map, or '' when nothing needs saying. */
+/** The store's state in words (the save status row and the top-centre chip, problems.ts, entry 24), or '' when nothing needs saying. */
 export function storeStatusText(state: StoreState): string {
     switch (state.status) {
         case 'read-only':

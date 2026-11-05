@@ -67,7 +67,7 @@ export function updateBatch(itemId: string, batchId: string, baseVersion: number
     return { batchId, ops: [{ op: 'update', entity: 'item', id: itemId, baseVersion, data }] };
 }
 
-/** The save state the component shows next to the drawing status. */
+/** The save state of the last edit sent: the save status's, and `data-save-state` on the map for the e2e suite (epic 4 entry 24). */
 export type SaveState =
     | { state: 'idle' }
     | { state: 'saving'; itemId: string }
@@ -78,26 +78,10 @@ export type SaveState =
 
 export const SAVE_IDLE: SaveState = { state: 'idle' };
 
-/** The words for a save state on the dev status line (`.mapstudio-save-status`, which the e2e suite reads); '' when idle. */
-export function saveStatusText(save: SaveState): string {
-    switch (save.state) {
-        case 'saving':
-            return 'Saving the line ...';
-        case 'saved':
-            return 'Saved as version ' + save.version;
-        case 'refused':
-            return 'Not saved: ' + save.message;
-        case 'unsent':
-            return 'Not saved: the store is unreachable. The line is kept here and saves when it is back.';
-        default:
-            return '';
-    }
-}
-
 /**
  * The studio's save status words (EXPERIENCE.md Save status, DESIGN.md save-status; epic 4 entry 2):
- * "Saved" with nothing pending, "Saving..." while a batch is out, and a problem in words on its own.
- * The dev status line keeps `saveStatusText`.
+ * "Saved" with nothing pending, "Saving..." while a batch is out, and a problem in words on its own
+ * (the save status row in Edit mode, the top-centre chip in View mode; problems.ts, entry 24).
  */
 export function saveStatusWords(save: SaveState): string {
     switch (save.state) {

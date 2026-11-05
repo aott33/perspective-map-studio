@@ -7,7 +7,6 @@ import {
     pointCreateBatch,
     refusedSave,
     roundCoordinate,
-    saveStatusText,
     saveStatusWords,
     updateBatch,
     withItem
@@ -50,13 +49,10 @@ describe('saving a drawn line (epic 4 entry 4)', () => {
         expect(start.ops[0].data!.ends).toEqual({ start: { itemId: 'a' } });
     });
 
-    test('the status words for each save state', () => {
-        expect(saveStatusText(SAVE_IDLE)).toBe('');
-        expect(saveStatusText({ state: 'saving', itemId: 'a' })).toBe('Saving the line ...');
-        expect(saveStatusText({ state: 'saved', itemId: 'a', version: 1 })).toBe('Saved as version 1');
+    test('a refused save keeps the code and the Gateway\'s words (the dev status line\'s words left with it, epic 4 entry 24)', () => {
         const refused = refusedSave('a', { code: 'role', message: 'You do not have a role that lets you change the map.' });
         expect(refused).toEqual({ state: 'refused', itemId: 'a', code: 'role', message: 'You do not have a role that lets you change the map.' });
-        expect(saveStatusText(refused)).toBe('Not saved: You do not have a role that lets you change the map.');
+        expect(saveStatusWords(refused)).toBe('Not saved - You do not have a role that lets you change the map.');
     });
 });
 

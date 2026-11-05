@@ -48,7 +48,12 @@ export const GLYPH_PATHS = {
     magnet: 'M6 3v9a6 6 0 0 0 12 0V3M6 3h4v9a2 2 0 0 0 4 0V3h4M6 7h4M14 7h4',
     /** Undo and Redo: an arrow curling back, and forward. */
     undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
-    redo: 'M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3'
+    redo: 'M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3',
+    /**
+     * Cloud: a cloud struck through, the top-centre chip's glyph for a problem with the map store or the edits kept here
+     * (epic 4 entry 24; DESIGN.md Icons names the cloud among the chrome glyphs). No alarm shape: no triangle, circle or square.
+     */
+    cloud: 'M7 18.5a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 17.6 9.3a4.6 4.6 0 0 1-.6 9.2zM4 4l16 16'
 } as const;
 
 export type GlyphName = keyof typeof GLYPH_PATHS;

@@ -413,27 +413,38 @@ export function entryText(entry: UnsavedEntry, level: EditLevel | null): string 
     if (!reason) {
         return 'Not saved yet - saving ...';
     }
+    return 'Not saved - ' + reasonText(reason);
+}
+
+/** A reason in words, as an entry says it after "Not saved - ": the other editor named on a conflict, the busy answer short. */
+export function reasonText(reason: UnsavedReason): string {
     if (reason.code === ErrorCodes.CONFLICT) {
-        return 'Not saved - conflict with ' + (reason.changedBy ? reason.changedBy + "'s" : "another editor's")
-            + ' change. ' + reason.message;
+        return 'conflict with ' + (reason.changedBy ? reason.changedBy + "'s" : "another editor's") + ' change. ' + reason.message;
     }
     if (isBusy(reason)) {
-        return 'Not saved - Map Studio is busy';
+        return 'Map Studio is busy';
     }
     switch (reason.code) {
         case LocalReasons.TIMEOUT:
-            return 'Not saved - store unreachable (no answer from the Gateway)';
+            return 'store unreachable (no answer from the Gateway)';
         case LocalReasons.DISCONNECTED:
-            return 'Not saved - store unreachable (not connected to the Gateway)';
+            return 'store unreachable (not connected to the Gateway)';
         case ErrorCodes.STORE_UNREACHABLE:
-            return 'Not saved - store unreachable. ' + reason.message;
+            return 'store unreachable. ' + reason.message;
         default:
-            return 'Not saved - ' + reason.message;
+            return reason.message;
     }
 }
 
 function edits(n: number): string {
     return n === 1 ? '1 edit' : n + ' edits';
+}
+
+/** Whether an entry waits because the store is out of reach (no answer, not connected, store-unreachable but not busy). */
+function unreachable(entries: UnsavedEntry[]): boolean {
+    return entries.some((e) => e.state === 'unsent' && !!e.reason && !isBusy(e.reason)
+        && (e.reason.code === LocalReasons.TIMEOUT || e.reason.code === LocalReasons.DISCONNECTED
+            || e.reason.code === ErrorCodes.STORE_UNREACHABLE));
 }
 
 /** The summary line over the list, or '' when the queue is empty. */
@@ -444,8 +455,21 @@ export function summaryText(entries: UnsavedEntry[], level: EditLevel | null): s
     if (level === 'none') {
         return edits(entries.length) + ' not saved. ' + SIGN_IN_TEXT;
     }
-    const unreachable = entries.some((e) => e.state === 'unsent' && !!e.reason && !isBusy(e.reason)
-        && (e.reason.code === LocalReasons.TIMEOUT || e.reason.code === LocalReasons.DISCONNECTED
-            || e.reason.code === ErrorCodes.STORE_UNREACHABLE));
-    return (unreachable ? 'Store unreachable - ' : '') + edits(entries.length) + ' not saved';
+    return (unreachable(entries) ? 'Store unreachable - ' : '') + edits(entries.length) + ' not saved';
+}
+
+/**
+ * The words for the edits waiting on the save status row and the View-mode chip (epic 4 entry 24, owner 2026-11-05:
+ * "2 edits not saved" with the reason): the summary, "Store unreachable - 2 edits not saved" while the store is out of
+ * reach (DESIGN.md Save status), else the count and the first reason the queue holds, oldest first, in an entry's words
+ * ("1 edit not saved - conflict with mapoperator's change. P31 was changed by ...", "2 edits not saved - Map Studio is
+ * busy"), or the count alone while no entry has a reason yet; '' with none.
+ */
+export function waitingText(entries: UnsavedEntry[], level: EditLevel | null): string {
+    const summary = summaryText(entries, level);
+    if (summary === '' || level === 'none' || unreachable(entries)) {
+        return summary;
+    }
+    const first = entries.find((e) => e.reason !== undefined);
+    return first && first.reason ? summary + ' - ' + reasonText(first.reason) : summary;
 }

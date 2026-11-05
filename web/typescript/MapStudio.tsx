@@ -24,7 +24,7 @@ import { NeedsYouRow } from './needsyou';
 import { readStartingArea, startingAreaKey } from './startingArea';
 import { Place } from './place';
 import { LiveState, itemPreset, itemState } from './live';
-import { CONNECTED, connectionChipText, connectionDetailText } from './connection';
+import { CONNECTED } from './connection';
 import { ThemeWatch } from './themeWatch';
 import { MarkerColors, SpriteSymbol, markerProperties, stateWord } from './markers';
 import { PresetPalette, StylePreview, TintPalette } from './StylePreview';
@@ -32,9 +32,10 @@ import { MapFeatures, SegmentRef, Selection } from './features';
 import { ZoomControl } from './ZoomControl';
 import { SearchControl } from './SearchControl';
 import { SearchResult } from './search';
-import { STORE_UNKNOWN, storeStateAttribute, storeStatusText } from './storeState';
-import { SAVE_IDLE, saveStatusText } from './save';
-import { UnsavedEntry, entryText, summaryText, unsavedItems } from './unsaved';
+import { STORE_UNKNOWN, storeStateAttribute } from './storeState';
+import { SAVE_IDLE } from './save';
+import { unsavedItems } from './unsaved';
+import { ProblemFacts, chipProblem, editProblems } from './problems';
 import { PopupPoint, isSheetWidth, sheetBasisWidth } from './popupParams';
 import { PopupAnchor, Rect } from './popupPlacement';
 import { SHARED_M } from './shared';
@@ -64,6 +65,7 @@ import { ItemList } from './studio/ItemList';
 import { PropertiesPanel } from './studio/PropertiesPanel';
 import { DrawToolbar } from './studio/DrawToolbar';
 import { DrawingBar } from './studio/DrawingBar';
+import { ChromeGlyph } from './studio/ChromeGlyph';
 
 /** Must match MapStudioComponent.COMPONENT_ID on the Java side. */
 export const COMPONENT_TYPE = 'ao.mapstudio';
@@ -90,8 +92,7 @@ export interface MapStudioProps {
     previewStyles: boolean;
     /**
      * Edit mode, both ways (epic 3 entry 14, epic 4 entry 2): the studio at level `full`, entered at mount and
-     * when the page writes true after it, left when the page writes false; the Edit switch writes it back. The
-     * dev click echo in the status line follows the prop where the studio does not show (entry 23: never in Edit mode).
+     * when the page writes true after it, left when the page writes false; the Edit switch writes it back.
      */
     editMode: boolean;
     /** The selected map item's id, which the component writes (epic 4 entry 2); never read back into the model (entry 14's). */
@@ -148,7 +149,7 @@ function clientLocationWords(store: AbstractUIElementStore): string {
 /**
  * The Map Studio component: a MapLibre map on a blank style that draws the
  * project's map items from the map store. Clicking a point item sends
- * `point.click` through the delegate; the reply is shown as text over the map.
+ * `point.click` through the delegate; the reply is kept on the map as `data-last-reply`, shown nowhere (epic 4 entry 24).
  * In Edit mode at level `full` (epic 4 entry 2) the studio's surfaces dock beside the map:
  * the rail, the item list, the properties panel and the floating draw toolbar.
  */
@@ -974,37 +975,36 @@ export class MapStudio extends Component<Props, MapStudioState> {
         );
     }
 
-    /** The queued edits, each with its reason, Try again and Discard (epic 2 story 8). */
-    private renderUnsaved(unsaved: UnsavedEntry[], level: EditLevel | null, warning: string, sending: string[]):
-        React.ReactNode {
-        if (unsaved.length === 0 && warning === '') {
-            return null;
-        }
-        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
-        const summary = summaryText(unsaved, level);
-        return (
-            <div className="mapstudio-unsaved" data-unsaved-count={String(unsaved.length)}>
-                {warning !== '' ? <div className="mapstudio-unsaved-warning">{warning}</div> : null}
-                {summary !== '' ? <div className="mapstudio-unsaved-summary">{summary}</div> : null}
-                {unsaved.map((entry) => (
-                    <div key={entry.batchId} className={'mapstudio-unsaved-row mapstudio-unsaved-row--' + entry.state}
-                         data-batch-id={entry.batchId}
-                         data-unsaved-state={entry.state}
-                         data-code={entry.reason ? entry.reason.code : ''}>
-                        <span className="mapstudio-unsaved-text">{entryText(entry, level)}</span>
-                        {entry.reason ? (
-                            <button type="button" className="mapstudio-unsaved-retry"
-                                    onClick={() => delegate && delegate.retryUnsaved(entry.batchId)}>Try again</button>
-                        ) : null}
-                        <button type="button" className="mapstudio-unsaved-discard"
-                                disabled={sending.indexOf(entry.batchId) >= 0}
-                                title={sending.indexOf(entry.batchId) >= 0 ? 'Being sent; wait for the answer.' : undefined}
-                                onClick={() => delegate && delegate.discardUnsaved(entry.batchId)}>Discard</button>
-                    </div>
-                ))}
-            </div>
-        );
+    /**
+     * What the problems are read from (problems.ts, entry 24): the delegate's state, with the level map.load last
+     * reported while a failed load leaves it unknown, so an editor's map keeps an editor's problems.
+     */
+    private problemFacts(delegate: MapStudioDelegateState): ProblemFacts {
+        return {
+            connection: delegate.connection,
+            load: delegate.load,
+            store: delegate.store,
+            level: delegate.level !== null ? delegate.level : this.lastLevel,
+            save: delegate.save,
+            unsaved: delegate.unsaved,
+            sending: delegate.sending,
+            storageWarning: delegate.storageWarning
+        };
     }
+
+    /** The queued edit's Try again and Discard, on the waiting edits under the save status row (entry 24). */
+    private onRetryUnsaved = (batchId: string): void => {
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        if (delegate) {
+            delegate.retryUnsaved(batchId);
+        }
+    };
+    private onDiscardUnsaved = (batchId: string): void => {
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        if (delegate) {
+            delegate.discardUnsaved(batchId);
+        }
+    };
 
     /**
      * The style preview panel (entry 1, the `previewStyles` prop): every kind's style rule and area
@@ -1098,12 +1098,19 @@ export class MapStudio extends Component<Props, MapStudioState> {
             );
         }
         const selected = this.state.selected;
+        const facts = this.problemFacts(delegate);
         return (
             <ItemList title={this.projectName() || 'Map'}
                       rows={listRows(delegate.items, delegate.lists.kinds, delegate.live, delegate.lists.assetNames)}
                       selectedId={selected ? selected.id : null}
                       save={delegate.save}
-                      onSelect={this.onRowSelect} />
+                      problems={editProblems(facts)}
+                      unsaved={delegate.unsaved}
+                      level={facts.level}
+                      sending={delegate.sending}
+                      onSelect={this.onRowSelect}
+                      onRetry={this.onRetryUnsaved}
+                      onDiscard={this.onDiscardUnsaved} />
         );
     }
 
@@ -1142,38 +1149,19 @@ export class MapStudio extends Component<Props, MapStudioState> {
 
     render(): React.ReactNode {
         const delegate = this.props.delegate;
-        const pending = !!(delegate && delegate.pendingId);
-        const replyLine = delegate && delegate.lastReply ? delegate.lastReply : 'Click a point.';
         const save = delegate ? delegate.save : SAVE_IDLE;
-        const saveText = saveStatusText(save);
         const load = delegate ? delegate.load : { state: 'loading', message: '' };
         const store = delegate ? delegate.store : STORE_UNKNOWN;
         const unsaved = delegate ? delegate.unsaved : [];
         const editing = delegate ? delegate.editing : 'on';
         // The studio's surfaces dock beside the map in Edit mode at level full (entry 2; the stage is the map's room).
         const studioOn = this.studioOn();
-        // The status line stays in the DOM for every state it reports (the save status, a failed load, a
-        // read-only store, unsaved edits), but the spike's click echo is dev-page test output and leaves
-        // View mode (owner review notes item 5, after entry 15): it renders where the editMode prop is true,
-        // and View mode shows the map and its controls only. In Edit mode (entry 23, owner 2026-11-05: "keep the
-        // problems box until entry 10") it reports problems only, a failed load, a read-only store, unsaved edits,
-        // a refused or unsent save, until entry 10's banner and save status row take them: never the echo, and
-        // never Saving or Saved (the save status stays in the DOM, hidden, for the e2e suite). The last reply
-        // stays readable for the tests as `data-last-reply` on the map. The echo waits for the level, so an editor's
-        // page opening in Edit mode never flashes it before the studio comes on.
-        const levelKnown = !!delegate && (delegate.level !== null || this.lastLevel !== null);
-        const echo = this.props.props.editMode && levelKnown && !studioOn;
-        const saveProblem = save.state === 'refused' || save.state === 'unsent';
-        // Every batch is queued before it is sent, so a save in flight is no problem: an unsaved entry counts once it has a
-        // reason (refused, or unsent after a failure) or is no longer being sent. A store that is unavailable stays a
-        // problem while each 15 s retry loads, and a browser that cannot keep unsaved edits says so.
-        const sending = delegate ? delegate.sending : [];
-        const stuck = unsaved.some((e) => e.reason !== undefined || sending.indexOf(e.batchId) < 0);
-        const problem = saveProblem || stuck || load.state === 'failed' || store.status === 'read-only' || store.status === 'unavailable'
-            || (delegate ? delegate.storageWarning !== '' : false);
-        const quiet = studioOn ? !problem : !echo && saveText === '' && load.state !== 'failed' && store.status !== 'read-only' && unsaved.length === 0;
+        // No status box (entry 24, owner 2026-11-05: "yes to both"): the click echo and the success words are gone, and a
+        // problem is said in words on the save status row in Edit mode (the Items list's header) and on the top-centre chip
+        // in View mode, one at a time, the worst first; in Edit mode the chip says no connection only (problems.ts). The save
+        // state, the last reply and the load and store states stay readable for the e2e suite as attributes on the map.
         const connection = delegate ? delegate.connection : CONNECTED;
-        const chipText = connectionChipText(connection);
+        const chip = delegate ? chipProblem(this.problemFacts(delegate), studioOn) : null;
         const studio = this.state.studio;
         const kinds = delegate ? delegate.lists.kinds : [];
         // The kind the tool in hand adds (entry 4): the kind button's, else the first of the tool's geometry.
@@ -1194,9 +1182,15 @@ export class MapStudio extends Component<Props, MapStudioState> {
                          data-tool-kind={studio.toolKind || ''}
                          data-snap={this.state.snap ? 'on' : 'off'}
                          data-load-state={load.state}
+                         data-load-message={load.message}
                          data-store-seq={delegate && delegate.seq !== null ? String(delegate.seq) : ''}
                          data-map-reloads={delegate ? String(delegate.reloads) : '0'}
                          data-store-state={storeStateAttribute(store)}
+                         data-store-reason={store.reason}
+                         data-save-state={save.state}
+                         data-save-item={save.state === 'idle' ? '' : save.itemId}
+                         data-save-version={save.state === 'saved' ? String(save.version) : ''}
+                         data-save-code={save.state === 'refused' || save.state === 'unsent' ? save.code : ''}
                          data-refresh-interval={delegate && delegate.refreshIntervalSeconds !== null
                              ? String(delegate.refreshIntervalSeconds) : ''}
                          data-unsaved-count={String(unsaved.length)}
@@ -1214,39 +1208,18 @@ export class MapStudio extends Component<Props, MapStudioState> {
                          data-legend-open="false"
                          data-search-open="false"
                          data-needs-open="false" />
-                    <div className={'mapstudio-reply' + (pending ? ' mapstudio-reply--pending' : '') + (quiet ? ' mapstudio-reply--quiet' : '')}
-                         data-pending={pending ? 'true' : 'false'}>
-                        {echo ? <div>{pending ? 'Waiting for the Gateway ...' : replyLine}</div> : null}
-                        {saveText !== '' ? (
-                            <div className={'mapstudio-save-status mapstudio-save-status--' + save.state}
-                                 hidden={studioOn && !saveProblem}
-                                 data-save-state={save.state}
-                                 data-item-id={save.state === 'idle' ? '' : save.itemId}
-                                 data-version={save.state === 'saved' ? String(save.version) : ''}
-                                 data-code={save.state === 'refused' || save.state === 'unsent' ? save.code : ''}>
-                                {saveText}
-                            </div>
-                        ) : null}
-                        {load.state === 'failed'
-                            ? <div className="mapstudio-load-status">Map store: {load.message}</div> : null}
-                        {store.status === 'read-only'
-                            ? <div className="mapstudio-store-status" data-store-state="read-only">{storeStatusText(store)}</div>
-                            : null}
-                        {studioOn && store.status === 'unavailable' && load.state !== 'failed'
-                            // While a 15 s retry loads, the box keeps saying why (entry 23: it stays a problem in Edit mode).
-                            ? <div className="mapstudio-store-status" data-store-state="unavailable">{storeStatusText(store)}</div>
-                            : null}
-                        {this.renderUnsaved(unsaved, delegate ? delegate.level : null,
-                            delegate ? delegate.storageWarning : '', delegate ? delegate.sending : [])}
-                    </div>
-                    {chipText !== '' ? (
-                        // The connection chip (item 32): in words, with the hourglass, over the map under the top bar.
-                        <div className="mapstudio-connection" role="status" title={connectionDetailText(connection)}
-                             data-state={connection.lost ? 'lost' : 'reloading'}>
-                            <svg className="mapstudio-connection-glyph" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href={SPRITE_URL + '#ms-stale'} />
-                            </svg>
-                            <span>{chipText}</span>
+                    {chip ? (
+                        // The top-centre chip (item 32; entry 24): one problem in words, the worst first, on at most two lines with
+                        // its full words as the title; the connection's with the hourglass, the store's and the edits' with the cloud.
+                        <div className={'mapstudio-chip mapstudio-chip--' + chip.code + (chip.code === 'connection' ? ' mapstudio-connection' : '')}
+                             role="status" title={chip.detail} data-problem={chip.code}
+                             data-state={chip.code === 'connection' ? (connection.lost ? 'lost' : 'reloading') : undefined}>
+                            {chip.code === 'connection' ? (
+                                <svg className="mapstudio-chip-glyph" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href={SPRITE_URL + '#ms-stale'} />
+                                </svg>
+                            ) : <ChromeGlyph name="cloud" className="mapstudio-chip-glyph" size={16} />}
+                            <span className="mapstudio-chip-text">{chip.text}</span>
                         </div>
                     ) : null}
                     {studioOn && delegate ? (
