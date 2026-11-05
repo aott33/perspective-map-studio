@@ -2550,9 +2550,10 @@
     color: var(--mapstudio-secondary);
 }
 
-/* The rail's Layers surface (entry 22): under the header the legend's desktop content as the panel draws it (the key,
-   Show and Basemap), docked: no card, no shadow or corner, no floating width or height, as wide as the dock; its body
-   scrolls inside the dock under the header, as the item list does. The key's rows and samples keep the panel's rules. */
+/* The rail's Layers surface (entry 22): under the header and its tabs the legend's desktop content as the panel draws it
+   (the open tab's part: Show and Basemap, or the key), docked: no card, no shadow or corner, no floating width or height,
+   as wide as the dock; its body scrolls inside the dock under the tabs, as the item list does. The key's rows and samples
+   keep the panel's rules. */
 .mapstudio-dock-legend,
 .mapstudio .mapstudio-legend-dock {
     display: flex;
@@ -2568,6 +2569,16 @@
 
 .mapstudio .mapstudio-legend-dock .mapstudio-legend-body {
     padding: 12px;
+}
+
+/* Its two tabs under the header (the owner's "2, the tabs"): the properties panel's tabs (`.mapstudio-panel-tabs`), whose
+   rule is the header's own here, at the dock's 12 px gutter; the Layers tab holds Show and Basemap, the Legend tab the key. */
+.mapstudio-dock--layers .mapstudio-dock-header {
+    border-bottom: none;
+}
+
+.mapstudio-dock--layers .mapstudio-panel-tabs {
+    padding: 0 12px;
 }
 
 .mapstudio-dock-note,

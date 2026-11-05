@@ -17,7 +17,7 @@ import { EditLevel, MapItemRecord } from './contract';
 import { AdapterStatus, HostLists, NO_HOST_LISTS } from './adapters';
 import { BasemapId, RasterSource } from './basemaps';
 import { EditSwitch } from './EditSwitch';
-import { LegendControl } from './LegendControl';
+import { DockPart, LegendControl } from './LegendControl';
 import { LegendToggle, readToggle, sessionStore, writeToggle } from './legend';
 import { NeedsYouControl } from './NeedsYouControl';
 import { NeedsYouRow } from './needsyou';
@@ -107,6 +107,10 @@ export interface ToastState {
     key: number;
 }
 
+/** The rail's Layers surface's tabs (epic 4 entry 22, the owner's "2, the tabs"): Layers (Show, Basemap) first, then Legend (the key). */
+export type LayersTab = 'layers' | 'legend';
+const LAYERS_TABS: Array<[LayersTab, string]> = [['layers', 'Layers'], ['legend', 'Legend']];
+
 export interface MapStudioState {
     /** The line or area being drawn vertex by vertex (epic 4 entry 4, drawing.ts), or null. */
     drawing: Drawing | null;
@@ -134,6 +138,8 @@ export interface MapStudioState {
      * kept in lock-step with `drawing` and `selected` through drawingState, toolState and selectionState (functional setState).
      */
     studio: StudioState;
+    /** The Layers surface's open tab (entry 22): it stays while Edit mode stays, and every entry to Edit mode opens on Layers. */
+    layersTab: LayersTab;
 }
 
 export type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
@@ -160,7 +166,7 @@ function clientLocationWords(store: AbstractUIElementStore): string {
 export class MapStudio extends Component<Props, MapStudioState> {
     state: MapStudioState = {
         drawing: null, snap: false, snapHint: '', toast: null, popup: null, clock: Date.now(), pick: null, selected: null, panel: null,
-        studio: fromProps(this.props.props.editMode)
+        studio: fromProps(this.props.props.editMode), layersTab: 'layers'
     };
 
     mapContainer: HTMLDivElement | null = null;
@@ -247,8 +253,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
     popupAnchor: PopupAnchor | null = null;
     /** The legend bottom-left, which holds the basemap choice (epic 3 entries 6 and 14), and the basemap revision last drawn. */
     legendControl: LegendControl | null = null;
-    /** The rail's Layers surface's host for the docked legend (epic 4 entry 22) while it is mounted, else null. */
+    /** The rail's Layers surface's open tab panel, the docked legend's host (epic 4 entry 22), while it is mounted, else null. */
     private layersHost: HTMLDivElement | null = null;
+    /** The Layers surface's tab and tab panel ids, unique to this component (two maps may share a page). */
+    private readonly layersTabsId = 'mapstudio-layers-' + Math.random().toString(36).slice(2, 8);
     /** The Mapbox logo control, bottom-right, while Satellite is drawn. */
     logoControl: MapboxLogoControl | null = null;
     drawnBasemap = -1;
@@ -307,7 +315,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.legendControl = controls.legend;
         if (this.layersHost) {
             // The Layers surface mounted before the control existed (entry 22): the docked legend is drawn into it now.
-            this.legendControl.dock(this.layersHost);
+            this.legendControl.dock(this.layersHost, this.dockPart());
         }
         // Mapbox's "Improve this map" carries the map's position (its attribution guide): after the control
         // rebuilds its links (its listeners run first) and after every move.
@@ -495,7 +503,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (!on) {
             editing.putToolDown(this);
         }
-        this.setState((prev) => ({ studio: on ? enterEdit(prev.studio) : leaveEdit(prev.studio), toast: on ? prev.toast : null }));
+        this.setState((prev) => ({ studio: on ? enterEdit(prev.studio) : leaveEdit(prev.studio), toast: on ? prev.toast : null,
+            layersTab: on ? 'layers' : prev.layersTab }));
         if (writeProp) {
             try {
                 this.props.store.props.write('editMode', on);
@@ -1069,30 +1078,50 @@ export class MapStudio extends Component<Props, MapStudioState> {
     }
 
     /**
-     * The Layers surface's host for the docked legend (entry 22), handed to the legend control as it mounts and taken back
-     * (null) as it unmounts; the control draws into it and React renders nothing inside it.
+     * The Layers surface's open tab panel, the docked legend's host (entry 22), handed to the legend control as it mounts
+     * and taken back (null) as it unmounts; the control draws the tab's part into it and React renders nothing inside it.
+     * The panel is keyed by the tab, so choosing the other tab mounts a new one with the other part.
      */
     private setLayersHost = (el: HTMLDivElement | null): void => {
         this.layersHost = el;
         if (this.legendControl) {
-            this.legendControl.dock(el);
+            this.legendControl.dock(el, this.dockPart());
         }
     };
 
+    /** The legend's part the open tab shows: the Layers tab the controls (Show, Basemap), the Legend tab the key. */
+    private dockPart(): DockPart {
+        return this.state.layersTab === 'legend' ? 'key' : 'controls';
+    }
+
+    private onLayersTab = (tab: LayersTab): void => this.setState({ layersTab: tab });
+
     /**
-     * The rail's surface (entry 2): the item list with the panel header; Layers, the legend's desktop content docked
-     * (entry 22: the key, Show and Basemap, drawn by the legend control from the panel's own state); or the empty Kinds
-     * surface until its entry. Each surface is keyed, so switching remounts it and the legend's host comes and goes whole.
+     * The rail's surface (entry 2): the item list with the panel header; Layers, the legend's desktop content docked under
+     * two tabs as the properties panel's (entry 22: the Layers tab Show and Basemap, the Legend tab the key, drawn by the
+     * legend control from the panel's own state); or the empty Kinds surface until its entry. Each surface is keyed, so
+     * switching remounts it and the legend's host comes and goes whole.
      */
     private renderDock(delegate: MapStudioDelegateState): React.ReactNode {
         const surface = this.state.studio.surface;
         if (surface === 'layers') {
+            const tab = this.state.layersTab;
+            const id = this.layersTabsId;
             return (
-                <section key="layers" className="mapstudio-dock mapstudio-dock--layers" aria-label="Layers" data-surface="layers">
+                <section key="layers" className="mapstudio-dock mapstudio-dock--layers" aria-label="Layers" data-surface="layers" data-tab={tab}>
                     <header className="mapstudio-dock-header">
                         <div className="mapstudio-dock-title-row"><h2 className="mapstudio-dock-title">Layers</h2></div>
                     </header>
-                    <div className="mapstudio-dock-legend" ref={this.setLayersHost} />
+                    <div className="mapstudio-panel-tabs" role="tablist" aria-label="Layers">
+                        {LAYERS_TABS.map(([key, label]) => (
+                            <button key={key} type="button" role="tab" id={id + '-' + key} data-tab={key} aria-selected={tab === key}
+                                    aria-controls={id + '-panel'}
+                                    className={'mapstudio-panel-tab' + (tab === key ? ' mapstudio-panel-tab--active' : '')}
+                                    onClick={() => this.onLayersTab(key)}>{label}</button>
+                        ))}
+                    </div>
+                    <div key={tab} id={id + '-panel'} className="mapstudio-dock-legend" role="tabpanel" aria-labelledby={id + '-' + tab}
+                         ref={this.setLayersHost} />
                 </section>
             );
         }

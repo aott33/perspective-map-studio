@@ -23,8 +23,9 @@
  * One legend, two places (epic 4 entry 22, the owner's render C of the legend review): in Edit mode the Legend
  * button and its panel leave the map (the stylesheet hides the button from 768 px, the component closes an open
  * panel as the studio comes on) and the rail's Layers surface hands the control a host (`dock`), which the same
- * `fill` draws the desktop content into (the key, Show and Basemap) from the same state, so every setter redraws
- * both, and a toggle or a basemap picked there goes through the same callbacks. The docked copy is never "open":
+ * `fill` draws one part of the desktop content into from the same state: on the surface's Layers tab the controls
+ * (Show, then Basemap), on its Legend tab the key (owner, "2, the tabs"), so every setter redraws both places, and
+ * a toggle or a basemap picked there goes through the same callbacks. The docked copy is never "open":
  * it calls no `onToggle` (`data-legend-open`), `isOpen` is the panel's alone (a map click closes the panel only),
  * it takes no focus when it is drawn and it keeps its own focused control across a redraw.
  */
@@ -78,6 +79,8 @@ interface LegendHost {
     root: HTMLDivElement;
     /** The Layers surface's copy: always the desktop layout (no sheet, no handle or Close), never "open". */
     docked: boolean;
+    /** What it draws: the panel everything; the docked copy its tab's part. */
+    part: 'all' | DockPart;
     body: HTMLDivElement | null;
     basemapGroup: HTMLDivElement | null;
     status: HTMLDivElement | null;
@@ -87,8 +90,11 @@ interface LegendHost {
     closeButton: HTMLButtonElement | null;
 }
 
-function newHost(root: HTMLDivElement, docked: boolean): LegendHost {
-    return { root, docked, body: null, basemapGroup: null, status: null, buttons: new Map(), checkboxes: new Map(), kindsButton: null, closeButton: null };
+/** The part the Layers surface's tab shows (entry 22): `controls` on the Layers tab (Show, Basemap), `key` on the Legend tab. */
+export type DockPart = 'controls' | 'key';
+
+function newHost(root: HTMLDivElement, docked: boolean, part: 'all' | DockPart): LegendHost {
+    return { root, docked, part, body: null, basemapGroup: null, status: null, buttons: new Map(), checkboxes: new Map(), kindsButton: null, closeButton: null };
 }
 
 export class LegendControl implements IControl {
@@ -179,7 +185,7 @@ export class LegendControl implements IControl {
         panel.setAttribute('role', 'region');
         panel.setAttribute('aria-label', 'Legend');
         this.container.insertBefore(panel, this.container.firstChild);
-        this.panel = newHost(panel, false);
+        this.panel = newHost(panel, false, 'all');
         this.button.setAttribute('aria-expanded', 'true');
         this.fill(this.panel);
         // The panel follows the phone breakpoint while it is open (a rotated phone, a resized window).
@@ -197,14 +203,14 @@ export class LegendControl implements IControl {
     }
 
     /**
-     * The docked copy in the rail's Layers surface (entry 22): with an element (the surface's host, as it mounts) the
-     * desktop content is drawn into a wrapper inside it, from the same state as the panel, and every setter redraws it;
-     * with null (the surface unmounting, Edit mode left) it leaves, its listeners taken off. It never takes the focus,
-     * calls no `onToggle` and does not count for `isOpen`.
+     * The docked copy in the rail's Layers surface (entry 22): with an element (the open tab's panel, as it mounts) one
+     * part of the desktop content, the controls or the key, is drawn into a wrapper inside it, from the same state as the
+     * panel, and every setter redraws it; with null (the surface unmounting, Edit mode left) it leaves, its listeners
+     * taken off. It never takes the focus, calls no `onToggle` and does not count for `isOpen`.
      */
-    dock(host: HTMLElement | null): void {
+    dock(host: HTMLElement | null, part: DockPart = 'controls'): void {
         const docked = this.docked;
-        if (docked && host && docked.root.parentNode === host) {
+        if (docked && host && docked.root.parentNode === host && docked.part === part) {
             return;
         }
         if (docked) {
@@ -219,8 +225,9 @@ export class LegendControl implements IControl {
         }
         const root = document.createElement('div');
         root.className = 'mapstudio-legend-dock';
+        root.setAttribute('data-part', part);
         host.appendChild(root);
-        this.docked = newHost(root, true);
+        this.docked = newHost(root, true, part);
         this.fill(this.docked);
     }
 
@@ -295,10 +302,15 @@ export class LegendControl implements IControl {
             body.appendChild(columns);
             this.renderKey(host, columns);
         } else {
-            // Sections in order: the key in the map's words (States first), Show, then Basemap when there is a choice.
-            this.renderKey(host, body);
-            this.renderShow(host, body);
-            if (offersBasemapSwitch(this.offered)) {
+            // Sections in order: the key in the map's words (States first), Show, then Basemap when there is a choice; the
+            // docked copy draws the key alone (the Legend tab) or Show and Basemap alone (the Layers tab).
+            if (host.part !== 'controls') {
+                this.renderKey(host, body);
+            }
+            if (host.part !== 'key') {
+                this.renderShow(host, body);
+            }
+            if (host.part !== 'key' && offersBasemapSwitch(this.offered)) {
                 const basemap = this.section(body, 'Basemap', 'mapstudio-legend-section--basemap');
                 const group = document.createElement('div');
                 group.className = 'mapstudio-basemap-group';
