@@ -3,7 +3,7 @@ title: "Edit mode talks in one place: Undo and Redo on the toolbar with the last
 type: 'feature'
 ticket: '23'
 created: '2026-11-05'
-status: 'in-review'
+status: 'built'
 baseline_revision: 'ccacb73b6c353de0c50814dc3cb3e1b44f79a3a9'
 route: 'full'
 route_source: 'auto'
@@ -108,6 +108,8 @@ Quick lens, 2026-11-05: 11 findings; high 0, medium 5, low 4, false 1, rejected 
 | DESIGN.md and EXPERIENCE.md still name the pill, the toast, the rail without History and "the mode always named in words" | low | DESIGN.md 451, 466; EXPERIENCE.md 67, 214 | patch: brought in line with the owner's decisions |
 | On the dev `/edit` page at 390 px the click echo now waits for the level | low | Dev-page output only; entry 24 removes the echo entirely next | rejected: no user meets it, and it goes with entry 24 |
 | The whole-suite evidence predates the last commit | false | The plan's Verification runs on the coordinator's side after the patches | rejected |
+
+After the patches (coordinator, 2026-11-05): `tsc` clean, 379 Jest tests green, Gradle build green offline, the contract check OK at 0.4.0, no em dashes; the whole e2e suite on a fresh dev stack 144 passed, 7 skipped, 1 failed in 29.3 min, the failure the review 390 px light-theme test of deferred-work.md, which passed when rerun alone; the `E2E_DOCS=1` runs of the studio, drawing and tracer specs 30 passed and rewrote the renders. Deferred: an edit saved while an undo is in flight (the other order of entry 2's window), in deferred-work.md.
 
 ## Verification
 
