@@ -549,6 +549,10 @@ for (const [width, height, listWidth, panelWidth] of [[1366, 768, 256, 320], [14
                 await expect(topbar).toBeHidden();
                 await expect(map).toHaveAttribute('data-search-open', 'false');
                 await expect(page.locator('.mapstudio-search-panel')).toHaveCount(0);
+                // The hidden field gave the focus up: a key typed now opens nothing behind the hidden bar.
+                await expect(page.locator('.mapstudio-search-input')).not.toBeFocused();
+                await page.keyboard.type('p');
+                await expect(map).toHaveAttribute('data-search-open', 'false');
                 await sw.click();
                 await expect(map).toHaveAttribute('data-studio', 'off');
                 await expect(searchField).toBeVisible();
@@ -616,6 +620,9 @@ for (const [width, height, listWidth, panelWidth] of [[1366, 768, 256, 320], [14
                 await expect(list).toHaveAttribute('data-rows', String(swd.length));
                 expect(await listIds(page)).toEqual(swd);
                 await expect(clear).toBeVisible();
+                const clearBox = await clear.boundingBox();
+                expect(Math.min(clearBox.width, clearBox.height), 'Clear a 32 px target').toBeGreaterThanOrEqual(32);
+                expect(clearBox.y + clearBox.height).toBeLessThanOrEqual(fieldBox.y + fieldBox.height);
                 await expect(page.locator('.mapstudio-list-empty')).toHaveCount(0);
                 // The selected row (Point 2) is filtered out of sight; the selection and Details stay.
                 await expect(map).toHaveAttribute('data-selected', p2);

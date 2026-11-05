@@ -532,12 +532,19 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * The View-mode top bar while the studio shows (entry 21; DESIGN.md Edit mode, Direction A): the stylesheet hides
      * the search field and the Needs you bar under `mapstudio--editing` (the search is the Items list's there) and the
      * toolbar takes the top row. As the studio comes on, however it came (the switch, the page's prop, the level
-     * arriving, a phone width widening), an open search or Needs you list closes, so nothing is open behind the hidden
-     * bar and nothing comes back open when Edit mode is left; the focus no longer returns to a bar that is hidden.
+     * arriving), an open search or Needs you list closes and the focus leaves the bar, so nothing is open behind the
+     * hidden bar and nothing comes back open when Edit mode is left; the focus no longer returns to a bar that is hidden.
      */
     private applyTopBar(): void {
         const on = this.studioOn();
         if (on && !this.studioWasOn) {
+            // A field or the bar keeping the focus while hidden (the page's prop turned Edit mode on) would take keys
+            // and open its list behind the hidden bar: the focus leaves it first.
+            const active = typeof document !== 'undefined' ? document.activeElement as HTMLElement | null : null;
+            const topbar = this.mapContainer ? this.mapContainer.querySelector('.mapstudio-topbar') : null;
+            if (active && topbar && topbar.contains(active) && typeof active.blur === 'function') {
+                active.blur();
+            }
             if (this.searchControl) {
                 this.searchControl.close();
             }

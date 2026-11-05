@@ -2514,8 +2514,9 @@
     overflow-wrap: anywhere;
 }
 
-/* The Search items field under the title row (entry 21, DESIGN.md key screen 4): the input's look (`.mapstudio-input`)
-   with the search glyph inside on the left and, while it holds text, Clear on the right. */
+/* The Search items field under the title row (entry 21, DESIGN.md key screen 4): the input's look (`.mapstudio-input`),
+   36 px tall so Clear keeps the 32 px mouse target inside it, with the search glyph inside on the left and, while it
+   holds text, Clear on the right. */
 .mapstudio-list-search {
     position: relative;
     display: flex;
@@ -2533,7 +2534,8 @@
 }
 
 .mapstudio-input.mapstudio-list-search-input {
-    padding: 0 32px 0 31px;
+    height: 36px;
+    padding: 0 36px 0 31px;
 }
 
 .mapstudio-list-search-input::placeholder {
@@ -2545,8 +2547,6 @@
     position: absolute;
     top: 2px;
     right: 2px;
-    width: 28px;
-    height: 28px;
     color: var(--mapstudio-secondary);
 }
 
