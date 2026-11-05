@@ -3,14 +3,14 @@ title: "The legend in the rail's Layers surface in Edit mode"
 type: 'feature'
 ticket: '22'
 created: '2026-11-05'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: 'ad74df19dfaf65aa2b7152963d8f6c14b9088fd2'
 route: 'full'
 route_source: 'auto'
 risk: 'low'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
