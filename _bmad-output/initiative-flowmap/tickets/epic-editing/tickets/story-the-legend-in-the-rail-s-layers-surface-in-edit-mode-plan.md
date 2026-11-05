@@ -95,6 +95,15 @@ Quick lens, 2026-11-05: 2 findings; high 0, medium 1, low 1, false 0, maybe-fals
 | The dock's legend is torn down and drawn again on every saved edit and every full values batch, even with the same key (`LegendControl.ts` `setKey` calls `fillAll` unconditionally; `itemsLayer.ts` calls `setKey` whenever `itemsRevision` or `live.fulls` moves) | medium | `setKey` stores and redraws with no comparison; the status region is appended empty and then filled, so a standing basemap status is announced again after each edit, a focused control is focused again, and a press spanning a rebuild loses its click. Before entry 22 only an open floating panel redrew; the dock stays in view while editing | patch: redraw only when the key changed; the status filled before it is appended |
 | `EXPERIENCE.md` line 23 still says Layers offers only the basemaps, against line 54 and the owner's 2026-11-05 decision this entry builds | low | The "spines win" list names the Show toggles in Layers as a mock that is wrong; the coordinator's decision edit changed line 54 and missed line 23 | patch: line 23 brought in line with the decision |
 
+Quick lens, second pass after the owner's tabs (2026-11-05): 4 findings; high 0, medium 1, low 2, false 1, maybe-false 0.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| The whole-suite criterion has no run on the final tree (the last whole run predates the key comparison and the tabs) | false | Not a defect in the change: the plan's Verification runs on the coordinator's side after this review, on the patched tree, as for every entry | rejected |
+| The ER-27 engineering review is not flagged for the alarm glyph key moving in Edit mode, now two clicks away (rail Layers, then the Legend tab) | medium | `initiative-flowmap.md` puts the legend's glyph key in ER-27's scope; entry 21's comparable Edit-mode change has an open item in `docs/review-er27.md` section 4; this entry adds none | patch: an open item in the ER-27 record, a line in the CHANGELOG and the contract paragraph |
+| `studio.spec.mjs` (about 997-1004): the "gives the focus up" check cannot fail, so the blur of a focused, hidden Legend button is untested | low | The test opens the panel by keyboard, so the focus sits in the panel, whose DOM is removed on close; `activeElement` is then the body either way; the blur at `MapStudio.tsx` 562-564 is for the button itself focused with the panel closed | patch: the test focuses the closed Legend button before the scripted switch press |
+| `DESIGN.md` does not describe the change: its Edit-mode layout keeps the Legend, its Legend component names only the button, panel and sheet, nothing names the Layers surface or its tabs | low | Lines 451 and 503 read so; the decision commit edited only the toolbar, pill, drawing bar and toast entries; the CHANGELOG cites "DESIGN.md Legend" | patch: the Edit-mode layout and the Legend component brought in line |
+
 ## Verification
 
 **Commands:**
