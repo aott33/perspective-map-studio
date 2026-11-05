@@ -3,7 +3,7 @@ title: "The legend in the rail's Layers surface in Edit mode"
 type: 'feature'
 ticket: '22'
 created: '2026-11-05'
-status: 'in-review'
+status: 'built'
 baseline_revision: 'ad74df19dfaf65aa2b7152963d8f6c14b9088fd2'
 route: 'full'
 route_source: 'auto'
@@ -103,6 +103,8 @@ Quick lens, second pass after the owner's tabs (2026-11-05): 4 findings; high 0,
 | The ER-27 engineering review is not flagged for the alarm glyph key moving in Edit mode, now two clicks away (rail Layers, then the Legend tab) | medium | `initiative-flowmap.md` puts the legend's glyph key in ER-27's scope; entry 21's comparable Edit-mode change has an open item in `docs/review-er27.md` section 4; this entry adds none | patch: an open item in the ER-27 record, a line in the CHANGELOG and the contract paragraph |
 | `studio.spec.mjs` (about 997-1004): the "gives the focus up" check cannot fail, so the blur of a focused, hidden Legend button is untested | low | The test opens the panel by keyboard, so the focus sits in the panel, whose DOM is removed on close; `activeElement` is then the body either way; the blur at `MapStudio.tsx` 562-564 is for the button itself focused with the panel closed | patch: the test focuses the closed Legend button before the scripted switch press |
 | `DESIGN.md` does not describe the change: its Edit-mode layout keeps the Legend, its Legend component names only the button, panel and sheet, nothing names the Layers surface or its tabs | low | Lines 451 and 503 read so; the decision commit edited only the toolbar, pill, drawing bar and toast entries; the CHANGELOG cites "DESIGN.md Legend" | patch: the Edit-mode layout and the Legend component brought in line |
+
+After the patches (coordinator, 2026-11-05): `tsc` clean, 355 Jest tests green, Gradle build green offline, the contract check OK at 0.4.0, and the whole e2e suite on a fresh dev stack 143 passed, 7 skipped, 0 failed in 28.6 min. Nothing deferred.
 
 ## Verification
 
