@@ -19,6 +19,14 @@
  * hidden control counts as a target. The component owns the state; the control reports clicks and toggles
  * and reflects `setKey`, `setToggles`, `setOffered`, `setSelected` and `setStatus`. Token colours only, in
  * mapstudio.css.
+ *
+ * One legend, two places (epic 4 entry 22, the owner's render C of the legend review): in Edit mode the Legend
+ * button and its panel leave the map (the stylesheet hides the button from 768 px, the component closes an open
+ * panel as the studio comes on) and the rail's Layers surface hands the control a host (`dock`), which the same
+ * `fill` draws the desktop content into (the key, Show and Basemap) from the same state, so every setter redraws
+ * both, and a toggle or a basemap picked there goes through the same callbacks. The docked copy is never "open":
+ * it calls no `onToggle` (`data-legend-open`), `isOpen` is the panel's alone (a map click closes the panel only),
+ * it takes no focus when it is drawn and it keeps its own focused control across a redraw.
  */
 
 import { IControl, Map as MapLibreMap, ScaleControl } from 'maplibre-gl';
@@ -61,27 +69,45 @@ const PHONE_QUERY = '(max-width: 767px)';
 /** The scale bar's longest length, in px (DESIGN.md: the scale bar beside the Legend button). */
 export const SCALE_MAX_WIDTH_PX = 80;
 
+/**
+ * One place the legend's content is drawn (entry 22): the floating panel over the map, or the docked copy in the
+ * rail's Layers surface. Each holds its own controls and listeners; the state they show is the control's.
+ */
+interface LegendHost {
+    /** The element the content is drawn into: the panel itself, or the docked wrapper inside the Layers surface. */
+    root: HTMLDivElement;
+    /** The Layers surface's copy: always the desktop layout (no sheet, no handle or Close), never "open". */
+    docked: boolean;
+    body: HTMLDivElement | null;
+    basemapGroup: HTMLDivElement | null;
+    status: HTMLDivElement | null;
+    buttons: Map<BasemapId, HTMLButtonElement>;
+    checkboxes: Map<LegendToggle, HTMLInputElement>;
+    kindsButton: HTMLButtonElement | null;
+    closeButton: HTMLButtonElement | null;
+}
+
+function newHost(root: HTMLDivElement, docked: boolean): LegendHost {
+    return { root, docked, body: null, basemapGroup: null, status: null, buttons: new Map(), checkboxes: new Map(), kindsButton: null, closeButton: null };
+}
+
 export class LegendControl implements IControl {
     private container: HTMLDivElement | null = null;
     private button: HTMLButtonElement | null = null;
-    private panel: HTMLDivElement | null = null;
-    private basemapGroup: HTMLDivElement | null = null;
-    private status: HTMLDivElement | null = null;
-    private body: HTMLDivElement | null = null;
+    /** The floating panel while it is open, else null. */
+    private panel: LegendHost | null = null;
+    /** The docked copy while the Layers surface shows (entry 22), else null. */
+    private docked: LegendHost | null = null;
     private scale: ScaleControl | null = null;
     private phoneQuery: MediaQueryList | null = null;
     /** The viewer's choice for the Kinds section (null: the default for the count of kinds). */
     private kindsOpen: boolean | null = null;
-    private buttons = new Map<BasemapId, HTMLButtonElement>();
     private offered: BasemapId[] = [];
     private selected: BasemapId | null = null;
     private statusText = '';
     private panelId = 'mapstudio-legend-' + Math.random().toString(36).slice(2, 8);
     private key: LegendKey = EMPTY_KEY;
     private toggles: Record<LegendToggle, boolean> = { lines: true, names: true };
-    private checkboxes = new Map<LegendToggle, HTMLInputElement>();
-    private kindsButton: HTMLButtonElement | null = null;
-    private closeButton: HTMLButtonElement | null = null;
 
     constructor(private readonly onChoose: (id: BasemapId) => void, private readonly onToggle: (open: boolean) => void,
                 private readonly onSwitch: (toggle: LegendToggle, on: boolean) => void = () => undefined) {}
@@ -115,6 +141,7 @@ export class LegendControl implements IControl {
 
     onRemove(): void {
         this.close(false);
+        this.dock(null);
         if (this.button) {
             this.button.removeEventListener('click', this.handleToggle);
         }
@@ -152,9 +179,9 @@ export class LegendControl implements IControl {
         panel.setAttribute('role', 'region');
         panel.setAttribute('aria-label', 'Legend');
         this.container.insertBefore(panel, this.container.firstChild);
-        this.panel = panel;
+        this.panel = newHost(panel, false);
         this.button.setAttribute('aria-expanded', 'true');
-        this.fill();
+        this.fill(this.panel);
         // The panel follows the phone breakpoint while it is open (a rotated phone, a resized window).
         if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
             this.phoneQuery = window.matchMedia(PHONE_QUERY);
@@ -170,24 +197,71 @@ export class LegendControl implements IControl {
     }
 
     /**
-     * Draw the panel's contents (again): on a desktop the key in order States, Kinds, Lines, Styles, Areas, then Show
-     * and, with more than one basemap offered, Basemap; on a phone a sheet with a handle and a header, Show first, the
-     * key in two columns and no Basemap. The scroll position and the focused control survive a redraw.
+     * The docked copy in the rail's Layers surface (entry 22): with an element (the surface's host, as it mounts) the
+     * desktop content is drawn into a wrapper inside it, from the same state as the panel, and every setter redraws it;
+     * with null (the surface unmounting, Edit mode left) it leaves, its listeners taken off. It never takes the focus,
+     * calls no `onToggle` and does not count for `isOpen`.
      */
-    private fill(): void {
-        const panel = this.panel;
-        if (!panel) {
+    dock(host: HTMLElement | null): void {
+        const docked = this.docked;
+        if (docked && host && docked.root.parentNode === host) {
             return;
         }
-        const phone = this.isPhone();
-        const scroll = this.body ? this.body.scrollTop : 0;
+        if (docked) {
+            this.clearHandlers(docked);
+            if (docked.root.parentNode) {
+                docked.root.parentNode.removeChild(docked.root);
+            }
+            this.docked = null;
+        }
+        if (!host) {
+            return;
+        }
+        const root = document.createElement('div');
+        root.className = 'mapstudio-legend-dock';
+        host.appendChild(root);
+        this.docked = newHost(root, true);
+        this.fill(this.docked);
+    }
+
+    /** The places the content is drawn now: the open panel and the docked copy, each when it is there. */
+    private hosts(): LegendHost[] {
+        const hosts: LegendHost[] = [];
+        if (this.panel) {
+            hosts.push(this.panel);
+        }
+        if (this.docked) {
+            hosts.push(this.docked);
+        }
+        return hosts;
+    }
+
+    /** Draw every place again (a new key, the Kinds section opened or closed, the Basemap section appearing or going). */
+    private fillAll(): void {
+        for (const host of this.hosts()) {
+            this.fill(host);
+        }
+    }
+
+    /**
+     * Draw a place's contents (again): on a desktop and in the dock the key in order States, Kinds, Lines, Styles, Areas,
+     * then Show and, with more than one basemap offered, Basemap; the panel on a phone a sheet with a handle and a header,
+     * Show first, the key in two columns and no Basemap. The scroll position and the focused control survive a redraw,
+     * each place keeping its own (its focus keys are looked up inside it alone).
+     */
+    private fill(host: LegendHost): void {
+        const panel = host.root;
+        const phone = !host.docked && this.isPhone();
+        const scroll = host.body ? host.body.scrollTop : 0;
         const focused = document.activeElement instanceof HTMLElement && panel.contains(document.activeElement)
             ? document.activeElement.getAttribute('data-focus-key') : null;
-        this.clearHandlers();
+        this.clearHandlers(host);
         while (panel.firstChild) {
             panel.removeChild(panel.firstChild);
         }
-        panel.classList.toggle('mapstudio-legend-panel--sheet', phone);
+        if (!host.docked) {
+            panel.classList.toggle('mapstudio-legend-panel--sheet', phone);
+        }
         if (phone) {
             const handle = document.createElement('div');
             handle.className = 'mapstudio-legend-handle';
@@ -205,25 +279,25 @@ export class LegendControl implements IControl {
             close.setAttribute('aria-label', 'Close the legend');
             close.innerHTML = glyphSvg('close', 'mapstudio-ctrl-glyph');
             close.addEventListener('click', this.handleClose);
-            this.closeButton = close;
+            host.closeButton = close;
             header.appendChild(close);
             panel.appendChild(header);
         }
         const body = document.createElement('div');
         body.className = 'mapstudio-legend-body';
         panel.appendChild(body);
-        this.body = body;
+        host.body = body;
         if (phone) {
             // The sheet leads with what a viewer changes: Show (the Lines and Names toggles); no basemap section.
-            this.renderShow(body);
+            this.renderShow(host, body);
             const columns = document.createElement('div');
             columns.className = 'mapstudio-legend-columns';
             body.appendChild(columns);
-            this.renderKey(columns);
+            this.renderKey(host, columns);
         } else {
             // Sections in order: the key in the map's words (States first), Show, then Basemap when there is a choice.
-            this.renderKey(body);
-            this.renderShow(body);
+            this.renderKey(host, body);
+            this.renderShow(host, body);
             if (offersBasemapSwitch(this.offered)) {
                 const basemap = this.section(body, 'Basemap', 'mapstudio-legend-section--basemap');
                 const group = document.createElement('div');
@@ -235,10 +309,10 @@ export class LegendControl implements IControl {
                 status.className = 'mapstudio-basemap-status';
                 status.setAttribute('role', 'status');
                 basemap.appendChild(status);
-                this.basemapGroup = group;
-                this.status = status;
-                this.renderBasemaps();
-                this.renderStatus();
+                host.basemapGroup = group;
+                host.status = status;
+                this.renderBasemaps(host);
+                this.renderStatus(host);
             }
         }
         body.scrollTop = scroll;
@@ -250,39 +324,39 @@ export class LegendControl implements IControl {
         }
     }
 
-    /** Take the listeners off the panel's controls before it is drawn again or removed. */
-    private clearHandlers(): void {
-        this.buttons.forEach((button) => button.removeEventListener('click', this.handleChoose));
-        this.buttons.clear();
-        this.checkboxes.forEach((box) => box.removeEventListener('change', this.handleSwitch));
-        this.checkboxes.clear();
-        if (this.kindsButton) {
-            this.kindsButton.removeEventListener('click', this.handleKinds);
-            this.kindsButton = null;
+    /** Take the listeners off a place's controls before it is drawn again or removed. */
+    private clearHandlers(host: LegendHost): void {
+        host.buttons.forEach((button) => button.removeEventListener('click', this.handleChoose));
+        host.buttons.clear();
+        host.checkboxes.forEach((box) => box.removeEventListener('change', this.handleSwitch));
+        host.checkboxes.clear();
+        if (host.kindsButton) {
+            host.kindsButton.removeEventListener('click', this.handleKinds);
+            host.kindsButton = null;
         }
-        if (this.closeButton) {
-            this.closeButton.removeEventListener('click', this.handleClose);
-            this.closeButton = null;
+        if (host.closeButton) {
+            host.closeButton.removeEventListener('click', this.handleClose);
+            host.closeButton = null;
         }
-        this.basemapGroup = null;
-        this.status = null;
+        host.basemapGroup = null;
+        host.status = null;
     }
 
     /** Close the panel; with `focusButton` the Legend button takes the focus back (Esc). */
     close(focusButton: boolean): void {
-        if (!this.panel) {
+        const panel = this.panel;
+        if (!panel) {
             return;
         }
-        this.clearHandlers();
+        this.clearHandlers(panel);
         if (this.phoneQuery) {
             this.phoneQuery.removeEventListener('change', this.handleBreakpoint);
             this.phoneQuery = null;
         }
-        if (this.panel.parentNode) {
-            this.panel.parentNode.removeChild(this.panel);
+        if (panel.root.parentNode) {
+            panel.root.parentNode.removeChild(panel.root);
         }
         this.panel = null;
-        this.body = null;
         if (this.button) {
             this.button.setAttribute('aria-expanded', 'false');
             if (focusButton) {
@@ -299,43 +373,53 @@ export class LegendControl implements IControl {
         }
         const before = offersBasemapSwitch(this.offered);
         this.offered = offered.slice();
-        if (this.panel && before !== offersBasemapSwitch(this.offered)) {
-            // The section appears or goes: the panel is drawn again.
-            this.fill();
-        } else {
-            this.renderBasemaps();
+        const sectionChanged = before !== offersBasemapSwitch(this.offered);
+        for (const host of this.hosts()) {
+            if (sectionChanged) {
+                // The section appears or goes: the place is drawn again.
+                this.fill(host);
+            } else {
+                this.renderBasemaps(host);
+            }
         }
     }
 
     setSelected(id: BasemapId | null): void {
         this.selected = id;
-        this.buttons.forEach((button, key) => {
-            const on = key === id;
-            button.setAttribute('aria-pressed', on ? 'true' : 'false');
-            button.classList.toggle('mapstudio-basemap-button--on', on);
-        });
+        for (const host of this.hosts()) {
+            this.markSelected(host);
+        }
     }
 
     /** The plain-words status under the basemap buttons, or '' for none. */
     setStatus(text: string): void {
         this.statusText = text;
-        this.renderStatus();
+        for (const host of this.hosts()) {
+            this.renderStatus(host);
+        }
     }
 
-    /** The key of what the map draws (legend.ts); an open panel is drawn again. */
+    /** The key of what the map draws (legend.ts); an open panel and the docked copy are drawn again. */
     setKey(key: LegendKey): void {
         this.key = key;
-        this.fill();
+        this.fillAll();
     }
 
     /** The Lines and Names toggles' state (the component remembers them). */
     setToggles(lines: boolean, names: boolean): void {
         this.toggles = { lines, names };
-        this.checkboxes.forEach((box, toggle) => { box.checked = this.toggles[toggle]; });
+        this.syncCheckboxes();
+    }
+
+    /** Every place's checkboxes as the toggles are. */
+    private syncCheckboxes(): void {
+        for (const host of this.hosts()) {
+            host.checkboxes.forEach((box, toggle) => { box.checked = this.toggles[toggle]; });
+        }
     }
 
     /** The key's sections: States, Kinds, Lines, and Styles and Areas when a kind setup turns them on. */
-    private renderKey(panel: HTMLElement): void {
+    private renderKey(host: LegendHost, panel: HTMLElement): void {
         const key = this.key;
         if (key.states.length > 0) {
             const states = this.section(panel, 'States', 'mapstudio-legend-section--states');
@@ -362,7 +446,7 @@ export class LegendControl implements IControl {
                 button.innerHTML = '<span>' + heading.textContent + '</span>' + glyphSvg('chevron', 'mapstudio-ctrl-glyph mapstudio-legend-chevron');
                 button.addEventListener('click', this.handleKinds);
                 kinds.replaceChild(button, heading);
-                this.kindsButton = button;
+                host.kindsButton = button;
             }
             if (open) {
                 for (const kind of key.kinds) {
@@ -423,7 +507,7 @@ export class LegendControl implements IControl {
     }
 
     /** The Show section: the Lines and Names checkboxes and the zoom 14 note. */
-    private renderShow(panel: HTMLElement): void {
+    private renderShow(host: LegendHost, panel: HTMLElement): void {
         const show = this.section(panel, 'Show', 'mapstudio-legend-section--show');
         const group = document.createElement('div');
         group.className = 'mapstudio-legend-toggles';
@@ -442,7 +526,7 @@ export class LegendControl implements IControl {
             words.textContent = toggle === 'lines' ? 'Lines' : 'Names';
             label.appendChild(words);
             group.appendChild(label);
-            this.checkboxes.set(toggle, box);
+            host.checkboxes.set(toggle, box);
         }
         show.appendChild(group);
         const note = document.createElement('div');
@@ -476,13 +560,13 @@ export class LegendControl implements IControl {
         return section;
     }
 
-    private renderBasemaps(): void {
-        const group = this.basemapGroup;
+    private renderBasemaps(host: LegendHost): void {
+        const group = host.basemapGroup;
         if (!group) {
             return;
         }
-        this.buttons.forEach((button) => button.removeEventListener('click', this.handleChoose));
-        this.buttons.clear();
+        host.buttons.forEach((button) => button.removeEventListener('click', this.handleChoose));
+        host.buttons.clear();
         while (group.firstChild) {
             group.removeChild(group.firstChild);
         }
@@ -497,25 +581,34 @@ export class LegendControl implements IControl {
             button.textContent = BASEMAP_LABELS[id];
             button.addEventListener('click', this.handleChoose);
             group.appendChild(button);
-            this.buttons.set(id, button);
+            host.buttons.set(id, button);
         }
-        this.setSelected(this.selected);
+        this.markSelected(host);
     }
 
-    private renderStatus(): void {
-        if (this.status) {
-            this.status.textContent = this.statusText;
-            this.status.hidden = this.statusText === '';
+    /** A place's basemap buttons pressed as the selection is. */
+    private markSelected(host: LegendHost): void {
+        host.buttons.forEach((button, key) => {
+            const on = key === this.selected;
+            button.setAttribute('aria-pressed', on ? 'true' : 'false');
+            button.classList.toggle('mapstudio-basemap-button--on', on);
+        });
+    }
+
+    private renderStatus(host: LegendHost): void {
+        if (host.status) {
+            host.status.textContent = this.statusText;
+            host.status.hidden = this.statusText === '';
         }
     }
 
-    /** The Kinds heading opens or closes the kinds (a long list starts closed, item 24). */
+    /** The Kinds heading opens or closes the kinds (a long list starts closed, item 24), in every place alike. */
     private handleKinds = (ev: MouseEvent): void => {
         ev.preventDefault();
         ev.stopPropagation();
-        const open = this.kindsButton ? this.kindsButton.getAttribute('aria-expanded') !== 'true' : true;
-        this.kindsOpen = open;
-        this.fill();
+        const button = ev.currentTarget as HTMLElement | null;
+        this.kindsOpen = button ? button.getAttribute('aria-expanded') !== 'true' : true;
+        this.fillAll();
     };
 
     /** The phone sheet's Close button. */
@@ -527,7 +620,9 @@ export class LegendControl implements IControl {
 
     /** The window crossed the phone breakpoint with the panel open: sheet or card, drawn again. */
     private handleBreakpoint = (): void => {
-        this.fill();
+        if (this.panel) {
+            this.fill(this.panel);
+        }
     };
 
     private handleToggle = (ev: MouseEvent): void => {
@@ -554,6 +649,8 @@ export class LegendControl implements IControl {
         const toggle = box.getAttribute('data-toggle') as LegendToggle | null;
         if (toggle === 'lines' || toggle === 'names') {
             this.toggles[toggle] = box.checked;
+            // One legend: the other place shows the same.
+            this.syncCheckboxes();
             this.onSwitch(toggle, box.checked);
         }
     };

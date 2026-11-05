@@ -190,7 +190,8 @@ export function onMapClick(host: SelectionHost, ev: MapMouseEvent): void {
         // A tool in hand (the Point, Line or Area tool; entries 2 and 4) owns the click.
         return;
     }
-    // A click on the map closes the legend panel (entry 14) and the Needs you list (entry 3).
+    // A click on the map closes the legend panel (entry 14) and the Needs you list (entry 3); the legend docked in the
+    // rail's Layers surface is never open (epic 4 entry 22), so it stays.
     if (host.legendControl && host.legendControl.isOpen()) {
         host.legendControl.close(false);
     }

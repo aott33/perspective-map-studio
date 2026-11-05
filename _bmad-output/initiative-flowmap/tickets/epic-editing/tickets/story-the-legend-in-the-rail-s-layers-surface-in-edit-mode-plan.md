@@ -56,11 +56,11 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `web/typescript/LegendControl.ts` -- a docked host the content draws into and leaves (desktop layout, its own focus keys, no `onToggle`, not `isOpen`), redrawn by every setter -- one legend, two places.
-- [ ] `web/typescript/MapStudio.tsx` -- the Layers surface renders the dock's host and hands it to the control as it mounts and unmounts; the floating panel closes as the studio comes on.
-- [ ] `web/typescript/mapstudio.css` -- the Legend button hidden in Edit mode from 768 px, the scale bar kept; the docked legend's look in the dock (no card, full width, scrolling with the dock).
-- [ ] `e2e/tests/studio.spec.mjs` -- the matrix at 1366 px (and the Layers surface at 1440 px), the old "Legend button stays" check reversed; a render of the Layers surface under `E2E_DOCS=1`.
-- [ ] `docs/contract.md`, `CHANGELOG.md` -- the legend in Layers in Edit mode, its test hooks.
+- [x] `web/typescript/LegendControl.ts` -- a docked host the content draws into and leaves (desktop layout, its own focus keys, no `onToggle`, not `isOpen`), redrawn by every setter -- one legend, two places.
+- [x] `web/typescript/MapStudio.tsx` -- the Layers surface renders the dock's host and hands it to the control as it mounts and unmounts; the floating panel closes as the studio comes on.
+- [x] `web/typescript/mapstudio.css` -- the Legend button hidden in Edit mode from 768 px, the scale bar kept; the docked legend's look in the dock (no card, full width, scrolling with the dock).
+- [x] `e2e/tests/studio.spec.mjs` -- the matrix at 1366 px (and the Layers surface at 1440 px), the old "Legend button stays" check reversed; a render of the Layers surface under `E2E_DOCS=1`.
+- [x] `docs/contract.md`, `CHANGELOG.md` -- the legend in Layers in Edit mode, its test hooks.
 
 **Acceptance Criteria:**
 - Given the dev Gateway as `mapeditor`, when the matrix runs in `studio.spec.mjs`, then each row holds.
@@ -72,6 +72,14 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 - Planner, 2026-11-05: the environment, commit and identity rules are entry 4's plan's (Docker started by hand after a container restart, `ops/up.sh --fresh` before a whole-suite run, the two trailer lines from the session's attribution reminder, no em dashes, no model identifier, never a bare `git stash`, never a push).
 
 ## Plan Change Log
+
+- 2026-11-05 (implementer): no change to the frozen intent. Readings and small additions, for the reviewer:
+  - One legend, two places (`LegendControl.ts`): the state (key, toggles, offered and selected basemaps, the status text and the Kinds disclosure) stays the control's, once; the panel and the docked copy are two `LegendHost`s, each with its own controls and listeners, which the same `fill` draws (the docked one always the desktop layout). Every setter redraws or updates both; a toggle in one place sets the other's checkbox too. `dock(el)` appends a wrapper `.mapstudio-legend-dock` to a child-less React element (`.mapstudio-dock-legend`, handed over through a ref callback as the Layers surface mounts, `dock(null)` as it unmounts; also in `componentDidMount` and `onRemove`), so React never renders into what the control draws. Each rail surface's section is keyed, so Kinds to Layers remounts instead of React reusing the note's `div` as the host.
+  - Its own focus keys: the same `data-focus-key` values, looked up inside each host alone, so each keeps its own focused control across a redraw; the dock takes no focus when drawn.
+  - As the studio comes on (`applyTopBar`), the focus leaves the Legend as it leaves the top bar, then an open panel closes (`close(false)`, so `data-legend-open` reads false); the map click (`selection.tsx`) still closes the panel only, since `isOpen` is the panel's (a comment there says so).
+  - `docs/basemaps.md` (not in the Code Map, one sentence): it said Edit mode's Layers "keeps its own switch when epic-editing builds it" (owner, 2026-10-28); render C makes it this same legend and switch, so the sentence now says so.
+  - Camera padding (not changed, noted): in Edit mode the bottom-left row is the 18 px scale bar alone instead of the 32 px button, so `cameraPadding`'s bottom inset there is 14 px smaller and a row pick centres 7 px lower; no spec measures it in Edit mode.
+  - The renders: beside `mapstudio-studio-layers-1366.png` and `-1440.png`, `mapstudio-studio-layers-end-1366.png` and `-1440.png` scrolled to the dock's end, so Show and Basemap are in view for the owner's comparison with render C. The basemap row stubs the OpenStreetMap tiles as `basemaps.spec.mjs` does (a local copy of its stub: the box may not reach the provider), and serves broken tiles for the status row. The 390 px row is a new test in the 390 px block.
 
 ## Review Triage Log
 

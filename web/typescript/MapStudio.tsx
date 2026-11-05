@@ -247,6 +247,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     popupAnchor: PopupAnchor | null = null;
     /** The legend bottom-left, which holds the basemap choice (epic 3 entries 6 and 14), and the basemap revision last drawn. */
     legendControl: LegendControl | null = null;
+    /** The rail's Layers surface's host for the docked legend (epic 4 entry 22) while it is mounted, else null. */
+    private layersHost: HTMLDivElement | null = null;
     /** The Mapbox logo control, bottom-right, while Satellite is drawn. */
     logoControl: MapboxLogoControl | null = null;
     drawnBasemap = -1;
@@ -303,6 +305,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.searchControl = controls.search;
         this.needsYouControl = controls.needsYou;
         this.legendControl = controls.legend;
+        if (this.layersHost) {
+            // The Layers surface mounted before the control existed (entry 22): the docked legend is drawn into it now.
+            this.legendControl.dock(this.layersHost);
+        }
         // Mapbox's "Improve this map" carries the map's position (its attribution guide): after the control
         // rebuilds its links (its listeners run first) and after every move.
         map.on('sourcedata', this.updateFeedbackLinks);
@@ -529,20 +535,23 @@ export class MapStudio extends Component<Props, MapStudioState> {
     }
 
     /**
-     * The View-mode top bar while the studio shows (entry 21; DESIGN.md Edit mode, Direction A): the stylesheet hides
-     * the search field and the Needs you bar under `mapstudio--editing` (the search is the Items list's there) and the
-     * toolbar takes the top row. As the studio comes on, however it came (the switch, the page's prop, the level
-     * arriving), an open search or Needs you list closes and the focus leaves the bar, so nothing is open behind the
-     * hidden bar and nothing comes back open when Edit mode is left; the focus no longer returns to a bar that is hidden.
+     * The View-mode top bar and Legend while the studio shows (entries 21 and 22; DESIGN.md Edit mode, Direction A): the
+     * stylesheet hides the search field and the Needs you bar under `mapstudio--editing` (the search is the Items list's
+     * there) and the toolbar takes the top row, and hides the Legend button (the legend is the rail's Layers surface
+     * there; the scale bar stays). As the studio comes on, however it came (the switch, the page's prop, the level
+     * arriving), an open search or Needs you list and an open Legend panel close and the focus leaves the bar and the
+     * legend, so nothing is open behind a hidden control and nothing comes back open when Edit mode is left; the focus
+     * no longer returns to a control that is hidden.
      */
     private applyTopBar(): void {
         const on = this.studioOn();
         if (on && !this.studioWasOn) {
-            // A field or the bar keeping the focus while hidden (the page's prop turned Edit mode on) would take keys
-            // and open its list behind the hidden bar: the focus leaves it first.
+            // A field, the bar or the Legend keeping the focus while hidden (the page's prop turned Edit mode on) would take
+            // keys and open its list or panel behind the hidden control: the focus leaves it first.
             const active = typeof document !== 'undefined' ? document.activeElement as HTMLElement | null : null;
             const topbar = this.mapContainer ? this.mapContainer.querySelector('.mapstudio-topbar') : null;
-            if (active && topbar && topbar.contains(active) && typeof active.blur === 'function') {
+            const legend = this.mapContainer ? this.mapContainer.querySelector('.mapstudio-legend') : null;
+            if (active && ((topbar && topbar.contains(active)) || (legend && legend.contains(active))) && typeof active.blur === 'function') {
                 active.blur();
             }
             if (this.searchControl) {
@@ -550,6 +559,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
             }
             if (this.needsYouControl) {
                 this.needsYouControl.close(false);
+            }
+            if (this.legendControl) {
+                this.legendControl.close(false);
             }
             this.openedBy = null;
         }
@@ -1056,19 +1068,41 @@ export class MapStudio extends Component<Props, MapStudioState> {
         );
     }
 
-    /** The rail's surface (entry 2): the item list with the panel header, or an empty Kinds or Layers surface until their entries. */
+    /**
+     * The Layers surface's host for the docked legend (entry 22), handed to the legend control as it mounts and taken back
+     * (null) as it unmounts; the control draws into it and React renders nothing inside it.
+     */
+    private setLayersHost = (el: HTMLDivElement | null): void => {
+        this.layersHost = el;
+        if (this.legendControl) {
+            this.legendControl.dock(el);
+        }
+    };
+
+    /**
+     * The rail's surface (entry 2): the item list with the panel header; Layers, the legend's desktop content docked
+     * (entry 22: the key, Show and Basemap, drawn by the legend control from the panel's own state); or the empty Kinds
+     * surface until its entry. Each surface is keyed, so switching remounts it and the legend's host comes and goes whole.
+     */
     private renderDock(delegate: MapStudioDelegateState): React.ReactNode {
         const surface = this.state.studio.surface;
-        if (surface !== 'items') {
-            const title = surface === 'kinds' ? 'Kinds' : 'Layers';
+        if (surface === 'layers') {
             return (
-                <section className="mapstudio-dock mapstudio-dock--empty" aria-label={title} data-surface={surface}>
+                <section key="layers" className="mapstudio-dock mapstudio-dock--layers" aria-label="Layers" data-surface="layers">
                     <header className="mapstudio-dock-header">
-                        <div className="mapstudio-dock-title-row"><h2 className="mapstudio-dock-title">{title}</h2></div>
+                        <div className="mapstudio-dock-title-row"><h2 className="mapstudio-dock-title">Layers</h2></div>
                     </header>
-                    <div className="mapstudio-dock-note">
-                        Nothing here yet. {surface === 'kinds' ? 'The kind setup screen comes in a later entry.' : 'The basemap switch comes in a later entry.'}
-                    </div>
+                    <div className="mapstudio-dock-legend" ref={this.setLayersHost} />
+                </section>
+            );
+        }
+        if (surface === 'kinds') {
+            return (
+                <section key="kinds" className="mapstudio-dock mapstudio-dock--empty" aria-label="Kinds" data-surface="kinds">
+                    <header className="mapstudio-dock-header">
+                        <div className="mapstudio-dock-title-row"><h2 className="mapstudio-dock-title">Kinds</h2></div>
+                    </header>
+                    <div className="mapstudio-dock-note">Nothing here yet. The kind setup screen comes in a later entry.</div>
                 </section>
             );
         }

@@ -10,12 +10,19 @@
 // entry closes; the Items list's Search items field filters the rows, Esc and Clear bring them back with the
 // selection kept, and a filtered row picked is a row click; at 1200 px, below the list's collapse width, the toolbar
 // stays on the row under the Editing switch; at 390 px the editor keeps View mode's top bar.
+// The legend in the rail's Layers surface (entry 22, the owner's render C of the legend review): in Edit mode no Legend
+// button over the map and the scale bar bottom-left alone; Layers holds the panel's own content (the key, Show and Basemap)
+// in the dock, and a map click leaves it; Lines turned off there hides the lines, stays off after a reload and shows off
+// in View mode's panel; a basemap picked there switches the map, is remembered and says its tile status there as the panel
+// does; a panel open as Edit mode comes on closes, and leaving Edit mode brings the Legend button back; at 390 px the
+// Legend sheet is as before.
 // Screenshots at 1366 and 1440 px for the docs (AD-15).
 
 import { TRACER, pagePixel } from '../lib/geo.mjs';
 import { randomUUID } from 'node:crypto';
 import {
-    EDITOR_USER, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, openMap, removeStrays, send, shot, signedInContext, test, view, watch
+    DRAW_MS, EDITOR_USER, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, openMap, removeStrays, send, shot, signedInContext, test, view,
+    watch
 } from './fixtures.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -447,8 +454,10 @@ for (const [width, height, listWidth, panelWidth] of [[1366, 768, 256, 320], [14
                 await expect(page.locator('.mapstudio-search-field')).toBeHidden();
                 await expect(page.locator('.mapstudio-needs')).toBeHidden();
                 await expect(page.locator('.mapstudio-list-search-input')).toBeVisible();
-                // The Legend button stays where it was (owner: it stays until decided).
-                await expect(page.locator('.mapstudio-legend-button')).toBeVisible();
+                // The Legend button leaves the map in Edit mode (entry 22, the owner's render C): the legend is the rail's
+                // Layers there, and the scale bar stays bottom-left.
+                await expect(page.locator('.mapstudio-legend-button')).toBeHidden();
+                await expect(page.locator('.mapstudio-legend-row .maplibregl-ctrl-scale')).toBeVisible();
 
                 // The properties panel docked: a row's Details, the map the rest of the component.
                 const p2 = seed.ids[TRACER.points.p2.key];
@@ -702,8 +711,309 @@ test.describe('1200 px, below the list\'s collapse width', () => {
         });
 });
 
+// ---- The legend in the rail's Layers surface (entry 22) ----
+
+const legendButton = (page) => page.locator('.mapstudio-legend-button');
+const legendPanel = (page) => page.locator('.mapstudio-legend-panel');
+/** The legend docked in the rail's Layers surface (the control's wrapper inside the dock). */
+const docked = (page) => page.locator('.mapstudio-dock--layers .mapstudio-legend-dock');
+/** How long a basemap change (a Gateway round trip, the tiles' first idle) may take on the dev stack (basemaps.spec.mjs). */
+const CHANGE_MS = 30_000;
+/** A 1 by 1 PNG, served for every OpenStreetMap tile as basemaps.spec.mjs serves them (the box may not reach the provider). */
+const TILE_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+const OSM_TILES = /^https:\/\/tile\.openstreetmap\.org\//;
+const TILES_FAILED = 'OpenStreetMap tiles are not loading; check the network.';
+
+/**
+ * Serve the stub tile for OpenStreetMap; with `broken` set on the returned object the tiles come back as bytes that are not
+ * an image, so a tile fails inside MapLibre (its error event) with no network error of the browser's own (basemaps.spec.mjs).
+ */
+async function stubOsmTiles(page) {
+    const tiles = { broken: false };
+    await page.route(OSM_TILES, (route) => route.fulfill({ status: 200, contentType: 'image/png',
+        body: tiles.broken ? Buffer.from('not a png') : TILE_PNG }));
+    return tiles;
+}
+
+/** The rail's Layers: the surface switched, the docked legend drawn. */
+async function openLayers(page, map) {
+    await page.locator('.mapstudio-rail-item[data-surface="layers"]').click();
+    await expect(map).toHaveAttribute('data-surface', 'layers');
+    await expect(page.locator('.mapstudio-rail-item[data-surface="layers"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(docked(page)).toBeVisible();
+}
+
+/** What a place of the legend shows: its headings, its key's words, its toggles and its basemap buttons with their state. */
+async function legendContent(root) {
+    return {
+        headings: await root.locator('.mapstudio-legend-heading').allTextContents(),
+        words: await root.locator('.mapstudio-legend-key-words').allTextContents(),
+        toggles: await root.locator('.mapstudio-legend-toggle').evaluateAll((els) => els.map((el) => el.getAttribute('data-toggle') + ':' + el.checked)),
+        basemaps: await root.locator('.mapstudio-basemap-button').evaluateAll((els) => els.map((el) => el.getAttribute('data-basemap') + ':'
+            + el.getAttribute('aria-pressed'))),
+        note: await root.locator('.mapstudio-legend-note').allTextContents()
+    };
+}
+
+for (const [width, height, listWidth] of [[1366, 768, 256], [1440, 900, 280]]) {
+    test.describe(width + ' px, the legend in Layers', () => {
+        test.use({ viewport: { width, height }, deviceScaleFactor: 1 });
+
+        editorTest('in Edit mode no Legend button over the map and the scale bar bottom-left alone; the rail\'s Layers holds the panel\'s key, Show and Basemap, docked, and a map click leaves it',
+            async ({ page }) => {
+                const map = await openEditor(page);
+                await expect(map).toHaveAttribute('data-studio', 'on');
+                // The key's Styles and Areas come with the first full batch's kind display.
+                await expect(map).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
+                // No Legend button and no panel over the map; the scale bar alone at the map inset, bottom-left.
+                await expect(legendButton(page)).toBeHidden();
+                await expect(legendPanel(page)).toHaveCount(0);
+                await expect(map).toHaveAttribute('data-legend-open', 'false');
+                const box = await map.boundingBox();
+                const scale = page.locator('.mapstudio-legend-row .maplibregl-ctrl-scale');
+                await expect(scale).toBeVisible();
+                const scaleBox = await scale.boundingBox();
+                expect(Math.abs(scaleBox.x - (box.x + INSET)), 'the scale bar at the map inset from the left edge').toBeLessThanOrEqual(1);
+                expect(Math.abs((box.y + box.height) - (scaleBox.y + scaleBox.height) - INSET), 'and from the bottom edge').toBeLessThanOrEqual(1);
+
+                // Layers: the dock titled Layers, as wide as the list, the legend's desktop content in it and nothing else.
+                await openLayers(page, map);
+                const dock = page.locator('.mapstudio-dock--layers');
+                await expect(dock.locator('.mapstudio-dock-title')).toHaveText('Layers');
+                await expect(dock.locator('.mapstudio-dock-note')).toHaveCount(0);
+                await expect(page.locator('.mapstudio-dock--empty')).toHaveCount(0);
+                const dockBox = await dock.boundingBox();
+                expect(Math.round(dockBox.width)).toBe(listWidth);
+                const legend = docked(page);
+                const headings = await legend.locator('.mapstudio-legend-heading').allTextContents();
+                console.log(width + ' px: Layers holds ' + headings.join(', '));
+                expect(headings[0], 'States first').toBe('States');
+                expect(headings, 'the line looks').toContain('Lines');
+                expect(headings.slice(-2), 'Show, then Basemap (the dev setup lists three)').toEqual(['Show', 'Basemap']);
+                await expect(legend.locator('.mapstudio-legend-state')).toHaveCount(6);
+                await expect(legend.locator('.mapstudio-legend-toggle[data-toggle="lines"]')).toBeChecked();
+                await expect(legend.locator('.mapstudio-legend-toggle[data-toggle="names"]')).toBeChecked();
+                await expect(legend.locator('.mapstudio-legend-note')).toHaveText('Below zoom 14 sites show as dots');
+                await expect(legend.locator('.mapstudio-basemap-button')).toHaveCount(3);
+                await expect(legend.locator('.mapstudio-basemap-button[data-basemap="none"]')).toHaveAttribute('aria-pressed', 'true');
+                // The desktop layout (no sheet handle or Close), and never "open": the attribute stays the panel's.
+                await expect(legend.locator('.mapstudio-legend-handle, .mapstudio-legend-close')).toHaveCount(0);
+                await expect(map).toHaveAttribute('data-legend-open', 'false');
+                // Docked, not a card: no shadow or corner, the dock's width less its edge, under the header, its body scrolling
+                // inside the dock.
+                const look = await legend.evaluate((el) => ({
+                    shadow: getComputedStyle(el).boxShadow,
+                    radius: getComputedStyle(el).borderTopLeftRadius,
+                    scrolls: getComputedStyle(el.querySelector('.mapstudio-legend-body')).overflowY
+                }));
+                expect(look).toEqual({ shadow: 'none', radius: '0px', scrolls: 'auto' });
+                const legendBox = await legend.boundingBox();
+                const header = await dock.locator('.mapstudio-dock-header').boundingBox();
+                expect(legendBox.y, 'under the header').toBeGreaterThanOrEqual(header.y + header.height - 1);
+                expect(Math.abs(legendBox.x - dockBox.x), 'from the dock\'s left edge').toBeLessThanOrEqual(1);
+                expect(Math.abs(legendBox.width - (dockBox.width - 1)), 'as wide as the dock less its edge').toBeLessThanOrEqual(1);
+                expect(legendBox.y + legendBox.height, 'inside the dock').toBeLessThanOrEqual(dockBox.y + dockBox.height + 1);
+                await view(page, map, TRACER.center, TRACER.zoom);
+                await shot(page, 'mapstudio-studio-layers-' + width + '.png');
+                // Scrolled to its end inside the dock: Show and Basemap in view, the header staying.
+                await legend.locator('.mapstudio-legend-body').evaluate((el) => { el.scrollTop = el.scrollHeight; });
+                await expect(legend.locator('.mapstudio-legend-section--basemap')).toBeInViewport();
+                await expect(dock.locator('.mapstudio-dock-title')).toBeInViewport();
+                await shot(page, 'mapstudio-studio-layers-end-' + width + '.png');
+                await legend.locator('.mapstudio-legend-body').evaluate((el) => { el.scrollTop = 0; });
+
+                // Clicks on the map with Layers showing (a marker, then the ground): the popup opens and closes, the dock's
+                // legend stays as it was.
+                const content = await legendContent(legend);
+                await view(page, map, TRACER.points.p1.lngLat, 15);
+                const [x, y] = await pixelNow(map, TRACER.points.p1.lngLat);
+                await page.mouse.click(x, y);
+                await expect(map).toHaveAttribute('data-popup-mode', 'card');
+                await expect(legend).toBeVisible();
+                const ground = await groundSpot(page, map);
+                await page.mouse.click(ground[0], ground[1]);
+                await expect(map).toHaveAttribute('data-popup-mode', '');
+                await expect(map).toHaveAttribute('data-selected', '');
+                await expect(legend).toBeVisible();
+                expect(await legendContent(legend)).toEqual(content);
+                await expect(map).toHaveAttribute('data-legend-open', 'false');
+
+                // One legend: View mode's panel draws the same content from the same state.
+                await page.locator('.mapstudio-edit-switch-button').click();
+                await expect(map).toHaveAttribute('data-studio', 'off');
+                await expect(page.locator('.mapstudio-legend-dock')).toHaveCount(0);
+                await expect(legendButton(page)).toBeVisible();
+                await legendButton(page).click();
+                await expect(legendPanel(page)).toBeVisible();
+                expect(await legendContent(legendPanel(page))).toEqual(content);
+            });
+    });
+}
+
+test.describe('1366 px, the legend in Layers acts as the panel does', () => {
+    test.use({ viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1 });
+
+    editorTest('Lines turned off in Layers hide the lines, stay off after a reload and show off in View mode\'s panel; turned on there, on in Layers',
+        async ({ page }) => {
+            let map = await openEditor(page);
+            await view(page, map, TRACER.center, TRACER.zoom);
+            await openLayers(page, map);
+            const lines = docked(page).locator('.mapstudio-legend-toggle[data-toggle="lines"]');
+            const names = docked(page).locator('.mapstudio-legend-toggle[data-toggle="names"]');
+            await expect(map).toHaveAttribute('data-lines', 'on');
+            await expect(map).toHaveAttribute('data-lines-drawn', /^[1-9][0-9]*$/, { timeout: DRAW_MS });
+            await lines.click();
+            await expect(lines).not.toBeChecked();
+            await expect(map).toHaveAttribute('data-lines', 'off');
+            await expect.poll(() => map.getAttribute('data-lines-drawn'), { timeout: DRAW_MS }).toBe('0');
+            await expect(names).toBeChecked();
+            await expect(map).toHaveAttribute('data-names', 'on');
+
+            // Remembered for the session as the panel's toggles are: after a reload the lines are still off.
+            await page.reload();
+            map = await openEditor(page);
+            await expect(map).toHaveAttribute('data-lines', 'off');
+            await expect(map).toHaveAttribute('data-names', 'on');
+            await openLayers(page, map);
+            await expect(lines).not.toBeChecked();
+            await expect(names).toBeChecked();
+
+            // View mode's panel shows them as Layers left them; Lines on from the panel is on in Layers again.
+            await page.locator('.mapstudio-edit-switch-button').click();
+            await expect(map).toHaveAttribute('data-studio', 'off');
+            await legendButton(page).click();
+            const panelLines = legendPanel(page).locator('.mapstudio-legend-toggle[data-toggle="lines"]');
+            await expect(panelLines).not.toBeChecked();
+            await expect(legendPanel(page).locator('.mapstudio-legend-toggle[data-toggle="names"]')).toBeChecked();
+            await panelLines.click();
+            await expect(map).toHaveAttribute('data-lines', 'on');
+            await page.locator('.mapstudio-edit-switch-button').click();
+            await expect(map).toHaveAttribute('data-studio', 'on');
+            await openLayers(page, map);
+            await expect(lines).toBeChecked();
+            await expect.poll(() => map.getAttribute('data-lines-drawn'), { timeout: DRAW_MS }).not.toBe('0');
+        });
+
+    editorTest('a basemap picked in Layers switches the map and is remembered as from the panel; a tile status is said there in words, as in the panel',
+        async ({ page }) => {
+            const tiles = await stubOsmTiles(page);
+            let map = await openEditor(page);
+            await openLayers(page, map);
+            const pick = (id) => docked(page).locator('.mapstudio-basemap-button[data-basemap="' + id + '"]');
+            const status = docked(page).locator('.mapstudio-basemap-status');
+            await expect(map).toHaveAttribute('data-basemap-offered', 'none,osm,satellite');
+            await expect(map).toHaveAttribute('data-basemap', 'none');
+            await expect(pick('none')).toHaveAttribute('aria-pressed', 'true');
+            await pick('osm').click();
+            await expect(map).toHaveAttribute('data-basemap', 'osm');
+            await expect(pick('osm')).toHaveAttribute('aria-pressed', 'true');
+            await expect(pick('none')).toHaveAttribute('aria-pressed', 'false');
+            await expect(map).toHaveAttribute('data-basemap-tiles', 'loaded', { timeout: CHANGE_MS });
+            await expect(map).toHaveAttribute('data-basemap-status', '');
+            await expect(status).toBeHidden();
+            await expect(page.locator('.maplibregl-ctrl-attrib')).toContainText('OpenStreetMap contributors');
+
+            // Remembered as a choice in the panel is: after a reload OpenStreetMap is drawn and pressed in Layers.
+            await page.reload();
+            map = await openEditor(page);
+            await expect(map).toHaveAttribute('data-basemap', 'osm', { timeout: CHANGE_MS });
+            await openLayers(page, map);
+            await expect(pick('osm')).toHaveAttribute('aria-pressed', 'true');
+
+            // Tiles that do not load: the status in words under Layers' buttons, as under the panel's.
+            tiles.broken = true;
+            await pick('none').click();
+            await expect(map).toHaveAttribute('data-basemap', 'none');
+            await pick('osm').click();
+            await expect(map).toHaveAttribute('data-basemap', 'osm');
+            await expect(map).toHaveAttribute('data-basemap-tiles', 'failed', { timeout: CHANGE_MS });
+            await expect(map).toHaveAttribute('data-basemap-status', TILES_FAILED);
+            await expect(status).toBeVisible();
+            await expect(status).toHaveText(TILES_FAILED);
+
+            // View mode's panel shows the same choice and the same status; None there clears it, as Layers then shows.
+            await page.locator('.mapstudio-edit-switch-button').click();
+            await expect(map).toHaveAttribute('data-studio', 'off');
+            await legendButton(page).click();
+            await expect(legendPanel(page).locator('.mapstudio-basemap-button[data-basemap="osm"]')).toHaveAttribute('aria-pressed', 'true');
+            await expect(legendPanel(page).locator('.mapstudio-basemap-status')).toHaveText(TILES_FAILED);
+            await legendPanel(page).locator('.mapstudio-basemap-button[data-basemap="none"]').click();
+            await expect(map).toHaveAttribute('data-basemap', 'none');
+            await expect(map).toHaveAttribute('data-basemap-status', '');
+            await page.locator('.mapstudio-edit-switch-button').click();
+            await expect(map).toHaveAttribute('data-studio', 'on');
+            await openLayers(page, map);
+            await expect(pick('none')).toHaveAttribute('aria-pressed', 'true');
+            await expect(status).toBeHidden();
+        });
+
+    editorTest('a Legend panel open as Edit mode comes on closes and gives the focus up; leaving Edit mode brings the Legend button back with its panel closed',
+        async ({ page }) => {
+            const map = await openEditor(page);
+            const sw = page.locator('.mapstudio-edit-switch-button');
+            await sw.click();
+            await expect(map).toHaveAttribute('data-studio', 'off');
+            await expect(legendButton(page)).toBeVisible();
+            // Opened by keyboard, so the focus is in the panel; the switch is pressed from a script so the focus stays there, as
+            // when the page's editMode prop turns Edit mode on.
+            await legendButton(page).focus();
+            await page.keyboard.press('Enter');
+            await expect(legendPanel(page)).toBeVisible();
+            await expect(map).toHaveAttribute('data-legend-open', 'true');
+            await page.evaluate(() => document.querySelector('.mapstudio-edit-switch-button').click());
+            await expect(map).toHaveAttribute('data-studio', 'on');
+            await expect(legendPanel(page)).toHaveCount(0);
+            await expect(map).toHaveAttribute('data-legend-open', 'false');
+            await expect(legendButton(page)).toBeHidden();
+            await expect(legendButton(page)).toHaveAttribute('aria-expanded', 'false');
+            expect(await page.evaluate(() => Boolean(document.activeElement && document.activeElement.closest('.mapstudio-legend'))),
+                'the focus left the legend').toBe(false);
+            // Layers shows the content.
+            await openLayers(page, map);
+            await expect(docked(page).locator('.mapstudio-legend-section--states')).toBeVisible();
+
+            // Off: the docked copy goes with the studio, the Legend button is back bottom-left with the scale bar on its bottom
+            // edge, its panel closed until asked for.
+            await sw.click();
+            await expect(map).toHaveAttribute('data-studio', 'off');
+            await expect(page.locator('.mapstudio-legend-dock')).toHaveCount(0);
+            await expect(legendButton(page)).toBeVisible();
+            await expect(legendButton(page)).toHaveAttribute('aria-expanded', 'false');
+            await expect(legendPanel(page)).toHaveCount(0);
+            await expect(map).toHaveAttribute('data-legend-open', 'false');
+            const box = await map.boundingBox();
+            const button = await legendButton(page).boundingBox();
+            const scale = await page.locator('.mapstudio-legend-row .maplibregl-ctrl-scale').boundingBox();
+            expect(Math.abs(button.x - (box.x + INSET)), 'the Legend button at the map inset').toBeLessThanOrEqual(1);
+            expect(scale.x, 'the scale bar beside it').toBeGreaterThan(button.x + button.width);
+            expect(Math.abs((scale.y + scale.height) - (button.y + button.height)), 'on its bottom edge').toBeLessThanOrEqual(1);
+            await legendButton(page).click();
+            await expect(legendPanel(page)).toBeVisible();
+            await expect(map).toHaveAttribute('data-legend-open', 'true');
+        });
+});
+
 test.describe('390 px, the top row', () => {
     test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+
+    editorTest('the map editor keeps the Legend button and its sheet at phone width, as before (entry 22): Show first, no Basemap, no Layers',
+        async ({ page }) => {
+            const map = await openEditor(page);
+            await expect(map).toHaveAttribute('data-studio', 'off');
+            await expect(legendButton(page)).toBeVisible();
+            await expect(page.locator('.mapstudio-legend-dock')).toHaveCount(0);
+            await legendButton(page).click();
+            await expect(legendPanel(page)).toBeVisible();
+            await expect(legendPanel(page)).toHaveClass(/mapstudio-legend-panel--sheet/);
+            await expect(map).toHaveAttribute('data-legend-open', 'true');
+            await expect(legendPanel(page).locator('.mapstudio-legend-handle')).toBeVisible();
+            const headings = await legendPanel(page).locator('.mapstudio-legend-heading').allTextContents();
+            expect(headings[0], 'Show first').toBe('Show');
+            expect(headings, 'no basemap section on a phone').not.toContain('Basemap');
+            await legendPanel(page).locator('.mapstudio-legend-close').click();
+            await expect(legendPanel(page)).toHaveCount(0);
+            await expect(map).toHaveAttribute('data-legend-open', 'false');
+        });
 
     editorTest('the map editor keeps View mode\'s top bar at phone width: the search field and the Needs you bar in the one bar, no list panel',
         async ({ page }) => {

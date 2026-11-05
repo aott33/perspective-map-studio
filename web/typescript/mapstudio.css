@@ -2550,6 +2550,26 @@
     color: var(--mapstudio-secondary);
 }
 
+/* The rail's Layers surface (entry 22): under the header the legend's desktop content as the panel draws it (the key,
+   Show and Basemap), docked: no card, no shadow or corner, no floating width or height, as wide as the dock; its body
+   scrolls inside the dock under the header, as the item list does. The key's rows and samples keep the panel's rules. */
+.mapstudio-dock-legend,
+.mapstudio .mapstudio-legend-dock {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.mapstudio .mapstudio-legend-dock {
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.mapstudio .mapstudio-legend-dock .mapstudio-legend-body {
+    padding: 12px;
+}
+
 .mapstudio-dock-note,
 .mapstudio-list-empty {
     padding: 12px;
@@ -2882,6 +2902,13 @@
    narrowed below it in Edit mode shows the bar before the component renders again. */
 @media (min-width: 768px) {
     .mapstudio.mapstudio--editing .mapstudio-topbar {
+        display: none;
+    }
+
+    /* The legend in Edit mode (entry 22, the owner's render C of the legend review): the Legend button leaves the map
+       (its panel was closed as the studio came on) and the rail's Layers surface shows the legend docked; the scale bar
+       stays bottom-left alone, on the row's bottom edge where the button's bottom edge was. From 768 px, as the top bar. */
+    .mapstudio.mapstudio--editing .mapstudio-legend-button {
         display: none;
     }
 }
