@@ -34,10 +34,11 @@ function threeEdits(): UndoStack {
     return stack;
 }
 
-function toolbar(tool: 'point' | 'line' | 'area' | null, toolKind: string | null, snap = false, paused = false, undo: UndoStack = UNDO_EMPTY): string {
+function toolbar(tool: 'point' | 'line' | 'area' | null, toolKind: string | null, snap = false, paused = false, undo: UndoStack = UNDO_EMPTY,
+                 editInFlight = false): string {
     return renderToStaticMarkup(React.createElement(DrawToolbar, {
-        tool, toolKind, kinds: KINDS, snap, paused, undo, onSelect: noop, onTool: noop, onSnap: noop, onUndo: noop, onRedo: noop, onUndoTo: noop,
-        now: NOW
+        tool, toolKind, kinds: KINDS, snap, paused, undo, editInFlight, onSelect: noop, onTool: noop, onSnap: noop, onUndo: noop, onRedo: noop,
+        onUndoTo: noop, now: NOW
     }));
 }
 
@@ -86,6 +87,10 @@ describe('the draw toolbar (epic 4 entry 4)', () => {
         expect(html).toContain('aria-label="Drawing tools - Paused - the map store is unreachable" data-paused="true"');
         expect(html).toContain('class="mapstudio-tool mapstudio-undo" disabled="" title="Paused - the map store is unreachable" aria-label="Undo: add Gathering line"');
         expect(html).toContain('title="Paused - the map store is unreachable" aria-label="Undo history"');
+        // Every button says it on hover (the faded toolbar takes the pointer for its titles), keeping its name for assistive technology.
+        expect((html.match(/title="Paused - the map store is unreachable"/g) || []).length).toBe(11);
+        expect(html).toContain('title="Paused - the map store is unreachable" aria-label="Point: add a point by clicking the map"');
+        expect(html).toContain('title="Paused - the map store is unreachable" aria-label="Snap"');
     });
 });
 
@@ -108,24 +113,32 @@ describe('Undo, its history and Redo on the toolbar (epic 4 entry 23)', () => {
         expect(html).toContain('class="mapstudio-tool mapstudio-redo" disabled="" title="Nothing to redo"');
     });
 
-    test('a reverse in flight: Undo and Redo wait; the chevron still opens the history, whose rows then take no choice', () => {
+    test('a reverse in flight: Undo and Redo wait saying "Undoing..."; the chevron still opens the history, whose rows then take no choice', () => {
         const stack = threeEdits();
         const started = startUndo(stack, 'u1', [])!.stack;
         const html = toolbar(null, null, false, false, started);
-        expect(html).toContain('class="mapstudio-tool mapstudio-undo" disabled="" title="Nothing to undo"');
+        expect(html).toContain('class="mapstudio-tool mapstudio-undo" disabled="" title="Undoing..." aria-label="Undo" data-step=""');
+        expect(html).toContain('class="mapstudio-tool mapstudio-redo" disabled="" title="Undoing..."');
         expect(html).toContain('class="mapstudio-tool mapstudio-undo-history-button" title="Undo history"');
         const list = renderToStaticMarkup(React.createElement(HistoryList, {
-            id: 'h', rows: undoHistory(started), marked: 0, busy: true, now: NOW(), shift: 0, onChoose: noop, onHover: noop, onFocusRow: noop, onRowKey: noop
+            id: 'h', rows: undoHistory(started), marked: 0, busy: 'Undoing...', now: NOW(), shift: 0, onChoose: noop, onHover: noop, onFocusRow: noop,
+            onRowKey: noop
         }));
         expect(list).toContain('data-busy="true"');
         expect((list.match(/aria-disabled="true"/g) || []).length).toBe(3);
         expect(list).toContain('Undoing...');
     });
 
+    test('a tool\'s or a field\'s edit being saved: Undo and Redo wait saying "Saving...", no step named until its own is on the stack', () => {
+        const html = toolbar(null, null, false, false, threeEdits(), true);
+        expect(html).toContain('class="mapstudio-tool mapstudio-undo" disabled="" title="Saving..." aria-label="Undo" data-step=""');
+        expect(html).toContain('class="mapstudio-tool mapstudio-redo" disabled="" title="Saving..."');
+    });
+
     test('the history: "Undo history", the steps newest first with how long ago, the marked row and every newer one tinted, the footer counting them', () => {
         const rows = undoHistory(threeEdits());
         const list = renderToStaticMarkup(React.createElement(HistoryList, {
-            id: 'h', rows, marked: 1, busy: false, now: NOW(), shift: 0, onChoose: noop, onHover: noop, onFocusRow: noop, onRowKey: noop
+            id: 'h', rows, marked: 1, busy: '', now: NOW(), shift: 0, onChoose: noop, onHover: noop, onFocusRow: noop, onRowKey: noop
         }));
         expect(list).toContain('class="mapstudio-undo-history" data-rows="3" data-marked="2" data-busy="false"');
         expect(list).toContain('<div class="mapstudio-undo-history-title" id="h-title">Undo history</div>');
@@ -141,7 +154,7 @@ describe('Undo, its history and Redo on the toolbar (epic 4 entry 23)', () => {
         expect(list).toContain('Click to undo back to here: undoes 2 changes');
         // Moved left to stay clear of the zoom card.
         const moved = renderToStaticMarkup(React.createElement(HistoryList, {
-            id: 'h', rows, marked: -1, busy: false, now: NOW(), shift: 108, onChoose: noop, onHover: noop, onFocusRow: noop, onRowKey: noop
+            id: 'h', rows, marked: -1, busy: '', now: NOW(), shift: 108, onChoose: noop, onHover: noop, onFocusRow: noop, onRowKey: noop
         }));
         expect(moved).toContain('style="transform:translateX(-108px)"');
         expect(moved).toContain('Click a step to undo back to it');
@@ -150,7 +163,7 @@ describe('Undo, its history and Redo on the toolbar (epic 4 entry 23)', () => {
 
     test('empty: "Nothing to undo", no rows and no footer', () => {
         const list = renderToStaticMarkup(React.createElement(HistoryList, {
-            id: 'h', rows: [], marked: -1, busy: false, now: NOW(), shift: 0, onChoose: noop, onHover: noop, onFocusRow: noop, onRowKey: noop
+            id: 'h', rows: [], marked: -1, busy: '', now: NOW(), shift: 0, onChoose: noop, onHover: noop, onFocusRow: noop, onRowKey: noop
         }));
         expect(list).toContain('<div class="mapstudio-undo-history-empty">Nothing to undo</div>');
         expect(list).not.toContain('role="menu"');

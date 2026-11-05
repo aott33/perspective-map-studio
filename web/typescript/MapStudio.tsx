@@ -1164,7 +1164,13 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const levelKnown = !!delegate && (delegate.level !== null || this.lastLevel !== null);
         const echo = this.props.props.editMode && levelKnown && !studioOn;
         const saveProblem = save.state === 'refused' || save.state === 'unsent';
-        const problem = saveProblem || load.state === 'failed' || store.status === 'read-only' || unsaved.length > 0;
+        // Every batch is queued before it is sent, so a save in flight is no problem: an unsaved entry counts once it has a
+        // reason (refused, or unsent after a failure) or is no longer being sent. A store that is unavailable stays a
+        // problem while each 15 s retry loads, and a browser that cannot keep unsaved edits says so.
+        const sending = delegate ? delegate.sending : [];
+        const stuck = unsaved.some((e) => e.reason !== undefined || sending.indexOf(e.batchId) < 0);
+        const problem = saveProblem || stuck || load.state === 'failed' || store.status === 'read-only' || store.status === 'unavailable'
+            || (delegate ? delegate.storageWarning !== '' : false);
         const quiet = studioOn ? !problem : !echo && saveText === '' && load.state !== 'failed' && store.status !== 'read-only' && unsaved.length === 0;
         const connection = delegate ? delegate.connection : CONNECTED;
         const chipText = connectionChipText(connection);
@@ -1226,6 +1232,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
                         {store.status === 'read-only'
                             ? <div className="mapstudio-store-status" data-store-state="read-only">{storeStatusText(store)}</div>
                             : null}
+                        {studioOn && store.status === 'unavailable' && load.state !== 'failed'
+                            // While a 15 s retry loads, the box keeps saying why (entry 23: it stays a problem in Edit mode).
+                            ? <div className="mapstudio-store-status" data-store-state="unavailable">{storeStatusText(store)}</div>
+                            : null}
                         {this.renderUnsaved(unsaved, delegate ? delegate.level : null,
                             delegate ? delegate.storageWarning : '', delegate ? delegate.sending : [])}
                     </div>
@@ -1246,6 +1256,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                                      snap={this.state.snap}
                                      paused={editing === 'off'}
                                      undo={delegate.undo}
+                                     editInFlight={delegate.editInFlight}
                                      onSelect={this.onSelectTool}
                                      onTool={this.onTool}
                                      onSnap={this.onSnap}

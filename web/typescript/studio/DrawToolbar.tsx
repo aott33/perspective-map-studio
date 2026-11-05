@@ -3,7 +3,7 @@ import { Kind } from '../adapters';
 import { snapTitle } from '../drawing';
 import { Glyph } from '../popupParts';
 import { StudioTool, kindButtons, toolOf } from '../studio';
-import { UndoStack, redoLabel, undoHistory, undoLabel } from '../undoStack';
+import { UndoStack, busyText, redoLabel, undoHistory, undoLabel } from '../undoStack';
 import { ChromeGlyph } from './ChromeGlyph';
 import { PAUSED_TEXT, UndoGroup } from './UndoGroup';
 
@@ -16,7 +16,7 @@ import { PAUSED_TEXT, UndoGroup } from './UndoGroup';
  * active tool is tinted in the selection token and named on hover and to assistive technology (its title, its label and
  * `aria-pressed`); the mode pill that named it in words under the toolbar left Edit mode with entry 23 (owner,
  * 2026-11-05): while a tool is in hand the drawing bar says it. While the map store is unreachable the toolbar fades and
- * takes no input (`paused`). Box select, the lasso and the instrument tool are entries 8 and 9.
+ * takes no input (`paused`), every button saying so on hover. Box select, the lasso and the instrument tool are entries 8 and 9.
  */
 export interface DrawToolbarProps {
     tool: StudioTool | null;
@@ -28,6 +28,8 @@ export interface DrawToolbarProps {
     paused: boolean;
     /** This session's undo stack (undoStack.ts): Undo's and Redo's steps and the history. */
     undo: UndoStack;
+    /** A tool's or a field's edit is being saved (the delegate's `editInFlight`): Undo, Redo and the history wait, "Saving...". */
+    editInFlight?: boolean;
     onSelect: () => void;
     onTool: (tool: StudioTool, kindId: string | null) => void;
     onSnap: () => void;
@@ -51,11 +53,13 @@ function toolWords(tool: StudioTool): string {
 
 export function DrawToolbar(props: DrawToolbarProps): React.ReactElement {
     const buttons = kindButtons(props.kinds);
+    // Undo and Redo wait, saying why, while a reverse or an edit is in flight (entry 23): no step is named meanwhile.
+    const busy = busyText(props.undo, !!props.editInFlight);
     const generic = (tool: StudioTool, name: string): React.ReactElement => {
         const active = props.tool === tool && props.toolKind === null;
         return (
             <button type="button" key={tool} className={'mapstudio-tool mapstudio-tool--' + tool + (active ? ' mapstudio-tool--active' : '')}
-                    aria-pressed={active} title={name} aria-label={name + ': ' + toolWords(tool)} disabled={props.paused}
+                    aria-pressed={active} title={props.paused ? PAUSED_TEXT : name} aria-label={name + ': ' + toolWords(tool)} disabled={props.paused}
                     data-tool={tool} onClick={active ? props.onSelect : () => props.onTool(tool, null)}>
                 <ChromeGlyph name={toolGlyph(tool)} />
             </button>
@@ -67,7 +71,8 @@ export function DrawToolbar(props: DrawToolbarProps): React.ReactElement {
             <div className="mapstudio-toolbar" role="toolbar" aria-label={props.paused ? 'Drawing tools - ' + PAUSED_TEXT : 'Drawing tools'}
                  data-paused={props.paused ? 'true' : 'false'}>
                 <button type="button" className={'mapstudio-tool mapstudio-tool--select' + (props.tool === null ? ' mapstudio-tool--active' : '')}
-                        aria-pressed={props.tool === null} title="Select" aria-label="Select" disabled={props.paused} onClick={props.onSelect}>
+                        aria-pressed={props.tool === null} title={props.paused ? PAUSED_TEXT : 'Select'} aria-label="Select" disabled={props.paused}
+                        onClick={props.onSelect}>
                     <ChromeGlyph name="pointer" />
                 </button>
                 {buttons.length > 0 ? <span className="mapstudio-toolbar-divider" aria-hidden="true" /> : null}
@@ -76,7 +81,8 @@ export function DrawToolbar(props: DrawToolbarProps): React.ReactElement {
                     const active = props.tool === tool && props.toolKind === kind.id;
                     return (
                         <button type="button" key={kind.id} className={'mapstudio-tool mapstudio-tool--kind' + (active ? ' mapstudio-tool--active' : '')}
-                                aria-pressed={active} title={kind.name} aria-label={kind.name + ': ' + toolWords(tool)} disabled={props.paused}
+                                aria-pressed={active} title={props.paused ? PAUSED_TEXT : kind.name} aria-label={kind.name + ': ' + toolWords(tool)}
+                                disabled={props.paused}
                                 data-kind={kind.id} data-tool={tool} onClick={active ? props.onSelect : () => props.onTool(tool, kind.id)}>
                             {kind.icon !== '' ? <Glyph id={kind.icon} className="mapstudio-tool-kind-glyph" size={20} /> : <ChromeGlyph name={toolGlyph(tool)} />}
                         </button>
@@ -88,15 +94,15 @@ export function DrawToolbar(props: DrawToolbarProps): React.ReactElement {
                 {generic('area', 'Area')}
                 <span className="mapstudio-toolbar-divider" aria-hidden="true" />
                 <button type="button" className={'mapstudio-tool mapstudio-tool--snap' + (props.snap ? ' mapstudio-tool--active' : '')}
-                        aria-pressed={props.snap} title={snapTitle(props.snap)} aria-label="Snap" disabled={props.paused}
+                        aria-pressed={props.snap} title={props.paused ? PAUSED_TEXT : snapTitle(props.snap)} aria-label="Snap" disabled={props.paused}
                         data-snap={props.snap ? 'on' : 'off'} onClick={props.onSnap}>
                     <ChromeGlyph name="magnet" />
                 </button>
                 <span className="mapstudio-toolbar-divider" aria-hidden="true" />
-                <UndoGroup undoLabel={undoLabel(props.undo)}
-                           redoLabel={redoLabel(props.undo)}
+                <UndoGroup undoLabel={busy !== '' ? '' : undoLabel(props.undo)}
+                           redoLabel={busy !== '' ? '' : redoLabel(props.undo)}
                            history={undoHistory(props.undo)}
-                           busy={props.undo.pending !== null}
+                           busy={busy}
                            paused={props.paused}
                            onUndo={props.onUndo}
                            onRedo={props.onRedo}

@@ -14,15 +14,16 @@ const TICK_MS = 15_000;
 /**
  * Undo, its history and Redo, the floating toolbar's last group (epic 4 entry 23, owner 2026-11-05; DESIGN.md Floating
  * draw toolbar, EXPERIENCE.md Undo and Redo, R28): Undo and Redo each name their step on hover and to assistive
- * technology ("Undo: add Gathering line"), disabled with "Nothing to undo" or "Nothing to redo"; the chevron beside Undo
+ * technology ("Undo: add Gathering line"), disabled with "Nothing to undo" or "Nothing to redo", or while something is in
+ * flight with what ("Undoing...", "Redoing...", "Saving..."); the chevron beside Undo
  * opens the history under it, the owner's mock: "Undo history", the last ten done steps of this session newest first,
  * each with how long ago it was saved, and a footer. Hovering a row (or the keyboard's focus on it) marks it and every
  * newer row, and the footer counts them ("Click to undo back to here: undoes 3 changes"); choosing one (a click, Enter
  * or Space) undoes it and every later step, which the delegate does as single undos one after another (`onUndoTo`).
  * With nothing to undo the list says "Nothing to undo"; while a reverse is being saved the rows take no choice. A menu
  * button: Enter, Space or Down opens it on the newest row, Up on the oldest (a pointer opens it with the focus left on
- * the chevron); Up and Down move (wrapping), Home and End jump, Esc closes it and Tab too, both returning the focus to
- * the chevron; a press outside closes it. The list opens
+ * the chevron); Up and Down move (wrapping), Home and End jump; Esc anywhere in the group closes it and goes no further,
+ * Tab on a row closes it, both returning the focus to the chevron; the focus leaving the group or a press outside closes it. The list opens
  * left-aligned with Undo, as the mock draws it, and moves left as far as it must to stay inside the map and clear of
  * the zoom card (with Details docked at 1366 px the map is 718 px wide). Paused (the store unreachable), every button
  * takes no input and says so on hover.
@@ -34,8 +35,11 @@ export interface UndoGroupProps {
     redoLabel: string;
     /** The history's rows, newest first (undoStack.ts `undoHistory`). */
     history: HistoryRow[];
-    /** A reverse is being saved: the history's rows take no choice meanwhile. */
-    busy: boolean;
+    /**
+     * What is in flight, in words (undoStack.ts `busyText`: "Undoing...", "Redoing...", "Saving..."), or '': while it is not
+     * '' Undo and Redo say it and wait, and the history's rows take no choice.
+     */
+    busy: string;
     paused: boolean;
     onUndo: () => void;
     onRedo: () => void;
@@ -51,7 +55,8 @@ export interface HistoryListProps {
     rows: HistoryRow[];
     /** The marked row, -1 for none: it and every newer row are marked, and the footer counts them. */
     marked: number;
-    busy: boolean;
+    /** What is in flight, in words, or '' (UndoGroupProps `busy`). */
+    busy: string;
     /** The time the rows' "how long ago" is read against (epoch ms). */
     now: number;
     /** How far the list moved left to stay clear of the zoom card, in px. */
@@ -70,7 +75,7 @@ export function HistoryList(props: HistoryListProps): React.ReactElement {
     const titleId = props.id + '-title';
     return (
         <div ref={props.panelRef} id={props.id} className="mapstudio-undo-history" data-rows={String(rows.length)}
-             data-marked={String(marked + 1)} data-busy={props.busy ? 'true' : 'false'}
+             data-marked={String(marked + 1)} data-busy={props.busy !== '' ? 'true' : 'false'} tabIndex={-1}
              style={props.shift > 0 ? { transform: 'translateX(-' + props.shift + 'px)' } : undefined}
              onMouseLeave={props.onLeave}>
             <div className="mapstudio-undo-history-title" id={titleId}>Undo history</div>
@@ -80,7 +85,7 @@ export function HistoryList(props: HistoryListProps): React.ReactElement {
                         <li key={row.count} role="none">
                             <button type="button" role="menuitem" tabIndex={-1}
                                     className={'mapstudio-undo-history-row' + (i <= marked ? ' mapstudio-undo-history-row--marked' : '')}
-                                    data-count={String(row.count)} aria-disabled={props.busy ? 'true' : undefined}
+                                    data-count={String(row.count)} aria-disabled={props.busy !== '' ? 'true' : undefined}
                                     onClick={() => props.onChoose(i)}
                                     onMouseEnter={() => props.onHover(i)}
                                     onFocus={() => props.onFocusRow(i)}
@@ -194,11 +199,24 @@ export class UndoGroup extends React.Component<UndoGroupProps, UndoGroupState> {
             } else {
                 this.openList(ev.key === 'ArrowDown' ? 'first' : 'last');
             }
-        } else if (ev.key === 'Escape' && this.state.open) {
-            // Esc closes the list and goes no further (the root's Esc would close Details).
+        }
+    };
+
+    /** Esc anywhere in the group (the chevron, Undo, Redo, a row) closes an open list and goes no further: the root's Esc would close Details. */
+    private onGroupKey = (ev: React.KeyboardEvent<HTMLDivElement>): void => {
+        if (ev.key === 'Escape' && this.state.open) {
             ev.preventDefault();
             ev.stopPropagation();
             this.close(true);
+        }
+    };
+
+    /** The focus leaving the group (Tab from the chevron or Redo, a click elsewhere) closes the list. */
+    private onGroupBlur = (ev: React.FocusEvent<HTMLDivElement>): void => {
+        const root = this.root.current;
+        const next = ev.relatedTarget as Node | null;
+        if (this.state.open && root && (next === null || !root.contains(next))) {
+            this.close(false);
         }
     };
 
@@ -228,7 +246,7 @@ export class UndoGroup extends React.Component<UndoGroupProps, UndoGroupState> {
 
     private choose(index: number): void {
         const row = this.props.history[index];
-        if (!row || this.props.busy) {
+        if (!row || this.props.busy !== '') {
             return;
         }
         this.close(true);
@@ -259,11 +277,9 @@ export class UndoGroup extends React.Component<UndoGroupProps, UndoGroupState> {
                 ev.preventDefault();
                 this.choose(index);
                 break;
-            case 'Escape':
             case 'Tab':
-                // Both close the list and return the focus to the chevron; Esc goes no further.
+                // Closes the list with the focus back on the chevron, never on a row that goes (Esc is the group's).
                 ev.preventDefault();
-                ev.stopPropagation();
                 this.close(true);
                 break;
             default:
@@ -304,12 +320,13 @@ export class UndoGroup extends React.Component<UndoGroupProps, UndoGroupState> {
     private onRowKeyDown = (ev: React.KeyboardEvent<HTMLButtonElement>, index: number): void => this.onRowKey(ev, index);
 
     render(): React.ReactElement {
-        const { undoLabel, redoLabel, paused } = this.props;
+        const { undoLabel, redoLabel, paused, busy } = this.props;
         const open = this.state.open;
         return (
-            <div ref={this.root} className="mapstudio-undo-group" data-history-open={open ? 'true' : 'false'}>
-                <button type="button" className="mapstudio-tool mapstudio-undo" disabled={paused || undoLabel === ''}
-                        title={paused ? PAUSED_TEXT : undoLabel || 'Nothing to undo'} aria-label={undoLabel || 'Undo'} data-step={undoLabel}
+            <div ref={this.root} className="mapstudio-undo-group" data-history-open={open ? 'true' : 'false'} onKeyDown={this.onGroupKey}
+                 onBlur={this.onGroupBlur}>
+                <button type="button" className="mapstudio-tool mapstudio-undo" disabled={paused || busy !== '' || undoLabel === ''}
+                        title={paused ? PAUSED_TEXT : busy || undoLabel || 'Nothing to undo'} aria-label={undoLabel || 'Undo'} data-step={undoLabel}
                         onClick={this.props.onUndo}>
                     <ChromeGlyph name="undo" />
                 </button>
@@ -320,8 +337,8 @@ export class UndoGroup extends React.Component<UndoGroupProps, UndoGroupState> {
                         onClick={this.onChevronClick} onKeyDown={this.onChevronKey}>
                     <ChromeGlyph name="chevron" size={16} />
                 </button>
-                <button type="button" className="mapstudio-tool mapstudio-redo" disabled={paused || redoLabel === ''}
-                        title={paused ? PAUSED_TEXT : redoLabel || 'Nothing to redo'} aria-label={redoLabel || 'Redo'} data-step={redoLabel}
+                <button type="button" className="mapstudio-tool mapstudio-redo" disabled={paused || busy !== '' || redoLabel === ''}
+                        title={paused ? PAUSED_TEXT : busy || redoLabel || 'Nothing to redo'} aria-label={redoLabel || 'Redo'} data-step={redoLabel}
                         onClick={this.props.onRedo}>
                     <ChromeGlyph name="redo" />
                 </button>

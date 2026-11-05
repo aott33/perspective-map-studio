@@ -104,6 +104,11 @@ export interface MapStudioDelegateState {
     connection: ConnectionState;
     /** The undo stack of this session's saved edits (epic 4 entry 2, undoStack.ts). */
     undo: UndoStack;
+    /**
+     * A tool's or a field's edit is being saved (entry 23): Undo, Redo and the history wait for its step, so it never lands
+     * past the cursor.
+     */
+    editInFlight: boolean;
 }
 
 /** `localStorage`, or null when the browser refuses it (a private window, blocked site data). */
@@ -267,7 +272,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             live: this.live,
             liveRevision: this.liveRevision,
             connection: this.connection,
-            undo: this.undoStack
+            undo: this.undoStack,
+            editInFlight: this.editInFlight()
         };
     }
 
@@ -567,8 +573,29 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.sendBatch(updateBatch(id, newId(), item.version, data), id, label);
     }
 
+    /**
+     * Whether a tool's or a field's edit is still being saved (entry 23): sent and awaiting its step, or held behind another
+     * batch of its item. Undo, Redo and the history wait meanwhile: its reply pushes the step after the cursor, and a reverse
+     * started before it would leave that step past the cursor, out of Undo's reach and reversed by a later Redo.
+     */
+    private editInFlight(): boolean {
+        return this.pendingSteps.size > 0 || Array.from(this.heldByItem.values()).some((held) => held.some((h) => h.label !== null));
+    }
+
+    /** True, with one console line, when an edit being saved makes Undo, Redo or the history wait. */
+    private waitForEdit(what: string): boolean {
+        if (!this.editInFlight()) {
+            return false;
+        }
+        console.info('[MapStudio] ' + what + ' waits: an edit is still being saved.');
+        return true;
+    }
+
     /** Undo the last saved edit of this session (entry 2): its reverse batch, at this session's own version of the record, through the queue. */
     undo(): void {
+        if (this.waitForEdit('Undo')) {
+            return;
+        }
         if (!this.undoNext()) {
             console.info('[MapStudio] Nothing to undo, or a reverse is still being saved.');
         }
@@ -581,6 +608,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * the save status row, as for any undo), at a step whose reverse cannot be built, or when another edit is made.
      */
     undoTo(count: number): void {
+        if (this.waitForEdit('Undo to here')) {
+            return;
+        }
         const run = startRun(this.undoStack, count);
         if (!run) {
             console.info('[MapStudio] Nothing to undo back to, or a reverse is still being saved.');
@@ -603,6 +633,17 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         return true;
     }
 
+    /**
+     * The run's reverse was refused or not sent (entry 23): the run stops at the first refusal, a temporary one included (busy,
+     * the store unreachable, no answer), so a later replay that saves it sends nothing more.
+     */
+    private stopRun(batchId: string, why: string): void {
+        if (this.undoRun !== null && this.isPendingUndo(batchId)) {
+            this.undoRun = null;
+            console.info('[MapStudio] Undo to here stopped: the undo of batch ' + batchId + ' ' + why + '.');
+        }
+    }
+
     /** A reverse of the run saved: one fewer to go, and the next sent now, after the save (entry 23). */
     private continueRun(): void {
         const run = this.undoRun ? runAfterSave(this.undoRun) : null;
@@ -618,6 +659,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
     /** Redo the last undone edit: the reverse of its undo, through the queue. */
     redo(): void {
+        if (this.waitForEdit('Redo')) {
+            return;
+        }
         const started = startRedo(this.undoStack, newId(), this.changes.state.items);
         if (!started) {
             console.info('[MapStudio] Nothing to redo, or a reverse is still being saved.');
@@ -666,10 +710,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      */
     private giveUp(batchId: string): void {
         this.pendingSteps.delete(batchId);
-        if (this.undoRun !== null && this.isPendingUndo(batchId)) {
-            this.undoRun = null;
-            console.info('[MapStudio] Undo to here stopped: the undo of batch ' + batchId + ' was refused or discarded.');
-        }
+        this.stopRun(batchId, 'was refused or discarded');
         this.undoStack = failPending(this.undoStack, batchId);
         this.releaseFlight(batchId, null);
     }
@@ -710,6 +751,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
     /** No answer, or not connected: the save status says unsent; the sender replays it. */
     private onUnsent(batchId: string, reason: UnsavedReason): void {
+        this.stopRun(batchId, 'was not sent (' + reason.code + ')');
         if (this.save.state !== 'idle' && batchId === this.saveBatchId) {
             this.save = { state: 'unsent', itemId: this.save.itemId, code: reason.code };
         }
@@ -874,7 +916,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         } else if (reply.kind === 'error') {
             // A transient refusal (store unreachable, busy, read-only, no answer) keeps the batch queued and replaying,
             // so its step and its item's turn stay pending until the replay saves or the user discards it; a final
-            // one (conflict, role, invalid) is the queue giving the batch up.
+            // one (conflict, role, invalid) is the queue giving the batch up. Either ends an undo-to-here run (entry 23).
+            if (outcome.kind === 'failed') {
+                this.stopRun(outcome.batchId, 'was refused (' + outcome.reason.code + ')');
+            }
             if (outcome.kind === 'failed' && !isTransient(outcome.reason.code)) {
                 this.giveUp(outcome.batchId);
             }

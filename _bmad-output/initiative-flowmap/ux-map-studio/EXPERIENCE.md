@@ -64,7 +64,7 @@ Two modes on one component. **No Publish step** (owner, confirmed): every finish
 
 **Entering Edit mode** - two ways (owner): the Edit switch on the map, shown only to users with an editing role, or the integrator opens the component straight into Edit mode with a prop. View on the rail returns to View mode. On the phone there is no map-wide Edit switch.
 
-**Rail order** - View, Items, Kinds, Layers, Import.
+**Rail order** - View, Items, Kinds, Layers, History (owner, 2026-11-05; entry 11), Import.
 
 **Deferred, not dropped** - FR-32's Mapbox vector style and FR-26's reference layers (land grids among them) stay out of Layers for now (owner, 2026-10-27).
 
@@ -211,7 +211,7 @@ Behavioural. Visual contrast lives in `DESIGN.md` (3:1 non-text in both themes).
 - Colour is never the only signal: every state has a glyph or a word (ISA-101, ER-27); comms lost and stale have no colour at all; save problems and import flags carry words.
 - Every drag has a non-drag way: typed coordinates, typed distance along line, Move then tap (FR-14, FR-15, FR-40).
 - Search (`{components.search-field}`) and its results work keyboard only (FR-33). Every tool has a keyboard path; Esc always returns to Select.
-- The current mode is always named in words (FR-8).
+- The current mode is always named (FR-8): the tool in hand is tinted on the toolbar and named in words on hover and to assistive technology, and while a tool is in hand the drawing bar names it in words with its glyph; no mode pill in Edit mode (owner, 2026-11-05).
 - Selection uses `{colors.selection}`, distinct from every state hue.
 - [ASSUMPTION] Glyphs carry text alternatives matching their legend words ("Priority 1 alarm, unacknowledged", "Comms lost").
 - [ASSUMPTION] The tag browser's tree works keyboard only, as a tree: Up and Down move, Right expands, Left collapses or goes to the parent, Enter picks a tag; the shared-tag warning and the resolve count are words, never colour alone.

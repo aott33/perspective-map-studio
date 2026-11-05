@@ -2880,7 +2880,7 @@
 }
 
 /* The floating draw toolbar top-centre over the map: floating, so the one soft shadow; above the popup layer with the
-   other controls (owner re-test R2). Paused, it fades and takes no input. Its groups (Select; the kind buttons; Point,
+   other controls (owner re-test R2). Paused, it fades and its buttons are disabled, each saying why on hover (entry 23). Its groups (Select; the kind buttons; Point,
    Line, Area; Snap; Undo, its history and Redo) are divided by thin rules (DESIGN.md draw-toolbar). The mode pill that
    sat under it left Edit mode with entry 23 (owner, 2026-11-05): the drawing bar names the tool in hand. */
 .mapstudio-toolbar-float {
@@ -2942,7 +2942,6 @@
 
 .mapstudio-toolbar-float--paused .mapstudio-toolbar {
     opacity: 0.42;
-    pointer-events: none;
 }
 
 .mapstudio-toolbar {
@@ -3002,8 +3001,9 @@
     gap: 2px;
 }
 
+/* The split button's chevron at 24 px wide, WCAG 2.2's target minimum (NFR-3). */
 .mapstudio-tool.mapstudio-undo-history-button {
-    width: 20px;
+    width: 24px;
     border-radius: 6px;
 }
 
@@ -3022,6 +3022,11 @@
     box-shadow: var(--mapstudio-float-shadow);
     font-size: 13px;
     line-height: 1.4;
+}
+
+.mapstudio-undo-history:focus {
+    /* Focusable only so a click on its words keeps the focus in the group; the rows show the keyboard's focus. */
+    outline: none;
 }
 
 .mapstudio-undo-history-title {

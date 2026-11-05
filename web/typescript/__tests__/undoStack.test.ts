@@ -2,7 +2,7 @@
 // Entry 23: the history (the last ten done steps, newest first, with how long ago) and the undo-to-here run.
 import { EditBatch, MapItemRecord } from '../contract';
 import {
-    HISTORY_SIZE, UNDO_EMPTY, UndoStack, agoText, canRedo, canUndo, failPending, finishPending, historyFooterText, ownVersion, pushStep, rebase,
+    HISTORY_SIZE, UNDO_EMPTY, UndoStack, agoText, busyText, canRedo, canUndo, failPending, finishPending, historyFooterText, ownVersion, pushStep, rebase,
     redoLabel, runAfterSave, startRedo, startRun, startUndo, stepLabel, undoHistory, undoLabel
 } from '../undoStack';
 
@@ -257,11 +257,23 @@ describe('the history: the last ten done steps, newest first, with how long ago 
         expect(agoText(T0, T0 - 5 * MIN)).toBe('just now');
     });
 
-    test('the footer counts the marked rows as the mock says it, and says when an undo is being saved', () => {
-        expect(historyFooterText(3, false)).toBe('Click to undo back to here: undoes 3 changes');
-        expect(historyFooterText(1, false)).toBe('Click to undo back to here: undoes 1 change');
-        expect(historyFooterText(0, false)).toBe('Click a step to undo back to it');
-        expect(historyFooterText(2, true)).toBe('Undoing...');
+    test('the footer counts the marked rows as the mock says it, and says what is in flight', () => {
+        expect(historyFooterText(3, '')).toBe('Click to undo back to here: undoes 3 changes');
+        expect(historyFooterText(1, '')).toBe('Click to undo back to here: undoes 1 change');
+        expect(historyFooterText(0, '')).toBe('Click a step to undo back to it');
+        expect(historyFooterText(2, 'Undoing...')).toBe('Undoing...');
+        expect(historyFooterText(2, 'Saving...')).toBe('Saving...');
+    });
+
+    test('what Undo and Redo wait for: an undo or a redo in flight, or an edit being saved; nothing otherwise', () => {
+        const stack = threeSteps();
+        expect(busyText(stack, false)).toBe('');
+        expect(busyText(UNDO_EMPTY, false)).toBe('');
+        expect(busyText(stack, true)).toBe('Saving...');
+        const undoing = startUndo(stack, 'u1', [pad(3, { name: 'P31', assetId: 'P12' })])!.stack;
+        expect(busyText(undoing, false)).toBe('Undoing...');
+        const undone = finishPending(undoing, 'u1', [{ entity: 'item', id: PAD, version: 4 }], T0);
+        expect(busyText(startRedo(undone, 'r1', [pad(4, { name: 'P31' })])!.stack, true)).toBe('Redoing...');
     });
 });
 

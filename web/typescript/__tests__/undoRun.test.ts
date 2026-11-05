@@ -28,6 +28,7 @@ import { Kind } from '../adapters';
 import { EditBatch } from '../contract';
 import { MESSAGE_EVENT, MessageTypes } from '../messages';
 import { MapStudioStoreDelegate } from '../MapStudioStoreDelegate';
+import { REPLY_TIMEOUT_MS } from '../unsaved';
 import { redoLabel, undoHistory, undoLabel } from '../undoStack';
 
 const PAD: Kind = { id: 'pad', name: 'Well pad', geometry: 'point', icon: 'well-pad', labelRank: 10, fields: [] };
@@ -185,5 +186,71 @@ describe('undo to here, a run of single undos (entry 23)', () => {
         save(last());
         expect(sent()).toHaveLength(before + 1);
         expect(delegate.mapStateToProps().undo.done).toBe(2);
+    });
+
+    test('a temporary refusal (busy) stops the run too: when a replay later saves that undo, nothing more is sent', () => {
+        const [, p2, p3] = threePads();
+        const before = sent().length;
+        delegate.undoTo(3);
+        const first = last();
+        expect(first.body.ops[0].id).toBe(p3);
+        refuse(first, 'store-unreachable', 'Map Studio is busy with other map requests; nothing was saved. Try again in a moment.');
+        expect(sent()).toHaveLength(before + 1);
+        expect(logged.some((l) => l.includes('Undo to here stopped: the undo of batch ' + first.body.batchId + ' was refused (store-unreachable)'))).toBe(true);
+        // The queue keeps the undo and a replay saves it later: the step is undone, and no next undo goes unasked.
+        save(first);
+        expect(sent()).toHaveLength(before + 1);
+        const state = delegate.mapStateToProps();
+        expect(state.undo.done).toBe(2);
+        expect(state.undo.pending).toBeNull();
+        expect(state.items.some((i) => i.id === p2 && !i.deleted)).toBe(true);
+    });
+
+    test('an undo of the run with no answer (the reply timer) stops the run as well', () => {
+        threePads();
+        const before = sent().length;
+        delegate.undoTo(2);
+        const first = last();
+        jest.advanceTimersByTime(REPLY_TIMEOUT_MS + 1);
+        expect(logged.some((l) => l.includes('Undo to here stopped: the undo of batch ' + first.body.batchId + ' was not sent (timeout)'))).toBe(true);
+        // A late answer saves it; nothing more is sent.
+        save(first);
+        expect(sent()).toHaveLength(before + 1);
+        expect(delegate.mapStateToProps().undo.done).toBe(2);
+    });
+
+    test('while a tool\'s or a field\'s edit is in flight, Undo, Redo and the history wait, so the edit never lands past the cursor', () => {
+        // The reviewer's trace: steps A, B and C saved, a rename of A in flight, the second newest chosen.
+        const [a, , c] = threePads();
+        delegate.renameItem(a, 'P31');
+        const rename = last();
+        const before = sent().length;
+        expect(delegate.mapStateToProps().editInFlight).toBe(true);
+        delegate.undoTo(2);
+        delegate.undo();
+        delegate.redo();
+        expect(sent()).toHaveLength(before);
+        expect(logged).toContain('[MapStudio] Undo to here waits: an edit is still being saved.');
+        expect(logged).toContain('[MapStudio] Undo waits: an edit is still being saved.');
+        expect(logged).toContain('[MapStudio] Redo waits: an edit is still being saved.');
+
+        // Saved: the rename is the newest step, and the second newest chosen now undoes the rename, then C, in that order.
+        save(rename);
+        let state = delegate.mapStateToProps();
+        expect(state.editInFlight).toBe(false);
+        expect(undoHistory(state.undo).map((r) => r.label)).toEqual(['rename P31', 'add Well pad', 'add Well pad', 'add Well pad']);
+        delegate.undoTo(2);
+        expect(last().body.ops).toEqual([{ op: 'update', entity: 'item', id: a, baseVersion: 2, data: { name: 'Well pad' } }]);
+        save(last());
+        expect(last().body.ops).toEqual([{ op: 'delete', entity: 'item', id: c, baseVersion: 1 }]);
+        save(last());
+        state = delegate.mapStateToProps();
+        expect(state.undo.done).toBe(2);
+        // Redo puts them back in order, C's add first and then the rename, never reversing a saved edit.
+        delegate.redo();
+        expect(last().body.ops).toMatchObject([{ op: 'create', entity: 'item', id: c }]);
+        save(last());
+        delegate.redo();
+        expect(last().body.ops).toEqual([{ op: 'update', entity: 'item', id: a, baseVersion: 3, data: { name: 'P31' } }]);
     });
 });

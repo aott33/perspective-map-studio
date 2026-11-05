@@ -225,13 +225,24 @@ export function agoText(at: number, now: number): string {
 }
 
 /**
- * The history's footer: with a row marked (the pointer on it, or the keyboard's focus) how many changes choosing it
- * undoes ("Click to undo back to here: undoes 3 changes", the owner's mock); with none marked how to use it; while a
- * reverse is being saved, that it is (the rows take no choice meanwhile).
+ * Why Undo, Redo and the history wait (entry 23), in their words: a reverse in flight ("Undoing...", "Redoing...") or a
+ * tool's or field's edit being saved ("Saving...", its step not on the stack yet); '' when nothing is in flight.
  */
-export function historyFooterText(count: number, busy: boolean): string {
-    if (busy) {
-        return 'Undoing...';
+export function busyText(stack: UndoStack, editInFlight: boolean): string {
+    if (stack.pending !== null) {
+        return stack.pending.direction === 'undo' ? 'Undoing...' : 'Redoing...';
+    }
+    return editInFlight ? 'Saving...' : '';
+}
+
+/**
+ * The history's footer: with a row marked (the pointer on it, or the keyboard's focus) how many changes choosing it
+ * undoes ("Click to undo back to here: undoes 3 changes", the owner's mock); with none marked how to use it; while
+ * something is in flight, what (`busyText`; the rows take no choice meanwhile).
+ */
+export function historyFooterText(count: number, busy: string): string {
+    if (busy !== '') {
+        return busy;
     }
     if (count < 1) {
         return 'Click a step to undo back to it';
