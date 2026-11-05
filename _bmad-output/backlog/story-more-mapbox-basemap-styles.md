@@ -38,3 +38,4 @@ Light and Dark matter most for an operator map: a quiet grey base like the mocku
 - Constraint: Mapbox's terms for client sites are still the owner's to confirm (epic-viewing Notes, release 0.3.0); every new style rides on the same answer.
 - Decision: 2026-10-30 Owner ("agree, keep it in the backlog after 0.3.0"): more Mapbox styles wait until after release 0.3.0; Light and Dark first as raster styles, then a project's own Studio style.
 - Note: a viewer would choose among the styles from a settings gear (story 12, `story-viewer-map-settings-behind-a-gear.md`).
+- Note: 2026-11-05 Owner (asked whether Layers would add layers such as weather): in Edit mode the place for overlay toggles and basemap choices is the rail's Layers surface, Layers tab (epic 4 entry 22, two tabs: Layers and Legend); View mode's place stays the Legend or the gear (story 12).

@@ -37,3 +37,4 @@ Storm season on a field map: a raster weather radar drawn over the basemap, and 
 - Constraint: alarm presentation (ER-27): lightning is a style state, never an alarm glyph; the radar is context that a viewer may hide, never a state mark; a range ring, if added, goes to engineering review first.
 - Constraint: the weather provider is the project's subscription and terms; Map Studio ships no provider key and no default provider.
 - Open question: whether a radar frame timestamp older than the provider's interval should fade the overlay or only say so in words.
+- Note: 2026-11-05 Owner (asked whether Layers would add layers such as weather): in Edit mode the place for overlay toggles and basemap choices is the rail's Layers surface, Layers tab (epic 4 entry 22, two tabs: Layers and Legend); View mode's place stays the Legend or the gear (story 12).
