@@ -3,14 +3,14 @@ title: "Edit mode's top row as designed: search in the Items list, no Needs you 
 type: 'feature'
 ticket: '21'
 created: '2026-11-05'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: 'fb9ea5ef9723d114a881b03a75baa34a4e525e5d'
 route: 'full'
 route_source: 'auto'
 risk: 'low'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
