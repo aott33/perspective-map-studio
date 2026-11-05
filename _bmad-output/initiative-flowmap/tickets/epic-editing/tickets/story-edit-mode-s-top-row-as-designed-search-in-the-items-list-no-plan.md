@@ -3,7 +3,7 @@ title: "Edit mode's top row as designed: search in the Items list, no Needs you 
 type: 'feature'
 ticket: '21'
 created: '2026-11-05'
-status: 'in-review'
+status: 'built'
 baseline_revision: 'fb9ea5ef9723d114a881b03a75baa34a4e525e5d'
 route: 'full'
 route_source: 'auto'
@@ -94,6 +94,8 @@ Quick lens, 2026-11-05: 6 findings; high 0, medium 2, low 4, false 0, maybe-fals
 | The drawing spec's field step no longer exercises the map container's field guard (`editing.ts` `inField`), which has no unit test | low | The list's field is in the dock, outside `.mapstudio-map`, so its keys reach neither the capture listener nor Terra Draw's canvas; the step passes with the guard deleted; the guard's comments still name the search field | patch: the guard unit tested where it can be, its comments corrected |
 | "No matches" is a `role="status"` element created already holding its text, which many screen readers do not announce (`ItemList.tsx`) | low | The region mounts with the text in the same commit; the View search uses a persistent region (`.mapstudio-search-status`) | patch: a region always mounted, only its text changing |
 | `docs/platform-checks.md` "The toolbar's row" cites entry 4's renders for entry 21's 48 px figure | low | The evidence cell still reads "(the renders above)" | patch: cite `studio.spec.mjs` and the `mapstudio-studio-top-row-*.png` renders |
+
+After the patches (coordinator, 2026-11-05): the six patches verified on the patched tree: `tsc` clean, 353 Jest tests green, Gradle build green offline, the contract check OK at 0.4.0, no em dashes, and the whole e2e suite on a fresh dev stack 137 passed, 7 skipped, 0 failed in 28.8 min. Nothing deferred.
 
 ## Verification
 
