@@ -57,10 +57,18 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             // One round trip: click p1, the Gateway answers in the envelope.
             const [x, y] = pagePixel(box, TRACER.points.p1.lngLat, TRACER.center, TRACER.zoom);
             await page.mouse.click(x, y);
-            // The click echo is dev-page output in Edit mode (owner review notes item 5); the map's `data-last-reply` holds it too.
+            // The map's `data-last-reply` holds the reply. The click echo is dev-page output (owner review notes item 5) where the
+            // page sets editMode and the studio does not show: at 390 px, which keeps View mode. In Edit mode (1440 px) the status
+            // line reports problems only and never echoes the click (entry 23, owner 2026-11-05).
             const reply = page.locator('.mapstudio-reply');
-            await expect(reply).toContainText('Gateway received click on ' + p1, { timeout: 15_000 });
-            await expect(map).toHaveAttribute('data-last-reply', new RegExp('Gateway received click on ' + p1));
+            await expect(map).toHaveAttribute('data-last-reply', new RegExp('Gateway received click on ' + p1), { timeout: 15_000 });
+            if (width >= 768) {
+                await expect(map).toHaveAttribute('data-studio', 'on');
+                await expect(reply).not.toContainText('Gateway received click');
+                await expect(reply).toBeHidden();
+            } else {
+                await expect(reply).toContainText('Gateway received click on ' + p1, { timeout: 15_000 });
+            }
 
             // The click also opens the default popup from the pad kind setup (a card at 1440 px, a
             // bottom sheet at 390 px; epic 3 entry 8 retired the spike's popupView prop).
@@ -74,7 +82,7 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
 
             const before = Number(await map.getAttribute('data-items-loaded'));
             if (width >= 768) {
-                // Escape cancels a drawing: one vertex, then nothing is drawn and the pill reads Select.
+                // Escape cancels a drawing: one vertex, then nothing is drawn, Select is in hand and nothing talks (no pill).
                 const cx = box.x + box.width / 2;
                 const cy = box.y + box.height / 2;
                 const [a] = TRACER.drawOffsets.map(([dx, dy]) => [cx + dx, cy + dy]);
@@ -88,13 +96,16 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
                 await page.keyboard.press('Escape');
                 await expect(bar).toHaveCount(0);
                 await expect(map).toHaveAttribute('data-tool', '');
-                await expect(page.locator('.mapstudio-pill')).toHaveText('Select');
+                await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
+                await expect(page.locator('.mapstudio-tool--select')).toHaveAttribute('aria-pressed', 'true');
                 await expect(page.locator('.mapstudio-tool--line')).toHaveAttribute('aria-pressed', 'false');
                 await expect(map).toHaveAttribute('data-items-loaded', String(before));
 
-                // A two-vertex line finished with Enter: saved at once, selected, its two vertices in the map store.
+                // A two-vertex line finished with Enter: saved at once, selected, its two vertices in the map store. The dev status
+                // line keeps the save's state for the suite, unseen in Edit mode: a success is not a problem (entry 23).
                 await drawLine(page, map);
                 await expect(page.locator('.mapstudio-save-status')).toHaveAttribute('data-save-state', 'saved', { timeout: 30_000 });
+                await expect(page.locator('.mapstudio-save-status')).toBeHidden();
                 await expect(map).toHaveAttribute('data-items-loaded', String(before + 1), { timeout: 15_000 });
                 const lineId = await map.getAttribute('data-selected');
                 const saved = (await send(page, 'map.load', {})).body.items.find((i) => i.id === lineId);

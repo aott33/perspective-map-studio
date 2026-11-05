@@ -16,13 +16,19 @@
 // in View mode's panel; a basemap picked there switches the map, is remembered and says its tile status there as the panel
 // does; a panel open as Edit mode comes on closes, and leaving Edit mode brings the Legend button back; at 390 px the
 // Legend sheet is as before.
+// Edit mode talks in one place (entry 23, the owner's option 2 of the messages review, the toast dropped, and the undo
+// history): no mode pill, no toast and no status box in Edit mode; Undo and Redo on the toolbar's end naming their step
+// on hover, the chevron beside Undo opening the last ten steps newest first with how long ago, the second newest chosen
+// undoing two, one batch each, and Redo redoing one; Ctrl+Z and Ctrl+Shift+Z one step each way; a refusal stopping the
+// run with the reason on the save status row; the Point tool's bar naming the kind; the toolbar with its new group still
+// clear of the Editing switch at 1366 and 1440 px with Details docked, the history list inside the map and clear of it.
 // Screenshots at 1366 and 1440 px for the docs (AD-15).
 
 import { TRACER, pagePixel } from '../lib/geo.mjs';
 import { randomUUID } from 'node:crypto';
 import {
-    DRAW_MS, EDITOR_USER, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, openMap, removeStrays, send, shot, signedInContext, test, view,
-    watch
+    DRAW_MS, EDITOR_USER, VERTEX_PAUSE_MS, WARNING_SETTLE_MS, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, openMap, removeStrays, send,
+    shot, signedInContext, test, view, watch
 } from './fixtures.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -137,7 +143,14 @@ test.describe('1366 px', () => {
         await expect(page.locator('.mapstudio-rail')).toBeVisible();
         await expect(page.locator('.mapstudio-dock--items')).toBeVisible();
         await expect(page.locator('.mapstudio-toolbar')).toBeVisible();
-        await expect(page.locator('.mapstudio-pill')).toHaveText('Select');
+        // Select in hand and nothing talks (entry 23): the Select tool tinted and named, no mode pill, no drawing bar, and the
+        // status line quiet (no click echo, no success; it stays in the DOM for the suite).
+        await expect(page.locator('.mapstudio-tool--select')).toHaveAttribute('aria-pressed', 'true');
+        await expect(page.locator('.mapstudio-tool--select')).toHaveAttribute('title', 'Select');
+        await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
+        await expect(page.locator('.mapstudio-drawing-bar')).toHaveCount(0);
+        await expect(page.locator('.mapstudio-reply')).toBeAttached();
+        await expect(page.locator('.mapstudio-reply')).toBeHidden();
         const sw = page.locator('.mapstudio-edit-switch-button');
         await expect(sw).toHaveAttribute('aria-checked', 'true');
         await expect(sw).toContainText('Editing');
@@ -238,10 +251,17 @@ test.describe('1366 px', () => {
             const viewerMap = await openMap(viewer, '/');
             const viewerBefore = await mapLoaded(viewerMap);
 
-            // The Point tool: the pill names the kind; one click on the ground places a pad and saves it at once.
+            // The Point tool: tinted and named on the toolbar, and the bar bottom-centre names the kind (entry 23: the bar, not a
+            // pill); one click on the ground places a pad and saves it at once.
             await page.locator('.mapstudio-tool--point').click();
             await expect(map).toHaveAttribute('data-tool', 'point');
-            await expect(page.locator('.mapstudio-pill')).toHaveText('Add a well pad - click the map, then drag to fine-tune');
+            await expect(page.locator('.mapstudio-tool--point')).toHaveAttribute('aria-pressed', 'true');
+            await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
+            const pointBar = page.locator('.mapstudio-drawing-bar');
+            await expect(pointBar).toHaveAttribute('data-tool', 'point');
+            await expect(pointBar.locator('.mapstudio-drawing-title')).toHaveText('New well pad');
+            await expect(pointBar.locator('.mapstudio-drawing-hint')).toHaveText('Click the map, then drag to fine-tune');
+            await expect(pointBar.locator('.mapstudio-drawing-done')).toBeVisible();
             const box = await map.boundingBox();
             // A spot clear of the seeded items at this view (the tracer's first draw offset is), under the toolbar.
             const at = [box.x + box.width / 2 + TRACER.drawOffsets[0][0], box.y + box.height / 2 + TRACER.drawOffsets[0][1]];
@@ -262,10 +282,19 @@ test.describe('1366 px', () => {
             await expect(status).toHaveText('Saved');
             await expect(panel).toHaveAttribute('data-pending', 'false');
             await expect(map).toHaveAttribute('data-items-loaded', String(before + 1), { timeout: 15_000 });
-            const undo = page.locator('.mapstudio-undo');
-            const redo = page.locator('.mapstudio-redo');
+            // Undo and Redo are the toolbar's (entry 23): the list header keeps the map's name and the save status. No toast
+            // follows the add, and the status line shows no success.
+            const undo = page.locator('.mapstudio-toolbar .mapstudio-undo');
+            const redo = page.locator('.mapstudio-toolbar .mapstudio-redo');
+            await expect(page.locator('.mapstudio-dock-header .mapstudio-undo, .mapstudio-dock-header .mapstudio-redo')).toHaveCount(0);
             await expect(undo).toHaveAttribute('data-step', 'Undo: add Well pad');
+            await expect(undo).toHaveAttribute('title', 'Undo: add Well pad');
             await expect(redo).toBeDisabled();
+            await expect(redo).toHaveAttribute('title', 'Nothing to redo');
+            await expect(page.locator('.mapstudio-toast')).toHaveCount(0);
+            await expect(page.locator('.mapstudio-save-status')).toHaveAttribute('data-save-state', 'saved');
+            await expect(page.locator('.mapstudio-save-status')).toBeHidden();
+            await expect(page.locator('.mapstudio-reply')).toBeHidden();
             await expect(page.locator('.mapstudio-list-row[data-item-id="' + padId + '"]')).toHaveAttribute('data-state', 'unlinked');
             await expectPageSelection(page, padId, 'Well pad', 'pad');
             await expect(viewerMap).toHaveAttribute('data-items-loaded', String(viewerBefore + 1), { timeout: PUSH_MS });
@@ -312,7 +341,9 @@ test.describe('1366 px', () => {
             // Undo, last first: the link, the name, the move, the pad; each a reverse batch saved, the button naming each step.
             await page.locator('.mapstudio-tool--select').click();
             await expect(map).toHaveAttribute('data-tool', '');
-            await expect(page.locator('.mapstudio-pill')).toHaveText('Select');
+            // The tool put down: the bar goes and nothing talks.
+            await expect(page.locator('.mapstudio-drawing-bar')).toHaveCount(0);
+            await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
             const steps = ['Undo: link P31', 'Undo: rename P31', 'Undo: move Well pad', 'Undo: add Well pad'];
             for (let i = 0; i < steps.length; i++) {
                 await expect(undo).toHaveAttribute('data-step', steps[i], { timeout: REPLY_MS });
@@ -373,6 +404,10 @@ test.describe('1366 px', () => {
             const [x, y] = await pixelNow(map, TRACER.points.p1.lngLat);
             await page.mouse.click(x, y);
             await expect(map).toHaveAttribute('data-selected', p1);
+            // The click round trip echoes nowhere in Edit mode (entry 23): only the map's `data-last-reply` holds it.
+            await expect(map).toHaveAttribute('data-last-reply', new RegExp('Gateway received click on ' + p1), { timeout: REPLY_MS });
+            await expect(page.locator('.mapstudio-reply')).not.toContainText('Gateway received click');
+            await expect(page.locator('.mapstudio-reply')).toBeHidden();
             // A marker click selects and opens the popup as in View mode; Details stays the list's and the Point tool's
             // (opening properties from the map and keeping the selection in view is entry 7's), so the panel for Point 2 goes.
             await expect(page.locator('.mapstudio-panel')).toHaveCount(0);
@@ -397,8 +432,241 @@ test.describe('1366 px', () => {
             await page.locator('.maplibregl-canvas').focus();
             await page.keyboard.press('Escape');
             await expect(map).toHaveAttribute('data-tool', '');
-            await expect(page.locator('.mapstudio-pill')).toHaveText('Select');
+            await expect(page.locator('.mapstudio-drawing-bar')).toHaveCount(0);
+            await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
             await expect(page.locator('.mapstudio-tool--select')).toHaveAttribute('aria-pressed', 'true');
+            // The Point tool's Done puts it down as Esc does.
+            await page.locator('.mapstudio-tool--point').click();
+            await expect(map).toHaveAttribute('data-tool', 'point');
+            await page.locator('.mapstudio-drawing-done').click();
+            await expect(map).toHaveAttribute('data-tool', '');
+            await expect(page.locator('.mapstudio-drawing-bar')).toHaveCount(0);
+        });
+});
+
+// ---- Undo and its history on the toolbar (entry 23) ----
+
+/** A page pixel `dx` from the map's centre and `fromTop` below its top edge now: at the tracer's view, the clear ground north of its points. */
+async function spotFromTop(map, dx, fromTop) {
+    const box = await map.boundingBox();
+    return [box.x + box.width / 2 + dx, box.y + fromTop];
+}
+
+/** The stored record of a live map item through the test hook, or undefined once it is deleted. */
+async function storedItem(page, id) {
+    return (await send(page, 'map.load', {})).body.items.find((i) => i.id === id && !i.deleted);
+}
+
+/** A pad placed with the Point tool at `at` and saved: its id (Details opens on it with Name focused). */
+async function placePad(page, map, at) {
+    if ((await map.getAttribute('data-tool')) !== 'point') {
+        await page.locator('.mapstudio-tool--point').click();
+        await expect(map).toHaveAttribute('data-tool', 'point');
+    }
+    const panel = page.locator('.mapstudio-panel');
+    const before = (await panel.count()) > 0 ? await panel.getAttribute('data-item-id') : null;
+    await page.mouse.click(at[0], at[1]);
+    await expect(panel).toBeVisible({ timeout: 15_000 });
+    if (before !== null) {
+        await expect(panel).not.toHaveAttribute('data-item-id', before, { timeout: 15_000 });
+    }
+    const id = await panel.getAttribute('data-item-id');
+    expect(id).toMatch(UUID);
+    await expect(panel).toHaveAttribute('data-pending', 'false', { timeout: REPLY_MS });
+    return id;
+}
+
+/** The focused Name field renamed and finished with Enter; the step is saved once Undo names it. */
+async function rename(page, name) {
+    const field = page.locator('.mapstudio-field-name');
+    await expect(field).toBeFocused();
+    await field.fill(name);
+    await field.press('Enter');
+    await expect(page.locator('.mapstudio-toolbar .mapstudio-undo')).toHaveAttribute('data-step', 'Undo: rename ' + name, { timeout: REPLY_MS });
+}
+
+test.describe('1366 px, Undo and its history on the toolbar', () => {
+    test.use({ viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1 });
+
+    editorTest('three saved edits: Undo names the last on hover; the history lists them newest first with how long ago; the second newest chosen undoes two, one batch each, the oldest stays; Redo redoes one; Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y one step each; the history by keyboard',
+        async ({ page }) => {
+            test.setTimeout(180_000);
+            const map = await openEditor(page);
+            await view(page, map, TRACER.center, TRACER.zoom);
+            const undo = page.locator('.mapstudio-toolbar .mapstudio-undo');
+            const redo = page.locator('.mapstudio-toolbar .mapstudio-redo');
+            const chevron = page.locator('.mapstudio-toolbar .mapstudio-undo-history-button');
+            const list = page.locator('.mapstudio-undo-history');
+            const rows = list.locator('.mapstudio-undo-history-row');
+            const footer = list.locator('.mapstudio-undo-history-footer');
+            const panel = page.locator('.mapstudio-panel');
+
+            // Nothing to undo yet: Undo is disabled and says so on hover, the history says so too.
+            await expect(undo).toBeDisabled();
+            await expect(undo).toHaveAttribute('title', 'Nothing to undo');
+            await expect(chevron).toHaveAttribute('aria-haspopup', 'menu');
+            await chevron.click();
+            await expect(chevron).toHaveAttribute('aria-expanded', 'true');
+            await expect(list.locator('.mapstudio-undo-history-empty')).toHaveText('Nothing to undo');
+            await expect(rows).toHaveCount(0);
+            await chevron.click();
+            await expect(list).toHaveCount(0);
+
+            // Three saved edits: a pad added with the Point tool, renamed, and a gathering line by its kind button.
+            const padId = await placePad(page, map, await spotFromTop(map, -120, 220));
+            await expect(undo).toHaveAttribute('data-step', 'Undo: add Well pad', { timeout: REPLY_MS });
+            await rename(page, 'P41');
+            await page.locator('.mapstudio-tool--kind[data-kind="line"]').click();
+            await expect(map).toHaveAttribute('data-tool', 'line');
+            const bar = page.locator('.mapstudio-drawing-bar');
+            for (const [i, [dx, fromTop]] of [[-40, 160], [140, 160]].entries()) {
+                const p = await spotFromTop(map, dx, fromTop);
+                await page.mouse.click(p[0], p[1]);
+                await expect(bar).toHaveAttribute('data-points', String(i + 1));
+                await page.waitForTimeout(VERTEX_PAUSE_MS);
+            }
+            await page.keyboard.press('Enter');
+            await expect(bar).toHaveAttribute('data-points', '0');
+            await expect(panel).not.toHaveAttribute('data-item-id', padId, { timeout: 15_000 });
+            const lineId = await panel.getAttribute('data-item-id');
+            await page.locator('.mapstudio-tool--select').click();
+            await expect(map).toHaveAttribute('data-tool', '');
+            // No toast after the adds and nothing in the status line; the header says Saved.
+            await expect(page.locator('.mapstudio-toast')).toHaveCount(0);
+            await expect(page.locator('.mapstudio-reply')).toBeHidden();
+            await expect(page.locator('.mapstudio-panel-save')).toHaveText('Saved', { timeout: REPLY_MS });
+
+            // Hover Undo: the last step, to the pointer and to assistive technology.
+            await undo.hover();
+            await expect(undo).toHaveAttribute('title', 'Undo: add Gathering line', { timeout: REPLY_MS });
+            await expect(undo).toHaveAttribute('aria-label', 'Undo: add Gathering line');
+            await expect(redo).toHaveAttribute('title', 'Nothing to redo');
+
+            // The history: the three steps newest first, each with how long ago; the newest row marked as it opens.
+            await chevron.click();
+            await expect(list).toBeVisible();
+            await expect(list.locator('.mapstudio-undo-history-title')).toHaveText('Undo history');
+            await expect(list.locator('.mapstudio-undo-history-label')).toHaveText(['add Gathering line', 'rename P41', 'add Well pad']);
+            await expect(list.locator('.mapstudio-undo-history-ago')).toHaveText(['just now', 'just now', 'just now']);
+            // Hovering the second newest marks it and every newer row; the footer counts them.
+            await rows.nth(1).hover();
+            await expect(list).toHaveAttribute('data-marked', '2');
+            await expect(list.locator('.mapstudio-undo-history-row--marked')).toHaveCount(2);
+            await expect(footer).toHaveText('Click to undo back to here: undoes 2 changes');
+            await shot(page, 'mapstudio-studio-undo-history-1366.png');
+
+            // Chosen: the line's add and the rename undone, newest first, one batch each (two seqs); the pad stays.
+            const seqBefore = Number(await map.getAttribute('data-store-seq'));
+            await rows.nth(1).click();
+            await expect(list).toHaveCount(0);
+            await expect(undo).toHaveAttribute('data-step', 'Undo: add Well pad', { timeout: REPLY_MS * 2 });
+            await expect(map).toHaveAttribute('data-store-seq', String(seqBefore + 2), { timeout: REPLY_MS });
+            expect(await storedItem(page, lineId)).toBeUndefined();
+            expect(await storedItem(page, padId)).toMatchObject({ name: 'Well pad' });
+            // Redo redoes one step: the name comes back, the line does not.
+            await expect(redo).toHaveAttribute('data-step', 'Redo: rename P41');
+            await redo.click();
+            await expect(redo).toHaveAttribute('data-step', 'Redo: add Gathering line', { timeout: REPLY_MS });
+            await expect(undo).toHaveAttribute('data-step', 'Undo: rename P41');
+            expect(await storedItem(page, padId)).toMatchObject({ name: 'P41' });
+            expect(await storedItem(page, lineId)).toBeUndefined();
+
+            // The shortcuts outside a field, one step each way: Ctrl+Z, Ctrl+Shift+Z, and Ctrl+Y as Redo.
+            await page.locator('.maplibregl-canvas').focus();
+            await page.keyboard.press('Control+z');
+            await expect(undo).toHaveAttribute('data-step', 'Undo: add Well pad', { timeout: REPLY_MS });
+            await page.keyboard.press('Control+Shift+Z');
+            await expect(undo).toHaveAttribute('data-step', 'Undo: rename P41', { timeout: REPLY_MS });
+            await page.keyboard.press('Control+z');
+            await expect(undo).toHaveAttribute('data-step', 'Undo: add Well pad', { timeout: REPLY_MS });
+            await page.keyboard.press('Control+y');
+            await expect(undo).toHaveAttribute('data-step', 'Undo: rename P41', { timeout: REPLY_MS });
+            expect(await storedItem(page, padId)).toMatchObject({ name: 'P41' });
+
+            // By keyboard: Down opens on the newest, Down moves, Esc closes with nothing undone and the focus on the chevron;
+            // Enter opens again, End goes to the oldest and Enter undoes back to it.
+            await chevron.focus();
+            await page.keyboard.press('ArrowDown');
+            await expect(list).toBeVisible();
+            await expect(rows.first()).toBeFocused();
+            await expect(list).toHaveAttribute('data-marked', '1');
+            await expect(footer).toHaveText('Click to undo back to here: undoes 1 change');
+            await page.keyboard.press('ArrowDown');
+            await expect(rows.nth(1)).toBeFocused();
+            await expect(list).toHaveAttribute('data-marked', '2');
+            await page.keyboard.press('Escape');
+            await expect(list).toHaveCount(0);
+            await expect(chevron).toBeFocused();
+            await expect(undo).toHaveAttribute('data-step', 'Undo: rename P41');
+            await page.keyboard.press('Enter');
+            await expect(rows.first()).toBeFocused();
+            await page.keyboard.press('End');
+            await expect(rows.last()).toBeFocused();
+            await expect(footer).toHaveText('Click to undo back to here: undoes 2 changes');
+            await page.keyboard.press('Enter');
+            await expect(list).toHaveCount(0);
+            // While a run's reverse is in flight Undo and Redo wait (no step named); Redo names its step once the last one saved.
+            await expect(redo).toHaveAttribute('data-step', 'Redo: add Well pad', { timeout: REPLY_MS * 2 });
+            await expect(undo).toHaveAttribute('data-step', '');
+            await expect(undo).toBeDisabled();
+            await expect(undo).toHaveAttribute('title', 'Nothing to undo');
+            expect(await storedItem(page, padId)).toBeUndefined();
+        });
+
+    editorTest('a refusal stops the run: the newest undone, the next refused with who changed the item on the save status row, the oldest never sent',
+        async ({ page }) => {
+            test.setTimeout(180_000);
+            const map = await openEditor(page);
+            await view(page, map, TRACER.center, TRACER.zoom);
+            const undo = page.locator('.mapstudio-toolbar .mapstudio-undo');
+            const list = page.locator('.mapstudio-undo-history');
+            const rows = list.locator('.mapstudio-undo-history-row');
+
+            // Three saved edits: pad A added and renamed, then pad B added.
+            const padA = await placePad(page, map, await spotFromTop(map, -120, 220));
+            await rename(page, 'P42');
+            const padB = await placePad(page, map, await spotFromTop(map, 140, 235));
+            await expect(undo).toHaveAttribute('data-step', 'Undo: add Well pad', { timeout: REPLY_MS });
+            await page.locator('.mapstudio-tool--select').click();
+            await expect(map).toHaveAttribute('data-tool', '');
+
+            // Another save moves pad A on behind this session's undo stack (through the test hook, as another editor's would).
+            const storedA = await storedItem(page, padA);
+            const other = await send(page, 'edits.apply', { batchId: randomUUID(),
+                ops: [{ op: 'update', entity: 'item', id: padA, baseVersion: storedA.version, data: { name: 'P42 moved on' } }] });
+            expect(other.type, JSON.stringify(other.body)).toBe('edits.apply.reply');
+            await expect(page.locator('.mapstudio-list-row[data-item-id="' + padA + '"]')).toContainText('P42 moved on', { timeout: PUSH_MS });
+            const seqBefore = Number(await map.getAttribute('data-store-seq'));
+
+            // The oldest chosen: three undos to go. Pad B's add is undone; the rename's undo is refused and the run stops there.
+            await page.locator('.mapstudio-toolbar .mapstudio-undo-history-button').click();
+            await expect(rows).toHaveCount(3);
+            await rows.nth(2).hover();
+            await expect(list.locator('.mapstudio-undo-history-footer')).toHaveText('Click to undo back to here: undoes 3 changes');
+            await rows.nth(2).click();
+            const row = page.locator('.mapstudio-panel-save--row');
+            await expect(row).toHaveAttribute('data-code', 'conflict', { timeout: REPLY_MS * 2 });
+            await expect(row).toContainText('P42 moved on was changed by ' + EDITOR_USER);
+            await expect(row).toBeVisible();
+            expect(await storedItem(page, padB)).toBeUndefined();
+            expect(await storedItem(page, padA)).toMatchObject({ name: 'P42 moved on', deleted: false });
+            await expect(undo).toHaveAttribute('data-step', 'Undo: rename P42');
+            // One batch was saved (B's undo); the refused one wrote nothing and pad A's add was never sent.
+            await expect(map).toHaveAttribute('data-store-seq', String(seqBefore + 1), { timeout: REPLY_MS });
+            await page.waitForTimeout(WARNING_SETTLE_MS);
+            await expect(map).toHaveAttribute('data-store-seq', String(seqBefore + 1));
+            expect(await storedItem(page, padA)).toBeDefined();
+            // In Edit mode the status line shows the problem, never a success (entry 23: until entry 10 takes it).
+            await expect(page.locator('.mapstudio-reply')).toBeVisible();
+            await expect(page.locator('.mapstudio-save-status')).toHaveAttribute('data-save-state', 'refused');
+            await expect(page.locator('.mapstudio-save-status')).toBeVisible();
+            await shot(page, 'mapstudio-studio-undo-refused-1366.png');
+
+            // Pad A leaves the map for the specs after this one (through the test hook, as removeStrays does).
+            const latest = await storedItem(page, padA);
+            const removed = await send(page, 'edits.apply', { batchId: randomUUID(),
+                ops: [{ op: 'delete', entity: 'item', id: padA, baseVersion: latest.version }] });
+            expect(removed.type, JSON.stringify(removed.body)).toBe('edits.apply.reply');
         });
 });
 
@@ -445,7 +713,7 @@ for (const [width, height, listWidth, panelWidth] of [[1366, 768, 256, 320], [14
     test.describe(width + ' px, the top row', () => {
         test.use({ viewport: { width, height }, deviceScaleFactor: 1 });
 
-        lossTest('no search field or Needs you bar over the map; the toolbar on the top row level with the Editing switch and clear of it and the zoom card with properties docked; the pill, then the connection chip, under it',
+        lossTest('no search field or Needs you bar over the map; the toolbar on the top row level with the Editing switch and clear of it and the zoom card with properties docked, Undo, its history and Redo at its end, the history list inside the map and clear of them; no pill; the connection chip under the toolbar',
             async ({ page }) => {
                 const map = await openEditor(page);
                 await expect(map).toHaveAttribute('data-studio', 'on');
@@ -471,7 +739,6 @@ for (const [width, height, listWidth, panelWidth] of [[1366, 768, 256, 320], [14
                 const toolbar = await page.locator('.mapstudio-toolbar').boundingBox();
                 const sw = await page.locator('.mapstudio-edit-switch').boundingBox();
                 const zoom = await page.locator('.mapstudio-zoom').boundingBox();
-                const pill = await page.locator('.mapstudio-pill').boundingBox();
                 console.log(width + ' px: map ' + Math.round(box.width) + ' wide; toolbar ' + Math.round(toolbar.x - box.x) + ' to '
                     + Math.round(toolbar.x + toolbar.width - box.x) + ', switch from ' + Math.round(sw.x - box.x) + ', zoom card from '
                     + Math.round(zoom.x - box.x));
@@ -483,13 +750,36 @@ for (const [width, height, listWidth, panelWidth] of [[1366, 768, 256, 320], [14
                 expect(sw.x - (toolbar.x + toolbar.width), 'clear of the Editing switch').toBeGreaterThanOrEqual(INSET);
                 expect(zoom.x - (toolbar.x + toolbar.width), 'clear of the zoom card').toBeGreaterThanOrEqual(INSET);
                 expect(toolbar.x - box.x, 'clear of the map\'s left edge').toBeGreaterThanOrEqual(INSET);
-                // The pill under the toolbar, clear of the zoom card.
-                expect(pill.y, 'the pill under the toolbar').toBeGreaterThanOrEqual(toolbar.y + toolbar.height);
-                expect(overlaps(pill, zoom), 'the pill clear of the zoom card').toBe(false);
-                expect(overlaps(pill, sw), 'the pill clear of the switch').toBe(false);
+                // No mode pill under the toolbar (entry 23); Undo, the history's chevron and Redo are its last group.
+                await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
+                const undoBox = await page.locator('.mapstudio-toolbar .mapstudio-undo').boundingBox();
+                const redoBox = await page.locator('.mapstudio-toolbar .mapstudio-redo').boundingBox();
+                expect(redoBox.x + redoBox.width, 'Redo at the toolbar\'s end').toBeGreaterThan(toolbar.x + toolbar.width - 40);
+                expect(undoBox.x, 'Undo before Redo').toBeLessThan(redoBox.x);
                 await shot(page, 'mapstudio-studio-top-row-' + width + '.png');
 
-                // The connection chip under the pill: the client's connection closed for a few seconds.
+                // The history opened under the toolbar: inside the map and clear of the Editing switch and the zoom card.
+                const chevron = page.locator('.mapstudio-undo-history-button');
+                await chevron.click();
+                await expect(chevron).toHaveAttribute('aria-expanded', 'true');
+                const list = page.locator('.mapstudio-undo-history');
+                await expect(list).toBeVisible();
+                await expect(list.locator('.mapstudio-undo-history-title')).toHaveText('Undo history');
+                await expect(list.locator('.mapstudio-undo-history-empty')).toHaveText('Nothing to undo');
+                const listBox = await list.boundingBox();
+                console.log(width + ' px: the history list ' + Math.round(listBox.x - box.x) + ' to ' + Math.round(listBox.x + listBox.width - box.x));
+                expect(listBox.y, 'the history under the toolbar').toBeGreaterThanOrEqual(toolbar.y + toolbar.height);
+                expect(listBox.x, 'inside the map').toBeGreaterThanOrEqual(box.x + INSET - 1);
+                expect(overlaps(listBox, zoom), 'the history clear of the zoom card').toBe(false);
+                expect(overlaps(listBox, sw), 'the history clear of the Editing switch').toBe(false);
+                expect(listBox.x + listBox.width, 'left of the zoom card').toBeLessThanOrEqual(zoom.x - INSET + 1);
+                await page.keyboard.press('Escape');
+                await expect(list).toHaveCount(0);
+                await expect(chevron).toBeFocused();
+                // Esc went no further: Details stays open.
+                await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', p2);
+
+                // The connection chip under the toolbar: the client's connection closed for a few seconds.
                 const chip = page.locator('.mapstudio-connection');
                 await expect(chip).toHaveCount(0);
                 await page.evaluate((s) => window.__client.simulateLostConnection(s), LOST_S);
@@ -497,8 +787,8 @@ for (const [width, height, listWidth, panelWidth] of [[1366, 768, 256, 320], [14
                 await expect(chip).toBeVisible();
                 await expect(map).toHaveAttribute('data-studio', 'on');
                 const chipBox = await chip.boundingBox();
-                const pillNow = await page.locator('.mapstudio-pill').boundingBox();
-                expect(chipBox.y, 'the chip under the pill').toBeGreaterThanOrEqual(pillNow.y + pillNow.height);
+                const toolbarNow = await page.locator('.mapstudio-toolbar').boundingBox();
+                expect(chipBox.y, 'the chip under the toolbar').toBeGreaterThanOrEqual(toolbarNow.y + toolbarNow.height);
                 expect(Math.abs(chipBox.x + chipBox.width / 2 - (box.x + box.width / 2)), 'the chip centred over the map').toBeLessThanOrEqual(1);
                 expect(overlaps(chipBox, await page.locator('.mapstudio-toolbar').boundingBox()), 'the chip clear of the toolbar').toBe(false);
                 await shot(page, 'mapstudio-studio-top-row-chip-' + width + '.png');

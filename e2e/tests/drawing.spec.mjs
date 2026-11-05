@@ -1,9 +1,12 @@
 // Drawing lines and areas (epic 4 entry 4): at 1366 px as the map editor, a gathering line by its kind button with
-// Snap on from CTB1 to SWD1 (its ends stored, drawn snapped) and the toast's Undo; the same with Snap off (ends null,
+// Snap on from CTB1 to SWD1 (its ends stored, drawn snapped) and the toolbar's Undo; the same with Snap off (ends null,
 // drawn floating); a geofence by three clicks and a double-click (a LineString of three vertices drawn as a closed
 // fill); a one-vertex line that cannot finish, Backspace removing the last vertex and Esc cancelling to Select; a
 // self-intersecting ring flagged until Backspace fixes it; the generic Line tool with the Kind select in Details;
-// every step by keyboard and clicks with no drag; and at 390 px no toolbar. Screenshots at 1366 px for the docs (AD-15).
+// every step by keyboard and clicks with no drag; and at 390 px no toolbar. Entry 23 (owner, 2026-11-05): the bar is the
+// one place that talks (no mode pill, no "Snap on" or "Snap off" words, the snap target only while one is in reach), Snap
+// is its glyph saying on or off on hover, no toast follows an add (Details opening and the header's Saved confirm it) and
+// Undo is the toolbar's. Screenshots at 1366 px for the docs (AD-15).
 
 import { randomUUID } from 'node:crypto';
 import { TRACER, pagePixel } from '../lib/geo.mjs';
@@ -53,7 +56,7 @@ async function pixelNow(map, lngLat) {
     return pagePixel(box, lngLat, center, zoom);
 }
 
-/** A page pixel `dx` from the map's centre and `fromTop` below its top edge now (under the toolbar and its pill on the top row, clear of the controls). */
+/** A page pixel `dx` from the map's centre and `fromTop` below its top edge now (under the toolbar on the top row, clear of the controls). */
 async function spot(map, dx, fromTop) {
     const box = await map.boundingBox();
     return [box.x + box.width / 2 + dx, box.y + fromTop];
@@ -75,14 +78,15 @@ async function remove(page, id) {
 test.describe('1366 px', () => {
     test.use({ viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1 });
 
-    editorTest('a gathering line by its kind button with Snap on: the ends snap to CTB1 and SWD1, one batch saves it, Details opens on Name, the toast undoes it',
+    editorTest('a gathering line by its kind button with Snap on: the ends snap to CTB1 and SWD1, one batch saves it, Details opens on Name, no toast, the toolbar's Undo undoes it',
         async ({ page }) => {
             const map = await openEditor(page);
             const before = Number(await map.getAttribute('data-items-loaded'));
             const seqBefore = await map.getAttribute('data-store-seq');
             await view(page, map, SWD_VIEW.center, SWD_VIEW.zoom);
 
-            // The kind button of the dev list's line kind (the second of the list's first three kinds); the pill names it.
+            // The kind button of the dev list's line kind (the second of the list's first three kinds): tinted and named on the
+            // toolbar, and the bar names the kind (entry 23: no pill).
             const bar = page.locator('.mapstudio-drawing-bar');
             await expect(bar).toHaveCount(0);
             const button = page.locator('.mapstudio-tool--kind[data-kind="line"]');
@@ -91,21 +95,27 @@ test.describe('1366 px', () => {
             await expect(map).toHaveAttribute('data-tool', 'line');
             await expect(map).toHaveAttribute('data-tool-kind', 'line');
             await expect(button).toHaveAttribute('aria-pressed', 'true');
-            await expect(page.locator('.mapstudio-pill')).toHaveText('Draw a gathering line - click to add points, Enter to finish');
+            await expect(button).toHaveAttribute('title', 'Gathering line');
+            await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
             await expect(bar).toHaveAttribute('data-points', '0');
             await expect(bar.locator('.mapstudio-drawing-title')).toHaveText('New gathering line');
             await expect(bar.locator('.mapstudio-drawing-finish')).toBeDisabled();
 
-            // Snap, off by default, turned on for this line (UJ-1 step 5).
+            // Snap, off by default, turned on for this line (UJ-1 step 5). It is the magnet glyph alone, saying on or off on hover
+            // (entry 23); the bar says nothing of it until a target is within reach.
             const snap = page.locator('.mapstudio-tool--snap');
             await expect(snap).toHaveAttribute('data-snap', 'off');
-            await expect(snap).toHaveText('Snap off');
-            await expect(bar.locator('.mapstudio-drawing-snap')).toHaveText('Snap off');
+            await expect(snap).toHaveAttribute('aria-pressed', 'false');
+            await expect(snap).toHaveAttribute('title', 'Snap off');
+            await expect(snap).toHaveText('');
+            await expect(bar.locator('.mapstudio-drawing-snap')).toHaveCount(0);
             await snap.click();
             await expect(snap).toHaveAttribute('data-snap', 'on');
-            await expect(snap).toHaveText('Snap on');
+            await expect(snap).toHaveAttribute('aria-pressed', 'true');
+            await expect(snap).toHaveAttribute('title', /^Snap on/);
             await expect(map).toHaveAttribute('data-snap', 'on');
-            await expect(bar.locator('.mapstudio-drawing-snap')).toHaveText('Snap on');
+            await expect(bar).toHaveAttribute('data-snap', 'on');
+            await expect(bar.locator('.mapstudio-drawing-snap')).toHaveCount(0);
 
             // The pointer a few pixels off CTB1: the indicator names it; the click lands the vertex on it.
             let [x, y] = await pixelNow(map, CTB1);
@@ -119,10 +129,11 @@ test.describe('1366 px', () => {
             await expect(bar).toHaveAttribute('data-valid', 'false');
             await expect(bar).toHaveAttribute('data-reason', 'A line needs two points');
             await page.waitForTimeout(VERTEX_PAUSE_MS);
-            // Away from every item nothing is within reach.
+            // Away from every item nothing is within reach, and the indicator goes.
             const clear = await spot(map, 0, 175);
             await page.mouse.move(clear[0], clear[1]);
             await expect(bar).toHaveAttribute('data-snap-target', '');
+            await expect(bar.locator('.mapstudio-drawing-snap')).toHaveCount(0);
             [x, y] = await pixelNow(map, SWD1);
             await page.mouse.move(x - 7, y + 5);
             await expect(bar).toHaveAttribute('data-snap-target', 'SWD1');
@@ -137,7 +148,8 @@ test.describe('1366 px', () => {
             await page.keyboard.press('Enter');
 
             // Finished: saved at once as one batch, selected, Details open with the cursor in Name and the kind's name as the
-            // placeholder; the tool stays in hand with no vertex. The toast says so and offers Undo.
+            // placeholder; the tool stays in hand with no vertex. No toast (entry 23): Details opening and the header's Saved
+            // confirm it, and the toolbar's Undo names the step.
             await expect(bar).toHaveAttribute('data-points', '0');
             await expect(map).toHaveAttribute('data-tool', 'line');
             const panel = page.locator('.mapstudio-panel');
@@ -150,11 +162,13 @@ test.describe('1366 px', () => {
             await expect(page.locator('.mapstudio-field-kind')).toHaveValue('line');
             await expect(page.locator('.mapstudio-panel-save')).toHaveAttribute('data-save-state', 'saved', { timeout: 30_000 });
             await expect(map).toHaveAttribute('data-items-loaded', String(before + 1), { timeout: 15_000 });
-            const toast = page.locator('.mapstudio-toast');
-            await expect(toast).toHaveAttribute('data-message', 'Gathering line added and saved');
-            await expect(toast).toHaveText(/Gathering line added and saved/);
-            const undo = toast.locator('.mapstudio-toast-undo');
+            await expect(page.locator('.mapstudio-panel-save')).toHaveText('Saved');
+            await expect(page.locator('.mapstudio-toast')).toHaveCount(0);
+            await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
+            await expect(page.locator('.mapstudio-reply')).toBeHidden();
+            const undo = page.locator('.mapstudio-toolbar .mapstudio-undo');
             await expect(undo).toHaveAttribute('aria-label', 'Undo: add Gathering line');
+            await expect(undo).toHaveAttribute('title', 'Undo: add Gathering line');
             await expect(undo).toBeEnabled();
             // One batch, one seq: the record carries the kind, the placeholder name, both ends and the pads' own places.
             expect(Number(await map.getAttribute('data-store-seq'))).toBe(Number(seqBefore) + 1);
@@ -169,9 +183,8 @@ test.describe('1366 px', () => {
             await expect(map).toHaveAttribute('data-floating-ends', '0');
             await shot(page, 'mapstudio-drawing-snapped-1366.png');
 
-            // Undo from the toast: the add is reversed and the line goes, with its selection.
+            // Undo from the toolbar: the add is reversed and the line goes, with its selection.
             await undo.click();
-            await expect(toast).toHaveCount(0);
             await expect(map).toHaveAttribute('data-items-loaded', String(before), { timeout: REPLY_MS });
             await expect(panel).toHaveCount(0);
             expect(await stored(page, lineId)).toBeUndefined();
@@ -228,10 +241,12 @@ test.describe('1366 px', () => {
             await fence.click();
             await expect(map).toHaveAttribute('data-tool', 'area');
             await expect(map).toHaveAttribute('data-tool-kind', 'geofence');
-            await expect(page.locator('.mapstudio-pill')).toHaveText('Draw a geofence - click to add points, double-click to close');
+            await expect(fence).toHaveAttribute('aria-pressed', 'true');
+            await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
             const bar = page.locator('.mapstudio-drawing-bar');
             await expect(bar.locator('.mapstudio-drawing-title')).toHaveText('New geofence');
-            // A triangle on the clear ground north of the tracer's points (under the toolbar and its pill).
+            await expect(bar.locator('.mapstudio-drawing-progress')).toHaveText('Click the map to add the first point');
+            // A triangle on the clear ground north of the tracer's points (under the toolbar).
             const a = await spot(map, -150, 235);
             const b = await spot(map, 0, 155);
             const c = await spot(map, 150, 235);
@@ -259,7 +274,9 @@ test.describe('1366 px', () => {
             expect(saved.geometry.coordinates).toHaveLength(3);
             // Drawn as a closed fill (features.ts closes the ring).
             await expect.poll(async () => JSON.parse(await map.getAttribute('data-areas')).some((area) => area.id === fenceId), { timeout: 15_000 }).toBe(true);
-            await expect(page.locator('.mapstudio-toast')).toHaveAttribute('data-message', 'Geofence added and saved');
+            // No toast (entry 23): the toolbar's Undo names the add.
+            await expect(page.locator('.mapstudio-toast')).toHaveCount(0);
+            await expect(page.locator('.mapstudio-toolbar .mapstudio-undo')).toHaveAttribute('data-step', 'Undo: add Geofence');
             await shot(page, 'mapstudio-drawing-geofence-1366.png');
             await remove(page, fenceId);
         });
@@ -315,11 +332,11 @@ test.describe('1366 px', () => {
             await page.keyboard.press('Backspace');
             await expect(bar).toHaveAttribute('data-points', '1');
             await expect(bar).toHaveAttribute('data-valid', 'false');
-            // Esc cancels the drawing: the pill reads Select, the bar goes, nothing was sent.
+            // Esc cancels the drawing: Select is tinted again, the bar goes and nothing talks (no pill), nothing was sent.
             await page.keyboard.press('Escape');
             await expect(bar).toHaveCount(0);
             await expect(map).toHaveAttribute('data-tool', '');
-            await expect(page.locator('.mapstudio-pill')).toHaveText('Select');
+            await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
             await expect(page.locator('.mapstudio-tool--select')).toHaveAttribute('aria-pressed', 'true');
             await page.waitForTimeout(1_000);
             await expect(map).toHaveAttribute('data-items-loaded', String(before));
@@ -335,8 +352,10 @@ test.describe('1366 px', () => {
             await view(page, map, TRACER_VIEW.center, TRACER_VIEW.zoom);
             await page.locator('.mapstudio-tool--area').click();
             await expect(map).toHaveAttribute('data-tool', 'area');
-            await expect(page.locator('.mapstudio-pill')).toHaveText('Draw a geofence - click to add points, double-click to close');
+            await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
             const bar = page.locator('.mapstudio-drawing-bar');
+            // The generic Area tool saves the first area kind, which the bar names.
+            await expect(bar.locator('.mapstudio-drawing-title')).toHaveText('New geofence');
             // A bow tie: the edge a to b crosses the edge c to d.
             const a = await spot(map, -120, 155);
             const b = await spot(map, 120, 235);
@@ -385,8 +404,10 @@ test.describe('1366 px', () => {
         await expect(map).toHaveAttribute('data-tool', 'line');
         await expect(page.locator('.mapstudio-tool--line')).toHaveAttribute('aria-pressed', 'true');
         await expect(page.locator('.mapstudio-tool--kind[data-kind="line"]')).toHaveAttribute('aria-pressed', 'false');
-        await expect(page.locator('.mapstudio-pill')).toHaveText('Draw a gathering line - click to add points, Enter to finish');
+        await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
         const bar = page.locator('.mapstudio-drawing-bar');
+        // The generic Line tool saves the first line kind, which the bar names.
+        await expect(bar.locator('.mapstudio-drawing-title')).toHaveText('New gathering line');
         for (const [i, [dx, fromTop]] of [[-140, 235], [0, 155], [140, 235]].entries()) {
             const p = await spot(map, dx, fromTop);
             await page.mouse.click(p[0], p[1]);
@@ -426,5 +447,6 @@ test.describe('390 px', () => {
         await expect(page.locator('.mapstudio-toolbar')).toHaveCount(0);
         await expect(page.locator('.mapstudio-drawing-bar')).toHaveCount(0);
         await expect(page.locator('.mapstudio-toast')).toHaveCount(0);
+        await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
     });
 });

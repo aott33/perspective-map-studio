@@ -55,7 +55,8 @@ export const VERTEX_PAUSE_MS = 300;
  * Draw the tracer's two-point line with the toolbar's Line tool (epic 4 entry 4: Edit mode at level `full`, 768 px
  * and wider), `dy` pixels below the map's centre offsets (unsaved.spec draws 200 px above, dy -200, so its dashed
  * line is not hidden under a saved one), finished with Enter, and wait until the save was sent (the dev status
- * line shows it: saving, saved, refused or unsent). The tool stays in hand after the finish, so a second line
+ * line holds it: saving, saved, refused or unsent; in Edit mode only a problem shows, the rest stays in the DOM
+ * unseen, epic 4 entry 23). The tool stays in hand after the finish, so a second line
  * needs no click on the tool. A viewer's or a phone editor's line, where no tool shows, goes through the test
  * hook instead (`hookLineBatch`).
  */
@@ -114,7 +115,8 @@ export async function openMap(page, pagePath = '/', project = undefined) {
     // the banner's active class is the signal that it is reconnecting.
     await page.waitForSelector('.connection-banner.banner-active', { state: 'detached', timeout: 30_000 }).catch(() => {});
     await expect(map).toHaveAttribute('data-map-ready', 'true', { timeout: 60_000 });
-    // The status line is in the DOM on every page; in View mode it shows only when it has a status (entry 15).
+    // The status line is in the DOM on every page; in View mode it shows only when it has a status (entry 15), in Edit mode only
+    // when it has a problem (epic 4 entry 23).
     await page.locator('.mapstudio-reply').waitFor({ state: 'attached' });
     return map;
 }

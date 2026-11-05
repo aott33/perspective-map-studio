@@ -143,6 +143,8 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
                 await expect(row).toHaveAttribute('data-unsaved-state', 'unsent');
                 await expect(page.locator('.mapstudio-unsaved-summary')).toHaveText('Store unreachable - 1 edit not saved');
                 await expect(page.locator('.mapstudio-save-status')).toHaveAttribute('data-save-state', 'unsent');
+                // A problem still shows in the status line, in Edit mode too (epic 4 entry 23: problems only, until entry 10).
+                await expect(page.locator('.mapstudio-save-status')).toBeVisible();
                 await expect(map).toHaveAttribute('data-unsaved-count', '1');
                 await expect(map).toHaveAttribute('data-items-loaded', String(before));
                 expect(gate.dropped).toBeGreaterThan(0);
