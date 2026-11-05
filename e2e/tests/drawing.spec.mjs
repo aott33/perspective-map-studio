@@ -78,7 +78,7 @@ async function remove(page, id) {
 test.describe('1366 px', () => {
     test.use({ viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1 });
 
-    editorTest('a gathering line by its kind button with Snap on: the ends snap to CTB1 and SWD1, one batch saves it, Details opens on Name, no toast, the toolbar's Undo undoes it',
+    editorTest('a gathering line by its kind button with Snap on: the ends snap to CTB1 and SWD1, one batch saves it, Details opens on Name, no toast, the toolbar\'s Undo undoes it',
         async ({ page }) => {
             const map = await openEditor(page);
             const before = Number(await map.getAttribute('data-items-loaded'));
