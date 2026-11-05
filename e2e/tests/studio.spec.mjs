@@ -3,7 +3,13 @@
 // the same page stays in View mode with the prop as written, one pad is added with the Point tool, fine-tuned
 // by a drag, named and linked (each a batch that a viewer's open map gets within seconds), undone step by
 // step and redone, and the page's selectedItem label and onItemSelected script follow every selection.
-// Screenshots at 1366 px for the docs (AD-15).
+// Edit mode's top row (entry 21, the owner's option B; DESIGN.md Edit mode, Direction A, key screen 4): at 1366
+// and 1440 px with the properties panel docked, no search field or Needs you bar over the map, the toolbar on
+// the top row level with the Editing switch and clear of it and the zoom card, the pill and then the connection
+// chip under it; leaving Edit mode brings the View-mode top bar back with its lists closed, and a list open on
+// entry closes; the Items list's Search items field filters the rows, Esc and Clear bring them back with the
+// selection kept, and a filtered row picked is a row click; at 390 px the editor keeps View mode's top bar.
+// Screenshots at 1366 and 1440 px for the docs (AD-15).
 
 import { TRACER, pagePixel } from '../lib/geo.mjs';
 import { randomUUID } from 'node:crypto';
@@ -385,5 +391,305 @@ test.describe('1366 px', () => {
             await expect(map).toHaveAttribute('data-tool', '');
             await expect(page.locator('.mapstudio-pill')).toHaveText('Select');
             await expect(page.locator('.mapstudio-tool--select')).toHaveAttribute('aria-pressed', 'true');
+        });
+});
+
+// ---- Edit mode's top row (entry 21) ----
+
+/**
+ * The client logs its own failed reconnect attempts while a lost connection is simulated ("Hello API call failed ...
+ * Simulated disconnect", as connection.spec.mjs filters them): those are the loss itself; any other console or page
+ * error still fails the test.
+ */
+const SIMULATED = /Simulated disconnect/;
+const lossTest = editorTest.extend({
+    watched: [
+        async ({ page }, use) => {
+            const w = watch(page);
+            await use(w);
+            expect(w.errors.filter((e) => !SIMULATED.test(e)), 'browser console and page errors').toEqual([]);
+        },
+        { auto: true }
+    ]
+});
+/** How long the simulated loss lasts (the client's `__client.simulateLostConnection`). */
+const LOST_S = 6;
+/** The floating controls' distance from the map's edge (DESIGN.md spacing map-inset). */
+const INSET = 12;
+
+/** The rows the list shows, by item id, in its order. */
+async function listIds(page) {
+    return page.locator('.mapstudio-list-row').evaluateAll((els) => els.map((el) => el.getAttribute('data-item-id')));
+}
+
+/** Whether two page rectangles overlap. */
+function overlaps(a, b) {
+    return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+/** Wait until a map move that changes `data-center` from `before` has ended, and return the centre then. */
+async function centreAfter(map, before) {
+    await expect.poll(() => map.getAttribute('data-center'), { timeout: 10_000 }).not.toBe(before);
+    return map.getAttribute('data-center');
+}
+
+for (const [width, height, listWidth, panelWidth] of [[1366, 768, 256, 320], [1440, 900, 280, 340]]) {
+    test.describe(width + ' px, the top row', () => {
+        test.use({ viewport: { width, height }, deviceScaleFactor: 1 });
+
+        lossTest('no search field or Needs you bar over the map; the toolbar on the top row level with the Editing switch and clear of it and the zoom card with properties docked; the pill, then the connection chip, under it',
+            async ({ page }) => {
+                const map = await openEditor(page);
+                await expect(map).toHaveAttribute('data-studio', 'on');
+                // The View-mode top bar is hidden in Edit mode: the search is the Items list's, Needs you stays View mode's.
+                await expect(page.locator('.mapstudio-topbar')).toBeHidden();
+                await expect(page.locator('.mapstudio-search-field')).toBeHidden();
+                await expect(page.locator('.mapstudio-needs')).toBeHidden();
+                await expect(page.locator('.mapstudio-list-search-input')).toBeVisible();
+                // The Legend button stays where it was (owner: it stays until decided).
+                await expect(page.locator('.mapstudio-legend-button')).toBeVisible();
+
+                // The properties panel docked: a row's Details, the map the rest of the component.
+                const p2 = seed.ids[TRACER.points.p2.key];
+                await page.locator('.mapstudio-list-row[data-item-id="' + p2 + '"]').click();
+                await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', p2);
+                await expectStageWidth(map, width - 72 - listWidth - panelWidth);
+                expect(Math.round((await page.locator('.mapstudio-dock--items').boundingBox()).width)).toBe(listWidth);
+                expect(Math.round((await page.locator('.mapstudio-panel').boundingBox()).width)).toBe(panelWidth);
+
+                const box = await map.boundingBox();
+                const toolbar = await page.locator('.mapstudio-toolbar').boundingBox();
+                const sw = await page.locator('.mapstudio-edit-switch').boundingBox();
+                const zoom = await page.locator('.mapstudio-zoom').boundingBox();
+                const pill = await page.locator('.mapstudio-pill').boundingBox();
+                console.log(width + ' px: map ' + Math.round(box.width) + ' wide; toolbar ' + Math.round(toolbar.x - box.x) + ' to '
+                    + Math.round(toolbar.x + toolbar.width - box.x) + ', switch from ' + Math.round(sw.x - box.x) + ', zoom card from '
+                    + Math.round(zoom.x - box.x));
+                // The top row: the toolbar at the map inset, centred over the map, level with the switch (both 36 px tall).
+                expect(Math.abs(toolbar.y - (box.y + INSET)), 'the toolbar at the map inset').toBeLessThanOrEqual(1);
+                expect(Math.abs(toolbar.x + toolbar.width / 2 - (box.x + box.width / 2)), 'the toolbar centred over the map').toBeLessThanOrEqual(1);
+                expect(Math.abs((toolbar.y + toolbar.height / 2) - (sw.y + sw.height / 2)), 'level with the Editing switch').toBeLessThanOrEqual(2);
+                // Apart from the switch and the zoom card under it: at least the map inset between them, nothing overlapping.
+                expect(sw.x - (toolbar.x + toolbar.width), 'clear of the Editing switch').toBeGreaterThanOrEqual(INSET);
+                expect(zoom.x - (toolbar.x + toolbar.width), 'clear of the zoom card').toBeGreaterThanOrEqual(INSET);
+                expect(toolbar.x - box.x, 'clear of the map\'s left edge').toBeGreaterThanOrEqual(INSET);
+                // The pill under the toolbar, clear of the zoom card.
+                expect(pill.y, 'the pill under the toolbar').toBeGreaterThanOrEqual(toolbar.y + toolbar.height);
+                expect(overlaps(pill, zoom), 'the pill clear of the zoom card').toBe(false);
+                expect(overlaps(pill, sw), 'the pill clear of the switch').toBe(false);
+                await shot(page, 'mapstudio-studio-top-row-' + width + '.png');
+
+                // The connection chip under the pill: the client's connection closed for a few seconds.
+                const chip = page.locator('.mapstudio-connection');
+                await expect(chip).toHaveCount(0);
+                await page.evaluate((s) => window.__client.simulateLostConnection(s), LOST_S);
+                await expect(map).toHaveAttribute('data-connection', 'lost', { timeout: 10_000 });
+                await expect(chip).toBeVisible();
+                await expect(map).toHaveAttribute('data-studio', 'on');
+                const chipBox = await chip.boundingBox();
+                const pillNow = await page.locator('.mapstudio-pill').boundingBox();
+                expect(chipBox.y, 'the chip under the pill').toBeGreaterThanOrEqual(pillNow.y + pillNow.height);
+                expect(Math.abs(chipBox.x + chipBox.width / 2 - (box.x + box.width / 2)), 'the chip centred over the map').toBeLessThanOrEqual(1);
+                expect(overlaps(chipBox, await page.locator('.mapstudio-toolbar').boundingBox()), 'the chip clear of the toolbar').toBe(false);
+                await shot(page, 'mapstudio-studio-top-row-chip-' + width + '.png');
+                // Back: the map reloads and the chip goes.
+                await expect(map).toHaveAttribute('data-connection', 'ok', { timeout: (LOST_S + 30) * 1000 });
+                await expect(chip).toHaveCount(0);
+            });
+
+        editorTest('leaving Edit mode brings the search field and the Needs you bar back with their lists closed; a list open on entry closes and nothing comes back open',
+            async ({ page }) => {
+                const map = await openEditor(page);
+                await expect(map).toHaveAttribute('data-studio', 'on');
+                const sw = page.locator('.mapstudio-edit-switch-button');
+                const topbar = page.locator('.mapstudio-topbar');
+                const searchField = page.locator('.mapstudio-search-field');
+                const needs = page.locator('.mapstudio-needs');
+                const panels = page.locator('.mapstudio-topbar-panel');
+                await expect(topbar).toBeHidden();
+
+                // Off: View mode, the top bar back where View mode draws it (top-left at the map inset), both lists closed.
+                await sw.click();
+                await expect(map).toHaveAttribute('data-mode', 'view');
+                await expect(map).toHaveAttribute('data-studio', 'off');
+                await expect(searchField).toBeVisible();
+                await expect(needs).toBeVisible();
+                await expect(map).toHaveAttribute('data-search-open', 'false');
+                await expect(map).toHaveAttribute('data-needs-open', 'false');
+                await expect(panels).toHaveCount(0);
+                const box = await map.boundingBox();
+                const fieldBox = await searchField.boundingBox();
+                expect(Math.round(fieldBox.x - box.x)).toBe(INSET);
+                expect(Math.round(fieldBox.y - box.y)).toBe(INSET);
+
+                // The Needs you list open, then the switch on: the list closes with the bar.
+                await needs.click();
+                await expect(page.locator('.mapstudio-needs-panel')).toBeVisible();
+                await expect(map).toHaveAttribute('data-needs-open', 'true');
+                await sw.click();
+                await expect(map).toHaveAttribute('data-studio', 'on');
+                await expect(topbar).toBeHidden();
+                await expect(map).toHaveAttribute('data-needs-open', 'false');
+                await expect(page.locator('.mapstudio-needs-panel')).toHaveCount(0);
+                // Off again: nothing comes back open.
+                await sw.click();
+                await expect(map).toHaveAttribute('data-studio', 'off');
+                await expect(needs).toBeVisible();
+                await expect(needs).toHaveAttribute('aria-expanded', 'false');
+                await expect(map).toHaveAttribute('data-needs-open', 'false');
+                await expect(panels).toHaveCount(0);
+
+                // The search's list open (its chevron: every item), then the switch on. The switch is pressed from a script so
+                // the focus stays in the field, as when the page's editMode prop turns Edit mode on: the list closes all the same.
+                await page.locator('.mapstudio-search-chevron').click();
+                await expect(page.locator('.mapstudio-search-panel')).toBeVisible();
+                await expect(map).toHaveAttribute('data-search-open', 'true');
+                await page.evaluate(() => document.querySelector('.mapstudio-edit-switch-button').click());
+                await expect(map).toHaveAttribute('data-studio', 'on');
+                await expect(topbar).toBeHidden();
+                await expect(map).toHaveAttribute('data-search-open', 'false');
+                await expect(page.locator('.mapstudio-search-panel')).toHaveCount(0);
+                await sw.click();
+                await expect(map).toHaveAttribute('data-studio', 'off');
+                await expect(searchField).toBeVisible();
+                await expect(map).toHaveAttribute('data-search-open', 'false');
+                await expect(page.locator('.mapstudio-search-input')).toHaveAttribute('aria-expanded', 'false');
+                await expect(panels).toHaveCount(0);
+            });
+
+        editorTest('Search items: "swd" keeps the rows whose name, kind or linked asset holds it, in list order, "No matches" with none; Esc and Clear bring every row back, the selection kept; a filtered row picked is a row click',
+            async ({ page }) => {
+                const map = await openEditor(page);
+                await expect(map).toHaveAttribute('data-studio', 'on');
+                const field = page.locator('.mapstudio-list-search-input');
+                const clear = page.locator('.mapstudio-list-search-clear');
+                const list = page.locator('.mapstudio-list');
+                const panel = page.locator('.mapstudio-panel');
+                // The field under the header's title row (DESIGN.md key screen 4): a search glyph, "Search items", its own name.
+                await expect(field).toHaveAttribute('placeholder', 'Search items');
+                await expect(field).toHaveAttribute('aria-label', 'Search items by name, kind or asset');
+                await expect(page.locator('.mapstudio-list-search-glyph')).toBeVisible();
+                await expect(clear).toHaveCount(0);
+                const title = await page.locator('.mapstudio-dock-title').boundingBox();
+                const fieldBox = await field.boundingBox();
+                const dock = await page.locator('.mapstudio-dock--items').boundingBox();
+                expect(fieldBox.y).toBeGreaterThanOrEqual(title.y + title.height);
+                expect(fieldBox.x).toBeGreaterThanOrEqual(dock.x);
+                expect(fieldBox.x + fieldBox.width).toBeLessThanOrEqual(dock.x + dock.width);
+                const all = await listIds(page);
+                expect(all.length).toBeGreaterThanOrEqual(33);
+                await expect(list).toHaveAttribute('data-rows', String(all.length));
+
+                // What "swd" keeps, from map.load: the rows whose name, kind name or linked asset name holds it, in the list's order.
+                const load = (await send(page, 'map.load', {})).body;
+                const kindName = Object.fromEntries(load.kinds.map((k) => [k.id, k.name]));
+                const assetName = Object.fromEntries((load.assetNames || []).map((a) => [a.id, a.name]));
+                const holds = (text) => typeof text === 'string' && text.toLowerCase().includes('swd');
+                const byId = Object.fromEntries(load.items.filter((i) => !i.deleted).map((i) => [i.id, i]));
+                const matching = new Set(Object.values(byId)
+                    .filter((i) => holds(i.name) || holds(kindName[i.kind]) || (i.assetId !== null && holds(assetName[i.assetId])))
+                    .map((i) => i.id));
+                const swd = all.filter((id) => matching.has(id));
+                const swd1 = seed.ids['swd/swd1'];
+                expect(swd).toContain(swd1);
+                expect(swd.length).toBeLessThan(all.length);
+
+                // A row selected first (Details docked), so Esc and Clear can show the selection stays; then a plain row click on
+                // SWD1 from the tracer's view, the reference for what a row click does.
+                const p2 = seed.ids[TRACER.points.p2.key];
+                await page.locator('.mapstudio-list-row[data-item-id="' + p2 + '"]').click();
+                await expect(panel).toHaveAttribute('data-item-id', p2);
+                await expectStageWidth(map, width - 72 - listWidth - panelWidth);
+                await view(page, map, TRACER.center, TRACER.zoom);
+                let before = await map.getAttribute('data-center');
+                await page.locator('.mapstudio-list-row[data-item-id="' + swd1 + '"]').click();
+                await expect(map).toHaveAttribute('data-selected', swd1);
+                const rowClickCentre = await centreAfter(map, before);
+
+                // Typed: only the rows holding it, in the list's order; Clear shows while there is text.
+                await view(page, map, TRACER.center, TRACER.zoom);
+                await page.locator('.mapstudio-list-row[data-item-id="' + p2 + '"]').click();
+                await expect(panel).toHaveAttribute('data-item-id', p2);
+                await field.click();
+                await field.pressSequentially('swd');
+                await expect(field).toHaveValue('swd');
+                await expect(list).toHaveAttribute('data-rows', String(swd.length));
+                expect(await listIds(page)).toEqual(swd);
+                await expect(clear).toBeVisible();
+                await expect(page.locator('.mapstudio-list-empty')).toHaveCount(0);
+                // The selected row (Point 2) is filtered out of sight; the selection and Details stay.
+                await expect(map).toHaveAttribute('data-selected', p2);
+                await expect(panel).toHaveAttribute('data-item-id', p2);
+                await shot(page, 'mapstudio-studio-search-' + width + '.png');
+
+                // A filtered row picked: selected, Details open on it, the map panned exactly as the plain row click panned it, no popup.
+                await view(page, map, TRACER.center, TRACER.zoom);
+                before = await map.getAttribute('data-center');
+                const row = page.locator('.mapstudio-list-row[data-item-id="' + swd1 + '"]');
+                await row.click();
+                await expect(map).toHaveAttribute('data-selected', swd1);
+                await expect(row).toHaveAttribute('aria-current', 'true');
+                await expect(panel).toHaveAttribute('data-item-id', swd1);
+                await expect(page.locator('.mapstudio-panel-name')).toHaveText(byId[swd1].name);
+                await expect(map).toHaveAttribute('data-popup-mode', '');
+                expect(await centreAfter(map, before)).toBe(rowClickCentre);
+                await expectPageSelection(page, swd1, byId[swd1].name, byId[swd1].kind);
+                // The text stays after the pick.
+                await expect(field).toHaveValue('swd');
+
+                // Esc in the field: the text empties and every row is back; the selection and Details stay (Esc goes no further).
+                await field.focus();
+                await page.keyboard.press('Escape');
+                await expect(field).toHaveValue('');
+                await expect(clear).toHaveCount(0);
+                await expect(list).toHaveAttribute('data-rows', String(all.length));
+                expect(await listIds(page)).toEqual(all);
+                await expect(map).toHaveAttribute('data-selected', swd1);
+                await expect(panel).toHaveAttribute('data-item-id', swd1);
+                await expect(field).toBeFocused();
+
+                // None matching: "No matches", no row; Clear brings every row back, the focus in the field, the selection kept.
+                await field.pressSequentially('zz no such item');
+                await expect(list).toHaveAttribute('data-rows', '0');
+                await expect(page.locator('.mapstudio-list-row')).toHaveCount(0);
+                await expect(page.locator('.mapstudio-list-empty--search')).toHaveText('No matches');
+                await clear.click();
+                await expect(field).toHaveValue('');
+                await expect(field).toBeFocused();
+                await expect(page.locator('.mapstudio-list-empty--search')).toHaveCount(0);
+                await expect(list).toHaveAttribute('data-rows', String(all.length));
+                expect(await listIds(page)).toEqual(all);
+                await expect(map).toHaveAttribute('data-selected', swd1);
+                await expect(panel).toHaveAttribute('data-item-id', swd1);
+                // Case and accents aside, as the View-mode search compares.
+                await field.pressSequentially('SWD');
+                await expect(list).toHaveAttribute('data-rows', String(swd.length));
+                await page.keyboard.press('Escape');
+                await expect(field).toHaveValue('');
+            });
+    });
+}
+
+test.describe('390 px, the top row', () => {
+    test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+
+    editorTest('the map editor keeps View mode\'s top bar at phone width: the search field and the Needs you bar in the one bar, no list panel',
+        async ({ page }) => {
+            const map = await openEditor(page);
+            await expect(map).toHaveAttribute('data-studio', 'off');
+            await expect(map).toHaveAttribute('data-mode', 'view');
+            const bar = page.locator('.mapstudio-topbar');
+            await expect(bar).toBeVisible();
+            await expect(page.locator('.mapstudio-search-field')).toBeVisible();
+            await expect(page.locator('.mapstudio-needs')).toBeVisible();
+            await expect(page.locator('.mapstudio-dock')).toHaveCount(0);
+            await expect(page.locator('.mapstudio-list-search')).toHaveCount(0);
+            // The one top bar 8 px from the edges, 48 px tall (DESIGN.md Phone), as search.spec.mjs reads it.
+            const box = await map.boundingBox();
+            const barBox = await bar.boundingBox();
+            expect(Math.round(barBox.x - box.x)).toBe(8);
+            expect(Math.round(barBox.y - box.y)).toBe(8);
+            expect(Math.round(barBox.width)).toBe(390 - 16);
+            expect(Math.round(barBox.height)).toBe(48);
         });
 });

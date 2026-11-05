@@ -53,7 +53,7 @@ async function pixelNow(map, lngLat) {
     return pagePixel(box, lngLat, center, zoom);
 }
 
-/** A page pixel `dx` from the map's centre and `fromTop` below its top edge now (under the top bar, the toolbar and its pill, clear of the controls). */
+/** A page pixel `dx` from the map's centre and `fromTop` below its top edge now (under the toolbar and its pill on the top row, clear of the controls). */
 async function spot(map, dx, fromTop) {
     const box = await map.boundingBox();
     return [box.x + box.width / 2 + dx, box.y + fromTop];
@@ -291,9 +291,9 @@ test.describe('1366 px', () => {
             await page.waitForTimeout(VERTEX_PAUSE_MS);
             await expect(bar).toHaveAttribute('data-points', '1');
             await expect(bar.locator('.mapstudio-drawing-hint')).toHaveText('A line needs two points');
-            // A key typed in a field inside the map container (the search field) stays the field's: Backspace there
-            // removes the letter, not the vertex.
-            const search = page.locator('.mapstudio-search-input');
+            // A key typed in a field stays the field's: Backspace in the Items list's Search items field (entry 21: in
+            // Edit mode the search is the list's, the View-mode top bar is hidden) removes the letter, not the vertex.
+            const search = page.locator('.mapstudio-list-search-input');
             await search.click();
             await page.keyboard.type('x');
             await expect(search).toHaveValue('x');
