@@ -84,6 +84,17 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 ## Review Triage Log
 
+Quick lens, 2026-11-05: 6 findings; high 0, medium 2, low 4, false 0, maybe-false 0.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| Below about 1280 px with Details docked the toolbar on the top row covers the Editing switch (`mapstudio.css` `.mapstudio-toolbar-float` at the map inset) | medium | Below 1440 px the rail, list and panel are fixed widths (648 px), so the map is 376 px at 1024 px; the 348 px toolbar centred there spans the switch, both at z-index 6 with the toolbar later in the DOM. Entry 4's second row cleared it. DESIGN.md gives those widths the list collapse, which is entry 7's and not built | patch: below 1280 px the toolbar keeps entry 4's row under the switch until entry 7's collapse, with a 1200 px check |
+| Hiding the Needs you bar in Edit mode changes alarm presentation and is not flagged for ER-27 (CLAUDE.md alarm changes; handoff-epic-4.md: ER-27 review of alarm presentation is the owner's) | medium | `epic-editing.md` names only the marker and the distance rows for ER-27; neither the CHANGELOG nor the contract paragraph flags the hidden summary. The editor still sees the states as list badges and markers; View mode is unchanged | patch: flagged in the CHANGELOG, the contract paragraph and `docs/review-er27.md`'s record for the owner's ER-27 review |
+| The stylesheet's top bar rule has no 768 px guard, so a window shrunk below 768 px in Edit mode loses View mode's bar until the next update (`mapstudio.css`) | low | `phoneWidth()` is read only on a render; the ResizeObserver calls no setState; the 767 px block already hides the studio for that stale window, and the new rule adds the bar to what vanishes | patch: the rule scoped to 768 px and wider |
+| The drawing spec's field step no longer exercises the map container's field guard (`editing.ts` `inField`), which has no unit test | low | The list's field is in the dock, outside `.mapstudio-map`, so its keys reach neither the capture listener nor Terra Draw's canvas; the step passes with the guard deleted; the guard's comments still name the search field | patch: the guard unit tested where it can be, its comments corrected |
+| "No matches" is a `role="status"` element created already holding its text, which many screen readers do not announce (`ItemList.tsx`) | low | The region mounts with the text in the same commit; the View search uses a persistent region (`.mapstudio-search-status`) | patch: a region always mounted, only its text changing |
+| `docs/platform-checks.md` "The toolbar's row" cites entry 4's renders for entry 21's 48 px figure | low | The evidence cell still reads "(the renders above)" | patch: cite `studio.spec.mjs` and the `mapstudio-studio-top-row-*.png` renders |
+
 ## Verification
 
 **Commands:**
