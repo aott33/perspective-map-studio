@@ -981,7 +981,7 @@ test.describe('1366 px, the legend in Layers acts as the panel does', () => {
             await expect(status).toBeHidden();
         });
 
-    editorTest('a Legend panel open as Edit mode comes on closes and gives the focus up; leaving Edit mode brings the Legend button back with its panel closed',
+    editorTest('a Legend panel open as Edit mode comes on closes and gives the focus up; leaving Edit mode brings the Legend button back with its panel closed; a focused Legend button gives the focus up as Edit mode comes on',
         async ({ page }) => {
             const map = await openEditor(page);
             const sw = page.locator('.mapstudio-edit-switch-button');
@@ -1024,6 +1024,29 @@ test.describe('1366 px, the legend in Layers acts as the panel does', () => {
             await legendButton(page).click();
             await expect(legendPanel(page)).toBeVisible();
             await expect(map).toHaveAttribute('data-legend-open', 'true');
+
+            // The Legend button itself focused, its panel closed (Esc returns the focus to it), then Edit mode turned on by a
+            // script, as the page's editMode prop does: the hidden button gives the focus up. Read as the studio's render commits
+            // (a mutation observer's microtask, after the commit's componentDidUpdate): the browser blurs a hidden element by
+            // itself only at its next rendering update, so a later read could not tell the component's blur from the browser's.
+            await page.keyboard.press('Escape');
+            await expect(legendPanel(page)).toHaveCount(0);
+            await expect(legendButton(page)).toBeFocused();
+            const onButton = await page.evaluate(() => new Promise((resolve) => {
+                const el = document.querySelector('.mapstudio-map');
+                const button = document.querySelector('.mapstudio-legend-button');
+                const watch = new MutationObserver(() => {
+                    if (el.getAttribute('data-studio') === 'on') {
+                        watch.disconnect();
+                        resolve(document.activeElement === button);
+                    }
+                });
+                watch.observe(el, { attributes: true, attributeFilter: ['data-studio'] });
+                document.querySelector('.mapstudio-edit-switch-button').click();
+            }));
+            expect(onButton, 'the focus is no longer on the hidden Legend button').toBe(false);
+            await expect(map).toHaveAttribute('data-studio', 'on');
+            await expect(legendButton(page)).toBeHidden();
         });
 });
 
