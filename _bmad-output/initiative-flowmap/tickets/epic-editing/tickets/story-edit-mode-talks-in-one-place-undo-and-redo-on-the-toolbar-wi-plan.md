@@ -3,14 +3,14 @@ title: "Edit mode talks in one place: Undo and Redo on the toolbar with the last
 type: 'feature'
 ticket: '23'
 created: '2026-11-05'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: 'ccacb73b6c353de0c50814dc3cb3e1b44f79a3a9'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
