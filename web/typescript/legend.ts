@@ -146,6 +146,37 @@ export function legendKey(items: readonly MapItemRecord[], kinds: readonly Kind[
     return { kinds: kindRows, states: STATE_ROWS, lines: LINE_ROWS, styles: anyRule ? STYLE_ROWS : [], tints };
 }
 
+/** Two plain values (the key's rows: strings, numbers, booleans, null, arrays and objects) alike, field by field. */
+function sameValue(a: unknown, b: unknown): boolean {
+    if (a === b) {
+        return true;
+    }
+    if (Array.isArray(a) || Array.isArray(b)) {
+        return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => sameValue(v, b[i]));
+    }
+    if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
+        return false;
+    }
+    const ra = a as Record<string, unknown>;
+    const rb = b as Record<string, unknown>;
+    // A field left out and a field set to undefined are alike (a line row's optional `arrow`).
+    const keys = new Set([...Object.keys(ra), ...Object.keys(rb)]);
+    for (const k of keys) {
+        if (!sameValue(ra[k], rb[k])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Whether two keys hold the same rows (a structural comparison), so the legend is drawn again only when what it
+ * names changed, not on every saved edit or full batch that rebuilt an equal key (epic 4 entry 22). Pure.
+ */
+export function sameLegendKey(a: LegendKey, b: LegendKey): boolean {
+    return sameValue(a, b);
+}
+
 export type LegendToggle = 'lines' | 'names';
 
 /** The session storage keys the toggles are remembered under (per browser session, EXPERIENCE.md Legend). */

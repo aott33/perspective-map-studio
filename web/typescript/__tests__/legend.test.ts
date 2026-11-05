@@ -1,7 +1,10 @@
 import { Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import { KindDisplay } from '../live';
-import { KINDS_COLLAPSE_OVER, LINE_ROWS, STATE_ROWS, STYLE_ROWS, TOGGLE_KEYS, ToggleStore, kindsHeading, kindsStartCollapsed, legendKey, readToggle, writeToggle } from '../legend';
+import {
+    KINDS_COLLAPSE_OVER, LINE_ROWS, STATE_ROWS, STYLE_ROWS, TOGGLE_KEYS, ToggleStore, kindsHeading, kindsStartCollapsed, legendKey, readToggle, sameLegendKey,
+    writeToggle
+} from '../legend';
 
 const PAD: Kind = { id: 'pad', name: 'Well pad', geometry: 'point', icon: 'well-pad', labelRank: 10, fields: [] };
 const SWD: Kind = { id: 'swd', name: 'SWD', geometry: 'point', icon: 'swd', labelRank: 8, fields: [] };
@@ -70,6 +73,35 @@ describe('the legend key (epic 3 entry 3)', () => {
         const refusing: ToggleStore = { getItem: () => { throw new Error('no'); }, setItem: () => { throw new Error('no'); } };
         expect(readToggle(refusing, 'names')).toBe(true);
         expect(() => writeToggle(refusing, 'names', false)).not.toThrow();
+    });
+});
+
+describe('the same key (epic 4 entry 22: the legend is drawn again only when its key changed)', () => {
+    const ITEMS = [item('a', 'pad'), item('b', 'line'), item('c', 'geofence')];
+    const KINDS = [PAD, LINE, FENCE];
+
+    test('two keys built apart from equal items, kinds and display are the same, row by row', () => {
+        const a = legendKey(ITEMS, KINDS, { pad: PAD_DISPLAY, geofence: FENCE_DISPLAY });
+        const b = legendKey(ITEMS.map((i) => ({ ...i, version: 2 })), KINDS.map((k) => ({ ...k })),
+            { pad: { ...PAD_DISPLAY }, geofence: { ...FENCE_DISPLAY } });
+        expect(a).not.toBe(b);
+        expect(sameLegendKey(a, b)).toBe(true);
+        // Copies of the fixed rows, an optional field left out on one side and undefined on the other, are alike.
+        const copied = { ...a, states: a.states.map((r) => ({ ...r })), lines: a.lines.map((r) => ({ ...r, arrow: r.arrow })) };
+        expect(sameLegendKey(a, copied)).toBe(true);
+        expect(sameLegendKey(legendKey([], [], {}), { kinds: [], states: STATE_ROWS, lines: LINE_ROWS, styles: [], tints: [] })).toBe(true);
+    });
+
+    test('a kind on the map or gone, a renamed kind, a style rule turned on, a changed tint or row words differ', () => {
+        const base = legendKey(ITEMS, KINDS, { pad: PAD_DISPLAY, geofence: FENCE_DISPLAY });
+        expect(sameLegendKey(base, legendKey([...ITEMS, item('d', 'swd')], [...KINDS, SWD], { pad: PAD_DISPLAY, geofence: FENCE_DISPLAY }))).toBe(false);
+        expect(sameLegendKey(base, legendKey(ITEMS.slice(0, 2), KINDS, { pad: PAD_DISPLAY, geofence: FENCE_DISPLAY }))).toBe(false);
+        expect(sameLegendKey(base, legendKey(ITEMS, [{ ...PAD, name: 'Pad' }, LINE, FENCE], { pad: PAD_DISPLAY, geofence: FENCE_DISPLAY }))).toBe(false);
+        expect(sameLegendKey(legendKey(ITEMS, KINDS, { geofence: FENCE_DISPLAY }), base)).toBe(false);
+        const retinted: KindDisplay = { ...FENCE_DISPLAY, areaTints: { property: 'operator', tints: [{ category: 'North', tint: 'tint-2' }, { category: 'South', tint: 'tint-4' }] } };
+        expect(sameLegendKey(base, legendKey(ITEMS, KINDS, { pad: PAD_DISPLAY, geofence: retinted }))).toBe(false);
+        expect(sameLegendKey(base, { ...base, lines: base.lines.map((r, i) => (i === 0 ? { ...r, words: 'Pipeline' } : r)) })).toBe(false);
+        expect(sameLegendKey(base, { ...base, lines: base.lines.map((r, i) => (i === 4 ? { ...r, arrow: false } : r)) })).toBe(false);
     });
 });
 

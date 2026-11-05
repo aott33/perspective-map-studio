@@ -32,7 +32,7 @@
 import { IControl, Map as MapLibreMap, ScaleControl } from 'maplibre-gl';
 import { BASEMAP_LABELS, BasemapId, offersBasemapSwitch } from './basemaps';
 import { glyphSvg } from './controls';
-import { LegendKey, LegendToggle, ZOOM_NOTE, kindsHeading, kindsStartCollapsed } from './legend';
+import { LegendKey, LegendToggle, ZOOM_NOTE, kindsHeading, kindsStartCollapsed, sameLegendKey } from './legend';
 import { DIMMED_OPACITY } from './markers';
 
 /** The sprite the kind and state glyphs come from, as the default popup draws them (DefaultPopup.tsx). */
@@ -308,11 +308,12 @@ export class LegendControl implements IControl {
                 const status = document.createElement('div');
                 status.className = 'mapstudio-basemap-status';
                 status.setAttribute('role', 'status');
-                basemap.appendChild(status);
                 host.basemapGroup = group;
                 host.status = status;
-                this.renderBasemaps(host);
+                // The words go in before the live region is in the document, so a redraw never announces a standing status again.
                 this.renderStatus(host);
+                basemap.appendChild(status);
+                this.renderBasemaps(host);
             }
         }
         body.scrollTop = scroll;
@@ -399,8 +400,14 @@ export class LegendControl implements IControl {
         }
     }
 
-    /** The key of what the map draws (legend.ts); an open panel and the docked copy are drawn again. */
+    /**
+     * The key of what the map draws (legend.ts); an open panel and the docked copy are drawn again only when it changed,
+     * not for every saved edit or full batch that rebuilt an equal key (a redraw would move the focus and drop a click).
+     */
     setKey(key: LegendKey): void {
+        if (sameLegendKey(this.key, key)) {
+            return;
+        }
         this.key = key;
         this.fillAll();
     }
