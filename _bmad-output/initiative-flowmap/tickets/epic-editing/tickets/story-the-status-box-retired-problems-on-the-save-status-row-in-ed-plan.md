@@ -3,7 +3,7 @@ title: "The status box retired: problems on the save status row in Edit mode and
 type: 'feature'
 ticket: '24'
 created: '2026-11-05'
-status: 'draft'
+status: 'ready-for-dev'
 baseline_revision: ''
 route: 'full'
 route_source: 'auto'
@@ -25,7 +25,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 ## Boundaries & Constraints
 
-**Always:** Every problem the box shows today is still shown in words somewhere visible: in Edit mode on the save status row, in View mode on the chip (No connection first, then the store unreachable or a setup error, then edits waiting, then a read-only store, then the storage warning; a viewer sees only what concerns the map, not an editor's edits). The chip wraps to two lines at most and its full words are its title. Try again and Discard for an edit waiting stay reachable in Edit mode as the open question below settles. The e2e hooks move with them: the save state, the last reply and the load and store states stay readable as attributes on the map, and the specs read the new places with their expectations kept. Colours from theme tokens; no em dashes.
+**Always:** Every problem the box shows today is still shown in words somewhere visible: in Edit mode on the save status row, in View mode on the chip (No connection first, then the store unreachable or a setup error, then edits waiting, then a read-only store, then the storage warning; a viewer sees only what concerns the map, not an editor's edits). The chip wraps to two lines at most and its full words are its title. Decision (owner, 2026-11-05, "a", after a mock of both places): in Edit mode the save status row reads "2 edits not saved" with the reason and opens the waiting edits under it in the dock, each in words with Try again (when it has a reason) and Discard, and Hide; View mode's chip names the problem only, with no list. The e2e hooks move with them: the save state, the last reply and the load and store states stay readable as attributes on the map, and the specs read the new places with their expectations kept. Colours from theme tokens; no em dashes.
 
 **Never:** Build entry 10's save banner, busy banner, conflict card or "Show my N edits"; change the Gateway, `common/`, a message, a prop or the contract version; add a control in the bottom-right corner.
 
@@ -36,16 +36,12 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 | A save | Edit mode, an add | No box; the header says Saving..., then Saved | No error expected |
 | Store unreachable | The store stopped | Edit mode: the save status row says so in words, the toolbar paused; View mode: the chip says so | No blink across the 15 s retries |
 | Setup error | `setup.json` invalid | The chip (View) or the row (Edit) holds the setup's reason | Long words wrap to two lines, the rest in the title |
-| Edits waiting | Two unsent edits | Edit mode: the row says "2 edits not saved"; View mode (an editor): the chip says so | Try again and Discard as the open question settles |
+| Edits waiting | Two unsent edits | Edit mode: the row says "2 edits not saved"; View mode (an editor): the chip says so | Edit mode: the rows under the save status row with Try again and Discard; View mode: words only |
 | Read-only store | The store read-only | The row in Edit mode, the chip for an editor in View mode | No error expected |
 | No connection | The client disconnected | The chip as today, before any other problem | No error expected |
 | A point click | View or Edit mode | Nothing shows (the echo is gone) | No error expected |
 
 </frozen-after-approval>
-
-## Open Questions
-
-1. **Where Try again and Discard live for an edit waiting, until entry 10.** Today they are buttons on each waiting edit's row in the box. Options: (a) the save status row in the list header reads "2 edits not saved" and opens the rows under it in the dock (Try again, Discard), Edit mode only; (b) the rows open from the View-mode chip too, as a small list under it. A mock goes to the owner before this plan is approved.
 
 ## Code Map
 
@@ -59,7 +55,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 **Execution:**
 - [ ] `web/typescript/MapStudio.tsx`, `mapstudio.css` -- the box removed; the chip's problem order and words; the attributes on the map for the tests.
-- [ ] `web/typescript/studio/ItemList.tsx` -- the save status row's problems in words, and the waiting edits as the open question settles.
+- [ ] `web/typescript/studio/ItemList.tsx` -- the save status row's problems in words, and the waiting edits under it (Try again, Discard, Hide), from `renderUnsaved`'s rows.
 - [ ] Unit tests for the chip's problem order and the row's words (pure, beside `save.ts` or `storeState.ts`).
 - [ ] The e2e readers above -- the new places, expectations kept; renders of a problem in each mode under `E2E_DOCS=1`.
 - [ ] `docs/contract.md`, `CHANGELOG.md` -- the box gone, where each problem shows, the hooks.
@@ -70,6 +66,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 ## Implementation Notes
 
+- Approval (owner, 2026-11-05): "a, go ahead with entry 24", taken as the plan's approval after the mocks of the problem places and of the waiting edits.
 - Planner, 2026-11-05: the environment, commit and identity rules are entry 4's plan's (Docker started by hand after a container restart, `ops/up.sh --fresh` before a whole-suite run, the two trailer lines from the session's attribution reminder, no em dashes, no model identifier, never a bare `git stash`, never a push).
 
 ## Plan Change Log
