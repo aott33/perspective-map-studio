@@ -101,6 +101,7 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
         const problem = save.state === 'refused' || save.state === 'unsent';
         const query = this.state.query;
         const shown = filterRows(props.rows, query);
+        const noMatches = props.rows.length > 0 && shown.length === 0;
         return (
             <section className="mapstudio-dock mapstudio-dock--items" aria-label="Items">
                 <header className="mapstudio-dock-header">
@@ -144,9 +145,9 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
                     </div>
                 </header>
                 {props.rows.length === 0 ? <div className="mapstudio-list-empty">No items yet - items you add are listed here.</div> : null}
-                {props.rows.length > 0 && shown.length === 0 ? (
-                    <div className="mapstudio-list-empty mapstudio-list-empty--search" role="status" data-empty="search">{NO_MATCHES}</div>
-                ) : null}
+                {noMatches ? <div className="mapstudio-list-empty mapstudio-list-empty--search" data-empty="search">{NO_MATCHES}</div> : null}
+                {/* One polite live region, always mounted and visually hidden, so a screen reader hears "No matches" when it comes. */}
+                <div className="mapstudio-visually-hidden mapstudio-list-status" role="status" aria-live="polite">{noMatches ? NO_MATCHES : ''}</div>
                 <ul id={this.listId} className="mapstudio-list" data-rows={String(shown.length)}>
                     {shown.map((row) => (
                         // A list item holding the button, so assistive technology hears both the list and a button (R14).

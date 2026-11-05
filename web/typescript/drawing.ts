@@ -161,3 +161,17 @@ export function addedText(kindName: string): string {
 
 /** How long the toast stays, unless the pointer rests on it (EXPERIENCE.md Toast: timing open; entry 10 may refine). */
 export const TOAST_MS = 6000;
+
+/**
+ * Whether a key's target takes typed text: an input, a textarea, a select or an editable element. The map
+ * container's key handling (editing.ts `onKeyDown`, capture phase) leaves such a key to the field, a field inside
+ * the container such as one in a custom popup view's content, so Backspace there removes a letter, not a vertex.
+ */
+export function inField(target: EventTarget | null): boolean {
+    const el = target as { tagName?: unknown; isContentEditable?: unknown } | null;
+    if (!el || typeof el.tagName !== 'string') {
+        return false;
+    }
+    const tag = el.tagName.toUpperCase();
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable === true;
+}

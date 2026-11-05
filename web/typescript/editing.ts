@@ -28,7 +28,9 @@ import {
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import type { MapStudioState, Props } from './MapStudio';
 import { MapStudioStoreDelegate } from './MapStudioStoreDelegate';
-import { Drawing, DrawingTool, REASON_SELF_INTERSECTS, addedText, drawingEnds, isDrawingTool, minVertices, startDrawing, withVertices } from './drawing';
+import {
+    Drawing, DrawingTool, REASON_SELF_INTERSECTS, addedText, drawingEnds, inField, isDrawingTool, minVertices, startDrawing, withVertices
+} from './drawing';
 import { Selection } from './features';
 import { SnapTarget, nearestSnap, snapDistanceM, snapTargets } from './geometry';
 import { StudioTool, isDrawing, isPlacing, toolKind } from './studio';
@@ -503,23 +505,14 @@ function onPointFinish(host: EditingHost, id: string | number, action: string): 
     }
 }
 
-/** Whether a key event's target takes typed text (the search field is a MapLibre control inside the map container). */
-function inField(ev: KeyboardEvent): boolean {
-    const target = ev.target as HTMLElement | null;
-    if (!target || typeof target.tagName !== 'string') {
-        return false;
-    }
-    const tag = target.tagName.toUpperCase();
-    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable === true;
-}
-
 /**
  * Keys on the map container (capture phase): Escape puts the tool in hand down, cancelling a drawing in progress
  * (the popup's Esc is selection.tsx's); Backspace while drawing removes the last vertex (the mode's undo). A key
- * typed in a field inside the container (the search field) stays the field's.
+ * typed in a field inside the container (a field of a custom popup view, which MapLibre puts in the container)
+ * stays the field's (drawing.ts `inField`).
  */
 export function onKeyDown(host: EditingHost, ev: KeyboardEvent): void {
-    if (inField(ev)) {
+    if (inField(ev.target)) {
         return;
     }
     if (ev.key === 'Escape') {

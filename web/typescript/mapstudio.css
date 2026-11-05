@@ -2878,9 +2878,26 @@
 /* Edit mode's top row (entry 21, the owner's option B; DESIGN.md Edit mode, Direction A, key screen 4): while the
    studio shows, the View-mode top bar (the search field and the Needs you bar in its row, and their lists) leaves
    the map; the search is the Items list's Search items field there, and the toolbar takes the top row. View mode
-   and phone widths (which keep View mode) draw the bar as before. */
-.mapstudio.mapstudio--editing .mapstudio-topbar {
-    display: none;
+   and phone widths (which keep View mode) draw the bar as before: the rule holds from 768 px only, so a window
+   narrowed below it in Edit mode shows the bar before the component renders again. */
+@media (min-width: 768px) {
+    .mapstudio.mapstudio--editing .mapstudio-topbar {
+        display: none;
+    }
+}
+
+/* Below 1280 px the rail, the list and the properties panel (648 px together) leave too little map for the toolbar
+   beside the Editing switch (376 px of map at 1024 px), so the toolbar keeps entry 4's row under the switch's and
+   the chip moves down with it. DESIGN.md gives these widths the list's collapse to a button, which entry 7 builds;
+   that collapse returns the toolbar to the top row here. */
+@media (max-width: 1279px) {
+    .mapstudio-toolbar-float {
+        top: calc(var(--mapstudio-map-inset) + 40px + 8px);
+    }
+
+    .mapstudio--editing .mapstudio-connection {
+        top: calc(var(--mapstudio-map-inset) + 40px + 8px + 36px + 6px + 24px + 10px);
+    }
 }
 
 .mapstudio-toolbar-float--paused .mapstudio-toolbar {

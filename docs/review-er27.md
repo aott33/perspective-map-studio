@@ -174,3 +174,5 @@ Items 2, 4, 6, 8, 9 and 10 are met as the template has them (names from zoom 14,
 ## 4. The record
 
 The verdicts above are the owner's (hitl). When the review is done: a row in [platform-checks.md](platform-checks.md) under "Epic 3 entry 12" ("Engineering review (ER-27), 0.3.0: passed" or the changes asked for, reviewer and date), a dated Decision in the epic's Notes, and, for a change, the entry that builds it before the 0.3.0 tag. The template's cards take the comms-lost colour at the cutover so an operator sees one convention (owner, 2026-10-28; epic-template-cutover).
+
+**Open, for the owner's ER-27 review before 0.4.0 (epic 4 entry 21, not yet reviewed):** in Edit mode the Needs you summary is hidden while the list's state badges and the markers keep every alarm, comms lost and stale state; View mode is unchanged ([contract.md](contract.md), "Edit mode's top row and the Items list's search"; renders [mapstudio-studio-top-row-1366.png](screenshots/mapstudio-studio-top-row-1366.png) and [-1440](screenshots/mapstudio-studio-top-row-1440.png)). Verdict:

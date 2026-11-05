@@ -1,6 +1,6 @@
 import {
-    Drawing, REASON_SELF_INTERSECTS, TOAST_MS, addedText, canFinish, drawingEnds, drawnLengthM, endSnap, finishHint, isDrawingTool, minVertices,
-    newItemText, problemText, progressText, reasonText, snapIndicatorText, snapToggleText, startDrawing, startSnap, withVertices
+    Drawing, REASON_SELF_INTERSECTS, TOAST_MS, addedText, canFinish, drawingEnds, drawnLengthM, endSnap, finishHint, inField, isDrawingTool,
+    minVertices, newItemText, problemText, progressText, reasonText, snapIndicatorText, snapToggleText, startDrawing, startSnap, withVertices
 } from '../drawing';
 import { SnapTarget } from '../geometry';
 
@@ -86,5 +86,26 @@ describe('the drawing in progress (epic 4 entry 4)', () => {
         expect(isDrawingTool('area')).toBe(true);
         expect(isDrawingTool('point')).toBe(false);
         expect(isDrawingTool(null)).toBe(false);
+    });
+});
+
+describe('a key typed in a field stays the field\'s (inField)', () => {
+    /** A key's target as the browser gives it: an element's tag name and whether it is editable. */
+    const target = (tagName: string, isContentEditable = false): EventTarget => ({ tagName, isContentEditable }) as unknown as EventTarget;
+
+    test('an input, a textarea, a select and an editable element are fields, whatever the tag\'s case', () => {
+        expect(inField(target('INPUT'))).toBe(true);
+        expect(inField(target('input'))).toBe(true);
+        expect(inField(target('TEXTAREA'))).toBe(true);
+        expect(inField(target('SELECT'))).toBe(true);
+        expect(inField(target('DIV', true))).toBe(true);
+    });
+
+    test('the canvas, a div and no target are not', () => {
+        expect(inField(target('CANVAS'))).toBe(false);
+        expect(inField(target('DIV'))).toBe(false);
+        expect(inField(null)).toBe(false);
+        // A target with no tag name (the window, the document) is not a field either.
+        expect(inField({} as EventTarget)).toBe(false);
     });
 });

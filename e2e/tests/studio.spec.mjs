@@ -8,7 +8,8 @@
 // the top row level with the Editing switch and clear of it and the zoom card, the pill and then the connection
 // chip under it; leaving Edit mode brings the View-mode top bar back with its lists closed, and a list open on
 // entry closes; the Items list's Search items field filters the rows, Esc and Clear bring them back with the
-// selection kept, and a filtered row picked is a row click; at 390 px the editor keeps View mode's top bar.
+// selection kept, and a filtered row picked is a row click; at 1200 px, below the list's collapse width, the toolbar
+// stays on the row under the Editing switch; at 390 px the editor keeps View mode's top bar.
 // Screenshots at 1366 and 1440 px for the docs (AD-15).
 
 import { TRACER, pagePixel } from '../lib/geo.mjs';
@@ -574,6 +575,7 @@ for (const [width, height, listWidth, panelWidth] of [[1366, 768, 256, 320], [14
                 await expect(field).toHaveAttribute('aria-label', 'Search items by name, kind or asset');
                 await expect(page.locator('.mapstudio-list-search-glyph')).toBeVisible();
                 await expect(clear).toHaveCount(0);
+                await expect(page.locator('.mapstudio-list-status')).toHaveText('');
                 const title = await page.locator('.mapstudio-dock-title').boundingBox();
                 const fieldBox = await field.boundingBox();
                 const dock = await page.locator('.mapstudio-dock--items').boundingBox();
@@ -660,7 +662,12 @@ for (const [width, height, listWidth, panelWidth] of [[1366, 768, 256, 320], [14
                 await expect(list).toHaveAttribute('data-rows', '0');
                 await expect(page.locator('.mapstudio-list-row')).toHaveCount(0);
                 await expect(page.locator('.mapstudio-list-empty--search')).toHaveText('No matches');
+                // The words reach a screen reader through the list's one live region, mounted before they came.
+                const status = page.locator('.mapstudio-list-status');
+                await expect(status).toHaveAttribute('role', 'status');
+                await expect(status).toHaveText('No matches');
                 await clear.click();
+                await expect(status).toHaveText('');
                 await expect(field).toHaveValue('');
                 await expect(field).toBeFocused();
                 await expect(page.locator('.mapstudio-list-empty--search')).toHaveCount(0);
@@ -676,6 +683,24 @@ for (const [width, height, listWidth, panelWidth] of [[1366, 768, 256, 320], [14
             });
     });
 }
+
+test.describe('1200 px, below the list\'s collapse width', () => {
+    test.use({ viewport: { width: 1200, height: 768 }, deviceScaleFactor: 1 });
+
+    editorTest('with Details docked the toolbar keeps the row under the Editing switch and never covers it (entry 7\'s list collapse returns the top row)',
+        async ({ page }) => {
+            const map = await openEditor(page);
+            await expect(map).toHaveAttribute('data-studio', 'on');
+            const p2 = seed.ids[TRACER.points.p2.key];
+            await page.locator('.mapstudio-list-row[data-item-id="' + p2 + '"]').click();
+            await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', p2);
+            await expectStageWidth(map, 1200 - 72 - 256 - 320);
+            const toolbar = await page.locator('.mapstudio-toolbar').boundingBox();
+            const sw = await page.locator('.mapstudio-edit-switch').boundingBox();
+            expect(overlaps(toolbar, sw), 'the toolbar clear of the Editing switch').toBe(false);
+            expect(toolbar.y, 'the toolbar under the switch').toBeGreaterThanOrEqual(sw.y + sw.height);
+        });
+});
 
 test.describe('390 px, the top row', () => {
     test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
