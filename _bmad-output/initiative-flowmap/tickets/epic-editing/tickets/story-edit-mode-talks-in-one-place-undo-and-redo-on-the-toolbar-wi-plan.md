@@ -93,6 +93,22 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 ## Review Triage Log
 
+Quick lens, 2026-11-05: 11 findings; high 0, medium 5, low 4, false 1, rejected low 1.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| The status box flashes "1 edit not saved - saving ..." during every save in Edit mode (`MapStudio.tsx` `problem` counts `unsaved.length`) | medium | `UnsavedSender.enqueueAndSend` queues each batch as `unsent` before sending and `host.changed()` renders; the entry leaves the queue only in `onSaved`, so every add, rename, move and each step of a run shows the box for its round trip | patch: an entry still being sent with no reason is not a problem |
+| A run carries on after a temporary refusal (busy, store unreachable, no answer): the replay later saves the reverse and `continueRun` sends the rest unasked (`MapStudioStoreDelegate.ts` about 874-880) | medium | Only a final refusal calls `giveUp`; the frozen rule says the run stops at the first refusal | patch: any error reply or unsent reverse ends the run |
+| A run can start while a tool or field edit is in flight, and that edit lands past the cursor; a later Redo would reverse a saved edit (`undoStack.ts` `startRun` checks `canUndo` only) | medium | The reviewer's trace with steps A, B, C and a rename in flight; the implementer reported the same window for a single undo (entry 2) | patch: Undo, Redo and the run refused, and the history busy, while a tool or field edit is in flight |
+| The paused toolbar says nothing: `pointer-events: none` stops every title, the pill that said "Paused" is gone, and the status box blinks with each 15 s retry because `problem` counts only `load.state === 'failed'` | medium | `mapstudio.css` 2943-2946; `sendMapLoadMessage` sets `loading` on each retry; DESIGN.md bans blinking | patch: the titles reachable on the paused toolbar; `store.status === 'unavailable'` counts as a problem |
+| The chevron is 20 px wide, under WCAG 2.2's 24 px target minimum (NFR-3) and DESIGN.md's 32 px tool size | medium | `mapstudio.css` 3005-3008; it sits flush with Undo, so the spacing exception does not apply | patch: 24 px, recorded in DESIGN.md as the split button's chevron |
+| The storage warning ("This browser cannot keep unsaved edits ...") is hidden in Edit mode | low | `problem` leaves out `delegate.storageWarning`; `renderUnsaved` draws it only in the box | patch: it counts as a problem |
+| Undo says "Nothing to undo" while a run is saving | low | `undoLabel` is '' while a reverse is pending | patch: "Undoing..." while busy |
+| Tab from a history opened by the mouse leaves it open, and Esc then closes Details instead | low | `UndoGroup.tsx` `onChevronKey` handles arrows and Esc only | patch: Tab or the focus leaving the group closes the list; Esc on the chevron closes it |
+| DESIGN.md and EXPERIENCE.md still name the pill, the toast, the rail without History and "the mode always named in words" | low | DESIGN.md 451, 466; EXPERIENCE.md 67, 214 | patch: brought in line with the owner's decisions |
+| On the dev `/edit` page at 390 px the click echo now waits for the level | low | Dev-page output only; entry 24 removes the echo entirely next | rejected: no user meets it, and it goes with entry 24 |
+| The whole-suite evidence predates the last commit | false | The plan's Verification runs on the coordinator's side after the patches | rejected |
+
 ## Verification
 
 **Commands:**
