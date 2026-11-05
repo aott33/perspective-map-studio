@@ -253,7 +253,8 @@ export function cameraPadding(host: CameraHost): CameraPadding {
         card = { rect: { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height }, anchor: host.popupAnchor };
     }
     return paddingFor(container.clientWidth, container.clientHeight, {
-        topBar: controlRect(host, '.maplibregl-ctrl-top-left'),
+        // In Edit mode the View-mode top bar is hidden and the draw toolbar with its pill holds the top row (entry 21).
+        topBar: controlRect(host, '.maplibregl-ctrl-top-left') || controlRect(host, '.mapstudio-toolbar-float'),
         zoomCard: controlRect(host, '.maplibregl-ctrl-top-right'),
         bottomRow: controlRect(host, '.maplibregl-ctrl-bottom-left')
     }, sheet, card);

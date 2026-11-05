@@ -272,6 +272,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * state draws it (the toolbar fades), instead of vanishing until the store is back.
      */
     lastLevel: EditLevel | null = null;
+    /** Whether the studio showed at the last update (entry 21): the View-mode lists close as it comes on. */
+    studioWasOn = false;
 
     componentDidMount(): void {
         if (!this.mapContainer) {
@@ -419,6 +421,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         this.applyEditMode(prevProps);
         this.applyStudioControls();
+        this.applyTopBar();
         this.dropDeadSelection();
         basemap.applyBasemap(this);
         this.drawItems();
@@ -523,6 +526,27 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (this.editSwitch) {
             this.editSwitch.setOn(isEditing(this.state.studio));
         }
+    }
+
+    /**
+     * The View-mode top bar while the studio shows (entry 21; DESIGN.md Edit mode, Direction A): the stylesheet hides
+     * the search field and the Needs you bar under `mapstudio--editing` (the search is the Items list's there) and the
+     * toolbar takes the top row. As the studio comes on, however it came (the switch, the page's prop, the level
+     * arriving, a phone width widening), an open search or Needs you list closes, so nothing is open behind the hidden
+     * bar and nothing comes back open when Edit mode is left; the focus no longer returns to a bar that is hidden.
+     */
+    private applyTopBar(): void {
+        const on = this.studioOn();
+        if (on && !this.studioWasOn) {
+            if (this.searchControl) {
+                this.searchControl.close();
+            }
+            if (this.needsYouControl) {
+                this.needsYouControl.close(false);
+            }
+            this.openedBy = null;
+        }
+        this.studioWasOn = on;
     }
 
     /** A selected item that left the map (an undo of its add, another editor's delete) leaves the selection too. */
@@ -1044,7 +1068,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const selected = this.state.selected;
         return (
             <ItemList title={this.projectName() || 'Map'}
-                      rows={listRows(delegate.items, delegate.lists.kinds, delegate.live)}
+                      rows={listRows(delegate.items, delegate.lists.kinds, delegate.live, delegate.lists.assetNames)}
                       selectedId={selected ? selected.id : null}
                       save={delegate.save}
                       undoLabel={undoLabel(delegate.undo)}

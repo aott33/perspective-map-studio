@@ -2514,6 +2514,42 @@
     overflow-wrap: anywhere;
 }
 
+/* The Search items field under the title row (entry 21, DESIGN.md key screen 4): the input's look (`.mapstudio-input`)
+   with the search glyph inside on the left and, while it holds text, Clear on the right. */
+.mapstudio-list-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.mapstudio-list-search-glyph {
+    position: absolute;
+    top: 50%;
+    left: 9px;
+    color: var(--mapstudio-secondary);
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+
+.mapstudio-input.mapstudio-list-search-input {
+    padding: 0 32px 0 31px;
+}
+
+.mapstudio-list-search-input::placeholder {
+    color: var(--label--disabled);
+    opacity: 1;
+}
+
+.mapstudio-dock-button.mapstudio-list-search-clear {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 28px;
+    height: 28px;
+    color: var(--mapstudio-secondary);
+}
+
 .mapstudio-dock-note,
 .mapstudio-list-empty {
     padding: 12px;
@@ -2816,11 +2852,9 @@
    groups (Select; the kind buttons; Point, Line, Area; Snap) are divided by thin rules (DESIGN.md draw-toolbar). */
 .mapstudio-toolbar-float {
     position: absolute;
-    /* Under the View-mode top bar's row (the search field, 40 px, and the Needs you bar) while entry 2 keeps that
-       bar over the map in Edit mode: with the kind buttons and Snap (entry 4) the toolbar no longer fits beside
-       it at 1366 px with the properties panel docked. Entry 7 moves the search into the Items list, and the toolbar
-       then takes the top row as DESIGN.md draws it. */
-    top: calc(var(--mapstudio-map-inset) + 40px + 8px);
+    /* On the top row, level with the Editing switch and the zoom card (entry 21, DESIGN.md Edit mode, Direction A):
+       the View-mode top bar is hidden while the studio shows (below), so the toolbar sits at the map inset. */
+    top: var(--mapstudio-map-inset);
     left: 50%;
     z-index: 6;
     display: flex;
@@ -2835,9 +2869,18 @@
     pointer-events: auto;
 }
 
-/* The connection chip (item 32) sits under the toolbar and its pill while the studio is on. */
+/* The connection chip (item 32) sits under the toolbar (36 px) and its pill (about 24 px, 6 px below it) while the
+   studio is on, 10 px clear of the pill. */
 .mapstudio--editing .mapstudio-connection {
-    top: 136px;
+    top: calc(var(--mapstudio-map-inset) + 36px + 6px + 24px + 10px);
+}
+
+/* Edit mode's top row (entry 21, the owner's option B; DESIGN.md Edit mode, Direction A, key screen 4): while the
+   studio shows, the View-mode top bar (the search field and the Needs you bar in its row, and their lists) leaves
+   the map; the search is the Items list's Search items field there, and the toolbar takes the top row. View mode
+   and phone widths (which keep View mode) draw the bar as before. */
+.mapstudio.mapstudio--editing .mapstudio-topbar {
+    display: none;
 }
 
 .mapstudio-toolbar-float--paused .mapstudio-toolbar {
