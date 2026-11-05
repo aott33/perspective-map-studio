@@ -3,7 +3,7 @@ title: "The legend in the rail's Layers surface in Edit mode"
 type: 'feature'
 ticket: '22'
 created: '2026-11-05'
-status: 'in-review'
+status: 'in-progress'
 baseline_revision: 'ad74df19dfaf65aa2b7152963d8f6c14b9088fd2'
 route: 'full'
 route_source: 'auto'
@@ -11,7 +11,7 @@ risk: 'low'
 review: 'quick'
 review_source: 'pinned'
 lenses_ran: ['quick']
-review_loop_iteration: 0
+review_loop_iteration: 1
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
 
@@ -21,7 +21,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 **Problem:** In Edit mode the Legend button and its panel float over the map bottom-left, one more thing over the map while the rail's Layers surface says "Nothing here yet".
 
-**Approach:** Decision (owner, 2026-11-05): render C of the legend review. In Edit mode the Legend button and its floating panel leave the map, the scale bar staying bottom-left alone, and the Layers surface shows the legend's desktop content in the dock: the key (States, Kinds, Lines, Styles, Areas), Show (the Lines and Names toggles) and the Basemap choice when more than one basemap is offered. View mode and phone widths keep the Legend button and its panel as today.
+**Approach:** Decision (owner, 2026-11-05): render C of the legend review. In Edit mode the Legend button and its floating panel leave the map, the scale bar staying bottom-left alone, and the Layers surface shows the legend's desktop content in the dock: the key (States, Kinds, Lines, Styles, Areas), Show (the Lines and Names toggles) and the Basemap choice when more than one basemap is offered. View mode and phone widths keep the Legend button and its panel as today. Decision (owner, 2026-11-05, after the Layers options sheet: "2, the tabs"): the surface has two tabs under its header, Layers (first and open by default: Show, then Basemap with more than one basemap) and Legend (the key), as the properties panel's Details and Style tabs look and behave.
 
 ## Boundaries & Constraints
 
@@ -34,7 +34,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 | Scenario | Input / State | Expected Output / Behavior | Error Handling |
 |----------|--------------|---------------------------|----------------|
 | Edit mode | 1366 px, the studio on | No Legend button over the map; the scale bar bottom-left | No error expected |
-| Layers | The rail's Layers | The dock titled Layers holds the key, Show and Basemap (with more than one basemap) | No error expected |
+| Layers | The rail's Layers | The dock titled Layers with two tabs; the Layers tab open: Show, then Basemap (with more than one basemap) | No error expected |
+| Legend tab | The Legend tab chosen | The key (States, Kinds, Lines, Styles, Areas) alone; the tab stays chosen while Edit mode stays | No error expected |
 | Toggle there | Lines off in Layers | Lines hide on the map; still off after a reload and in View mode's panel | No error expected |
 | Basemap there | Another basemap picked | The map switches, as from the panel | The basemap status as in the panel |
 | Panel open on entry | View mode with the panel open, then the switch on | The panel closes; Layers shows the content | No error expected |
@@ -72,6 +73,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 - Planner, 2026-11-05: the environment, commit and identity rules are entry 4's plan's (Docker started by hand after a container restart, `ops/up.sh --fresh` before a whole-suite run, the two trailer lines from the session's attribution reminder, no em dashes, no model identifier, never a bare `git stash`, never a push).
 
 ## Plan Change Log
+
+- 2026-11-05 (coordinator, after the review's patches): the owner changed the intent after seeing an options sheet of the Layers surface ("2, the tabs"): the surface splits into a Layers tab (Show, Basemap; later Units and overlays) and a Legend tab (the key). Amended: the Approach (a decision appended in the frozen block, by the owner) and the matrix's Layers row with a Legend tab row. KEEP: the one-legend control with a docked host, the key comparison in `setKey`, the status text set before it is appended, the button hidden from 768 px, the panel closing as the studio comes on, and the specs' checks of toggles, basemaps and the map click.
 
 - 2026-11-05 (implementer): no change to the frozen intent. Readings and small additions, for the reviewer:
   - One legend, two places (`LegendControl.ts`): the state (key, toggles, offered and selected basemaps, the status text and the Kinds disclosure) stays the control's, once; the panel and the docked copy are two `LegendHost`s, each with its own controls and listeners, which the same `fill` draws (the docked one always the desktop layout). Every setter redraws or updates both; a toggle in one place sets the other's checkbox too. `dock(el)` appends a wrapper `.mapstudio-legend-dock` to a child-less React element (`.mapstudio-dock-legend`, handed over through a ref callback as the Layers surface mounts, `dock(null)` as it unmounts; also in `componentDidMount` and `onRemove`), so React never renders into what the control draws. Each rail surface's section is keyed, so Kinds to Layers remounts instead of React reusing the note's `div` as the host.
