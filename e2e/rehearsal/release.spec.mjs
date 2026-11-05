@@ -41,8 +41,8 @@ test('a line saved in one browser is on a second browser\'s map without a reload
         expect(beforeA, 'both browsers loaded the same map').toBe(beforeB);
 
         await drawLine(pageA, mapA);
-        const status = pageA.locator('.mapstudio-save-status');
-        await expect(status).toHaveAttribute('data-save-state', 'saved', { timeout: 30_000 });
+        // The save's state is the map's (epic 4 entry 24: the status box is gone).
+        await expect(mapA).toHaveAttribute('data-save-state', 'saved', { timeout: 30_000 });
         const saved = Date.now();
         await expect(mapB).toHaveAttribute('data-items-loaded', String(beforeB + 1), { timeout: PUSH_MS });
         const seenAfterMs = Date.now() - saved;

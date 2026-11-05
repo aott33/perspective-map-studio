@@ -19,7 +19,7 @@ test.beforeAll(async ({ browser }) => {
 
 // The dev View page (owner review notes items 4 and 5): with items in the store its line is the click hint (the
 // view's startup script counts them; the empty-map hint to seed from /edit is in the item 4 render), and a click
-// round trip shows no echo in View mode, only the map's `data-last-reply`.
+// round trip shows no echo, only the map's `data-last-reply` (epic 4 entry 24: the status box is gone at every width).
 editorTest('the dev View page: the click hint with items, and no click echo in View mode', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     const map = await openMap(page, '/');
@@ -30,7 +30,9 @@ editorTest('the dev View page: the click hint with items, and no click echo in V
     const [x, y] = pagePixel(box, TRACER.points.p1.lngLat, TRACER.center, TRACER.zoom);
     await page.mouse.click(x, y);
     await expect(map).toHaveAttribute('data-last-reply', new RegExp('Gateway received click on ' + p1), { timeout: 15_000 });
-    await expect(page.locator('.mapstudio-reply')).not.toContainText('Gateway received click');
+    await expect(page.getByText(/Gateway received click/)).toHaveCount(0);
+    await expect(page.locator('.mapstudio-reply')).toHaveCount(0);
+    await expect(page.locator('.mapstudio-chip')).toHaveCount(0);
 });
 
 for (const [width, height] of [[1440, 900], [390, 844]]) {
@@ -57,18 +59,13 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             // One round trip: click p1, the Gateway answers in the envelope.
             const [x, y] = pagePixel(box, TRACER.points.p1.lngLat, TRACER.center, TRACER.zoom);
             await page.mouse.click(x, y);
-            // The map's `data-last-reply` holds the reply. The click echo is dev-page output (owner review notes item 5) where the
-            // page sets editMode and the studio does not show: at 390 px, which keeps View mode. In Edit mode (1440 px) the status
-            // line reports problems only and never echoes the click (entry 23, owner 2026-11-05).
-            const reply = page.locator('.mapstudio-reply');
+            // The map's `data-last-reply` holds the reply, and nothing shows it (epic 4 entry 24, owner 2026-11-05: the status box
+            // and its click echo are gone at every width): not in Edit mode at 1440 px, not at 390 px, which keeps View mode.
             await expect(map).toHaveAttribute('data-last-reply', new RegExp('Gateway received click on ' + p1), { timeout: 15_000 });
-            if (width >= 768) {
-                await expect(map).toHaveAttribute('data-studio', 'on');
-                await expect(reply).not.toContainText('Gateway received click');
-                await expect(reply).toBeHidden();
-            } else {
-                await expect(reply).toContainText('Gateway received click on ' + p1, { timeout: 15_000 });
-            }
+            await expect(map).toHaveAttribute('data-studio', width >= 768 ? 'on' : 'off');
+            await expect(page.getByText(/Gateway received click/)).toHaveCount(0);
+            await expect(page.locator('.mapstudio-reply')).toHaveCount(0);
+            await expect(page.locator('.mapstudio-chip')).toHaveCount(0);
 
             // The click also opens the default popup from the pad kind setup (a card at 1440 px, a
             // bottom sheet at 390 px; epic 3 entry 8 retired the spike's popupView prop).
@@ -101,11 +98,12 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
                 await expect(page.locator('.mapstudio-tool--line')).toHaveAttribute('aria-pressed', 'false');
                 await expect(map).toHaveAttribute('data-items-loaded', String(before));
 
-                // A two-vertex line finished with Enter: saved at once, selected, its two vertices in the map store. The dev status
-                // line keeps the save's state for the suite, unseen in Edit mode: a success is not a problem (entry 23).
+                // A two-vertex line finished with Enter: saved at once, selected, its two vertices in the map store. The map keeps
+                // the save's state for the suite (entry 24); the header says Saved and nothing else talks of a success.
                 await drawLine(page, map);
-                await expect(page.locator('.mapstudio-save-status')).toHaveAttribute('data-save-state', 'saved', { timeout: 30_000 });
-                await expect(page.locator('.mapstudio-save-status')).toBeHidden();
+                await expect(map).toHaveAttribute('data-save-state', 'saved', { timeout: 30_000 });
+                await expect(page.locator('.mapstudio-panel-save')).toHaveText('Saved');
+                await expect(page.locator('.mapstudio-panel-save--row')).toHaveCount(0);
                 await expect(map).toHaveAttribute('data-items-loaded', String(before + 1), { timeout: 15_000 });
                 const lineId = await map.getAttribute('data-selected');
                 const saved = (await send(page, 'map.load', {})).body.items.find((i) => i.id === lineId);

@@ -165,7 +165,9 @@ test.describe('1366 px', () => {
             await expect(page.locator('.mapstudio-panel-save')).toHaveText('Saved');
             await expect(page.locator('.mapstudio-toast')).toHaveCount(0);
             await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
-            await expect(page.locator('.mapstudio-reply')).toBeHidden();
+            // No status box (epic 4 entry 24) and no problem row: a success says nothing but the header's Saved.
+            await expect(page.locator('.mapstudio-reply')).toHaveCount(0);
+            await expect(page.locator('.mapstudio-panel-save--row')).toHaveCount(0);
             const undo = page.locator('.mapstudio-toolbar .mapstudio-undo');
             await expect(undo).toHaveAttribute('aria-label', 'Undo: add Gathering line');
             await expect(undo).toHaveAttribute('title', 'Undo: add Gathering line');

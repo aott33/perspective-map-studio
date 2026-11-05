@@ -9,7 +9,7 @@
 // the global setup after a crashed run). Screenshots at 1440 and 390 px.
 
 import { backUpSetup, committedSetup, gatewayRun, putBackSetup, scanProject, setupWarnings, writeSetup } from '../lib/gateway.mjs';
-import { EDITOR_USER, editorTest, expect, openMap, shot, test } from './fixtures.mjs';
+import { EDITOR_USER, chipLines, editorTest, expect, openMap, shot, test } from './fixtures.mjs';
 
 /** How long a scanned change may take to reach a fresh map.load (seen well under 1 s, docs/platform-checks.md). */
 const APPLY_CAP_MS = 30_000;
@@ -71,10 +71,17 @@ test.describe('1440 px', () => {
             const warnings = (await setupWarnings(badReadAt)).filter((m) => m.includes('mapstudio-dev'));
             expect(warnings, 'one warning for the bad read, none from the map.loads after it').toHaveLength(1);
             expect(warnings[0]).toContain(TEN_REASON);
-            const status = page.locator('.mapstudio-load-status');
-            await expect(status).toContainText('store-unreachable');
-            await expect(status).toContainText('The Map Studio setup of project mapstudio-dev cannot be read: ' + TEN_REASON);
-            await expect(page.locator('.mapstudio-map')).toHaveAttribute('data-edit-level', '');
+            // The setup's reason on the top-centre chip (epic 4 entry 24: the status box is gone): a page whose first load failed has
+            // no level, so the studio does not show and the chip says it; the code stays on the map's `data-load-message`.
+            const map = page.locator('.mapstudio-map');
+            await expect(map).toHaveAttribute('data-load-message', /^store-unreachable: /);
+            const status = page.locator('.mapstudio-chip[data-problem="store"]');
+            const words = 'Map store: The Map Studio setup of project mapstudio-dev cannot be read: ' + TEN_REASON + '.';
+            await expect(status).toContainText(words);
+            await expect(status).toHaveAttribute('title', words);
+            expect((await chipLines(status)).lines, 'the chip on two lines at most').toBeLessThanOrEqual(2);
+            await expect(map).toHaveAttribute('data-studio', 'off');
+            await expect(map).toHaveAttribute('data-edit-level', '');
             await shot(page, 'mapstudio-setup-invalid-1440.png');
         } finally {
             await putBack();
@@ -97,11 +104,16 @@ test.describe('390 px', () => {
             writeSetup('{\n  "schemaVersion": 1,\n  "connection": "MapStudio"\n');
             await scanProject();
             await reloadUntil(page, '/', { load: 'failed' });
-            await expect(page.locator('.mapstudio-load-status')).toContainText(/setup\.json is not valid JSON \(line \d+, column \d+\)/);
+            // The setup's reason on the top-centre chip (epic 4 entry 24): a viewer's map, since it concerns the map.
+            const status = page.locator('.mapstudio-chip[data-problem="store"]');
+            await expect(status).toContainText(/setup\.json is not valid JSON \(line \d+, column \d+\)/);
             writeSetup({ ...committedSetup(), refreshIntervalSeconds: 'ten' });
             await scanProject();
             await reloadUntil(page, '/', { load: 'failed' });
-            await expect(page.locator('.mapstudio-load-status')).toContainText(TEN_REASON);
+            await expect(status).toContainText(TEN_REASON);
+            // Long words wrap to two lines on the phone, the rest cut and in the title.
+            expect(await status.getAttribute('title')).toContain(TEN_REASON);
+            expect(await chipLines(status)).toEqual({ lines: 2, cut: true });
             await shot(page, 'mapstudio-setup-invalid-390.png');
         } finally {
             await putBack();

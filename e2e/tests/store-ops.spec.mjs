@@ -58,10 +58,13 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             const map = await openCheckMap(page);
             await expect(map).toHaveAttribute('data-load-state', 'failed');
             await expect(map).toHaveAttribute('data-store-state', 'unavailable');
-            const status = page.locator('.mapstudio-load-status');
-            await expect(status).toContainText('store-unreachable: The map store is unavailable');
+            // The words on the top-centre chip (epic 4 entry 24: the status box is gone), the code on the map's data-load-message.
+            await expect(map).toHaveAttribute('data-load-message', /^store-unreachable: The map store is unavailable/);
+            const status = page.locator('.mapstudio-chip[data-problem="store"]');
+            await expect(status).toContainText('Map store: The map store is unavailable');
             await expect(status).toContainText('MapStudioCheck');
             await expect(status).toContainText('Ask an administrator (see the Gateway log).');
+            expect(await status.getAttribute('title')).toContain('Ask an administrator (see the Gateway log).');
             // Epic 2 story 8: the draw tool is off. This map never loaded items, so items 0 only
             // checks the attribute; a store that fails after items were drawn, with a queued line
             // kept, is unsaved.spec.mjs ("a map.load that fails after the map loaded").
@@ -80,7 +83,10 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             const before = Number(await map.getAttribute('data-items-loaded'));
             const reason = 'The map store was upgraded by a newer Map Studio (schema 999, this module knows 2); '
                 + 'saving is off until the module is upgraded.';
-            await expect(page.locator('.mapstudio-store-status')).toHaveText('Map store: read only. ' + reason);
+            // The reason on the map (epic 4 entry 24); this viewer sees no chip for it: a read-only store is an editor's problem
+            // (the save status row in Edit mode, the chip in View mode for an editor; e2e/tests/problems.spec.mjs).
+            await expect(map).toHaveAttribute('data-store-reason', reason);
+            await expect(page.locator('.mapstudio-chip')).toHaveCount(0);
 
             // The store state is checked before the role (story 1's order), so this anonymous
             // viewer's save is refused read-only, not role. No tool shows at level none (epic 4
@@ -116,7 +122,8 @@ test.describe('healing', () => {
         }
         await expect(map).toHaveAttribute('data-store-state', 'ready');
         await expect(map).toHaveAttribute('data-load-state', 'loaded');
-        await expect(page.locator('.mapstudio-load-status')).toHaveCount(0);
+        await expect(map).toHaveAttribute('data-load-message', '');
+        await expect(page.locator('.mapstudio-chip')).toHaveCount(0);
         expect(await getMapResult(page)).toEqual({ count: 0, readOnly: null });
     });
 

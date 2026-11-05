@@ -4,7 +4,7 @@
 // phone or full.
 //
 // "Gateway gone" is made deterministic by routing the page's websockets through the test
-// (Playwright routeWebSocket) and taking every edits.apply out of the browser's frames, so
+// (Playwright routeWebSocket, lib/sockets.mjs) and taking every edits.apply out of the browser's frames, so
 // the Gateway never sees the save and the 15 s reply timer runs out. The same routing drops a
 // map.changed (a gap) and turns a map.load.reply into a store-unreachable error, to show what
 // a failed load after the map loaded does. Whether Chromium's offline
@@ -16,6 +16,7 @@ import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { envFileValue, gatewayUrl } from '../lib/env.mjs';
 import { TRACER } from '../lib/geo.mjs';
+import { routeSockets } from '../lib/sockets.mjs';
 import {
     EDITOR_USER, OPERATOR_USER, drawLine, editorTest, expect, mapLoaded, openMap, send, shot, signedInContext, test
 } from './fixtures.mjs';
@@ -28,88 +29,6 @@ const UNSENT_TIMEOUT_MS = 25_000;
 /** The queue as stored for the map editor. */
 async function storedQueue(page) {
     return page.evaluate((key) => JSON.parse(window.localStorage.getItem(key) || '[]'), KEY);
-}
-
-const EVENT_FIRED = 'event-fired:';
-const BUSY_MESSAGE = 'Map Studio is busy with other map requests; nothing was saved. Try again in a moment.';
-
-/**
- * The Gateway's reply as Perspective delivers it ([observed in the 8.3.10 client]: a text
- * frame `event-fired:` and JSON whose `event` is the Map Studio envelope), or null.
- */
-function firedEvent(message) {
-    if (typeof message !== 'string' || !message.startsWith(EVENT_FIRED)) return null;
-    try {
-        const frame = JSON.parse(message.slice(EVENT_FIRED.length));
-        return frame && frame.event && typeof frame.event.type === 'string' ? frame : null;
-    } catch (err) {
-        return null;
-    }
-}
-
-const SYNC = 'sync:';
-
-/**
- * A browser frame without the edits.apply events the gate drops. Perspective sends component
- * events inside numbered `sync:` frames and waits for each one to be answered
- * ([observed in the 8.3.10 client]: a dropped frame stalls every later one), so the frame is
- * passed on with those events taken out rather than dropped.
- */
-function withoutDroppedSaves(message, gate) {
-    if (typeof message !== 'string' || !message.startsWith(SYNC) || !message.includes('edits.apply')) return message;
-    let frame;
-    try {
-        frame = JSON.parse(message.slice(SYNC.length));
-    } catch (err) {
-        return message;
-    }
-    if (!frame || !Array.isArray(frame.events)) return message;
-    const kept = frame.events.filter((e) => {
-        const ev = e && e.event;
-        const save = ev && ev.type === 'edits.apply';
-        const drop = save && (gate.drop || (gate.dropBatch && ev.body && ev.body.batchId === gate.dropBatch));
-        if (drop) gate.dropped++;
-        return !drop;
-    });
-    if (kept.length === frame.events.length) return message;
-    frame.events = kept;
-    return SYNC + JSON.stringify(frame);
-}
-
-/**
- * Route every websocket of the context through the test. While `gate.drop` is true, every
- * edits.apply the browser sends is taken out (the Gateway never sees it), and while
- * `gate.dropBatch` is set, every edits.apply of that batch. While
- * `gate.dropChanged` is above 0, that many map.changed frames are dropped (a gap). While
- * `gate.failLoad` is 'busy' or 'down', a map.load.reply becomes that store-unreachable error.
- */
-async function routeSockets(context, gate) {
-    await context.routeWebSocket(/.*/, (ws) => {
-        const server = ws.connectToServer();
-        ws.onMessage((message) => {
-            server.send(withoutDroppedSaves(message, gate));
-        });
-        server.onMessage((message) => {
-            const frame = firedEvent(message);
-            if (frame && frame.event.type === 'map.changed' && gate.dropChanged > 0) {
-                gate.dropChanged--;
-                return;
-            }
-            if (frame && frame.event.type === 'map.load.reply' && gate.failLoad) {
-                gate.failedLoads++;
-                frame.event = {
-                    v: frame.event.v, type: 'error', id: frame.event.id,
-                    body: {
-                        code: 'store-unreachable',
-                        message: gate.failLoad === 'busy' ? BUSY_MESSAGE : 'The map store is unavailable (test).'
-                    }
-                };
-                ws.send(EVENT_FIRED + JSON.stringify(frame));
-                return;
-            }
-            ws.send(message);
-        });
-    });
 }
 
 for (const [width, height] of [[1440, 900], [390, 844]]) {
@@ -137,14 +56,31 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
                 if (width < 768) {
                     await page.setViewportSize({ width, height });
                 }
-                const row = page.locator('.mapstudio-unsaved-row');
-                // Unsent from the start; the reason arrives when the 15 s reply timer runs out.
-                await expect(row).toHaveAttribute('data-code', 'timeout', { timeout: UNSENT_TIMEOUT_MS });
-                await expect(row).toHaveAttribute('data-unsaved-state', 'unsent');
-                await expect(page.locator('.mapstudio-unsaved-summary')).toHaveText('Store unreachable - 1 edit not saved');
-                await expect(page.locator('.mapstudio-save-status')).toHaveAttribute('data-save-state', 'unsent');
-                // A problem still shows in the status line, in Edit mode too (epic 4 entry 23: problems only, until entry 10).
-                await expect(page.locator('.mapstudio-save-status')).toBeVisible();
+                // Unsent from the start; the reason arrives when the 15 s reply timer runs out. The problem is said in words where
+                // the mode says it (epic 4 entry 24, the status box gone): on the save status row in Edit mode, whose waiting edits
+                // open under it, and on the top-centre chip in View mode (390 px keeps it), which names the problem only.
+                await expect(map).toHaveAttribute('data-save-code', 'timeout', { timeout: UNSENT_TIMEOUT_MS });
+                await expect(map).toHaveAttribute('data-save-state', 'unsent');
+                if (width >= 768) {
+                    const waiting = page.locator('.mapstudio-panel-save--row [data-problem="edits"]');
+                    await expect(waiting).toHaveText('Store unreachable - 1 edit not saved');
+                    await expect(waiting).toBeVisible();
+                    await expect(waiting).toHaveAttribute('aria-expanded', 'false');
+                    await waiting.click();
+                    await expect(waiting).toHaveAttribute('aria-expanded', 'true');
+                    const row = page.locator('.mapstudio-unsaved-row');
+                    await expect(row).toHaveAttribute('data-code', 'timeout');
+                    await expect(row).toHaveAttribute('data-unsaved-state', 'unsent');
+                    await expect(row.locator('.mapstudio-unsaved-text')).toHaveText('Not saved - store unreachable (no answer from the Gateway)');
+                } else {
+                    const chip = page.locator('.mapstudio-chip[data-problem="edits"]');
+                    await expect(chip).toHaveText('Store unreachable - 1 edit not saved');
+                    await expect(chip).toBeVisible();
+                    await expect(page.locator('.mapstudio-unsaved')).toHaveCount(0);
+                    const [kept] = await storedQueue(page);
+                    expect(kept.state).toBe('unsent');
+                    expect(kept.reason.code).toBe('timeout');
+                }
                 await expect(map).toHaveAttribute('data-unsaved-count', '1');
                 await expect(map).toHaveAttribute('data-items-loaded', String(before));
                 expect(gate.dropped).toBeGreaterThan(0);
@@ -215,20 +151,45 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
 
                 await page.reload({ waitUntil: 'load' });
                 map = await openMap(page, '/edit');
+                expect(refusal.body.message).toContain(OPERATOR_USER);
+                const named = `conflict with ${OPERATOR_USER}'s change. ` + refusal.body.message;
+                if (width < 768) {
+                    // View mode (390 px keeps it): the top-centre chip names the problem with its reason, and no list (epic 4 entry 24).
+                    const chip = page.locator('.mapstudio-chip[data-problem="edits"]');
+                    await expect(chip).toContainText('1 edit not saved - ' + named, { timeout: 30_000 });
+                    await expect(page.locator('.mapstudio-unsaved')).toHaveCount(0);
+                    const [kept] = await storedQueue(page);
+                    expect(kept.state).toBe('refused');
+                    expect(kept.reason.code).toBe('conflict');
+                    await expect(map).toHaveAttribute('data-unsaved-count', '1');
+                    await expect(map).toHaveAttribute('data-unsaved-drawn', '1');
+                    await shot(page, `mapstudio-unsaved-conflict-${width}.png`);
+                    // Discard is Edit mode's, on the waiting edits under the save status row: the page opens again at a laptop width.
+                    await page.setViewportSize({ width: 1366, height: 768 });
+                    await page.reload({ waitUntil: 'load' });
+                    map = await openMap(page, '/edit');
+                }
+                // Edit mode: the save status row says it with the reason and opens the waiting edits under it, each in words.
+                const waiting = page.locator('.mapstudio-panel-save--row [data-problem="edits"]');
+                await expect(waiting).toHaveText('1 edit not saved - ' + named, { timeout: 30_000 });
+                await waiting.click();
                 const row = page.locator(`.mapstudio-unsaved-row[data-batch-id="${stale.batchId}"]`);
                 await expect(row).toHaveAttribute('data-unsaved-state', 'refused', { timeout: 30_000 });
                 await expect(row).toHaveAttribute('data-code', 'conflict');
                 await expect(row).toContainText(`Not saved - conflict with ${OPERATOR_USER}'s change.`);
                 await expect(row).toContainText(refusal.body.message);
-                expect(refusal.body.message).toContain(OPERATOR_USER);
+                await expect(row.locator('.mapstudio-unsaved-retry')).toBeVisible();
                 await expect(map).toHaveAttribute('data-unsaved-count', '1');
                 await expect(map).toHaveAttribute('data-unsaved-drawn', '1');
-                await shot(page, `mapstudio-unsaved-conflict-${width}.png`);
+                if (width >= 768) {
+                    await shot(page, `mapstudio-unsaved-conflict-${width}.png`);
+                }
 
                 await row.locator('.mapstudio-unsaved-discard').click();
                 await expect(map).toHaveAttribute('data-unsaved-count', '0');
                 await expect(map).toHaveAttribute('data-unsaved-drawn', '0');
                 await expect(page.locator('.mapstudio-unsaved')).toHaveCount(0);
+                await expect(page.locator('.mapstudio-panel-save--row')).toHaveCount(0);
                 expect(await storedQueue(page)).toEqual([]);
             });
     });
@@ -290,7 +251,12 @@ editorTest.describe('a map.load that fails after the map loaded', () => {
             await expect(page.locator('.mapstudio-tool--line')).toBeDisabled();
             await expect(map).toHaveAttribute('data-unsaved-count', '1');
             await expect(map).toHaveAttribute('data-unsaved-drawn', '1');
-            await expect(page.locator('.mapstudio-load-status')).toContainText('store-unreachable: The map store is unavailable (test).');
+            // In Edit mode the save status row says it in words (epic 4 entry 24), the code on the map's data-load-message, with
+            // the queued line waiting on the row too.
+            await expect(map).toHaveAttribute('data-load-message', 'store-unreachable: The map store is unavailable (test).');
+            const problems = page.locator('.mapstudio-panel-save--row');
+            await expect(problems.locator('[data-problem="store"]')).toHaveText('Map store: The map store is unavailable (test).');
+            await expect(problems.locator('[data-problem="edits"]')).toHaveText('Store unreachable - 1 edit not saved');
             await shot(page, 'mapstudio-unsaved-store-down-1440.png');
 
             // The store is back: the next timed retry loads the map, editing comes back on and the
@@ -337,6 +303,9 @@ test.describe('with the dev Gateway stopped', () => {
         docker('stop', container);
         try {
             await drawLine(page, map, { dy: -200 });
+            // The waiting edits open under the save status row (epic 4 entry 24).
+            await expect(map).toHaveAttribute('data-save-code', /^(timeout|disconnected)$/, { timeout: UNSENT_TIMEOUT_MS });
+            await page.locator('.mapstudio-panel-save--row [data-problem="edits"]').click();
             const row = page.locator('.mapstudio-unsaved-row');
             await expect(row).toHaveAttribute('data-code', /^(timeout|disconnected)$/, { timeout: UNSENT_TIMEOUT_MS });
             await expect(row).toHaveAttribute('data-unsaved-state', 'unsent');

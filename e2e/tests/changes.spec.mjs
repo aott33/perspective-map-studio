@@ -70,8 +70,8 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
                 expect(editorBefore).toBe(viewerBefore);
 
                 await drawLine(page, editorMap);
-                const status = page.locator('.mapstudio-save-status');
-                await expect(status).toHaveAttribute('data-save-state', 'saved', { timeout: 30_000 });
+                // The save's state is the map's (epic 4 entry 24: the status box is gone).
+                await expect(editorMap).toHaveAttribute('data-save-state', 'saved', { timeout: 30_000 });
                 const saved = Date.now();
                 await expect(viewerMap).toHaveAttribute('data-items-loaded', String(viewerBefore + 1), { timeout: PUSH_MS });
                 expect(Date.now() - saved).toBeLessThan(PUSH_MS);

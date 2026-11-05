@@ -26,11 +26,12 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             await expect(map).toHaveAttribute('data-edit-level', 'full');
 
             await drawLine(page, map);
-            const status = page.locator('.mapstudio-save-status');
-            await expect(status).toHaveAttribute('data-save-state', 'saved', { timeout: 30_000 });
-            await expect(status).toHaveAttribute('data-version', '1');
-            await expect(status).toContainText('Saved as version 1');
-            expect(await status.getAttribute('data-item-id')).toMatch(UUID);
+            // The save's state, version and item are the map's (epic 4 entry 24: the status box and its "Saved as version 1"
+            // are gone); the list header says Saved.
+            await expect(map).toHaveAttribute('data-save-state', 'saved', { timeout: 30_000 });
+            await expect(map).toHaveAttribute('data-save-version', '1');
+            await expect(page.locator('.mapstudio-panel-save')).toHaveText('Saved');
+            expect(await map.getAttribute('data-save-item')).toMatch(UUID);
             await expect(map).toHaveAttribute('data-items-loaded', String(before + 1));
             if (width < 768) {
                 await page.setViewportSize({ width, height });
@@ -42,7 +43,7 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             map = await openMap(page, '/edit');
             expect(await mapLoaded(map)).toBe(before + 1);
             await expect(map).toHaveAttribute('data-edit-level', 'full');
-            await expect(page.locator('.mapstudio-save-status')).toHaveCount(0);
+            await expect(map).toHaveAttribute('data-save-state', 'idle');
             await shot(page, `mapstudio-store-editor-reload-${width}.png`);
         });
 

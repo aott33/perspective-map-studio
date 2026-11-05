@@ -143,14 +143,15 @@ test.describe('1366 px', () => {
         await expect(page.locator('.mapstudio-rail')).toBeVisible();
         await expect(page.locator('.mapstudio-dock--items')).toBeVisible();
         await expect(page.locator('.mapstudio-toolbar')).toBeVisible();
-        // Select in hand and nothing talks (entry 23): the Select tool tinted and named, no mode pill, no drawing bar, and the
-        // status line quiet (no click echo, no success; it stays in the DOM for the suite).
+        // Select in hand and nothing talks (entry 23): the Select tool tinted and named, no mode pill, no drawing bar, and no
+        // status box (entry 24: gone; the header says Saved and no problem row shows).
         await expect(page.locator('.mapstudio-tool--select')).toHaveAttribute('aria-pressed', 'true');
         await expect(page.locator('.mapstudio-tool--select')).toHaveAttribute('title', 'Select');
         await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
         await expect(page.locator('.mapstudio-drawing-bar')).toHaveCount(0);
-        await expect(page.locator('.mapstudio-reply')).toBeAttached();
-        await expect(page.locator('.mapstudio-reply')).toBeHidden();
+        await expect(page.locator('.mapstudio-reply')).toHaveCount(0);
+        await expect(page.locator('.mapstudio-panel-save')).toHaveText('Saved');
+        await expect(page.locator('.mapstudio-panel-save--row')).toHaveCount(0);
         const sw = page.locator('.mapstudio-edit-switch-button');
         await expect(sw).toHaveAttribute('aria-checked', 'true');
         await expect(sw).toContainText('Editing');
@@ -283,7 +284,7 @@ test.describe('1366 px', () => {
             await expect(panel).toHaveAttribute('data-pending', 'false');
             await expect(map).toHaveAttribute('data-items-loaded', String(before + 1), { timeout: 15_000 });
             // Undo and Redo are the toolbar's (entry 23): the list header keeps the map's name and the save status. No toast
-            // follows the add, and the status line shows no success.
+            // follows the add, and nothing but the header's Saved talks of the success (entry 24: no status box).
             const undo = page.locator('.mapstudio-toolbar .mapstudio-undo');
             const redo = page.locator('.mapstudio-toolbar .mapstudio-redo');
             await expect(page.locator('.mapstudio-dock-header .mapstudio-undo, .mapstudio-dock-header .mapstudio-redo')).toHaveCount(0);
@@ -292,9 +293,8 @@ test.describe('1366 px', () => {
             await expect(redo).toBeDisabled();
             await expect(redo).toHaveAttribute('title', 'Nothing to redo');
             await expect(page.locator('.mapstudio-toast')).toHaveCount(0);
-            await expect(page.locator('.mapstudio-save-status')).toHaveAttribute('data-save-state', 'saved');
-            await expect(page.locator('.mapstudio-save-status')).toBeHidden();
-            await expect(page.locator('.mapstudio-reply')).toBeHidden();
+            await expect(map).toHaveAttribute('data-save-state', 'saved');
+            await expect(page.locator('.mapstudio-reply')).toHaveCount(0);
             await expect(page.locator('.mapstudio-list-row[data-item-id="' + padId + '"]')).toHaveAttribute('data-state', 'unlinked');
             await expectPageSelection(page, padId, 'Well pad', 'pad');
             await expect(viewerMap).toHaveAttribute('data-items-loaded', String(viewerBefore + 1), { timeout: PUSH_MS });
@@ -404,10 +404,10 @@ test.describe('1366 px', () => {
             const [x, y] = await pixelNow(map, TRACER.points.p1.lngLat);
             await page.mouse.click(x, y);
             await expect(map).toHaveAttribute('data-selected', p1);
-            // The click round trip echoes nowhere in Edit mode (entry 23): only the map's `data-last-reply` holds it.
+            // The click round trip echoes nowhere (entries 23 and 24): only the map's `data-last-reply` holds it.
             await expect(map).toHaveAttribute('data-last-reply', new RegExp('Gateway received click on ' + p1), { timeout: REPLY_MS });
-            await expect(page.locator('.mapstudio-reply')).not.toContainText('Gateway received click');
-            await expect(page.locator('.mapstudio-reply')).toBeHidden();
+            await expect(page.getByText(/Gateway received click/)).toHaveCount(0);
+            await expect(page.locator('.mapstudio-reply')).toHaveCount(0);
             // A marker click selects and opens the popup as in View mode; Details stays the list's and the Point tool's
             // (opening properties from the map and keeping the selection in view is entry 7's), so the panel for Point 2 goes.
             await expect(page.locator('.mapstudio-panel')).toHaveCount(0);
@@ -531,9 +531,9 @@ test.describe('1366 px, Undo and its history on the toolbar', () => {
             const lineId = await panel.getAttribute('data-item-id');
             await page.locator('.mapstudio-tool--select').click();
             await expect(map).toHaveAttribute('data-tool', '');
-            // No toast after the adds and nothing in the status line; the header says Saved.
+            // No toast after the adds and no status box (entry 24); the header says Saved.
             await expect(page.locator('.mapstudio-toast')).toHaveCount(0);
-            await expect(page.locator('.mapstudio-reply')).toBeHidden();
+            await expect(page.locator('.mapstudio-reply')).toHaveCount(0);
             await expect(page.locator('.mapstudio-panel-save')).toHaveText('Saved', { timeout: REPLY_MS });
 
             // Hover Undo: the last step, to the pointer and to assistive technology.
@@ -660,10 +660,12 @@ test.describe('1366 px, Undo and its history on the toolbar', () => {
             await page.waitForTimeout(WARNING_SETTLE_MS);
             await expect(map).toHaveAttribute('data-store-seq', String(seqBefore + 1));
             expect(await storedItem(page, padA)).toBeDefined();
-            // In Edit mode the status line shows the problem, never a success (entry 23: until entry 10 takes it).
-            await expect(page.locator('.mapstudio-reply')).toBeVisible();
-            await expect(page.locator('.mapstudio-save-status')).toHaveAttribute('data-save-state', 'refused');
-            await expect(page.locator('.mapstudio-save-status')).toBeVisible();
+            // The problem is the save status row's alone (entry 24: no status box): the refused undo waits as an edit not saved,
+            // the row naming who changed the item, and the map keeps the save's state for the suite.
+            await expect(page.locator('.mapstudio-reply')).toHaveCount(0);
+            await expect(map).toHaveAttribute('data-save-state', 'refused');
+            await expect(map).toHaveAttribute('data-save-code', 'conflict');
+            await expect(row.locator('[data-problem="edits"]')).toContainText('1 edit not saved - ');
             await shot(page, 'mapstudio-studio-undo-refused-1366.png');
 
             // Pad A leaves the map for the specs after this one (through the test hook, as removeStrays does).
