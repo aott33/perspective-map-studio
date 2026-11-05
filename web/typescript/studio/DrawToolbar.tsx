@@ -1,18 +1,22 @@
 import * as React from 'react';
 import { Kind } from '../adapters';
-import { snapToggleText } from '../drawing';
+import { snapTitle } from '../drawing';
 import { Glyph } from '../popupParts';
 import { StudioTool, kindButtons, toolOf } from '../studio';
+import { UndoStack, redoLabel, undoHistory, undoLabel } from '../undoStack';
 import { ChromeGlyph } from './ChromeGlyph';
+import { PAUSED_TEXT, UndoGroup } from './UndoGroup';
 
 /**
- * The floating draw toolbar and the mode pill (epic 4 entries 2 and 4; DESIGN.md draw-toolbar and mode-pill,
- * EXPERIENCE.md Floating draw toolbar, Mode pill and Snap): top-centre over the map, in groups divided by thin
- * rules: Select; the kind buttons (the kind list's first kinds, up to three, each drawing its kind at once);
- * the generic Point, Line and Area tools (the kind picked in the form after); and the Snap toggle with the
- * magnet glyph and "Snap off" or "Snap on" (off by default). The active tool is tinted in the selection token,
- * and under the toolbar the pill names the mode in words (FR-8). While the map store is unreachable the toolbar
- * fades and takes no input (`paused`). Box select, the lasso and the instrument tool are entries 8 and 9.
+ * The floating draw toolbar (epic 4 entries 2, 4 and 23; DESIGN.md draw-toolbar, EXPERIENCE.md Floating draw toolbar,
+ * Snap, Undo and Redo): top-centre over the map, in groups divided by thin rules: Select; the kind buttons (the kind
+ * list's first kinds, up to three, each drawing its kind at once); the generic Point, Line and Area tools (the kind
+ * picked in the form after); Snap, the magnet glyph alone (off by default), tinted when on and saying on or off on hover;
+ * then Undo with the chevron opening its history, and Redo, each naming its step on hover (UndoGroup, entry 23). The
+ * active tool is tinted in the selection token and named on hover and to assistive technology (its title, its label and
+ * `aria-pressed`); the mode pill that named it in words under the toolbar left Edit mode with entry 23 (owner,
+ * 2026-11-05): while a tool is in hand the drawing bar says it. While the map store is unreachable the toolbar fades and
+ * takes no input (`paused`). Box select, the lasso and the instrument tool are entries 8 and 9.
  */
 export interface DrawToolbarProps {
     tool: StudioTool | null;
@@ -21,11 +25,18 @@ export interface DrawToolbarProps {
     /** The project's kind list; the toolbar takes its first kinds as the buttons. */
     kinds: Kind[];
     snap: boolean;
-    pill: string;
     paused: boolean;
+    /** This session's undo stack (undoStack.ts): Undo's and Redo's steps and the history. */
+    undo: UndoStack;
     onSelect: () => void;
     onTool: (tool: StudioTool, kindId: string | null) => void;
     onSnap: () => void;
+    onUndo: () => void;
+    onRedo: () => void;
+    /** A history row chosen: undo that many steps, the newest first, one at a time. */
+    onUndoTo: (count: number) => void;
+    /** The clock the history's times are read against; Date.now unless a test fixes it. */
+    now?: () => number;
 }
 
 /** The chrome glyph of a tool. */
@@ -53,7 +64,8 @@ export function DrawToolbar(props: DrawToolbarProps): React.ReactElement {
     return (
         <div className={'mapstudio-toolbar-float' + (props.paused ? ' mapstudio-toolbar-float--paused' : '')} data-tool={props.tool || 'select'}
              data-tool-kind={props.toolKind || ''}>
-            <div className="mapstudio-toolbar" role="toolbar" aria-label="Drawing tools">
+            <div className="mapstudio-toolbar" role="toolbar" aria-label={props.paused ? 'Drawing tools - ' + PAUSED_TEXT : 'Drawing tools'}
+                 data-paused={props.paused ? 'true' : 'false'}>
                 <button type="button" className={'mapstudio-tool mapstudio-tool--select' + (props.tool === null ? ' mapstudio-tool--active' : '')}
                         aria-pressed={props.tool === null} title="Select" aria-label="Select" disabled={props.paused} onClick={props.onSelect}>
                     <ChromeGlyph name="pointer" />
@@ -76,15 +88,20 @@ export function DrawToolbar(props: DrawToolbarProps): React.ReactElement {
                 {generic('area', 'Area')}
                 <span className="mapstudio-toolbar-divider" aria-hidden="true" />
                 <button type="button" className={'mapstudio-tool mapstudio-tool--snap' + (props.snap ? ' mapstudio-tool--active' : '')}
-                        aria-pressed={props.snap} title={props.snap ? 'Snap on: a vertex lands on the nearest item or vertex within reach' : 'Snap off'}
-                        disabled={props.paused} data-snap={props.snap ? 'on' : 'off'} onClick={props.onSnap}>
+                        aria-pressed={props.snap} title={snapTitle(props.snap)} aria-label="Snap" disabled={props.paused}
+                        data-snap={props.snap ? 'on' : 'off'} onClick={props.onSnap}>
                     <ChromeGlyph name="magnet" />
-                    <span className="mapstudio-tool-word">{snapToggleText(props.snap)}</span>
                 </button>
-            </div>
-            <div className="mapstudio-pill" role="status" data-tool={props.tool || 'select'}>
-                <ChromeGlyph name={toolGlyph(props.tool)} className="mapstudio-pill-glyph" size={16} />
-                <span className="mapstudio-pill-words">{props.paused ? 'Paused - the map store is unreachable' : props.pill}</span>
+                <span className="mapstudio-toolbar-divider" aria-hidden="true" />
+                <UndoGroup undoLabel={undoLabel(props.undo)}
+                           redoLabel={redoLabel(props.undo)}
+                           history={undoHistory(props.undo)}
+                           busy={props.undo.pending !== null}
+                           paused={props.paused}
+                           onUndo={props.onUndo}
+                           onRedo={props.onRedo}
+                           onUndoTo={props.onUndoTo}
+                           now={props.now} />
             </div>
         </div>
     );

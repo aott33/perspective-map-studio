@@ -2418,7 +2418,8 @@
     height: 22px;
 }
 
-/* The docked list panel and the empty surfaces: a header with the map's name, Undo, Redo and the save status, then the rows. */
+/* The docked list panel and the empty surfaces: a header with the map's name and the save status, then the rows (Undo and
+   Redo are the toolbar's since entry 23). */
 .mapstudio-dock {
     display: flex;
     flex: 0 0 var(--mapstudio-list-width);
@@ -2488,7 +2489,7 @@
     cursor: not-allowed;
 }
 
-/* The save status beside Undo and Redo: small secondary words; a problem on its own row with the warning glyph's tone. */
+/* The save status beside the map's name: small secondary words; a problem on its own row with the warning glyph's tone. */
 .mapstudio-panel-save {
     flex: 0 0 auto;
     margin-left: 4px;
@@ -2878,9 +2879,10 @@
     cursor: not-allowed;
 }
 
-/* The floating draw toolbar top-centre over the map, the mode pill under it: floating, so the one soft shadow;
-   above the popup layer with the other controls (owner re-test R2). Paused, it fades and takes no input. Its
-   groups (Select; the kind buttons; Point, Line, Area; Snap) are divided by thin rules (DESIGN.md draw-toolbar). */
+/* The floating draw toolbar top-centre over the map: floating, so the one soft shadow; above the popup layer with the
+   other controls (owner re-test R2). Paused, it fades and takes no input. Its groups (Select; the kind buttons; Point,
+   Line, Area; Snap; Undo, its history and Redo) are divided by thin rules (DESIGN.md draw-toolbar). The mode pill that
+   sat under it left Edit mode with entry 23 (owner, 2026-11-05): the drawing bar names the tool in hand. */
 .mapstudio-toolbar-float {
     position: absolute;
     /* On the top row, level with the Editing switch and the zoom card (entry 21, DESIGN.md Edit mode, Direction A):
@@ -2900,10 +2902,10 @@
     pointer-events: auto;
 }
 
-/* The connection chip (item 32) sits under the toolbar (36 px) and its pill (about 24 px, 6 px below it) while the
-   studio is on, 10 px clear of the pill. */
+/* The connection chip (item 32) sits under the toolbar (36 px) while the studio is on, 10 px clear of it (entry 23: no
+   pill between them). */
 .mapstudio--editing .mapstudio-connection {
-    top: calc(var(--mapstudio-map-inset) + 36px + 6px + 24px + 10px);
+    top: calc(var(--mapstudio-map-inset) + 36px + 10px);
 }
 
 /* Edit mode's top row (entry 21, the owner's option B; DESIGN.md Edit mode, Direction A, key screen 4): while the
@@ -2934,7 +2936,7 @@
     }
 
     .mapstudio--editing .mapstudio-connection {
-        top: calc(var(--mapstudio-map-inset) + 40px + 8px + 36px + 6px + 24px + 10px);
+        top: calc(var(--mapstudio-map-inset) + 40px + 8px + 36px + 10px);
     }
 }
 
@@ -2983,23 +2985,118 @@
     color: var(--callToAction);
 }
 
-/* A kind button draws its kind's glyph from the sprite in the text colour; the Snap toggle is a glyph and a word. */
+/* A kind button draws its kind's glyph from the sprite in the text colour; the Snap toggle is the magnet glyph alone
+   (entry 23), tinted when on and saying on or off in its title. */
 .mapstudio-tool-kind-glyph {
     display: block;
     width: 20px;
     height: 20px;
 }
 
-.mapstudio-tool--snap {
-    width: auto;
-    padding: 0 8px 0 6px;
-    gap: 4px;
+/* Undo, the chevron opening its history, and Redo (entry 23, the owner's mock): the history list hangs under the toolbar
+   from Undo's left edge, moved left as far as it must to stay clear of the zoom card (UndoGroup.tsx). */
+.mapstudio-undo-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 2px;
 }
 
-.mapstudio-tool-word {
+.mapstudio-tool.mapstudio-undo-history-button {
+    width: 20px;
+    border-radius: 6px;
+}
+
+.mapstudio-undo-history {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    z-index: 1;
+    box-sizing: border-box;
+    width: 300px;
+    max-width: calc(var(--mapstudio-map-width, 100vw) - 2 * var(--mapstudio-map-inset));
+    padding: 10px 0 0;
+    border-radius: 10px;
+    background: var(--mapstudio-surface);
+    color: var(--label);
+    box-shadow: var(--mapstudio-float-shadow);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.mapstudio-undo-history-title {
+    padding: 0 12px 6px;
+    color: var(--mapstudio-secondary);
     font-size: 12px;
-    line-height: 1;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.mapstudio-undo-history-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* A row: the step's words, how long ago right-aligned in the secondary text; marked (the pointer or the focus on it, and
+   every newer row) on the selection tint, as the mock draws them. */
+.mapstudio-undo-history-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 30px;
+    padding: 4px 12px;
+    border: none;
+    background: transparent;
+    color: var(--label);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.mapstudio-undo-history-row--marked {
+    background: var(--mapstudio-selection-tint);
+}
+
+.mapstudio-undo-history-row:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -2px;
+}
+
+.mapstudio-undo-history-row[aria-disabled="true"] {
+    color: var(--label--disabled);
+    cursor: default;
+}
+
+.mapstudio-undo-history-label {
+    flex: 1 1 auto;
+    min-width: 0;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mapstudio-undo-history-ago {
+    flex: 0 0 auto;
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.mapstudio-undo-history-empty {
+    padding: 4px 12px 12px;
+    color: var(--mapstudio-secondary);
+}
+
+.mapstudio-undo-history-footer {
+    margin-top: 4px;
+    padding: 8px 12px 10px;
+    border-top: 1px solid var(--mapstudio-divider);
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
 }
 
 .mapstudio-toolbar-divider {
@@ -3009,10 +3106,11 @@
     background: var(--mapstudio-divider);
 }
 
-/* The drawing bar bottom-centre while a line or an area is drawn (DESIGN.md Drawing bar): the kind glyph,
-   "New pipeline", the progress, the snapping state, the finish hint or what keeps it from finishing, Cancel and
-   Finish; above the dev status line and the legend row, never in the bottom-right corner. Floating, so the one
-   soft shadow; above the popup layer with the controls. */
+/* The drawing bar bottom-centre while any tool is in hand (DESIGN.md Drawing bar; entry 23: the one place Edit mode
+   talks): the kind glyph, "New pipeline", the progress, the snap target while one is in reach, the finish hint or what
+   keeps it from finishing, Cancel and Finish (for the Point tool its hint and Done); above the status line (which in
+   Edit mode shows problems only) and the legend row, never in the bottom-right corner. Floating, so the one soft
+   shadow; above the popup layer with the controls. */
 .mapstudio-drawing-bar {
     position: absolute;
     left: 50%;
@@ -3086,95 +3184,8 @@
 }
 
 .mapstudio-drawing-cancel,
-.mapstudio-drawing-finish {
-    flex: 0 0 auto;
-}
-
-/* The toast and Undo bar bottom-centre after an add (DESIGN.md toast-undo-bar): a dark bar in the attention token
-   with the panel surface for its text, a check, the message and Undo; never in the bottom-right corner. */
-.mapstudio-toast {
-    position: absolute;
-    left: 50%;
-    bottom: 100px;
-    z-index: 6;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    box-sizing: border-box;
-    max-width: calc(var(--mapstudio-map-width, 100vw) - 2 * var(--mapstudio-map-inset) - 2 * var(--mapstudio-target) - 24px);
-    padding: 8px 10px 8px 12px;
-    border-radius: 8px;
-    background: var(--mapstudio-attention);
-    color: var(--mapstudio-surface);
-    box-shadow: var(--mapstudio-float-shadow);
-    font-size: 13px;
-    line-height: 1.3;
-    transform: translateX(-50%);
-}
-
-/* Above the drawing bar while a drawing tool is still in hand. */
-.mapstudio-toast--above {
-    bottom: 160px;
-}
-
-.mapstudio-toast-glyph {
-    flex: 0 0 auto;
-}
-
-.mapstudio-toast-text {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.mapstudio-toast-undo {
-    flex: 0 0 auto;
-    box-sizing: border-box;
-    height: 28px;
-    padding: 0 10px;
-    border: 1px solid var(--mapstudio-surface);
-    border-radius: 6px;
-    background: transparent;
-    color: var(--mapstudio-surface);
-    font: inherit;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.mapstudio-toast-undo:hover:not(:disabled) {
-    background: var(--mapstudio-surface);
-    color: var(--mapstudio-attention);
-}
-
-.mapstudio-toast-undo:focus-visible {
-    outline: 2px solid var(--mapstudio-surface);
-    outline-offset: 2px;
-}
-
-.mapstudio-toast-undo:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.mapstudio-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    max-width: calc(var(--mapstudio-map-width, 100vw) - 2 * var(--mapstudio-map-inset) - 2 * var(--mapstudio-target) - 24px);
-    padding: 4px 10px;
-    border-radius: 999px;
-    background: var(--mapstudio-surface);
-    color: var(--neutral-80, var(--label));
-    box-shadow: var(--mapstudio-float-shadow);
-    font-size: 12px;
-    line-height: 1.3;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.mapstudio-pill-glyph {
+.mapstudio-drawing-finish,
+.mapstudio-drawing-done {
     flex: 0 0 auto;
 }
 
@@ -3246,14 +3257,13 @@
     left: 16px;
 }
 
-/* Phone widths keep View mode (entry 6): none of the studio shows below 768 px, the drawing bar and the toast included. */
+/* Phone widths keep View mode (entry 6): none of the studio shows below 768 px, the drawing bar included. */
 @media (max-width: 767px) {
     .mapstudio-rail,
     .mapstudio-dock,
     .mapstudio-panel,
     .mapstudio-toolbar-float,
     .mapstudio-drawing-bar,
-    .mapstudio-toast,
     .mapstudio .mapstudio-edit-switch {
         display: none;
     }

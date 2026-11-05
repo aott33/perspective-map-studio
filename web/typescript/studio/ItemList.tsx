@@ -9,8 +9,8 @@ import { ChromeGlyph } from './ChromeGlyph';
 
 /**
  * The docked list panel (epic 4 entry 2; DESIGN.md Panel header, list-row, state-badge; EXPERIENCE.md
- * Item list, Save status, Undo and Redo): the header with the map's name, Undo and Redo naming their
- * step, and the save status; then one flat list of every live map item, by name, each row the kind
+ * Item list, Save status): the header with the map's name and the save status (Undo and Redo are the
+ * toolbar's since entry 23, owner 2026-11-05); then one flat list of every live map item, by name, each row the kind
  * glyph, the name and the live state badge (the alarm glyph with its digit, Comms lost, Stale,
  * Unlinked). A row click selects the item and pans the map to it (the component's `onSelect`).
  *
@@ -27,14 +27,7 @@ export interface ItemListProps {
     rows: ListRow[];
     selectedId: string | null;
     save: SaveState;
-    /** "Undo: add Well pad", or '' with nothing to undo (the button is then disabled). */
-    undoLabel: string;
-    redoLabel: string;
-    /** The map store is unreachable (map.load): Undo and Redo take no input, as the toolbar does. */
-    paused: boolean;
     onSelect: (id: string) => void;
-    onUndo: () => void;
-    onRedo: () => void;
 }
 
 function Badge(props: { row: ListRow }): React.ReactElement | null {
@@ -107,16 +100,6 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
                 <header className="mapstudio-dock-header">
                     <div className="mapstudio-dock-title-row">
                         <h2 className="mapstudio-dock-title">{props.title}</h2>
-                        <button type="button" className="mapstudio-dock-button mapstudio-undo" disabled={props.paused || props.undoLabel === ''}
-                                title={props.paused ? 'Paused - the map store is unreachable' : props.undoLabel || 'Nothing to undo'}
-                                aria-label={props.undoLabel || 'Undo'} data-step={props.undoLabel} onClick={props.onUndo}>
-                            <ChromeGlyph name="undo" />
-                        </button>
-                        <button type="button" className="mapstudio-dock-button mapstudio-redo" disabled={props.paused || props.redoLabel === ''}
-                                title={props.paused ? 'Paused - the map store is unreachable' : props.redoLabel || 'Nothing to redo'}
-                                aria-label={props.redoLabel || 'Redo'} data-step={props.redoLabel} onClick={props.onRedo}>
-                            <ChromeGlyph name="redo" />
-                        </button>
                         {problem ? null : (
                             <span className={'mapstudio-panel-save mapstudio-panel-save--' + save.state} role="status" data-save-state={save.state}>
                                 {saveStatusWords(save)}

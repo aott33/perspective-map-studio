@@ -1,7 +1,7 @@
 import { Kind } from '../adapters';
 import {
     KIND_BUTTONS, StudioState, clearSelection, enterEdit, fromProps, isDrawing, isEditing, isPlacing, kindButtons, kindsFor, leaveEdit, pickTool,
-    pillText, pointKind, select, selectedId, showSurface, toggleSelect, toolKind, toolOf, withArticle
+    pointKind, select, selectedId, showSurface, toggleSelect, toolKind, toolOf
 } from '../studio';
 
 describe('fromProps', () => {
@@ -169,20 +169,6 @@ describe('the point tool and the surfaces (entry 2)', () => {
         expect(pointKind([LINE, PAD, INLET])).toBe(PAD);
         expect(pointKind([LINE])).toBeNull();
         expect(pointKind([])).toBeNull();
-    });
-
-    it('the pill names the mode in words, the kind after an article', () => {
-        expect(withArticle('Well pad')).toBe('a well pad');
-        expect(withArticle('Inlet')).toBe('an inlet');
-        expect(pillText('point', PAD)).toBe('Add a well pad - click the map, then drag to fine-tune');
-        expect(pillText('point', INLET)).toBe('Add an inlet - click the map, then drag to fine-tune');
-        expect(pillText('point', null)).toBe('Add a point - the kind list has no point kind');
-        expect(pillText('line', PIPE)).toBe('Draw a pipeline - click to add points, Enter to finish');
-        expect(pillText('line', null)).toBe('Draw a line - the kind list has no line kind');
-        expect(pillText('area', FENCE)).toBe('Draw a geofence - click to add points, double-click to close');
-        expect(pillText('area', EASEMENT)).toBe('Draw an easement - click to add points, double-click to close');
-        expect(pillText('area', null)).toBe('Draw an area - the kind list has no area kind');
-        expect(pillText(null, PAD)).toBe('Select');
     });
 });
 

@@ -27,7 +27,7 @@ export const GLYPH_PATHS = {
     search: 'M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13M15.5 15.5L20 20',
     /** Close: the Clear button of the search field. */
     close: 'M6 6l12 12M18 6L6 18',
-    /** Chevron: the Needs you bar's open and close mark (entry 3). */
+    /** Chevron: the Needs you bar's open and close mark (entry 3), and the toolbar's Undo history (epic 4 entry 23). */
     chevron: 'M6 9l6 6 6-6',
     /** The studio's chrome (epic 4 entry 2; DESIGN.md Icons: UI chrome glyphs, one style, 24 px grid, 2 px stroke). */
     /** Eye: View on the rail and the Edit switch off ("Edit map"). */
@@ -46,8 +46,6 @@ export const GLYPH_PATHS = {
     area: 'M5 8l7-4 7 5-2 8-9 3-5-5z M5 8h.01M12 4h.01M19 9h.01M17 17h.01M8 20h.01',
     /** Magnet: the Snap toggle (DESIGN.md Floating draw toolbar; entry 4). */
     magnet: 'M6 3v9a6 6 0 0 0 12 0V3M6 3h4v9a2 2 0 0 0 4 0V3h4M6 7h4M14 7h4',
-    /** Check: the toast's mark after an add (DESIGN.md toast-undo-bar; entry 4). */
-    check: 'M5 13l4 4L19 7',
     /** Undo and Redo: an arrow curling back, and forward. */
     undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
     redo: 'M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3'

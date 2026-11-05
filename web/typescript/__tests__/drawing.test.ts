@@ -1,6 +1,7 @@
+import { Kind } from '../adapters';
 import {
-    Drawing, REASON_SELF_INTERSECTS, TOAST_MS, addedText, canFinish, drawingEnds, drawnLengthM, endSnap, finishHint, inField, isDrawingTool,
-    minVertices, newItemText, problemText, progressText, reasonText, snapIndicatorText, snapToggleText, startDrawing, startSnap, withVertices
+    Drawing, PLACE_HINT, REASON_SELF_INTERSECTS, barTitle, canFinish, drawingEnds, drawnLengthM, endSnap, finishHint, inField, isDrawingTool,
+    minVertices, newItemText, noKindText, problemText, progressText, reasonText, snapIndicatorText, snapTitle, startDrawing, startSnap, withVertices
 } from '../drawing';
 import { SnapTarget } from '../geometry';
 
@@ -75,17 +76,40 @@ describe('the drawing in progress (epic 4 entry 4)', () => {
         const area: Drawing = withVertices(startDrawing('area', 'g', [A], null), [A, B], null, '');
         expect(progressText(area)).toMatch(/^2 points - [0-9.]+ km$/);
         expect(snapIndicatorText('CTB1')).toBe('Snap to CTB1 - click to connect');
-        expect(snapToggleText(false)).toBe('Snap off');
-        expect(snapToggleText(true)).toBe('Snap on');
+        // Snap is the magnet glyph alone (entry 23): on or off is said in its hover title, no longer in words on the toolbar or the bar.
+        expect(snapTitle(false)).toBe('Snap off');
+        expect(snapTitle(true)).toBe('Snap on: a vertex lands on the nearest item or vertex within reach');
         expect(finishHint('line')).toBe('Double-click or Enter to finish');
         expect(finishHint('area')).toBe('Double-click or Enter to close');
         expect(newItemText('Gathering line')).toBe('New gathering line');
-        expect(addedText('Pipeline')).toBe('Pipeline added and saved');
-        expect(TOAST_MS).toBe(6000);
         expect(isDrawingTool('line')).toBe(true);
         expect(isDrawingTool('area')).toBe(true);
         expect(isDrawingTool('point')).toBe(false);
         expect(isDrawingTool(null)).toBe(false);
+    });
+});
+
+describe('the bar names the tool in hand in words, for every tool (entry 23: the mode pill\'s words move here)', () => {
+    const PAD: Kind = { id: 'pad', name: 'Well pad', geometry: 'point', icon: 'well-pad', labelRank: 10, fields: [] };
+    const INLET: Kind = { id: 'inlet', name: 'Inlet', geometry: 'point', icon: 'inlet', labelRank: 1, fields: [] };
+    const PIPE: Kind = { id: 'pipeline', name: 'Pipeline', geometry: 'line', icon: 'pipeline', labelRank: 5, fields: [] };
+    const FENCE: Kind = { id: 'geofence', name: 'Geofence', geometry: 'line', icon: 'geofence', labelRank: 0, fields: [], area: true };
+
+    test('the kind it adds after New, or the tool when the kind list has none for it, and that as the problem', () => {
+        expect(barTitle('point', PAD)).toBe('New well pad');
+        expect(barTitle('point', INLET)).toBe('New inlet');
+        expect(barTitle('line', PIPE)).toBe('New pipeline');
+        expect(barTitle('area', FENCE)).toBe('New geofence');
+        expect(barTitle('point', null)).toBe('New point');
+        expect(barTitle('line', null)).toBe('New line');
+        expect(barTitle('area', null)).toBe('New area');
+        expect(noKindText('point')).toBe('The kind list has no point kind');
+        expect(noKindText('line')).toBe('The kind list has no line kind');
+        expect(noKindText('area')).toBe('The kind list has no area kind');
+    });
+
+    test('the Point tool\'s hint, as UJ-1 step 2 reads it', () => {
+        expect(PLACE_HINT).toBe('Click the map, then drag to fine-tune');
     });
 });
 

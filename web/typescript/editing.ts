@@ -29,7 +29,7 @@ import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import type { MapStudioState, Props } from './MapStudio';
 import { MapStudioStoreDelegate } from './MapStudioStoreDelegate';
 import {
-    Drawing, DrawingTool, REASON_SELF_INTERSECTS, addedText, drawingEnds, inField, isDrawingTool, minVertices, startDrawing, withVertices
+    Drawing, DrawingTool, REASON_SELF_INTERSECTS, drawingEnds, inField, isDrawingTool, minVertices, startDrawing, withVertices
 } from './drawing';
 import { Selection } from './features';
 import { SnapTarget, nearestSnap, snapDistanceM, snapTargets } from './geometry';
@@ -41,12 +41,6 @@ export const DRAW_MODE_OFF = 'static';
 export const DRAW_MODE_POINT = 'point';
 export const DRAW_MODE_LINE = 'linestring';
 export const DRAW_MODE_AREA = 'polygon';
-
-/** An add whose save the toast waits on (MapStudio.tsx applyToast): the item and the toast's words. */
-export interface PendingToast {
-    itemId: string;
-    message: string;
-}
 
 /** What the tools read and write on the component. */
 export interface EditingHost {
@@ -65,8 +59,6 @@ export interface EditingHost {
     placedPoints: Map<string | number, string>;
     /** The item whose Details opens with the cursor in Name (the item just added), or null. */
     focusNameId: string | null;
-    /** The add whose save the toast waits on, or null. */
-    toastFor: PendingToast | null;
     /** The snap targets of the items as last read, keyed by the items revision they were read at. */
     snapCache: { revision: number; targets: SnapTarget[] } | null;
     /** The target the snapping callback last offered (what the next placed vertex snaps to), or null. */
@@ -411,8 +403,8 @@ export function onDrawFinish(host: EditingHost, id: string | number, context: { 
  * A line or an area finished (entry 4): saved at once through the delegate's one batch as the tool's kind (the
  * kind a kind button fixed, else the first of its geometry) with the kind's name as its placeholder, an area's
  * ring unclosed (AD-20), and for a line the `ends` its first and last vertex snapped to; the new item takes the
- * selection and Details opens with Name focused, the toast follows the reply, and Terra Draw's copy goes once
- * the unsaved layer draws it. The tool stays in hand for the next one.
+ * selection and Details opens with Name focused (the confirmation: no toast follows, entry 23, owner 2026-11-05; the
+ * header says Saved), and Terra Draw's copy goes once the unsaved layer draws it. The tool stays in hand for the next one.
  */
 function onLineFinish(host: EditingHost, id: string | number, tool: DrawingTool): void {
     const draw = host.draw;
@@ -442,7 +434,6 @@ function onLineFinish(host: EditingHost, id: string | number, tool: DrawingTool)
     // After Terra Draw's finish handler has returned; componentDidUpdate may do it first.
     setTimeout(() => host.dropQueuedFeatures(), 0);
     host.focusNameId = itemId;
-    host.toastFor = { itemId, message: addedText(kind.name) };
     host.closePopup();
     host.setState((prev) => ({
         ...host.selectionState(prev, { id: itemId, kind: 'line', segment: null }), pick: null, panel: itemId, ...host.drawingState(prev, null)
@@ -497,7 +488,6 @@ function onPointFinish(host: EditingHost, id: string | number, action: string): 
         const itemId = delegate.createPoint(lngLat, kind);
         host.placedPoints.set(id, itemId);
         host.focusNameId = itemId;
-        host.toastFor = { itemId, message: addedText(kind.name) };
         // The new item takes the selection (an open popup goes); its Details open beside the map.
         host.closePopup();
         host.setState((prev) => ({ ...host.selectionState(prev, { id: itemId, kind: 'point' }), pick: null, panel: itemId }));

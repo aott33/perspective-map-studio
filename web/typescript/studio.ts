@@ -9,7 +9,8 @@
  * point, line or polygon mode is on (editing.ts), with the kind a kind button fixed (`toolKind`) or
  * null for a generic tool, whose kind is the first of its geometry in the kind list (entry 4); the
  * selection holds the id of the selected point or line (`selected` in features.ts keeps its kind and
- * segment). The words the toolbar's pill and the tools show are here too, so they are tested with the model.
+ * segment). The mode pill and its words left Edit mode with entry 23 (owner, 2026-11-05): the tool in hand is named
+ * by its tinted button and by the drawing bar (drawing.ts `barTitle`).
  */
 
 import { Kind } from './adapters';
@@ -154,30 +155,4 @@ export const KIND_BUTTONS = 3;
 /** The toolbar's kind buttons (entry 4): the kind list's first kinds, up to three, in the list's order and nothing else. */
 export function kindButtons(kinds: Kind[]): Kind[] {
     return kinds.slice(0, KIND_BUTTONS);
-}
-
-/** A kind's name after "a" or "an", lower-cased as the pill reads it: "a well pad", "an inlet". */
-export function withArticle(name: string): string {
-    const lower = name.length > 0 ? name.charAt(0).toLowerCase() + name.slice(1) : name;
-    const article = /^[aeiou]/i.test(lower) ? 'an' : 'a';
-    return article + ' ' + lower;
-}
-
-/**
- * The mode pill's words (FR-8, EXPERIENCE.md Mode pill, UJ-1 step 2): the tool in hand named in plain
- * words with the kind it adds ("Add a well pad - click the map, then drag to fine-tune", "Draw a pipeline
- * - click to add points, Enter to finish", "Draw a geofence - click to add points, double-click to
- * close"), Select with none.
- */
-export function pillText(tool: StudioTool | null, kind: Kind | null): string {
-    if (tool === 'point') {
-        return kind ? 'Add ' + withArticle(kind.name) + ' - click the map, then drag to fine-tune' : 'Add a point - the kind list has no point kind';
-    }
-    if (tool === 'line') {
-        return kind ? 'Draw ' + withArticle(kind.name) + ' - click to add points, Enter to finish' : 'Draw a line - the kind list has no line kind';
-    }
-    if (tool === 'area') {
-        return kind ? 'Draw ' + withArticle(kind.name) + ' - click to add points, double-click to close' : 'Draw an area - the kind list has no area kind';
-    }
-    return 'Select';
 }

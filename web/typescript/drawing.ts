@@ -1,12 +1,15 @@
 /**
  * The drawing in progress and the drawing bar's words (epic 4 entry 4; DESIGN.md Drawing bar, EXPERIENCE.md
- * Drawing bar, Draw and Snap, Toast): what the component holds while a line or an area is drawn vertex by
- * vertex with Terra Draw (editing.ts), the words the bar bottom-centre shows for it ("2 points - 0.7 km -
- * start floating", "Snap to CTB1 - click to connect", "A line needs two points"), and the toast's after the
- * add. Pure functions only, unit tested in node; Terra Draw does the drawing, the validation and the snapping
- * callback, the component keeps this state and the delegate saves.
+ * Drawing bar, Draw and Snap): what the component holds while a line or an area is drawn vertex by vertex with
+ * Terra Draw (editing.ts), and the words the bar bottom-centre shows for it ("2 points - 0.7 km - start floating",
+ * "Snap to CTB1 - click to connect", "A line needs two points"). From entry 23 (owner, 2026-11-05) the bar is the one
+ * place Edit mode talks, for every tool in hand: the Point tool's bar names the kind and "Click the map, then drag to
+ * fine-tune" too, and there is no toast after an add and no Snap word (the toolbar's magnet says it on hover). Pure
+ * functions only, unit tested in node; Terra Draw does the drawing, the validation and the snapping callback, the
+ * component keeps this state and the delegate saves.
  */
 
+import { Kind } from './adapters';
 import { Position, SnapTarget, endsFrom, lengthM } from './geometry';
 import { MapItemRecord } from './contract';
 import { distanceText } from './linePopup';
@@ -131,14 +134,36 @@ export function newItemText(kindName: string): string {
     return 'New ' + (kindName.length > 0 ? kindName.charAt(0).toLowerCase() + kindName.slice(1) : kindName);
 }
 
+/**
+ * The bar's title for the tool in hand (entry 23, FR-8: the tool named in words with its glyph): "New well pad" with the
+ * kind it adds, else "New point", "New line" or "New area" when the kind list has none for the tool.
+ */
+export function barTitle(tool: StudioTool, kind: Kind | null): string {
+    if (kind) {
+        return newItemText(kind.name);
+    }
+    return tool === 'point' ? 'New point' : tool === 'area' ? 'New area' : 'New line';
+}
+
+/** What keeps a tool from adding anything: the kind list has no kind for it (the bar's problem, entry 23). */
+export function noKindText(tool: StudioTool): string {
+    return 'The kind list has no ' + (tool === 'point' ? 'point' : tool === 'area' ? 'area' : 'line') + ' kind';
+}
+
+/** The Point tool's hint on the bar (EXPERIENCE.md Drawing bar, UJ-1 step 2). */
+export const PLACE_HINT = 'Click the map, then drag to fine-tune';
+
 /** The snap indicator while a target is within reach (EXPERIENCE.md Snap): "Snap to CTB1 - click to connect". */
 export function snapIndicatorText(targetName: string): string {
     return 'Snap to ' + targetName + ' - click to connect';
 }
 
-/** The Snap toggle's words (DESIGN.md Floating draw toolbar). */
-export function snapToggleText(on: boolean): string {
-    return on ? 'Snap on' : 'Snap off';
+/**
+ * The Snap toggle's hover title (DESIGN.md Floating draw toolbar: Snap as the magnet glyph alone, tinted when on and
+ * named on hover; entry 23): whether it is on or off.
+ */
+export function snapTitle(on: boolean): string {
+    return on ? 'Snap on: a vertex lands on the nearest item or vertex within reach' : 'Snap off';
 }
 
 /** How the drawing finishes, as the bar says it (DESIGN.md Drawing bar). */
@@ -153,14 +178,6 @@ export function drawingEnds(drawing: Drawing): MapItemRecord['ends'] {
     }
     return endsFrom(startSnap(drawing), endSnap(drawing));
 }
-
-/** The toast after an add (EXPERIENCE.md Toast / Undo bar): "Pipeline added and saved". */
-export function addedText(kindName: string): string {
-    return kindName + ' added and saved';
-}
-
-/** How long the toast stays, unless the pointer rests on it (EXPERIENCE.md Toast: timing open; entry 10 may refine). */
-export const TOAST_MS = 6000;
 
 /**
  * Whether a key's target takes typed text: an input, a textarea, a select or an editable element. The map
