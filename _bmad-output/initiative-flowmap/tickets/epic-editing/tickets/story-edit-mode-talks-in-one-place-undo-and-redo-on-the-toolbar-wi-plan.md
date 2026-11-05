@@ -3,7 +3,7 @@ title: "Edit mode talks in one place: Undo and Redo on the toolbar with the last
 type: 'feature'
 ticket: '23'
 created: '2026-11-05'
-status: 'draft'
+status: 'ready-for-dev'
 baseline_revision: ''
 route: 'full'
 route_source: 'auto'
@@ -72,6 +72,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 ## Implementation Notes
 
+- Approval (owner, 2026-11-05): "2, drop the toast" with the undo history ("can the undo have a dropdown that shows the last 10 actions and they can undo to a specific one") and its mock, taken as the plan's approval; the status line's problems-only rule until entry 10 was told to the owner with the plan, open to change.
 - Planner, 2026-11-05: the environment, commit and identity rules are entry 4's plan's (Docker started by hand after a container restart, `ops/up.sh --fresh` before a whole-suite run, the two trailer lines from the session's attribution reminder, no em dashes, no model identifier, never a bare `git stash`, never a push). A Gateway Java test (`SetupLookupsTest`, thread-pool timing) can fail once on a busy box; rerun it.
 
 ## Plan Change Log
