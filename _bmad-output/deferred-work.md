@@ -140,3 +140,6 @@
 - source_plan: `_bmad-output/initiative-flowmap/tickets/epic-editing/tickets/story-edit-mode-talks-in-one-place-undo-and-redo-on-the-toolbar-wi-plan.md`
   summary: An edit saved while an undo's reverse is in flight, whose reply arrives before the reverse's, lands past the undo cursor, so Undo cannot reach it and a later Redo would reverse it.
   evidence: Entry 2's single undo had this window; entry 23 blocks the other order (an undo started while an edit is in flight) but not this one. A fix needs the reverse's versions kept after the undone step leaves the stack, or the edit held until the reverse settles; a candidate for entry 10 (save states).
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-editing/tickets/story-change-geometry-and-delete-move-vertices-split-non-drag-ways-plan.md`
+  summary: A Split here that waits behind an earlier save of the same line saves its new part later without selecting it or opening it in Details; the line stays selected.
+  evidence: The implementer's risk note after the review's patches (entry 5); the immediate split selects the new part and focuses Name, the held one does not. Low: the new part is in the list and on the map.
