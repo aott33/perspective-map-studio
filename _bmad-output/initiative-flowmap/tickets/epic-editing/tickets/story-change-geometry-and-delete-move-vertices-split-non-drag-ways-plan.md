@@ -91,6 +91,18 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 
 ## Review Triage Log
 
+Quick lens, 2026-11-06: 7 findings; high 0, medium 4, low 2, by design 1.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| A geometry change is dropped with only a console line when a save it touches is in flight; typed latitude and longitude regress (before, held and rebased) and the field keeps showing a coordinate never saved | medium | `shapeBusy` in `MapStudioStoreDelegate.ts` 557-585 returns false; the drag guard checks only the current copy; Details' Move is never disabled for it; `MapStudio.onMove` ignores the false | patch: never drop a change; hold it and build it from the records when the saves it waits on settle |
+| Move then a click and Delete point can save an area whose edges cross | medium | The drag path has `selfIntersectable: false` and the Area tool refuses a crossing ring; `vertexMoveBatch` and `vertexDeleteBatch` check nothing and the Gateway checks only two positions | patch: the same crossing check, refused in words in the bar |
+| A line's end can snap to an instrument on that same line, which later makes the Gateway refuse a save | medium | `snapEdit` excludes only the line itself; PT-2 is about 81 m from L-SWD's end, inside 20 px at the spec's zoom | patch: the line's own instruments are never its snap targets |
+| Dragging the chosen point while Move waits leaves Move waiting, so the next click moves it again | low | `onHandleFinish` keeps `moving: true` when the dragged index is the chosen one | patch: a drag puts Move down |
+| Details' Move says it is a toggle but pressing it again does not put it down | low | `aria-pressed={moving}`; activating it sets `moving: true` again | patch: pressing it again puts Move down |
+| `geometry.spec.mjs` runs neither a refused geometry save nor a phone-level user at 1366 px | low | The matrix's refusal and "level below full" cells | patch: both tested |
+| With a line selected, a click on the pad its end snaps to chooses the line's end point instead of selecting the pad | by design | The selected line's handles are drawn over the map and take its clicks, as in other map editors; Esc or a click elsewhere clears the line, and the list selects the pad | rejected as a defect; the precedence written in `docs/contract.md` |
+
 ## Verification
 
 **Commands:**
