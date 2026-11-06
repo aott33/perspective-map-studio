@@ -3,7 +3,7 @@ title: "The item form: kind fields, required marks, prefill, duplicate names, un
 type: 'feature'
 ticket: '6'
 created: '2026-11-06'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '3a971b7b6f9573f6eb48fded79b56e1aee04f360'
 route: 'full'
 route_source: 'auto'
@@ -74,6 +74,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 
 ## Implementation Notes
 
+- Approval (owner, 2026-11-06): "Keep full plan, approve and continue" (the plan about 2,400 tokens, kept whole); it went ready-for-dev and implementation started in this session.
 - Planner, 2026-11-06: the environment, commit and identity rules are entry 4's plan's (Docker started by hand after a container restart, `ops/up.sh --fresh` before a whole-suite run with nothing else against the stack, the two trailer lines from the session's attribution reminder, `git commit --only` your paths, no em dashes, no model identifier, never a bare `git stash`, never a push). Commit at each working milestone. A layout that departs from DESIGN.md's Properties panel is rendered for the owner before it is built (owner's rule, 2026-11-05).
 
 ## Plan Change Log
