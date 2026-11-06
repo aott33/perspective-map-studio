@@ -3,7 +3,7 @@ title: "Delete, undone in one step, and every shortcut named on its control"
 type: 'feature'
 ticket: '25'
 created: '2026-11-06'
-status: 'in-review'
+status: built
 baseline_revision: 'cb5d8d3e31bc7cf2e808419ff15c8fb2e386da16'
 route: 'full'
 route_source: 'auto'
@@ -93,6 +93,8 @@ Quick lens, 2026-11-06: 7 findings; high 0, medium 3, low 3, verification 1.
 | Some controls with a key do not name it: Select (Esc), the popup's close (Esc), the Items list's Clear the search (Esc), the waiting edits' Hide (Esc); Details' Move names Esc without `aria-keyshortcuts` | low | `DrawToolbar.tsx` 74, `popupParts.tsx` 40, `ItemList.tsx` 134, `SaveStatus.tsx` 103 | patch: each names its key in its hover words and `aria-keyshortcuts` |
 | `docs/contract.md` entry 23's section still gives Undo and Redo's hover words without the key | low | `docs/contract.md` 172 | patch: amended as entry 24 amended it |
 | The whole e2e suite has no clean run on record (a `writepath.spec.mjs` failure outside the allowed flake) | verification | The failure came from a mock run sharing the stack's output folder | resolved at verification: a whole-suite run on a fresh stack after the patches, nothing else running against it |
+
+Outcome, 2026-11-06: the six patches applied (fdf5d47) and verified (2b26ef2): `tsc` clean, Jest 438 passed in 47 suites (rerun by the orchestrator), the Gradle clean build offline, the contract check OK at 0.4.0, and the whole e2e suite on a fresh dev stack 171 passed, 7 skipped, 0 failed in 39.3 min. Found on the way and deferred (`deferred-work.md`): Esc with the Line or Area tool in hand also closes Details, since entry 4.
 
 ## Verification
 
