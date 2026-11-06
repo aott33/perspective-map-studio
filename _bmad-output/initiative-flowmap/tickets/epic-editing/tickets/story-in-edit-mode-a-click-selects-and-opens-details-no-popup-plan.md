@@ -3,7 +3,7 @@ title: "In Edit mode a click selects and opens Details, no popup"
 type: 'feature'
 ticket: '26'
 created: '2026-11-06'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '1153ef47de8776749793951b0cc2b183c8e798f2'
 route: 'full'
 route_source: 'auto'
@@ -67,6 +67,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 
 ## Implementation Notes
 
+- Approval (owner, 2026-11-06): "Approve and continue"; the plan went ready-for-dev and implementation started in this session.
 - Planner, 2026-11-06: the environment, commit and identity rules are entry 4's plan's (Docker started by hand after a container restart, `ops/up.sh --fresh` before a whole-suite run with nothing else against the stack, the two trailer lines from the session's attribution reminder, `git commit --only` your paths, no em dashes, no model identifier, never a bare `git stash`, never a push). Commit at each working milestone.
 
 ## Plan Change Log
