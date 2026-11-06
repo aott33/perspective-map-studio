@@ -34,10 +34,15 @@ export function Chrome(props: { name: keyof typeof CHROME; className: string }):
     );
 }
 
-/** The popup's close button: Map Studio's own, in the header (UX review P1), 32 px on a card and 44 px on the sheet or a phone. */
+/**
+ * The popup's close button: Map Studio's own, in the header (UX review P1), 32 px on a card and 44 px on the sheet or a phone. Esc
+ * closes every popup it sits in (the card, the line popup, a custom view's close row, the sheet; selection.tsx), so it names the
+ * key on hover and to assistive technology (epic 4 entry 25's review: each control with a key names it).
+ */
 export function CloseButton(props: { onClose: () => void }): React.ReactElement {
     return (
-        <button type="button" className="mapstudio-popup-icon mapstudio-popup-close" aria-label="Close" title="Close" onClick={props.onClose}>
+        <button type="button" className="mapstudio-popup-icon mapstudio-popup-close" aria-label="Close" title="Close (Esc)" aria-keyshortcuts="Escape"
+                onClick={props.onClose}>
             <Chrome name="close" className="mapstudio-popup-chrome" />
         </button>
     );

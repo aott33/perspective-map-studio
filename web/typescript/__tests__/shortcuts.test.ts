@@ -1,6 +1,9 @@
 // Every shortcut named on its control (epic 4 entry 25, owner 2026-11-06: no `?` panel): each studio control with a key names it in
 // its hover text and to assistive technology ("Undo: add Gathering line (Ctrl+Z)", "Redo: ... (Ctrl+Shift+Z)", "Delete (Del)",
-// Cancel (Esc), Finish (Enter), Done (Esc), Delete point (Del)), with `aria-keyshortcuts`; a control that is off says why.
+// Cancel (Esc), Finish (Enter), Done (Esc), Delete point (Del); from the review Select (Esc), the popup's Close (Esc), the Items
+// list's Clear the search (Esc), the waiting edits' Hide (Esc) and Details' Move while it waits), with `aria-keyshortcuts`; a
+// control that is off says why. The footer's delete is off for an item never saved and while a tool is in hand, and names Del
+// only while Del deletes the item.
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Kind } from '../adapters';
@@ -9,7 +12,9 @@ import { startDrawing, withVertices } from '../drawing';
 import { DrawToolbar } from '../studio/DrawToolbar';
 import { DrawingBar } from '../studio/DrawingBar';
 import { GeometryBar } from '../studio/GeometryBar';
-import { DELETE_TITLE, PropertiesPanel, PropertiesPanelProps } from '../studio/PropertiesPanel';
+import { CloseButton } from '../popupParts';
+import { ItemList } from '../studio/ItemList';
+import { DELETE_TITLE, NOT_SAVED_TEXT, PropertiesPanel, PropertiesPanelProps, TOOL_IN_HAND_TEXT, deleteButton } from '../studio/PropertiesPanel';
 import { PAUSED_TEXT, REDO_KEY, UNDO_KEY, withKey } from '../studio/UndoGroup';
 import { UNDO_EMPTY, UndoStack, finishPending, pushStep, startUndo } from '../undoStack';
 
@@ -46,7 +51,7 @@ function panel(overrides: Partial<PropertiesPanelProps> = {}): string {
     return renderToStaticMarkup(React.createElement(PropertiesPanel, {
         item: PAD, kind: KINDS[0], kinds: [KINDS[0]], assets: [], assetName: null, pending: false, paused: false, autoFocusName: false,
         onNameFocused: noop, onClose: noop, onRename: noop, onMove: noop, canMoveByClick: true, moving: false, onMoveStart: noop, onLink: noop,
-        onKind: noop, onDelete: noop, ...overrides
+        onKind: noop, onDelete: noop, toolInHand: false, delKey: true, ...overrides
     }));
 }
 
@@ -100,7 +105,7 @@ describe('the properties panel\'s footer: the delete icon (entry 25; DESIGN.md P
         expect(DELETE_TITLE).toBe('Delete (Del)');
         const html = panel();
         expect(html).toContain('<footer class="mapstudio-panel-footer"><button type="button" class="mapstudio-dock-button mapstudio-panel-delete" '
-            + 'title="Delete (Del)" aria-label="Delete CTB1" aria-keyshortcuts="Delete">');
+            + 'title="Delete (Del)" aria-label="Delete CTB1" aria-keyshortcuts="Delete" data-off="">');
         // The footer comes after the body, at the panel's foot; the trash glyph is the button's only content.
         expect(html.indexOf('mapstudio-panel-footer')).toBeGreaterThan(html.indexOf('mapstudio-panel-body'));
         expect(html).toContain('M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3');
@@ -111,5 +116,53 @@ describe('the properties panel\'s footer: the delete icon (entry 25; DESIGN.md P
 
     test('paused (the store unreachable), the delete icon takes no input and says so', () => {
         expect(panel({ paused: true })).toContain('class="mapstudio-dock-button mapstudio-panel-delete" disabled="" title="' + PAUSED_TEXT + '"');
+    });
+
+    test('off for an item never saved ("Not saved yet") and while a tool is in hand, saying why and naming no key', () => {
+        expect(NOT_SAVED_TEXT).toBe('Not saved yet');
+        const unsaved = panel({ pending: true, item: { ...PAD, version: 0 } });
+        expect(unsaved).toContain('class="mapstudio-dock-button mapstudio-panel-delete" disabled="" title="Not saved yet" aria-label="Delete CTB1" '
+            + 'data-off="Not saved yet">');
+        const tool = panel({ toolInHand: true });
+        expect(tool).toContain('disabled="" title="' + TOOL_IN_HAND_TEXT + '" aria-label="Delete CTB1" data-off="' + TOOL_IN_HAND_TEXT + '">');
+        expect(tool).not.toContain('aria-keyshortcuts="Delete"');
+        // The order of the reasons: paused, then never saved, then a tool in hand.
+        expect(deleteButton(true, true, true, true).off).toBe(PAUSED_TEXT);
+        expect(deleteButton(false, true, true, true).off).toBe(NOT_SAVED_TEXT);
+        expect(deleteButton(false, false, true, true)).toEqual({ off: TOOL_IN_HAND_TEXT, title: TOOL_IN_HAND_TEXT, key: false });
+    });
+
+    test('on, it names Del only while Del deletes the item: plain "Delete" while a point is chosen or Move waits', () => {
+        expect(deleteButton(false, false, false, true)).toEqual({ off: '', title: 'Delete (Del)', key: true });
+        expect(deleteButton(false, false, false, false)).toEqual({ off: '', title: 'Delete', key: false });
+        const chosen = panel({ delKey: false });
+        expect(chosen).toContain('class="mapstudio-dock-button mapstudio-panel-delete" title="Delete" aria-label="Delete CTB1" data-off="">');
+        expect(chosen).not.toContain('aria-keyshortcuts="Delete"');
+    });
+
+    test('Details\' Move names Esc while it waits', () => {
+        expect(panel({ moving: true })).toContain('title="Move waits for a click on the map; press again or Esc to cancel" '
+            + 'aria-keyshortcuts="Escape">Move</button>');
+        expect(panel({ moving: false })).toContain('title="Move: click the new place on the map">Move</button>');
+    });
+});
+
+describe('the other controls with a key name it (entry 25\'s review)', () => {
+    test('Select (Esc) on the toolbar', () => {
+        expect(toolbar(UNDO_EMPTY)).toContain('aria-pressed="true" title="Select (Esc)" aria-label="Select" aria-keyshortcuts="Escape"');
+        expect(toolbar(UNDO_EMPTY, true)).toContain('title="' + PAUSED_TEXT + '" aria-label="Select" disabled="" aria-keyshortcuts="Escape"');
+    });
+
+    test('the popup\'s Close (Esc), its name kept', () => {
+        expect(renderToStaticMarkup(React.createElement(CloseButton, { onClose: noop })))
+            .toContain('class="mapstudio-popup-icon mapstudio-popup-close" aria-label="Close" title="Close (Esc)" aria-keyshortcuts="Escape"');
+    });
+
+    test('the Items list\'s Clear the search (Esc), shown while the field holds text', () => {
+        const list = new ItemList({ title: 'Map', rows: [], selectedId: null, save: { state: 'idle' }, saveWords: '', problems: [], unsaved: [],
+            records: [], level: 'full', sending: [], onSelect: noop, onRetry: noop, onDiscard: noop });
+        list.state = { ...list.state, query: 'P1' };
+        expect(renderToStaticMarkup(list.render())).toContain('mapstudio-list-search-clear" title="Clear the search (Esc)" aria-label="Clear the search" '
+            + 'aria-keyshortcuts="Escape"');
     });
 });

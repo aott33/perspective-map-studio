@@ -100,7 +100,8 @@ export function WaitingList(props: WaitingListProps): React.ReactElement {
                     );
                 })}
             </ul>
-            <button type="button" className="mapstudio-unsaved-button mapstudio-unsaved-hide" onClick={props.onHide}>Hide</button>
+            <button type="button" className="mapstudio-unsaved-button mapstudio-unsaved-hide" title="Hide (Esc)" aria-keyshortcuts="Escape"
+                    onClick={props.onHide}>Hide</button>
         </div>
     );
 }

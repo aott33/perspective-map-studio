@@ -215,7 +215,12 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * records, so each waits as a builder while a save of any item it touches is in flight or waiting, and is built again from
      * the records once those saves settle (`releaseShapes`): saved in order, never dropped and never built on a stale record.
      */
-    private heldShapes: Array<{ itemId: string; label: string; build: () => EditBatch | null; ids: string[] }> = [];
+    private heldShapes: Array<{ itemId: string; label: string; build: () => EditBatch | null; ids: string[]; waits: (batch: EditBatch) => boolean }> = [];
+    /**
+     * The batches this page sent and awaits a reply for (replaying after a transient refusal included), by id: what a delete
+     * waits on when one of them names an item it deletes in its `ends` (entry 25), until it saves or is given up.
+     */
+    private batchesInFlight = new Map<string, EditBatch>();
     /** The geometry batches sent and not yet saved, with the items they touch and the item's name: a refusal drops what waits on them. */
     private shapesSent = new Map<string, { ids: string[]; name: string }>();
     private shapeRefused: ShapeRefusal = NO_SHAPE_REFUSAL;
@@ -487,6 +492,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         for (const id of ids) {
             this.inFlightByItem.set(id, batch.batchId);
         }
+        this.batchesInFlight.set(batch.batchId, batch);
         this.save = { state: 'saving', itemId };
         this.saveBatchId = batch.batchId;
         this.sender.enqueueAndSend(batch, now);
@@ -499,6 +505,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * would be refused the same way (one console line names them).
      */
     private releaseFlight(batchId: string, results: Array<{ entity: string; id: string; version: number }> | null): void {
+        this.batchesInFlight.delete(batchId);
         for (const [itemId, flight] of Array.from(this.inFlightByItem.entries())) {
             if (flight !== batchId) {
                 continue;
@@ -595,19 +602,35 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * A geometry change (entry 5): sent now when no save of any item its batch touches is in flight or waiting and no earlier
      * geometry change waits; else it waits as a builder (one console line) and goes when those saves settle (`releaseShapes`).
      */
-    private sendShapeChange(itemId: string, label: string, build: () => EditBatch | null): void {
+    private sendShapeChange(itemId: string, label: string, build: () => EditBatch | null,
+        waits: (batch: EditBatch) => boolean = () => false): void {
         const batch = build();
         if (batch === null) {
             return;
         }
-        if (this.heldShapes.length === 0 && !this.touchesBusy(batch)) {
+        if (this.heldShapes.length === 0 && !this.touchesBusy(batch) && !waits(batch)) {
             this.sendShapeBatch(batch, itemId, label);
             return;
         }
         // The items it touches as built now: a refusal of a save of any of them drops it (it was made on top of that save).
-        this.heldShapes.push({ itemId, label, build, ids: [itemId].concat(batch.ops.map((op) => op.id)) });
+        this.heldShapes.push({ itemId, label, build, ids: [itemId].concat(batch.ops.map((op) => op.id)), waits });
         console.info('[MapStudio] ' + label + ' waits its turn: a save of an item it changes is still in flight.');
         this.notify();
+    }
+
+    /**
+     * Whether a save this page sent and awaits (replaying after a transient refusal included), or one waiting its turn behind
+     * another, writes `ends` naming one of `ids` (entry 25): a delete of those items waits for it, since the records it is built
+     * from take those `ends` only when that save's reply comes, and would leave the line naming a deleted item.
+     */
+    private endsInFlightName(ids: string[]): boolean {
+        const names = (ends: unknown): boolean => {
+            const e = ends as MapItemRecord['ends'] | undefined;
+            return !!e && ((!!e.start && ids.indexOf(e.start.itemId) >= 0) || (!!e.end && ids.indexOf(e.end.itemId) >= 0));
+        };
+        const held = Array.from(this.heldByItem.values()).reduce((all, list) => all.concat(list.map((h) => h.batch)), [] as EditBatch[]);
+        return Array.from(this.batchesInFlight.values()).concat(held)
+            .some((b) => b.ops.some((op) => op.entity === 'item' && !!op.data && names(op.data.ends)));
     }
 
     /** Whether a save of a map item the batch touches is in flight, or waiting its turn behind one. */
@@ -626,7 +649,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         while (this.heldShapes.length > 0) {
             const next = this.heldShapes[0];
             const batch = next.build();
-            if (batch !== null && this.touchesBusy(batch)) {
+            if (batch !== null && (this.touchesBusy(batch) || next.waits(batch))) {
                 return;
             }
             this.heldShapes.shift();
@@ -737,24 +760,28 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * Delete (entry 25; EXPERIENCE.md Delete: no confirmation, one undo restores it): one batch with the item, a line with every
      * instrument on it, and the `ends` of the lines that name a deleted item cleared (geometry.ts itemDeleteBatch), "delete <name>".
      * It carries whole `ends` and the records' versions, so it is held and built from the records as a geometry change is: sent now,
-     * or once the saves of the items it touches settle (an item's create still being saved, a line's reshape, a pad's move), never
-     * built on a stale record. Its undo restores every item at its tombstone with its link, properties, kind and geometry and puts
-     * the `ends` back (undo.ts); Redo deletes them again. False, with one console line, when the item is not on the map.
+     * or once the saves of the items it touches settle (a line's reshape, a pad's move), and the saves that would write `ends`
+     * naming an item it deletes (a line's end snapped to the pad, still being saved or replaying), never built on a stale record.
+     * Its undo restores every item at its tombstone with its link, properties, kind and geometry and puts the `ends` back
+     * (undo.ts); Redo deletes them again. False, with one console line, when the item is not stored on the map (never saved: no
+     * delete at version 0).
      */
     deleteItem(id: string): boolean {
-        const item = this.knownRecord(id);
+        const item = this.storedRecord(id);
         if (!item) {
-            console.info('[MapStudio] The delete of ' + id + ' was dropped: the item is not on the map.');
+            // Never a delete at version 0 (review, entry 25): an item only this page's waiting edits know (its create still being
+            // saved, or refused for good) has nothing stored to delete; Discard under the save status row drops a refused one.
+            console.info('[MapStudio] The delete of ' + id + ' was dropped: the item is not saved on the map.');
             return false;
         }
         this.sendShapeChange(id, stepLabel('delete', item.name), () => {
-            const now = this.knownRecord(id);
+            const now = this.storedRecord(id);
             if (!now) {
                 console.info('[MapStudio] The delete of ' + item.name + ' was let go: the item left the map before its turn.');
                 return null;
             }
             return itemDeleteBatch(newId(), now, this.changes.state.items);
-        });
+        }, (batch) => this.endsInFlightName(batch.ops.filter((op) => op.op === 'delete').map((op) => op.id)));
         return true;
     }
 

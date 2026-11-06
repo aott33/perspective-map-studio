@@ -9,6 +9,30 @@ import { PAUSED_TEXT } from './UndoGroup';
 /** The footer's delete icon on hover (entry 25): what it does and its key; no question is asked and Undo restores the item. */
 export const DELETE_TITLE = 'Delete (Del)';
 
+/** Why the footer's delete is off for an item never saved (entry 25's review: no delete at version 0; Discard drops a refused one). */
+export const NOT_SAVED_TEXT = 'Not saved yet';
+
+/** Why the footer's delete is off while the Point, Line or Area tool is in hand (entry 25's review): Esc puts the tool down. */
+export const TOOL_IN_HAND_TEXT = 'Off while a tool is in hand - Esc puts it down';
+
+/** The footer's delete icon as it shows: why it is off ('' when on), its hover words, and whether it names the Delete key. */
+export interface DeleteButton {
+    off: string;
+    title: string;
+    key: boolean;
+}
+
+/**
+ * The footer's delete icon (entry 25 and its review): off, saying why, while the store is unreachable, for an item never saved, and
+ * while a tool is in hand (no delete then by the icon or the key); on, it names Del ("Delete (Del)", `aria-keyshortcuts`) only when
+ * Del deletes this item (`delKey`), and is plain "Delete" while Del is a chosen point's Delete point or Move waits for its click.
+ */
+export function deleteButton(paused: boolean, pending: boolean, toolInHand: boolean, delKey: boolean): DeleteButton {
+    const off = paused ? PAUSED_TEXT : pending ? NOT_SAVED_TEXT : toolInHand ? TOOL_IN_HAND_TEXT : '';
+    const key = off === '' && delKey;
+    return { off, title: off !== '' ? off : key ? DELETE_TITLE : 'Delete', key };
+}
+
 /**
  * The docked properties panel's Details tab (epic 4 entries 2 and 4; DESIGN.md Properties panel and tabs,
  * EXPERIENCE.md Properties panel, Place a point, Draw): the header with the kind glyph, the name and the
@@ -26,7 +50,8 @@ export const DELETE_TITLE = 'Delete (Del)';
  * unreachable the fields are paused, as the toolbar is. From entry 25 (DESIGN.md Properties panel: "Footer: a delete icon",
  * key screen 4's bottom right of the panel, which docks left of the map, so the App Bar's corner stays clear) the footer holds
  * the delete icon: no question asked, the item deleted in one batch and one undo step, "Delete (Del)" on hover and as its
- * description; the close names Esc. Each control with a key names it in its hover text and to assistive technology.
+ * description while Del deletes this item (`deleteButton`; off for an item never saved and while a tool is in hand); the close
+ * names Esc, and Move names Esc while it waits. Each control with a key names it in its hover text and to assistive technology.
  */
 export interface PropertiesPanelProps {
     item: MapItemRecord;
@@ -59,6 +84,10 @@ export interface PropertiesPanelProps {
     onKind: (kindId: string) => void;
     /** The footer's delete icon (entry 25): the item deleted with no question asked; Undo restores it. */
     onDelete: () => void;
+    /** The Point, Line or Area tool is in hand, or a drawing is in progress: the footer's delete is off (entry 25's review). */
+    toolInHand: boolean;
+    /** The Delete key deletes this item now (no point chosen, no Move waiting): the footer names it. */
+    delKey: boolean;
 }
 
 interface Drafts {
@@ -189,6 +218,7 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         const kindName = kind ? kind.name : item.kind;
         const assetId = item.assetId;
         const subline = kindName + ' - ' + (item.assetId === null ? 'not linked' : 'linked to ' + (assetName || item.assetId));
+        const remove = deleteButton(paused, pending, this.props.toolInHand, this.props.delKey);
         const latProblem = this.state.lat !== '' && readCoordinate(this.state.lat, 90) === null;
         const lngProblem = this.state.lng !== '' && readCoordinate(this.state.lng, 180) === null;
         return (
@@ -232,7 +262,8 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                             {point && this.props.canMoveByClick ? (
                                 <button type="button" className="mapstudio-button mapstudio-field-move" aria-pressed={this.props.moving} disabled={paused}
                                         title={this.props.moving ? 'Move waits for a click on the map; press again or Esc to cancel'
-                                            : 'Move: click the new place on the map'} onClick={this.props.onMoveStart}>Move</button>
+                                            : 'Move: click the new place on the map'} aria-keyshortcuts={this.props.moving ? 'Escape' : undefined}
+                                        onClick={this.props.onMoveStart}>Move</button>
                             ) : null}
                         </div>
                         {point ? (
@@ -281,9 +312,9 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                     </div>
                 </div>
                 <footer className="mapstudio-panel-footer">
-                    <button type="button" className="mapstudio-dock-button mapstudio-panel-delete" disabled={paused}
-                            title={paused ? PAUSED_TEXT : DELETE_TITLE} aria-label={'Delete ' + item.name} aria-keyshortcuts="Delete"
-                            onClick={this.props.onDelete}>
+                    <button type="button" className="mapstudio-dock-button mapstudio-panel-delete" disabled={remove.off !== ''} title={remove.title}
+                            aria-label={'Delete ' + item.name} aria-keyshortcuts={remove.key ? 'Delete' : undefined}
+                            data-off={remove.off} onClick={this.props.onDelete}>
                         <ChromeGlyph name="trash" />
                     </button>
                 </footer>

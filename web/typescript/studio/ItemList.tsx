@@ -131,8 +131,9 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
                                autoComplete="off" spellCheck={false} value={query} onChange={this.onQuery} onKeyDown={this.onQueryKey} />
                         {query !== '' ? (
                             // Only while there is text, so a hidden button never counts as a target (as the View-mode field's Clear).
-                            <button type="button" className="mapstudio-dock-button mapstudio-list-search-clear" title="Clear the search"
-                                    aria-label="Clear the search" onClick={this.onClear}>
+                            // Esc in the field empties it too, so Clear names the key (epic 4 entry 25's review).
+                            <button type="button" className="mapstudio-dock-button mapstudio-list-search-clear" title="Clear the search (Esc)"
+                                    aria-label="Clear the search" aria-keyshortcuts="Escape" onClick={this.onClear}>
                                 <ChromeGlyph name="close" size={16} />
                             </button>
                         ) : null}

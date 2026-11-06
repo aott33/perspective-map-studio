@@ -146,7 +146,8 @@ test.describe('1366 px', () => {
         // Select in hand and nothing talks (entry 23): the Select tool tinted and named, no mode pill, no drawing bar, and no
         // status box (entry 24: gone; the header says Saved and no problem row shows).
         await expect(page.locator('.mapstudio-tool--select')).toHaveAttribute('aria-pressed', 'true');
-        await expect(page.locator('.mapstudio-tool--select')).toHaveAttribute('title', 'Select');
+        // Its key on hover too (entry 25's review: Esc returns to Select).
+        await expect(page.locator('.mapstudio-tool--select')).toHaveAttribute('title', 'Select (Esc)');
         await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
         await expect(page.locator('.mapstudio-drawing-bar')).toHaveCount(0);
         await expect(page.locator('.mapstudio-reply')).toHaveCount(0);

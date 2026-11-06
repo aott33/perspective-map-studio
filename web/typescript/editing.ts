@@ -809,17 +809,27 @@ export function canDelete(host: EditingHost): boolean {
     return !!delegate && delegate.editing !== 'off' && host.studioOn();
 }
 
+/** The Point, Line or Area tool is in hand, or a drawing is in progress: no delete then, by the footer or the key (entry 25's review). */
+export function toolInHand(host: EditingHost): boolean {
+    return host.state.studio.tool !== null || host.state.drawing !== null;
+}
+
 /**
  * Delete the selected item (entry 25; EXPERIENCE.md Delete, the properties panel's footer and the Delete key): no question asked,
  * one batch through the delegate (a line with every instrument on it, the `ends` naming them cleared) and one undo step, "delete
- * <name>". The selection clears at once, so Details closes and an open popup goes, and the focus goes to the map, where Ctrl+Z
+ * <name>"; nothing while a tool is in hand or for an item never saved (entry 25's review). The selection clears at once, so Details closes and an open popup goes, and the focus goes to the map, where Ctrl+Z
  * undoes it; nothing says it saved (the save status does), and a refusal shows on the save status row. A pin the Point tool still
  * holds goes, as an undo's does. True when a delete was sent.
  */
 export function deleteSelected(host: EditingHost): boolean {
     const selected = host.state.selected;
     const delegate = host.props.store.delegate as MapStudioStoreDelegate | undefined;
-    if (!selected || !delegate || !canDelete(host) || !delegate.deleteItem(selected.id)) {
+    if (!selected || !delegate || !canDelete(host) || toolInHand(host)) {
+        return false;
+    }
+    // Never an item only the waiting edits know (version 0: its create being saved, or refused for good): "Not saved yet".
+    const item = host.liveItem(selected.id);
+    if (!item || item.version < 1 || !delegate.deleteItem(selected.id)) {
         return false;
     }
     clearPlacedPoints(host);
@@ -834,17 +844,17 @@ export function deleteSelected(host: EditingHost): boolean {
 
 /**
  * The Delete key outside a field (entry 25; the component's keydown, MapStudio.tsx): with a point of the selected line or area
- * chosen (entry 5) it removes that point as the bar's Delete point does (off at the floor, and while Move waits for its click);
- * otherwise it deletes the selected item. Nothing while a line or an area is being drawn, or where Delete does not act
- * (`canDelete`). True when the key was taken.
+ * chosen (entry 5) it removes that point as the bar's Delete point does (off at the floor); while Move waits for its click (a
+ * point's, or a point item's from Details) it does nothing; otherwise it deletes the selected item. Nothing while a tool is in
+ * hand (entry 25's review), or where Delete does not act (`canDelete`). True when the key was taken.
  */
 export function onDeleteKey(host: EditingHost): boolean {
-    if (!canDelete(host) || host.state.drawing !== null) {
+    if (!canDelete(host) || toolInHand(host)) {
         return false;
     }
     const pick = host.state.geometry;
-    if (pick && pick.index !== null && host.state.studio.tool === null) {
-        if (!pick.moving) {
+    if (pick) {
+        if (pick.index !== null && !pick.moving) {
             deletePoint(host);
         }
         return true;

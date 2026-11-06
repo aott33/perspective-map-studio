@@ -3,10 +3,11 @@
 // on the line): CTB1 deleted from the footer's delete icon with no question asked, in one batch with L-SWD's end that names it
 // cleared, Details closing; L-SWD deleted with the Delete key, its three instruments in the same batch; each one Undo step that
 // restores everything with its link and properties, and Redo deleting again; with a point of L-SWD chosen the Delete key is that
-// point's Delete point (off at the floor and while Move waits); in the Name field Delete is the field's; a delete refused (another
-// save of CTB1 landed first) said on the save status row; Undo, Redo, the footer's delete, the panel's close and the bars' buttons
-// each name their key on hover and as their accessible description. At 390 px, for a phone editor at 1366 px and for a viewer
-// no delete. A render of the footer for the docs under E2E_DOCS=1 (AD-15). The spec leaves the seed as it found it (each delete
+// point's Delete point (off at the floor and while Move waits), the footer then naming no key; in the Name field Delete is the
+// field's; with a tool in hand no delete, the footer off saying why (the review's patch); a delete refused (another save of CTB1
+// landed first) said on the save status row; Undo, Redo, Select, the footer's delete, the panel's close, the popup's close, Clear
+// the search, Hide and the bars' buttons each name their key on hover and as their accessible description. At 390 px, for a
+// phone editor at 1366 px and for a viewer no delete. A render of the footer for the docs under E2E_DOCS=1 (AD-15). The spec leaves the seed as it found it (each delete
 // undone, then the seed run again and the strays removed), since later specs read L-SWD.
 
 import { pagePixel } from '../lib/geo.mjs';
@@ -238,9 +239,15 @@ test.describe('1366 px', () => {
             const bend = await pixelNow(map, BEND);
             await page.mouse.click(bend[0], bend[1]);
             await expect(bar.locator('.mapstudio-geometry-title')).toHaveText('Point 2 of 3 on L-SWD');
+            // Del is the point's now: the footer's delete stays on but names no key.
+            const footerDelete = page.locator('.mapstudio-panel .mapstudio-panel-delete');
+            await expect(footerDelete).toBeEnabled();
+            await expect(footerDelete).toHaveAttribute('title', 'Delete');
+            await expect(footerDelete).not.toHaveAttribute('aria-keyshortcuts', /./);
             // While Move waits for its click, Delete does nothing.
             await bar.locator('.mapstudio-geometry-move').click();
             await expect(map).toHaveAttribute('data-moving', 'point');
+            await expect(footerDelete).toHaveAttribute('title', 'Delete');
             let seqBefore = await seqOf(map);
             await page.keyboard.press('Delete');
             await expectNothingSent(page, map, seqBefore);
@@ -338,17 +345,32 @@ test.describe('1366 px', () => {
             expect(items[ids.ctb1].version).toBe(pad.version + 1);
             expect(endsAre(items[ids.line].ends, ids.ctb1, ids.swd1)).toBe(true);
             await expect(page.locator('.mapstudio-list-row[data-item-id="' + ids.ctb1 + '"]')).toHaveCount(1);
-            // The refused edit waits under the row with Discard, as any refused edit does; discarded, nothing is left.
+            // The refused edit waits under the row with Discard, as any refused edit does; discarded, nothing is left. Hide names Esc.
             await page.locator('.mapstudio-panel-problem--edits').click();
+            const hide = page.locator('.mapstudio-unsaved-hide');
+            await expect(hide).toHaveAttribute('title', 'Hide (Esc)');
+            await expect(hide).toHaveAttribute('aria-keyshortcuts', 'Escape');
             await page.locator('.mapstudio-unsaved-discard').first().click();
             await expect(map).toHaveAttribute('data-unsaved-count', '0', { timeout: REPLY_MS });
         });
 
-    editorTest('every control with a key names it on hover and as its description: the panel\'s close, the drawing bar, the Point tool\'s Done, the geometry bar',
+    editorTest('every control with a key names it on hover and as its description: Select, Clear the search, the panel\'s close, the drawing bar, the Point tool\'s Done, the geometry bar; with a tool in hand no delete',
         async ({ page }) => {
             const map = await openEditor(page);
+            const select = page.locator('.mapstudio-tool--select');
+            await expect(select).toHaveAttribute('title', 'Select (Esc)');
+            await expect(select).toHaveAccessibleDescription('Select (Esc)');
+            await expect(select).toHaveAttribute('aria-keyshortcuts', 'Escape');
+            // The Items list's Clear, shown while the search holds text: Esc in the field empties it too.
+            await page.locator('.mapstudio-list-search-input').fill('L-SWD');
+            const clear = page.locator('.mapstudio-list-search-clear');
+            await expect(clear).toHaveAttribute('title', 'Clear the search (Esc)');
+            await expect(clear).toHaveAttribute('aria-keyshortcuts', 'Escape');
+            await clear.click();
             await selectRow(page, ids.line);
             await view(page, map, SWD_VIEW.center, SWD_VIEW.zoom);
+            const footerDelete = page.locator('.mapstudio-panel .mapstudio-panel-delete');
+            await expect(footerDelete).toHaveAttribute('title', 'Delete (Del)');
             const close = page.locator('.mapstudio-panel .mapstudio-panel-close');
             await expect(close).toHaveAttribute('title', 'Close (Esc)');
             await expect(close).toHaveAccessibleDescription('Close (Esc)');
@@ -371,9 +393,19 @@ test.describe('1366 px', () => {
             await page.keyboard.press('Escape');
             await expect(bar).toHaveCount(0);
 
-            // The Line tool's bar: Cancel (Esc), and Finish (Enter) once two points are placed; Esc then cancels, nothing saved.
+            // The Line tool's bar: Cancel (Esc), and Finish (Enter) once two points are placed; Cancel then puts it down, nothing saved.
             const seqBefore = await seqOf(map);
             await page.locator('.mapstudio-tool--line').click();
+            await expect(map).toHaveAttribute('data-tool', 'line');
+            // With a tool in hand, before its first point too, no delete: the footer is off saying why, and Del deletes nothing.
+            await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', ids.line);
+            await expect(footerDelete).toBeDisabled();
+            await expect(footerDelete).toHaveAttribute('title', 'Off while a tool is in hand - Esc puts it down');
+            await expect(footerDelete).not.toHaveAttribute('aria-keyshortcuts', /./);
+            await page.locator('.maplibregl-canvas').focus();
+            await page.keyboard.press('Delete');
+            await expectNothingSent(page, map, seqBefore);
+            expect((await storedAll(page))[ids.line]).toBeDefined();
             const drawing = page.locator('.mapstudio-drawing-bar');
             const cancel = drawing.locator('.mapstudio-drawing-cancel');
             const finish = drawing.locator('.mapstudio-drawing-finish');
@@ -390,12 +422,17 @@ test.describe('1366 px', () => {
             await expect(finish).toBeEnabled();
             await expect(finish).toHaveAttribute('title', 'Finish (Enter)');
             await expect(finish).toHaveAccessibleDescription('Finish (Enter)');
-            await page.keyboard.press('Escape');
+            // Cancel puts the tool down, nothing saved (its Esc is drawing.spec.mjs's; it closes Details as well).
+            await cancel.click();
             await expect(drawing).toHaveCount(0);
             await expect(map).toHaveAttribute('data-tool', '');
+            // The tool down: the footer deletes again and names Del.
+            await expect(footerDelete).toBeEnabled();
+            await expect(footerDelete).toHaveAttribute('title', 'Delete (Del)');
 
-            // The Point tool's bar: Done (Esc).
+            // The Point tool's bar: Done (Esc); the footer off while it is in hand.
             await page.locator('.mapstudio-tool--point').click();
+            await expect(footerDelete).toBeDisabled();
             const done = page.locator('.mapstudio-drawing-bar--point .mapstudio-drawing-done');
             await expect(done).toHaveAttribute('title', 'Done (Esc)');
             await expect(done).toHaveAccessibleDescription('Done (Esc)');
@@ -414,6 +451,10 @@ test.describe('the phone and a viewer: no delete', () => {
         await page.mouse.click(pad[0], pad[1]);
         await expect(map).toHaveAttribute('data-selected', ids.ctb1);
         await expect(page.locator('.mapstudio-panel-delete')).toHaveCount(0);
+        // The popup's close (a card, or the sheet at 390 px) names Esc, which closes it.
+        const close = page.locator('.mapstudio-popup-close').first();
+        await expect(close).toHaveAttribute('title', 'Close (Esc)');
+        await expect(close).toHaveAttribute('aria-keyshortcuts', 'Escape');
         await page.locator('.maplibregl-canvas').focus();
         const seqBefore = await seqOf(map);
         await page.keyboard.press('Delete');

@@ -88,7 +88,8 @@ describe('the edits waiting under the row (entry 24)', () => {
         expect(html.match(/mapstudio-unsaved-retry/g)).toHaveLength(2);
         expect(html.match(/mapstudio-unsaved-discard/g)).toHaveLength(3);
         expect(html).toContain('class="mapstudio-unsaved-button mapstudio-unsaved-discard" disabled="" title="Being sent; wait for the answer."');
-        expect(html).toMatch(/<button type="button" class="mapstudio-unsaved-button mapstudio-unsaved-hide">Hide<\/button><\/div>$/);
+        // Hide names Esc, which hides the list too (epic 4 entry 25's review: each control with a key names it).
+        expect(html).toMatch(/<button type="button" class="mapstudio-unsaved-button mapstudio-unsaved-hide" title="Hide \(Esc\)" aria-keyshortcuts="Escape">Hide<\/button><\/div>$/);
     });
 
     test('a waiting edit in Undo\'s words: add, rename, move, link, unlink, edit, delete, the name from the batch or the record', () => {

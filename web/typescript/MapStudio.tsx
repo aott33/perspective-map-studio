@@ -1245,7 +1245,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              onMoveStart={this.onMoveByClick}
                              onLink={this.onLink}
                              onKind={this.onKind}
-                             onDelete={this.onDeleteItem} />
+                             onDelete={this.onDeleteItem}
+                             toolInHand={this.state.studio.tool !== null || this.state.drawing !== null}
+                             delKey={!(pick && pick.itemId === item.id)} />
         );
     }
 

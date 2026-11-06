@@ -1,8 +1,10 @@
 // Delete in the store delegate (epic 4 entry 25; EXPERIENCE.md Delete): one `edits.apply` batch through the queue and one undo
 // step, "delete <name>"; a line goes with its instruments, the `ends` naming a deleted item are cleared in the same batch, Undo
 // restores every item at its tombstone with its link, properties, kind and geometry and puts the `ends` back, Redo deletes again.
-// A delete touching an item with a save in flight waits and is built from the records once it settles, as a geometry change.
-// The delegate is driven as the Gateway would, as in geometryHold.test.ts.
+// A delete touching an item with a save in flight waits and is built from the records once it settles, as a geometry change, and
+// so does one while a save in flight or waiting its turn (replaying after a transient refusal too) writes `ends` naming an item it
+// deletes (the review's patch); an item never saved gets no delete at version 0. The delegate is driven as the Gateway would, as
+// in geometryHold.test.ts.
 
 jest.mock('@inductiveautomation/perspective-client', () => ({
     ComponentStoreDelegate: class {
@@ -29,6 +31,7 @@ import { EditBatch, MapItemRecord } from '../contract';
 import { MESSAGE_EVENT, MessageTypes } from '../messages';
 import { MapStudioStoreDelegate } from '../MapStudioStoreDelegate';
 import { editProblems } from '../problems';
+import { REPLAY_INTERVAL_MS } from '../unsaved';
 import { redoLabel, undoLabel } from '../undoStack';
 
 const PAD: Kind = { id: 'pad', name: 'Well pad', geometry: 'point', icon: 'well-pad', labelRank: 10, fields: [] };
@@ -178,17 +181,81 @@ describe('a delete is one batch and one undo step (entry 25)', () => {
         expect(delegate.mapStateToProps().editInFlight).toBe(false);
     });
 
-    test('a pad deleted while its create is still being saved goes once the create is saved, at its saved version', () => {
+    test('an item never saved (its create in flight, or refused for good) gets no delete at version 0: nothing sent', () => {
         const pad = delegate.createPoint(CTB, PAD);
         const create = last();
         const before = sent().length;
+        expect(delegate.deleteItem(pad)).toBe(false);
+        expect(sent()).toHaveLength(before);
+        refuse(create, 'invalid', 'The kind pad is not in the kind list.');
+        // Only the waiting edits know it now (Discard under the save status row drops it): still no delete.
+        expect(delegate.mapStateToProps().unsaved.map((e) => e.batchId)).toEqual([create.body.batchId]);
+        expect(delegate.deleteItem(pad)).toBe(false);
+        expect(sent()).toHaveLength(before);
+        // Once saved, it deletes at its saved version.
+        const saved = delegate.createPoint(SWD, PAD);
+        save(last());
+        expect(delegate.deleteItem(saved)).toBe(true);
+        expect(last().body.ops).toEqual([{ op: 'delete', entity: 'item', id: saved, baseVersion: 1 }]);
+    });
+
+    test('a delete waits while a save in flight writes ends naming the pad, then clears them: no line names a deleted item', () => {
+        const pad = delegate.createPoint(CTB, PAD);
+        save(last());
+        // A line with floating ends; its start then dragged onto the pad with Snap on (a save in flight naming the pad).
+        const line = delegate.createLine([[-105.0, 39.72], BEND, SWD], LINE, null);
+        save(last());
+        expect(delegate.moveVertex(line, 0, CTB, pad)).toBe(true);
+        const snap = last();
+        expect(snap.body.ops[0].data!.ends).toEqual({ start: { itemId: pad } });
+        const before = sent().length;
+        // Built now, the delete would touch only the pad (the line's record does not name it until the reply): it waits.
         expect(delegate.deleteItem(pad)).toBe(true);
         expect(sent()).toHaveLength(before);
-        save(create);
-        expect(last().body.ops).toEqual([{ op: 'delete', entity: 'item', id: pad, baseVersion: 1 }]);
+        expect(delegate.mapStateToProps().editInFlight).toBe(true);
+        save(snap);
+        expect(sent()).toHaveLength(before + 1);
+        expect(last().body.ops).toEqual([
+            { op: 'delete', entity: 'item', id: pad, baseVersion: 1 },
+            { op: 'update', entity: 'item', id: line, baseVersion: 2, data: { ends: null } }]);
         save(last());
-        expect(record(pad)).toBeUndefined();
-        expect(undoLabel(delegate.mapStateToProps().undo)).toBe('Undo: delete Well pad');
+        expect(record(line)!.ends).toBeNull();
+        expect(delegate.mapStateToProps().editInFlight).toBe(false);
+    });
+
+    test('a save naming the pad waiting its turn, then replaying after a transient refusal, holds the delete until it saves', () => {
+        delegate.sendMapLoad();
+        const load = ((delegate as unknown as { fired: Array<{ id: string; type: string }> }).fired).filter((m) => m.type === MessageTypes.MAP_LOAD);
+        delegate.handleEvent(MESSAGE_EVENT, { v: 1, type: MessageTypes.MAP_LOAD_REPLY, id: load[load.length - 1].id,
+            body: { level: 'full', seq: 0, items: [] } });
+        const pad = delegate.createPoint(CTB, PAD);
+        save(last());
+        const line = delegate.createLine([CTB, BEND, SWD], LINE, null);
+        save(last());
+        // A rename of the line in flight, and behind it (held) a batch that snaps the line's start to the pad.
+        delegate.renameItem(line, 'L-TEST');
+        const rename = last();
+        delegate.sendBatch({ batchId: 'snap-ends', ops: [{ op: 'update', entity: 'item', id: line, baseVersion: 2,
+            data: { ends: { start: { itemId: pad } } } }] }, line, 'edit L-TEST');
+        const before = sent().length;
+        expect(delegate.deleteItem(pad)).toBe(true);
+        expect(sent()).toHaveLength(before);
+        save(rename);
+        // The held batch goes; the delete still waits on it.
+        expect(sent()).toHaveLength(before + 1);
+        const ends = last();
+        expect(ends.body.batchId).toBe('snap-ends');
+        refuse(ends, 'store-unreachable', 'The map store could not save the change (SQLState 08001); nothing was saved.');
+        expect(sent()).toHaveLength(before + 1);
+        // The replay sends it again; once it saves, the delete is built with the line's end cleared.
+        jest.advanceTimersByTime(REPLAY_INTERVAL_MS);
+        expect(sent()).toHaveLength(before + 2);
+        expect(last().body.batchId).toBe('snap-ends');
+        save(last());
+        expect(sent()).toHaveLength(before + 3);
+        expect(last().body.ops).toEqual([
+            { op: 'delete', entity: 'item', id: pad, baseVersion: 1 },
+            { op: 'update', entity: 'item', id: line, baseVersion: 3, data: { ends: null } }]);
     });
 
     test('an item not on the map: nothing sent', () => {

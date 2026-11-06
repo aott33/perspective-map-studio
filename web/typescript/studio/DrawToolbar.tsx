@@ -71,8 +71,8 @@ export function DrawToolbar(props: DrawToolbarProps): React.ReactElement {
             <div className="mapstudio-toolbar" role="toolbar" aria-label={props.paused ? 'Drawing tools - ' + PAUSED_TEXT : 'Drawing tools'}
                  data-paused={props.paused ? 'true' : 'false'}>
                 <button type="button" className={'mapstudio-tool mapstudio-tool--select' + (props.tool === null ? ' mapstudio-tool--active' : '')}
-                        aria-pressed={props.tool === null} title={props.paused ? PAUSED_TEXT : 'Select'} aria-label="Select" disabled={props.paused}
-                        onClick={props.onSelect}>
+                        aria-pressed={props.tool === null} title={props.paused ? PAUSED_TEXT : 'Select (Esc)'} aria-label="Select" disabled={props.paused}
+                        aria-keyshortcuts="Escape" onClick={props.onSelect}>
                     <ChromeGlyph name="pointer" />
                 </button>
                 {buttons.length > 0 ? <span className="mapstudio-toolbar-divider" aria-hidden="true" /> : null}
