@@ -170,7 +170,8 @@ test.describe('1366 px', () => {
             await expect(page.locator('.mapstudio-panel-save--row')).toHaveCount(0);
             const undo = page.locator('.mapstudio-toolbar .mapstudio-undo');
             await expect(undo).toHaveAttribute('aria-label', 'Undo: add Gathering line');
-            await expect(undo).toHaveAttribute('title', 'Undo: add Gathering line');
+            // Its key too (entry 25: each control names its shortcut on hover).
+            await expect(undo).toHaveAttribute('title', 'Undo: add Gathering line (Ctrl+Z)');
             await expect(undo).toBeEnabled();
             // One batch, one seq: the record carries the kind, the placeholder name, both ends and the pads' own places.
             expect(Number(await map.getAttribute('data-store-seq'))).toBe(Number(seqBefore) + 1);

@@ -289,7 +289,7 @@ test.describe('1366 px', () => {
             const redo = page.locator('.mapstudio-toolbar .mapstudio-redo');
             await expect(page.locator('.mapstudio-dock-header .mapstudio-undo, .mapstudio-dock-header .mapstudio-redo')).toHaveCount(0);
             await expect(undo).toHaveAttribute('data-step', 'Undo: add Well pad');
-            await expect(undo).toHaveAttribute('title', 'Undo: add Well pad');
+            await expect(undo).toHaveAttribute('title', 'Undo: add Well pad (Ctrl+Z)');
             await expect(redo).toBeDisabled();
             await expect(redo).toHaveAttribute('title', 'Nothing to redo');
             await expect(page.locator('.mapstudio-toast')).toHaveCount(0);
@@ -536,9 +536,9 @@ test.describe('1366 px, Undo and its history on the toolbar', () => {
             await expect(page.locator('.mapstudio-reply')).toHaveCount(0);
             await expect(page.locator('.mapstudio-panel-save')).toHaveText('Saved', { timeout: REPLY_MS });
 
-            // Hover Undo: the last step, to the pointer and to assistive technology.
+            // Hover Undo: the last step, to the pointer and to assistive technology, its key on hover (entry 25).
             await undo.hover();
-            await expect(undo).toHaveAttribute('title', 'Undo: add Gathering line', { timeout: REPLY_MS });
+            await expect(undo).toHaveAttribute('title', 'Undo: add Gathering line (Ctrl+Z)', { timeout: REPLY_MS });
             await expect(undo).toHaveAttribute('aria-label', 'Undo: add Gathering line');
             await expect(redo).toHaveAttribute('title', 'Nothing to redo');
 
