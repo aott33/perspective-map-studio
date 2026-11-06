@@ -73,6 +73,11 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 
 ## Plan Change Log
 
+- 2026-11-06 (implementer): the delete's batch carries whole `ends` and the records' versions, so the delegate holds and builds it as a geometry change (entry 5's `sendShapeChange`): sent now, or built from the records once the saves of the items it touches settle (the item's create, a line's reshape, a pad's move). `geometry.ts` `itemDeleteBatch` takes any item: a line goes through `lineDeleteBatch`, a point item (an instrument too) alone, then every live line whose `ends` name a deleted item (the item, or a deleted line's instruments) loses that side, `null` with no side left; the deletes come first, so the reverse restores before it puts the `ends` back.
+- 2026-11-06 (implementer): the Delete key is the component's (`MapStudio.tsx` root keydown, as Ctrl+Z is, `editing.ts` `onDeleteKey`): it deletes the selected item whether Details or a popup is open for it; with a point chosen it is that point's Delete point, off at the floor (now guarded in `deletePoint` itself) and while Move waits for its click; while a line or an area is being drawn it does nothing; with a point item's Move waiting (no point chosen) it deletes the item. After a delete the focus goes to the map, so Ctrl+Z undoes it at once (the footer's button leaves with Details).
+- 2026-11-06 (implementer): a control that is off keeps saying why on hover ("Nothing to undo", "A line keeps at least two points", the paused words), as entry 5 and 23 set; the key is named on hover once it is on, and `aria-keyshortcuts` carries it in both states. The panel's close names Esc too ("Close (Esc)"): a control with a key. The footer's icon is named "Delete CTB1" to assistive technology, "Delete (Del)" its description. The drawing bar's hint keeps its words (no Backspace added: the frozen shortcut words name none).
+- 2026-11-06 (implementer): found on the way, not this entry's: Esc in a Details field after typing saves the typed value (React 16 batching in `PropertiesPanel.onKey`); seen live with a throwaway probe and recorded in `_bmad-output/deferred-work.md`. The delete spec's field test finishes the field with Enter instead.
+
 ## Review Triage Log
 
 ## Verification
