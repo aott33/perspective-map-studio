@@ -3,7 +3,7 @@ title: "Change geometry: move, vertices, insert, split, snapped ends that follow
 type: 'feature'
 ticket: '5'
 created: '2026-11-06'
-status: 'in-review'
+status: 'built'
 baseline_revision: '0704c338b53f59e7856338b7c0daf29a837f4f0a'
 route: 'full'
 route_source: 'auto'
@@ -104,6 +104,8 @@ Quick lens, 2026-11-06: 7 findings; high 0, medium 4, low 2, by design 1.
 | Details' Move says it is a toggle but pressing it again does not put it down | low | `aria-pressed={moving}`; activating it sets `moving: true` again | patch: pressing it again puts Move down |
 | `geometry.spec.mjs` runs neither a refused geometry save nor a phone-level user at 1366 px | low | The matrix's refusal and "level below full" cells | patch: both tested |
 | With a line selected, a click on the pad its end snaps to chooses the line's end point instead of selecting the pad | by design | The selected line's handles are drawn over the map and take its clicks, as in other map editors; Esc or a click elsewhere clears the line, and the list selects the pad | rejected as a defect; the precedence written in `docs/contract.md` |
+
+After the patches (coordinator, 2026-11-06): one more patch from the implementer's own risk list (a refused geometry save drops the waiting changes made on top of it, said on the save status row); deferred: a held split does not open its new part (deferred-work.md). `tsc` clean, 413 Jest tests green, Gradle build green offline, the contract check OK at 0.4.0, no em dashes; the whole e2e suite on a fresh dev stack 161 passed, 7 skipped, 1 failed in 38.9 min, the failure the review 390 px dark-theme test of deferred-work.md, which passed when rerun alone; the `E2E_DOCS=1` run of `geometry.spec.mjs` 11 passed.
 
 ## Verification
 
