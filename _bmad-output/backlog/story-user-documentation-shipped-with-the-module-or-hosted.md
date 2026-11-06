@@ -1,7 +1,7 @@
 ---
 id: 27
 type: story
-title: "User documentation for Map Studio, shipped with the module or hosted on aoindustrial"
+title: "User documentation for Map Studio, hosted on aoindustrial.ca and shipped with the module"
 parent: none
 covers: []
 after: []
@@ -10,7 +10,7 @@ hitl: true
 risk: low
 ---
 
-# User documentation for Map Studio, shipped with the module or hosted on aoindustrial
+# User documentation for Map Studio, hosted on aoindustrial.ca and shipped with the module
 
 ## Description
 
@@ -31,4 +31,6 @@ Documentation written for the people who use Map Studio, not for contributors: a
 
 - Open question (owner): where the docs live. Options: (a) a docs site on aoindustrial built from this repository's pages per release (a static site generator over Markdown, one build per tag); (b) served by the module itself at a Gateway path such as `/res/mapstudio/docs/` so a site with no internet reads them in place; (c) both, the module's copy a snapshot of the site at its release. Sofia's pick: (c), since IT/OT sites are often offline and the site is the discoverable front door.
 - Open question: the audience split (integrator, map editor, operator, page builder) as separate guides or one book with parts; and whether the Designer's setup form links to its page.
+- Note: 2026-11-06 Owner: the docs get a page on the owner's site, aoindustrial.ca, at `modules.aoindustrial.ca` or `aoindustrial.ca/ignition-modules`. This settles option (a)'s host; whether the module also carries a copy (b, c) stays open. The plural name suggests a front door for all of AO Industrial's Ignition modules, with Map Studio's docs the first section.
+- Open question (owner): the subdomain or the path. `modules.aoindustrial.ca` is a separate static site (built from this repository per release and served by any static host through a DNS record), independent of how the main site is built; `aoindustrial.ca/ignition-modules` needs the main site's host to serve or proxy that path, but keeps one domain.
 - Note: 2026-11-04 Owner: added to the backlog as an idea to discuss, not scheduled; it waits at least until epic 4's studio exists, since the editor guide describes it, and fits before or with the open-source release.
