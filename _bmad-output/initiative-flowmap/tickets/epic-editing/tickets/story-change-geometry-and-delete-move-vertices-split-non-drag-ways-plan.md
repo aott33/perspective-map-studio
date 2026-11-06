@@ -3,14 +3,14 @@ title: "Change geometry: move, vertices, insert, split, snapped ends that follow
 type: 'feature'
 ticket: '5'
 created: '2026-11-06'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '0704c338b53f59e7856338b7c0daf29a837f4f0a'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md', '{project-root}/docs/instruments.md']
 ---
