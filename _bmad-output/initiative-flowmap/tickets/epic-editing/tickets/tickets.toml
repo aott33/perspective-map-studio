@@ -7,6 +7,7 @@
 # Entries 22 and 23 (owner, 2026-11-05, the messages and legend review after entry 21): the legend in Layers, then one place that talks with Undo's history; both ahead of 5.
 # Entry 24 (owner, 2026-11-05): the status box retired after 23; entry 11's Recent changes moves to a History item on the rail.
 # Entry 5 split (owner, 2026-11-06): geometry stays 5; Delete with shortcuts on the controls is 25; duplicate and add-another parked (backlog 28); the ? panel dropped.
+# Entry 26 (owner, 2026-11-06, testing on the dev stack): no popup in Edit mode, a click opens Details; after 25, taken out of entry 7.
 # Cross-epic prerequisites are pinned on the entries that need them ("2.n", "3.n").
 # Entry 21 (owner, 2026-11-05, option B of the layout review after entry 4): Edit mode's top row as DESIGN.md draws it, ahead of 5; entry 7 builds on its list header.
 
@@ -121,6 +122,17 @@ hitl = false
 risk = "low"
 
 [[entry]]
+id = 26
+type = "story"
+title = "In Edit mode a click selects and opens Details, no popup"
+description = "The owner's choice A (2026-11-06, testing entry 5 on the dev stack: \"when selecting an item in edit mode the popup opens up which makes it difficult to drag the point\"), as EXPERIENCE.md Select already says (in View mode a click opens the popup, in Edit mode it opens properties). In Edit mode a click on a point, a line or an area selects it and opens Details, and a line or area shows its handles; no popup, no line popup and no phone sheet opens in Edit mode, and one that is open closes when Edit mode is entered. A shared spot still opens its picker, whose choice selects. View mode's popups are unchanged. The Live now block in Details stays entry 6's and 7's; until then the live values are seen in View mode. Taken out of entry 7."
+verify = "On the dev Gateway at 1366 px as the map editor: a click on CTB1 in Edit mode selects it with Details open and no popup, and CTB1 drags at once; a click on L-SWD selects it with its handles and no line popup; an open popup closes when the Edit switch is turned on; in View mode the same clicks open the popups as before; e2e passes with the specs that clicked for a popup in Edit mode moved to View mode or to Details."
+covers = ["R19", "R20"]
+after = [25]
+hitl = false
+risk = "low"
+
+[[entry]]
 id = 6
 type = "story"
 title = "The item form: kind fields, required marks, prefill, the place check, duplicate names and unknown kinds"
@@ -135,7 +147,7 @@ risk = "medium"
 id = 7
 type = "story"
 title = "The item list as designed, the first-run checklist, the layout at 1366 and below 1280"
-description = "The list grouped by place from the linked asset's base path (field, site, what is on it; Field-wide; Not linked; Just added; owner, 2026-11-03), needs-attention first with the All normal divider, Sort by (needs attention, place, kind, name, last changed, the last from a changed {actor, at} that map.load.reply gains at the phone and full levels, added to contract 0.4.0), the Filter button with the kind chips, search within the list (its Search items field arrives with entry 21; here it searches the grouped list), the footer with Add item and the unlinked count opening the unlinked list, each row's state badge live, a row selecting, panning and opening properties (Layers is entry 22's); the first-run checklist on an empty map (Set up your kinds, Add or import items opening the add tools, Check the operator view; ticked when done; Hide checklist) and the viewer's note; the layout at 1440 and 1366 px (opening properties keeps the selection in view, and from here a marker click in Edit mode opens Details beside the popup's place, where entry 2 left it opening the popup as View mode does; owner, 2026-11-04), the list collapsing to a button below about 1280 px, nothing bottom-right."
+description = "The list grouped by place from the linked asset's base path (field, site, what is on it; Field-wide; Not linked; Just added; owner, 2026-11-03), needs-attention first with the All normal divider, Sort by (needs attention, place, kind, name, last changed, the last from a changed {actor, at} that map.load.reply gains at the phone and full levels, added to contract 0.4.0), the Filter button with the kind chips, search within the list (its Search items field arrives with entry 21; here it searches the grouped list), the footer with Add item and the unlinked count opening the unlinked list, each row's state badge live, a row selecting, panning and opening properties (Layers is entry 22's); the first-run checklist on an empty map (Set up your kinds, Add or import items opening the add tools, Check the operator view; ticked when done; Hide checklist) and the viewer's note; the layout at 1440 and 1366 px (opening properties keeps the selection in view; a click on the map in Edit mode is entry 26's), the list collapsing to a button below about 1280 px, nothing bottom-right."
 verify = "On the dev 30-pad set at 1440, 1366 and 1200 px: P14-2H lists under P14 under Mesa field, L-SWD under Field-wide, an unlinked pad under Not linked and a pad added this session under Just added; a pad in alarm heads the list and Sort by name reorders; the Filter chip Well pad keeps only pads; the footer counts the unlinked and lists them; clicking a row pans to the item with properties open and the selection in view; at 1200 px the list is a button; an empty dev map shows the checklist, Open Kinds opens the surface and the step ticks once a kind setup exists (saved through system.mapstudio.applyEdits until entry 12); a viewer sees the note; Sort by last changed follows the edit record's actor and time; e2e at the three widths passes."
 covers = ["R2", "R19", "R20"]
 after = [2, 21, 22]
@@ -270,7 +282,7 @@ title = "Refactor sweep"
 description = "Cleanup only, scoped at its start from the plans and review findings entries 2 to 16 deferred: duplication between the studio's surfaces, the mode and selection model's leftovers, test helpers, the contract docs' wording, and the WCAG checks folded into one accessibility pass of every tool and panel by keyboard at 1366 and 1440 px (R14's evidence for entry 18). Scope pushed out of another story is a new entry, never this one."
 verify = "Every e2e and unit test passes; the keyboard-only pass of every tool, the list, the panel, the Kinds screen and the tag browser is recorded in docs/platform-checks.md with the contrast readings in both themes; no behaviour or contract change."
 covers = ["R14"]
-after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 26]
 hitl = false
 risk = "low"
 
