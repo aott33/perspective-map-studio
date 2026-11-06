@@ -748,7 +748,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
 
     /**
      * A selection with the studio model that goes with it: the item's id selected, or nothing (studio.ts); from `prev` as
-     * above. The Details panel stays only for the item it is open for; a row click or a placement sets it after this.
+     * above. The Details panel stays only for the item it is open for; a row click, a placement or a click in Edit mode (entry 26)
+     * sets it after this.
      */
     selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio' | 'panel' | 'geometry'> {
         return {

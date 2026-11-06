@@ -266,8 +266,9 @@ export function selectLine(host: SelectionHost, id: string, segment: SegmentRef 
  * In Edit mode (the studio on: level `full`, 768 px and wider; epic 4 entry 26, the owner's choice A, EXPERIENCE.md Select) a
  * click selects the item and opens Details, as a list row does (`MapStudio.onRowSelect`), and no popup, line popup or sheet
  * opens: one still open (a pick list whose row was chosen) closes, the Gateway told with popup.close as when it is closed by
- * hand, and no popup.open is sent. The map does not move: the item stays where it was clicked, so a point drags at once and a
- * line or an area shows its handles (entry 5, editing.ts). A line is selected with no segment, the segment being its popup's.
+ * hand, and no popup.open is sent. Nothing covers the item, so a point drags at once and a line or an area shows its handles
+ * (entry 5, editing.ts). The camera is not moved to the item: when Details docks the stage narrows, as for a list row, and
+ * keeping the selection in view as it does is entry 7's. A line is selected with no segment, the segment being its popup's.
  */
 export function selectWithDetails(host: SelectionHost, selected: Selection): void {
     host.openedBy = null;
