@@ -1,6 +1,10 @@
 import * as React from 'react';
-import { Asset, Kind } from '../adapters';
+import { AdapterStatus, Asset, AssetName, FormField, Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
+import {
+    FieldValue, REQUIRED_TEXT, UNKNOWN_KIND, assetListNote, assetVanished, fieldText, isUnset, missingRequired, missingText, nameTwins,
+    readField, twinText, unknownKindText, vanishedText
+} from '../itemForm';
 import { Glyph } from '../popupParts';
 import { roundCoordinate } from '../save';
 import { ChromeGlyph } from './ChromeGlyph';
@@ -43,7 +47,7 @@ export function deleteButton(paused: boolean, pending: boolean, toolInHand: bool
  * assets, Unlink). Every field saves when it is finished (blur, Enter or a choice) through the component's
  * callbacks, one batch each; a field finished while the item's create is still being saved (the item just
  * added with the cursor already in Name) goes to the delegate like any other, which sends it right after the
- * create's reply at the right version. The Style tab, the kind's form fields, the place check, the page
+ * create's reply at the right version. The Style tab, the place check (entry 27), the page
  * link and the Live now block are later entries. The panel is keyed by the item's id, so its drafts
  * start from the record; a new version of the record (a save, an undo, another editor's change) resets
  * the fields the user has not touched and keeps a draft being typed. While map.load says the store is
@@ -52,6 +56,18 @@ export function deleteButton(paused: boolean, pending: boolean, toolInHand: bool
  * the delete icon: no question asked, the item deleted in one batch and one undo step, "Delete (Del)" on hover and as its
  * description while Del deletes this item (`deleteButton`; off for an item never saved and while a tool is in hand); the close
  * names Esc, and Move names Esc while it waits. Each control with a key names it in its hover text and to assistive technology.
+ *
+ * From entry 6 (R3, R12; itemForm.ts holds the rules) the kind's fields follow Location, in the kind list's order and as its
+ * types (DESIGN.md Properties panel: location, kind fields, then the asset link): text and number inputs saved on blur or
+ * Enter (Esc puts the record's value back), a number or a whole number that is not one refused in words beside the field
+ * and not saved; a boolean a checkbox and a choice a select with "Not set" first, both saved on change. Each save is one
+ * update of the whole `properties` (the delegate's `editProperty`), "edit <name>". A required field shows "Required" by its
+ * label and, while it is not set, the line at the top names every missing one ("Missing: Status"); nothing stops a save.
+ * Name is underlined in the `error` token while another live item with the same name (case and outer spaces aside) is
+ * linked to a different asset, its tooltip and description naming it; the name still saves. An item whose kind left the
+ * kind list shows "Unknown kind" with its stored values read only, Kind alone editable; one whose asset left the asset list
+ * says so under Asset and keeps its stored link; the asset list's status message shows under Asset while it is empty,
+ * incomplete, failing, slow or not configured.
  */
 export interface PropertiesPanelProps {
     item: MapItemRecord;
@@ -60,8 +76,12 @@ export interface PropertiesPanelProps {
     kinds: Kind[];
     /** The kind's assets from the asset list (level `phone` or `full`), for the picker. */
     assets: Asset[];
-    /** The linked asset's name, or null when none or not in the list. */
-    assetName: string | null;
+    /** Every asset's id and name (map.load's `assetNames`): the linked asset's name, and whether it left the list (entry 6). */
+    assetNames: AssetName[];
+    /** The asset list's status (map.load's `adapters.assets`), or null when the Gateway sent none. */
+    assetStatus: AdapterStatus | null;
+    /** The map's items, for the duplicate name check (entry 6). */
+    items: MapItemRecord[];
     /** The item's create is still being saved (no stored version yet): a finished field goes right after it. */
     pending: boolean;
     /** The map store is unreachable (map.load): the fields take no input, as the toolbar does. */
@@ -82,6 +102,8 @@ export interface PropertiesPanelProps {
     onMoveStart: () => void;
     onLink: (assetId: string | null) => void;
     onKind: (kindId: string) => void;
+    /** A finished field of the kind (entry 6): its key and its value as its type (null: not set). */
+    onProperty: (key: string, value: FieldValue) => void;
     /** The footer's delete icon (entry 25): the item deleted with no question asked; Undo restores it. */
     onDelete: () => void;
     /** The Point, Line or Area tool is in hand, or a drawing is in progress: the footer's delete is off (entry 25's review). */
@@ -94,7 +116,13 @@ interface Drafts {
     name: string;
     lat: string;
     lng: string;
+    /** The kind's fields being typed or just chosen, by key (entry 6); a key left out shows the record's value. */
+    fields: Record<string, string>;
+    /** A typed field's problem in words, by key ("Wells takes a whole number"); nothing of it was saved. */
+    problems: Record<string, string>;
 }
+
+type FixedField = 'name' | 'lat' | 'lng';
 
 /** The record's values as the fields show them. */
 function draftsOf(item: MapItemRecord): Drafts {
@@ -102,7 +130,9 @@ function draftsOf(item: MapItemRecord): Drafts {
     return {
         name: item.name,
         lat: point ? String(item.geometry.coordinates[1]) : '',
-        lng: point ? String(item.geometry.coordinates[0]) : ''
+        lng: point ? String(item.geometry.coordinates[0]) : '',
+        fields: {},
+        problems: {}
     };
 }
 
@@ -112,8 +142,25 @@ export function readCoordinate(text: string, limit: number): number | null {
     return text.trim() !== '' && Number.isFinite(n) && Math.abs(n) <= limit ? n : null;
 }
 
+/** A dictionary without one key (a copy). */
+function without(map: Record<string, string>, key: string): Record<string, string> {
+    const out = { ...map };
+    delete out[key];
+    return out;
+}
+
+/** Whether a field's new value is what the record holds already (nothing to save). */
+function sameValue(value: FieldValue, stored: unknown): boolean {
+    return value === null ? isUnset(stored) : value === stored;
+}
+
 export class PropertiesPanel extends React.Component<PropertiesPanelProps, Drafts> {
     private nameInput: HTMLInputElement | null = null;
+    /**
+     * The field whose Esc is blurring it: its blur must not save. React batches the Esc's own state change, so the blur
+     * that follows in the same handler still reads the typed draft.
+     */
+    private escaped: string | null = null;
 
     constructor(props: PropertiesPanelProps) {
         super(props);
@@ -138,6 +185,20 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                     next[field] = after[field];
                 }
             }
+            // A kind field's draft goes once the record holds it (saved) or still holds what it had (not touched since).
+            const fields: Record<string, string> = {};
+            const problems: Record<string, string> = {};
+            for (const key of Object.keys(this.state.fields)) {
+                const text = this.state.fields[key];
+                if (text !== fieldText(prev.item.properties[key]) && text !== fieldText(this.props.item.properties[key])) {
+                    fields[key] = text;
+                    if (this.state.problems[key]) {
+                        problems[key] = this.state.problems[key];
+                    }
+                }
+            }
+            next.fields = fields;
+            next.problems = problems;
             this.setState(next as Pick<Drafts, keyof Drafts>);
         }
         if (!prev.autoFocusName && this.props.autoFocusName) {
@@ -157,7 +218,19 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         this.nameInput = el;
     };
 
+    /** True, once, when the blur is the Esc's (nothing to save). */
+    private wasEscaped(field: string): boolean {
+        if (this.escaped === field) {
+            this.escaped = null;
+            return true;
+        }
+        return false;
+    }
+
     private commitName = (): void => {
+        if (this.wasEscaped('name')) {
+            return;
+        }
         const name = this.state.name.trim();
         if (name === '' || name === this.props.item.name || this.props.paused) {
             this.setState({ name: this.props.item.name });
@@ -166,7 +239,10 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         this.props.onRename(name);
     };
 
-    private commitLocation = (): void => {
+    private commitLocation = (field: 'lat' | 'lng') => (): void => {
+        if (this.wasEscaped(field)) {
+            return;
+        }
         const item = this.props.item;
         if (item.geometry.type !== 'Point') {
             return;
@@ -184,17 +260,81 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
     };
 
     /** Enter finishes a field (its blur saves it); Esc puts the record's value back. */
-    private onKey = (field: keyof Drafts) => (ev: React.KeyboardEvent<HTMLInputElement>): void => {
+    private onKey = (field: FixedField) => (ev: React.KeyboardEvent<HTMLInputElement>): void => {
         if (ev.key === 'Enter') {
             ev.preventDefault();
             ev.currentTarget.blur();
         } else if (ev.key === 'Escape') {
             ev.preventDefault();
             ev.stopPropagation();
-            this.setState({ [field]: draftsOf(this.props.item)[field] } as Pick<Drafts, keyof Drafts>);
+            this.escaped = field;
+            this.setState({ [field]: draftsOf(this.props.item)[field] } as Pick<Drafts, FixedField>);
             ev.currentTarget.blur();
+            this.escaped = null;
         }
     };
+
+    /** A kind field's text typed (entry 6): kept as the draft until it is finished. */
+    private onFieldText = (key: string) => (ev: React.ChangeEvent<HTMLInputElement>): void => {
+        const text = ev.target.value;
+        this.setState((prev) => ({ fields: { ...prev.fields, [key]: text } }));
+    };
+
+    /**
+     * A text or number field finished (entry 6): read as its type; a value that is not one says so beside the field and is not
+     * saved; one the record already holds saves nothing; else one update of `properties`, the draft showing the value as stored.
+     */
+    private commitField = (field: FormField) => (): void => {
+        if (this.wasEscaped('field:' + field.key)) {
+            return;
+        }
+        const text = this.state.fields[field.key];
+        if (text === undefined) {
+            return;
+        }
+        if (this.props.paused || !this.props.kind) {
+            this.setState((prev) => ({ fields: without(prev.fields, field.key), problems: without(prev.problems, field.key) }));
+            return;
+        }
+        const read = readField(field, text);
+        if ('problem' in read) {
+            const problem = read.problem;
+            this.setState((prev) => ({ problems: { ...prev.problems, [field.key]: problem } }));
+            return;
+        }
+        if (sameValue(read.value, this.props.item.properties[field.key])) {
+            this.setState((prev) => ({ fields: without(prev.fields, field.key), problems: without(prev.problems, field.key) }));
+            return;
+        }
+        const shown = fieldText(read.value);
+        this.setState((prev) => ({ fields: { ...prev.fields, [field.key]: shown }, problems: without(prev.problems, field.key) }));
+        this.props.onProperty(field.key, read.value);
+    };
+
+    /** Enter finishes a kind field; Esc puts the record's value back and saves nothing. */
+    private onFieldKey = (field: FormField) => (ev: React.KeyboardEvent<HTMLInputElement>): void => {
+        if (ev.key === 'Enter') {
+            ev.preventDefault();
+            ev.currentTarget.blur();
+        } else if (ev.key === 'Escape') {
+            ev.preventDefault();
+            ev.stopPropagation();
+            this.escaped = 'field:' + field.key;
+            this.setState((prev) => ({ fields: without(prev.fields, field.key), problems: without(prev.problems, field.key) }));
+            ev.currentTarget.blur();
+            this.escaped = null;
+        }
+    };
+
+    /** A choice or a checkbox (entry 6): saved at once, the draft showing it until the record holds it. */
+    private chooseField(field: FormField, value: FieldValue): void {
+        if (this.props.paused || !this.props.kind || sameValue(value, this.props.item.properties[field.key])) {
+            return;
+        }
+        const shown = fieldText(value);
+        this.setState((prev) => ({ fields: { ...prev.fields, [field.key]: shown } }));
+        this.props.onProperty(field.key, value);
+    }
 
     private onAssetChange = (ev: React.ChangeEvent<HTMLSelectElement>): void => {
         const value = ev.target.value;
@@ -212,18 +352,100 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         this.props.onLink(null);
     };
 
+    /** One of the kind's fields (entry 6) as its type, its draft or else the record's value. */
+    private renderField(field: FormField, index: number): React.ReactElement {
+        const { item, paused } = this.props;
+        const id = 'mapstudio-prop-' + item.id + '-' + index;
+        const draft = this.state.fields[field.key];
+        const text = draft !== undefined ? draft : fieldText(item.properties[field.key]);
+        const problem = this.state.problems[field.key] || '';
+        const required = field.required ? <span className="mapstudio-field-required">{REQUIRED_TEXT}</span> : null;
+        const rowProps = {
+            className: 'mapstudio-field mapstudio-field--prop mapstudio-field--' + field.type,
+            'data-field': field.key,
+            'data-type': field.type,
+            'data-required': field.required ? 'true' : 'false',
+            'data-problem': problem
+        };
+        if (field.type === 'boolean') {
+            return (
+                <div key={field.key} {...rowProps}>
+                    <div className="mapstudio-field-check-row">
+                        <input id={id} type="checkbox" className="mapstudio-field-prop mapstudio-field-check" checked={text === 'true'}
+                               disabled={paused} aria-required={field.required}
+                               onChange={(ev) => this.chooseField(field, ev.target.checked)} />
+                        <label className="mapstudio-field-check-label" htmlFor={id}>{field.label}</label>
+                        {required}
+                    </div>
+                </div>
+            );
+        }
+        const label = (
+            <div className="mapstudio-field-label-row mapstudio-field-label-row--start">
+                <label className="mapstudio-field-label" htmlFor={id}>{field.label}</label>
+                {required}
+            </div>
+        );
+        if (field.type === 'choice') {
+            const odd = text !== '' && field.choices.indexOf(text) < 0;
+            return (
+                <div key={field.key} {...rowProps}>
+                    {label}
+                    <select id={id} className="mapstudio-input mapstudio-field-prop" value={text} disabled={paused} aria-required={field.required}
+                            onChange={(ev) => this.chooseField(field, ev.target.value === '' ? null : ev.target.value)}>
+                        <option value="">Not set</option>
+                        {odd ? <option value={text}>{text} (not one of the choices)</option> : null}
+                        {field.choices.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                </div>
+            );
+        }
+        const hintId = id + '-problem';
+        return (
+            <div key={field.key} {...rowProps}>
+                {label}
+                <input id={id} className="mapstudio-input mapstudio-field-prop" type="text" value={text} disabled={paused}
+                       inputMode={field.type === 'integer' ? 'numeric' : field.type === 'number' ? 'decimal' : undefined}
+                       aria-required={field.required} aria-invalid={problem !== ''} aria-describedby={problem !== '' ? hintId : undefined}
+                       onChange={this.onFieldText(field.key)} onBlur={this.commitField(field)} onKeyDown={this.onFieldKey(field)} />
+                {problem !== '' ? <span id={hintId} className="mapstudio-field-hint mapstudio-field-problem" aria-live="polite">{problem}</span> : null}
+            </div>
+        );
+    }
+
+    /** An unknown kind's stored values, read only (entry 6): kept as they are until the kind is changed. */
+    private renderStored(): React.ReactNode {
+        const properties = this.props.item.properties;
+        return Object.keys(properties).filter((key) => !isUnset(properties[key])).map((key) => (
+            <div key={key} className="mapstudio-field mapstudio-field--stored" data-field={key}>
+                <span className="mapstudio-field-label">{key}</span>
+                <span className="mapstudio-field-text mapstudio-field-stored">{fieldText(properties[key])}</span>
+            </div>
+        ));
+    }
+
     render(): React.ReactElement {
-        const { item, kind, kinds, assets, assetName, pending, paused } = this.props;
+        const { item, kind, kinds, assets, assetNames, assetStatus, pending, paused } = this.props;
         const point = item.geometry.type === 'Point';
-        const kindName = kind ? kind.name : item.kind;
+        const known = kind !== undefined;
+        // Only Kind takes input while the kind is not in the kind list: the Gateway refuses any other change to the item.
+        const frozen = paused || !known;
         const assetId = item.assetId;
-        const subline = kindName + ' - ' + (item.assetId === null ? 'not linked' : 'linked to ' + (assetName || item.assetId));
+        const vanished = assetVanished(assetId, assetNames, assetStatus);
+        const listed = assetId !== null ? assetNames.find((a) => a.id === assetId) : undefined;
+        const linkWords = assetId === null || vanished ? 'not linked' : 'linked to ' + (listed ? listed.name : assetId);
+        const subline = (kind ? kind.name : UNKNOWN_KIND) + ' - ' + linkWords;
         const remove = deleteButton(paused, pending, this.props.toolInHand, this.props.delKey);
         const latProblem = this.state.lat !== '' && readCoordinate(this.state.lat, 90) === null;
         const lngProblem = this.state.lng !== '' && readCoordinate(this.state.lng, 180) === null;
+        const missing = missingText(missingRequired(kind, item.properties));
+        const twin = twinText(nameTwins(this.state.name, item, this.props.items, assetNames));
+        const twinId = 'mapstudio-twin-' + item.id;
+        const assetNote = assetListNote(assetStatus);
+        const kindWords = kind ? kind.name.toLowerCase() : item.kind;
         return (
             <section className="mapstudio-panel" aria-label={item.name} data-item-id={item.id} data-pending={pending ? 'true' : 'false'}
-                     data-paused={paused ? 'true' : 'false'}>
+                     data-paused={paused ? 'true' : 'false'} data-kind-known={known ? 'true' : 'false'} data-missing={missing}>
                 <header className="mapstudio-panel-header">
                     <span className="mapstudio-popup-disc">
                         {kind && kind.icon !== '' ? <Glyph id={kind.icon} className="mapstudio-popup-glyph" size={18} /> : null}
@@ -243,24 +465,34 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                 <div className="mapstudio-panel-body" role="tabpanel">
                     {paused ? <div className="mapstudio-panel-note" role="status">Paused - the map store is unreachable</div>
                         : pending ? <div className="mapstudio-panel-note" role="status">Saving the new item... a field you finish now saves right after it.</div> : null}
+                    {missing !== '' ? <div className="mapstudio-panel-note mapstudio-panel-missing" role="status">{missing}</div> : null}
                     <label className="mapstudio-field">
                         <span className="mapstudio-field-label">Name</span>
-                        <input ref={this.setNameInput} className="mapstudio-input mapstudio-field-name" type="text" value={this.state.name} disabled={paused}
+                        <input ref={this.setNameInput} className={'mapstudio-input mapstudio-field-name' + (twin !== '' ? ' mapstudio-field-name--twin' : '')}
+                               type="text" value={this.state.name} disabled={frozen} title={twin !== '' ? twin : undefined}
+                               aria-describedby={twin !== '' ? twinId : undefined} data-twin={twin}
                                onChange={(ev) => this.setState({ name: ev.target.value })} onBlur={this.commitName} onKeyDown={this.onKey('name')} />
                     </label>
+                    {/* Outside the label, so the words describe Name and are not part of its name. */}
+                    {twin !== '' ? <span id={twinId} className="mapstudio-visually-hidden">{twin}</span> : null}
                     <div className="mapstudio-field mapstudio-field--kind">
                         <label className="mapstudio-field-label" htmlFor={'mapstudio-kind-' + item.id}>Kind</label>
                         <select id={'mapstudio-kind-' + item.id} className="mapstudio-input mapstudio-field-kind" value={item.kind} disabled={paused}
-                                onChange={this.onKindChange}>
-                            {!kinds.some((k) => k.id === item.kind) ? <option value={item.kind}>{item.kind} (not in the kind list)</option> : null}
+                                aria-describedby={known ? undefined : 'mapstudio-kind-hint-' + item.id} onChange={this.onKindChange}>
+                            {!known || !kinds.some((k) => k.id === item.kind) ? <option value={item.kind}>{UNKNOWN_KIND}</option> : null}
                             {kinds.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
                         </select>
+                        {!known ? (
+                            <span id={'mapstudio-kind-hint-' + item.id} className="mapstudio-field-hint mapstudio-field-kind-hint">
+                                {unknownKindText(item.kind)}
+                            </span>
+                        ) : null}
                     </div>
                     <div className="mapstudio-field mapstudio-field--location">
                         <div className="mapstudio-field-label-row">
                             <span className="mapstudio-field-label">Location</span>
                             {point && this.props.canMoveByClick ? (
-                                <button type="button" className="mapstudio-button mapstudio-field-move" aria-pressed={this.props.moving} disabled={paused}
+                                <button type="button" className="mapstudio-button mapstudio-field-move" aria-pressed={this.props.moving} disabled={frozen}
                                         title={this.props.moving ? 'Move waits for a click on the map; press again or Esc to cancel'
                                             : 'Move: click the new place on the map'} aria-keyshortcuts={this.props.moving ? 'Escape' : undefined}
                                         onClick={this.props.onMoveStart}>Move</button>
@@ -271,14 +503,14 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                                 <label className="mapstudio-field-half">
                                     <span className="mapstudio-field-sublabel">Latitude</span>
                                     <input className="mapstudio-input mapstudio-field-lat" type="number" step="any" inputMode="decimal" value={this.state.lat}
-                                           disabled={paused} aria-invalid={latProblem} onChange={(ev) => this.setState({ lat: ev.target.value })}
-                                           onBlur={this.commitLocation} onKeyDown={this.onKey('lat')} />
+                                           disabled={frozen} aria-invalid={latProblem} onChange={(ev) => this.setState({ lat: ev.target.value })}
+                                           onBlur={this.commitLocation('lat')} onKeyDown={this.onKey('lat')} />
                                 </label>
                                 <label className="mapstudio-field-half">
                                     <span className="mapstudio-field-sublabel">Longitude</span>
                                     <input className="mapstudio-input mapstudio-field-lng" type="number" step="any" inputMode="decimal" value={this.state.lng}
-                                           disabled={paused} aria-invalid={lngProblem} onChange={(ev) => this.setState({ lng: ev.target.value })}
-                                           onBlur={this.commitLocation} onKeyDown={this.onKey('lng')} />
+                                           disabled={frozen} aria-invalid={lngProblem} onChange={(ev) => this.setState({ lng: ev.target.value })}
+                                           onBlur={this.commitLocation('lng')} onKeyDown={this.onKey('lng')} />
                                 </label>
                             </div>
                         ) : (
@@ -290,25 +522,31 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                                 : point ? 'Drag the pin to fine-tune, or type latitude and longitude.' : ''}
                         </span>
                     </div>
-                    <div className="mapstudio-field mapstudio-field--asset">
+                    {kind ? kind.fields.map((field, i) => this.renderField(field, i)) : this.renderStored()}
+                    <div className="mapstudio-field mapstudio-field--asset" data-vanished={vanished ? 'true' : 'false'}>
                         <label className="mapstudio-field-label" htmlFor={'mapstudio-asset-' + item.id}>Asset</label>
                         <div className="mapstudio-field-pair">
                             <select id={'mapstudio-asset-' + item.id} className="mapstudio-input mapstudio-field-asset" value={assetId === null ? '' : assetId}
-                                    disabled={paused} onChange={this.onAssetChange}>
+                                    disabled={frozen} onChange={this.onAssetChange}>
                                 <option value="">Not linked</option>
                                 {assetId !== null && !assets.some((a) => a.id === assetId)
-                                    ? <option value={assetId}>{assetId} (not in the asset list)</option> : null}
+                                    ? <option value={assetId}>{listed && !vanished ? listed.name : assetId + ' (not in the asset list)'}</option> : null}
                                 {assets.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                             </select>
                             {assetId !== null ? (
-                                <button type="button" className="mapstudio-button mapstudio-field-unlink" disabled={paused} onClick={this.onUnlink}>Unlink</button>
+                                <button type="button" className="mapstudio-button mapstudio-field-unlink" disabled={frozen} onClick={this.onUnlink}>Unlink</button>
                             ) : null}
                         </div>
-                        <span className="mapstudio-field-hint">
-                            {assetId === null
-                                ? (assets.length === 0 ? 'No ' + kindName.toLowerCase() + ' assets in the asset list.' : 'Not linked. Pick an asset to show live values.')
-                                : 'Live values come from the linked asset\'s tags.'}
+                        <span className="mapstudio-field-hint mapstudio-field-asset-hint">
+                            {vanished && assetId !== null
+                                ? vanishedText(assetId)
+                                : assetId === null
+                                    ? (assets.length === 0 ? 'No ' + kindWords + ' assets in the asset list.' : 'Not linked. Pick an asset to show live values.')
+                                    : 'Live values come from the linked asset\'s tags.'}
                         </span>
+                        {assetNote !== '' ? (
+                            <span className="mapstudio-field-asset-status" role="status" data-status={assetStatus ? assetStatus.status : ''}>{assetNote}</span>
+                        ) : null}
                     </div>
                 </div>
                 <footer className="mapstudio-panel-footer">

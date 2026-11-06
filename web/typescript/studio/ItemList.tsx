@@ -65,7 +65,10 @@ function Badge(props: { row: ListRow }): React.ReactElement | null {
         );
     }
     if (row.badge === 'unlinked') {
-        return <span className="mapstudio-badge mapstudio-badge--unlinked" data-badge="unlinked">{row.words}</span>;
+        return (
+            <span className="mapstudio-badge mapstudio-badge--unlinked" data-badge="unlinked" title={row.reason !== '' ? row.reason : undefined}
+                  data-reason={row.reason}>{row.words}</span>
+        );
     }
     return (
         <span className={'mapstudio-badge mapstudio-badge--' + row.badge} data-badge={row.badge}>

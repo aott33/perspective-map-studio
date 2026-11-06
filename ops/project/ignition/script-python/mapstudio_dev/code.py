@@ -5,7 +5,9 @@
 #
 # Modes: ok (good lists), empty (no rows), broken (raises), slow (sleeps 8 s,
 # past Map Studio's 5 s timeout), incomplete (some bad rows), unknown-icon (the
-# pad kind names an icon Map Studio does not have, story 2.10; assets as ok).
+# pad kind names an icon Map Studio does not have, story 2.10; assets as ok), tank
+# (one more kind, tank, so an item made in it is of a kind no longer in the list
+# once the mode is ok again: epic 4 entry 6's Unknown kind; assets as ok).
 #
 # The mode is kept in system.util.getGlobals(), shared by the Gateway's scripts,
 # so a Perspective session script's set_mode reaches the calls Map Studio makes
@@ -14,7 +16,7 @@
 import java.lang
 import time
 
-MODES = ('ok', 'empty', 'broken', 'slow', 'incomplete', 'unknown-icon')
+MODES = ('ok', 'empty', 'broken', 'slow', 'incomplete', 'unknown-icon', 'tank')
 MODE_KEY = 'mapstudio_dev.adapter_mode'
 CALLS_KEY = 'mapstudio_dev.adapter_calls'
 SLOW_SECONDS = 8
@@ -44,6 +46,10 @@ KINDS = [
     {'id': 'valve', 'name': 'Line valve', 'geometry': 'point', 'icon': 'line-valve', 'labelRank': 1, 'instrument': True,
      'fields': [{'key': 'tag', 'label': 'Tag', 'type': 'text', 'required': False}]},
 ]
+
+# Mode tank's extra kind (epic 4 entry 6): a point kind with one number field, gone again in mode ok.
+TANK_KIND = {'id': 'tank', 'name': 'Tank', 'geometry': 'point', 'icon': 'tank-battery', 'labelRank': 4,
+             'fields': [{'key': 'capacity', 'label': 'Capacity (bbl)', 'type': 'number', 'required': False}]}
 
 ASSETS = [
     {'id': 'P12', 'name': 'Pad 12', 'kind': 'pad', 'basePath': '[default]Mesa/P12'},
@@ -145,6 +151,8 @@ def _rows(what, good, incomplete):
         rows = [dict(row) for row in good]
         rows[0]['icon'] = UNKNOWN_ICON
         return rows
+    if current == 'tank' and what == 'kinds':
+        return [dict(row) for row in good] + [dict(TANK_KIND)]
     return [dict(row) for row in good]
 
 

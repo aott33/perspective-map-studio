@@ -91,3 +91,15 @@ describe('the studio\'s saves (epic 4 entry 2)', () => {
     });
 
 });
+
+describe('a new item takes its kind\'s last values (epic 4 entry 6, R12)', () => {
+    test('a point or a line created with properties carries them; with none, no properties key at all', () => {
+        const pad = pointCreateBatch('i', 'b', 'pad', 'Well pad', [-104.97, 39.74], { operator: 'Acme', status: 'shut in' });
+        expect(pad.ops[0].data).toEqual({ kind: 'pad', name: 'Well pad', geometry: { type: 'Point', coordinates: [-104.97, 39.74] },
+            properties: { operator: 'Acme', status: 'shut in' } });
+        expect('properties' in pointCreateBatch('i', 'b', 'pad', 'Well pad', [0, 0], {}).ops[0].data!).toBe(false);
+        const line = lineCreateBatch('i', 'b', 'line', 'Gathering line', [[0, 0], [1, 1]], null, { diameter: 6 });
+        expect(line.ops[0].data!.properties).toEqual({ diameter: 6 });
+        expect('properties' in lineCreateBatch('i', 'b', 'line', 'Gathering line', [[0, 0], [1, 1]], null).ops[0].data!).toBe(false);
+    });
+});

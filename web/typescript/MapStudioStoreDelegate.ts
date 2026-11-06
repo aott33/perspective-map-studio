@@ -14,6 +14,10 @@
  * `reshapeLine`, `deleteVertex` and `splitLine` change a line's or an area's shape, each one batch (geometry.ts) and one step.
  * From entry 25 `deleteItem` deletes an item, a line with its instruments, clearing the `ends` that name them, in one batch and
  * one step, held and built as a geometry change is.
+ * From entry 6 `editProperty` saves one of the kind's fields as one update of the whole `properties` (the changed key merged
+ * onto the newest the page knows, saves still in flight included), "edit <name>", and keeps the value as the kind's last for
+ * the next item of that kind (itemForm.ts, per project and kind in localStorage), which `createPoint` and `createLine` start
+ * with; `setKind` carries the values the new kind defines and drops the rest in the same update.
  */
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
@@ -42,6 +46,7 @@ import {
 import { UnsavedSender } from './unsavedSender';
 import { registerTestHook, takeTestReply } from './testHook';
 import { NO_SHAPE_REFUSAL, ShapeRefusal, droppedText } from './problems';
+import { FieldValue, keptProperties, prefillFor, prefillKey, readPrefill, rememberValue, withValue } from './itemForm';
 
 /** The basemap the map draws (epic 3 entry 6, basemaps.ts): what the setup offers, the choice, its source. */
 export interface BasemapState {
@@ -448,8 +453,17 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      */
     createLine(coordinates: Array<[number, number]>, kind: Kind, ends: MapItemRecord['ends']): string {
         const itemId = newId();
-        this.sendBatch(lineCreateBatch(itemId, newId(), kind.id, kind.name, coordinates, ends), itemId, stepLabel('add', kind.name));
+        this.sendBatch(lineCreateBatch(itemId, newId(), kind.id, kind.name, coordinates, ends, this.prefillOf(kind)), itemId,
+            stepLabel('add', kind.name));
         return itemId;
+    }
+
+    /**
+     * The values a new item of `kind` starts with (entry 6, R12): the last finished value of each of its fields in this project
+     * (localStorage), those the kind still defines with their type; never a name, a location or a link.
+     */
+    private prefillOf(kind: Kind): Record<string, unknown> {
+        return prefillFor(kind, readPrefill(this.storage, prefillKey(this.projectName(), kind.id)));
     }
 
     /**
@@ -566,13 +580,54 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      */
     createPoint(lngLat: [number, number], kind: Kind): string {
         const itemId = newId();
-        this.sendBatch(pointCreateBatch(itemId, newId(), kind.id, kind.name, lngLat), itemId, stepLabel('add', kind.name));
+        this.sendBatch(pointCreateBatch(itemId, newId(), kind.id, kind.name, lngLat, this.prefillOf(kind)), itemId,
+            stepLabel('add', kind.name));
         return itemId;
     }
 
     /** A finished Name field (entry 2): one update at the stored version, the step "rename <new name>". */
     renameItem(id: string, name: string): void {
         this.sendUpdate(id, { name }, stepLabel('rename', name));
+    }
+
+    /**
+     * A finished field of the item's kind (entry 6, R12): one update of the whole `properties` object with `key` set to
+     * `value` (null leaves it out: not set), merged onto the newest properties this page knows, "edit <name>"; the value is
+     * kept as the kind's last for the next item of that kind. Typed as the field's type by the form (itemForm.ts `readField`).
+     */
+    editProperty(id: string, key: string, value: FieldValue): void {
+        const item = this.knownRecord(id);
+        if (!item) {
+            console.info('[MapStudio] The change to ' + id + ' was dropped: the item is not on the map.');
+            return;
+        }
+        this.sendUpdate(id, { properties: withValue(this.propertiesFor(item), key, value) }, stepLabel('edit', item.name));
+        rememberValue(this.storage, prefillKey(this.projectName(), item.kind), key, value);
+    }
+
+    /**
+     * The newest `properties` this page knows for an item: those of its latest batch still in flight or waiting its turn (a
+     * field finished while the last one is saved), else the record's, so a second field's update never carries the first
+     * field's old value. A batch given up drops what waited on it, so the record's are the newest again.
+     */
+    private propertiesFor(item: MapItemRecord): Record<string, unknown> {
+        const batches: EditBatch[] = [];
+        const flight = this.inFlightByItem.get(item.id);
+        const inFlight = flight !== undefined ? this.batchesInFlight.get(flight) : undefined;
+        if (inFlight) {
+            batches.push(inFlight);
+        }
+        const own = this.heldByItem.get(item.id) || [];
+        own.forEach((h) => batches.push(h.batch));
+        let properties = item.properties;
+        for (const batch of batches) {
+            for (const op of batch.ops) {
+                if (op.entity === 'item' && op.id === item.id && op.op !== 'delete' && op.data && op.data.properties) {
+                    properties = op.data.properties;
+                }
+            }
+        }
+        return properties;
     }
 
     /**
@@ -791,13 +846,19 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.sendUpdate(id, { assetId }, stepLabel(assetId === null ? 'unlink' : 'link', item ? item.name : id));
     }
 
-    /** The Kind select in Details (entry 4): one update of `kind` to another kind of the item's geometry, "edit <name>". */
+    /**
+     * The Kind select in Details (entry 4): one update of `kind` to another kind of the item's geometry, "edit <name>". From
+     * entry 6 the same update carries the item's values the new kind defines (with their type) and drops the rest, since the
+     * Gateway refuses a key the kind does not define; its undo puts the kind and every value back.
+     */
     setKind(id: string, kind: string): void {
         const item = this.knownRecord(id);
         if (item && item.kind === kind) {
             return;
         }
-        this.sendUpdate(id, { kind }, stepLabel('edit', item ? item.name : id));
+        const target = this.lists.kinds.find((k) => k.id === kind);
+        const data: MapItemData = item && target ? { kind, properties: keptProperties(this.propertiesFor(item), target) } : { kind };
+        this.sendUpdate(id, data, stepLabel('edit', item ? item.name : id));
     }
 
     private sendUpdate(id: string, data: MapItemData, label: string): void {

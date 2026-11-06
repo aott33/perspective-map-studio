@@ -23,10 +23,11 @@ export function roundCoordinate(n: number): number {
  * One `edits.apply` batch creating one line map item at baseVersion 0 (epic 4 entry 4): a finished line or
  * area saved at once as `kind` with the kind's name as the placeholder name, its vertices to 6 decimals
  * (an area's ring unclosed, AD-20), and the `ends` its first and last vertex snapped to (null when both
- * float, AD-19: stored, never inferred from the coordinates).
+ * float, AD-19: stored, never inferred from the coordinates). From entry 6 it carries `properties`, the kind's last values
+ * (itemForm.ts `prefillFor`), when there are any.
  */
 export function lineCreateBatch(itemId: string, batchId: string, kind: string, name: string, coordinates: Array<[number, number]>,
-                                ends: MapItemRecord['ends']): EditBatch {
+                                ends: MapItemRecord['ends'], properties: Record<string, unknown> = {}): EditBatch {
     return {
         batchId,
         ops: [{
@@ -38,7 +39,8 @@ export function lineCreateBatch(itemId: string, batchId: string, kind: string, n
                 kind,
                 name,
                 geometry: { type: 'LineString', coordinates: coordinates.map(([x, y]) => [roundCoordinate(x), roundCoordinate(y)] as [number, number]) },
-                ...(ends === null ? {} : { ends })
+                ...(ends === null ? {} : { ends }),
+                ...(Object.keys(properties).length === 0 ? {} : { properties })
             }
         }]
     };
@@ -47,9 +49,11 @@ export function lineCreateBatch(itemId: string, batchId: string, kind: string, n
 /**
  * One `edits.apply` batch creating one point map item at baseVersion 0 (epic 4 entry 2: the Point
  * tool's click saves at once as the kind list's first point kind, with the kind's name as the
- * placeholder name; the kind picker is entry 4's).
+ * placeholder name; the kind picker is entry 4's). From entry 6 it carries `properties`, the kind's last values (itemForm.ts
+ * `prefillFor`), when there are any; never a link or a location other than the click's.
  */
-export function pointCreateBatch(itemId: string, batchId: string, kind: string, name: string, lngLat: [number, number]): EditBatch {
+export function pointCreateBatch(itemId: string, batchId: string, kind: string, name: string, lngLat: [number, number],
+                                 properties: Record<string, unknown> = {}): EditBatch {
     return {
         batchId,
         ops: [{
@@ -57,7 +61,12 @@ export function pointCreateBatch(itemId: string, batchId: string, kind: string, 
             entity: 'item',
             id: itemId,
             baseVersion: 0,
-            data: { kind, name, geometry: { type: 'Point', coordinates: [roundCoordinate(lngLat[0]), roundCoordinate(lngLat[1])] } }
+            data: {
+                kind,
+                name,
+                geometry: { type: 'Point', coordinates: [roundCoordinate(lngLat[0]), roundCoordinate(lngLat[1])] },
+                ...(Object.keys(properties).length === 0 ? {} : { properties })
+            }
         }]
     };
 }

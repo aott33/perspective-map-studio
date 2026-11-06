@@ -281,6 +281,35 @@
       "type": "ia.input.button",
       "version": 0,
       "props": {
+       "text": "Adapter: tank"
+      },
+      "meta": {
+       "name": "mode_tank",
+       "domId": "mapstudio-dev-adapter-tank"
+      },
+      "position": {
+       "basis": "140px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 4 entry 6): switch the dev kind and asset adapter\n\t# (project library mapstudio_dev) to mode tank, then ask Map Studio to call\n\t# both functions now. refreshAdapters waits for the calls to answer or time out.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devadapter')\n\tout = self.view.rootContainer.getChild('adapterResult')\n\n\t# The buttons change test equipment for every session, so only a map editor may\n\t# press them (the same role check as the /edit page's script checks).\n\tif not mapstudio_dev.holdsMapEditor(self.session):\n\t\tout.props.text = system.util.jsonEncode({'refused': 'Switching the dev adapter needs the MapEditor role. Sign in as a map editor first.'})\n\t\treturn\n\n\ttry:\n\t\tmapstudio_dev.set_mode('tank')\n\t\tresult = system.mapstudio.refreshAdapters(system.util.getProjectName())\n\t\tout.props.text = system.util.jsonEncode({'mode': 'tank', 'kinds': result['kinds'], 'assets': result['assets'],\n\t\t\t'calls': mapstudio_dev.calls()})\n\texcept java.lang.Throwable as ex:\n\t\tlogger.warn('Dev adapter refresh failed: %s' % ex.getClass().getSimpleName())\n\t\tout.props.text = system.util.jsonEncode({'error': ex.getMessage()})\n\texcept Exception as ex:\n\t\tlogger.warn('Dev adapter refresh failed: %s' % type(ex).__name__)\n\t\tout.props.text = system.util.jsonEncode({'error': str(ex)})"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
        "text": "Refresh lists"
       },
       "meta": {

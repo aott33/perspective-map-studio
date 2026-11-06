@@ -113,3 +113,20 @@ describe('filterRows (entry 21, the Search items field)', () => {
         expect(ids('swd 2')).toEqual([]);
     });
 });
+
+describe('a vanished asset counts as unlinked (entry 6, R3)', () => {
+    test('with the asset list known, a link to an asset not among the names reads Unlinked with the reason; without it, as before', () => {
+        const names: AssetName[] = [{ id: 'A', name: 'Pad 14' }];
+        const items = [item('p1', 'Pad 1', 'pad'), item('g1', 'Ghost', 'pad', { assetId: 'P99' }), item('u1', 'Loose', 'pad', { assetId: null })];
+        const known = Object.fromEntries(listRows(items, [PAD], LIVE_INITIAL, names, true).map((r) => [r.id, r]));
+        expect(known.p1).toMatchObject({ badge: 'normal', reason: '' });
+        expect(known.g1).toMatchObject({ badge: 'unlinked', words: 'Unlinked', assetName: null, reason: 'P99 is no longer in the asset list' });
+        expect(known.u1).toMatchObject({ badge: 'unlinked', reason: '' });
+        // The list not known (loading, not configured, an older Gateway): the link is taken as it is.
+        const unknown = Object.fromEntries(listRows(items, [PAD], LIVE_INITIAL, names).map((r) => [r.id, r]));
+        expect(unknown.g1).toMatchObject({ badge: 'normal', reason: '' });
+        // A live state still wins over the badge: a vanished asset's alarm shows as the alarm.
+        const alarmed = listRows([item('p1', 'Pad 1', 'pad', { assetId: 'P99' })], [PAD], LIVE, names, true);
+        expect(alarmed[0]).toMatchObject({ badge: 'alarm', reason: 'P99 is no longer in the asset list' });
+    });
+});

@@ -60,6 +60,7 @@ import {
     StudioState, StudioSurface, StudioTool, clearSelection, enterEdit, fromProps, isEditing, leaveEdit, pickTool, select, showSurface, toolKind
 } from './studio';
 import { listRows } from './itemList';
+import { FieldValue, assetListKnown } from './itemForm';
 import { Rail } from './studio/Rail';
 import { ItemList } from './studio/ItemList';
 import { PropertiesPanel } from './studio/PropertiesPanel';
@@ -916,6 +917,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
             delegate.linkItem(selected.id, assetId);
         }
     };
+    /** A finished field of the item's kind (entry 6): one update of its whole `properties`, the value kept for the next of the kind. */
+    onProperty = (key: string, value: FieldValue): void => {
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        const selected = this.state.selected;
+        if (delegate && selected) {
+            delegate.editProperty(selected.id, key, value);
+        }
+    };
 
     /** The toolbar (entries 2 and 4): Select puts every tool down; a tool or kind button picks its tool up; Snap toggles. The bar's Done puts the Point tool down. */
     onSelectTool = (): void => editing.putToolDown(this);
@@ -1212,7 +1221,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const selected = this.state.selected;
         return (
             <ItemList title={this.projectName() || 'Map'}
-                      rows={listRows(delegate.items, delegate.lists.kinds, delegate.live, delegate.lists.assetNames)}
+                      rows={listRows(delegate.items, delegate.lists.kinds, delegate.live, delegate.lists.assetNames,
+                          assetListKnown(delegate.lists.adapters ? delegate.lists.adapters.assets : null))}
                       selectedId={selected ? selected.id : null}
                       save={delegate.save}
                       saveWords={headerSaveWords(facts)}
@@ -1227,7 +1237,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
         );
     }
 
-    /** The properties panel for the selected item (entry 2): Details, keyed by the item so its drafts start from the record. */
+    /**
+     * The properties panel for the selected item (entry 2): Details, keyed by the item so its drafts start from the record. From
+     * entry 6 it takes every asset's name (`assetNames`, every level; `assets` is editors only and the kind's alone), so a link to
+     * an asset that left the list is told from one of another kind, the asset list's status and the items for the name check.
+     */
     private renderPanel(delegate: MapStudioDelegateState): React.ReactNode {
         const selected = this.state.selected;
         const item = selected && this.state.panel === selected.id ? this.itemFor(selected.id) : undefined;
@@ -1235,7 +1249,6 @@ export class MapStudio extends Component<Props, MapStudioState> {
             return null;
         }
         const assets = delegate.lists.assets || [];
-        const linked = item.assetId !== null ? assets.find((a) => a.id === item.assetId) : undefined;
         const geometry = item.geometry.type === 'Point' ? 'point' : 'line';
         const kind = delegate.lists.kinds.find((k) => k.id === item.kind);
         const pick = this.state.geometry;
@@ -1245,7 +1258,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              kind={kind}
                              kinds={delegate.lists.kinds.filter((k) => k.geometry === geometry)}
                              assets={assets.filter((a) => a.kind === item.kind)}
-                             assetName={linked ? linked.name : null}
+                             assetNames={delegate.lists.assetNames}
+                             assetStatus={delegate.lists.adapters ? delegate.lists.adapters.assets : null}
+                             items={delegate.items}
                              pending={item.version === 0}
                              paused={delegate.editing === 'off'}
                              autoFocusName={this.focusNameId === item.id}
@@ -1258,6 +1273,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              onMoveStart={this.onMoveByClick}
                              onLink={this.onLink}
                              onKind={this.onKind}
+                             onProperty={this.onProperty}
                              onDelete={this.onDeleteItem}
                              toolInHand={this.state.studio.tool !== null || this.state.drawing !== null}
                              delKey={!(pick && pick.itemId === item.id)} />

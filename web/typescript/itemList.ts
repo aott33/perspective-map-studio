@@ -5,13 +5,16 @@
  * from (alarm over comms lost over stale over unlinked). The list's Search items field (entry 21,
  * DESIGN.md key screen 4) filters these rows by name, kind name or linked asset name, compared as the
  * View-mode search compares (search.ts `fold`: letter case and accents aside). The grouping by place,
- * the sort, the Filter chips and the footer are entry 7's. Pure functions only, unit tested in node.
+ * the sort, the Filter chips and the footer are entry 7's. From entry 6 (R3) an item linked to an asset that is no longer in
+ * the asset list counts as unlinked too, the reason in its badge's title, once the asset list in use can be checked against
+ * (itemForm.ts `assetListKnown`). Pure functions only, unit tested in node.
  */
 
 import { AssetName, Kind } from './adapters';
 import { MapItemRecord } from './contract';
 import { LiveState, itemState } from './live';
 import { fold } from './search';
+import { vanishedReason } from './itemForm';
 
 export type ListBadge = 'alarm' | 'comms-lost' | 'stale' | 'unlinked' | 'normal';
 
@@ -35,6 +38,8 @@ export interface ListRow {
     badge: ListBadge;
     /** The badge's words ("Priority 1 alarm", "Comms lost", "Stale", "Unlinked"), '' when normal. */
     words: string;
+    /** Why a linked item reads unlinked (entry 6: "P99 is no longer in the asset list"), '' otherwise. */
+    reason: string;
     /** The alarm's priority and acknowledgement, for the glyph; null without an alarm. */
     alarm: { priority: 1 | 2 | 3; unacked: boolean } | null;
 }
@@ -57,9 +62,11 @@ export function badgeWords(badge: ListBadge, priority: 1 | 2 | 3 | null): string
 
 /**
  * The rows of the list: the live items by name (letter case and accents aside), each with its badge and the
- * name of the asset it is linked to, from `map.load.reply`'s `assetNames` (the lists' `assetNames`).
+ * name of the asset it is linked to, from `map.load.reply`'s `assetNames` (the lists' `assetNames`). With `assetsKnown` (the
+ * asset list in use can be checked against, entry 6) an item whose asset is not among them is unlinked, with the reason.
  */
-export function listRows(items: MapItemRecord[], kinds: Kind[], live: LiveState, assetNames: readonly AssetName[] = []): ListRow[] {
+export function listRows(items: MapItemRecord[], kinds: Kind[], live: LiveState, assetNames: readonly AssetName[] = [],
+    assetsKnown = false): ListRow[] {
     const kindById = new Map<string, Kind>();
     kinds.forEach((k) => kindById.set(k.id, k));
     const assetById = new Map<string, string>();
@@ -71,9 +78,10 @@ export function listRows(items: MapItemRecord[], kinds: Kind[], live: LiveState,
         }
         const kind = kindById.get(item.kind);
         const state = itemState(live.items[item.id], live.display[item.kind]);
-        const badge: ListBadge = state.alarm ? 'alarm' : state.commsLost ? 'comms-lost' : state.stale ? 'stale'
-            : item.assetId === null ? 'unlinked' : 'normal';
         const assetName = item.assetId !== null ? assetById.get(item.assetId) : undefined;
+        const vanished = item.assetId !== null && assetsKnown && assetName === undefined;
+        const badge: ListBadge = state.alarm ? 'alarm' : state.commsLost ? 'comms-lost' : state.stale ? 'stale'
+            : item.assetId === null || vanished ? 'unlinked' : 'normal';
         rows.push({
             id: item.id,
             name: item.name,
@@ -84,6 +92,7 @@ export function listRows(items: MapItemRecord[], kinds: Kind[], live: LiveState,
             geometry: item.geometry.type === 'Point' ? 'point' : 'line',
             badge,
             words: badgeWords(badge, state.alarm ? state.alarm.priority : null),
+            reason: vanished && item.assetId !== null ? vanishedReason(item.assetId) : '',
             alarm: state.alarm ? { priority: state.alarm.priority, unacked: state.alarm.unacked } : null
         });
     }

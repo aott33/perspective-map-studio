@@ -2920,6 +2920,69 @@
     flex: 1 1 auto;
 }
 
+/* The item form (entry 6; DESIGN.md Properties panel): the kind's fields between Location and Asset, "Required" by a required
+   field's label, the missing ones named at the top in the note box, a typed field's problem in words under it (the input's
+   edge in the warning token, as a typed latitude's), a checkbox with its label beside it, an unknown kind's stored values as
+   text, and the asset list's status message under Asset in the note box. No hue but the duplicate name's underline. */
+.mapstudio-field-label-row--start {
+    justify-content: flex-start;
+}
+
+.mapstudio-field-required {
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.mapstudio-panel-missing {
+    color: var(--label);
+}
+
+.mapstudio-field-hint.mapstudio-field-problem {
+    color: var(--label);
+}
+
+.mapstudio-field-check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 24px;
+}
+
+.mapstudio-field-check {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--callToAction);
+}
+
+.mapstudio-field-check-label {
+    font-size: 13px;
+}
+
+.mapstudio-field-stored {
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-field-asset-status {
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--mapstudio-hover);
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+    overflow-wrap: anywhere;
+}
+
+/* Another live item has this name on a different asset (R3): a red underline in the error token, never a refusal; the tooltip
+   and the description name it. */
+.mapstudio-input.mapstudio-field-name--twin {
+    text-decoration: underline;
+    text-decoration-color: var(--error);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+}
+
 .mapstudio-button {
     flex: 0 0 auto;
     box-sizing: border-box;
