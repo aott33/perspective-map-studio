@@ -66,7 +66,8 @@ async function pixelNow(map, lngLat) {
 
 /**
  * A page pixel on the ground: at least 44 px from every seeded point and 24 px from every line segment at the
- * map's view now, and off an open popup card, searched on a grid inside the map box away from its controls.
+ * map's view now, outside every area (in Edit mode a click inside one selects it, epic 4 entry 26), and off an
+ * open popup card, searched on a grid inside the map box away from its controls.
  */
 async function groundSpot(page, map) {
     const box = await map.boundingBox();
@@ -80,6 +81,10 @@ async function groundSpot(page, map) {
         const coords = line.geometry.coordinates.map(px);
         for (let i = 1; i < coords.length; i++) segments.push([coords[i - 1], coords[i]]);
     }
+    // The areas the map draws (their ids on the map), as rings of page pixels; an area's closing edge counts as a segment too.
+    const areaIds = new Set(JSON.parse((await map.getAttribute('data-areas')) || '[]').map((a) => a.id));
+    const rings = items.filter((i) => areaIds.has(i.id)).map((i) => i.geometry.coordinates.map(px));
+    for (const ring of rings) segments.push([ring[ring.length - 1], ring[0]]);
     // Read without waiting: with no card open there is no element (a locator's boundingBox would wait for one).
     const card = await page.evaluate(() => {
         const el = document.querySelector('.maplibregl-popup-content');
@@ -99,10 +104,22 @@ async function groundSpot(page, map) {
             if (points.some(([px0, py0]) => Math.hypot(px0 - x, py0 - y) < 44)) continue;
             if (segments.some((seg) => toSegment([x, y], seg) < 24)) continue;
             if (card && x >= card.x - 8 && x <= card.x + card.width + 8 && y >= card.y - 8 && y <= card.y + card.height + 8) continue;
+            if (rings.some((ring) => insideRing([x, y], ring))) continue;
             return [x, y];
         }
     }
     throw new Error('No ground spot clear of the seeded items in this view.');
+}
+
+/** Whether a pixel is inside a ring of pixels (the even-odd rule; the ring unclosed, as an area is stored). */
+function insideRing([x, y], ring) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [xi, yi] = ring[i];
+        const [xj, yj] = ring[j];
+        if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
 }
 
 /** Wait until the stage has the width the docked panels leave it (the map resizes after a panel opens or closes). */
@@ -383,7 +400,7 @@ test.describe('1366 px', () => {
         }
     });
 
-    editorTest('the page follows the selection: a list row, a marker click, a tap on the ground; Esc puts the Point tool down',
+    editorTest('the page follows the selection: a list row, a marker click opening Details, a tap on the ground; Esc puts the Point tool down',
         async ({ page }) => {
             const map = await openEditor(page);
             const p1 = seed.ids[TRACER.points.p1.key];
@@ -398,8 +415,8 @@ test.describe('1366 px', () => {
             await expectPageSelection(page, p2, 'Point 2', 'pad');
             expect(Math.round((await page.locator('.mapstudio-panel').boundingBox()).width)).toBe(320);
             await shot(page, 'mapstudio-studio-details-1366.png');
-            // A marker click (the popup opens as in View mode): p1 at the map's centre at zoom 15, where it is a full disc
-            // (at zoom 12 it is a dot the Tracer line's name chip can displace, so a click there can land on the line).
+            // A marker click: p1 at the map's centre at zoom 15, where it is a full disc (at zoom 12 it is a dot the Tracer
+            // line's name chip can displace, so a click there can land on the line).
             await expectStageWidth(map, STAGE_WITH_PANEL);
             await view(page, map, TRACER.points.p1.lngLat, 15);
             const [x, y] = await pixelNow(map, TRACER.points.p1.lngLat);
@@ -409,24 +426,22 @@ test.describe('1366 px', () => {
             await expect(map).toHaveAttribute('data-last-reply', new RegExp('Gateway received click on ' + p1), { timeout: REPLY_MS });
             await expect(page.getByText(/Gateway received click/)).toHaveCount(0);
             await expect(page.locator('.mapstudio-reply')).toHaveCount(0);
-            // A marker click selects and opens the popup as in View mode; Details stays the list's and the Point tool's
-            // (opening properties from the map and keeping the selection in view is entry 7's), so the panel for Point 2 goes.
-            await expect(page.locator('.mapstudio-panel')).toHaveCount(0);
-            await expect(map).toHaveAttribute('data-popup-mode', 'card');
-            await expect(page.locator('.maplibregl-popup .mapstudio-popup--default')).toHaveAttribute('data-point-id', p1, { timeout: 30_000 });
+            // In Edit mode a marker click selects and opens Details, with no popup (entry 26, the owner's choice A; the matrix is
+            // editclick.spec.mjs): the panel moves from Point 2 to Point 1 and stays docked, so the stage keeps its width.
+            await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', p1);
+            await expect(page.locator('.mapstudio-panel-name')).toHaveText('Point 1');
+            await expect(map).toHaveAttribute('data-popup-mode', '');
+            await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
             await expectPageSelection(page, p1, 'Point 1', 'pad');
-            // The card sits inside the map, which grew back to the list's width when the panel went.
-            await expectStageWidth(map, 1366 - 72 - 256);
-            const cardBox = await page.locator('.maplibregl-popup-content').boundingBox();
-            const mapBox = await map.boundingBox();
-            expect(cardBox.x).toBeGreaterThanOrEqual(mapBox.x - 1);
-            expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(mapBox.x + mapBox.width + 1);
-            // The ground (clear of every item and the open card): the selection, the popup and the page's labels clear.
+            await expectStageWidth(map, STAGE_WITH_PANEL);
+            // The ground (clear of every item): the selection, Details and the page's labels clear, and the map grows back to the list's width.
             const ground = await groundSpot(page, map);
             await page.mouse.click(ground[0], ground[1]);
             await expect(map).toHaveAttribute('data-selected', '');
+            await expect(page.locator('.mapstudio-panel')).toHaveCount(0);
             await expect(map).toHaveAttribute('data-popup-mode', '');
             await expectPageSelection(page, null);
+            await expectStageWidth(map, 1366 - 72 - 256);
             // The Point tool in hand, Esc on the map puts it down; the Select tool does too.
             await page.locator('.mapstudio-tool--point').click();
             await expect(map).toHaveAttribute('data-tool', 'point');
@@ -1136,18 +1151,22 @@ for (const [width, height, listWidth] of [[1366, 768, 256], [1440, 900, 280]]) {
                 expect(legendBox.y + legendBox.height, 'inside the dock').toBeLessThanOrEqual(dockBox.y + dockBox.height + 1);
                 await shot(page, 'mapstudio-studio-layers-legend-' + width + '.png');
 
-                // Clicks on the map with the Legend tab showing (a marker, then the ground): the popup opens and closes, the dock's
-                // legend stays as it was.
+                // Clicks on the map with the Legend tab showing (a marker, then the ground): Details opens beside the dock with no
+                // popup (entry 26) and closes, the dock's legend staying as it was.
                 const key = await legendContent(legend);
                 await view(page, map, TRACER.points.p1.lngLat, 15);
                 const [x, y] = await pixelNow(map, TRACER.points.p1.lngLat);
                 await page.mouse.click(x, y);
-                await expect(map).toHaveAttribute('data-popup-mode', 'card');
+                await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', seed.ids[TRACER.points.p1.key]);
+                await expect(map).toHaveAttribute('data-popup-mode', '');
                 await expect(legend).toBeVisible();
+                // The ground is found once the stage has its width beside the dock and Details (320 px at 1366, 340 px at 1440).
+                await expectStageWidth(map, width - 72 - listWidth - (width >= 1440 ? 340 : 320));
                 const ground = await groundSpot(page, map);
                 await page.mouse.click(ground[0], ground[1]);
                 await expect(map).toHaveAttribute('data-popup-mode', '');
                 await expect(map).toHaveAttribute('data-selected', '');
+                await expect(page.locator('.mapstudio-panel')).toHaveCount(0);
                 await expect(legend).toBeVisible();
                 expect(await legendContent(legend)).toEqual(key);
                 await expect(map).toHaveAttribute('data-legend-open', 'false');

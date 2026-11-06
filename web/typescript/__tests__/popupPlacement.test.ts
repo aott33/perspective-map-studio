@@ -1,5 +1,6 @@
 import {
-    ANCHOR_ORDER, PLACEMENT_MARGIN_PX, PLACEMENT_MIN_HEIGHT_PX, Rect, cameraPadding, cardRect, intersects, placePopup, placedMaxWidth
+    ANCHOR_ORDER, PLACEMENT_MARGIN_PX, PLACEMENT_MIN_HEIGHT_PX, Rect, cameraPadding, cardRect, insideMap, intersects, intoView, pageShift, placePopup,
+    placedMaxWidth
 } from '../popupPlacement';
 
 /** A 1440 by 900 map with the desktop's controls: the top bar (search and Needs you) and the zoom card. */
@@ -128,5 +129,35 @@ describe('the camera padding (owner review notes item 27)', () => {
         expect(cameraPadding(W, H, controls, null, { rect: { x: 500, y: 100, w: 320, h: 300 }, anchor: 'top' }).bottom).toBe(300 + 16);
         expect(cameraPadding(W, H, controls, null, { rect: { x: 500, y: 100, w: 320, h: 300 }, anchor: 'left' }).right).toBe(320 + 16);
         expect(cameraPadding(W, H, controls, null, { rect: { x: 500, y: 100, w: 320, h: 300 }, anchor: 'right' }).left).toBe(320 + 16);
+    });
+});
+
+describe('the place kept as Details docks after an Edit-mode click (epic 4 entry 26)', () => {
+    // At 1366 px: the stage 1038 px wide right of the rail and the list (328 px), 718 px once the 320 px panel docks before it.
+    const before = { box: { x: 328, y: 60, w: 1038, h: 700 }, at: { x: 399, y: 388 } };
+
+    test('the page shift of a place between two readings, as panBy takes it: MapLibre kept its centre, the place went 160 px right', () => {
+        // The centre kept, the place is 160 px nearer the stage's narrower middle: 399 - 519 + 359 = 239, and 648 + 239 = 887.
+        expect(pageShift(before, { box: { x: 648, y: 60, w: 718, h: 700 }, at: { x: 239, y: 388 } })).toEqual([160, 0]);
+        expect(pageShift(before, before)).toEqual([0, 0]);
+        expect(pageShift(before, { box: { x: 328, y: 80, w: 1038, h: 680 }, at: { x: 399, y: 378 } })).toEqual([0, 10]);
+    });
+
+    test('a pixel inside the map, an inset from each edge', () => {
+        expect(insideMap({ x: 22, y: 22 }, 718, 700, 22)).toBe(true);
+        expect(insideMap({ x: 21, y: 300 }, 718, 700, 22)).toBe(false);
+        expect(insideMap({ x: -220, y: 300 }, 718, 700, 22)).toBe(false);
+        expect(insideMap({ x: 300, y: 690 }, 718, 700, 22)).toBe(false);
+    });
+
+    test('into view: nothing when it is there, else just enough inside the camera padding and the margin, on each axis', () => {
+        const pad = { top: 72, bottom: 40, left: 0, right: 60 };
+        expect(intoView({ x: 300, y: 300 }, 718, 700, pad, 48)).toEqual([0, 0]);
+        // Under the docked panel, 220 px left of the stage: panned 268 px, so it stands 48 px inside the left edge.
+        expect(intoView({ x: -220, y: 300 }, 718, 700, pad, 48)).toEqual([-268, 0]);
+        // Under the toolbar's row and past the zoom card: the padding counts.
+        expect(intoView({ x: 700, y: 30 }, 718, 700, pad, 48)).toEqual([700 - (718 - 60 - 48), 30 - (72 + 48)]);
+        // A map with no room once padded: the pixel is centred in what there is.
+        expect(intoView({ x: 10, y: 300 }, 100, 700, { top: 0, bottom: 0, left: 40, right: 40 }, 48)).toEqual([10 - 50, 0]);
     });
 });

@@ -4,7 +4,9 @@
 // the default popup, and a wrong path falling back to the default popup with one warning naming
 // it. The spike's popupView prop is retired (every dev page draws from the kind setup). The pad
 // kind setup is changed through the component's real session path (window.__mapStudioTest, as
-// kindsetup.spec.mjs does) and the seed puts it back afterwards.
+// kindsetup.spec.mjs does) and the seed puts it back afterwards. The map editor clicks on the dev View page `/`, in View
+// mode: on `/edit` the editor is in Edit mode, where a click selects and opens Details with no popup (epic 4 entry 26,
+// editclick.spec.mjs); at 390 px `/edit` keeps View mode, so the phone's sheet is still clicked there.
 
 import { TRACER, centerFor, pagePixel } from '../lib/geo.mjs';
 import {
@@ -60,7 +62,7 @@ async function clickAt(page, map, lngLat) {
 }
 
 editorTest('the default popup card: its own close, the page link filled from the setup and hidden with no value', async ({ page, watched }) => {
-    const map = await openMap(page, '/edit');
+    const map = await openMap(page, '/');
     await mapLoaded(map);
     await expect(map).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
     await changePadSetup(page, map, { link: '/pad/{asset.id}' });
@@ -105,7 +107,7 @@ editorTest('the default popup card: its own close, the page link filled from the
     await expect(page.locator('#mapstudio-pad-title')).toHaveText('Pad P12', { timeout: 30_000 });
 
     // An item with no asset: {asset.id} has no value, so the icon is hidden, not disabled.
-    const again = await openMap(page, '/edit');
+    const again = await openMap(page, '/');
     await clickAt(page, again, PAD_1);
     const unlinked = page.locator('.maplibregl-popup .mapstudio-popup--default');
     await expect(unlinked).toBeVisible({ timeout: 30_000 });
@@ -120,7 +122,7 @@ editorTest('the default popup card: its own close, the page link filled from the
 });
 
 editorTest('a kind setup\'s popupView opens the project view with mapItem and a padName param; a wrong path falls back', async ({ page, watched }) => {
-    const map = await openMap(page, '/edit');
+    const map = await openMap(page, '/');
     await mapLoaded(map);
     await expect(map).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
     await changePadSetup(page, map, { popupView: { path: 'Popups/PadAlarms', params: { padName: '{item.name}', alarmsPath: '{asset.path}' } } });
@@ -174,7 +176,7 @@ editorTest('a kind setup\'s popupView opens the project view with mapItem and a 
     // A view that is not there: the default popup, with exactly one warning naming the path. The map
     // is reopened first: a setup change while Point 1's view popup is open redraws that popup with
     // the new path, which is one more fallback and one more warning.
-    const again = await openMap(page, '/edit');
+    const again = await openMap(page, '/');
     await mapLoaded(again);
     await expect(again).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
     await changePadSetup(page, again, { popupView: { path: 'Popups/Nope', params: {} } });

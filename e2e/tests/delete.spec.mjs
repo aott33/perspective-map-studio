@@ -422,10 +422,12 @@ test.describe('1366 px', () => {
             await expect(finish).toBeEnabled();
             await expect(finish).toHaveAttribute('title', 'Finish (Enter)');
             await expect(finish).toHaveAccessibleDescription('Finish (Enter)');
-            // Cancel puts the tool down, nothing saved (its Esc is drawing.spec.mjs's; it closes Details as well).
+            // Cancel puts the tool down, nothing saved, Details staying open (its Esc is drawing.spec.mjs's and, with Details open,
+            // editclick.spec.mjs's: since entry 26 it too puts the tool down and nothing else).
             await cancel.click();
             await expect(drawing).toHaveCount(0);
             await expect(map).toHaveAttribute('data-tool', '');
+            await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', ids.line);
             // The tool down: the footer deletes again and names Del.
             await expect(footerDelete).toBeEnabled();
             await expect(footerDelete).toHaveAttribute('title', 'Delete (Del)');

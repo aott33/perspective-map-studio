@@ -2,8 +2,10 @@
  * Where a popup card goes (owner review notes items 18 and 27): inside the map less the controls that
  * float over it (the top bar of search and Needs you, the zoom card, the legend row), and the camera
  * padding those controls and an open card or sheet leave, so a chosen or returned-to item is centred
- * in the area a person can see. Pure: pixels in, an anchor and a pan out; MapStudio.tsx measures the
- * DOM and moves the map. Unit tested in node.
+ * in the area a person can see; and (epic 4 entry 26) the pans that keep an Edit-mode click's item
+ * where it was on the page as Details docks, and bring it into view when the panel covers it. Pure:
+ * pixels in, an anchor and a pan out; MapStudio.tsx and selection.tsx measure the DOM and move the
+ * map. Unit tested in node.
  */
 
 export interface Rect {
@@ -177,4 +179,39 @@ export function cameraPadding(width: number, height: number, controls: { topBar:
     const capY = Math.floor(height * 0.45);
     const capX = Math.floor(width * 0.45);
     return { top: Math.min(top, capY), bottom: Math.min(bottom, capY), left: Math.min(left, capX), right: Math.min(right, capX) };
+}
+
+/**
+ * A place on the page (epic 4 entry 26): the map's box on the page and the place's pixel in the map, read before an Edit-mode
+ * click docks Details and again once the stage has narrowed.
+ */
+export interface PagePlace {
+    /** The map's box on the page: its left and top edges and its size, in px. */
+    box: Rect;
+    /** The place's pixel in the map. */
+    at: { x: number; y: number };
+}
+
+/**
+ * How far a place moved on the page between two readings (entry 26), as MapLibre's `panBy` takes it: the map panned by it puts
+ * the place, and every other one with it, back where it was on the page. [0, 0] when it did not move.
+ */
+export function pageShift(before: PagePlace, after: PagePlace): [number, number] {
+    return [after.box.x + after.at.x - (before.box.x + before.at.x), after.box.y + after.at.y - (before.box.y + before.at.y)];
+}
+
+/** Whether a pixel is inside a map `width` by `height` px, at least `inset` px from each of its edges. */
+export function insideMap(at: { x: number; y: number }, width: number, height: number, inset: number): boolean {
+    return at.x >= inset && at.x <= width - inset && at.y >= inset && at.y <= height - inset;
+}
+
+/**
+ * The pan that brings a pixel into the area a person can see (entry 26; EXPERIENCE.md Responsive, 1366: opening properties
+ * keeps the selection in view): the map `width` by `height` px less the camera padding and `margin` round it. [0, 0] when the
+ * pixel is there already, else just enough on each axis, as MapLibre's `panBy` takes it (the map's content moves by minus it).
+ * An axis with no room left once padded centres the pixel in what there is.
+ */
+export function intoView(at: { x: number; y: number }, width: number, height: number, padding: CameraPadding, margin: number): [number, number] {
+    const axis = (v: number, lo: number, hi: number): number => (hi < lo ? v - (lo + hi) / 2 : v < lo ? v - lo : v > hi ? v - hi : 0);
+    return [axis(at.x, padding.left + margin, width - padding.right - margin), axis(at.y, padding.top + margin, height - padding.bottom - margin)];
 }
