@@ -50,10 +50,15 @@ export const GLYPH_PATHS = {
     undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
     redo: 'M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3',
     /**
-     * Cloud: a cloud struck through, the top-centre chip's glyph for a problem with the map store or the edits kept here
-     * (epic 4 entry 24; DESIGN.md Icons names the cloud among the chrome glyphs). No alarm shape: no triangle, circle or square.
+     * Cloud: a cloud struck through, the top-centre chip's glyph for the map store out of reach (epic 4 entry 24; DESIGN.md
+     * Save banner: the cloud for Store unreachable, Icons names it among the chrome glyphs).
      */
-    cloud: 'M7 18.5a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 17.6 9.3a4.6 4.6 0 0 1-.6 9.2zM4 4l16 16'
+    cloud: 'M7 18.5a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 17.6 9.3a4.6 4.6 0 0 1-.6 9.2zM4 4l16 16',
+    /**
+     * Warning: an exclamation mark in an octagon, the chip's glyph for every other problem (entry 24; DESIGN.md Save banner:
+     * the warning glyph for Busy). An octagon, so it never reads as an alarm shape (triangle, circle or square, ER-27).
+     */
+    warning: 'M8.3 3h7.4L21 8.3v7.4L15.7 21H8.3L3 15.7V8.3zM12 7.5v5.5M12 16.5h.01'
 } as const;
 
 export type GlyphName = keyof typeof GLYPH_PATHS;

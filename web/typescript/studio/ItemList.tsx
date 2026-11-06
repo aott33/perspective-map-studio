@@ -1,14 +1,14 @@
 import * as React from 'react';
-import { EditLevel } from '../contract';
+import { EditLevel, MapItemRecord } from '../contract';
 import { LIST_SEARCH_LABEL, LIST_SEARCH_PLACEHOLDER, ListRow, filterRows } from '../itemList';
 import { alarmGlyphId } from '../live';
 import { Glyph } from '../popupParts';
 import { Problem } from '../problems';
-import { SaveState, saveStatusWords } from '../save';
+import { SaveState } from '../save';
 import { NO_MATCHES } from '../search';
 import { UnsavedEntry } from '../unsaved';
 import { ChromeGlyph } from './ChromeGlyph';
-import { ProblemRow, WaitingList } from './SaveStatus';
+import { ProblemStatus } from './SaveStatus';
 
 /**
  * The docked list panel (epic 4 entry 2; DESIGN.md Panel header, list-row, state-badge; EXPERIENCE.md
@@ -25,20 +25,23 @@ import { ProblemRow, WaitingList } from './SaveStatus';
  * The text is the list's own: it starts empty each time the list mounts (entering Edit mode, the rail's Items).
  * The grouping, Sort by, the Filter chips and the footer are entry 7's; checkboxes are entry 8's.
  *
- * The save status beside the title says Saved or Saving...; with a problem it moves to its own row under the title
- * (entry 24, owner 2026-11-05: the status box retired, its problems said here in Edit mode; studio/SaveStatus.tsx), and
- * the edits waiting on that row open the list of them under it, closed until asked for and closed again with Hide, Esc
- * or the edits' going; it starts closed each time the list mounts.
+ * The save status beside the title always says the save state (Saving..., Not saved while edits wait, else Saved); a
+ * problem shows on its own row under the title (entry 24, owner 2026-11-05: the status box retired, its problems said
+ * here in Edit mode; studio/SaveStatus.tsx `ProblemStatus`), and the edits waiting on that row open the list of them
+ * under it, closed until asked for and closed again with Hide, Esc or the edits' going.
  */
 export interface ItemListProps {
     title: string;
     rows: ListRow[];
     selectedId: string | null;
     save: SaveState;
-    /** Edit mode's problems, worst first (problems.ts editProblems); none shows the status beside the title. */
+    /** The words beside the title (problems.ts headerSaveWords). */
+    saveWords: string;
+    /** Edit mode's problems, worst first (problems.ts editProblems), on the row under the title. */
     problems: Problem[];
-    /** The queued batches, the session's level for their words, and the ones being sent (their Discard waits). */
+    /** The queued batches, the records that name their edits, the session's level for their words, and the ones being sent. */
     unsaved: UnsavedEntry[];
+    records: MapItemRecord[];
     level: EditLevel | null;
     sending: string[];
     onSelect: (id: string) => void;
@@ -75,41 +78,13 @@ function Badge(props: { row: ListRow }): React.ReactElement | null {
 interface ItemListState {
     /** The Search items field's text, as typed. */
     query: string;
-    /** Whether the edits waiting are open under the save status row. */
-    waitingOpen: boolean;
-}
-
-/** Whether the save status row holds the edits waiting (the line that opens them). */
-function hasWaiting(problems: Problem[]): boolean {
-    return problems.some((p) => p.code === 'edits');
 }
 
 export class ItemList extends React.Component<ItemListProps, ItemListState> {
-    state: ItemListState = { query: '', waitingOpen: false };
+    state: ItemListState = { query: '' };
 
     private readonly input = React.createRef<HTMLInputElement>();
-    private readonly waitingToggle = React.createRef<HTMLButtonElement>();
     private readonly listId = 'mapstudio-item-list-' + Math.random().toString(36).slice(2, 8);
-    private readonly waitingId = 'mapstudio-unsaved-' + Math.random().toString(36).slice(2, 8);
-
-    /** The edits waiting all went (saved, discarded): their list closes, so it opens closed when edits wait again. */
-    componentDidUpdate(): void {
-        if (this.state.waitingOpen && !hasWaiting(this.props.problems)) {
-            this.setState({ waitingOpen: false });
-        }
-    }
-
-    private onWaitingToggle = (): void => {
-        this.setState((prev) => ({ waitingOpen: !prev.waitingOpen }));
-    };
-
-    /** Hide (or Esc in the list) closes it; the focus goes back to the line that opens it. */
-    private onWaitingHide = (): void => {
-        this.setState({ waitingOpen: false });
-        if (this.waitingToggle.current) {
-            this.waitingToggle.current.focus();
-        }
-    };
 
     private onQuery = (ev: React.ChangeEvent<HTMLInputElement>): void => {
         this.setState({ query: ev.target.value });
@@ -135,8 +110,6 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
     render(): React.ReactElement {
         const props = this.props;
         const save = props.save;
-        const problem = props.problems.length > 0;
-        const waitingOpen = this.state.waitingOpen && hasWaiting(props.problems);
         const query = this.state.query;
         const shown = filterRows(props.rows, query);
         const noMatches = props.rows.length > 0 && shown.length === 0;
@@ -145,21 +118,12 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
                 <header className="mapstudio-dock-header">
                     <div className="mapstudio-dock-title-row">
                         <h2 className="mapstudio-dock-title">{props.title}</h2>
-                        {problem ? null : (
-                            <span className={'mapstudio-panel-save mapstudio-panel-save--' + save.state} role="status" data-save-state={save.state}>
-                                {saveStatusWords(save)}
-                            </span>
-                        )}
+                        <span className={'mapstudio-panel-save mapstudio-panel-save--' + save.state} role="status" data-save-state={save.state}>
+                            {props.saveWords}
+                        </span>
                     </div>
-                    {problem ? (
-                        // A problem moves the status to its own full-width row under the title, so the words fit (DESIGN.md Panel header).
-                        <ProblemRow save={save} problems={props.problems} listId={this.waitingId} open={waitingOpen}
-                                    onToggle={this.onWaitingToggle} toggleRef={this.waitingToggle} />
-                    ) : null}
-                    {waitingOpen ? (
-                        <WaitingList id={this.waitingId} entries={props.unsaved} level={props.level} sending={props.sending}
-                                     onRetry={props.onRetry} onDiscard={props.onDiscard} onHide={this.onWaitingHide} />
-                    ) : null}
+                    <ProblemStatus save={save} problems={props.problems} unsaved={props.unsaved} records={props.records} level={props.level}
+                                   sending={props.sending} onRetry={props.onRetry} onDiscard={props.onDiscard} />
                     <div className="mapstudio-list-search" role="search" aria-label="Items list">
                         <ChromeGlyph name="search" className="mapstudio-list-search-glyph" size={16} />
                         <input ref={this.input} type="text" className="mapstudio-input mapstudio-list-search-input"

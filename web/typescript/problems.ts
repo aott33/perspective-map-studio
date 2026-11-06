@@ -6,8 +6,8 @@
  * - **Edit mode**: the save status row in the list panel's header, every problem at once, each on its own line, in the
  *   order below (the connection keeps its chip under the toolbar); the edits waiting open the list of them under the row.
  * - **View mode**: the top-centre chip that says "No connection - values from 14:02", one problem at a time, the worst
- *   first: no connection, then the map store unreachable or a setup that cannot be read, then edits waiting (a refused or
- *   unsent save when none waits), then a read-only store, then a browser that cannot keep unsaved edits. A viewer sees
+ *   first: no connection, then the map store unreachable or a setup that cannot be read, then edits waiting, then a
+ *   read-only store, then a browser that cannot keep unsaved edits. A viewer sees
  *   only what concerns the map (the connection and the store); the edits, the read-only store and the storage warning
  *   are an editor's (level `phone` or `full`).
  *
@@ -16,12 +16,19 @@
 
 import { ConnectionState, connectionChipText, connectionDetailText } from './connection';
 import { EditLevel } from './contract';
-import { SaveState, saveStatusWords } from './save';
+import { SaveState } from './save';
 import { StoreState, storeStatusText } from './storeState';
-import { UnsavedEntry, waitingText } from './unsaved';
+import { UnsavedEntry, unreachable, waitingText } from './unsaved';
 
 /** What a problem is about: the chip's and the row's `data-problem`. */
-export type ProblemCode = 'connection' | 'store' | 'edits' | 'save' | 'read-only' | 'storage';
+export type ProblemCode = 'connection' | 'store' | 'edits' | 'read-only' | 'storage';
+
+/**
+ * The chip's glyph (DESIGN.md Save status, Save banner): the hourglass for no connection (its values are stale), the cloud
+ * for the map store out of reach (the store unreachable, or edits waiting because it is), the warning glyph for every other
+ * problem (busy, a setup that cannot be read, a refused edit, a read-only store, the storage warning).
+ */
+export type ProblemGlyph = 'stale' | 'cloud' | 'warning';
 
 export interface Problem {
     code: ProblemCode;
@@ -29,6 +36,7 @@ export interface Problem {
     text: string;
     /** The long form, the chip's title; the words themselves where there is none. */
     detail: string;
+    glyph: ProblemGlyph;
 }
 
 /** The delegate's state the problems are read from. */
@@ -38,6 +46,7 @@ export interface ProblemFacts {
     store: StoreState;
     /** The level map.load reported, or the last one it reported while a failed load leaves it unknown; null before any. */
     level: EditLevel | null;
+    /** The last save's state: the save status beside the title says Saving... from it (the row's problems never do). */
     save: SaveState;
     unsaved: UnsavedEntry[];
     /** The queued batches this tab waits on a reply for. */
@@ -45,8 +54,8 @@ export interface ProblemFacts {
     storageWarning: string;
 }
 
-function problem(code: ProblemCode, text: string, detail: string = text): Problem {
-    return { code, text, detail };
+function problem(code: ProblemCode, text: string, glyph: ProblemGlyph, detail: string = text): Problem {
+    return { code, text, detail, glyph };
 }
 
 /** An editor's session: the edits, the read-only store and the storage warning concern it; a viewer's map does not show them. */
@@ -63,16 +72,26 @@ export function loadFailureText(message: string): string {
 }
 
 /**
+ * Whether a store-unreachable sentence is the store out of reach (the cloud) rather than the busy answer or a setup the
+ * Gateway cannot read or does not have (SetupRegistry's sentences), which take the warning glyph.
+ */
+export function storeOutOfReach(sentence: string): boolean {
+    return sentence.indexOf('Map Studio is busy') !== 0 && sentence.indexOf('The Map Studio setup of project ') !== 0
+        && sentence.indexOf(' has no Map Studio setup ') < 0;
+}
+
+/**
  * The map store unreachable, or a setup that cannot be read (the Gateway answers both `store-unreachable`, the setup's
- * reason in its sentence), or the busy answer to a load. An unavailable store stays a problem while each 15 s retry
- * loads, in the same words, so nothing blinks; the busy answer is a problem only while it is the last answer.
+ * reason in its sentence), or the busy answer to a load. Each holds until a load succeeds: the delegate keeps the failed
+ * load's words while each 15 s retry loads (and an unavailable store keeps its reason), so nothing blinks.
  */
 export function storeProblem(facts: ProblemFacts): Problem | null {
     if (facts.store.status === 'unavailable') {
-        return problem('store', storeStatusText(facts.store));
+        return problem('store', storeStatusText(facts.store), storeOutOfReach(facts.store.reason) ? 'cloud' : 'warning');
     }
-    if (facts.load.state === 'failed') {
-        return problem('store', loadFailureText(facts.load.message));
+    if (facts.load.state !== 'loaded' && facts.load.message !== '') {
+        const text = loadFailureText(facts.load.message);
+        return problem('store', text, storeOutOfReach(text.slice('Map store: '.length)) ? 'cloud' : 'warning');
     }
     return null;
 }
@@ -86,31 +105,40 @@ export function editsWait(unsaved: UnsavedEntry[], sending: string[]): boolean {
 }
 
 /**
- * The edits waiting ("Store unreachable - 2 edits not saved", "1 edit not saved - conflict with ..."), or with none waiting
- * a save refused or unsent whose entry has gone (a discard), in the save status's words ("Not saved - ...").
+ * The edits waiting ("Store unreachable - 2 edits not saved", "1 edit not saved - conflict with ..."). A refused or unsent
+ * save counts only while its batch waits in the queue, which is when this line says it: once its entry has gone (a
+ * Discard, or saved by a replay) its state says nothing, so no stale "Not saved" stays.
  */
 export function editsProblem(facts: ProblemFacts): Problem | null {
     if (editsWait(facts.unsaved, facts.sending)) {
-        return problem('edits', waitingText(facts.unsaved, facts.level));
-    }
-    if (facts.save.state === 'refused' || facts.save.state === 'unsent') {
-        return problem('save', saveStatusWords(facts.save));
+        return problem('edits', waitingText(facts.unsaved, facts.level), unreachable(facts.unsaved) ? 'cloud' : 'warning');
     }
     return null;
 }
 
 function readOnlyProblem(facts: ProblemFacts): Problem | null {
-    return facts.store.status === 'read-only' ? problem('read-only', storeStatusText(facts.store)) : null;
+    return facts.store.status === 'read-only' ? problem('read-only', storeStatusText(facts.store), 'warning') : null;
 }
 
 function storageProblem(facts: ProblemFacts): Problem | null {
-    return facts.storageWarning !== '' ? problem('storage', facts.storageWarning) : null;
+    return facts.storageWarning !== '' ? problem('storage', facts.storageWarning, 'warning') : null;
 }
 
 /** No connection, or reconnected and reloading: the chip's words as before, the long form its title. */
 export function connectionProblem(connection: ConnectionState): Problem | null {
     const text = connectionChipText(connection);
-    return text !== '' ? problem('connection', text, connectionDetailText(connection)) : null;
+    return text !== '' ? problem('connection', text, 'stale', connectionDetailText(connection)) : null;
+}
+
+/**
+ * The save status beside the list header's title, always shown (the problems on the row under it): "Saving..." while a
+ * batch is out, "Not saved" while edits wait, else "Saved".
+ */
+export function headerSaveWords(facts: ProblemFacts): string {
+    if (facts.save.state === 'saving') {
+        return 'Saving...';
+    }
+    return editsWait(facts.unsaved, facts.sending) ? 'Not saved' : 'Saved';
 }
 
 function present(list: Array<Problem | null>): Problem[] {

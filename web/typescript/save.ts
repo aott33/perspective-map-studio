@@ -78,24 +78,6 @@ export type SaveState =
 
 export const SAVE_IDLE: SaveState = { state: 'idle' };
 
-/**
- * The studio's save status words (EXPERIENCE.md Save status, DESIGN.md save-status; epic 4 entry 2):
- * "Saved" with nothing pending, "Saving..." while a batch is out, and a problem in words on its own
- * (the save status row in Edit mode, the top-centre chip in View mode; problems.ts, entry 24).
- */
-export function saveStatusWords(save: SaveState): string {
-    switch (save.state) {
-        case 'saving':
-            return 'Saving...';
-        case 'refused':
-            return 'Not saved - ' + save.message;
-        case 'unsent':
-            return 'Not saved - store unreachable; the edit is kept here and saves when it is back';
-        default:
-            return 'Saved';
-    }
-}
-
 /** The refused state for an error reply to a save. */
 export function refusedSave(itemId: string, error: ErrorBody): SaveState {
     return { state: 'refused', itemId, code: error.code, message: error.message };

@@ -57,7 +57,7 @@ A field set to JSON `null` takes its default. Any other field is refused: a miss
 
 ## When a setup is wrong
 
-Map Studio checks every field and reports every problem at once, each naming its field in plain words. A project whose setup is wrong has no map store until it is fixed: every `map.load`, `edits.apply` and `system.mapstudio` call answers `store-unreachable` with the reason, and the component shows it under the map ("Map store: store-unreachable: ..."). The last good setup is not kept (owner decision, 2026-10-26), so a broken file is visible at once.
+Map Studio checks every field and reports every problem at once, each naming its field in plain words. A project whose setup is wrong has no map store until it is fixed: every `map.load`, `edits.apply` and `system.mapstudio` call answers `store-unreachable` with the reason, and the component says it in words ("Map store: The Map Studio setup of project ... cannot be read: ..."): in View mode on the top-centre chip, to everyone, two lines at most with the whole reason in its tooltip; in Edit mode on the save status row under the map's name ([contract.md](contract.md), "Problems in words"). The last good setup is not kept (owner decision, 2026-10-26), so a broken file is visible at once.
 
 The Gateway log (logger `MapStudio.setup`) has one warning each time a wrong setup is read, naming the project and the reason **[live 8.3.10]**:
 

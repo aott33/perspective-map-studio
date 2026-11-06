@@ -2408,7 +2408,7 @@
     cursor: not-allowed;
 }
 
-/* The save status beside the map's name: small secondary words; a problem on its own row with the warning glyph's tone. */
+/* The save status beside the map's name, always: small secondary words; the problems on their own row under it, in the warning tone. */
 .mapstudio-panel-save {
     flex: 0 0 auto;
     margin-left: 4px;
@@ -2426,6 +2426,7 @@
     flex-direction: column;
     gap: 4px;
     margin: 6px 0 0;
+    font-size: 12px;
     padding: 6px 8px;
     border-left: 3px solid var(--mapstudio-warning);
     border-radius: 6px;
@@ -2515,12 +2516,19 @@
     border-bottom: 1px solid var(--mapstudio-divider);
 }
 
+/* Each waiting edit named as Undo names its step, its reason under it (entry 24). */
+.mapstudio-unsaved-edit {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
 .mapstudio-unsaved-text {
+    color: var(--mapstudio-secondary);
     overflow-wrap: anywhere;
 }
 
 .mapstudio-unsaved-row--refused .mapstudio-unsaved-text {
-    font-weight: 600;
+    color: var(--label);
 }
 
 .mapstudio-unsaved-actions {

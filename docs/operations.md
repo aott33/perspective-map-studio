@@ -33,7 +33,7 @@ Map Studio cannot prepare its map store on database connection MapStudioCheck: m
 
 It names the connection, the migration, the statement (its number in the migration's transaction and its first words), the SQLState, the missing right when the SQLState is 42501, and PostgreSQL's own message. It never holds a password, a value or a map item's properties. Any other failed statement gives the same line with its SQLState (for example 42P07 when a table of that name is already there), and a failure that is not a database error says SQLState "none". The whole migration is rolled back: no `mapstudio_` table it created is left behind.
 
-While the map store is unavailable a map shows "Map store: store-unreachable: The map store is unavailable: ... Ask an administrator (see the Gateway log)." and nothing can be saved (`map.load` and `applyEdits` answer `store-unreachable`).
+While the map store is unavailable a map says "Map store: The map store is unavailable: ... Ask an administrator (see the Gateway log)." (on the top-centre chip in View mode, to everyone; on the save status row under the map's name in Edit mode; [contract.md](contract.md), "Problems in words") and nothing can be saved (`map.load` and `applyEdits` answer `store-unreachable`).
 
 **Recovery:** fix the right (`GRANT CREATE ON SCHEMA public TO <role>`, or the table in the way). No restart is needed: Map Studio tries again at most once a minute, the next time a map of a project naming that connection is opened or saved **[live 8.3.10]**, and logs the error line again only when it changes (unit tested; **[unverified]** live). A Gateway or module restart also tries again at once.
 
@@ -45,7 +45,7 @@ While the map store is unavailable a map shows "Map store: store-unreachable: Th
 | read only | the schema is newer than this module, or this Gateway is a standby | read | refused `read-only`, with the reason |
 | unavailable | the connection never became usable, or a migration failed | not read | refused `store-unreachable` |
 
-The component shows the state on its map container (`data-store-state`: `ready`, `read-only` or `unavailable`) and, when read only or unavailable, says why under the map. `system.mapstudio.getMap(project)` still returns the list of map item records on a read-only store; the list's `readOnly` attribute is the reason (None when saving works), and `applyEdits` raises `read-only: <reason>`.
+The component shows the state on its map container (`data-store-state`: `ready`, `read-only` or `unavailable`, the reason in `data-store-reason`) and, when read only or unavailable, says why in words: in Edit mode on the save status row under the map's name, in View mode on the top-centre chip. An unavailable store is said to everyone; a read-only store only to an editor (level `phone` or `full`), since a viewer saves nothing, so a viewer sees no words for it ([contract.md](contract.md), "Problems in words"). `system.mapstudio.getMap(project)` still returns the list of map item records on a read-only store; the list's `readOnly` attribute is the reason (None when saving works), and `applyEdits` raises `read-only: <reason>`.
 
 ## Schema versions and downgrades
 
@@ -55,7 +55,7 @@ Each module release knows a newest schema version; migrations only ever add (`ga
 Map Studio's map store on database connection MapStudioCheck is at schema version 999, newer than this module knows (2); the map is read only here until the Map Studio module is upgraded. Nothing was migrated or changed.
 ```
 
-The map shows "Map store: read only. The map store was upgraded by a newer Map Studio (schema 999, this module knows 2); saving is off until the module is upgraded." **[live 8.3.10]**. To downgrade for real, restore the `mapstudio_` tables from a backup taken before the upgrade; there is no down migration.
+An editor's map says "Map store: read only. The map store was upgraded by a newer Map Studio (schema 999, this module knows 2); saving is off until the module is upgraded." (the save status row in Edit mode, the top-centre chip in View mode; a viewer's map shows no words for it and keeps the reason in `data-store-reason`) **[live 8.3.10]**. To downgrade for real, restore the `mapstudio_` tables from a backup taken before the upgrade; there is no down migration.
 
 ## Redundant pairs
 

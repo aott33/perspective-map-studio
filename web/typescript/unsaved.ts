@@ -15,6 +15,7 @@
 import { isRecord } from './json';
 import { EditBatch, EditLevel, ErrorCodes, MapItemRecord } from './contract';
 import { ErrorBody } from './messages';
+import { stepLabel } from './undoStack';
 
 /** The storage the queue writes to: `localStorage` in the browser, a fake in tests. */
 export interface KeyValueStore {
@@ -441,7 +442,7 @@ function edits(n: number): string {
 }
 
 /** Whether an entry waits because the store is out of reach (no answer, not connected, store-unreachable but not busy). */
-function unreachable(entries: UnsavedEntry[]): boolean {
+export function unreachable(entries: UnsavedEntry[]): boolean {
     return entries.some((e) => e.state === 'unsent' && !!e.reason && !isBusy(e.reason)
         && (e.reason.code === LocalReasons.TIMEOUT || e.reason.code === LocalReasons.DISCONNECTED
             || e.reason.code === ErrorCodes.STORE_UNREACHABLE));
@@ -472,4 +473,37 @@ export function waitingText(entries: UnsavedEntry[], level: EditLevel | null): s
     }
     const first = entries.find((e) => e.reason !== undefined);
     return first && first.reason ? summary + ' - ' + reasonText(first.reason) : summary;
+}
+
+/**
+ * Which edit a queued batch is, in Undo's words (undoStack.ts `stepLabel`; entry 24, each waiting edit named as the owner's
+ * mock names it): its first map item op as "add Gathering line", "rename P14" (the new name), "move SWD1", "link P14",
+ * "unlink P14", "edit P14" or "delete L-TEST"; the item's name from the batch's own data, else from the record `items`
+ * holds, else "an item". A batch of kind setups alone is "edit a kind setup".
+ */
+export function editLabel(batch: EditBatch, items: MapItemRecord[]): string {
+    const op = batch.ops.find((o) => o.entity === 'item');
+    if (!op) {
+        return 'edit a kind setup';
+    }
+    const data = op.data || {};
+    const record = items.find((i) => i.id === op.id);
+    const name = typeof data.name === 'string' && data.name !== '' ? data.name : record && record.name !== '' ? record.name : 'an item';
+    if (op.op === 'create') {
+        return stepLabel('add', name);
+    }
+    if (op.op === 'delete') {
+        return 'delete ' + name;
+    }
+    const keys = Object.keys(data);
+    if (keys.length === 1 && keys[0] === 'name') {
+        return stepLabel('rename', name);
+    }
+    if (keys.length === 1 && keys[0] === 'geometry') {
+        return stepLabel('move', name);
+    }
+    if (keys.length === 1 && keys[0] === 'assetId') {
+        return stepLabel(data.assetId === null ? 'unlink' : 'link', name);
+    }
+    return stepLabel('edit', name);
 }

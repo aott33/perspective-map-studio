@@ -35,7 +35,7 @@ import { SearchResult } from './search';
 import { STORE_UNKNOWN, storeStateAttribute } from './storeState';
 import { SAVE_IDLE } from './save';
 import { unsavedItems } from './unsaved';
-import { ProblemFacts, chipProblem, editProblems } from './problems';
+import { ProblemFacts, chipProblem, editProblems, headerSaveWords } from './problems';
 import { PopupPoint, isSheetWidth, sheetBasisWidth } from './popupParams';
 import { PopupAnchor, Rect } from './popupPlacement';
 import { SHARED_M } from './shared';
@@ -66,6 +66,7 @@ import { PropertiesPanel } from './studio/PropertiesPanel';
 import { DrawToolbar } from './studio/DrawToolbar';
 import { DrawingBar } from './studio/DrawingBar';
 import { ChromeGlyph } from './studio/ChromeGlyph';
+import { ProblemStatus } from './studio/SaveStatus';
 
 /** Must match MapStudioComponent.COMPONENT_ID on the Java side. */
 export const COMPONENT_TYPE = 'ao.mapstudio';
@@ -1006,6 +1007,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     };
 
+    /** The save status row and the edits waiting under it, in a dock surface's header (entry 24: every surface says the problems). */
+    private renderProblemStatus(delegate: MapStudioDelegateState, facts: ProblemFacts): React.ReactNode {
+        return (
+            <ProblemStatus save={delegate.save} problems={editProblems(facts)} unsaved={delegate.unsaved} records={delegate.items}
+                           level={facts.level} sending={delegate.sending} onRetry={this.onRetryUnsaved} onDiscard={this.onDiscardUnsaved} />
+        );
+    }
+
     /**
      * The style preview panel (entry 1, the `previewStyles` prop): every kind's style rule and area
      * tints from the kind display, each case in its preset, then the preset and tint palettes; drawn
@@ -1066,6 +1075,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
      */
     private renderDock(delegate: MapStudioDelegateState): React.ReactNode {
         const surface = this.state.studio.surface;
+        const facts = this.problemFacts(delegate);
         if (surface === 'layers') {
             const tab = this.state.layersTab;
             const id = this.layersTabsId;
@@ -1073,6 +1083,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 <section key="layers" className="mapstudio-dock mapstudio-dock--layers" aria-label="Layers" data-surface="layers" data-tab={tab}>
                     <header className="mapstudio-dock-header">
                         <div className="mapstudio-dock-title-row"><h2 className="mapstudio-dock-title">Layers</h2></div>
+                        {this.renderProblemStatus(delegate, facts)}
                     </header>
                     <div className="mapstudio-panel-tabs" role="tablist" aria-label="Layers">
                         {LAYERS_TABS.map(([key, label]) => (
@@ -1092,20 +1103,22 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 <section key="kinds" className="mapstudio-dock mapstudio-dock--empty" aria-label="Kinds" data-surface="kinds">
                     <header className="mapstudio-dock-header">
                         <div className="mapstudio-dock-title-row"><h2 className="mapstudio-dock-title">Kinds</h2></div>
+                        {this.renderProblemStatus(delegate, facts)}
                     </header>
                     <div className="mapstudio-dock-note">Nothing here yet. The kind setup screen comes in a later entry.</div>
                 </section>
             );
         }
         const selected = this.state.selected;
-        const facts = this.problemFacts(delegate);
         return (
             <ItemList title={this.projectName() || 'Map'}
                       rows={listRows(delegate.items, delegate.lists.kinds, delegate.live, delegate.lists.assetNames)}
                       selectedId={selected ? selected.id : null}
                       save={delegate.save}
+                      saveWords={headerSaveWords(facts)}
                       problems={editProblems(facts)}
                       unsaved={delegate.unsaved}
+                      records={delegate.items}
                       level={facts.level}
                       sending={delegate.sending}
                       onSelect={this.onRowSelect}
@@ -1210,15 +1223,16 @@ export class MapStudio extends Component<Props, MapStudioState> {
                          data-needs-open="false" />
                     {chip ? (
                         // The top-centre chip (item 32; entry 24): one problem in words, the worst first, on at most two lines with
-                        // its full words as the title; the connection's with the hourglass, the store's and the edits' with the cloud.
+                        // its full words as the title; the hourglass for no connection, the cloud for the store out of reach, the
+                        // warning glyph for every other problem (problems.ts ProblemGlyph).
                         <div className={'mapstudio-chip mapstudio-chip--' + chip.code + (chip.code === 'connection' ? ' mapstudio-connection' : '')}
-                             role="status" title={chip.detail} data-problem={chip.code}
+                             role="status" title={chip.detail} data-problem={chip.code} data-glyph={chip.glyph}
                              data-state={chip.code === 'connection' ? (connection.lost ? 'lost' : 'reloading') : undefined}>
-                            {chip.code === 'connection' ? (
+                            {chip.glyph === 'stale' ? (
                                 <svg className="mapstudio-chip-glyph" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
                                     <use href={SPRITE_URL + '#ms-stale'} />
                                 </svg>
-                            ) : <ChromeGlyph name="cloud" className="mapstudio-chip-glyph" size={16} />}
+                            ) : <ChromeGlyph name={chip.glyph} className="mapstudio-chip-glyph" size={16} />}
                             <span className="mapstudio-chip-text">{chip.text}</span>
                         </div>
                     ) : null}

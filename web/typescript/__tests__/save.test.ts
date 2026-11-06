@@ -1,13 +1,11 @@
 import { MapItemRecord } from '../contract';
 import {
-    SAVE_IDLE,
     itemsToGeoJson,
     lineCreateBatch,
     newId,
     pointCreateBatch,
     refusedSave,
     roundCoordinate,
-    saveStatusWords,
     updateBatch,
     withItem
 } from '../save';
@@ -49,10 +47,9 @@ describe('saving a drawn line (epic 4 entry 4)', () => {
         expect(start.ops[0].data!.ends).toEqual({ start: { itemId: 'a' } });
     });
 
-    test('a refused save keeps the code and the Gateway\'s words (the dev status line\'s words left with it, epic 4 entry 24)', () => {
+    test('a refused save keeps the code and the Gateway\'s words (said by the waiting edits since epic 4 entry 24, problems.ts)', () => {
         const refused = refusedSave('a', { code: 'role', message: 'You do not have a role that lets you change the map.' });
         expect(refused).toEqual({ state: 'refused', itemId: 'a', code: 'role', message: 'You do not have a role that lets you change the map.' });
-        expect(saveStatusWords(refused)).toBe('Not saved - You do not have a role that lets you change the map.');
     });
 });
 
@@ -93,12 +90,4 @@ describe('the studio\'s saves (epic 4 entry 2)', () => {
         expect(updateBatch('i', 'b', 4, { assetId: null }).ops[0].data).toEqual({ assetId: null });
     });
 
-    test('the panel header\'s words: Saved, Saving..., a problem on its own', () => {
-        expect(saveStatusWords(SAVE_IDLE)).toBe('Saved');
-        expect(saveStatusWords({ state: 'saved', itemId: 'a', version: 2 })).toBe('Saved');
-        expect(saveStatusWords({ state: 'saving', itemId: 'a' })).toBe('Saving...');
-        expect(saveStatusWords(refusedSave('a', { code: 'conflict', message: 'P31 was changed by mapoperator at 14:02 UTC since you loaded it. Nothing in this save was written.' })))
-            .toBe('Not saved - P31 was changed by mapoperator at 14:02 UTC since you loaded it. Nothing in this save was written.');
-        expect(saveStatusWords({ state: 'unsent', itemId: 'a', code: 'timeout' })).toMatch(/^Not saved - store unreachable/);
-    });
 });

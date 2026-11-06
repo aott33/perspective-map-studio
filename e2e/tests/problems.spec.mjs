@@ -146,10 +146,19 @@ test.describe('1366 px', () => {
             const store = row(page).locator('[data-problem="store"]');
             await expect(store).toHaveText('Map store: ' + DOWN_MESSAGE);
             await expect(row(page)).toHaveAttribute('data-problems', 'store');
-            await expect(page.locator('.mapstudio-dock-title-row .mapstudio-panel-save')).toHaveCount(0);
+            // The save state stays beside the title, the problem on its own row under it.
+            await expect(page.locator('.mapstudio-dock-title-row .mapstudio-panel-save')).toHaveText('Saved');
             // In Edit mode the chip is the connection's alone.
             await expect(chip(page)).toHaveCount(0);
             await shot(page, 'mapstudio-problem-edit-store-1366.png');
+            // Every surface of the dock says it: Kinds and Layers hold the same row under their titles.
+            for (const surface of ['kinds', 'layers']) {
+                await page.locator('.mapstudio-rail-item[data-surface="' + surface + '"]').click();
+                await expect(page.locator('.mapstudio-dock[data-surface="' + surface + '"] .mapstudio-panel-save--row [data-problem="store"]'))
+                    .toHaveText('Map store: ' + DOWN_MESSAGE);
+            }
+            await page.locator('.mapstudio-rail-item[data-surface="items"]').click();
+            await expect(store).toBeVisible();
             // Each 15 s retry loads again: the row keeps its words through it, frame by frame, and the toolbar stays paused.
             const edit = await acrossRetry(page, gate, '.mapstudio-panel-save--row [data-problem="store"]');
             console.log('Edit mode across a retry: ' + edit.frames + ' frames, ' + edit.gaps + ' without the row');
@@ -164,6 +173,8 @@ test.describe('1366 px', () => {
             const viewChip = page.locator('.mapstudio-chip[data-problem="store"]');
             await expect(viewChip).toHaveText('Map store: ' + DOWN_MESSAGE);
             await expect(viewChip).toHaveAttribute('title', 'Map store: ' + DOWN_MESSAGE);
+            // The cloud for the store out of reach (DESIGN.md Save banner); a setup's reason takes the warning glyph below.
+            await expect(viewChip).toHaveAttribute('data-glyph', 'cloud');
             await expect(viewChip).toHaveAttribute('role', 'status');
             await expect(viewChip.locator('.mapstudio-chip-glyph')).toHaveCount(1);
             await expect(chip(page)).not.toHaveClass(/mapstudio-connection/);
@@ -179,6 +190,7 @@ test.describe('1366 px', () => {
             gate.failLoad = SETUP;
             await expect(viewChip).toHaveText('Map store: ' + SETUP, { timeout: RETRY_MS });
             await expect(viewChip).toHaveAttribute('title', 'Map store: ' + SETUP);
+            await expect(viewChip).toHaveAttribute('data-glyph', 'warning');
             expect((await chipLines(viewChip)).lines, 'two lines at most').toBeLessThanOrEqual(2);
             await expectChipClear(page, map);
             await shot(page, 'mapstudio-problem-view-setup-1366.png');
@@ -206,13 +218,19 @@ test.describe('1366 px', () => {
 
             // Two lines the Gateway never sees: unsent once the 15 s reply timer runs out.
             gate.drop = true;
+            const header = page.locator('.mapstudio-dock-title-row .mapstudio-panel-save');
             await drawLine(page, map, { dy: -200 });
+            // While it is being sent no problem shows: the header says Saving... (a save in flight is no problem).
+            await expect(header).toHaveText('Saving...');
+            await expect(row(page)).toHaveCount(0);
+            await expect(chip(page)).toHaveCount(0);
             await drawLine(page, map, { dy: -140 });
             await expect.poll(async () => (await storedQueue(page)).length).toBe(2);
-            // While they are being sent no problem shows: the header says Saving...
             const waiting = row(page).locator('[data-problem="edits"]');
             await expect(waiting).toHaveText('Store unreachable - 2 edits not saved', { timeout: RETRY_MS });
             await expect(map).toHaveAttribute('data-save-state', 'unsent');
+            // Once edits wait the header beside the title says Not saved; the reason is the row's.
+            await expect(header).toHaveText('Not saved');
             await expect(waiting).toHaveAttribute('aria-expanded', 'false');
             const list = page.locator('.mapstudio-unsaved');
             await expect(list).toHaveCount(0);
@@ -225,6 +243,8 @@ test.describe('1366 px', () => {
             await expect(rows).toHaveCount(2);
             for (const r of await rows.all()) {
                 await expect(r).toHaveAttribute('data-unsaved-state', 'unsent');
+                // Each names its edit as Undo names its step, the reason under it.
+                await expect(r.locator('.mapstudio-unsaved-edit')).toHaveText('Add Gathering line');
                 await expect(r.locator('.mapstudio-unsaved-text')).toHaveText(/^Not saved - store unreachable/);
                 await expect(r.locator('.mapstudio-unsaved-retry')).toHaveText('Try again');
                 await expect(r.locator('.mapstudio-unsaved-discard')).toHaveText('Discard');
@@ -252,11 +272,14 @@ test.describe('1366 px', () => {
             await expect(waiting).toBeFocused();
             await expect(page.locator('.mapstudio-panel')).toBeVisible();
 
-            // Discard one (not the one a replay may be sending): one waits.
+            // Discard one (not the one a replay may be sending): one waits, and the focus goes to the next row's Discard, else to
+            // the edits line, never to the page.
             await waiting.click();
             await list.locator('.mapstudio-unsaved-discard:enabled').first().click();
             await expect(rows).toHaveCount(1);
             await expect(waiting).toHaveText('Store unreachable - 1 edit not saved');
+            await expect.poll(() => page.evaluate(() => document.activeElement ? document.activeElement.className : ''))
+                .toMatch(/mapstudio-unsaved-discard|mapstudio-panel-problem--edits/);
             const [kept] = await storedQueue(page);
             const keptId = kept.batch.ops[0].id;
 
@@ -264,6 +287,7 @@ test.describe('1366 px', () => {
             await page.locator('.mapstudio-edit-switch-button').click();
             await expect(map).toHaveAttribute('data-studio', 'off');
             await expect(page.locator('.mapstudio-chip[data-problem="edits"]')).toHaveText('Store unreachable - 1 edit not saved');
+            await expect(chip(page)).toHaveAttribute('data-glyph', 'cloud');
             await expect(list).toHaveCount(0);
             await expectChipClear(page, map);
             await shot(page, 'mapstudio-problem-view-edits-1366.png');
@@ -273,6 +297,7 @@ test.describe('1366 px', () => {
             await expect(map).toHaveAttribute('data-connection', 'lost', { timeout: 10_000 });
             await expect(page.locator('.mapstudio-chip[data-problem="connection"]')).toHaveText(/^No connection - /);
             await expect(chip(page)).toHaveClass(/mapstudio-connection/);
+            await expect(chip(page)).toHaveAttribute('data-glyph', 'stale');
             await expect(map).toHaveAttribute('data-connection', 'ok', { timeout: (LOST_S + 30) * 1000 });
             await expect(page.locator('.mapstudio-chip[data-problem="edits"]')).toHaveText('Store unreachable - 1 edit not saved', { timeout: RETRY_MS });
 
@@ -299,6 +324,7 @@ test.describe('1366 px', () => {
             await expect(map).toHaveAttribute('data-studio', 'off');
             const readOnly = page.locator('.mapstudio-chip[data-problem="read-only"]');
             await expect(readOnly).toHaveText('Map store: read only. ' + READ_ONLY);
+            await expect(readOnly).toHaveAttribute('data-glyph', 'warning');
             expect((await chipLines(readOnly)).lines).toBeLessThanOrEqual(2);
             await expectChipClear(page, map);
             await shot(page, 'mapstudio-problem-view-readonly-1366.png');
@@ -367,6 +393,38 @@ test.describe('390 px', () => {
             });
             expect(removed.type, JSON.stringify(removed.body)).toBe('edits.apply.reply');
         });
+});
+
+test.describe('390 px, the editor\'s chip', () => {
+    test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+
+    lossTest('the phone keeps View mode: a read-only store on the editor\'s chip, and No connection before it', async ({ page, context }) => {
+        test.setTimeout(180_000);
+        const gate = openGate();
+        await routeSockets(context, gate);
+        gate.readOnly = READ_ONLY;
+        const map = await openMap(page, '/edit');
+        await mapLoaded(map);
+        await expect(map).toHaveAttribute('data-edit-level', 'full');
+        await expect(map).toHaveAttribute('data-studio', 'off');
+        await expect(map).toHaveAttribute('data-store-state', 'read-only');
+        const readOnly = page.locator('.mapstudio-chip[data-problem="read-only"]');
+        await expect(readOnly).toHaveText('Map store: read only. ' + READ_ONLY);
+        await expect(readOnly).toHaveAttribute('title', 'Map store: read only. ' + READ_ONLY);
+        await expect(readOnly).toHaveAttribute('data-glyph', 'warning');
+        expect((await chipLines(readOnly)).lines, 'two lines at most').toBeLessThanOrEqual(2);
+        await expectChipClear(page, map);
+        await shot(page, 'mapstudio-problem-phone-readonly-390.png');
+
+        // No connection comes first; when it is back (the reload says read only again) the chip names the store again.
+        await page.evaluate((s) => window.__client.simulateLostConnection(s), LOST_S);
+        await expect(map).toHaveAttribute('data-connection', 'lost', { timeout: 10_000 });
+        await expect(page.locator('.mapstudio-chip[data-problem="connection"]')).toHaveText(/^No connection - /);
+        await expect(chip(page)).toHaveCount(1);
+        await expectChipClear(page, map);
+        await expect(map).toHaveAttribute('data-connection', 'ok', { timeout: (LOST_S + 30) * 1000 });
+        await expect(readOnly).toHaveText('Map store: read only. ' + READ_ONLY, { timeout: RETRY_MS });
+    });
 });
 
 for (const [width, height] of [[1366, 768], [390, 844]]) {

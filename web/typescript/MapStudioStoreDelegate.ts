@@ -75,7 +75,10 @@ export interface MapStudioDelegateState {
     refreshIntervalSeconds: number | null;
     /** The project setup's alarm page template (epic 3 entry 8), '' when none or not sent. */
     alarmPage: string;
-    /** 'loading', 'loaded', or the store-unreachable (or other) reason map.load answered. */
+    /**
+     * 'loading', 'loaded', or 'failed'; `message` is the last failed map.load's code and sentence (`store-unreachable: ...`),
+     * kept while a retry loads and '' once a load succeeds, so the problem it says holds across the 15 s retries (entry 24).
+     */
     load: { state: 'loading' | 'loaded' | 'failed'; message: string };
     /** The last save of a drawn line. */
     save: SaveState;
@@ -406,7 +409,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private sendMapLoadMessage(): void {
         const message = mapLoad();
         this.mapLoadId = message.id;
-        this.load = { state: 'loading', message: '' };
+        // A retry after a failed load keeps its words until a load succeeds (entry 24: no blink across the retries).
+        this.load = { state: 'loading', message: this.load.state === 'loaded' ? '' : this.load.message };
         this.notify();
         this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject);
     }
