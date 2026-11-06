@@ -17,22 +17,34 @@
  * callbacks it reads), and the state is the component's: the drawing in progress (drawing.ts) and the
  * studio model (studio.ts) are written through its `drawingState`, `toolState` and `selectionState`, in a
  * functional setState.
+ *
+ * Changing geometry (entry 5; EXPERIENCE.md Change geometry, the owner's four mocks of 2026-11-06): with Select in hand the
+ * selected map item goes into Terra Draw as a copy in its select mode (an area as a closed ring) while it is selected, and
+ * leaves when the selection changes or its saved record draws (`applyHandles`). A line or an area shows a handle at each
+ * point and a smaller dashed one at each midpoint; dragging a point moves it, dragging a midpoint adds a point there, and a
+ * point item's marker is dragged as well; never a whole line or area by its body. A click on a handle chooses that point
+ * (the bar's Move, Split here and Delete point are the component's); Move, from that bar or beside a point item's Location in
+ * Details, takes the next click on the map as the new place (`onGeometryClick`); Esc puts down Move or the chosen point
+ * (`escapeGeometry`). Each change is one batch through the delegate when the drag or the action ends, never per pointer
+ * move. A line's end point dragged or moved with Snap on lands on and names a target, with Snap off it floats.
  */
 
 import type { Position } from 'geojson';
 import { Map as MapLibreMap } from 'maplibre-gl';
+import type { FilterSpecification, MapMouseEvent } from 'maplibre-gl';
 import {
-    GeoJSONStoreFeatures, SnappableContext, TerraDraw, TerraDrawLineStringMode, TerraDrawMouseEvent, TerraDrawPointMode, TerraDrawPolygonMode,
-    ValidateNotSelfIntersecting
+    GeoJSONStoreFeatures, HexColor, SnappableContext, TerraDraw, TerraDrawLineStringMode, TerraDrawMouseEvent, TerraDrawPointMode, TerraDrawPolygonMode,
+    TerraDrawSelectMode, ValidateNotSelfIntersecting
 } from 'terra-draw';
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import type { MapStudioState, Props } from './MapStudio';
 import { MapStudioStoreDelegate } from './MapStudioStoreDelegate';
+import { MapItemRecord } from './contract';
 import {
-    Drawing, DrawingTool, REASON_SELF_INTERSECTS, drawingEnds, inField, isDrawingTool, minVertices, startDrawing, withVertices
+    Drawing, DrawingTool, GeometryPick, REASON_SELF_INTERSECTS, drawingEnds, inField, isDrawingTool, minVertices, startDrawing, withVertices
 } from './drawing';
 import { Selection } from './features';
-import { SnapTarget, nearestSnap, snapDistanceM, snapTargets } from './geometry';
+import { SnapTarget, endSideOf, nearestSnap, snapDistanceM, snapTargets } from './geometry';
 import { StudioTool, isDrawing, isPlacing, toolKind } from './studio';
 import { drawColor } from './theme';
 
@@ -41,6 +53,37 @@ export const DRAW_MODE_OFF = 'static';
 export const DRAW_MODE_POINT = 'point';
 export const DRAW_MODE_LINE = 'linestring';
 export const DRAW_MODE_AREA = 'polygon';
+/** Entry 5: the select mode the selected item's copy is edited in, and the modes its copy belongs to (never picked as tools). */
+export const DRAW_MODE_SELECT = 'select';
+const EDIT_MODE_POINT = 'edit-point';
+const EDIT_MODE_LINE = 'edit-line';
+const EDIT_MODE_AREA = 'edit-area';
+
+/** How near the pointer must be to a handle, in screen pixels, to drag it or, with a click, to choose it (entry 5). */
+export const HANDLE_PX = 12;
+
+/** The map's own layers over Terra Draw's for the handles (entry 5): the dashed midpoints and the chosen point. */
+export const LAYER_HANDLE_MIDPOINTS = 'mapstudio-handle-midpoints';
+export const LAYER_HANDLE_CHOSEN = 'mapstudio-handle-chosen';
+const MIDPOINT_IMAGE = 'mapstudio-handle-midpoint';
+/** Terra Draw's point source on the MapLibre adapter (its `td` prefix): the handles' features with their properties. */
+const TERRA_DRAW_POINTS = 'td-point';
+
+/**
+ * The selected item's copy in Terra Draw while Select is in hand (entry 5): which item, its shape, the stored coordinates it
+ * was made from and the record it was made from as a key; a new key makes the copy again.
+ */
+export interface Handles {
+    featureId: string | number;
+    itemId: string;
+    shape: 'point' | 'line' | 'area';
+    /** The stored coordinates: a point's place, a line's points, an area's ring unclosed. */
+    coords: Array<[number, number]>;
+    /** The record's id, version and coordinates as text. */
+    key: string;
+    /** A drag was sent: no new drag starts and the copy is made again from the record once the save settles. */
+    awaiting: boolean;
+}
 
 /** What the tools read and write on the component. */
 export interface EditingHost {
@@ -59,6 +102,12 @@ export interface EditingHost {
     placedPoints: Map<string | number, string>;
     /** The item whose Details opens with the cursor in Name (the item just added), or null. */
     focusNameId: string | null;
+    /** Entry 5: Terra Draw's select mode, the selected item's copy in it (null with none), and the target a dragged end snapped to. */
+    selectMode: TerraDrawSelectMode | null;
+    handles: Handles | null;
+    dragSnap: SnapTarget | null;
+    /** The chosen point the handle layer draws (its index, -1 for none), so the layer's filter is set only when it changes. */
+    chosenDrawn: number;
     /** The snap targets of the items as last read, keyed by the items revision they were read at. */
     snapCache: { revision: number; targets: SnapTarget[] } | null;
     /** The target the snapping callback last offered (what the next placed vertex snaps to), or null. */
@@ -72,13 +121,16 @@ export interface EditingHost {
     /** The drawing in progress (or null) from the pending state, for a functional setState. */
     drawingState(prev: Readonly<MapStudioState>, drawing: Drawing | null): Pick<MapStudioState, 'drawing'>;
     /** A tool picked up (with the kind a kind button fixed) or put down with null, with the studio model, from the pending state. */
-    toolState(prev: Readonly<MapStudioState>, tool: StudioTool | null, kindId: string | null): Pick<MapStudioState, 'drawing' | 'snapHint' | 'studio'>;
+    toolState(prev: Readonly<MapStudioState>, tool: StudioTool | null, kindId: string | null): Pick<MapStudioState, 'drawing' | 'snapHint' | 'studio' | 'geometry'>;
     /** A selection with the studio model that goes with it (studio.ts), from the pending state. */
-    selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio' | 'panel'>;
+    selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio' | 'panel' | 'geometry'>;
     /** Close the open popup, card or sheet (selection.tsx): an added item takes the selection. */
     closePopup: () => void;
     /** A finished line is queued and drawn from the unsaved layer: remove Terra Draw's copy of it (itemsLayer.ts). */
     dropQueuedFeatures(): void;
+    /** Whether the studio shows (Edit mode at level full, 768 px and wider), and the live map item with an id (entry 5). */
+    studioOn(): boolean;
+    liveItem(id: string): MapItemRecord | undefined;
 }
 
 /** Terra Draw's mode for a tool. */
@@ -148,18 +200,459 @@ export function startTerraDraw(host: EditingHost, map: MapLibreMap, root: HTMLEl
     const snapping = { toCustom: (event: TerraDrawMouseEvent, context: SnappableContext): Position | undefined => snapCustom(host, event, context) };
     host.lineMode = new TerraDrawLineStringMode({ styles: lineStyles, validation, snapping });
     host.areaMode = new TerraDrawPolygonMode({ styles: areaStyles, validation, snapping });
+    const fill = drawColor(root, ['--containerRoot', '--container', '--neutral-10']);
+    const midpoint = fill && selection ? midpointImage(fill, selection) : null;
+    host.selectMode = makeSelectMode(host, { line, fill, selection, dashedMidpoints: midpoint !== null });
     const draw = new TerraDraw({
         adapter: new TerraDrawMapLibreGLAdapter({ map }),
-        modes: [host.lineMode, host.areaMode, new TerraDrawPointMode({ editable: true, styles: pointStyles })]
+        modes: [host.lineMode, host.areaMode, new TerraDrawPointMode({ editable: true, styles: pointStyles }), host.selectMode,
+            new TerraDrawPointMode({ modeName: EDIT_MODE_POINT }), new TerraDrawLineStringMode({ modeName: EDIT_MODE_LINE }),
+            new TerraDrawPolygonMode({ modeName: EDIT_MODE_AREA })]
     });
     draw.on('finish', host.onDrawFinish);
     draw.on('change', host.onDrawChange);
     draw.start();
     host.draw = draw;
+    addHandleLayers(map, midpoint, fill, selection);
     if (host.mapContainer) {
         // Capture phase, so Escape and Backspace reach the tool before Terra Draw's own key handling on the canvas.
         host.mapContainer.addEventListener('keydown', host.onKeyDown, true);
     }
+}
+
+/**
+ * Terra Draw's select mode for the selected item's copy (entry 5). Its clicks and keys are off (the component chooses a point
+ * on a click and owns Esc and Delete; nothing is selected or deselected by Terra Draw itself) and only its drags act: a line's
+ * or an area's points and midpoints (a midpoint dragged adds a point there), never the body; a point item's whole feature. A
+ * line may cross itself, an area may not. A line's end point snaps while the Snap toggle is on (`snapEdit`). No drag starts
+ * while the last one is being saved. The vertex handles take the mocks' look: a disc in the surface token ringed in the
+ * selection token; the midpoints are drawn dashed by the map's own layer when the image could be made; the copy itself shows
+ * only while its shape differs from the stored record (during a drag and until the save draws), the map drawing the item.
+ */
+function makeSelectMode(host: EditingHost, colors: { line: HexColor | null; fill: HexColor | null; selection: HexColor | null;
+    dashedMidpoints: boolean }): TerraDrawSelectMode {
+    const shown = (feature: GeoJSONStoreFeatures): number => (copyChanged(host, feature) ? 1 : 0);
+    const styles: { [key: string]: HexColor | number | ((feature: GeoJSONStoreFeatures) => number) } = {
+        selectionPointWidth: 6, selectionPointOutlineWidth: 2.5,
+        midPointWidth: 4, midPointOutlineWidth: 1.5, midPointOpacity: colors.dashedMidpoints ? 0 : 1, midPointOutlineOpacity: colors.dashedMidpoints ? 0 : 1,
+        selectedLineStringWidth: 3, selectedLineStringOpacity: shown,
+        selectedPolygonFillOpacity: 0, selectedPolygonOutlineWidth: 3, selectedPolygonOutlineOpacity: shown,
+        selectedPointWidth: 7, selectedPointOutlineWidth: 2, selectedPointOpacity: shown, selectedPointOutlineOpacity: shown
+    };
+    if (colors.fill) {
+        styles.selectionPointColor = colors.fill;
+        styles.midPointColor = colors.fill;
+        styles.selectedPointOutlineColor = colors.fill;
+    }
+    if (colors.selection) {
+        styles.selectionPointOutlineColor = colors.selection;
+        styles.midPointOutlineColor = colors.selection;
+        styles.selectedPointColor = colors.selection;
+    }
+    if (colors.line) {
+        styles.selectedLineStringColor = colors.line;
+        styles.selectedPolygonOutlineColor = colors.line;
+    }
+    const points = { draggable: true, midpoints: { draggable: true }, deletable: false };
+    return new TerraDrawSelectMode({
+        pointerDistance: HANDLE_PX,
+        keyEvents: null,
+        allowManualSelection: false,
+        allowManualDeselection: false,
+        pointerEvents: {
+            leftClick: false, rightClick: false, contextMenu: false,
+            onDragStart: () => !(host.handles && host.handles.awaiting), onDrag: true, onDragEnd: true
+        },
+        flags: {
+            [EDIT_MODE_POINT]: { feature: { draggable: true } },
+            [EDIT_MODE_LINE]: { feature: { draggable: false, selfIntersectable: true, coordinates: {
+                ...points, snappable: { toCustom: (event: TerraDrawMouseEvent, context: SnappableContext) => snapEdit(host, event, context) } } } },
+            [EDIT_MODE_AREA]: { feature: { draggable: false, selfIntersectable: false, coordinates: points } }
+        },
+        styles: styles as SelectStyles
+    });
+}
+
+/** The select mode's styling keys (Terra Draw does not export the type). */
+type SelectStyles = NonNullable<NonNullable<ConstructorParameters<typeof TerraDrawSelectMode>[0]>['styles']>;
+
+/** Whether the copy's shape differs from the stored coordinates it was made from (a drag moved it). */
+function copyChanged(host: EditingHost, feature: GeoJSONStoreFeatures): boolean {
+    const handles = host.handles;
+    if (!handles || feature.id !== handles.featureId) {
+        return false;
+    }
+    const coords = coordsOf(feature.geometry);
+    return coords.length !== handles.coords.length || coords.some((c, i) => !samePlace(c, handles.coords[i]));
+}
+
+/** A copy's coordinates as stored: a point's place, a line's points, a polygon's ring unclosed. */
+function coordsOf(geometry: GeoJSONStoreFeatures['geometry']): Array<[number, number]> {
+    if (geometry.type === 'Point') {
+        return [[geometry.coordinates[0], geometry.coordinates[1]]];
+    }
+    if (geometry.type === 'LineString') {
+        return geometry.coordinates.map((c) => [c[0], c[1]] as [number, number]);
+    }
+    if (geometry.type === 'Polygon') {
+        return (geometry.coordinates[0] || []).slice(0, -1).map((c) => [c[0], c[1]] as [number, number]);
+    }
+    return [];
+}
+
+/** The dashed midpoint of the mocks (a 4 px disc in the surface token with a dashed ring in the selection token), or null without a canvas. */
+function midpointImage(fill: string, stroke: string): ImageData | null {
+    if (typeof document === 'undefined') {
+        return null;
+    }
+    const ratio = 2;
+    const size = 12 * ratio;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx || typeof ctx.setLineDash !== 'function') {
+        return null;
+    }
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, 4 * ratio, 0, 2 * Math.PI);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.lineWidth = 1.5 * ratio;
+    ctx.setLineDash([2 * ratio, 2 * ratio]);
+    ctx.strokeStyle = stroke;
+    ctx.stroke();
+    return ctx.getImageData(0, 0, size, size);
+}
+
+/** The filter of the chosen point's layer: the selection point with this index (-1 for none). */
+function chosenFilter(index: number): FilterSpecification {
+    return ['all', ['==', ['get', 'selectionPoint'], true], ['==', ['get', 'index'], index]] as FilterSpecification;
+}
+
+/**
+ * The map's own layers over Terra Draw's, reading Terra Draw's point source (entry 5): the dashed midpoints, and the chosen
+ * point drawn filled in the selection token, larger, ringed in the surface token (the owner's mock 2).
+ */
+function addHandleLayers(map: MapLibreMap, midpoint: ImageData | null, fill: HexColor | null, selection: HexColor | null): void {
+    if (!map.getSource(TERRA_DRAW_POINTS)) {
+        console.info('[MapStudio] Terra Draw\'s point source is not there; the handles keep the library\'s look.');
+        return;
+    }
+    if (midpoint) {
+        map.addImage(MIDPOINT_IMAGE, midpoint, { pixelRatio: 2 });
+        map.addLayer({
+            id: LAYER_HANDLE_MIDPOINTS, type: 'symbol', source: TERRA_DRAW_POINTS,
+            filter: ['==', ['get', 'midPoint'], true] as FilterSpecification,
+            layout: { 'icon-image': MIDPOINT_IMAGE, 'icon-allow-overlap': true, 'icon-ignore-placement': true }
+        });
+    }
+    map.addLayer({
+        id: LAYER_HANDLE_CHOSEN, type: 'circle', source: TERRA_DRAW_POINTS, filter: chosenFilter(-1),
+        paint: {
+            'circle-radius': 8,
+            'circle-color': selection || '#000000',
+            'circle-stroke-width': 2.5,
+            'circle-stroke-color': fill || '#ffffff'
+        }
+    });
+}
+
+/**
+ * The selected item's copy in Terra Draw (entry 5), after every update of the component: wanted while Select is in hand in the
+ * studio, the store reachable, and a stored map item is selected that may be reshaped (a point that is not an instrument, which
+ * moves along its line with entry 9; a line; an area). A new record (its save drew, an undo, another editor) makes the copy
+ * again, as does a drag's save that settled without one (a refusal). Then the chosen point and Move are kept only while they
+ * still name the copy, and the handles' attributes are published for the e2e suite.
+ */
+export function applyHandles(host: EditingHost): void {
+    const draw = host.draw;
+    if (!draw) {
+        return;
+    }
+    const want = wantedHandles(host);
+    const have = host.handles;
+    const delegate = host.props.delegate;
+    const settled = !!have && have.awaiting && !!delegate && !delegate.editInFlight;
+    if (!(want && have && !settled && have.itemId === want.itemId && have.key === want.key)) {
+        if (have) {
+            dropHandles(host, want !== null);
+        }
+        if (want) {
+            addHandles(host, want);
+        }
+    }
+    keepPick(host);
+    publishHandles(host);
+}
+
+function wantedHandles(host: EditingHost): Omit<Handles, 'featureId' | 'awaiting'> | null {
+    const delegate = host.props.delegate;
+    const selected = host.state.selected;
+    if (!delegate || delegate.editing === 'off' || !selected || host.state.studio.tool !== null || !host.studioOn()) {
+        return null;
+    }
+    const item = host.liveItem(selected.id);
+    if (!item || item.version < 1) {
+        return null;
+    }
+    const kind = delegate.lists.kinds.find((k) => k.id === item.kind);
+    const key = item.id + ':' + item.version + ':' + JSON.stringify(item.geometry.coordinates);
+    if (item.geometry.type === 'Point') {
+        if (item.attachment !== null || (kind && kind.instrument)) {
+            return null;
+        }
+        return { itemId: item.id, shape: 'point', coords: [[item.geometry.coordinates[0], item.geometry.coordinates[1]]], key };
+    }
+    const coords = item.geometry.coordinates.map((c) => [c[0], c[1]] as [number, number]);
+    return { itemId: item.id, shape: kind && kind.area ? 'area' : 'line', coords, key };
+}
+
+function addHandles(host: EditingHost, want: Omit<Handles, 'featureId' | 'awaiting'>): void {
+    const draw = host.draw;
+    if (!draw) {
+        return;
+    }
+    const featureId = draw.getFeatureId();
+    const geometry = want.shape === 'point' ? { type: 'Point' as const, coordinates: want.coords[0] }
+        : want.shape === 'area' ? { type: 'Polygon' as const, coordinates: [want.coords.concat([want.coords[0]])] }
+            : { type: 'LineString' as const, coordinates: want.coords };
+    const mode = want.shape === 'point' ? EDIT_MODE_POINT : want.shape === 'area' ? EDIT_MODE_AREA : EDIT_MODE_LINE;
+    if (draw.getMode() !== DRAW_MODE_SELECT) {
+        draw.setMode(DRAW_MODE_SELECT);
+    }
+    const [result] = draw.addFeatures([{ type: 'Feature', id: featureId, geometry, properties: { mode } } as GeoJSONStoreFeatures]);
+    if (!result || !result.valid) {
+        console.info('[MapStudio] No handles for ' + want.itemId + ': ' + (result && result.reason ? result.reason : 'Terra Draw refused its shape') + '.');
+        draw.setMode(DRAW_MODE_OFF);
+        return;
+    }
+    draw.selectFeature(featureId);
+    host.handles = { ...want, featureId, awaiting: false };
+}
+
+/** The copy leaves Terra Draw; Terra Draw idles again unless another copy follows (`keepSelect`). */
+function dropHandles(host: EditingHost, keepSelect: boolean): void {
+    const draw = host.draw;
+    const handles = host.handles;
+    host.handles = null;
+    host.dragSnap = null;
+    if (!draw || !handles) {
+        return;
+    }
+    if (!keepSelect && draw.getMode() === DRAW_MODE_SELECT) {
+        draw.setMode(DRAW_MODE_OFF);
+    }
+    try {
+        if (draw.hasFeature(handles.featureId)) {
+            draw.removeFeatures([handles.featureId]);
+        }
+    } catch (err) {
+        console.info('[MapStudio] The handles\' copy was already gone.');
+    }
+}
+
+/**
+ * The chosen point and Move stay only while they still name what the studio shows (entry 5): a point of the copy's line or
+ * area, or Move of the selected point item with Select in hand and the store reachable; else they go (nothing is sent).
+ */
+function keepPick(host: EditingHost): void {
+    const pick = host.state.geometry;
+    if (!pick) {
+        return;
+    }
+    const handles = host.handles;
+    const delegate = host.props.delegate;
+    const selected = host.state.selected;
+    const usable = !!delegate && delegate.editing !== 'off' && host.state.studio.tool === null && host.studioOn()
+        && !!selected && selected.id === pick.itemId;
+    const kept = usable && (pick.index === null
+        ? !!host.liveItem(pick.itemId) || !!(handles && handles.itemId === pick.itemId)
+        : !!handles && handles.itemId === pick.itemId && handles.shape !== 'point' && pick.index < handles.coords.length);
+    if (!kept) {
+        host.setState((prev) => (prev.geometry === pick ? { geometry: null } : null));
+    }
+}
+
+/**
+ * For the e2e suite: the item whose handles show and the handles Terra Draw holds for it (its selection points and midpoints:
+ * a point item has none, its marker is dragged); and the chosen point drawn by the handle layer.
+ */
+function publishHandles(host: EditingHost): void {
+    const handles = host.handles;
+    const el = host.mapContainer;
+    if (el) {
+        let points = 0;
+        let midpoints = 0;
+        if (handles && host.draw) {
+            for (const feature of host.draw.getSnapshot()) {
+                if (feature.properties.selectionPoint) {
+                    points++;
+                } else if (feature.properties.midPoint) {
+                    midpoints++;
+                }
+            }
+        }
+        el.setAttribute('data-handles', handles ? handles.itemId : '');
+        el.setAttribute('data-handle-points', handles ? String(points) : '');
+        el.setAttribute('data-handle-midpoints', handles ? String(midpoints) : '');
+    }
+    const pick = host.state.geometry;
+    const chosen = pick && pick.index !== null && handles && handles.itemId === pick.itemId ? pick.index : -1;
+    const map = host.map;
+    if (map && chosen !== host.chosenDrawn && map.getLayer(LAYER_HANDLE_CHOSEN)) {
+        map.setFilter(LAYER_HANDLE_CHOSEN, chosenFilter(chosen));
+        host.chosenDrawn = chosen;
+    }
+}
+
+/**
+ * A line's end point dragged (Terra Draw's custom snapping in the select mode, entry 5): with Snap on, the nearest point item or
+ * vertex of another item within reach takes it and is remembered for the drag's save, so `ends` names it; an inner point, an
+ * area's point or Snap off never snaps, and the end floats.
+ */
+function snapEdit(host: EditingHost, event: TerraDrawMouseEvent, context: SnappableContext): Position | undefined {
+    host.dragSnap = null;
+    const handles = host.handles;
+    const map = host.map;
+    if (!host.state.snap || !map || !handles || handles.shape !== 'line' || context.currentCoordinate === undefined) {
+        return undefined;
+    }
+    const geometry = context.getCurrentGeometrySnapshot();
+    const count = geometry && geometry.type === 'LineString' ? geometry.coordinates.length : handles.coords.length;
+    if (endSideOf(count, context.currentCoordinate, false) === null) {
+        return undefined;
+    }
+    const hit = nearestSnap(snapTargetsOf(host).filter((t) => t.itemId !== handles.itemId), [event.lng, event.lat],
+        snapDistanceM(map.getZoom(), event.lat));
+    host.dragSnap = hit;
+    return hit ? [hit.position[0], hit.position[1]] : undefined;
+}
+
+/**
+ * A drag of the copy ended (Terra Draw's select-mode finish, entry 5): one batch for it through the delegate, read from the
+ * copy against the stored coordinates. A point item: its move with the snapped ends of its lines. A line or an area: one more
+ * point (a midpoint dragged in) saves the new points; one point moved saves that point, a line's end naming the target it
+ * snapped to or floating. The midpoint's insert at the drag's start sends nothing: the drag's end does. The chosen point stays
+ * chosen when it was the one dragged, else it goes (the points may have moved on).
+ */
+function onHandleFinish(host: EditingHost, id: string | number, action: string): void {
+    const draw = host.draw;
+    const handles = host.handles;
+    const delegate = host.props.store.delegate as MapStudioStoreDelegate | undefined;
+    if (!draw || !handles || handles.featureId !== id || (action !== 'dragCoordinate' && action !== 'dragFeature')) {
+        return;
+    }
+    const snap = host.dragSnap;
+    host.dragSnap = null;
+    const feature = draw.getSnapshotFeature(id);
+    const coords = feature ? coordsOf(feature.geometry) : [];
+    let sent = false;
+    let moved = -1;
+    if (delegate && coords.length > 0) {
+        if (handles.shape === 'point') {
+            sent = !samePlace(coords[0], handles.coords[0]) && delegate.moveItem(handles.itemId, coords[0]);
+        } else if (coords.length === handles.coords.length + 1) {
+            sent = delegate.reshapeLine(handles.itemId, coords);
+        } else if (coords.length === handles.coords.length) {
+            moved = coords.findIndex((c, i) => !samePlace(c, handles.coords[i]));
+            const side = moved >= 0 ? endSideOf(coords.length, moved, handles.shape === 'area') : null;
+            sent = moved >= 0 && delegate.moveVertex(handles.itemId, moved, coords[moved], side !== null && snap ? snap.itemId : null);
+        }
+    }
+    // Saved or not, the copy is made again from the record once nothing of it is in flight; a drag that sent nothing at once,
+    // after Terra Draw's drag end has returned.
+    handles.awaiting = true;
+    if (!sent) {
+        setTimeout(() => applyHandles(host), 0);
+    }
+    console.info('[MapStudio] Handle drag on ' + handles.itemId + (sent ? ' saved as one batch' : ' sent nothing') + '.');
+    host.setState((prev) => (prev.geometry && prev.geometry.itemId === handles.itemId && !(prev.geometry.index === moved && moved >= 0)
+        ? { geometry: null } : null));
+}
+
+/**
+ * A click on the map with Select in hand (entry 5), before the selection's own click: while Move waits, the click is the new
+ * place, saved as one batch, and Move goes (a chosen point stays chosen); else a click on a handle of the selected line or area
+ * chooses that point. True when the click was taken.
+ */
+export function onGeometryClick(host: EditingHost, ev: MapMouseEvent): boolean {
+    const map = host.map;
+    if (!map || host.state.studio.tool !== null || !host.studioOn()) {
+        return false;
+    }
+    const pick = host.state.geometry;
+    if (pick && pick.moving) {
+        placeMove(host, pick, [ev.lngLat.lng, ev.lngLat.lat]);
+        return true;
+    }
+    const handles = host.handles;
+    if (!handles || handles.shape === 'point') {
+        return false;
+    }
+    let index = -1;
+    let best = HANDLE_PX;
+    handles.coords.forEach((c, i) => {
+        const p = map.project(c);
+        const d = Math.hypot(p.x - ev.point.x, p.y - ev.point.y);
+        if (d <= best) {
+            best = d;
+            index = i;
+        }
+    });
+    if (index < 0) {
+        return false;
+    }
+    const itemId = handles.itemId;
+    host.setState({ geometry: { itemId, index, moving: false } });
+    console.info('[MapStudio] Point ' + (index + 1) + ' of ' + itemId + ' chosen.');
+    return true;
+}
+
+/**
+ * Move then a click (entry 5): a point item moves there with the snapped ends of its lines; a point of a line or an area moves
+ * there, a line's end landing on and naming the target within reach while Snap is on, else floating. One batch; Move goes.
+ */
+function placeMove(host: EditingHost, pick: GeometryPick, at: [number, number]): void {
+    const delegate = host.props.store.delegate as MapStudioStoreDelegate | undefined;
+    const map = host.map;
+    if (!delegate || !map) {
+        return;
+    }
+    if (pick.index === null) {
+        if (delegate.moveItem(pick.itemId, at)) {
+            host.setState((prev) => (prev.geometry === pick ? { geometry: null } : null));
+        }
+        return;
+    }
+    const handles = host.handles;
+    if (!handles || handles.itemId !== pick.itemId) {
+        return;
+    }
+    let to: [number, number] = at;
+    let snapTo: string | null = null;
+    if (host.state.snap && endSideOf(handles.coords.length, pick.index, handles.shape === 'area') !== null) {
+        const hit = nearestSnap(snapTargetsOf(host).filter((t) => t.itemId !== pick.itemId), at, snapDistanceM(map.getZoom(), at[1]));
+        if (hit) {
+            to = [hit.position[0], hit.position[1]];
+            snapTo = hit.itemId;
+        }
+    }
+    if (delegate.moveVertex(pick.itemId, pick.index, to, snapTo)) {
+        handles.awaiting = true;
+        host.setState((prev) => (prev.geometry === pick ? { geometry: { ...pick, moving: false } } : null));
+    }
+}
+
+/** Esc with Select in hand (entry 5): Move is put down (back to the chosen point, if any), else the chosen point; true when it acted. */
+export function escapeGeometry(host: EditingHost): boolean {
+    const pick = host.state.geometry;
+    if (!pick || host.state.studio.tool !== null) {
+        return false;
+    }
+    host.setState((prev) => (prev.geometry === null ? null
+        : { geometry: prev.geometry.moving && prev.geometry.index !== null ? { ...prev.geometry, moving: false } : null }));
+    return true;
 }
 
 /** Every tool is off while map.load says the store is unreachable: a drawing in progress is cancelled, a placed pin dropped. */
@@ -392,6 +885,8 @@ export function onDrawFinish(host: EditingHost, id: string | number, context: { 
     }
     if (context.mode === DRAW_MODE_POINT) {
         onPointFinish(host, id, context.action);
+    } else if (context.mode === DRAW_MODE_SELECT) {
+        onHandleFinish(host, id, context.action);
     } else if (context.mode === DRAW_MODE_LINE) {
         onLineFinish(host, id, 'line');
     } else if (context.mode === DRAW_MODE_AREA) {

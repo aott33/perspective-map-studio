@@ -10,11 +10,14 @@
  * the component calls the public `send*`, `createPoint`, `createLine`, `renameItem`, `moveItem`, `linkItem`,
  * `setKind`, `undo`, `redo`, `undoTo`, `selectBasemap`, `retryUnsaved`, `discardUnsaved`, `onStorage` and `stopReplay`.
  * From entry 23 `undoTo` runs the history's undo-to-here as single undos, each sent after the last reverse saved.
+ * From entry 5 the geometry changes: `moveItem` carries the snapped ends of the item's lines, and `moveVertex`,
+ * `reshapeLine`, `deleteVertex` and `splitLine` change a line's or an area's shape, each one batch (geometry.ts) and one step.
  */
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
 import { MapChanges, MapChangedBody } from './changes';
 import { EditBatch, EditLevel, MapItemData, MapItemRecord } from './contract';
+import { Position, lineGeometryBatch, pointMoveBatch, splitAtBatch, vertexDeleteBatch, vertexMoveBatch } from './geometry';
 import { HostLists, NO_HOST_LISTS } from './adapters';
 import { MESSAGE_EVENT, Reply, basemapSource, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText } from './messages';
 import {
@@ -25,7 +28,7 @@ import { LIVE_INITIAL, LiveState, ValuesBatchBody, applyBatch, freezeLive } from
 import { CONNECTED, ConnectionState, ConnectionWatch } from './connection';
 import { SegmentRef } from './features';
 import { STORE_UNKNOWN, StoreState, storeStateFromError, storeStateFromLoad, storeStateFromSaveError } from './storeState';
-import { SAVE_IDLE, SaveState, lineCreateBatch, newId, pointCreateBatch, refusedSave, roundCoordinate, updateBatch } from './save';
+import { SAVE_IDLE, SaveState, lineCreateBatch, newId, pointCreateBatch, refusedSave, updateBatch } from './save';
 import { Kind } from './adapters';
 import {
     UNDO_EMPTY, UndoRun, UndoStack, failPending, finishPending, pushStep, runAfterSave, startRedo, startRun, startUndo, stepLabel
@@ -448,19 +451,24 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * `label` makes the saved batch an undo step; null is a reverse, which the stack settles itself.
      */
     private dispatch(batch: EditBatch, itemId: string, label: string | null, now: Date): void {
-        if (this.inFlightByItem.has(itemId)) {
-            const held = this.heldByItem.get(itemId) || [];
+        // Every map item the batch touches (entry 5: a geometry change carries a line's instruments, a moved pad its lines).
+        const ids = [itemId].concat(batch.ops.filter((op) => op.entity === 'item' && op.id !== itemId).map((op) => op.id));
+        const busy = ids.find((id) => this.inFlightByItem.has(id));
+        if (busy !== undefined) {
+            const held = this.heldByItem.get(busy) || [];
             held.push({ batch, label });
-            this.heldByItem.set(itemId, held);
+            this.heldByItem.set(busy, held);
             this.save = { state: 'saving', itemId };
             this.notify();
-            console.info('[MapStudio] Batch ' + batch.batchId + ' waits its turn on ' + itemId + ' (' + held.length + ' waiting).');
+            console.info('[MapStudio] Batch ' + batch.batchId + ' waits its turn on ' + busy + ' (' + held.length + ' waiting).');
             return;
         }
         if (label !== null) {
             this.pendingSteps.set(batch.batchId, { label, before: this.recordsFor(batch) });
         }
-        this.inFlightByItem.set(itemId, batch.batchId);
+        for (const id of ids) {
+            this.inFlightByItem.set(id, batch.batchId);
+        }
         this.save = { state: 'saving', itemId };
         this.saveBatchId = batch.batchId;
         this.sender.enqueueAndSend(batch, now);
@@ -541,16 +549,101 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.sendUpdate(id, { name }, stepLabel('rename', name));
     }
 
-    /** A moved point (the pin's drag end, or typed latitude and longitude): one update of its geometry, "move <name>". */
-    moveItem(id: string, lngLat: [number, number]): void {
+    /**
+     * A moved point (the pin's drag end, its handle's drag, Move then a click, or typed latitude and longitude): one batch with
+     * its geometry and, from entry 5, the first or last vertex of every line whose stored `ends` name it (geometry.ts
+     * pointMoveBatch, the lines' instruments re-placed), "move <name>". The map store keeps 6 decimals (docs/contract.md).
+     */
+    moveItem(id: string, lngLat: [number, number]): boolean {
         const item = this.knownRecord(id);
-        if (!item) {
-            console.info('[MapStudio] The move of ' + id + ' was dropped: the item is not on the map.');
-            return;
+        if (!item || item.geometry.type !== 'Point') {
+            console.info('[MapStudio] The move of ' + id + ' was dropped: the item is not a point on the map.');
+            return false;
         }
-        // The map store keeps 6 decimals (docs/contract.md): the batch carries the pin's or the field's place rounded.
-        const geometry: MapItemData['geometry'] = { type: 'Point', coordinates: [roundCoordinate(lngLat[0]), roundCoordinate(lngLat[1])] };
-        this.sendBatch(updateBatch(id, newId(), item.version, { geometry }), id, stepLabel('move', item.name));
+        const batch = pointMoveBatch(newId(), item, lngLat, this.changes.state.items);
+        // A point alone waits its turn and is rebased (the Point tool's pin dragged while its create is saved); the lines it
+        // carries are built from their stored shapes, which a change still being saved would make stale.
+        if (batch.ops.length > 1 && this.shapeBusy(batch, id)) {
+            return false;
+        }
+        this.sendBatch(batch, id, stepLabel('move', item.name));
+        return true;
+    }
+
+    /**
+     * Whether another map item of a geometry batch (other than `except`) has a batch in flight or waiting its turn (entry 5): the
+     * batch carries whole shapes built from the stored records, so it is not sent until that one is saved (one console line).
+     */
+    private shapeBusy(batch: EditBatch, except: string | null): boolean {
+        const ids = batch.ops.map((op) => op.id).filter((id) => id !== except);
+        const held = Array.from(this.heldByItem.values()).some((list) => list.some((h) => h.batch.ops.some((op) => ids.indexOf(op.id) >= 0)));
+        if (!held && !ids.some((id) => this.inFlightByItem.has(id))) {
+            return false;
+        }
+        console.info('[MapStudio] A shape change waits: an earlier change of the same line is still being saved; nothing was sent.');
+        return true;
+    }
+
+    /** Whether a map item is drawn as an area (its kind's `area`): an unclosed ring with no ends and no split (AD-20). */
+    private isArea(item: MapItemRecord): boolean {
+        const kind = this.lists.kinds.find((k) => k.id === item.kind);
+        return !!(kind && kind.area);
+    }
+
+    /**
+     * A change to a stored line's or area's shape (entry 5): the batch `build` makes from the stored record, sent as one step
+     * named `action` and the line's name; false, with one console line, when the line is not stored or the change cannot be made.
+     */
+    private sendShape(id: string, action: 'reshape' | 'split', build: (line: MapItemRecord, area: boolean) => EditBatch): boolean {
+        const line = this.storedRecord(id);
+        if (!line || line.geometry.type !== 'LineString') {
+            console.info('[MapStudio] The ' + action + ' of ' + id + ' was dropped: the line is not on the map.');
+            return false;
+        }
+        let batch: EditBatch;
+        try {
+            batch = build(line, this.isArea(line));
+        } catch (err) {
+            console.info('[MapStudio] The ' + action + ' of ' + line.name + ' was not sent: ' + (err instanceof Error ? err.message : String(err)));
+            return false;
+        }
+        if (this.shapeBusy(batch, null)) {
+            return false;
+        }
+        this.sendBatch(batch, id, stepLabel(action, line.name));
+        return true;
+    }
+
+    /**
+     * One point of a line or an area moved (its handle dragged, or Move then a click; entry 5): one batch, "reshape <name>". A
+     * line's first or last point names `snapTo`, the item it now snaps to, in `ends`, or floats with null (geometry.ts).
+     */
+    moveVertex(id: string, index: number, to: Position, snapTo: string | null): boolean {
+        return this.sendShape(id, 'reshape', (line, area) => vertexMoveBatch(newId(), line, index, to, snapTo, this.changes.state.items, area));
+    }
+
+    /** A line's or an area's new points (a midpoint dragged in: one more point there; entry 5): one batch, "reshape <name>". */
+    reshapeLine(id: string, coordinates: Position[]): boolean {
+        return this.sendShape(id, 'reshape', (line) => lineGeometryBatch(newId(), line, coordinates, this.changes.state.items));
+    }
+
+    /** The chosen point's Delete point (entry 5): one batch without it, an end point's side of `ends` gone, "reshape <name>". */
+    deleteVertex(id: string, index: number): boolean {
+        return this.sendShape(id, 'reshape', (line, area) => vertexDeleteBatch(newId(), line, index, this.changes.state.items, area));
+    }
+
+    /**
+     * The chosen point's Split here (entry 5): one batch in which the line keeps its start and the new line its end
+     * (geometry.ts splitAtBatch), "split <name>". Returns the new line's id, or null when nothing was sent.
+     */
+    splitLine(id: string, index: number): string | null {
+        const partId = newId();
+        return this.sendShape(id, 'split', (line, area) => {
+            if (area) {
+                throw new Error('an area has no split');
+            }
+            return splitAtBatch(newId(), line, index, partId, this.changes.state.items);
+        }) ? partId : null;
     }
 
     /** The asset picker (entry 2): one update of `assetId` (null to unlink), "link <name>" or "unlink <name>". */

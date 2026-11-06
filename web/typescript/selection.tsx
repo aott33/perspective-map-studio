@@ -101,7 +101,7 @@ export interface SelectionHost {
     liveItem(id: string): MapItemRecord | undefined;
     anchorFor(id: string, lngLat: [number, number]): [number, number];
     /** A selection with the studio model that goes with it (studio.ts), built from the pending state, for a functional setState. */
-    selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio' | 'panel'>;
+    selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio' | 'panel' | 'geometry'>;
     /** Whether the studio's surfaces show (epic 4 entry 2): an open card is then placed again when the stage or its content changes. */
     studioOn(): boolean;
     /** Watches the card's content size, and the size it was last placed at. */

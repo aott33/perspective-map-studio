@@ -10,7 +10,8 @@ import { ChromeGlyph } from './ChromeGlyph';
  * EXPERIENCE.md Properties panel, Place a point, Draw): the header with the kind glyph, the name and the
  * subline, the Details tab, then Name, Kind (a select of the kinds with the item's geometry, so a line or
  * area drawn with a generic tool takes its kind here; the Gateway accepts a kind of the same geometry),
- * Location (latitude and longitude, typed, the non-drag way to place a point) and the asset link (the kind's
+ * Location (latitude and longitude, typed, the non-drag way to place a point; from entry 5 Move beside the label for a
+ * point item that is not an instrument, then a click on the map, the owner's mock 4) and the asset link (the kind's
  * assets, Unlink). Every field saves when it is finished (blur, Enter or a choice) through the component's
  * callbacks, one batch each; a field finished while the item's create is still being saved (the item just
  * added with the cursor already in Name) goes to the delegate like any other, which sends it right after the
@@ -39,6 +40,10 @@ export interface PropertiesPanelProps {
     onClose: () => void;
     onRename: (name: string) => void;
     onMove: (lngLat: [number, number]) => void;
+    /** Entry 5: whether Move beside Location shows (a point item; an instrument moves along its line, entry 9), whether it waits for the click, and Move pressed. */
+    canMoveByClick: boolean;
+    moving: boolean;
+    onMoveStart: () => void;
     onLink: (assetId: string | null) => void;
     onKind: (kindId: string) => void;
 }
@@ -208,7 +213,13 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                         </select>
                     </div>
                     <div className="mapstudio-field mapstudio-field--location">
-                        <span className="mapstudio-field-label">Location</span>
+                        <div className="mapstudio-field-label-row">
+                            <span className="mapstudio-field-label">Location</span>
+                            {point && this.props.canMoveByClick ? (
+                                <button type="button" className="mapstudio-button mapstudio-field-move" aria-pressed={this.props.moving} disabled={paused}
+                                        title="Move: click the new place on the map" onClick={this.props.onMoveStart}>Move</button>
+                            ) : null}
+                        </div>
                         {point ? (
                             <div className="mapstudio-field-pair">
                                 <label className="mapstudio-field-half">

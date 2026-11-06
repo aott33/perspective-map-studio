@@ -10,8 +10,8 @@ import {
     Size2d
 } from '@inductiveautomation/perspective-client';
 import { ErrorEvent, Map as MapLibreMap, MapMouseEvent, Popup, setWorkerUrl } from 'maplibre-gl';
-import { TerraDraw, TerraDrawLineStringMode, TerraDrawPolygonMode } from 'terra-draw';
-import { Drawing } from './drawing';
+import { TerraDraw, TerraDrawLineStringMode, TerraDrawPolygonMode, TerraDrawSelectMode } from 'terra-draw';
+import { Drawing, GeometryPick, inField } from './drawing';
 import { SnapTarget } from './geometry';
 import { EditLevel, MapItemRecord } from './contract';
 import { AdapterStatus, HostLists, NO_HOST_LISTS } from './adapters';
@@ -65,6 +65,7 @@ import { ItemList } from './studio/ItemList';
 import { PropertiesPanel } from './studio/PropertiesPanel';
 import { DrawToolbar } from './studio/DrawToolbar';
 import { DrawingBar } from './studio/DrawingBar';
+import { GeometryBar } from './studio/GeometryBar';
 import { ChromeGlyph } from './studio/ChromeGlyph';
 import { ProblemStatus } from './studio/SaveStatus';
 
@@ -131,6 +132,11 @@ export interface MapStudioState {
     studio: StudioState;
     /** The Layers surface's open tab (entry 22): it stays while Edit mode stays, and every entry to Edit mode opens on Layers. */
     layersTab: LayersTab;
+    /**
+     * The geometry change in hand with Select (entry 5, drawing.ts): a chosen point of the selected line or area, or Move waiting
+     * for a click; kept only for the selected item (selectionState) and dropped when a tool is picked (toolState).
+     */
+    geometry: GeometryPick | null;
 }
 
 export type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
@@ -157,7 +163,7 @@ function clientLocationWords(store: AbstractUIElementStore): string {
 export class MapStudio extends Component<Props, MapStudioState> {
     state: MapStudioState = {
         drawing: null, snap: false, snapHint: '', popup: null, clock: Date.now(), pick: null, selected: null, panel: null,
-        studio: fromProps(this.props.props.editMode), layersTab: 'layers'
+        studio: fromProps(this.props.props.editMode), layersTab: 'layers', geometry: null
     };
 
     mapContainer: HTMLDivElement | null = null;
@@ -171,6 +177,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
     snapCache: { revision: number; targets: SnapTarget[] } | null = null;
     lastSnap: SnapTarget | null = null;
     drawingReason = '';
+    /** Entry 5 (editing.ts): Terra Draw's select mode, the selected item's copy in it, a dragged end's snap, the chosen point drawn. */
+    selectMode: TerraDrawSelectMode | null = null;
+    handles: editing.Handles | null = null;
+    dragSnap: SnapTarget | null = null;
+    chosenDrawn = -1;
     /** The Edit switch top-right (entry 2), added once map.load says the level is full; null otherwise. */
     editSwitch: EditSwitch | null = null;
     /** The MapLibre popup, created once and moved between points; its content is a React portal. */
@@ -343,6 +354,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             map.on('click', this.onMapClick);
             addPointerCursor(map);
             editing.startTerraDraw(this, map, root);
+            // A selection made before the map loaded (a restored place, a list row) takes its handles now (entry 5).
+            editing.applyHandles(this);
             // Readiness for the e2e suite: set once the map has gone idle with
             // its sources and layers added.
             map.once('idle', () => camera.publishReadiness(this, map));
@@ -430,6 +443,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.drawItems();
         this.dropQueuedFeatures();
         editing.applyEditing(this);
+        editing.applyHandles(this);
         camera.applyStartingArea(this);
         camera.applyRestore(this);
         camera.saveSelection(this);
@@ -679,6 +693,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         this.lineMode = null;
         this.areaMode = null;
+        this.selectMode = null;
+        this.handles = null;
         if (this.popupSizeObserver) {
             this.popupSizeObserver.disconnect();
             this.popupSizeObserver = null;
@@ -720,19 +736,23 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * A tool picked up, with the kind a kind button fixed (null for a generic tool), or put down with null, with the studio
      * model (studio.ts); a drawing in progress goes with the tool before it. From `prev` as above.
      */
-    toolState(prev: Readonly<MapStudioState>, tool: StudioTool | null, kindId: string | null): Pick<MapStudioState, 'drawing' | 'snapHint' | 'studio'> {
-        return { drawing: null, snapHint: '', studio: pickTool(prev.studio, tool, kindId) };
+    toolState(prev: Readonly<MapStudioState>, tool: StudioTool | null, kindId: string | null):
+        Pick<MapStudioState, 'drawing' | 'snapHint' | 'studio' | 'geometry'> {
+        // A chosen point and Move are Select's (entry 5): picking a tool, or putting one down, drops them.
+        return { drawing: null, snapHint: '', studio: pickTool(prev.studio, tool, kindId), geometry: null };
     }
 
     /**
      * A selection with the studio model that goes with it: the item's id selected, or nothing (studio.ts); from `prev` as
      * above. The Details panel stays only for the item it is open for; a row click or a placement sets it after this.
      */
-    selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio' | 'panel'> {
+    selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio' | 'panel' | 'geometry'> {
         return {
             selected,
             studio: selected ? select(prev.studio, selected.id) : clearSelection(prev.studio),
-            panel: selected !== null && prev.panel === selected.id ? prev.panel : null
+            panel: selected !== null && prev.panel === selected.id ? prev.panel : null,
+            // A chosen point and Move stay with their item only (entry 5).
+            geometry: selected !== null && prev.geometry !== null && prev.geometry.itemId === selected.id ? prev.geometry : null
         };
     }
 
@@ -754,11 +774,24 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 return;
             }
         }
+        if (ev.key === 'Escape' && !ev.defaultPrevented && !inField(ev.target) && editing.escapeGeometry(this)) {
+            // Esc puts down Move, then the chosen point (entry 5), before it closes a popup or Details.
+            ev.preventDefault();
+            return;
+        }
         selection.onRootKeyDown(this, ev);
     };
 
-    /** A click on the map (selection.tsx): a marker's popup or pick list, a line's popup, or the ground clearing the selection. */
-    private onMapClick = (ev: MapMouseEvent): void => selection.onMapClick(this, ev);
+    /**
+     * A click on the map: with Select in hand, Move's new place or a click on a handle first (entry 5, editing.ts); else the
+     * selection's (selection.tsx): a marker's popup or pick list, a line's popup, or the ground clearing the selection.
+     */
+    private onMapClick = (ev: MapMouseEvent): void => {
+        if (editing.onGeometryClick(this, ev)) {
+            return;
+        }
+        selection.onMapClick(this, ev);
+    };
 
     /** The selection and the popups (selection.tsx), which the camera's restore and choices open as a click does. */
     selectLine(id: string, segment: SegmentRef | null = null): void { selection.selectLine(this, id, segment); }
@@ -873,6 +906,49 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /** The drawing bar (entry 4): Finish as Enter, Cancel as Esc. */
     onFinishDrawing = (): void => editing.finishDrawing(this);
     onCancelDrawing = (): void => editing.cancelDrawing(this);
+
+    /**
+     * Details' Move beside a point item's Location (entry 5): the tool in hand is put down (Move is Select's) and the next click
+     * on the map is the item's new place.
+     */
+    onMoveByClick = (): void => {
+        const selected = this.state.selected;
+        if (!selected || (this.props.delegate && this.props.delegate.editing === 'off')) {
+            return;
+        }
+        if (this.state.studio.tool !== null) {
+            editing.putToolDown(this);
+        }
+        this.setState((prev) => (prev.selected && prev.selected.id === selected.id ? { geometry: { itemId: selected.id, index: null, moving: true } } : null));
+    };
+
+    /** The geometry bar (entry 5): Move for the chosen point, Cancel (as Esc), Split here and Delete point, each one batch. */
+    onGeometryMove = (): void => this.setState((prev) => (prev.geometry ? { geometry: { ...prev.geometry, moving: true } } : null));
+    onGeometryCancel = (): void => {
+        editing.escapeGeometry(this);
+    };
+    onSplitHere = (): void => {
+        const pick = this.state.geometry;
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        if (!pick || pick.index === null || !delegate) {
+            return;
+        }
+        const partId = delegate.splitLine(pick.itemId, pick.index);
+        if (partId === null) {
+            return;
+        }
+        // The new part opens in Details with Name focused, as an added item does (owner, 2026-11-06).
+        this.focusNameId = partId;
+        selection.closePopup(this);
+        this.setState((prev) => ({ ...this.selectionState(prev, { id: partId, kind: 'line', segment: null }), pick: null, panel: partId, geometry: null }));
+    };
+    onDeletePoint = (): void => {
+        const pick = this.state.geometry;
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        if (pick && pick.index !== null && delegate && delegate.deleteVertex(pick.itemId, pick.index)) {
+            this.setState((prev) => (prev.geometry === pick ? { geometry: null } : null));
+        }
+    };
 
     /** The Kind select in Details (entry 4): one update of `kind` to a kind of the item's geometry. */
     onKind = (kindId: string): void => {
@@ -1137,10 +1213,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const assets = delegate.lists.assets || [];
         const linked = item.assetId !== null ? assets.find((a) => a.id === item.assetId) : undefined;
         const geometry = item.geometry.type === 'Point' ? 'point' : 'line';
+        const kind = delegate.lists.kinds.find((k) => k.id === item.kind);
+        const pick = this.state.geometry;
         return (
             <PropertiesPanel key={item.id}
                              item={item}
-                             kind={delegate.lists.kinds.find((k) => k.id === item.kind)}
+                             kind={kind}
                              kinds={delegate.lists.kinds.filter((k) => k.geometry === geometry)}
                              assets={assets.filter((a) => a.kind === item.kind)}
                              assetName={linked ? linked.name : null}
@@ -1151,6 +1229,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              onClose={this.onPanelClose}
                              onRename={this.onRename}
                              onMove={this.onMove}
+                             canMoveByClick={geometry === 'point' && item.attachment === null && !(kind && kind.instrument)}
+                             moving={!!pick && pick.itemId === item.id && pick.moving}
+                             onMoveStart={this.onMoveByClick}
                              onLink={this.onLink}
                              onKind={this.onKind} />
         );
@@ -1180,6 +1261,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
         // The kind the tool in hand adds (entry 4): the kind button's, else the first of the tool's geometry.
         const inHand = studio.tool !== null ? toolKind(kinds, studio.tool, studio.toolKind) : null;
         const drawing = this.state.drawing;
+        // The chosen point or Move (entry 5): its item, for the geometry bar's words.
+        const pick = studioOn && studio.tool === null ? this.state.geometry : null;
+        const picked = pick ? this.itemFor(pick.itemId) : undefined;
+        const pickedKind = picked ? kinds.find((k) => k.id === picked.kind) : undefined;
         return (
             <div {...this.props.emit({ classes: studioOn ? ['mapstudio', 'mapstudio--editing'] : ['mapstudio'] })} onKeyDown={this.onRootKeyDown}>
                 {studioOn ? <Rail surface={studio.surface} onView={this.onRailView} onSurface={this.onRailSurface} /> : null}
@@ -1194,6 +1279,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                          data-tool={studio.tool || ''}
                          data-tool-kind={studio.toolKind || ''}
                          data-snap={this.state.snap ? 'on' : 'off'}
+                         data-chosen-point={pick && pick.index !== null ? String(pick.index) : ''}
+                         data-moving={pick && pick.moving ? (pick.index === null ? 'item' : 'point') : ''}
                          data-load-state={load.state}
                          data-load-message={load.message}
                          data-store-seq={delegate && delegate.seq !== null ? String(delegate.seq) : ''}
@@ -1261,6 +1348,18 @@ export class MapStudio extends Component<Props, MapStudioState> {
                                     onCancel={this.onCancelDrawing}
                                     onFinish={this.onFinishDrawing}
                                     onDone={this.onSelectTool} />
+                    ) : null}
+                    {delegate && pick && picked ? (
+                        // With Select in hand, the chosen point's or Move's bar is the one place that talks (entry 5).
+                        <GeometryBar pick={pick}
+                                     name={picked.name}
+                                     vertexCount={picked.geometry.type === 'LineString' ? picked.geometry.coordinates.length : 1}
+                                     area={!!(pickedKind && pickedKind.area)}
+                                     busy={delegate.editInFlight}
+                                     onMove={this.onGeometryMove}
+                                     onCancel={this.onGeometryCancel}
+                                     onSplit={this.onSplitHere}
+                                     onDelete={this.onDeletePoint} />
                     ) : null}
                     {this.renderStylePanel()}
                     {selection.renderPopup(this)}

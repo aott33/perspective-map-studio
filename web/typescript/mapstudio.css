@@ -2843,6 +2843,24 @@
     min-height: 20px;
 }
 
+/* Location's label with Move beside it for a point item (entry 5, the owner's mock 4): the label left, a small Move right. */
+.mapstudio-field-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.mapstudio-field-move {
+    height: 24px;
+    padding: 0 10px;
+}
+
+.mapstudio-field-move[aria-pressed="true"] {
+    border-color: var(--callToAction);
+    color: var(--callToAction);
+}
+
 .mapstudio-field-pair {
     display: flex;
     gap: 8px;
@@ -3168,8 +3186,10 @@
    talks): the kind glyph, "New pipeline", the progress, the snap target while one is in reach, the finish hint or what
    keeps it from finishing, Cancel and Finish (for the Point tool its hint and Done); above the status line (which in
    Edit mode shows problems only) and the legend row, never in the bottom-right corner. Floating, so the one soft
-   shadow; above the popup layer with the controls. */
-.mapstudio-drawing-bar {
+   shadow; above the popup layer with the controls. Entry 5: the geometry bar (a chosen point, Move) is its sibling in the
+   same place and look, shown only with Select in hand, so the two never show together (the owner's mocks 2 and 3). */
+.mapstudio-drawing-bar,
+.mapstudio-geometry-bar {
     position: absolute;
     left: 50%;
     bottom: 100px;
@@ -3243,8 +3263,37 @@
 
 .mapstudio-drawing-cancel,
 .mapstudio-drawing-finish,
-.mapstudio-drawing-done {
+.mapstudio-drawing-done,
+.mapstudio-geometry-move,
+.mapstudio-geometry-split,
+.mapstudio-geometry-delete,
+.mapstudio-geometry-cancel {
     flex: 0 0 auto;
+}
+
+/* The geometry bar's buttons sit closer than the drawing bar's pair (the owner's mock 2: Move, Split here, Delete point). It
+   takes its content's width up to the bar's maximum: at `left: 50%` a shrink-to-fit width would stop at half the stage. */
+.mapstudio-geometry-bar {
+    gap: 6px;
+    width: max-content;
+}
+
+/* Its words keep their room beside the three buttons: with Details docked the map is narrower than the mock's, so the hint
+   wraps under the title rather than running under the buttons. */
+.mapstudio-geometry-bar .mapstudio-drawing-words {
+    flex: 0 1 auto;
+    min-width: 160px;
+    margin-right: 4px;
+}
+
+.mapstudio-geometry-bar .mapstudio-drawing-hint {
+    white-space: normal;
+}
+
+/* While Move waits for its click (entry 5) the map takes a crosshair over MapLibre's grab and the markers' pointer. */
+.mapstudio-map[data-moving="point"] .maplibregl-canvas,
+.mapstudio-map[data-moving="item"] .maplibregl-canvas {
+    cursor: crosshair !important;
 }
 
 /* The Edit switch top-right above the zoom card: a glyph, the word and a switch track; on, the track takes the attention token. */
@@ -3322,6 +3371,7 @@
     .mapstudio-panel,
     .mapstudio-toolbar-float,
     .mapstudio-drawing-bar,
+    .mapstudio-geometry-bar,
     .mapstudio .mapstudio-edit-switch {
         display: none;
     }
