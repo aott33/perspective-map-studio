@@ -8,6 +8,7 @@
 # Entry 24 (owner, 2026-11-05): the status box retired after 23; entry 11's Recent changes moves to a History item on the rail.
 # Entry 5 split (owner, 2026-11-06): geometry stays 5; Delete with shortcuts on the controls is 25; duplicate and add-another parked (backlog 28); the ? panel dropped.
 # Entry 26 (owner, 2026-11-06, testing on the dev stack): no popup in Edit mode, a click opens Details; after 25, taken out of entry 7.
+# Entry 6 split (owner, 2026-11-06): the form stays 6; the place check is 27, right after it.
 # Cross-epic prerequisites are pinned on the entries that need them ("2.n", "3.n").
 # Entry 21 (owner, 2026-11-05, option B of the layout review after entry 4): Edit mode's top row as DESIGN.md draws it, ahead of 5; entry 7 builds on its list header.
 
@@ -135,11 +136,22 @@ risk = "low"
 [[entry]]
 id = 6
 type = "story"
-title = "The item form: kind fields, required marks, prefill, the place check, duplicate names and unknown kinds"
-description = "The Details tab complete: the kind's form fields typed per the kind list, required fields marked and the missing ones named, each field saved when finished, the last values prefilled per kind except name, location and link; the location row with the place line, typed latitude and longitude as the backup to click then drag (with the hint), swapped or out-of-range values flagged, Zoom to location; the offline place check (country, state or province, city) from Natural Earth admin boundaries and GeoNames cities served by the module as a static asset within 5 MB on the wire and loaded on first use, with the attributions in NOTICE and the legend (owner, 2026-11-03); a name already used on another asset underlined in red with a tooltip; an item whose asset vanished shown unlinked with the reason and one whose kind left the list as Unknown kind, both kept; and the adapter's status in words in the form when the asset list is empty or incomplete (R13 consumed; the Kinds screen's words are entry 12's)."
-verify = "On the dev Gateway: a required field left empty is named and the item still saves what it has; reopening the form for a pad prefills the last operator but not the name; typing 32.7 and -103.1 shows Lea County, New Mexico, US and Zoom to location goes there; -103.1 and 32.7 is flagged as swapped; a second P14 on another asset is underlined with the tooltip; switching the dev adapter to incomplete shows the status words in the form; the place check data is under 5 MB on the wire and its attributions are listed; unit tests of the lookup and e2e pass."
-covers = ["R3", "R12", "R13"]
+title = "The item form: kind fields, required marks, prefill, duplicate names, unknown kinds and the asset list's status"
+description = "The Details tab's form (owner, 2026-11-06: entry 6 split, the place check is entry 27): the kind's form fields typed per the kind list (text, number, integer, boolean, choice), required fields marked and the missing ones named in words while the item still saves what it has (the Gateway does not enforce required), each field saved when finished, the last values prefilled per kind except name, location and link; a name already used on another asset underlined in red with a tooltip; an item whose asset vanished shown unlinked with the reason and one whose kind left the list as Unknown kind, both kept; and the adapter's status in words in the form when the asset list is empty or incomplete (R13 consumed; the Kinds screen's words are entry 12's)."
+verify = "On the dev Gateway: a pad's required Status left empty is named and the item still saves what it has; Operator and Wells save when finished and a typed letter in Wells is refused in words; placing a second pad prefills the last operator but not the name; a second P14 on another asset is underlined with the tooltip; an item whose kind or asset left the lists shows Unknown kind or the vanished asset's reason and keeps its values; switching the dev adapter to empty or incomplete shows the status words in the form; unit tests and e2e pass."
+covers = ["R3", "R12"]
 after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 27
+type = "story"
+title = "The place check: the place line under Location, swapped values flagged, Zoom to location"
+description = "Split from entry 6 (owner, 2026-11-06, \"Split, and A\"). The Location row of Details gains the place line from an offline place check: in the US the county, the state and the country from Natural Earth's US counties and admin-1 boundaries (\"Lea County, New Mexico, US\"), elsewhere the nearest GeoNames town, the state or province and the country (\"Near Grande Prairie, Alberta, CA\"; owner's option A); the data simplified once by a script in the repository from Natural Earth (public domain) and GeoNames (CC BY 4.0, credited in NOTICE) and committed, served by the module as a static file in `/res/mapstudio/` and fetched on first use, within 5 MB on the wire, never in the main bundle; typed latitude and longitude that look swapped (a latitude past 90 or a pair whose swap lands on land where the typed pair does not) or out of range are flagged in words; Zoom to location moves the map to the point. Builds stay offline: the generated data is committed, the script runs by hand."
+verify = "On the dev Gateway: typing 32.7 and -103.1 shows Lea County, New Mexico, US and Zoom to location goes there; -103.1 and 32.7 is flagged as swapped; a point in Alberta shows its nearest town, Alberta and CA; the place data is under 5 MB on the wire, fetched only when Details first shows a location, and its credits are in NOTICE; unit tests of the lookup and e2e pass."
+covers = ["R13"]
+after = [6]
 hitl = false
 risk = "medium"
 
@@ -282,7 +294,7 @@ title = "Refactor sweep"
 description = "Cleanup only, scoped at its start from the plans and review findings entries 2 to 16 deferred: duplication between the studio's surfaces, the mode and selection model's leftovers, test helpers, the contract docs' wording, and the WCAG checks folded into one accessibility pass of every tool and panel by keyboard at 1366 and 1440 px (R14's evidence for entry 18). Scope pushed out of another story is a new entry, never this one."
 verify = "Every e2e and unit test passes; the keyboard-only pass of every tool, the list, the panel, the Kinds screen and the tag browser is recorded in docs/platform-checks.md with the contrast readings in both themes; no behaviour or contract change."
 covers = ["R14"]
-after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 26]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 26, 27]
 hitl = false
 risk = "low"
 

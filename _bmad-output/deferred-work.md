@@ -156,3 +156,6 @@
 - source_plan: `_bmad-output/initiative-flowmap/tickets/epic-editing/tickets/story-in-edit-mode-a-click-selects-and-opens-details-no-popup-plan.md`
   summary: Closing Details (a click on the ground, the panel's close, Esc) lets the stage widen around the map's centre, so every item moves about 160 px left at 1366; after an Edit-mode click docked Details with its item kept in place, the map ends up half a panel's width from where it was before the click.
   evidence: Named by entry 26's implementer (2026-11-06): the plan keeps the item in place as Details docks (its Design Notes) and leaves the ground's close "as today"; `tracer.spec.mjs` at 1440 px draws its line after a click and a close, from the map's middle, so it lands about 170 px east of where it did before entry 26. The same pan by the stage's shift on undocking (`selection.tsx` `keepPlace`) would keep the items put both ways, a candidate for entry 7.
+- source_plan: none
+  summary: The place check (the place line under Location, swapped values flagged, Zoom to location, the offline Natural Earth and GeoNames data) split from epic-editing entry 6.
+  evidence: The owner chose to split entry 6 on 2026-11-06 ("Split, and A"): the place check ships on its own and together they ran past the plan's size; it is planned as epic-editing entry 27, right after entry 6, with option A for the place line.
