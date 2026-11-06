@@ -3,14 +3,14 @@ title: "In Edit mode a click selects and opens Details, no popup"
 type: 'feature'
 ticket: '26'
 created: '2026-11-06'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '1153ef47de8776749793951b0cc2b183c8e798f2'
 route: 'full'
 route_source: 'auto'
 risk: 'low'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
