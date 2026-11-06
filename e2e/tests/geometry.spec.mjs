@@ -162,7 +162,6 @@ test.describe('1366 px', () => {
             await expect(page.locator('.mapstudio-tool--select')).toHaveAttribute('aria-pressed', 'true');
             await expect(page.locator('.mapstudio-geometry-bar')).toHaveCount(0);
             await expect(page.locator('.mapstudio-drawing-bar')).toHaveCount(0);
-            await shot(page, 'mapstudio-geometry-handles-1366.png');
 
             // A click on the bend's handle chooses it: the bar names it and offers Move, Split here and Delete point.
             const bend = await pixelNow(map, BEND);
@@ -196,6 +195,9 @@ test.describe('1366 px', () => {
             await expect(map).toHaveAttribute('data-chosen-point', '');
             await expect(map).toHaveAttribute('data-selected', ids.line);
             await expect(page.locator('.mapstudio-panel')).toBeVisible();
+            await expect(map).toHaveAttribute('data-handle-points', '3');
+            // The handles' render once the map has settled at the view's zoom (the markers' look follows the tiles' zoom).
+            await shot(page, 'mapstudio-geometry-handles-1366.png');
             await page.keyboard.press('Escape');
             await expect(page.locator('.mapstudio-panel')).toHaveCount(0);
             await expect(map).toHaveAttribute('data-handles', '');

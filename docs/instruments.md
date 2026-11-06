@@ -35,10 +35,16 @@ While it is open the Gateway pushes the line and every listed instrument within 
 
 A line kind's custom popup view (the kind setup's `popupView`, entry 8; a missing or failing view falls back to the line popup) gets the line's map item object (entry 8's `{id, name, kind, assetId, properties, basePath, alarmsPath, values}`) with `instruments: [{id, name, kind, distanceM, liveValues}]` in order along the line and the open `segment: {fromId, toId}` (AD-7).
 
+## Reshaping and splitting a line (epic 4 entry 5)
+
+A line's shape changes in Edit mode ([contract.md](contract.md), "Changing geometry"): a point dragged, or moved by Move then a click, a midpoint dragged in, a point deleted, or a point item moved that the line's `ends` name (its first or last point follows). Each is one `edits.apply` batch with the line's new geometry and, for each instrument on it, an update to its nearest place on the new shape: `attachment.distanceM` measured again from the line's first point and the point at that distance (`web/typescript/geometry.ts` `lineGeometryBatch`); the Gateway checks every instrument within 1 m of its place and refuses a line batch that leaves one out. An instrument does not ride on a point: it keeps its nearest place, so a point dragged away near an instrument leaves the instrument where the new line passes nearest **[live 8.3.10]**, **[build]**.
+
+A split at an inner point is one batch too: the line keeps the part from its start to the split point, the new line ("L-SWD 2") the part from there to the end, and each instrument goes to the part it sits on (the nearer; the first part on a tie) at its distance from that part's start (`lineSplitBatch`, `splitAtBatch`). On the dev stack, L-SWD with a point added between PT-1 and PT-2 at about 1.8 km and split there keeps PT-1 at 1.1 km and puts LV-1 at about 0.2 km and PT-2 at about 1.1 km on L-SWD 2 **[live 8.3.10]** (`e2e/tests/geometry.spec.mjs`); the unit tests split the test vectors' L-SWD at its bend the same way **[build]**. The nodes and segments of each part follow from its own `ends` and attachments as above: the split point is a floating end of both. One Undo puts the line back, removes the new part and returns every instrument to the line, in one reverse batch **[live 8.3.10]**.
+
 ## Screenshots
 
 `docs/screenshots/mapstudio-line-popup-1440.png` (the quiet L-SWD at PT-1 to PT-2), `mapstudio-line-popup-stale-1440.png` (PT-1 comms lost: CTB1 to PT-1 and PT-1 to PT-2 dashed) and `mapstudio-line-popup-390.png`, against the mockups `_bmad-output/initiative-flowmap/ux-map-studio/mockups/key-screen-3-line-instruments-live.png` and `-stale.png`.
 
 ## Not here
 
-Editing an instrument (the tool, snapping, moving along the line: epic-editing); the legend (entry 3); the alarm summary in words, the View alarms button, the page link and the phone bottom sheet (entry 8); the hue review (entry 12).
+Editing an instrument (the tool, snapping, moving along the line: epic-editing entry 9; entry 5's handles leave instruments out); the legend (entry 3); the alarm summary in words, the View alarms button, the page link and the phone bottom sheet (entry 8); the hue review (entry 12).
