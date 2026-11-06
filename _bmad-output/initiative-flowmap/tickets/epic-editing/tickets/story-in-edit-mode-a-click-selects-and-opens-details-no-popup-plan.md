@@ -54,12 +54,12 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `web/typescript/selection.tsx` -- in Edit mode a point, line, pick row or restore selects with Details open and opens no popup -- the click goes to Details, not a card.
-- [ ] `web/typescript/MapStudio.tsx` -- entering Edit mode closes an open popup or pick list -- no card stays over the studio.
-- [ ] `web/typescript/editing.ts` -- Esc that puts a tool down is handled there alone -- one press, one step.
-- [ ] Jest -- the Edit-mode branch, the switch closing a popup, the Esc step.
-- [ ] e2e -- the matrix at 1366 px as `mapeditor`; the specs that clicked for a popup in Edit mode moved to View mode or Details.
-- [ ] `docs/contract.md`, `CHANGELOG.md`.
+- [x] `web/typescript/selection.tsx` -- in Edit mode a point, line, pick row or restore selects with Details open and opens no popup -- the click goes to Details, not a card.
+- [x] `web/typescript/MapStudio.tsx` -- entering Edit mode closes an open popup or pick list -- no card stays over the studio.
+- [x] `web/typescript/editing.ts` -- Esc that puts a tool down is handled there alone -- one press, one step.
+- [x] Jest -- the Edit-mode branch, the switch closing a popup, the Esc step.
+- [x] e2e -- the matrix at 1366 px as `mapeditor`; the specs that clicked for a popup in Edit mode moved to View mode or Details.
+- [x] `docs/contract.md`, `CHANGELOG.md`.
 
 **Acceptance Criteria:**
 - Given the dev Gateway as `mapeditor` at 1366 px, when the matrix runs, then each row holds.
@@ -71,6 +71,12 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 - Planner, 2026-11-06: the environment, commit and identity rules are entry 4's plan's (Docker started by hand after a container restart, `ops/up.sh --fresh` before a whole-suite run with nothing else against the stack, the two trailer lines from the session's attribution reminder, `git commit --only` your paths, no em dashes, no model identifier, never a bare `git stash`, never a push). Commit at each working milestone.
 
 ## Plan Change Log
+
+- 2026-11-06 (implementer): the Edit-mode branch is one function, `selection.tsx` `selectWithDetails` (the selection, `pick` cleared, `panel` set as `onRowSelect` does; an open card or pick list closed through `closePopup`, so `popup.close` goes as for a hand close), called first in `openPopup` and `openLinePopup` while `studioOn()`; so a marker, a line, a pick list's row, the camera's restore and a choice all reach it, `onPointClick` and `onPick` still send `point.click`, and no `popup.open` is sent. A line is selected with no segment in Edit mode: the segment and its highlighted instruments are the line popup's.
+- 2026-11-06 (implementer): the camera is not moved on an Edit-mode click: as Details docks the stage narrows and the map keeps its centre (the clicked item moves by half the panel's width, as after a Point tool placement since entry 2); keeping the selection in view is entry 7's (EXPERIENCE.md Responsive, 1366). `MapStudio.setEditMode` closes the popup on entering (the switch and the page's prop); the studio cannot come on another way with a popup open (the level arrives with the items, and a phone width leaves Edit mode and is not re-entered by widening).
+- 2026-11-06 (implementer): no `selection*.test.ts` existed; the new `web/typescript/__tests__/editClick.test.ts` drives the `MapStudio` component itself (its map click, keys, Edit switch and pick row through `selection.tsx`, `editing.ts` and `camera.ts`), with `maplibre-gl`, `terra-draw`, its MapLibre adapter and the Perspective client stubbed; 9 of its 12 tests fail on the baseline sources, the 3 View-mode ones pass on both.
+- 2026-11-06 (implementer): e2e: the matrix is the new `e2e/tests/editclick.spec.mjs` (P14 is Point 2, linked to the dev asset P14; `popup.open`, `popup.close` and `point.click` are read from the frames the page sends on the Perspective session socket). `delete.spec.mjs` line 455 (`noDelete`) clicks with the studio off (390 px, a phone editor, a viewer), so it is unchanged; its hover test's comment on Esc follows the fix and it now checks that Details stays after Cancel. `popup.spec.mjs`'s two editor tests click on the dev View page `/` (the 390 px sheet stays on `/edit`, which keeps View mode there); `studio.spec.mjs`'s two marker clicks (the selection test, the Layers legend test) and `tracer.spec.mjs`'s 1440 px click assert Details with no popup. A render for the docs, `docs/screenshots/mapstudio-editclick-point-1366.png`, under `E2E_DOCS=1`.
+- 2026-11-06 (implementer): verified on the built tree: `tsc` clean, 450 Jest tests green (48 suites), the Gradle clean build green offline, the contract check OK at 0.4.0, no em dashes; `editclick.spec.mjs` 6 passed alone, `popup`, `tracer`, `delete` (18) and `studio` (20) passed alone; then `ops/up.sh --fresh` and the whole e2e suite with nothing else against the stack: 177 passed, 7 skipped, 0 failed in 40.1 min (the review 390 px flake did not show).
 
 ## Review Triage Log
 
