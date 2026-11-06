@@ -121,8 +121,9 @@ export interface MapStudioState {
     selected: Selection | null;
     /**
      * The item whose Details panel is docked beside the map (epic 4 entry 2): opened by the studio's own actions, a
-     * list row or the Point tool's placement, never by a marker click or a restored popup, whose card keeps the map's
-     * room (opening properties from the map and keeping the selection in view is entry 7's); null when none.
+     * list row, the Point tool's placement and, since entry 26, every click that would open a popup in View mode (a
+     * marker, a line, a pick list's row, a restored popup; selection.tsx `selectWithDetails`), since Edit mode opens
+     * no popup; keeping the selection in view as it opens is entry 7's; null when none.
      */
     panel: string | null;
     /**
@@ -158,7 +159,8 @@ function clientLocationWords(store: AbstractUIElementStore): string {
  * project's map items from the map store. Clicking a point item sends
  * `point.click` through the delegate; the reply is kept on the map as `data-last-reply`, shown nowhere (epic 4 entry 24).
  * In Edit mode at level `full` (epic 4 entry 2) the studio's surfaces dock beside the map:
- * the rail, the item list, the properties panel and the floating draw toolbar.
+ * the rail, the item list, the properties panel and the floating draw toolbar; there a click on an item selects it and
+ * opens Details, and no popup opens (entry 26).
  */
 export class MapStudio extends Component<Props, MapStudioState> {
     state: MapStudioState = {
@@ -476,10 +478,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
 
     /**
      * The mode set by the Edit switch, the rail's View (both write the prop back) or the page's prop write (not
-     * written back): leaving puts every tool down and keeps the selection; entering opens Items.
+     * written back): leaving puts every tool down and keeps the selection; entering opens Items and closes an open
+     * popup, line popup, sheet or pick list (entry 26: Edit mode opens none, so no card stays over the studio), the
+     * Gateway told with popup.close as when it is closed by hand (selection.tsx `closePopup`, `onPopupClosed`).
      */
     private setEditMode(on: boolean, writeProp: boolean): void {
-        if (!on) {
+        if (on) {
+            selection.closePopup(this);
+        } else {
             editing.putToolDown(this);
         }
         this.setState((prev) => ({ studio: on ? enterEdit(prev.studio) : leaveEdit(prev.studio), layersTab: on ? 'layers' : prev.layersTab }));
@@ -758,7 +764,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * Keys on the component: Ctrl+Z and Ctrl+Shift+Z (or Ctrl+Y) undo and redo in Edit mode outside a field (a
      * field keeps its own undo); Delete outside a field deletes the selected item, or with a point of the selected line or area
      * chosen that point (entry 25, editing.ts `onDeleteKey`; a field keeps its own Delete); Esc closes the open popup, card,
-     * sheet or pick list and returns the focus (item 14; selection.tsx).
+     * sheet or pick list and returns the focus (item 14; selection.tsx), else Details; an Esc the map container's listener took
+     * to put a tool down comes here handled and does nothing more (entry 26, editing.ts `onKeyDown`).
      */
     private onRootKeyDown = (ev: React.KeyboardEvent<HTMLDivElement>): void => {
         if (ev.key === 'Delete' && !ev.defaultPrevented && !ev.ctrlKey && !ev.metaKey && !ev.altKey && !inField(ev.target)) {
@@ -790,7 +797,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
 
     /**
      * A click on the map: with Select in hand, Move's new place or a click on a handle first (entry 5, editing.ts); else the
-     * selection's (selection.tsx): a marker's popup or pick list, a line's popup, or the ground clearing the selection.
+     * selection's (selection.tsx): a marker's popup or pick list, a line's popup (in Edit mode Details instead, entry 26), or
+     * the ground clearing the selection.
      */
     private onMapClick = (ev: MapMouseEvent): void => {
         if (editing.onGeometryClick(this, ev)) {
@@ -799,7 +807,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         selection.onMapClick(this, ev);
     };
 
-    /** The selection and the popups (selection.tsx), which the camera's restore and choices open as a click does. */
+    /** The selection and the popups (selection.tsx), which the camera's restore and choices open as a click does (in Edit mode Details, entry 26). */
     selectLine(id: string, segment: SegmentRef | null = null): void { selection.selectLine(this, id, segment); }
     openLinePopup(id: string, segment: SegmentRef | null, lngLat: [number, number]): void { selection.openLinePopup(this, id, segment, lngLat); }
     openPopup(point: PopupPoint, lngLat: [number, number]): void { selection.openPopup(this, point, lngLat); }
