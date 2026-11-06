@@ -40,6 +40,22 @@ export interface Problem {
 }
 
 /** The delegate's state the problems are read from. */
+/** A geometry save refused for good and the waiting changes made on top of it, dropped with it (entry 5). */
+export interface ShapeRefusal {
+    revision: number;
+    batchId: string;
+    ids: string[];
+    /** "1 later change to L-SWD was not saved", or ''. */
+    dropped: string;
+}
+
+export const NO_SHAPE_REFUSAL: ShapeRefusal = { revision: 0, batchId: '', ids: [], dropped: '' };
+
+/** The words for the later changes a refused geometry save took with it: "1 later change to L-SWD was not saved". */
+export function droppedText(count: number, name: string): string {
+    return count + (count === 1 ? ' later change to ' : ' later changes to ') + name + (count === 1 ? ' was' : ' were') + ' not saved';
+}
+
 export interface ProblemFacts {
     connection: ConnectionState;
     load: { state: 'loading' | 'loaded' | 'failed'; message: string };
@@ -52,6 +68,8 @@ export interface ProblemFacts {
     /** The queued batches this tab waits on a reply for. */
     sending: string[];
     storageWarning: string;
+    /** The last geometry save refused for good and the later changes it took with it (entry 5); absent before any. */
+    shapeRefused?: ShapeRefusal;
 }
 
 function problem(code: ProblemCode, text: string, glyph: ProblemGlyph, detail: string = text): Problem {
@@ -111,9 +129,21 @@ export function editsWait(unsaved: UnsavedEntry[], sending: string[]): boolean {
  */
 export function editsProblem(facts: ProblemFacts): Problem | null {
     if (editsWait(facts.unsaved, facts.sending)) {
-        return problem('edits', waitingText(facts.unsaved, facts.level), unreachable(facts.unsaved) ? 'cloud' : 'warning');
+        return problem('edits', withDropped(waitingText(facts.unsaved, facts.level), facts), unreachable(facts.unsaved) ? 'cloud' : 'warning');
     }
     return null;
+}
+
+/**
+ * The waiting edits' words with the later changes a refused geometry save took with it (entry 5), while that refused edit
+ * still waits in the queue: "... Nothing in this save was written, and 1 later change to L-SWD was not saved."
+ */
+function withDropped(text: string, facts: ProblemFacts): string {
+    const refused = facts.shapeRefused;
+    if (!refused || refused.dropped === '' || !facts.unsaved.some((e) => e.batchId === refused.batchId)) {
+        return text;
+    }
+    return text.replace(/\.\s*$/, '') + ', and ' + refused.dropped + '.';
 }
 
 function readOnlyProblem(facts: ProblemFacts): Problem | null {

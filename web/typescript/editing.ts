@@ -83,8 +83,10 @@ export interface Handles {
     shown: Array<[number, number]>;
     /** The record's id, version and coordinates as text. */
     key: string;
-    /** A drag was sent: no new drag starts and the copy is made again from the record once the save settles. */
+    /** A change was made on the copy: it is made again from the record once nothing is in flight. */
     awaiting: boolean;
+    /** The delegate's geometry refusal last read: a newer one of this item makes the copy again from the stored shape. */
+    refusalSeen: number;
 }
 
 /** What the tools read and write on the component. */
@@ -419,7 +421,14 @@ export function applyHandles(host: EditingHost): void {
     const busy = !!delegate && delegate.editInFlight;
     let keep = false;
     if (want && have && have.itemId === want.itemId && have.shape === want.shape) {
-        keep = host.handleDrag || (have.awaiting ? busy : have.key === want.key);
+        // A geometry save of this item refused for good: the changes made on it went with it, so the stored shape shows again.
+        const refusal = delegate ? delegate.shapeRefused : null;
+        let refused = false;
+        if (!host.handleDrag && refusal && refusal.revision !== have.refusalSeen) {
+            refused = refusal.ids.indexOf(have.itemId) >= 0;
+            have.refusalSeen = refusal.revision;
+        }
+        keep = host.handleDrag || (!refused && (have.awaiting ? busy : have.key === want.key));
     }
     if (!keep) {
         if (have) {
@@ -451,7 +460,7 @@ function setCopy(host: EditingHost, coords: Array<[number, number]>): void {
     }
 }
 
-function wantedHandles(host: EditingHost): Omit<Handles, 'featureId' | 'awaiting' | 'shown'> | null {
+function wantedHandles(host: EditingHost): Omit<Handles, 'featureId' | 'awaiting' | 'shown' | 'refusalSeen'> | null {
     const delegate = host.props.delegate;
     const selected = host.state.selected;
     if (!delegate || delegate.editing === 'off' || !selected || host.state.studio.tool !== null || !host.studioOn()) {
@@ -473,7 +482,7 @@ function wantedHandles(host: EditingHost): Omit<Handles, 'featureId' | 'awaiting
     return { itemId: item.id, shape: kind && kind.area ? 'area' : 'line', coords, key };
 }
 
-function addHandles(host: EditingHost, want: Omit<Handles, 'featureId' | 'awaiting' | 'shown'>): void {
+function addHandles(host: EditingHost, want: Omit<Handles, 'featureId' | 'awaiting' | 'shown' | 'refusalSeen'>): void {
     const draw = host.draw;
     if (!draw) {
         return;
@@ -493,7 +502,8 @@ function addHandles(host: EditingHost, want: Omit<Handles, 'featureId' | 'awaiti
         return;
     }
     draw.selectFeature(featureId);
-    host.handles = { ...want, featureId, shown: want.coords, awaiting: false };
+    const delegate = host.props.delegate;
+    host.handles = { ...want, featureId, shown: want.coords, awaiting: false, refusalSeen: delegate ? delegate.shapeRefused.revision : 0 };
 }
 
 /** The copy leaves Terra Draw; Terra Draw idles again unless another copy follows (`keepSelect`). */

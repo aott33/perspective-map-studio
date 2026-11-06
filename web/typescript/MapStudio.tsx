@@ -1063,7 +1063,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             save: delegate.save,
             unsaved: delegate.unsaved,
             sending: delegate.sending,
-            storageWarning: delegate.storageWarning
+            storageWarning: delegate.storageWarning,
+            shapeRefused: delegate.shapeRefused
         };
     }
 

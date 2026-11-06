@@ -39,6 +39,7 @@ import {
 } from './unsaved';
 import { UnsavedSender } from './unsavedSender';
 import { registerTestHook, takeTestReply } from './testHook';
+import { NO_SHAPE_REFUSAL, ShapeRefusal, droppedText } from './problems';
 
 /** The basemap the map draws (epic 3 entry 6, basemaps.ts): what the setup offers, the choice, its source. */
 export interface BasemapState {
@@ -115,6 +116,11 @@ export interface MapStudioDelegateState {
      * past the cursor.
      */
     editInFlight: boolean;
+    /**
+     * The last geometry save refused for good (entry 5): its batch, the items it touched, a revision bumped on each (the handles
+     * of those items are made again from the stored shape), and in words the later changes it took with it ('' for none).
+     */
+    shapeRefused: ShapeRefusal;
 }
 
 /** `localStorage`, or null when the browser refuses it (a private window, blocked site data). */
@@ -207,7 +213,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * records, so each waits as a builder while a save of any item it touches is in flight or waiting, and is built again from
      * the records once those saves settle (`releaseShapes`): saved in order, never dropped and never built on a stale record.
      */
-    private heldShapes: Array<{ itemId: string; label: string; build: () => EditBatch | null }> = [];
+    private heldShapes: Array<{ itemId: string; label: string; build: () => EditBatch | null; ids: string[] }> = [];
+    /** The geometry batches sent and not yet saved, with the items they touch and the item's name: a refusal drops what waits on them. */
+    private shapesSent = new Map<string, { ids: string[]; name: string }>();
+    private shapeRefused: ShapeRefusal = NO_SHAPE_REFUSAL;
 
     constructor(componentStore: AbstractUIElementStore) {
         super(componentStore);
@@ -285,7 +294,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             liveRevision: this.liveRevision,
             connection: this.connection,
             undo: this.undoStack,
-            editInFlight: this.editInFlight()
+            editInFlight: this.editInFlight(),
+            shapeRefused: this.shapeRefused
         };
     }
 
@@ -584,17 +594,16 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * geometry change waits; else it waits as a builder (one console line) and goes when those saves settle (`releaseShapes`).
      */
     private sendShapeChange(itemId: string, label: string, build: () => EditBatch | null): void {
-        if (this.heldShapes.length === 0) {
-            const batch = build();
-            if (batch === null) {
-                return;
-            }
-            if (!this.touchesBusy(batch)) {
-                this.sendBatch(batch, itemId, label);
-                return;
-            }
+        const batch = build();
+        if (batch === null) {
+            return;
         }
-        this.heldShapes.push({ itemId, label, build });
+        if (this.heldShapes.length === 0 && !this.touchesBusy(batch)) {
+            this.sendShapeBatch(batch, itemId, label);
+            return;
+        }
+        // The items it touches as built now: a refusal of a save of any of them drops it (it was made on top of that save).
+        this.heldShapes.push({ itemId, label, build, ids: [itemId].concat(batch.ops.map((op) => op.id)) });
         console.info('[MapStudio] ' + label + ' waits its turn: a save of an item it changes is still in flight.');
         this.notify();
     }
@@ -620,8 +629,40 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             }
             this.heldShapes.shift();
             if (batch !== null) {
-                this.sendBatch(batch, next.itemId, next.label);
+                this.sendShapeBatch(batch, next.itemId, next.label);
             }
+        }
+    }
+
+    /** A geometry change's batch sent, remembered with the items it touches until it saves or is refused. */
+    private sendShapeBatch(batch: EditBatch, itemId: string, label: string): void {
+        const record = this.knownRecord(itemId);
+        this.shapesSent.set(batch.batchId, { ids: batch.ops.map((op) => op.id), name: record ? record.name : itemId });
+        this.sendBatch(batch, itemId, label);
+    }
+
+    /**
+     * A geometry save refused for good (entry 5): the changes waiting that touch its items were made on top of it (a midpoint
+     * dragged in carries the shape the handles showed), so they go with it, said with the refusal on the save status row ("and 1
+     * later change to L-SWD was not saved"); the handles of those items are made again from the stored shape. Changes to other
+     * items keep waiting and save.
+     */
+    private dropOnRefusal(batchId: string): void {
+        const sent = this.shapesSent.get(batchId);
+        if (!sent) {
+            return;
+        }
+        this.shapesSent.delete(batchId);
+        const dropped = this.heldShapes.filter((h) => h.ids.some((id) => sent.ids.indexOf(id) >= 0));
+        this.heldShapes = this.heldShapes.filter((h) => dropped.indexOf(h) < 0);
+        this.shapeRefused = {
+            revision: this.shapeRefused.revision + 1,
+            batchId,
+            ids: sent.ids,
+            dropped: dropped.length > 0 ? droppedText(dropped.length, sent.name) : ''
+        };
+        if (dropped.length > 0) {
+            console.info('[MapStudio] ' + droppedText(dropped.length, sent.name) + ': made on top of a change that was refused.');
         }
     }
 
@@ -851,6 +892,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * undo-to-here run with it, entry 23: the refusal stops it, its reason on the save status row), its item's turn moves on.
      */
     private giveUp(batchId: string): void {
+        this.dropOnRefusal(batchId);
         this.pendingSteps.delete(batchId);
         this.stopRun(batchId, 'was refused or discarded');
         this.undoStack = failPending(this.undoStack, batchId);
@@ -1044,6 +1086,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
                     }
                 }
             }
+            this.shapesSent.delete(reply.body.batchId);
             this.settleUndo(reply.body.batchId, reply.body.results, outcome.entry ? outcome.entry.batch : null);
             if (shown && this.save.state !== 'idle') {
                 const itemId = this.save.itemId;

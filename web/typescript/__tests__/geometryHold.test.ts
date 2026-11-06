@@ -28,6 +28,7 @@ import { Kind } from '../adapters';
 import { EditBatch, MapItemRecord } from '../contract';
 import { MESSAGE_EVENT, MessageTypes } from '../messages';
 import { MapStudioStoreDelegate } from '../MapStudioStoreDelegate';
+import { droppedText, editProblems } from '../problems';
 import { undoLabel } from '../undoStack';
 
 const PAD: Kind = { id: 'pad', name: 'Well pad', geometry: 'point', icon: 'well-pad', labelRank: 10, fields: [] };
@@ -149,20 +150,49 @@ describe('a geometry change waits for the saves it touches and is built from the
         expect(delegate.mapStateToProps().editInFlight).toBe(false);
     });
 
-    test('a refusal of the save it waits on lets it go, built on the record as it stayed; nothing is dropped', () => {
-        const { pad, line } = padAndLine();
-        expect(delegate.moveVertex(line, 1, [-105.0, 39.72], null)).toBe(true);
-        const refused = last();
-        const before = sent().length;
-        expect(delegate.moveItem(pad, [-105.0125, 39.7265])).toBe(true);
-        expect(sent()).toHaveLength(before);
-        refuse(refused, 'conflict', 'L-SWD was changed by mapoperator at 14:02 UTC since you loaded it. Nothing in this save was written.');
-        expect(sent()).toHaveLength(before + 1);
-        const move = last().body;
-        expect(move.ops.map((op) => [op.id, op.baseVersion])).toEqual([[pad, 1], [line, 1]]);
-        expect((move.ops[1].data!.geometry as { coordinates: Array<[number, number]> }).coordinates).toEqual([[-105.0125, 39.7265], BEND, SWD]);
-        // The newer change's Saving... is on the save status, not the older refusal.
-        expect(delegate.mapStateToProps().save).toEqual({ state: 'saving', itemId: pad });
+    test('a refused reshape drops the later changes made on top of it, says so with the refusal, makes the handles again; another item\'s change saves',
+        () => {
+            const { pad, line } = padAndLine();
+            const other = delegate.createPoint([-104.98, 39.71], PAD);
+            save(last());
+            expect(delegate.moveVertex(line, 1, [-105.0, 39.72], null)).toBe(true);
+            const refused = last();
+            const before = sent().length;
+            // Made while the first is in flight, on the shape the handles show: a midpoint dragged in, the pad its start snaps to.
+            expect(delegate.reshapeLine(line, [CTB, [-105.0, 39.72], [-104.99, 39.718], SWD])).toBe(true);
+            expect(delegate.moveItem(pad, [-105.0125, 39.7265])).toBe(true);
+            expect(delegate.moveItem(other, [-104.981, 39.711])).toBe(true);
+            expect(sent()).toHaveLength(before);
+            const revision = delegate.mapStateToProps().shapeRefused.revision;
+
+            refuse(refused, 'conflict', 'Gathering line was changed by mapoperator at 14:02 UTC since you loaded it. Nothing in this save was written.');
+            // The two changes on the line went with it; the other pad's move saves.
+            expect(sent()).toHaveLength(before + 1);
+            expect(last().body.ops.map((op) => op.id)).toEqual([other]);
+            const state = delegate.mapStateToProps();
+            expect(state.shapeRefused).toMatchObject({ revision: revision + 1, batchId: refused.body.batchId, dropped: '2 later changes to Gathering line were not saved' });
+            expect(state.shapeRefused.ids).toEqual(expect.arrayContaining([line]));
+            // The save status row says it with the refusal, while the refused edit waits in the queue.
+            const facts = { connection: state.connection, load: state.load, store: state.store, level: 'full' as const, save: state.save,
+                unsaved: state.unsaved, sending: state.sending, storageWarning: state.storageWarning, shapeRefused: state.shapeRefused };
+            const edits = editProblems(facts).find((p) => p.code === 'edits');
+            expect(edits && edits.text).toMatch(/Nothing in this save was written, and 2 later changes to Gathering line were not saved\.$/);
+            // Nothing of the line's changes was written; the line keeps its stored shape.
+            save(last());
+            expect(record(line).geometry.coordinates).toEqual([CTB, BEND, SWD]);
+            expect(record(line).version).toBe(1);
+            expect(delegate.mapStateToProps().editInFlight).toBe(false);
+            expect(sent()).toHaveLength(before + 1);
+            // Once the refused edit is discarded the row says nothing of it.
+            delegate.discardUnsaved(refused.body.batchId);
+            const after = delegate.mapStateToProps();
+            expect(editProblems({ ...facts, unsaved: after.unsaved, sending: after.sending, shapeRefused: after.shapeRefused })
+                .some((p) => p.code === 'edits')).toBe(false);
+        });
+
+    test('the words for one change and for several', () => {
+        expect(droppedText(1, 'L-SWD')).toBe('1 later change to L-SWD was not saved');
+        expect(droppedText(3, 'L-SWD')).toBe('3 later changes to L-SWD were not saved');
     });
 
     test('a change that cannot be built when its turn comes (its point gone) is the only one let go', () => {
