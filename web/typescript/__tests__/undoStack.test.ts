@@ -50,6 +50,9 @@ describe('the stack and its labels', () => {
         expect(stepLabel('add', 'Well pad')).toBe('add Well pad');
         expect(stepLabel('move', 'P31')).toBe('move P31');
         expect(stepLabel('unlink', 'P31')).toBe('unlink P31');
+        // Entry 5: a line's shape changed, and a split.
+        expect(stepLabel('reshape', 'L-SWD')).toBe('reshape L-SWD');
+        expect(stepLabel('split', 'L-SWD')).toBe('split L-SWD');
     });
 });
 

@@ -5,8 +5,9 @@ import { join } from 'path';
 
 import { MapItemRecord } from '../contract';
 import {
-    Position, SNAP_PX, endsFrom, instrumentsOn, lengthM, lineDeleteBatch, lineGeometryBatch, lineMoveBatch, lineSplitBatch, nearestSnap, pointAt,
-    project, round1, round6, snapDistanceM, snapTargets
+    Position, SNAP_PX, canDeleteVertex, canSplitAt, endSideOf, endsFrom, endsWith, instrumentsOn, lengthM, lineDeleteBatch, lineGeometryBatch,
+    lineMoveBatch, lineSplitBatch, linesSnappedTo, minVertexCount, nearestSnap, pointAt, pointMoveBatch, project, round1, round6, snapDistanceM,
+    snapTargets, splitAtBatch, splitName, vertexDeleteBatch, vertexMoveBatch
 } from '../geometry';
 
 interface Vectors {
@@ -240,5 +241,120 @@ describe('snapping (epic 4 entry 4, AD-19)', () => {
         expect(endsFrom(c1, null)).toEqual({ start: { itemId: 'c1' } });
         expect(endsFrom(null, s1)).toEqual({ end: { itemId: 's1' } });
         expect(endsFrom(null, null)).toBeNull();
+    });
+});
+
+describe('changing geometry (epic 4 entry 5): one batch per change, ends stored and never inferred', () => {
+    const CTB = '66666666-6666-4666-8666-666666666666';
+    const SWDP = '77777777-7777-4777-8777-777777777777';
+    const PART = '88888888-8888-4888-8888-888888888888';
+    const OTHER = '99999999-9999-4999-8999-999999999999';
+    const ENDS = { start: { itemId: CTB }, end: { itemId: SWDP } };
+    const SNAPPED = { ...LINE, ends: ENDS, assetId: 'LSWD', properties: { diameter: 6 }, overrides: { styleRule: { source: { instruments: 'worst' } } } };
+    const PAD = record(CTB, 'pad', 'CTB1', { type: 'Point', coordinates: SWD[0] }, 3);
+    const PAD_END = record(SWDP, 'pad', 'SWD1', { type: 'Point', coordinates: SWD[2] }, 2);
+    const WITH_ENDS = [ITEMS[0], SNAPPED, ITEMS[2], ITEMS[3], PAD, PAD_END];
+    const lineOp = (batch: { ops: Array<{ id: string; data?: Record<string, unknown> }> }) => batch.ops.find((o) => o.id === LINE_ID)!;
+
+    test('endsWith names one side or leaves it out, and is null with no side left', () => {
+        expect(endsWith(ENDS, 'start', 'x')).toEqual({ start: { itemId: 'x' }, end: { itemId: SWDP } });
+        expect(endsWith(ENDS, 'start', null)).toEqual({ end: { itemId: SWDP } });
+        expect(endsWith({ end: { itemId: SWDP } }, 'end', null)).toBeNull();
+        expect(endsWith(null, 'end', 'x')).toEqual({ end: { itemId: 'x' } });
+        expect(endsWith(null, 'start', null)).toBeNull();
+    });
+
+    test('the floors and the sides: two points for a line, three for an area; a split at an inner point of a line only', () => {
+        expect(minVertexCount(false)).toBe(2);
+        expect(minVertexCount(true)).toBe(3);
+        expect(canDeleteVertex(3, false)).toBe(true);
+        expect(canDeleteVertex(2, false)).toBe(false);
+        expect(canDeleteVertex(3, true)).toBe(false);
+        expect(canDeleteVertex(4, true)).toBe(true);
+        expect([0, 1, 2].map((i) => canSplitAt(3, i, false))).toEqual([false, true, false]);
+        expect(canSplitAt(4, 1, true)).toBe(false);
+        expect([0, 1, 2].map((i) => endSideOf(3, i, false))).toEqual(['start', null, 'end']);
+        expect(endSideOf(3, 0, true)).toBeNull();
+    });
+
+    test('an inner vertex moved: one batch with the new shape and the instruments re-placed, ends untouched', () => {
+        const to: Position = [-103.505, 31.9223];
+        const batch = vertexMoveBatch('m1', SNAPPED, 1, to, null, WITH_ENDS, false);
+        expect(batch.ops.map((o) => o.id)).toEqual([LINE_ID, PT1, PT2]);
+        expect(lineOp(batch).data).toEqual({ geometry: { type: 'LineString', coordinates: [SWD[0], to, SWD[2]] } });
+        batch.ops.slice(1).forEach((o) => expectOnLine(o.data as Record<string, unknown>, [SWD[0], to, SWD[2]]));
+    });
+
+    test('an end vertex moved names the item it snaps to, or floats and its side of ends goes; an area has no ends', () => {
+        const near: Position = [-103.5201, 31.9201];
+        const snapped = vertexMoveBatch('m2', SNAPPED, 2, SWD[2], OTHER, WITH_ENDS, false);
+        expect(lineOp(snapped).data!.ends).toEqual({ start: { itemId: CTB }, end: { itemId: OTHER } });
+        const floating = vertexMoveBatch('m3', SNAPPED, 0, near, null, WITH_ENDS, false);
+        expect(lineOp(floating).data!.ends).toEqual({ end: { itemId: SWDP } });
+        expect((lineOp(floating).data!.geometry as { coordinates: Position[] }).coordinates[0]).toEqual(near);
+        // Snapped again to the item it names: no ends in the op.
+        expect(lineOp(vertexMoveBatch('m4', SNAPPED, 0, SWD[0], CTB, WITH_ENDS, false)).data).not.toHaveProperty('ends');
+        expect(lineOp(vertexMoveBatch('m5', LINE, 0, near, null, ITEMS, true)).data).not.toHaveProperty('ends');
+        expect(() => vertexMoveBatch('m6', SNAPPED, 3, near, null, WITH_ENDS, false)).toThrow('has no vertex 3');
+    });
+
+    test('a vertex deleted: one batch without it, an end point\'s side of ends goes, never below the floor', () => {
+        const inner = vertexDeleteBatch('d1', SNAPPED, 1, WITH_ENDS, false);
+        expect(lineOp(inner).data).toEqual({ geometry: { type: 'LineString', coordinates: [SWD[0], SWD[2]] } });
+        expect(inner.ops.map((o) => o.id)).toEqual([LINE_ID, PT1, PT2]);
+        inner.ops.slice(1).forEach((o) => expectOnLine(o.data as Record<string, unknown>, [SWD[0], SWD[2]]));
+        const start = vertexDeleteBatch('d2', SNAPPED, 0, WITH_ENDS, false);
+        expect(lineOp(start).data!.ends).toEqual({ end: { itemId: SWDP } });
+        expect((lineOp(start).data!.geometry as { coordinates: Position[] }).coordinates).toEqual([SWD[1], SWD[2]]);
+        const two = { ...SNAPPED, geometry: { type: 'LineString' as const, coordinates: [SWD[0], SWD[2]] } };
+        expect(() => vertexDeleteBatch('d3', two, 0, [two], false)).toThrow('keeps at least 2 vertices');
+        expect(() => vertexDeleteBatch('d4', LINE, 1, ITEMS, true)).toThrow('keeps at least 3 vertices');
+    });
+
+    test('a split at the point between PT-1 and PT-2: the line keeps its name, link and start, the new part the kind, properties and end', () => {
+        expect(splitName('L-SWD')).toBe('L-SWD 2');
+        const batch = splitAtBatch('s1', SNAPPED, 1, PART, WITH_ENDS);
+        expect(batch.ops.map((o) => [o.op, o.id])).toEqual([['update', LINE_ID], ['create', PART], ['update', PT1], ['update', PT2]]);
+        expect(batch.ops[0].data).toEqual({ geometry: { type: 'LineString', coordinates: SWD.slice(0, 2) }, ends: { start: { itemId: CTB } } });
+        expect(batch.ops[1]).toEqual({ op: 'create', entity: 'item', id: PART, baseVersion: 0, data: {
+            kind: 'line', name: 'L-SWD 2', properties: { diameter: 6 }, assetId: null, ends: { end: { itemId: SWDP } },
+            geometry: { type: 'LineString', coordinates: SWD.slice(1) } } });
+        const pt1 = batch.ops[2].data!.attachment!;
+        const pt2 = batch.ops[3].data!.attachment!;
+        expect(pt1.lineId).toBe(LINE_ID);
+        expect(Math.abs(pt1.distanceM - 1143)).toBeLessThan(0.2);
+        expect(pt2.lineId).toBe(PART);
+        expect(Math.abs(pt2.distanceM - (2841 - lengthM(SWD.slice(0, 2))))).toBeLessThan(0.2);
+        // A line with floating ends: the line keeps none, the new part has none.
+        const loose = splitAtBatch('s2', LINE, 1, PART, ITEMS);
+        expect(loose.ops[0].data).not.toHaveProperty('ends');
+        expect(loose.ops[1].data).not.toHaveProperty('ends');
+        expect(() => splitAtBatch('s3', SNAPPED, 0, PART, WITH_ENDS)).toThrow('splits only at an inner vertex');
+        expect(() => splitAtBatch('s4', SNAPPED, 2, PART, WITH_ENDS)).toThrow('splits only at an inner vertex');
+    });
+
+    test('the lines whose stored ends name an item, with the sides that do; deleted lines and points are not', () => {
+        const loop = { ...LINE, id: OTHER, name: 'Loop', ends: { start: { itemId: CTB }, end: { itemId: CTB } } };
+        const gone = { ...SNAPPED, id: PART, deleted: true };
+        expect(linesSnappedTo([PAD, SNAPPED, loop, gone], CTB).map((s) => [s.line.name, s.sides])).toEqual([['L-SWD', ['start']], ['Loop', ['start', 'end']]]);
+        expect(linesSnappedTo([PAD, SNAPPED], SWDP).map((s) => s.sides)).toEqual([['end']]);
+        expect(linesSnappedTo([PAD, LINE], CTB)).toEqual([]);
+    });
+
+    test('a pad moved carries the snapped ends of its lines in the same batch, each line\'s instruments re-placed', () => {
+        const to: Position = [-103.5212345678, 31.9187654321];
+        const batch = pointMoveBatch('p1', PAD, to, WITH_ENDS);
+        expect(batch.ops.map((o) => [o.id, o.baseVersion])).toEqual([[CTB, 3], [LINE_ID, 4], [PT1, 2], [PT2, 2]]);
+        expect(batch.ops[0].data).toEqual({ geometry: { type: 'Point', coordinates: [-103.521235, 31.918765] } });
+        const moved = (lineOp(batch).data!.geometry as { coordinates: Position[] }).coordinates;
+        expect(moved).toEqual([[-103.521235, 31.918765], SWD[1], SWD[2]]);
+        expect(lineOp(batch).data).not.toHaveProperty('ends');
+        batch.ops.slice(2).forEach((o) => expectOnLine(o.data as Record<string, unknown>, moved));
+        // Both ends of one line on the pad: both move; a pad no line names moves alone.
+        const loop = { ...LINE, ends: { start: { itemId: CTB }, end: { itemId: CTB } } };
+        const both = pointMoveBatch('p2', PAD, to, [PAD, loop]);
+        expect((both.ops[1].data!.geometry as { coordinates: Position[] }).coordinates).toEqual([[-103.521235, 31.918765], SWD[1], [-103.521235, 31.918765]]);
+        expect(pointMoveBatch('p3', PAD_END, to, [PAD_END, LINE]).ops.map((o) => o.id)).toEqual([SWDP]);
+        expect(() => pointMoveBatch('p4', LINE, to, ITEMS)).toThrow('is not a point');
     });
 });

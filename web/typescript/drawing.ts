@@ -10,7 +10,7 @@
  */
 
 import { Kind } from './adapters';
-import { Position, SnapTarget, endsFrom, lengthM } from './geometry';
+import { Position, SnapTarget, canDeleteVertex, canSplitAt, endsFrom, lengthM, minVertexCount } from './geometry';
 import { MapItemRecord } from './contract';
 import { distanceText } from './linePopup';
 import { StudioTool } from './studio';
@@ -177,6 +177,55 @@ export function drawingEnds(drawing: Drawing): MapItemRecord['ends'] {
         return null;
     }
     return endsFrom(startSnap(drawing), endSnap(drawing));
+}
+
+/**
+ * The geometry change in hand with Select (epic 4 entry 5; EXPERIENCE.md Change geometry, the owner's four mocks of
+ * 2026-11-06): a point of the selected line or area chosen (its handle clicked), or Move pressed, for that point or from
+ * Details for a point item, waiting for a click on the map. The bar bottom-centre says it; with nothing chosen nothing does.
+ */
+export interface GeometryPick {
+    itemId: string;
+    /** The chosen vertex of a line or an area, or null for a point item's Move. */
+    index: number | null;
+    /** Move pressed: the next click on the map is the new place; Esc or Cancel puts it down and nothing is sent. */
+    moving: boolean;
+}
+
+/** The chosen point's hint (the owner's mock): the drag and its non-drag way. */
+export const CHOSEN_HINT = 'Drag it to move it, or use Move';
+
+/** Move's hint (the owner's mock): where to click, and the way out. */
+export const MOVE_HINT = 'Click the new place on the map - Esc to cancel';
+
+/** The bar's title: "Point 2 of 3 on L-SWD" for a chosen point, "Moving point 2 of L-SWD" once Move is pressed, "Moving CTB1" for a point item. */
+export function geometryTitle(pick: GeometryPick, name: string, vertexCount: number): string {
+    if (pick.index === null) {
+        return 'Moving ' + name;
+    }
+    const point = pick.index + 1;
+    return pick.moving ? 'Moving point ' + point + ' of ' + name : 'Point ' + point + ' of ' + vertexCount + ' on ' + name;
+}
+
+/** The bar's hint: Move's while it waits for the click, else the chosen point's. */
+export function geometryHint(pick: GeometryPick): string {
+    return pick.moving ? MOVE_HINT : CHOSEN_HINT;
+}
+
+/** Why Split here is off for the chosen point, '' when it is on: an area has none, a line splits at an inner point only. */
+export function splitOffText(vertexCount: number, index: number, area: boolean): string {
+    if (area) {
+        return 'An area has no split';
+    }
+    return canSplitAt(vertexCount, index, false) ? '' : 'A line splits at an inner point, not an end';
+}
+
+/** Why Delete point is off, '' when it is on: never below two points for a line or three for an area. */
+export function deleteOffText(vertexCount: number, area: boolean): string {
+    if (canDeleteVertex(vertexCount, area)) {
+        return '';
+    }
+    return (area ? 'An area keeps at least ' : 'A line keeps at least ') + (minVertexCount(area) === 3 ? 'three' : 'two') + ' points';
 }
 
 /**

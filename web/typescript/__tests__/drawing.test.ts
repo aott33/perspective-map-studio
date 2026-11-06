@@ -1,7 +1,8 @@
 import { Kind } from '../adapters';
 import {
-    Drawing, PLACE_HINT, REASON_SELF_INTERSECTS, barTitle, canFinish, drawingEnds, drawnLengthM, endSnap, finishHint, inField, isDrawingTool,
-    minVertices, newItemText, noKindText, problemText, progressText, reasonText, snapIndicatorText, snapTitle, startDrawing, startSnap, withVertices
+    CHOSEN_HINT, Drawing, MOVE_HINT, PLACE_HINT, REASON_SELF_INTERSECTS, barTitle, canFinish, deleteOffText, drawingEnds, drawnLengthM, endSnap,
+    finishHint, geometryHint, geometryTitle, inField, isDrawingTool, minVertices, newItemText, noKindText, problemText, progressText, reasonText,
+    snapIndicatorText, snapTitle, splitOffText, startDrawing, startSnap, withVertices
 } from '../drawing';
 import { SnapTarget } from '../geometry';
 
@@ -131,5 +132,30 @@ describe('a key typed in a field stays the field\'s (inField)', () => {
         expect(inField(null)).toBe(false);
         // A target with no tag name (the window, the document) is not a field either.
         expect(inField({} as EventTarget)).toBe(false);
+    });
+});
+
+describe('the chosen point\'s bar and Move\'s bar (epic 4 entry 5, the owner\'s four mocks)', () => {
+    test('the title names the point, the count and the line; Move names the point or the item', () => {
+        expect(geometryTitle({ itemId: 'l', index: 1, moving: false }, 'L-SWD', 3)).toBe('Point 2 of 3 on L-SWD');
+        expect(geometryTitle({ itemId: 'l', index: 1, moving: true }, 'L-SWD', 3)).toBe('Moving point 2 of L-SWD');
+        expect(geometryTitle({ itemId: 'p', index: null, moving: true }, 'CTB1', 1)).toBe('Moving CTB1');
+    });
+
+    test('the hints: the drag and Move while a point is chosen, where to click and Esc while Move waits', () => {
+        expect(CHOSEN_HINT).toBe('Drag it to move it, or use Move');
+        expect(MOVE_HINT).toBe('Click the new place on the map - Esc to cancel');
+        expect(geometryHint({ itemId: 'l', index: 0, moving: false })).toBe(CHOSEN_HINT);
+        expect(geometryHint({ itemId: 'l', index: 0, moving: true })).toBe(MOVE_HINT);
+    });
+
+    test('Split here is off on an end point and on an area; Delete point at the floor, each saying why', () => {
+        expect([0, 1, 2].map((i) => splitOffText(3, i, false))).toEqual(['A line splits at an inner point, not an end', '',
+            'A line splits at an inner point, not an end']);
+        expect(splitOffText(4, 1, true)).toBe('An area has no split');
+        expect(deleteOffText(3, false)).toBe('');
+        expect(deleteOffText(2, false)).toBe('A line keeps at least two points');
+        expect(deleteOffText(3, true)).toBe('An area keeps at least three points');
+        expect(deleteOffText(4, true)).toBe('');
     });
 });

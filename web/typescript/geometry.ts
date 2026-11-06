@@ -1,7 +1,8 @@
 /**
  * The shared geometry module (AD-19, epic 2 story 14): distances along a line and the one
  * batch that keeps a line's instruments on it when the line moves, changes shape, is split
- * or is deleted. Turf 7.4.0 (`length`, `along`, `nearestPointOnLine`, units metres, earth
+ * or is deleted; from epic 4 entry 5 the batches of changing geometry (a vertex moved, inserted,
+ * deleted, a split at a point, a point item moved with the snapped ends of its lines). Turf 7.4.0 (`length`, `along`, `nearestPointOnLine`, units metres, earth
  * radius 6371008.8 m); the Gateway checks the result with the same formulas
  * (common/.../contract/LineMeasure.java, shared test vectors). Pure, unit tested in node;
  * the drawing and editing tools of epic-editing call it, nothing draws here.
@@ -171,6 +172,178 @@ export function lineSplitBatch(batchId: string, line: MapItemRecord, partA: Posi
         const onA = project(a, from);
         const onB = project(b, from);
         ops.push(onB.offM < onA.offM ? placeOp(instrument, newLine.id, b, from) : placeOp(instrument, line.id, a, from));
+    }
+    return { batchId, ops };
+}
+
+/**
+ * Changing geometry (epic 4 entry 5; EXPERIENCE.md Change geometry, AD-19, AD-20): the batches the handles, Move then a
+ * click and the chosen point's bar send, each one `edits.apply` batch and one undo step. A line keeps its instruments at
+ * their nearest place on the new shape (lineGeometryBatch) and a split puts each on the part it sits on (lineSplitBatch).
+ * `ends` stay stored, never inferred: a line's end vertex moved names the item it now snaps to or, floating, leaves that
+ * side out; a point item moved carries the first or last vertex of every line whose `ends` name it. An area is an
+ * unclosed ring (AD-20), so it has no ends and no split.
+ */
+
+/** Which end of a line a side of `ends` is. */
+export type EndSide = 'start' | 'end';
+
+/** `ends` with one side naming `itemId`, or with that side left out for null (a floating end); null when no side is left. */
+export function endsWith(ends: MapItemRecord['ends'], side: EndSide, itemId: string | null): MapItemRecord['ends'] {
+    const next: { start?: { itemId: string }; end?: { itemId: string } } = {};
+    if (ends && ends.start && side !== 'start') {
+        next.start = { itemId: ends.start.itemId };
+    }
+    if (ends && ends.end && side !== 'end') {
+        next.end = { itemId: ends.end.itemId };
+    }
+    if (itemId !== null) {
+        next[side] = { itemId };
+    }
+    return next.start || next.end ? next : null;
+}
+
+function sameEnds(a: MapItemRecord['ends'], b: MapItemRecord['ends']): boolean {
+    const start = (e: MapItemRecord['ends']) => (e && e.start ? e.start.itemId : null);
+    const end = (e: MapItemRecord['ends']) => (e && e.end ? e.end.itemId : null);
+    return start(a) === start(b) && end(a) === end(b);
+}
+
+/** The line op of a line batch (its first op) with `ends` added when they changed. */
+function withEnds(batch: EditBatch, line: MapItemRecord, ends: MapItemRecord['ends']): EditBatch {
+    if (sameEnds(line.ends, ends)) {
+        return batch;
+    }
+    const [first, ...rest] = batch.ops;
+    return { batchId: batch.batchId, ops: [{ ...first, data: { ...first.data, ends } }, ...rest] };
+}
+
+/** The fewest vertices a line keeps (two) and an area's ring (three). */
+export function minVertexCount(area: boolean): number {
+    return area ? 3 : 2;
+}
+
+/** Whether a vertex may be deleted: never below two for a line or three for an area. */
+export function canDeleteVertex(vertexCount: number, area: boolean): boolean {
+    return vertexCount > minVertexCount(area);
+}
+
+/** Whether a line may be split at a vertex: an inner vertex of a line; never an end, never an area. */
+export function canSplitAt(vertexCount: number, index: number, area: boolean): boolean {
+    return !area && index > 0 && index < vertexCount - 1;
+}
+
+/** The side of `ends` a vertex is: the first vertex of a line is its start, the last its end; an inner vertex or an area's none. */
+export function endSideOf(vertexCount: number, index: number, area: boolean): EndSide | null {
+    if (area) {
+        return null;
+    }
+    return index === 0 ? 'start' : index === vertexCount - 1 ? 'end' : null;
+}
+
+/**
+ * One vertex of a line or an area moved to `to` (its handle dragged, or Move then a click): one batch with the new shape and
+ * the line's instruments at their nearest place on it. A line's first or last vertex names the item it now snaps to
+ * (`snapTo`, from the Snap toggle's target) in `ends`, or with null floats and its side of `ends` goes.
+ */
+export function vertexMoveBatch(batchId: string, line: MapItemRecord, index: number, to: Position, snapTo: string | null,
+    items: MapItemRecord[], area: boolean): EditBatch {
+    const coords = lineCoords(line).map(([x, y]) => [x, y] as Position);
+    if (index < 0 || index >= coords.length) {
+        throw new Error(`Map item ${line.id} has no vertex ${index}.`);
+    }
+    coords[index] = [to[0], to[1]];
+    const batch = lineGeometryBatch(batchId, line, coords, items);
+    const side = endSideOf(coords.length, index, area);
+    return side === null ? batch : withEnds(batch, line, endsWith(line.ends, side, snapTo));
+}
+
+/**
+ * One vertex of a line or an area removed (the chosen point's Delete point): one batch with the shape without it and the
+ * instruments re-placed; never below two vertices for a line or three for an area. A line's first or last vertex removed
+ * leaves the next one as the end, which floats: that side of `ends` goes.
+ */
+export function vertexDeleteBatch(batchId: string, line: MapItemRecord, index: number, items: MapItemRecord[], area: boolean): EditBatch {
+    const coords = lineCoords(line);
+    if (index < 0 || index >= coords.length) {
+        throw new Error(`Map item ${line.id} has no vertex ${index}.`);
+    }
+    if (!canDeleteVertex(coords.length, area)) {
+        throw new Error(`Map item ${line.id} keeps at least ${minVertexCount(area)} vertices.`);
+    }
+    const batch = lineGeometryBatch(batchId, line, coords.filter((_c, i) => i !== index), items);
+    const side = endSideOf(coords.length, index, area);
+    return side === null ? batch : withEnds(batch, line, endsWith(line.ends, side, null));
+}
+
+/** The new part's name on a split (owner, 2026-11-06): the line's name and " 2". */
+export function splitName(name: string): string {
+    return name + ' 2';
+}
+
+/**
+ * A line split at an inner vertex (the chosen point's Split here; owner, 2026-11-06): one batch in which the line keeps its
+ * name, asset link, start and the vertices up to the split point, and the new line `newId` takes the vertices from the split
+ * point on with the line's kind, properties and end, the name "<name> 2" and no asset link. The two new ends at the split
+ * point float. Each instrument goes to the part it sits on, measured from that part's start (lineSplitBatch, AD-19).
+ */
+export function splitAtBatch(batchId: string, line: MapItemRecord, index: number, newId: string, items: MapItemRecord[]): EditBatch {
+    const coords = lineCoords(line);
+    if (!canSplitAt(coords.length, index, false)) {
+        throw new Error(`Map item ${line.id} splits only at an inner vertex, not ${index}.`);
+    }
+    const newEnds = line.ends && line.ends.end ? { end: { itemId: line.ends.end.itemId } } : null;
+    const data: MapItemData = {
+        kind: line.kind,
+        name: splitName(line.name),
+        properties: { ...line.properties },
+        assetId: null,
+        ...(newEnds ? { ends: newEnds } : {})
+    };
+    const batch = lineSplitBatch(batchId, line, coords.slice(0, index + 1), coords.slice(index), { id: newId, data }, items);
+    return withEnds(batch, line, endsWith(line.ends, 'end', null));
+}
+
+/** The live lines whose stored `ends` name a map item, with the sides that do, in item order. */
+export function linesSnappedTo(items: MapItemRecord[], itemId: string): Array<{ line: MapItemRecord; sides: EndSide[] }> {
+    const out: Array<{ line: MapItemRecord; sides: EndSide[] }> = [];
+    for (const item of items) {
+        if (item.deleted || item.geometry.type !== 'LineString' || !item.ends || item.id === itemId) {
+            continue;
+        }
+        const sides: EndSide[] = [];
+        if (item.ends.start && item.ends.start.itemId === itemId) {
+            sides.push('start');
+        }
+        if (item.ends.end && item.ends.end.itemId === itemId) {
+            sides.push('end');
+        }
+        if (sides.length > 0) {
+            out.push({ line: item, sides });
+        }
+    }
+    return out;
+}
+
+/**
+ * A point map item moved to `to` (its drag, Move then a click, or typed latitude and longitude): one batch with its new
+ * place and, for every live line whose stored `ends` name it, the line's first or last vertex (or both) moved there too with
+ * the line's instruments at their nearest place on its new shape (AD-19: the ends stay stored and still name the item).
+ */
+export function pointMoveBatch(batchId: string, item: MapItemRecord, to: Position, items: MapItemRecord[]): EditBatch {
+    pointOf(item);
+    const at: Position = [round6(to[0]), round6(to[1])];
+    const ops: EditOp[] = [{
+        op: 'update', entity: 'item', id: item.id, baseVersion: item.version,
+        data: { geometry: { type: 'Point', coordinates: at } }
+    }];
+    for (const { line, sides } of linesSnappedTo(items, item.id)) {
+        const coords = lineCoords(line).map(([x, y]) => [x, y] as Position);
+        for (const side of sides) {
+            coords[side === 'start' ? 0 : coords.length - 1] = at;
+        }
+        // At most one op per id in a batch (docs/contract.md): an id already moved here keeps its first op.
+        ops.push(...lineGeometryBatch(batchId, line, coords, items).ops.filter((op) => !ops.some((o) => o.id === op.id)));
     }
     return { batchId, ops };
 }

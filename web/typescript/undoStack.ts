@@ -180,8 +180,11 @@ export function failPending(stack: UndoStack, batchId: string): UndoStack {
     return { ...stack, pending: null };
 }
 
-/** The words of a step: what was done to which item ("add Well pad", "move P31", "rename P31", "link P31", "edit P31" for a kind change). */
-export function stepLabel(action: 'add' | 'move' | 'rename' | 'link' | 'unlink' | 'edit', name: string): string {
+/**
+ * The words of a step: what was done to which item ("add Well pad", "move P31", "rename P31", "link P31", "edit P31" for a kind
+ * change; from entry 5 "reshape L-SWD" for a line's or an area's point moved, added or deleted, and "split L-SWD").
+ */
+export function stepLabel(action: 'add' | 'move' | 'rename' | 'link' | 'unlink' | 'edit' | 'reshape' | 'split', name: string): string {
     return action + ' ' + name;
 }
 
