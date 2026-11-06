@@ -8,9 +8,7 @@
  * popup.open and popup.close the Gateway is told, the selection attributes the e2e suite reads, and
  * (epic 4 entry 2, contract 0.4.0) the page's window on the selection: `selectedItem` written to the
  * component's props and `onItemSelected` fired with the AD-7 map item object on every selection
- * change, in `publishSelection`, which every selection path reaches. In Edit mode (epic 4 entry 26, the owner's choice A;
- * EXPERIENCE.md Select) no popup, line popup or sheet opens: every way into one (a marker, a line, a pick list's row, the
- * restore of a remembered place, a choice) selects the item and opens Details instead (`selectWithDetails`).
+ * change, in `publishSelection`, which every selection path reaches.
  * DOM-bound (the popup's element is measured, the sheet is focused); every function takes the
  * component as its host (SelectionHost names the fields and callbacks it reads), and the component
  * keeps the state: `popup`, `pick` and `selected` are its React state, written here through its
@@ -104,10 +102,7 @@ export interface SelectionHost {
     anchorFor(id: string, lngLat: [number, number]): [number, number];
     /** A selection with the studio model that goes with it (studio.ts), built from the pending state, for a functional setState. */
     selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio' | 'panel' | 'geometry'>;
-    /**
-     * Whether the studio's surfaces show (epic 4 entry 2): Edit mode at level `full`, 768 px and wider. A click then selects and opens
-     * Details, with no popup (entry 26).
-     */
+    /** Whether the studio's surfaces show (epic 4 entry 2): an open card is then placed again when the stage or its content changes. */
     studioOn(): boolean;
     /** Watches the card's content size, and the size it was last placed at. */
     popupSizeObserver: ResizeObserver | null;
@@ -124,14 +119,12 @@ export interface SelectionHost {
 /**
  * Esc anywhere in the component closes the open popup, card, sheet or pick list (owner review notes
  * item 14) and returns the focus to the map, or to the search field or the Needs you bar that opened
- * it; with none open it closes Details. The controls that handle Esc themselves (the search list, the
- * Needs you list, the legend) stop the event before it gets here, and the draw tool's own Esc runs on the
- * map container and marks the event handled once it has put the tool down (editing.ts `onKeyDown`, epic 4
- * entry 26), so the same press closes nothing here: one press, one step, and a second Esc closes Details.
+ * it. The controls that handle Esc themselves (the search list, the Needs you list, the legend) stop
+ * the event before it gets here, and the draw tool's own Esc runs on the map container.
  */
 export function onRootKeyDown(host: SelectionHost, ev: React.KeyboardEvent<HTMLDivElement>): void {
     if (ev.key !== 'Escape' || ev.defaultPrevented || host.state.studio.tool !== null) {
-        // A tool in hand takes Esc on the map container (editing.ts), which marks it handled; a field's own Esc stops before here.
+        // A tool in hand takes Esc on the map container (editing.ts); a field's own Esc stops before here.
         return;
     }
     if (host.state.popup === null && host.state.pick === null) {
@@ -157,10 +150,6 @@ export function onRootKeyDown(host: SelectionHost, ev: React.KeyboardEvent<HTMLD
     }
 }
 
-/**
- * A marker clicked: its popup opens (in Edit mode its Details instead, entry 26, through `openPopup`) and the point
- * click round trip goes to the Gateway either way.
- */
 export function onPointClick(host: SelectionHost, ev: MapLayerMouseEvent): void {
     if (host.state.studio.tool !== null) {
         // The click belongs to the tool in hand (the Point, Line or Area tool).
@@ -191,10 +180,8 @@ export function onPointClick(host: SelectionHost, ev: MapLayerMouseEvent): void 
 
 /**
  * A click on the map: a marker opens its popup (a shared marker its pick list) and selects the
- * item; a line selects it (its casing and flow arrow) and opens its popup; the ground clears the
- * selection and closes the popup (the template's docs/map.md section 5 item 9). In Edit mode a
- * marker or a line opens Details instead of a popup (entry 26), a shared marker still its pick
- * list, and the ground closes Details as it clears the selection. MapLibre's own closeOnClick
+ * item; a line selects it (its casing and flow arrow); the ground clears the selection and
+ * closes the popup (the template's docs/map.md section 5 item 9). MapLibre's own closeOnClick
  * is not used: it runs after the layer click handler and would close the popup that a click on
  * another point has just moved.
  */
@@ -263,32 +250,12 @@ export function selectLine(host: SelectionHost, id: string, segment: SegmentRef 
 }
 
 /**
- * In Edit mode (the studio on: level `full`, 768 px and wider; epic 4 entry 26, the owner's choice A, EXPERIENCE.md Select) a
- * click selects the item and opens Details, as a list row does (`MapStudio.onRowSelect`), and no popup, line popup or sheet
- * opens: one still open (a pick list whose row was chosen) closes, the Gateway told with popup.close as when it is closed by
- * hand, and no popup.open is sent. Nothing covers the item, so a point drags at once and a line or an area shows its handles
- * (entry 5, editing.ts). The camera is not moved to the item: when Details docks the stage narrows, as for a list row, and
- * keeping the selection in view as it does is entry 7's. A line is selected with no segment, the segment being its popup's.
- */
-export function selectWithDetails(host: SelectionHost, selected: Selection): void {
-    host.openedBy = null;
-    closePopup(host);
-    const id = selected.id;
-    host.setState((prev) => ({ ...host.selectionState(prev, selected), pick: null, panel: id }));
-    console.info('[MapStudio] ' + (selected.kind === 'line' ? 'Line ' : 'Point ') + id + ' selected in Edit mode, Details open.');
-}
-
-/**
  * A line clicked (entry 2, AD-7): its default popup at the clicked segment, the line selected with
  * that segment (the instruments at its ends highlighted), the Gateway told with popup.open
  * {itemId, segment}. A line whose kind shows nothing and that carries no instrument is only
- * selected, as before. In Edit mode the line is selected with Details open and no popup (entry 26).
+ * selected, as before.
  */
 export function openLinePopup(host: SelectionHost, id: string, segment: SegmentRef | null, lngLat: [number, number]): void {
-    if (host.studioOn()) {
-        selectWithDetails(host, { id, kind: 'line', segment: null });
-        return;
-    }
     const delegate = host.props.delegate;
     const item = host.liveItem(id);
     if (!host.map || !delegate || !item || item.geometry.type !== 'LineString') {
@@ -409,7 +376,7 @@ export function openPick(host: SelectionHost, memberIds: string, lngLat: [number
     host.setState((prev) => ({ popup: null, pick: { rows, lngLat }, ...host.selectionState(prev, null) }), () => showPopupAt(host, lngLat));
 }
 
-/** A row of the pick list: what a click on that item's own marker does (in Edit mode its Details, entry 26). */
+/** A row of the pick list: what a click on that item's own marker does. */
 export function onPick(host: SelectionHost, id: string): void {
     const item = host.liveItem(id);
     if (!item || item.geometry.type !== 'Point') {
@@ -427,16 +394,10 @@ export function onPick(host: SelectionHost, id: string): void {
 /**
  * Open (or move) the MapLibre popup at a point. The popup's DOM node is
  * filled by React through a portal in render(), so the embedded project
- * view stays in this component's React tree. Every way into a point's popup
- * comes here (a marker, a pick list's row, the camera's restore and choices),
- * so in Edit mode this is where the item opens in Details instead (entry 26).
+ * view stays in this component's React tree.
  */
 export function openPopup(host: SelectionHost, point: PopupPoint, lngLat: [number, number]): void {
     if (!host.map) {
-        return;
-    }
-    if (host.studioOn()) {
-        selectWithDetails(host, { id: point.id, kind: 'point' });
         return;
     }
     if (!hasPopupContent(host, point)) {

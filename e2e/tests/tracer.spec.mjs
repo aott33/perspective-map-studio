@@ -1,6 +1,5 @@
 // The tracer view at 1440 and 390 px: the seeded map items (epic 2 story 11), the round
-// trip, the click's Details at 1440 px in Edit mode (epic 4 entry 26) or its popup sheet at
-// 390 px, and a drawn line; one screenshot per width for the docs (AD-15).
+// trip, the popup view and a drawn line; one screenshot per width for the docs (AD-15).
 // On the dev editing page /edit as the map editor (epic 3 entry 14, epic 4 entry 4): the
 // toolbar's Line tool is Edit mode's at level full and 768 px and wider, so the line is drawn
 // with it at 1440 px and goes through the test hook at 390 px, where no tool shows.
@@ -40,7 +39,7 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
     test.describe(`${width} px`, () => {
         test.use({ viewport: { width, height }, deviceScaleFactor: 1 });
 
-        editorTest('map, round trip, Details or the popup sheet, and a drawn line', async ({ page }) => {
+        editorTest('map, round trip, popup view and a drawn line', async ({ page }) => {
             const map = await openMap(page, '/edit');
             await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
             // Read back from MapLibre's own item sources by the component, not from its input: at least
@@ -68,28 +67,15 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             await expect(page.locator('.mapstudio-reply')).toHaveCount(0);
             await expect(page.locator('.mapstudio-chip')).toHaveCount(0);
 
-            if (width >= 768) {
-                // In Edit mode the click selects p1 and opens Details, with no popup (epic 4 entry 26; editclick.spec.mjs).
-                const panel = page.locator('.mapstudio-panel');
-                await expect(panel).toHaveAttribute('data-item-id', p1);
-                await expect(panel.locator('.mapstudio-panel-name')).toHaveText('Point 1');
-                await expect(map).toHaveAttribute('data-popup-mode', '');
-                await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
-                // Closed before drawing, so the map has the room the draw offsets were read for again.
-                await panel.locator('.mapstudio-panel-close').click();
-                await expect(panel).toHaveCount(0);
-                await expect.poll(async () => Math.round((await map.boundingBox()).width), { timeout: 10_000 }).toBe(Math.round(box.width));
-            } else {
-                // At 390 px, which keeps View mode, the click also opens the default popup from the pad kind setup as a bottom
-                // sheet (epic 3 entry 8 retired the spike's popupView prop).
-                const popup = page.locator('.mapstudio-sheet .mapstudio-popup--default');
-                await expect(popup).toBeVisible({ timeout: 30_000 });
-                await expect(popup).toHaveAttribute('data-point-id', p1);
-                await expect(popup.locator('.mapstudio-popup-name')).toHaveText('Point 1');
-                // Closed before drawing: the sheet covers the middle of the map, where the vertices go.
-                await popup.locator('.mapstudio-popup-close').click();
-                await expect(page.locator('.mapstudio-popup--default')).toHaveCount(0);
-            }
+            // The click also opens the default popup from the pad kind setup (a card at 1440 px, a
+            // bottom sheet at 390 px; epic 3 entry 8 retired the spike's popupView prop).
+            const popup = page.locator((width === 1440 ? '.maplibregl-popup' : '.mapstudio-sheet') + ' .mapstudio-popup--default');
+            await expect(popup).toBeVisible({ timeout: 30_000 });
+            await expect(popup).toHaveAttribute('data-point-id', p1);
+            await expect(popup.locator('.mapstudio-popup-name')).toHaveText('Point 1');
+            // Closed before drawing: at 390 px the sheet covers the middle of the map, where the vertices go.
+            await popup.locator('.mapstudio-popup-close').click();
+            await expect(page.locator('.mapstudio-popup--default')).toHaveCount(0);
 
             const before = Number(await map.getAttribute('data-items-loaded'));
             if (width >= 768) {

@@ -3,7 +3,7 @@ title: "In Edit mode a click selects and opens Details, no popup"
 type: 'feature'
 ticket: '26'
 created: '2026-11-06'
-status: 'in-review'
+status: 'in-progress'
 baseline_revision: '1153ef47de8776749793951b0cc2b183c8e798f2'
 route: 'full'
 route_source: 'auto'
@@ -11,7 +11,7 @@ risk: 'low'
 review: 'quick'
 review_source: 'pinned'
 lenses_ran: ['quick']
-review_loop_iteration: 0
+review_loop_iteration: 1
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
 
@@ -45,21 +45,22 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 ## Code Map
 
 - `web/typescript/selection.tsx` -- `onPointClick` (153), `onMapClick` (188), `openLinePopup` (254), `onPick` (380), `openPopup` (399): the one place every popup opens through (the camera's restore and choices call `host.openPopup`, `camera.ts` 201, 358); the Edit-mode branch belongs here, through `host.studioOn()`, setting `panel` as `MapStudio.onRowSelect` does (`MapStudio.tsx` 860). `onRootKeyDown` (125): Esc closes the popup, else Details; it returns early on `ev.defaultPrevented` or a tool in hand.
-- `web/typescript/MapStudio.tsx` -- `setEditMode` (481): entering Edit mode closes the popup here (`selection.closePopup`, which sends `popup.close` through `onPopupClosed`); `onRootKeyDown` (763); `selectionState` (747) keeps `panel` only for the same id.
+- `web/typescript/selection.tsx` `onMapClick` -- it queries only `LAYER_ITEM_MARKERS` and the line layers, so an area's click falls to `clearSelection`; in Edit mode it also queries the area layers (`mapLayers.ts` 34-36: `LAYER_AREA_FILL`, `LAYER_AREA_LINE`, `LAYER_AREA_LINE_DASHED`; areas are `features.ts` `buildFeatures`' `areas` collection) after the markers and the lines, and an area is selected with Details as a list row selects one (`Selection` kind `'line'` for a non-point, `features.ts` 82; `MapStudio.onRowSelect`); View mode's area click stays as it is.
+- `web/typescript/MapStudio.tsx` -- `setEditMode` (481): entering Edit mode closes the popup here, keeping the selection: `selection.closePopup` removes the MapLibre popup, whose close event runs `onPopupClosed` (`selection.tsx` 634-650), which clears the selection and so publishes `selectedItem: null` to the page; the switch must close the card with `popup.close` sent and the selected item kept selected (no Details opened for it). `onRootKeyDown` (763); `selectionState` (747) keeps `panel` only for the same id. The panel docks left of `.mapstudio-stage` (1293-1296): at 1366 px the stage narrows from about 1038 to 718 px when Details opens and MapLibre keeps the centre, so every item moves about 160 px right (Design Notes).
 - `web/typescript/editing.ts` -- `onKeyDown` (1206), a capture listener on the map container: its Esc puts the tool down outside React's batching, so the root's Esc then finds no tool and closes Details; `ev.preventDefault()` there when it puts a tool down lets the root skip it.
 - Handles: entry 5's geometry module shows them for the selected line or area in Edit mode (`editing.ts`, `geometry` state); reuse, do not change.
 - Tests: Jest beside `__tests__/selection*.test.ts` and `__tests__/shortcuts.test.ts`; e2e `studio.spec.mjs` (416, a card placed beside the docked studio), `tracer.spec.mjs` (72), `delete.spec.mjs` (455) and any other spec that clicks for a popup in Edit mode; new cases in `studio.spec.mjs` or a new `editclick.spec.mjs` restoring the seed after itself.
-- Docs: `docs/contract.md` (the studio's behaviour paragraphs), `CHANGELOG.md` 0.4.0; `_bmad-output/deferred-work.md`'s Esc entry is marked resolved by this entry.
+- Docs: `docs/contract.md` (the studio's behaviour paragraphs, and "The map's place for the browser session", around line 198, whose restore opens a card "as a click opens it": in Edit mode Details instead), `docs/instruments.md` line 26 (a line click opens its popup: in View mode), `CHANGELOG.md` 0.4.0; `_bmad-output/deferred-work.md`'s Esc entry is marked resolved by this entry. Words that claim a behaviour (an area's click, the camera) match the code and its tests.
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `web/typescript/selection.tsx` -- in Edit mode a point, line, pick row or restore selects with Details open and opens no popup -- the click goes to Details, not a card.
-- [x] `web/typescript/MapStudio.tsx` -- entering Edit mode closes an open popup or pick list -- no card stays over the studio.
-- [x] `web/typescript/editing.ts` -- Esc that puts a tool down is handled there alone -- one press, one step.
-- [x] Jest -- the Edit-mode branch, the switch closing a popup, the Esc step.
-- [x] e2e -- the matrix at 1366 px as `mapeditor`; the specs that clicked for a popup in Edit mode moved to View mode or Details.
-- [x] `docs/contract.md`, `CHANGELOG.md`.
+- [ ] `web/typescript/selection.tsx` -- in Edit mode a point, line, area, pick row or restore selects with Details open and opens no popup, and the clicked item keeps its place on the page as Details docks (Design Notes) -- the click goes to Details, not a card, and the item stays under the pointer.
+- [ ] `web/typescript/MapStudio.tsx` -- entering Edit mode closes an open popup or pick list and keeps the selection -- no card stays over the studio, and the page sees no change of selection.
+- [ ] `web/typescript/editing.ts` -- Esc that puts a tool down is handled there alone -- one press, one step.
+- [ ] Jest -- the Edit-mode branch (an area too), the switch closing a popup with the selection kept, the item's place kept as Details docks, the Esc step.
+- [ ] e2e -- the matrix at 1366 px as `mapeditor`, the drag pressing where it clicked without reading the item's position again, an area clicked, the switch keeping P14 selected; the specs that clicked for a popup in Edit mode moved to View mode or Details.
+- [ ] `docs/contract.md`, `docs/instruments.md`, `CHANGELOG.md`.
 
 **Acceptance Criteria:**
 - Given the dev Gateway as `mapeditor` at 1366 px, when the matrix runs, then each row holds.
@@ -78,7 +79,22 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 - 2026-11-06 (implementer): e2e: the matrix is the new `e2e/tests/editclick.spec.mjs` (P14 is Point 2, linked to the dev asset P14; `popup.open`, `popup.close` and `point.click` are read from the frames the page sends on the Perspective session socket). `delete.spec.mjs` line 455 (`noDelete`) clicks with the studio off (390 px, a phone editor, a viewer), so it is unchanged; its hover test's comment on Esc follows the fix and it now checks that Details stays after Cancel. `popup.spec.mjs`'s two editor tests click on the dev View page `/` (the 390 px sheet stays on `/edit`, which keeps View mode there); `studio.spec.mjs`'s two marker clicks (the selection test, the Layers legend test) and `tracer.spec.mjs`'s 1440 px click assert Details with no popup. A render for the docs, `docs/screenshots/mapstudio-editclick-point-1366.png`, under `E2E_DOCS=1`.
 - 2026-11-06 (implementer): verified on the built tree: `tsc` clean, 450 Jest tests green (48 suites), the Gradle clean build green offline, the contract check OK at 0.4.0, no em dashes; `editclick.spec.mjs` 6 passed alone, `popup`, `tracer`, `delete` (18) and `studio` (20) passed alone; then `ops/up.sh --fresh` and the whole e2e suite with nothing else against the stack: 177 passed, 7 skipped, 0 failed in 40.1 min (the review 390 px flake did not show).
 
+- 2026-11-06 (review loop 1, bad_plan): triggered by the quick lens finding that the clicked item slides about 160 px from the pointer as Details docks, so it does not drag at once. Amended: the Code Map (the area layers, the switch keeping the selection, the stage narrowing, the two docs), the Tasks, and a Design Notes section on the camera. Known-bad state avoided: a click that opens Details moving the item away from the pointer; an area that a click cannot select; the switch deselecting the page's item. The code of commits ebcd73f, 1acd964, 145e484 and b66c35c is reverted for re-derivation. KEEP (it worked and must survive): `selection.tsx` `selectWithDetails` as the one Edit-mode branch, called first in `openPopup` and `openLinePopup` while `host.studioOn()`, with `point.click` still sent, no `popup.open`, and a line selected with no segment; `editing.ts` `onKeyDown` calling `ev.preventDefault()` when its Esc puts the Point, Line or Area tool down; the Jest harness `__tests__/editClick.test.ts` driving the real `MapStudio` with `maplibre-gl`, `terra-draw` and the Perspective client stubbed, and its twelve cases; `e2e/tests/editclick.spec.mjs` reading `popup.open`, `popup.close` and `point.click` from the session socket's frames, undoing its drag and re-seeding after itself; `popup.spec.mjs`'s two editor tests on the View page `/`, `studio.spec.mjs`'s and `tracer.spec.mjs`'s clicks asserting Details, `delete.spec.mjs`'s check that Details stays after Cancel; the contract's "A click in Edit mode" paragraph, the CHANGELOG bullet, the deferred Esc entry marked resolved, and the render under `E2E_DOCS=1`. Those commits hold them and may be reapplied, then amended.
+
 ## Review Triage Log
+
+Quick lens, 2026-11-06 (loop 1): 4 findings; high 0, medium 3, low 1.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| When Details docks after an Edit-mode click the clicked item slides about 160 px right, so a press where it was lands on the ground and an item near the right edge leaves the map: "it drags at once" fails | medium | The panel docks left of the stage (`MapStudio.tsx` 1293-1296), the stage narrows and MapLibre keeps the centre (the implementer's own change log); `editclick.spec.mjs` re-reads CTB1's pixel before the drag, hiding it; entry 7 leaves the click to entry 26 | bad_plan: the plan never said what the camera does as Details docks; Design Notes now do, and the e2e drag presses where it clicked |
+| A click on an area in Edit mode does not select it; the CHANGELOG and contract say it does | medium | `onMapClick` queries only markers and line layers; areas are drawn by `LAYER_AREA_*` (`mapLayers.ts` 34-36); no test clicks an area | moot in the loopback; the Code Map now names the area layers |
+| Turning Edit mode on with a popup open also clears the selection and publishes `selectedItem: null` | medium | `closePopup` removes the MapLibre popup, whose close event runs `onPopupClosed`, which calls `selectionState(prev, null)` (`selection.tsx` 648-650) | moot in the loopback; the Code Map now asks for the selection kept |
+| `docs/contract.md` (the map's place, around 198) and `docs/instruments.md` 26 still say a restore or a line click opens a popup, with no Edit-mode exception | low | The diff qualified two other paragraphs only | moot in the loopback; the Code Map now names both |
+
+## Design Notes
+
+The camera on an Edit-mode click (review, 2026-11-06): when the click docks Details (none open before), nothing on the page moves. Once the stage has narrowed, the map is panned with no animation by the stage's shift, so the clicked item, and every other item, keeps its page position and stays under the pointer: a press where it was clicked drags it. If the docked panel then covers the clicked item or it lies outside the stage, the map pans just enough, with the camera's padding, to bring it into view (EXPERIENCE.md Responsive 1366: opening properties keeps the selection in view). A click while Details is already open docks nothing and moves nothing. The Point tool's placement shift (since entry 2) is not this entry's.
 
 ## Verification
 

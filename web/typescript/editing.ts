@@ -1201,11 +1201,7 @@ function onPointFinish(host: EditingHost, id: string | number, action: string): 
  * Keys on the map container (capture phase): Escape puts the tool in hand down, cancelling a drawing in progress
  * (the popup's Esc is selection.tsx's); Backspace while drawing removes the last vertex (the mode's undo). A key
  * typed in a field inside the container (a field of a custom popup view, which MapLibre puts in the container)
- * stays the field's (drawing.ts `inField`). An Esc that puts a tool down is handled here alone (epic 4 entry 26,
- * EXPERIENCE.md: Esc returns to Select, one press one step): this listener runs outside React's batching, so the
- * tool is already down when the component's own keydown sees the same press, which would then close Details too;
- * the event is marked handled (`preventDefault`), which the component's Esc skips (MapStudio.tsx `onRootKeyDown`,
- * selection.tsx), and Details stays open for a second Esc to close.
+ * stays the field's (drawing.ts `inField`).
  */
 export function onKeyDown(host: EditingHost, ev: KeyboardEvent): void {
     if (inField(ev.target)) {
@@ -1213,7 +1209,6 @@ export function onKeyDown(host: EditingHost, ev: KeyboardEvent): void {
     }
     if (ev.key === 'Escape') {
         if (isDrawing(host.state.studio) || isPlacing(host.state.studio)) {
-            ev.preventDefault();
             putToolDown(host);
         }
         return;
