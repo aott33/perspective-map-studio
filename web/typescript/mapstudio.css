@@ -2965,6 +2965,12 @@
     overflow-wrap: anywhere;
 }
 
+/* An unknown kind's fields other than Kind take no input (the Gateway refuses any other change): drawn as off. */
+.mapstudio-panel[data-kind-known="false"] .mapstudio-input:disabled {
+    color: var(--label--disabled);
+    cursor: not-allowed;
+}
+
 .mapstudio-field-asset-status {
     padding: 4px 8px;
     border-radius: 6px;

@@ -39,6 +39,18 @@ A list of dicts, one per kind:
 
 A form field is `{key, label, type, required, choices}`: `key` text, at most 64 characters, unique in the kind; `label` defaults to the key; `type` is `text`, `number`, `integer`, `boolean` or `choice`; `required` defaults to false; a `choice` field needs a non-empty `choices` list of text. Adding a kind needs no module change: return one more row.
 
+**The fields as the form shows them (epic 4 entry 6).** In Edit mode, a map item's Details shows its kind's fields after Location, in the list's order, each under its `label` ([contract.md](contract.md), "The item form"). By `type`:
+
+| `type` | In Details | Saved as |
+| --- | --- | --- |
+| `text` | A text input, saved on blur or Enter (Esc puts the stored value back) | The text, outer spaces aside; blank is not set |
+| `number` | A text input taking a decimal (`4.5`, `.5`, `1e3`); anything else is refused in words beside the field ("Diameter (in) takes a number") and not saved | A JSON number |
+| `integer` | As `number`, a whole number only (`3`, `3.0`, `1e3`; "Wells takes a whole number"); past 2^53 it is out of range in the browser, though the Gateway takes up to 2^63 - 1 | A JSON number |
+| `boolean` | A checkbox with the label beside it, saved on change | `true` or `false` |
+| `choice` | A select with "Not set" first, then the `choices`, saved on change | The choice's text; "Not set" leaves the key out |
+
+Each change is one update of the whole `properties` object. **`required` is the browser's alone**: a required field shows "Required" by its label and, while it is not set, a line at the top of Details names every missing one ("Missing: Status"); the Gateway never enforces it, so an item saves what it has (the draw tools, imports and scripts create items before their form is filled). A kind change keeps the values the new kind defines with their type and drops the rest in the same update, since the Gateway refuses a key the kind does not define. A new item of a kind (the Point tool, a kind button, a generic tool, a line or an area) starts with the last finished value of each of the kind's fields in this project and browser, never with a name, a place or a link. An item whose kind is no longer in the list shows "Unknown kind" with its stored values read only until its kind is changed; one whose asset is no longer in the asset list keeps its stored link and shows as not linked, counted as unlinked in the Items list **[live 8.3.10]** (`e2e/tests/details.spec.mjs`).
+
 ## The asset list
 
 A list of dicts, one per asset a map item can be linked to:
@@ -93,7 +105,7 @@ Each list has a status: `{status, message, function, count, left, refreshedAt}`.
 | `not-configured` | the setup names no function | "The setup names no kind function." | none |
 | `loading` | the first call has not answered yet | "Loading the kind list from mapstudio_dev.kinds." | none |
 
-All seven words are stable kebab-case; messages are plain words and may change. Reasons name rows by position and `id` only, never other row content; an echoed `id`, `kind` or field `key` is cut to 64 characters and every control character in it (newline, tab, escape) becomes `?`, and exception text is cut the same way to one line of 200 characters, so a host value cannot add a line to the Gateway log.
+All seven words are stable kebab-case; messages are plain words and may change. In Edit mode, Details shows the asset list's message under Asset while its status is `empty`, `incomplete`, `failing`, `slow` or `not-configured` (epic 4 entry 6, EXPERIENCE.md "No asset list or incomplete"), and an item's link is checked against the list only while one is in use (`ok`, `incomplete`, `empty`, or a `failing` or `slow` list kept from before), so a link never reads as gone while the list loads. Reasons name rows by position and `id` only, never other row content; an echoed `id`, `kind` or field `key` is cut to 64 characters and every control character in it (newline, tab, escape) becomes `?`, and exception text is cut the same way to one line of 200 characters, so a host value cannot add a line to the Gateway log.
 
 **Viewers.** A session at level `none` gets the same status words and counts, but `failing` and `incomplete` messages without the host's error text or the row reasons: "The kind function mapstudio_dev.kinds failed.", "2 of 6 assets from mapstudio_dev.assets left out." (with "Showing the list from ..." when it applies). Sessions at `phone` and `full`, `refreshAdapters` and the Gateway log get the full message.
 
@@ -109,4 +121,4 @@ All seven words are stable kebab-case; messages are plain words and may change. 
 
 ## The dev adapter
 
-The dev project's library `mapstudio_dev` (`ops/project/ignition/script-python/mapstudio_dev/code.py`) is test equipment: five kinds (`pad`, `line`, `geofence`, an area kind, and the instrument kinds `tap` and `valve`) and ten assets (the tracer's and the L-SWD set's, epic 3 entry 2), and a mode (`ok`, `empty`, `broken`, `slow`, `incomplete`) switched by the buttons of the `/adapters` page (map editors only) and kept in `system.util.getGlobals()`, which the page's session scripts and Map Studio's calls share **[live 8.3.10]**. Its setup refreshes every 30 s, so the e2e test's two overlapping refreshes are not crossed by a timed one. The library also holds the dev views' role check, `holdsMapEditor(session)`, used by the `/adapters` buttons and by the `/edit` page's script checks and seed button (epic 2 story 12); if the library fails to load, those buttons raise a script error and write nothing.
+The dev project's library `mapstudio_dev` (`ops/project/ignition/script-python/mapstudio_dev/code.py`) is test equipment: five kinds (`pad`, `line`, `geofence`, an area kind, and the instrument kinds `tap` and `valve`) and ten assets (the tracer's and the L-SWD set's, epic 3 entry 2), and a mode (`ok`, `empty`, `broken`, `slow`, `incomplete`, `unknown-icon`, and from epic 4 entry 6 `tank`, which adds a point kind `tank` with one number field so an item made in it is of a kind no longer in the list once the mode is `ok` again) switched by the buttons of the `/adapters` page (map editors only) and kept in `system.util.getGlobals()`, which the page's session scripts and Map Studio's calls share **[live 8.3.10]**. Its setup refreshes every 30 s, so the e2e test's two overlapping refreshes are not crossed by a timed one. The library also holds the dev views' role check, `holdsMapEditor(session)`, used by the `/adapters` buttons and by the `/edit` page's script checks and seed button (epic 2 story 12); if the library fails to load, those buttons raise a script error and write nothing.

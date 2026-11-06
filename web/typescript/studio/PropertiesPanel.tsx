@@ -236,6 +236,8 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
             this.setState({ name: this.props.item.name });
             return;
         }
+        // The field shows the name as it is saved, outer spaces aside.
+        this.setState({ name });
         this.props.onRename(name);
     };
 

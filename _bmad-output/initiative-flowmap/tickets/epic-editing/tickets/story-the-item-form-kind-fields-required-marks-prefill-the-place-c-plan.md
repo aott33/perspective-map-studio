@@ -61,12 +61,12 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] A helper module and Jest tests -- field values parsed and checked as `ItemCheck` does, the missing required, duplicate names, the prefill store -- the rules in one tested place.
-- [ ] `web/typescript/MapStudioStoreDelegate.ts`, `save.ts` -- properties saved as one update; creates take the prefill; a kind change keeps the new kind's values -- one save path for the form.
-- [ ] `web/typescript/studio/PropertiesPanel.tsx`, `MapStudio.tsx`, `mapstudio.css` -- the field rows, Required and Missing, the duplicate underline, Unknown kind, the vanished asset, the asset list's status -- the form as the matrix says.
-- [ ] `web/typescript/itemList.ts` -- a vanished asset counts as unlinked.
-- [ ] `e2e/tests/details.spec.mjs` -- the matrix at 1366 px as `mapeditor`; a render of Details under `E2E_DOCS=1`.
-- [ ] `docs/contract.md`, `docs/kinds-and-assets.md`, `CHANGELOG.md`.
+- [x] A helper module and Jest tests -- field values parsed and checked as `ItemCheck` does, the missing required, duplicate names, the prefill store -- the rules in one tested place.
+- [x] `web/typescript/MapStudioStoreDelegate.ts`, `save.ts` -- properties saved as one update; creates take the prefill; a kind change keeps the new kind's values -- one save path for the form.
+- [x] `web/typescript/studio/PropertiesPanel.tsx`, `MapStudio.tsx`, `mapstudio.css` -- the field rows, Required and Missing, the duplicate underline, Unknown kind, the vanished asset, the asset list's status -- the form as the matrix says.
+- [x] `web/typescript/itemList.ts` -- a vanished asset counts as unlinked.
+- [x] `e2e/tests/details.spec.mjs` -- the matrix at 1366 px as `mapeditor`; a render of Details under `E2E_DOCS=1`.
+- [x] `docs/contract.md`, `docs/kinds-and-assets.md`, `CHANGELOG.md`.
 
 **Acceptance Criteria:**
 - Given the dev Gateway as `mapeditor` at 1366 px, when the matrix runs, then each row holds.
@@ -78,6 +78,11 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 - Planner, 2026-11-06: the environment, commit and identity rules are entry 4's plan's (Docker started by hand after a container restart, `ops/up.sh --fresh` before a whole-suite run with nothing else against the stack, the two trailer lines from the session's attribution reminder, `git commit --only` your paths, no em dashes, no model identifier, never a bare `git stash`, never a push). Commit at each working milestone. A layout that departs from DESIGN.md's Properties panel is rendered for the owner before it is built (owner's rule, 2026-11-05).
 
 ## Plan Change Log
+
+- 2026-11-06, implementation: the kind fields sit after Location and before Asset, not between Kind and Location as the Code Map said. DESIGN.md's Properties panel and EXPERIENCE.md's both order Details as name, kind, location, kind fields, asset link, and this plan's own note says a layout that departs from DESIGN.md's Properties panel is rendered for the owner before it is built; the spines' order needs no such render. Entry 27's place line stays in Location.
+- 2026-11-06, implementation: the Gateway refuses any save of an item whose kind is not in the kind list, so the e2e cannot make "an item of kind `tank`" with the dev kinds as they were. The dev adapter (test equipment, `ops/project/.../mapstudio_dev/code.py`) gains the mode `tank`, which adds a point kind `tank` with one number field, and the `/adapters` page its button; the spec makes the item in that mode and switches back to `ok`. Nothing of the Gateway, `common/`, a message, a prop or the contract changes. An item linked to P99 needs no mode: the Gateway does not check an asset id.
+- 2026-11-06, implementation: the duplicate's words name the other item's asset by its name, as the header's subline does ("Also the name of the item linked to Pad 14"), since `assetNames` carries names, not base paths; an unlinked item counts as on a different asset from a linked one, two unlinked items do not. An unknown kind also turns Name, Location, Move and Asset off (the Gateway refuses any change but the kind), the footer's delete as it was.
+- 2026-11-06, implementation: a PropertiesPanel render test already existed (`__tests__/shortcuts.test.ts`); its props helper takes the new props, no expectation changed. The Esc of Name, Latitude and Longitude saved what was typed on the blur it makes (React batches the reset, so the blur read the draft); fixed with the kind fields' Esc, and the Name field now shows the name as saved, outer spaces aside.
 
 ## Review Triage Log
 
