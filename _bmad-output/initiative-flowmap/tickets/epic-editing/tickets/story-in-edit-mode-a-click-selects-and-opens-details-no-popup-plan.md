@@ -3,7 +3,7 @@ title: "In Edit mode a click selects and opens Details, no popup"
 type: 'feature'
 ticket: '26'
 created: '2026-11-06'
-status: 'in-review'
+status: 'built'
 baseline_revision: '1153ef47de8776749793951b0cc2b183c8e798f2'
 route: 'full'
 route_source: 'auto'
@@ -104,6 +104,8 @@ Quick lens, 2026-11-06 (after loop 1): 4 findings; high 0, medium 1, low 3.
 | A popup restored in Edit mode can leave its item outside the stage with Details open | low | `keepPlace` (354) brings into view only when the place was inside the map before Details docked; a restore's remembered centre may come from a wider map | patch: bring into view whenever the place ends outside the map, whatever it was before |
 | The Edit switch can open Details for the kept selection when `panel` survives from an earlier Edit-mode session | low | `setEditMode(false)` keeps `panel`; a View-mode click on the same id keeps it (`selectionState`, 762); `dismissPopup` keeps it again, against the Code Map and `docs/contract.md` 178 | patch: `dismissPopup` clears `panel` |
 | `docs/contract.md` 176 says the Delete key deletes the selected item "with Details open for it"; `onDeleteKey` acts on the selection alone, and this entry makes selected states with no Details | low | `editing.ts` `onDeleteKey`, `deleteSelected` (824-863) never read `panel` | patch: the sentence says the selected item, Details open or not |
+
+Outcome, 2026-11-06: the four patches applied (edb7e3e) and verified by the orchestrator after two container restarts: `tsc` clean, Jest 464 passed in 48 suites, the Gradle clean build offline, the contract check OK at 0.4.0, and `ops/up.sh --fresh` with the whole e2e suite on a fresh dev stack: 179 passed, 7 skipped, 0 failed in 35.2 min. Deferred (`deferred-work.md`): the Point tool's placement shift since entry 2, and closing Details widening the map around its centre; both candidates for entry 7.
 
 ## Design Notes
 
