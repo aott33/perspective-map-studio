@@ -347,15 +347,39 @@ function addHandleLayers(map: MapLibreMap, midpoint: ImageData | null, fill: Hex
             layout: { 'icon-image': MIDPOINT_IMAGE, 'icon-allow-overlap': true, 'icon-ignore-placement': true }
         });
     }
+    if (!fill || !selection) {
+        // No colour of Map Studio's own (AD-11): without the tokens the chosen point is said by the bar alone.
+        return;
+    }
     map.addLayer({
         id: LAYER_HANDLE_CHOSEN, type: 'circle', source: TERRA_DRAW_POINTS, filter: chosenFilter(-1),
-        paint: {
-            'circle-radius': 8,
-            'circle-color': selection || '#000000',
-            'circle-stroke-width': 2.5,
-            'circle-stroke-color': fill || '#ffffff'
-        }
+        paint: { 'circle-radius': 8, 'circle-color': selection, 'circle-stroke-width': 2.5, 'circle-stroke-color': fill }
     });
+}
+
+/**
+ * Terra Draw stopped (the component unmounts): the map's own handle layers leave first, since they read Terra Draw's point
+ * source, which its adapter removes as it stops (MapLibre refuses to remove a source a layer still uses).
+ */
+export function stopTerraDraw(host: EditingHost): void {
+    const map = host.map;
+    if (map) {
+        for (const id of [LAYER_HANDLE_CHOSEN, LAYER_HANDLE_MIDPOINTS]) {
+            if (map.getLayer(id)) {
+                map.removeLayer(id);
+            }
+        }
+        if (map.hasImage(MIDPOINT_IMAGE)) {
+            map.removeImage(MIDPOINT_IMAGE);
+        }
+    }
+    host.handles = null;
+    host.dragSnap = null;
+    host.chosenDrawn = -1;
+    if (host.draw) {
+        host.draw.stop();
+        host.draw = null;
+    }
 }
 
 /**

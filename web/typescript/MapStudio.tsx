@@ -687,14 +687,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (this.mapContainer) {
             this.mapContainer.removeEventListener('keydown', this.onKeyDown, true);
         }
-        if (this.draw) {
-            this.draw.stop();
-            this.draw = null;
-        }
+        // The handle layers leave before Terra Draw's own source does (entry 5).
+        editing.stopTerraDraw(this);
         this.lineMode = null;
         this.areaMode = null;
         this.selectMode = null;
-        this.handles = null;
         if (this.popupSizeObserver) {
             this.popupSizeObserver.disconnect();
             this.popupSizeObserver = null;

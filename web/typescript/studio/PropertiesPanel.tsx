@@ -216,8 +216,8 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                         <div className="mapstudio-field-label-row">
                             <span className="mapstudio-field-label">Location</span>
                             {point && this.props.canMoveByClick ? (
-                                <button type="button" className="mapstudio-button mapstudio-field-move" aria-pressed={this.props.moving} disabled={paused}
-                                        title="Move: click the new place on the map" onClick={this.props.onMoveStart}>Move</button>
+                                <button type="button" className="mapstudio-button mapstudio-field-move" aria-pressed={this.props.moving} disabled={paused || pending}
+                                        title={pending ? 'Saving the new item...' : 'Move: click the new place on the map'} onClick={this.props.onMoveStart}>Move</button>
                             ) : null}
                         </div>
                         {point ? (
