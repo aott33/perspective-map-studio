@@ -96,6 +96,15 @@ Quick lens, 2026-11-06 (loop 1): 4 findings; high 0, medium 3, low 1.
 | Turning Edit mode on with a popup open also clears the selection and publishes `selectedItem: null` | medium | `closePopup` removes the MapLibre popup, whose close event runs `onPopupClosed`, which calls `selectionState(prev, null)` (`selection.tsx` 648-650) | moot in the loopback; the Code Map now asks for the selection kept |
 | `docs/contract.md` (the map's place, around 198) and `docs/instruments.md` 26 still say a restore or a line click opens a popup, with no Edit-mode exception | low | The diff qualified two other paragraphs only | moot in the loopback; the Code Map now names both |
 
+Quick lens, 2026-11-06 (after loop 1): 4 findings; high 0, medium 1, low 3.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| With Details open, a click on a shared marker closes Details and the stage widens, so the marker and its pick list slide about 160 px from the pointer | medium | `selection.tsx` `openPick` (490) clears the selection with `selectionState(prev, null)`, so `panel` goes null; the Design Notes say a click while Details is open moves nothing | patch: in Edit mode the pick list keeps the selection and Details as they are |
+| A popup restored in Edit mode can leave its item outside the stage with Details open | low | `keepPlace` (354) brings into view only when the place was inside the map before Details docked; a restore's remembered centre may come from a wider map | patch: bring into view whenever the place ends outside the map, whatever it was before |
+| The Edit switch can open Details for the kept selection when `panel` survives from an earlier Edit-mode session | low | `setEditMode(false)` keeps `panel`; a View-mode click on the same id keeps it (`selectionState`, 762); `dismissPopup` keeps it again, against the Code Map and `docs/contract.md` 178 | patch: `dismissPopup` clears `panel` |
+| `docs/contract.md` 176 says the Delete key deletes the selected item "with Details open for it"; `onDeleteKey` acts on the selection alone, and this entry makes selected states with no Details | low | `editing.ts` `onDeleteKey`, `deleteSelected` (824-863) never read `panel` | patch: the sentence says the selected item, Details open or not |
+
 ## Design Notes
 
 The camera on an Edit-mode click (review, 2026-11-06): when the click docks Details (none open before), nothing on the page moves. Once the stage has narrowed, the map is panned with no animation by the stage's shift, so the clicked item, and every other item, keeps its page position and stays under the pointer: a press where it was clicked drags it. If the docked panel then covers the clicked item or it lies outside the stage, the map pans just enough, with the camera's padding, to bring it into view (EXPERIENCE.md Responsive 1366: opening properties keeps the selection in view). A click while Details is already open docks nothing and moves nothing. The Point tool's placement shift (since entry 2) is not this entry's.
