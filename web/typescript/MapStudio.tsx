@@ -756,9 +756,17 @@ export class MapStudio extends Component<Props, MapStudioState> {
 
     /**
      * Keys on the component: Ctrl+Z and Ctrl+Shift+Z (or Ctrl+Y) undo and redo in Edit mode outside a field (a
-     * field keeps its own undo); Esc closes the open popup, card, sheet or pick list and returns the focus (item 14; selection.tsx).
+     * field keeps its own undo); Delete outside a field deletes the selected item, or with a point of the selected line or area
+     * chosen that point (entry 25, editing.ts `onDeleteKey`; a field keeps its own Delete); Esc closes the open popup, card,
+     * sheet or pick list and returns the focus (item 14; selection.tsx).
      */
     private onRootKeyDown = (ev: React.KeyboardEvent<HTMLDivElement>): void => {
+        if (ev.key === 'Delete' && !ev.defaultPrevented && !ev.ctrlKey && !ev.metaKey && !ev.altKey && !inField(ev.target)) {
+            if (editing.onDeleteKey(this)) {
+                ev.preventDefault();
+            }
+            return;
+        }
         if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && (ev.key === 'z' || ev.key === 'Z' || ev.key === 'y' || ev.key === 'Y')) {
             const target = ev.target as HTMLElement | null;
             const tag = target && target.tagName ? target.tagName.toUpperCase() : '';
@@ -947,6 +955,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.setState((prev) => ({ ...this.selectionState(prev, { id: partId, kind: 'line', segment: null }), pick: null, panel: partId, geometry: null }));
     };
     onDeletePoint = (): void => editing.deletePoint(this);
+    /** The properties panel's footer delete (entry 25): the selected item deleted, no question asked, one undo step. */
+    onDeleteItem = (): void => {
+        editing.deleteSelected(this);
+    };
 
     /** The Kind select in Details (entry 4): one update of `kind` to a kind of the item's geometry. */
     onKind = (kindId: string): void => {
@@ -1232,7 +1244,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              moving={!!pick && pick.itemId === item.id && pick.moving}
                              onMoveStart={this.onMoveByClick}
                              onLink={this.onLink}
-                             onKind={this.onKind} />
+                             onKind={this.onKind}
+                             onDelete={this.onDeleteItem} />
         );
     }
 

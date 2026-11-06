@@ -27,6 +27,10 @@
  * Details, takes the next click on the map as the new place (`onGeometryClick`); Esc puts down Move or the chosen point
  * (`escapeGeometry`). Each change is one batch through the delegate when the drag or the action ends, never per pointer
  * move. A line's end point dragged or moved with Snap on lands on and names a target, with Snap off it floats.
+ *
+ * Delete (entry 25; EXPERIENCE.md Delete and Keyboard): the properties panel's footer and the Delete key outside a field delete
+ * the selected item with no question asked, one batch and one undo step (`deleteSelected`); with a point of the selected line
+ * or area chosen the Delete key is that point's Delete point (`onDeleteKey`).
  */
 
 import type { Position } from 'geojson';
@@ -44,7 +48,9 @@ import {
     Drawing, DrawingTool, GeometryPick, REASON_SELF_INTERSECTS, drawingEnds, inField, isDrawingTool, minVertices, startDrawing, withVertices
 } from './drawing';
 import { Selection } from './features';
-import { EDGES_CROSS, SnapTarget, endSideOf, nearestSnap, ringCrosses, snapDistanceM, snapTargets, snapTargetsForLine } from './geometry';
+import {
+    EDGES_CROSS, SnapTarget, canDeleteVertex, endSideOf, nearestSnap, ringCrosses, snapDistanceM, snapTargets, snapTargetsForLine
+} from './geometry';
 import { StudioTool, isDrawing, isPlacing, toolKind } from './studio';
 import { drawColor } from './theme';
 
@@ -765,6 +771,10 @@ export function deletePoint(host: EditingHost): void {
     if (!pick || pick.index === null || !handles || handles.itemId !== pick.itemId || handles.shape === 'point' || !delegate) {
         return;
     }
+    if (!canDeleteVertex(handles.shown.length, handles.shape === 'area')) {
+        // Off at the floor (two points for a line, three for an area), as the bar's button is: the Delete key does nothing either.
+        return;
+    }
     const index = pick.index;
     const next = handles.shown.filter((_c, i) => i !== index);
     if (handles.shape === 'area' && ringCrosses(next)) {
@@ -788,6 +798,58 @@ export function escapeGeometry(host: EditingHost): boolean {
         : { geometry: prev.geometry.moving && prev.geometry.index !== null
             ? { itemId: prev.geometry.itemId, index: prev.geometry.index, moving: false } : null }));
     return true;
+}
+
+/**
+ * Whether Delete acts (entry 25): the studio shows (Edit mode at level `full`, 768 px and wider) and the store is reachable; a
+ * phone, a viewer, a phone editor and a paused studio delete nothing.
+ */
+export function canDelete(host: EditingHost): boolean {
+    const delegate = host.props.delegate;
+    return !!delegate && delegate.editing !== 'off' && host.studioOn();
+}
+
+/**
+ * Delete the selected item (entry 25; EXPERIENCE.md Delete, the properties panel's footer and the Delete key): no question asked,
+ * one batch through the delegate (a line with every instrument on it, the `ends` naming them cleared) and one undo step, "delete
+ * <name>". The selection clears at once, so Details closes and an open popup goes, and the focus goes to the map, where Ctrl+Z
+ * undoes it; nothing says it saved (the save status does), and a refusal shows on the save status row. A pin the Point tool still
+ * holds goes, as an undo's does. True when a delete was sent.
+ */
+export function deleteSelected(host: EditingHost): boolean {
+    const selected = host.state.selected;
+    const delegate = host.props.store.delegate as MapStudioStoreDelegate | undefined;
+    if (!selected || !delegate || !canDelete(host) || !delegate.deleteItem(selected.id)) {
+        return false;
+    }
+    clearPlacedPoints(host);
+    host.closePopup();
+    host.setState((prev) => (prev.selected && prev.selected.id === selected.id ? { ...host.selectionState(prev, null), pick: null } : null));
+    if (host.map) {
+        host.map.getCanvas().focus({ preventScroll: true });
+    }
+    console.info('[MapStudio] ' + selected.id + ' deleted, with no question asked: Undo restores it.');
+    return true;
+}
+
+/**
+ * The Delete key outside a field (entry 25; the component's keydown, MapStudio.tsx): with a point of the selected line or area
+ * chosen (entry 5) it removes that point as the bar's Delete point does (off at the floor, and while Move waits for its click);
+ * otherwise it deletes the selected item. Nothing while a line or an area is being drawn, or where Delete does not act
+ * (`canDelete`). True when the key was taken.
+ */
+export function onDeleteKey(host: EditingHost): boolean {
+    if (!canDelete(host) || host.state.drawing !== null) {
+        return false;
+    }
+    const pick = host.state.geometry;
+    if (pick && pick.index !== null && host.state.studio.tool === null) {
+        if (!pick.moving) {
+            deletePoint(host);
+        }
+        return true;
+    }
+    return deleteSelected(host);
 }
 
 /** Every tool is off while map.load says the store is unreachable: a drawing in progress is cancelled, a placed pin dropped. */

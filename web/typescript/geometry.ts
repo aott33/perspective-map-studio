@@ -2,7 +2,8 @@
  * The shared geometry module (AD-19, epic 2 story 14): distances along a line and the one
  * batch that keeps a line's instruments on it when the line moves, changes shape, is split
  * or is deleted; from epic 4 entry 5 the batches of changing geometry (a vertex moved, inserted,
- * deleted, a split at a point, a point item moved with the snapped ends of its lines). Turf 7.4.0 (`length`, `along`, `nearestPointOnLine`, units metres, earth
+ * deleted, a split at a point, a point item moved with the snapped ends of its lines), and from entry 25 the delete of an item
+ * with the `ends` naming it cleared. Turf 7.4.0 (`length`, `along`, `nearestPointOnLine`, units metres, earth
  * radius 6371008.8 m); the Gateway checks the result with the same formulas
  * (common/.../contract/LineMeasure.java, shared test vectors). Pure, unit tested in node;
  * the drawing and editing tools of epic-editing call it, nothing draws here.
@@ -405,6 +406,36 @@ export function lineDeleteBatch(batchId: string, line: MapItemRecord, items: Map
     const ops: EditOp[] = [{ op: 'delete', entity: 'item', id: line.id, baseVersion: line.version }];
     for (const instrument of instrumentsOn(items, line.id)) {
         ops.push({ op: 'delete', entity: 'item', id: instrument.id, baseVersion: instrument.version });
+    }
+    return { batchId, ops };
+}
+
+/**
+ * A delete of one map item (epic 4 entry 25; EXPERIENCE.md Delete: no confirmation, one undo restores it): one batch with the
+ * item and, for a line, every instrument on it (lineDeleteBatch; the Gateway refuses a line deleted without them), then for
+ * every live line left whose stored `ends` name an item the batch deletes, an update with that side of `ends` gone, so no line
+ * names a deleted item (AD-19: `ends` stay stored, never inferred). The deletes come first, so the reverse (undo.ts) restores
+ * the items before it puts the `ends` back; one undo step restores them all with their links, properties, kinds and shapes.
+ */
+export function itemDeleteBatch(batchId: string, item: MapItemRecord, items: MapItemRecord[]): EditBatch {
+    const ops: EditOp[] = item.geometry.type === 'LineString'
+        ? lineDeleteBatch(batchId, item, items).ops
+        : [{ op: 'delete', entity: 'item', id: item.id, baseVersion: item.version }];
+    const gone = new Set(ops.map((op) => op.id));
+    for (const line of items) {
+        if (line.deleted || gone.has(line.id) || line.geometry.type !== 'LineString' || !line.ends) {
+            continue;
+        }
+        let ends: MapItemRecord['ends'] = line.ends;
+        for (const side of ['start', 'end'] as EndSide[]) {
+            const named = ends ? ends[side] : undefined;
+            if (named && gone.has(named.itemId)) {
+                ends = endsWith(ends, side, null);
+            }
+        }
+        if (!sameEnds(line.ends, ends)) {
+            ops.push({ op: 'update', entity: 'item', id: line.id, baseVersion: line.version, data: { ends } });
+        }
     }
     return { batchId, ops };
 }

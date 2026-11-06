@@ -2812,6 +2812,19 @@
     overflow-y: auto;
 }
 
+/* The panel's footer (entry 25; DESIGN.md Properties panel "Footer: a delete icon", key screen 4): a row under the body behind
+   the divider, the delete icon at its right end, the dock button's 32 px box in the text colour (no hue: a delete is undone,
+   not warned about). The panel docks left of the map, so its bottom right is not the App Bar's corner. */
+.mapstudio-panel-footer {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 6px 12px 6px 16px;
+    border-top: 1px solid var(--mapstudio-divider);
+}
+
 .mapstudio-panel-note {
     margin: 4px 0 8px;
     padding: 6px 8px;

@@ -53,6 +53,8 @@ describe('the stack and its labels', () => {
         // Entry 5: a line's shape changed, and a split.
         expect(stepLabel('reshape', 'L-SWD')).toBe('reshape L-SWD');
         expect(stepLabel('split', 'L-SWD')).toBe('split L-SWD');
+        // Entry 25: an item deleted, a line with its instruments in the same step.
+        expect(stepLabel('delete', 'L-TEST')).toBe('delete L-TEST');
     });
 });
 

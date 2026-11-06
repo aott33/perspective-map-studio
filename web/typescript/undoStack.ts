@@ -182,9 +182,10 @@ export function failPending(stack: UndoStack, batchId: string): UndoStack {
 
 /**
  * The words of a step: what was done to which item ("add Well pad", "move P31", "rename P31", "link P31", "edit P31" for a kind
- * change; from entry 5 "reshape L-SWD" for a line's or an area's point moved, added or deleted, and "split L-SWD").
+ * change; from entry 5 "reshape L-SWD" for a line's or an area's point moved, added or deleted, and "split L-SWD"; from entry 25
+ * "delete L-TEST" for an item deleted, a line with its instruments and the ends naming them, in one step).
  */
-export function stepLabel(action: 'add' | 'move' | 'rename' | 'link' | 'unlink' | 'edit' | 'reshape' | 'split', name: string): string {
+export function stepLabel(action: 'add' | 'move' | 'rename' | 'link' | 'unlink' | 'edit' | 'reshape' | 'split' | 'delete', name: string): string {
     return action + ' ' + name;
 }
 

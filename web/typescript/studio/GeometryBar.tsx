@@ -6,8 +6,10 @@ import { GeometryPick, deleteOffText, geometryHint, geometryTitle, splitOffText 
  * drawing bar's sibling bottom-centre while a point of the selected line or area is chosen, or Move waits for a click. It is
  * then the one place Edit mode talks; with nothing chosen nothing does. A chosen point: "Point 2 of 3 on L-SWD", "Drag it to
  * move it, or use Move", then Move, Split here (an inner point of a line only) and Delete point (never below two points for a
- * line or three for an area), each off with the reason as its title. Move pressed: "Moving point 2 of L-SWD" (or "Moving CTB1"
- * for a point item's Move from Details), "Click the new place on the map - Esc to cancel" and Cancel. An action refused here
+ * line or three for an area), each off with the reason as its title; from entry 25 a button with a key names it on hover and to
+ * assistive technology ("Delete point (Del)", the Delete key outside a field doing the same; "Cancel (Esc)"). Move pressed:
+ * "Moving point 2 of L-SWD" (or "Moving CTB1" for a point item's Move from Details), "Click the new place on the map - Esc to
+ * cancel" and Cancel. An action refused here
  * says why in the hint ("The edges would cross" for an area), nothing sent. An action taken while an earlier change is being
  * saved goes after it (the delegate's turn), so the buttons never wait. Move swaps its buttons, so the focus that was on them (or lost with them) moves to
  * Cancel while Move waits and back to Move after, keeping Esc and Enter in the component. Its attributes are what the e2e
@@ -61,7 +63,8 @@ export function GeometryBar(props: GeometryBarProps): React.ReactElement {
                 </span>
             </span>
             {pick.moving ? (
-                <button type="button" className="mapstudio-button mapstudio-geometry-cancel" title="Cancel (Esc)" onClick={props.onCancel}>Cancel</button>
+                <button type="button" className="mapstudio-button mapstudio-geometry-cancel" title="Cancel (Esc)" aria-keyshortcuts="Escape"
+                        onClick={props.onCancel}>Cancel</button>
             ) : (
                 <>
                     <button type="button" className="mapstudio-button mapstudio-geometry-move"
@@ -69,7 +72,7 @@ export function GeometryBar(props: GeometryBarProps): React.ReactElement {
                     <button type="button" className="mapstudio-button mapstudio-geometry-split" disabled={split !== ''}
                             title={split || 'Split the line here into two lines'} onClick={props.onSplit}>Split here</button>
                     <button type="button" className="mapstudio-button mapstudio-geometry-delete" disabled={remove !== ''}
-                            title={remove || 'Delete this point'} onClick={props.onDelete}>Delete point</button>
+                            title={remove || 'Delete point (Del)'} aria-keyshortcuts="Delete" onClick={props.onDelete}>Delete point</button>
                 </>
             )}
         </div>

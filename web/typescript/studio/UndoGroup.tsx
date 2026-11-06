@@ -5,6 +5,18 @@ import { ChromeGlyph } from './ChromeGlyph';
 /** What a paused toolbar's Undo, history and Redo say on hover (the map store is unreachable; the toolbar fades). */
 export const PAUSED_TEXT = 'Paused - the map store is unreachable';
 
+/**
+ * The keys of Undo and Redo as their hover words name them (entry 25, owner 2026-11-06: no `?` panel, each control with a key
+ * names it): "Undo: add Gathering line (Ctrl+Z)", "Redo: rename P31 (Ctrl+Shift+Z)"; Ctrl+Y redoes too, as before.
+ */
+export const UNDO_KEY = 'Ctrl+Z';
+export const REDO_KEY = 'Ctrl+Shift+Z';
+
+/** A button's hover words with its key: "Undo: add Gathering line (Ctrl+Z)". */
+export function withKey(words: string, key: string): string {
+    return words + ' (' + key + ')';
+}
+
 /** The floating controls' distance from the map's edge (DESIGN.md spacing map-inset): the history list keeps it. */
 const INSET_PX = 12;
 
@@ -14,7 +26,8 @@ const TICK_MS = 15_000;
 /**
  * Undo, its history and Redo, the floating toolbar's last group (epic 4 entry 23, owner 2026-11-05; DESIGN.md Floating
  * draw toolbar, EXPERIENCE.md Undo and Redo, R28): Undo and Redo each name their step on hover and to assistive
- * technology ("Undo: add Gathering line"), disabled with "Nothing to undo" or "Nothing to redo", or while something is in
+ * technology ("Undo: add Gathering line"), from entry 25 with their key on hover and as their description ("Undo: add Gathering
+ * line (Ctrl+Z)", `aria-keyshortcuts` too), disabled with "Nothing to undo" or "Nothing to redo", or while something is in
  * flight with what ("Undoing...", "Redoing...", "Saving..."); the chevron beside Undo
  * opens the history under it, the owner's mock: "Undo history", the last ten done steps of this session newest first,
  * each with how long ago it was saved, and a footer. Hovering a row (or the keyboard's focus on it) marks it and every
@@ -326,7 +339,8 @@ export class UndoGroup extends React.Component<UndoGroupProps, UndoGroupState> {
             <div ref={this.root} className="mapstudio-undo-group" data-history-open={open ? 'true' : 'false'} onKeyDown={this.onGroupKey}
                  onBlur={this.onGroupBlur}>
                 <button type="button" className="mapstudio-tool mapstudio-undo" disabled={paused || busy !== '' || undoLabel === ''}
-                        title={paused ? PAUSED_TEXT : busy || undoLabel || 'Nothing to undo'} aria-label={undoLabel || 'Undo'} data-step={undoLabel}
+                        title={paused ? PAUSED_TEXT : busy || (undoLabel ? withKey(undoLabel, UNDO_KEY) : 'Nothing to undo')}
+                        aria-label={undoLabel || 'Undo'} data-step={undoLabel} aria-keyshortcuts="Control+Z"
                         onClick={this.props.onUndo}>
                     <ChromeGlyph name="undo" />
                 </button>
@@ -338,7 +352,8 @@ export class UndoGroup extends React.Component<UndoGroupProps, UndoGroupState> {
                     <ChromeGlyph name="chevron" size={16} />
                 </button>
                 <button type="button" className="mapstudio-tool mapstudio-redo" disabled={paused || busy !== '' || redoLabel === ''}
-                        title={paused ? PAUSED_TEXT : busy || redoLabel || 'Nothing to redo'} aria-label={redoLabel || 'Redo'} data-step={redoLabel}
+                        title={paused ? PAUSED_TEXT : busy || (redoLabel ? withKey(redoLabel, REDO_KEY) : 'Nothing to redo')}
+                        aria-label={redoLabel || 'Redo'} data-step={redoLabel} aria-keyshortcuts="Control+Shift+Z Control+Y"
                         onClick={this.props.onRedo}>
                     <ChromeGlyph name="redo" />
                 </button>

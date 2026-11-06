@@ -108,8 +108,9 @@ describe('Undo, its history and Redo on the toolbar (epic 4 entry 23)', () => {
 
     test('three saved edits: Undo names the last step on hover and to assistive technology; Redo has none', () => {
         const html = toolbar(null, null, false, false, threeEdits());
-        expect(html).toContain('class="mapstudio-tool mapstudio-undo" title="Undo: add Gathering line" aria-label="Undo: add Gathering line" '
-            + 'data-step="Undo: add Gathering line"');
+        // Its key on hover too (entry 25: no `?` panel, each control names its shortcut), and to assistive technology.
+        expect(html).toContain('class="mapstudio-tool mapstudio-undo" title="Undo: add Gathering line (Ctrl+Z)" aria-label="Undo: add Gathering line" '
+            + 'data-step="Undo: add Gathering line" aria-keyshortcuts="Control+Z"');
         expect(html).toContain('class="mapstudio-tool mapstudio-redo" disabled="" title="Nothing to redo"');
     });
 
@@ -198,7 +199,7 @@ describe('the drawing bar (epic 4 entry 4)', () => {
         expect(html).toContain('#ms-well-pad');
         expect(html).toContain('<span class="mapstudio-drawing-title">New well pad</span>');
         expect(html).toContain('<span class="mapstudio-drawing-hint">Click the map, then drag to fine-tune</span>');
-        expect(html).toContain('mapstudio-drawing-done" title="Done (Esc)">Done</button>');
+        expect(html).toContain('mapstudio-drawing-done" title="Done (Esc)" aria-keyshortcuts="Escape">Done</button>');
         expect(html).not.toContain('mapstudio-drawing-finish');
         expect(html).not.toContain('mapstudio-drawing-cancel');
         // A kind list with no point kind: the bar says so as its problem.

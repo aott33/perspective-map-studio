@@ -4,6 +4,10 @@ import { MapItemRecord } from '../contract';
 import { Glyph } from '../popupParts';
 import { roundCoordinate } from '../save';
 import { ChromeGlyph } from './ChromeGlyph';
+import { PAUSED_TEXT } from './UndoGroup';
+
+/** The footer's delete icon on hover (entry 25): what it does and its key; no question is asked and Undo restores the item. */
+export const DELETE_TITLE = 'Delete (Del)';
 
 /**
  * The docked properties panel's Details tab (epic 4 entries 2 and 4; DESIGN.md Properties panel and tabs,
@@ -19,7 +23,10 @@ import { ChromeGlyph } from './ChromeGlyph';
  * link and the Live now block are later entries. The panel is keyed by the item's id, so its drafts
  * start from the record; a new version of the record (a save, an undo, another editor's change) resets
  * the fields the user has not touched and keeps a draft being typed. While map.load says the store is
- * unreachable the fields are paused, as the toolbar is.
+ * unreachable the fields are paused, as the toolbar is. From entry 25 (DESIGN.md Properties panel: "Footer: a delete icon",
+ * key screen 4's bottom right of the panel, which docks left of the map, so the App Bar's corner stays clear) the footer holds
+ * the delete icon: no question asked, the item deleted in one batch and one undo step, "Delete (Del)" on hover and as its
+ * description; the close names Esc. Each control with a key names it in its hover text and to assistive technology.
  */
 export interface PropertiesPanelProps {
     item: MapItemRecord;
@@ -50,6 +57,8 @@ export interface PropertiesPanelProps {
     onMoveStart: () => void;
     onLink: (assetId: string | null) => void;
     onKind: (kindId: string) => void;
+    /** The footer's delete icon (entry 25): the item deleted with no question asked; Undo restores it. */
+    onDelete: () => void;
 }
 
 interface Drafts {
@@ -193,7 +202,8 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                         <div className="mapstudio-popup-name mapstudio-panel-name">{item.name}</div>
                         <div className="mapstudio-popup-subline mapstudio-panel-subline">{subline}</div>
                     </div>
-                    <button type="button" className="mapstudio-popup-icon mapstudio-panel-close" aria-label="Close" title="Close" onClick={this.props.onClose}>
+                    <button type="button" className="mapstudio-popup-icon mapstudio-panel-close" aria-label="Close" title="Close (Esc)"
+                            aria-keyshortcuts="Escape" onClick={this.props.onClose}>
                         <ChromeGlyph name="close" className="mapstudio-popup-chrome" />
                     </button>
                 </header>
@@ -270,6 +280,13 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                         </span>
                     </div>
                 </div>
+                <footer className="mapstudio-panel-footer">
+                    <button type="button" className="mapstudio-dock-button mapstudio-panel-delete" disabled={paused}
+                            title={paused ? PAUSED_TEXT : DELETE_TITLE} aria-label={'Delete ' + item.name} aria-keyshortcuts="Delete"
+                            onClick={this.props.onDelete}>
+                        <ChromeGlyph name="trash" />
+                    </button>
+                </footer>
             </section>
         );
     }

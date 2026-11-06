@@ -17,7 +17,8 @@ import { toolGlyph } from './DrawToolbar';
  * reach of the pointer (the toolbar's magnet says on or off; entry 23 dropped the "Snap on" and "Snap off" words), then
  * what keeps it from finishing in plain words ("A line needs two points", "The edges cross - Backspace removes the last
  * point") or the finish hint, and Cancel (Esc) and Finish, inert until the drawing is valid. For the Point tool: "Click
- * the map, then drag to fine-tune" and Done, which puts the tool down as Esc does. With no kind for the tool in the kind
+ * the map, then drag to fine-tune" and Done, which puts the tool down as Esc does. Each button names its key on hover and to
+ * assistive technology (entry 25: "Cancel (Esc)", "Finish (Enter)", "Done (Esc)"; `aria-keyshortcuts`); an off Finish says why. With no kind for the tool in the kind
  * list, that is the problem it says. Its attributes are what the e2e suite reads.
  */
 export interface DrawingBarProps {
@@ -61,7 +62,7 @@ export function DrawingBar(props: DrawingBarProps): React.ReactElement {
                         : <span className="mapstudio-drawing-hint">{PLACE_HINT}</span>}
                 </span>
                 <button type="button" className="mapstudio-button mapstudio-button--primary mapstudio-drawing-done" title="Done (Esc)"
-                        onClick={props.onDone}>Done</button>
+                        aria-keyshortcuts="Escape" onClick={props.onDone}>Done</button>
             </div>
         );
     }
@@ -88,9 +89,11 @@ export function DrawingBar(props: DrawingBarProps): React.ReactElement {
                     <span className={'mapstudio-drawing-hint' + (problem !== '' ? ' mapstudio-drawing-hint--problem' : '')}>{hint}</span>
                 ) : null}
             </span>
-            <button type="button" className="mapstudio-button mapstudio-drawing-cancel" title="Cancel (Esc)" onClick={props.onCancel}>Cancel</button>
+            <button type="button" className="mapstudio-button mapstudio-drawing-cancel" title="Cancel (Esc)" aria-keyshortcuts="Escape"
+                    onClick={props.onCancel}>Cancel</button>
             <button type="button" className="mapstudio-button mapstudio-button--primary mapstudio-drawing-finish" disabled={!valid}
-                    title={valid ? 'Finish (Enter)' : problem || 'Click the map to add points'} onClick={props.onFinish}>Finish</button>
+                    title={valid ? 'Finish (Enter)' : problem || 'Click the map to add points'} aria-keyshortcuts="Enter"
+                    onClick={props.onFinish}>Finish</button>
         </div>
     );
 }

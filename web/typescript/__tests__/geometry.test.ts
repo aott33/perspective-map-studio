@@ -5,7 +5,7 @@ import { join } from 'path';
 
 import { MapItemRecord } from '../contract';
 import {
-    EDGES_CROSS, Position, SNAP_PX, canDeleteVertex, canSplitAt, endSideOf, endsFrom, endsWith, instrumentsOn, lengthM, lineDeleteBatch,
+    EDGES_CROSS, Position, SNAP_PX, canDeleteVertex, canSplitAt, endSideOf, endsFrom, endsWith, instrumentsOn, itemDeleteBatch, lengthM, lineDeleteBatch,
     lineGeometryBatch, lineMoveBatch, lineSplitBatch, linesSnappedTo, minVertexCount, nearestSnap, pointAt, pointMoveBatch, project, ringCrosses,
     round1, round6, snapDistanceM, snapTargets, snapTargetsForLine, splitAtBatch, splitName, vertexDeleteBatch, vertexMoveBatch
 } from '../geometry';
@@ -393,5 +393,64 @@ describe('an area\'s edges never cross, and a line\'s end never snaps to its own
         const targets = snapTargetsForLine(snapTargets(items), items, LINE_ID);
         expect(Array.from(new Set(targets.map((t) => t.name)))).toEqual(['PT-free', 'PT-9', 'L-OTHER']);
         expect(targets.some((t) => t.itemId === PT1 || t.itemId === PT2 || t.itemId === LINE_ID)).toBe(false);
+    });
+});
+
+describe('a delete of one map item with the ends naming it cleared (epic 4 entry 25)', () => {
+    const CTB = '66666666-6666-4666-8666-666666666666';
+    const SWDP = '77777777-7777-4777-8777-777777777777';
+    const LAT = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const SPUR = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const ENDS = { start: { itemId: CTB }, end: { itemId: SWDP } };
+    const SNAPPED = { ...LINE, ends: ENDS };
+    const PAD = record(CTB, 'pad', 'CTB1', { type: 'Point', coordinates: SWD[0] }, 3);
+    const PAD_END = record(SWDP, 'pad', 'SWD1', { type: 'Point', coordinates: SWD[2] }, 2);
+    // A lateral from CTB1 to PT-2 on L-SWD, and a spur from L-SWD's bend to nowhere (its start names the line itself).
+    const LATERAL = { ...record(LAT, 'line', 'L-LAT', { type: 'LineString', coordinates: [SWD[0], [-103.5, 31.93]] }, 5),
+        ends: { start: { itemId: CTB }, end: { itemId: PT2 } } };
+    const SPUR_LINE = { ...record(SPUR, 'line', 'L-SPUR', { type: 'LineString', coordinates: [SWD[1], [-103.5, 31.91]] }, 1),
+        ends: { start: { itemId: LINE_ID } } };
+    const GONE_LINE = { ...record('gone', 'line', 'L-GONE', { type: 'LineString', coordinates: [SWD[0], SWD[1]] }, 2),
+        ends: { start: { itemId: CTB } }, deleted: true };
+    const ALL = [ITEMS[0], SNAPPED, ITEMS[2], ITEMS[3], PAD, PAD_END, LATERAL, SPUR_LINE, GONE_LINE];
+
+    test('a pad: its delete, then each live line naming it loses that side of ends; a line left with no side gets null', () => {
+        expect(itemDeleteBatch('d1', PAD, ALL)).toEqual({ batchId: 'd1', ops: [
+            { op: 'delete', entity: 'item', id: CTB, baseVersion: 3 },
+            { op: 'update', entity: 'item', id: LINE_ID, baseVersion: 4, data: { ends: { end: { itemId: SWDP } } } },
+            { op: 'update', entity: 'item', id: LAT, baseVersion: 5, data: { ends: { end: { itemId: PT2 } } } }] });
+        // A pad no line names is one delete alone; a deleted line naming it is left as it is.
+        expect(itemDeleteBatch('d2', ITEMS[3], ALL)).toEqual({ batchId: 'd2', ops: [{ op: 'delete', entity: 'item', id: FREE, baseVersion: 1 }] });
+        const onlyEnd = itemDeleteBatch('d3', PAD_END, [SNAPPED, PAD_END, { ...LATERAL, ends: { end: { itemId: SWDP } } }]);
+        expect(onlyEnd.ops).toEqual([
+            { op: 'delete', entity: 'item', id: SWDP, baseVersion: 2 },
+            { op: 'update', entity: 'item', id: LINE_ID, baseVersion: 4, data: { ends: { start: { itemId: CTB } } } },
+            { op: 'update', entity: 'item', id: LAT, baseVersion: 5, data: { ends: null } }]);
+    });
+
+    test('a line: the line and its instruments, then the lines naming any of them lose those sides', () => {
+        expect(itemDeleteBatch('d4', SNAPPED, ALL)).toEqual({ batchId: 'd4', ops: [
+            { op: 'delete', entity: 'item', id: LINE_ID, baseVersion: 4 },
+            { op: 'delete', entity: 'item', id: PT1, baseVersion: 2 },
+            { op: 'delete', entity: 'item', id: PT2, baseVersion: 2 },
+            { op: 'update', entity: 'item', id: LAT, baseVersion: 5, data: { ends: { start: { itemId: CTB } } } },
+            { op: 'update', entity: 'item', id: SPUR, baseVersion: 1, data: { ends: null } }] });
+        // The deletes are lineDeleteBatch's, in its order, ahead of the updates.
+        expect(itemDeleteBatch('d5', SNAPPED, ALL).ops.slice(0, 3)).toEqual(lineDeleteBatch('d5', SNAPPED, ALL).ops);
+        // A line nothing names and with no instruments: one delete.
+        expect(itemDeleteBatch('d6', LATERAL, ALL).ops).toEqual([{ op: 'delete', entity: 'item', id: LAT, baseVersion: 5 }]);
+    });
+
+    test('an instrument alone: its delete, and a line whose end named it floats there', () => {
+        expect(itemDeleteBatch('d7', ITEMS[0], ALL).ops).toEqual([
+            { op: 'delete', entity: 'item', id: PT2, baseVersion: 2 },
+            { op: 'update', entity: 'item', id: LAT, baseVersion: 5, data: { ends: { start: { itemId: CTB } } } }]);
+    });
+
+    test('one op per id: the deleted items carry no update, so the Gateway reads the batch as written', () => {
+        for (const item of ALL.filter((i) => !i.deleted)) {
+            const ids = itemDeleteBatch('d8', item, ALL).ops.map((op) => op.id);
+            expect(new Set(ids).size).toBe(ids.length);
+        }
     });
 });

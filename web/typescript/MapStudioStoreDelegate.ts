@@ -12,12 +12,14 @@
  * From entry 23 `undoTo` runs the history's undo-to-here as single undos, each sent after the last reverse saved.
  * From entry 5 the geometry changes: `moveItem` carries the snapped ends of the item's lines, and `moveVertex`,
  * `reshapeLine`, `deleteVertex` and `splitLine` change a line's or an area's shape, each one batch (geometry.ts) and one step.
+ * From entry 25 `deleteItem` deletes an item, a line with its instruments, clearing the `ends` that name them, in one batch and
+ * one step, held and built as a geometry change is.
  */
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
 import { MapChanges, MapChangedBody } from './changes';
 import { EditBatch, EditLevel, MapItemData, MapItemRecord } from './contract';
-import { Position, lineGeometryBatch, pointMoveBatch, splitAtBatch, vertexDeleteBatch, vertexMoveBatch } from './geometry';
+import { Position, itemDeleteBatch, lineGeometryBatch, pointMoveBatch, splitAtBatch, vertexDeleteBatch, vertexMoveBatch } from './geometry';
 import { HostLists, NO_HOST_LISTS } from './adapters';
 import { MESSAGE_EVENT, Reply, basemapSource, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText } from './messages';
 import {
@@ -729,6 +731,31 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             }
             return splitAtBatch(newId(), line, index, partId, this.changes.state.items);
         }) ? partId : null;
+    }
+
+    /**
+     * Delete (entry 25; EXPERIENCE.md Delete: no confirmation, one undo restores it): one batch with the item, a line with every
+     * instrument on it, and the `ends` of the lines that name a deleted item cleared (geometry.ts itemDeleteBatch), "delete <name>".
+     * It carries whole `ends` and the records' versions, so it is held and built from the records as a geometry change is: sent now,
+     * or once the saves of the items it touches settle (an item's create still being saved, a line's reshape, a pad's move), never
+     * built on a stale record. Its undo restores every item at its tombstone with its link, properties, kind and geometry and puts
+     * the `ends` back (undo.ts); Redo deletes them again. False, with one console line, when the item is not on the map.
+     */
+    deleteItem(id: string): boolean {
+        const item = this.knownRecord(id);
+        if (!item) {
+            console.info('[MapStudio] The delete of ' + id + ' was dropped: the item is not on the map.');
+            return false;
+        }
+        this.sendShapeChange(id, stepLabel('delete', item.name), () => {
+            const now = this.knownRecord(id);
+            if (!now) {
+                console.info('[MapStudio] The delete of ' + item.name + ' was let go: the item left the map before its turn.');
+                return null;
+            }
+            return itemDeleteBatch(newId(), now, this.changes.state.items);
+        });
+        return true;
     }
 
     /** The asset picker (entry 2): one update of `assetId` (null to unlink), "link <name>" or "unlink <name>". */
