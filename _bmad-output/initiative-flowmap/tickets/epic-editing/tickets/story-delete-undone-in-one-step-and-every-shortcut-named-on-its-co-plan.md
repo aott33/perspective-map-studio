@@ -3,14 +3,14 @@ title: "Delete, undone in one step, and every shortcut named on its control"
 type: 'feature'
 ticket: '25'
 created: '2026-11-06'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: 'cb5d8d3e31bc7cf2e808419ff15c8fb2e386da16'
 route: 'full'
 route_source: 'auto'
 risk: 'low'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
