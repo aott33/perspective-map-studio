@@ -81,6 +81,18 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 
 ## Review Triage Log
 
+Quick lens, 2026-11-06: 7 findings; high 0, medium 3, low 3, verification 1.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| A delete sent while a line's save that snaps to the item is in flight leaves that line naming a deleted item | medium | `itemDeleteBatch` reads `changes.state.items`, which takes a save's new `ends` only on its reply; `touchesBusy` checks only the delete's own op ids; the Gateway checks no `ends` on a delete | patch: the delete waits while any save in flight or waiting names the item in its `ends`, and is built from the records once they settle |
+| The footer's delete runs while a line or an area is drawn, and the Delete key does too while the Line or Area tool is in hand before its first point | medium | `deleteSelected` checks only `canDelete`; `state.drawing` stays null until the first point; `onLineFinish` saves the `ends` recorded while drawing | patch: no delete, from the footer or the key, while a drawing tool is in hand |
+| An item known only from the waiting edits (a create refused for good) gets a delete at version 0, which the Gateway refuses | medium | `knownRecord` falls back to `unsavedItems`, version 0; `giveUp` clears the flight, so nothing holds it | patch: Delete off for an item never saved, its hover saying why ("Not saved yet") |
+| The footer says "Delete (Del)" while Del does something else (a chosen point's Delete point, Move waiting, a drawing) | low | The footer's `title` and `aria-keyshortcuts` are fixed; `onDeleteKey` routes Del elsewhere in those states | patch: the footer names Del only when Del deletes the item |
+| Some controls with a key do not name it: Select (Esc), the popup's close (Esc), the Items list's Clear the search (Esc), the waiting edits' Hide (Esc); Details' Move names Esc without `aria-keyshortcuts` | low | `DrawToolbar.tsx` 74, `popupParts.tsx` 40, `ItemList.tsx` 134, `SaveStatus.tsx` 103 | patch: each names its key in its hover words and `aria-keyshortcuts` |
+| `docs/contract.md` entry 23's section still gives Undo and Redo's hover words without the key | low | `docs/contract.md` 172 | patch: amended as entry 24 amended it |
+| The whole e2e suite has no clean run on record (a `writepath.spec.mjs` failure outside the allowed flake) | verification | The failure came from a mock run sharing the stack's output folder | resolved at verification: a whole-suite run on a fresh stack after the patches, nothing else running against it |
+
 ## Verification
 
 **Commands:**
