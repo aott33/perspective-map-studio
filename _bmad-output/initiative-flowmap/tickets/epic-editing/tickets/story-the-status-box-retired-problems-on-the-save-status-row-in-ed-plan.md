@@ -3,7 +3,7 @@ title: "The status box retired: problems on the save status row in Edit mode and
 type: 'feature'
 ticket: '24'
 created: '2026-11-05'
-status: 'in-review'
+status: 'built'
 baseline_revision: '831291aab17dbf5bf38d387905d36288ada2b0d8'
 route: 'full'
 route_source: 'auto'
@@ -109,6 +109,8 @@ Quick lens, 2026-11-06, plus one coordinator finding from the renders: 11 findin
 | Focus drops to the page after a Discard in the waiting list | low | The focused button leaves with its row; only Hide and Esc restore focus | patch: the next row's Discard, else the edits line |
 | Try again and Discard cannot be reached below 768 px or at level `phone` | owner's call | The owner chose the list in the dock, Edit mode only; a refused edit waits there until a desktop session opens Edit mode | asked of the owner; the phone's own list belongs to epic-phone's edit sheet |
 | The waiting edits open on a press, where the approved mock showed them open with Hide | owner's call | The implementer read "opens under it" as a press; the mock showed them open | asked of the owner with the render |
+
+After the patches (coordinator, 2026-11-06): `tsc` clean, 393 Jest tests green, Gradle build green offline, the contract check OK at 0.4.0, no em dashes; the whole e2e suite on a fresh dev stack 151 passed, 7 skipped, 0 failed in 34.5 min; the `E2E_DOCS=1` runs of the problems, unsaved, setup, store, tracer and studio specs 42 passed and rewrote the renders. Open with the owner: the waiting list's open or closed default (closed as built) and the phone's own list (proposed for epic-phone); the new warning glyph (an exclamation mark in an octagon) shown to the owner.
 
 ## Verification
 
