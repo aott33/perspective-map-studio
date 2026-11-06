@@ -5,9 +5,9 @@ import { join } from 'path';
 
 import { MapItemRecord } from '../contract';
 import {
-    Position, SNAP_PX, canDeleteVertex, canSplitAt, endSideOf, endsFrom, endsWith, instrumentsOn, lengthM, lineDeleteBatch, lineGeometryBatch,
-    lineMoveBatch, lineSplitBatch, linesSnappedTo, minVertexCount, nearestSnap, pointAt, pointMoveBatch, project, round1, round6, snapDistanceM,
-    snapTargets, splitAtBatch, splitName, vertexDeleteBatch, vertexMoveBatch
+    EDGES_CROSS, Position, SNAP_PX, canDeleteVertex, canSplitAt, endSideOf, endsFrom, endsWith, instrumentsOn, lengthM, lineDeleteBatch,
+    lineGeometryBatch, lineMoveBatch, lineSplitBatch, linesSnappedTo, minVertexCount, nearestSnap, pointAt, pointMoveBatch, project, ringCrosses,
+    round1, round6, snapDistanceM, snapTargets, snapTargetsForLine, splitAtBatch, splitName, vertexDeleteBatch, vertexMoveBatch
 } from '../geometry';
 
 interface Vectors {
@@ -356,5 +356,42 @@ describe('changing geometry (epic 4 entry 5): one batch per change, ends stored 
         expect((both.ops[1].data!.geometry as { coordinates: Position[] }).coordinates).toEqual([[-103.521235, 31.918765], SWD[1], [-103.521235, 31.918765]]);
         expect(pointMoveBatch('p3', PAD_END, to, [PAD_END, LINE]).ops.map((o) => o.id)).toEqual([SWDP]);
         expect(() => pointMoveBatch('p4', LINE, to, ITEMS)).toThrow('is not a point');
+    });
+});
+
+describe('an area\'s edges never cross, and a line\'s end never snaps to its own instruments (entry 5)', () => {
+    // A small square and, inside it, a spike from its left side (a simple ring), in degrees near the dev field.
+    const at = ([x, y]: Position): Position => [-104.99 + x * 0.0001, 39.73 + y * 0.0001];
+    const SQUARE = [[0, 0], [10, 0], [10, 10], [0, 10]].map((p) => at(p as Position));
+    const SPIKED = [[0, 0], [10, 0], [10, 10], [0, 10], [0, 6], [8, 5], [0, 4]].map((p) => at(p as Position));
+    const FENCE = record('fence', 'geofence', 'North fence', { type: 'LineString', coordinates: SQUARE }, 2);
+    const SPIKE = record('spike', 'geofence', 'Spike', { type: 'LineString', coordinates: SPIKED }, 1);
+
+    test('a ring crosses when two edges that share no point meet; a square, a triangle and the spike do not', () => {
+        expect(ringCrosses(SQUARE)).toBe(false);
+        expect(ringCrosses(SPIKED)).toBe(false);
+        expect(ringCrosses(SQUARE.slice(0, 3))).toBe(false);
+        // A bow tie, and a ring whose edge runs along another.
+        expect(ringCrosses([[0, 0], [10, 10], [10, 0], [0, 10]].map((p) => at(p as Position)))).toBe(true);
+        expect(ringCrosses([[0, 0], [10, 0], [5, 0], [5, 5]].map((p) => at(p as Position)))).toBe(true);
+    });
+
+    test('Move then a click and Delete point refuse an area whose edges would cross, in words; a line may cross itself', () => {
+        // Point 3 of the square moved across its left side: a bow tie.
+        expect(() => vertexMoveBatch('x1', FENCE, 2, at([-5, 5]), null, [FENCE], true)).toThrow(EDGES_CROSS);
+        expect(vertexMoveBatch('x2', FENCE, 2, at([12, 12]), null, [FENCE], true).ops).toHaveLength(1);
+        expect(vertexMoveBatch('x3', { ...FENCE, kind: 'line' }, 2, at([-5, 5]), null, [FENCE], false).ops).toHaveLength(1);
+        // The spiked ring's corner deleted: the new edge from (10, 0) to (0, 10) would run across the spike.
+        expect(() => vertexDeleteBatch('x4', SPIKE, 2, [SPIKE], true)).toThrow(EDGES_CROSS);
+        expect(vertexDeleteBatch('x5', SPIKE, 0, [SPIKE], true).ops).toHaveLength(1);
+    });
+
+    test('a line\'s end leaves its own points and instruments out of its snap targets; another line\'s instruments stay', () => {
+        const other = record('other', 'line', 'L-OTHER', { type: 'LineString', coordinates: [[-103.6, 31.9], [-103.59, 31.91]] }, 1);
+        const onOther = { ...tapAt('pt9', 'PT-9', 10), attachment: { lineId: 'other', distanceM: 10 } };
+        const items = [...ITEMS, other, onOther];
+        const targets = snapTargetsForLine(snapTargets(items), items, LINE_ID);
+        expect(Array.from(new Set(targets.map((t) => t.name)))).toEqual(['PT-free', 'PT-9', 'L-OTHER']);
+        expect(targets.some((t) => t.itemId === PT1 || t.itemId === PT2 || t.itemId === LINE_ID)).toBe(false);
     });
 });

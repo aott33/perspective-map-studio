@@ -7,8 +7,9 @@ import { GeometryPick, deleteOffText, geometryHint, geometryTitle, splitOffText 
  * then the one place Edit mode talks; with nothing chosen nothing does. A chosen point: "Point 2 of 3 on L-SWD", "Drag it to
  * move it, or use Move", then Move, Split here (an inner point of a line only) and Delete point (never below two points for a
  * line or three for an area), each off with the reason as its title. Move pressed: "Moving point 2 of L-SWD" (or "Moving CTB1"
- * for a point item's Move from Details), "Click the new place on the map - Esc to cancel" and Cancel. While an edit of the
- * item is being saved the actions wait. Move swaps its buttons, so the focus that was on them (or lost with them) moves to
+ * for a point item's Move from Details), "Click the new place on the map - Esc to cancel" and Cancel. An action refused here
+ * says why in the hint ("The edges would cross" for an area), nothing sent. An action taken while an earlier change is being
+ * saved goes after it (the delegate's turn), so the buttons never wait. Move swaps its buttons, so the focus that was on them (or lost with them) moves to
  * Cancel while Move waits and back to Move after, keeping Esc and Enter in the component. Its attributes are what the e2e
  * suite reads.
  */
@@ -18,7 +19,7 @@ export interface GeometryBarProps {
     name: string;
     vertexCount: number;
     area: boolean;
-    /** An edit is being saved: the actions wait for it, so a shape is never built on a record about to change. */
+    /** An edit is being saved or waits its turn (`data-busy`); an action taken now goes after it. */
     busy: boolean;
     onMove: () => void;
     onCancel: () => void;
@@ -50,24 +51,25 @@ export function GeometryBar(props: GeometryBarProps): React.ReactElement {
     const index = pick.index;
     const split = index === null ? 'A point item has no split' : splitOffText(vertexCount, index, area);
     const remove = deleteOffText(vertexCount, area);
-    const waiting = busy ? 'Saving...' : '';
     return (
         <div ref={bar} className="mapstudio-geometry-bar" role="group" aria-label={title} data-item-id={pick.itemId} data-point={index === null ? '' : String(index)}
-             data-moving={pick.moving ? 'true' : 'false'} data-busy={busy ? 'true' : 'false'}>
+             data-moving={pick.moving ? 'true' : 'false'} data-busy={busy ? 'true' : 'false'} data-reason={pick.problem || ''}>
             <span className="mapstudio-drawing-words" aria-live="polite">
                 <span className="mapstudio-drawing-title mapstudio-geometry-title">{title}</span>
-                <span className="mapstudio-drawing-hint mapstudio-geometry-hint">{geometryHint(pick)}</span>
+                <span className={'mapstudio-drawing-hint mapstudio-geometry-hint' + (pick.problem ? ' mapstudio-drawing-hint--problem' : '')}>
+                    {geometryHint(pick)}
+                </span>
             </span>
             {pick.moving ? (
                 <button type="button" className="mapstudio-button mapstudio-geometry-cancel" title="Cancel (Esc)" onClick={props.onCancel}>Cancel</button>
             ) : (
                 <>
-                    <button type="button" className="mapstudio-button mapstudio-geometry-move" disabled={busy}
-                            title={waiting || 'Move: click the new place on the map'} onClick={props.onMove}>Move</button>
-                    <button type="button" className="mapstudio-button mapstudio-geometry-split" disabled={busy || split !== ''}
-                            title={waiting || split || 'Split the line here into two lines'} onClick={props.onSplit}>Split here</button>
-                    <button type="button" className="mapstudio-button mapstudio-geometry-delete" disabled={busy || remove !== ''}
-                            title={waiting || remove || 'Delete this point'} onClick={props.onDelete}>Delete point</button>
+                    <button type="button" className="mapstudio-button mapstudio-geometry-move"
+                            title="Move: click the new place on the map" onClick={props.onMove}>Move</button>
+                    <button type="button" className="mapstudio-button mapstudio-geometry-split" disabled={split !== ''}
+                            title={split || 'Split the line here into two lines'} onClick={props.onSplit}>Split here</button>
+                    <button type="button" className="mapstudio-button mapstudio-geometry-delete" disabled={remove !== ''}
+                            title={remove || 'Delete this point'} onClick={props.onDelete}>Delete point</button>
                 </>
             )}
         </div>

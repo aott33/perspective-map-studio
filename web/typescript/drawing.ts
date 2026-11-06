@@ -190,6 +190,8 @@ export interface GeometryPick {
     index: number | null;
     /** Move pressed: the next click on the map is the new place; Esc or Cancel puts it down and nothing is sent. */
     moving: boolean;
+    /** Why the last action was refused here, nothing sent ("The edges would cross" for an area), shown as the bar's hint; else absent. */
+    problem?: string;
 }
 
 /** The chosen point's hint (the owner's mock): the drag and its non-drag way. */
@@ -207,9 +209,9 @@ export function geometryTitle(pick: GeometryPick, name: string, vertexCount: num
     return pick.moving ? 'Moving point ' + point + ' of ' + name : 'Point ' + point + ' of ' + vertexCount + ' on ' + name;
 }
 
-/** The bar's hint: Move's while it waits for the click, else the chosen point's. */
+/** The bar's hint: why the last action was refused, else Move's while it waits for the click, else the chosen point's. */
 export function geometryHint(pick: GeometryPick): string {
-    return pick.moving ? MOVE_HINT : CHOSEN_HINT;
+    return pick.problem ? pick.problem : pick.moving ? MOVE_HINT : CHOSEN_HINT;
 }
 
 /** Why Split here is off for the chosen point, '' when it is on: an area has none, a line splits at an inner point only. */

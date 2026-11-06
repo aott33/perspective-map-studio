@@ -3,13 +3,16 @@
 // point and a dashed one at each midpoint; a point dragged, a midpoint dragged in, a point chosen with the bar's Move, Split here
 // and Delete point, Move then a click, a pad dragged and moved from Details with the snapped end following, a line's end dragged
 // with Snap off (it floats) and on (it lands on SWD1 and names it), an area's chosen point; each change one batch (one seq) and
-// one Undo step, Undo putting it back. Every non-drag way by clicks and keys. At 390 px and for a viewer no handles, no bar and
-// no Move. Renders of the four mocked states for the docs under E2E_DOCS=1 (AD-15). The spec leaves the seed as it found it
+// one Undo step, Undo putting it back; a reshape refused (another save of L-SWD landed first) said on the save status row, the
+// handles back on the stored shape. Every non-drag way by clicks and keys. At 390 px, for a phone editor at 1366 px and for a
+// viewer no handles, no bar and no Move. Renders of the four mocked states for the docs under E2E_DOCS=1 (AD-15). The spec leaves the seed as it found it
 // (each change undone, then the seed run again and the strays removed), since later specs read L-SWD.
 
 import { pagePixel } from '../lib/geo.mjs';
+import { randomUUID } from 'node:crypto';
 import {
-    EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot as shotNow, signedInContext, test, view
+    EDITOR_USER, OPERATOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot as shotNow, signedInContext,
+    test, view
 } from './fixtures.mjs';
 
 /** The Gateway's answer to a save. */
@@ -264,6 +267,62 @@ test.describe('1366 px', () => {
             await undoOnce(page, map, (now) => sameLine(now[ids.line].geometry.coordinates, SWD_LINE));
         });
 
+    editorTest('a reshape refused because another save of L-SWD landed first: the save status row says so and the handles return to the stored shape',
+        async ({ page }) => {
+            // The page's websocket is routed so the test can hold the Gateway's map.changed frames for a moment: another save of
+            // L-SWD commits while this page does not know of it yet, so the drag's batch carries the version before it.
+            let holding = false;
+            const held = [];
+            let toPage = null;
+            await page.routeWebSocket(/.*/, (ws) => {
+                const server = ws.connectToServer();
+                ws.onMessage((message) => server.send(message));
+                server.onMessage((message) => {
+                    if (holding && typeof message === 'string' && message.includes('"type": "map.changed"')) {
+                        held.push(message);
+                        return;
+                    }
+                    ws.send(message);
+                });
+                toPage = ws;
+            });
+            const map = await openEditor(page);
+            await selectLine(page, map);
+            const line = (await storedAll(page))[ids.line];
+            const bend = await pixelNow(map, BEND);
+            await page.mouse.move(bend[0], bend[1]);
+            await page.mouse.move(bend[0] + 1, bend[1] + 1);
+            await page.mouse.down();
+            await page.mouse.move(bend[0] + 15, bend[1] - 10, { steps: 4 });
+            await page.mouse.move(bend[0] + 40, bend[1] - 30, { steps: 8 });
+            // Another save of L-SWD (through the test hook, as another editor's would) commits before the drag ends.
+            holding = true;
+            const other = await send(page, 'edits.apply', { batchId: randomUUID(), ops: [{ op: 'update', entity: 'item', id: ids.line,
+                baseVersion: line.version, data: { properties: line.properties } }] });
+            expect(other.type, JSON.stringify(other.body)).toBe('edits.apply.reply');
+            await page.mouse.up();
+            const row = page.locator('.mapstudio-panel-save--row');
+            await expect(row).toHaveAttribute('data-code', 'conflict', { timeout: REPLY_MS });
+            await expect(row).toContainText('L-SWD');
+            await expect(map).toHaveAttribute('data-save-state', 'refused');
+            // The other save reaches the page now, as it would have a moment later.
+            holding = false;
+            for (const message of held.splice(0)) {
+                toPage.send(message);
+            }
+            // Nothing of the drag was written; the handles are made again from the stored shape.
+            const items = await storedAll(page);
+            expect(items[ids.line].version).toBe(line.version + 1);
+            expect(sameLine(items[ids.line].geometry.coordinates, SWD_LINE)).toBe(true);
+            await expect(map).toHaveAttribute('data-handles', ids.line);
+            await expect(map).toHaveAttribute('data-handles-changed', 'false', { timeout: REPLY_MS });
+            await expect(map).toHaveAttribute('data-handle-points', '3');
+            // The refused edit waits under the row with Discard, as any refused edit does; discarded, nothing is left.
+            await page.locator('.mapstudio-panel-problem--edits').click();
+            await page.locator('.mapstudio-unsaved-discard').first().click();
+            await expect(map).toHaveAttribute('data-unsaved-count', '0', { timeout: REPLY_MS });
+        });
+
     editorTest('a midpoint dragged in, then L-SWD split there between PT-1 and PT-2: two lines, PT-1 on the first and PT-2 on the second measured from its start, the new part in Details on Name; one Undo step each',
         async ({ page }) => {
             const map = await openEditor(page);
@@ -442,6 +501,13 @@ test.describe('1366 px', () => {
             await expect(page.locator('.mapstudio-panel')).toBeVisible();
             await page.waitForTimeout(500);
             await expect(map).toHaveAttribute('data-store-seq', String(seqBefore));
+            // Move pressed again while it waits puts it down, as Esc does.
+            await move.click();
+            await expect(map).toHaveAttribute('data-moving', 'item');
+            await move.click();
+            await expect(map).toHaveAttribute('data-moving', '');
+            await expect(move).toHaveAttribute('aria-pressed', 'false');
+            await expect(bar).toHaveCount(0);
             await move.click();
             await expect(map).toHaveAttribute('data-moving', 'item');
             const spot = [pad[0] - 60, pad[1] + 40];
@@ -513,6 +579,31 @@ test.describe('the phone and a viewer', () => {
 
     test.describe('1366 px', () => {
         test.use({ viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1 });
+
+        test('a phone editor (level phone) at 1366 px: View mode, no handles, no bar, no Move', async ({ browser }) => {
+            const context = await signedInContext(browser, OPERATOR_USER, { viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1 });
+            try {
+                const page = await context.newPage();
+                const map = await openMap(page, '/edit');
+                await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + OPERATOR_USER);
+                await mapLoaded(map);
+                await expect(map).toHaveAttribute('data-edit-level', 'phone');
+                await expect(map).toHaveAttribute('data-studio', 'off');
+                await view(page, map, SWD_VIEW.center, SWD_VIEW.zoom);
+                const pad = await pixelNow(map, CTB1);
+                await page.mouse.click(pad[0], pad[1]);
+                await expect(map).toHaveAttribute('data-selected', ids.ctb1);
+                await expect(map).toHaveAttribute('data-handles', '');
+                await expect(page.locator('.mapstudio-panel')).toHaveCount(0);
+                await expect(page.locator('.mapstudio-field-move')).toHaveCount(0);
+                const bend = await pixelNow(map, BEND);
+                await page.mouse.click(bend[0], bend[1]);
+                await expect(map).toHaveAttribute('data-chosen-point', '');
+                await expect(page.locator('.mapstudio-geometry-bar')).toHaveCount(0);
+            } finally {
+                await context.close();
+            }
+        });
 
         test('a viewer: a line selected shows no handles; a click on its point chooses nothing', async ({ page }) => {
             const map = await openMap(page, '/edit');

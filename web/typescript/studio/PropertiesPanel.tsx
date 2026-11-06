@@ -40,7 +40,11 @@ export interface PropertiesPanelProps {
     onClose: () => void;
     onRename: (name: string) => void;
     onMove: (lngLat: [number, number]) => void;
-    /** Entry 5: whether Move beside Location shows (a point item; an instrument moves along its line, entry 9), whether it waits for the click, and Move pressed. */
+    /**
+     * Entry 5: whether Move beside Location shows (a point item; an instrument moves along its line, entry 9), whether it waits
+     * for the click, and Move pressed (pressed again while it waits, Move is put down). A move made while the item's create is
+     * saved goes right after it, as a field does.
+     */
     canMoveByClick: boolean;
     moving: boolean;
     onMoveStart: () => void;
@@ -216,8 +220,9 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                         <div className="mapstudio-field-label-row">
                             <span className="mapstudio-field-label">Location</span>
                             {point && this.props.canMoveByClick ? (
-                                <button type="button" className="mapstudio-button mapstudio-field-move" aria-pressed={this.props.moving} disabled={paused || pending}
-                                        title={pending ? 'Saving the new item...' : 'Move: click the new place on the map'} onClick={this.props.onMoveStart}>Move</button>
+                                <button type="button" className="mapstudio-button mapstudio-field-move" aria-pressed={this.props.moving} disabled={paused}
+                                        title={this.props.moving ? 'Move waits for a click on the map; press again or Esc to cancel'
+                                            : 'Move: click the new place on the map'} onClick={this.props.onMoveStart}>Move</button>
                             ) : null}
                         </div>
                         {point ? (

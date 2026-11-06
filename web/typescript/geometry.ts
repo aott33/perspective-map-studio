@@ -218,6 +218,51 @@ function withEnds(batch: EditBatch, line: MapItemRecord, ends: MapItemRecord['en
     return { batchId: batch.batchId, ops: [{ ...first, data: { ...first.data, ends } }, ...rest] };
 }
 
+/** Why a change to an area is refused (the drag's select mode, like the Area tool, never lets a ring's edges cross). */
+export const EDGES_CROSS = 'The edges would cross';
+
+function turn(o: Position, a: Position, b: Position): number {
+    return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+}
+
+function within(a: Position, b: Position, p: Position): boolean {
+    return Math.min(a[0], b[0]) <= p[0] && p[0] <= Math.max(a[0], b[0]) && Math.min(a[1], b[1]) <= p[1] && p[1] <= Math.max(a[1], b[1]);
+}
+
+/** Whether the segments a-b and c-d meet (crossing, or touching or overlapping in a line). */
+function segmentsMeet(a: Position, b: Position, c: Position, d: Position): boolean {
+    const d1 = turn(c, d, a);
+    const d2 = turn(c, d, b);
+    const d3 = turn(a, b, c);
+    const d4 = turn(a, b, d);
+    if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+        return true;
+    }
+    return (d1 === 0 && within(c, d, a)) || (d2 === 0 && within(c, d, b)) || (d3 === 0 && within(a, b, c)) || (d4 === 0 && within(a, b, d));
+}
+
+/**
+ * Whether an area's ring (its points unclosed, AD-20) has two edges that meet other than at the point they share: the check
+ * Move then a click and Delete point run before an area's batch is built (entry 5), planar in longitude and latitude.
+ */
+export function ringCrosses(ring: Position[]): boolean {
+    const n = ring.length;
+    if (n < 4) {
+        return false;
+    }
+    for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+            if (j === i + 1 || (i === 0 && j === n - 1)) {
+                continue;
+            }
+            if (segmentsMeet(ring[i], ring[(i + 1) % n], ring[j], ring[(j + 1) % n])) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 /** The fewest vertices a line keeps (two) and an area's ring (three). */
 export function minVertexCount(area: boolean): number {
     return area ? 3 : 2;
@@ -253,6 +298,9 @@ export function vertexMoveBatch(batchId: string, line: MapItemRecord, index: num
         throw new Error(`Map item ${line.id} has no vertex ${index}.`);
     }
     coords[index] = [to[0], to[1]];
+    if (area && ringCrosses(coords)) {
+        throw new Error(EDGES_CROSS);
+    }
     const batch = lineGeometryBatch(batchId, line, coords, items);
     const side = endSideOf(coords.length, index, area);
     return side === null ? batch : withEnds(batch, line, endsWith(line.ends, side, snapTo));
@@ -271,7 +319,11 @@ export function vertexDeleteBatch(batchId: string, line: MapItemRecord, index: n
     if (!canDeleteVertex(coords.length, area)) {
         throw new Error(`Map item ${line.id} keeps at least ${minVertexCount(area)} vertices.`);
     }
-    const batch = lineGeometryBatch(batchId, line, coords.filter((_c, i) => i !== index), items);
+    const kept = coords.filter((_c, i) => i !== index);
+    if (area && ringCrosses(kept)) {
+        throw new Error(EDGES_CROSS);
+    }
+    const batch = lineGeometryBatch(batchId, line, kept, items);
     const side = endSideOf(coords.length, index, area);
     return side === null ? batch : withEnds(batch, line, endsWith(line.ends, side, null));
 }
@@ -418,6 +470,15 @@ export function nearestSnap(targets: SnapTarget[], at: Position, withinM: number
         }
     }
     return best;
+}
+
+/**
+ * The targets a line's end may snap to while the line is edited (entry 5): every target but the line's own points and its own
+ * instruments, since an end on an instrument of its line would move the line under the instrument and leave it off its place.
+ */
+export function snapTargetsForLine(targets: SnapTarget[], items: MapItemRecord[], lineId: string): SnapTarget[] {
+    const own = new Set([lineId].concat(instrumentsOn(items, lineId).map((i) => i.id)));
+    return targets.filter((t) => !own.has(t.itemId));
 }
 
 /** The saved line's `ends` from the targets its first and last vertex snapped to (null for either floating end); null with both floating. */

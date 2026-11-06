@@ -202,6 +202,12 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      */
     private inFlightByItem = new Map<string, string>();
     private heldByItem = new Map<string, Array<{ batch: EditBatch; label: string | null }>>();
+    /**
+     * The geometry changes waiting their turn (entry 5), oldest first. Their batches carry whole shapes built from the stored
+     * records, so each waits as a builder while a save of any item it touches is in flight or waiting, and is built again from
+     * the records once those saves settle (`releaseShapes`): saved in order, never dropped and never built on a stale record.
+     */
+    private heldShapes: Array<{ itemId: string; label: string; build: () => EditBatch | null }> = [];
 
     constructor(componentStore: AbstractUIElementStore) {
         super(componentStore);
@@ -513,6 +519,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             }
             this.dispatch(rebased, itemId, next.label, new Date());
         }
+        this.releaseShapes();
     }
 
     /** The stored records of the batch's map items as they are now (a create's id is absent). */
@@ -560,28 +567,62 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             console.info('[MapStudio] The move of ' + id + ' was dropped: the item is not a point on the map.');
             return false;
         }
-        const batch = pointMoveBatch(newId(), item, lngLat, this.changes.state.items);
-        // A point alone waits its turn and is rebased (the Point tool's pin dragged while its create is saved); the lines it
-        // carries are built from their stored shapes, which a change still being saved would make stale.
-        if (batch.ops.length > 1 && this.shapeBusy(batch, id)) {
-            return false;
-        }
-        this.sendBatch(batch, id, stepLabel('move', item.name));
+        // Built when it goes, from the records then: a pin dragged while its create is saved waits for the create's reply.
+        this.sendShapeChange(id, stepLabel('move', item.name), () => {
+            const now = this.knownRecord(id);
+            if (!now || now.geometry.type !== 'Point') {
+                console.info('[MapStudio] The move of ' + item.name + ' was let go: the item left the map before its turn.');
+                return null;
+            }
+            return pointMoveBatch(newId(), now, lngLat, this.changes.state.items);
+        });
         return true;
     }
 
     /**
-     * Whether another map item of a geometry batch (other than `except`) has a batch in flight or waiting its turn (entry 5): the
-     * batch carries whole shapes built from the stored records, so it is not sent until that one is saved (one console line).
+     * A geometry change (entry 5): sent now when no save of any item its batch touches is in flight or waiting and no earlier
+     * geometry change waits; else it waits as a builder (one console line) and goes when those saves settle (`releaseShapes`).
      */
-    private shapeBusy(batch: EditBatch, except: string | null): boolean {
-        const ids = batch.ops.map((op) => op.id).filter((id) => id !== except);
-        const held = Array.from(this.heldByItem.values()).some((list) => list.some((h) => h.batch.ops.some((op) => ids.indexOf(op.id) >= 0)));
-        if (!held && !ids.some((id) => this.inFlightByItem.has(id))) {
-            return false;
+    private sendShapeChange(itemId: string, label: string, build: () => EditBatch | null): void {
+        if (this.heldShapes.length === 0) {
+            const batch = build();
+            if (batch === null) {
+                return;
+            }
+            if (!this.touchesBusy(batch)) {
+                this.sendBatch(batch, itemId, label);
+                return;
+            }
         }
-        console.info('[MapStudio] A shape change waits: an earlier change of the same line is still being saved; nothing was sent.');
-        return true;
+        this.heldShapes.push({ itemId, label, build });
+        console.info('[MapStudio] ' + label + ' waits its turn: a save of an item it changes is still in flight.');
+        this.notify();
+    }
+
+    /** Whether a save of a map item the batch touches is in flight, or waiting its turn behind one. */
+    private touchesBusy(batch: EditBatch): boolean {
+        const ids = batch.ops.map((op) => op.id);
+        return ids.some((id) => this.inFlightByItem.has(id))
+            || Array.from(this.heldByItem.values()).some((list) => list.some((h) => h.batch.ops.some((op) => ids.indexOf(op.id) >= 0)));
+    }
+
+    /**
+     * A save settled (saved, refused or discarded): the geometry changes waiting go, oldest first, each built now from the
+     * records, until one still touches a save in flight. One that can no longer be built (its item left the map, a point gone)
+     * is let go with one console line; that is the only way a change does not save.
+     */
+    private releaseShapes(): void {
+        while (this.heldShapes.length > 0) {
+            const next = this.heldShapes[0];
+            const batch = next.build();
+            if (batch !== null && this.touchesBusy(batch)) {
+                return;
+            }
+            this.heldShapes.shift();
+            if (batch !== null) {
+                this.sendBatch(batch, next.itemId, next.label);
+            }
+        }
     }
 
     /** Whether a map item is drawn as an area (its kind's `area`): an unclosed ring with no ends and no split (AD-20). */
@@ -591,8 +632,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     }
 
     /**
-     * A change to a stored line's or area's shape (entry 5): the batch `build` makes from the stored record, sent as one step
-     * named `action` and the line's name; false, with one console line, when the line is not stored or the change cannot be made.
+     * A change to a stored line's or area's shape (entry 5), one step named `action` and the line's name: the batch `build` makes
+     * from the stored record when the change goes (now, or once the saves it waits on settle, `sendShapeChange`). False, with one
+     * console line, when the line is not stored; a change that can no longer be built when its turn comes is let go likewise.
      */
     private sendShape(id: string, action: 'reshape' | 'split', build: (line: MapItemRecord, area: boolean) => EditBatch): boolean {
         const line = this.storedRecord(id);
@@ -600,17 +642,18 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             console.info('[MapStudio] The ' + action + ' of ' + id + ' was dropped: the line is not on the map.');
             return false;
         }
-        let batch: EditBatch;
-        try {
-            batch = build(line, this.isArea(line));
-        } catch (err) {
-            console.info('[MapStudio] The ' + action + ' of ' + line.name + ' was not sent: ' + (err instanceof Error ? err.message : String(err)));
-            return false;
-        }
-        if (this.shapeBusy(batch, null)) {
-            return false;
-        }
-        this.sendBatch(batch, id, stepLabel(action, line.name));
+        this.sendShapeChange(id, stepLabel(action, line.name), () => {
+            const now = this.storedRecord(id);
+            try {
+                if (!now || now.geometry.type !== 'LineString') {
+                    throw new Error('the line left the map');
+                }
+                return build(now, this.isArea(now));
+            } catch (err) {
+                console.info('[MapStudio] The ' + action + ' of ' + line.name + ' was not sent: ' + (err instanceof Error ? err.message : String(err)));
+                return null;
+            }
+        });
         return true;
     }
 
@@ -634,7 +677,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
     /**
      * The chosen point's Split here (entry 5): one batch in which the line keeps its start and the new line its end
-     * (geometry.ts splitAtBatch), "split <name>". Returns the new line's id, or null when nothing was sent.
+     * (geometry.ts splitAtBatch), "split <name>". Returns the new line's id (sent now or once its turn comes), or null when the
+     * line is not on the map.
      */
     splitLine(id: string, index: number): string | null {
         const partId = newId();
@@ -676,7 +720,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * started before it would leave that step past the cursor, out of Undo's reach and reversed by a later Redo.
      */
     private editInFlight(): boolean {
-        return this.pendingSteps.size > 0 || Array.from(this.heldByItem.values()).some((held) => held.some((h) => h.label !== null));
+        return this.pendingSteps.size > 0 || this.heldShapes.length > 0
+            || Array.from(this.heldByItem.values()).some((held) => held.some((h) => h.label !== null));
     }
 
     /** True, with one console line, when an edit being saved makes Undo, Redo or the history wait. */
@@ -1017,11 +1062,12 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             if (outcome.kind === 'failed') {
                 this.stopRun(outcome.batchId, 'was refused (' + outcome.reason.code + ')');
             }
-            if (outcome.kind === 'failed' && !isTransient(outcome.reason.code)) {
-                this.giveUp(outcome.batchId);
-            }
             if (shown && this.save.state !== 'idle') {
                 this.save = refusedSave(this.save.itemId, reply.body);
+            }
+            if (outcome.kind === 'failed' && !isTransient(outcome.reason.code)) {
+                // After the refusal is on the save status: a geometry change waiting on it goes now (entry 5) and says Saving...
+                this.giveUp(outcome.batchId);
             }
             this.store = storeStateFromSaveError(this.store, reply.body);
         }

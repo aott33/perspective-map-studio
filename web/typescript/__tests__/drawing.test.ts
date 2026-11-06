@@ -147,6 +147,8 @@ describe('the chosen point\'s bar and Move\'s bar (epic 4 entry 5, the owner\'s 
         expect(MOVE_HINT).toBe('Click the new place on the map - Esc to cancel');
         expect(geometryHint({ itemId: 'l', index: 0, moving: false })).toBe(CHOSEN_HINT);
         expect(geometryHint({ itemId: 'l', index: 0, moving: true })).toBe(MOVE_HINT);
+        // A refused action says why instead, nothing sent (an area whose edges would cross).
+        expect(geometryHint({ itemId: 'a', index: 2, moving: true, problem: 'The edges would cross' })).toBe('The edges would cross');
     });
 
     test('Split here is off on an end point and on an area; Delete point at the floor, each saying why', () => {

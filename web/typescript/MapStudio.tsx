@@ -181,6 +181,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     selectMode: TerraDrawSelectMode | null = null;
     handles: editing.Handles | null = null;
     dragSnap: SnapTarget | null = null;
+    handleDrag = false;
     chosenDrawn = -1;
     /** The Edit switch top-right (entry 2), added once map.load says the level is full; null otherwise. */
     editSwitch: EditSwitch | null = null;
@@ -906,11 +907,16 @@ export class MapStudio extends Component<Props, MapStudioState> {
 
     /**
      * Details' Move beside a point item's Location (entry 5): the tool in hand is put down (Move is Select's) and the next click
-     * on the map is the item's new place.
+     * on the map is the item's new place; pressed again while it waits, Move is put down, as Esc does.
      */
     onMoveByClick = (): void => {
         const selected = this.state.selected;
         if (!selected || (this.props.delegate && this.props.delegate.editing === 'off')) {
+            return;
+        }
+        const pick = this.state.geometry;
+        if (pick && pick.itemId === selected.id && pick.moving) {
+            editing.escapeGeometry(this);
             return;
         }
         if (this.state.studio.tool !== null) {
@@ -920,7 +926,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     };
 
     /** The geometry bar (entry 5): Move for the chosen point, Cancel (as Esc), Split here and Delete point, each one batch. */
-    onGeometryMove = (): void => this.setState((prev) => (prev.geometry ? { geometry: { ...prev.geometry, moving: true } } : null));
+    onGeometryMove = (): void => this.setState((prev) => (prev.geometry
+        ? { geometry: { itemId: prev.geometry.itemId, index: prev.geometry.index, moving: true } } : null));
     onGeometryCancel = (): void => {
         editing.escapeGeometry(this);
     };
@@ -939,13 +946,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         selection.closePopup(this);
         this.setState((prev) => ({ ...this.selectionState(prev, { id: partId, kind: 'line', segment: null }), pick: null, panel: partId, geometry: null }));
     };
-    onDeletePoint = (): void => {
-        const pick = this.state.geometry;
-        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
-        if (pick && pick.index !== null && delegate && delegate.deleteVertex(pick.itemId, pick.index)) {
-            this.setState((prev) => (prev.geometry === pick ? { geometry: null } : null));
-        }
-    };
+    onDeletePoint = (): void => editing.deletePoint(this);
 
     /** The Kind select in Details (entry 4): one update of `kind` to a kind of the item's geometry. */
     onKind = (kindId: string): void => {
@@ -1350,7 +1351,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                         // With Select in hand, the chosen point's or Move's bar is the one place that talks (entry 5).
                         <GeometryBar pick={pick}
                                      name={picked.name}
-                                     vertexCount={picked.geometry.type === 'LineString' ? picked.geometry.coordinates.length : 1}
+                                     vertexCount={this.handles && this.handles.itemId === picked.id && this.handles.shape !== 'point'
+                                         ? this.handles.shown.length : picked.geometry.type === 'LineString' ? picked.geometry.coordinates.length : 1}
                                      area={!!(pickedKind && pickedKind.area)}
                                      busy={delegate.editInFlight}
                                      onMove={this.onGeometryMove}
