@@ -3,7 +3,7 @@ title: "In Edit mode a click selects and opens Details, no popup"
 type: 'feature'
 ticket: '26'
 created: '2026-11-06'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '1153ef47de8776749793951b0cc2b183c8e798f2'
 route: 'full'
 route_source: 'auto'
