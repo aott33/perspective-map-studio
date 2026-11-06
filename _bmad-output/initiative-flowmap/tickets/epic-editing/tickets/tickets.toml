@@ -9,6 +9,7 @@
 # Entry 5 split (owner, 2026-11-06): geometry stays 5; Delete with shortcuts on the controls is 25; duplicate and add-another parked (backlog 28); the ? panel dropped.
 # Entry 26 (owner, 2026-11-06, testing on the dev stack): no popup in Edit mode, a click opens Details; after 25, taken out of entry 7.
 # Entry 6 split (owner, 2026-11-06): the form stays 6; the place check is 27, right after it.
+# Owner, 2026-11-06 ("run 14, 15 and 16 after 27"): the page and place lane (14, 15, 16) moves ahead of the studio's 7 to 13.
 # Cross-epic prerequisites are pinned on the entries that need them ("2.n", "3.n").
 # Entry 21 (owner, 2026-11-05, option B of the layout review after entry 4): Edit mode's top row as DESIGN.md draws it, ahead of 5; entry 7 builds on its list header.
 
@@ -156,6 +157,39 @@ hitl = false
 risk = "medium"
 
 [[entry]]
+id = 14
+type = "story"
+title = "Selection, viewport and popup events to the page, and contract 0.4.0"
+description = "Initiative R48 and R49 (gap review item 1; AD-7, AD-9, AD-20): the bidirectional selectedItem prop complete (an id written by the page selects, moves to and opens the item's popup as a click does, a pick-list group or a line with its segment handled, an unknown id clearing the selection with one console warning), onItemSelected on every change with the AD-7 object (null when cleared); the read-only viewport prop {center, zoom, bounds} written once per move end, and onViewportChanged, onPopupOpen {itemId, segment} and onPopupClose fired for the page; editMode's bidirectional behaviour documented; the events declared in the descriptor with their schemas so the Designer lists them; the props and a new events section added to contract 0.4.0, and the dev project's /events page showing each event's last payload. Never per frame: the frame rate of R37 holds."
+verify = "On the dev Gateway: a Perspective table beside the map selects P14 on the map by writing selectedItem and a map click selects a row through onItemSelected; writing a line's id opens its popup; a pan fires one onViewportChanged at its end with the bounds, none during the move; opening and closing a popup fires the two events with the segment for a line; the Designer's component events list shows the four; the contract docs read 0.4.0 and the version check passes; e2e at 1366 and 390 px passes."
+covers = ["R17", "R21", "R22"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 15
+type = "story"
+title = "You are here and Locate me from the page's geolocation binding"
+description = "Initiative R50 (gap review item 2; owner, 2026-11-03): the userLocation prop in the closed list, in the shape of the session's geolocation property (enabled, permissionGranted, data with latitude, longitude, accuracy, altitude, heading, speed, timestamp) so the page binds it to session.props.geolocation in one binding; the map draws the you-are-here marker as entry 3 designed it (DESIGN.md components.you-are-here: a 14 px dot in the you-are-here token, the theme's qual-1, with a white ring, a soft accuracy circle at the map's scale and, when given, a heading wedge), with \"You are here\" in the legend's States, never a map item, never in Needs you, the list, the export or the batch; Locate me, the zoom card's last button (a navigation arrow), moves the map to it and is off with the reason in its hover text (\"Locate me - location is off for this session\", \"Locate me - location permission not granted\", \"Locate me - no location fix yet\"); the module reads nothing of the session itself and never calls the browser's geolocation API; the prop added to contract 0.4.0 and the dev project's /locate page with the session's geolocation turned on. The marker's look goes to entry 18's ER-27 review."
+verify = "On the dev Gateway with the session's geolocation enabled on the /locate page in a browser granting permission: the marker draws at the device's position with its ring and Locate me centres on it; with permission denied the marker is absent and the button says so; with enabled false the button says it is off in the session; the marker is absent from the list, Needs you and the export; no geolocation call appears in the module's code; e2e with a mocked position at 1366 and 390 px passes."
+covers = ["R23"]
+after = [14, 3, "3.14"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 16
+type = "story"
+title = "Directions in the popup and the sheet, Nearest to me in search, the distance on Needs you rows"
+description = "Initiative R51 and R52 (gap review item 2; owner, 2026-11-03): the directions prop {enabled, urlTemplate} in the closed list; with it on, a Directions button for a point (absent for a line or an area) in the popup card's footer and the phone's bottom sheet, as entry 3 designed it (owner, 2026-11-06): Directions and View alarms side by side, the same height and equal widths, Directions first, View alarms moving out of the desktop card's alarm block into the footer, one alone filling it; on the phone 44 px; the sheet's Edit button, a placeholder for phone editing that does nothing, leaves the sheet (owner, 2026-11-06: phone editing parked as backlog story 30); opening the route there (owner, 2026-11-06: the route, not the pin): the maps app or page opens with directions from the person's current position to the item's coordinates, ready to start; the platform's directions link: Apple Maps on iOS and iPadOS (`https://maps.apple.com/?daddr={lat},{lng}&q={name}`), Google Maps on Android and on a desktop (`https://www.google.com/maps/dir/?api=1&destination={lat},{lng}`, which Android hands to the Google Maps app when it is installed), or the prop's template with {lat}, {lng} and {name} filled instead; in a new tab or the app, with nothing sent to any service by Map Studio; whether the Perspective mobile app hands the link to the device's maps app is checked on a real phone, falling back to the browser; with a position known from userLocation, an A-Z | Nearest switch at the top of the search field's list, Nearest listing the ten nearest items with their distance right-aligned, chosen like any result, and the distance from the user on every Needs you row, right-aligned in the secondary text colour, the ranking by state unchanged; distances geodesic from the shared geometry module, in miles for a browser locale of en-US and kilometres otherwise, feet or metres under one unit (the fallback; entry 19 adds the units setting); the prop added to contract 0.4.0 and the dev pages updated. The distance rows and View alarms' move out of the alarm block go to entry 18's ER-27 review with the marker."
+verify = "On the dev Gateway: with directions on, P14's popup and its 390 px sheet show Directions and the link is the platform's directions link with P14's coordinates as the destination (Apple Maps for an iOS user agent, Google Maps otherwise), opening the route from the current position on a real Android phone and iPhone in the Perspective app and the browser, a template fills the three placeholders, and L-SWD's popup shows none; with a mocked position the search list's Nearest lists the nearest items with distances in order and choosing one zooms to it; every Needs you row shows its distance and the order is still by state; with no position neither appears; e2e at 1366 and 390 px passes."
+covers = ["R24", "R25"]
+after = [15, "3.8", "3.9", "3.3"]
+hitl = false
+risk = "medium"
+
+[[entry]]
 id = 7
 type = "story"
 title = "The item list as designed, the first-run checklist, the layout at 1366 and below 1280"
@@ -229,39 +263,6 @@ description = "Map Studio's own tag browser as DESIGN.md draws it (owner, 2026-1
 verify = "On the dev Gateway as mapeditor: the browser opens at [default]Mesa/P14 expanded with Pressure listed as Float8; picking Pressure writes {asset.path}/Pressure with Resolves for 2 of 3 well pads naming P15; picking [default]Plant/AmbientTemp writes the full path with the warning and the row keeps its tag; on P14's override the pick stores the full path marked Override; the provider select lists a second provider and browses it; a stopped tag provider shows the unreachable state and a typed path still converts; the tree is driven by keyboard only to a pick; a viewer's browse is refused before any tag is read; a seeded setup with a double slash is reported by the check and the save now refuses it; e2e tags and unit tests pass."
 covers = ["R4"]
 after = [12, "2.15"]
-hitl = false
-risk = "medium"
-
-[[entry]]
-id = 14
-type = "story"
-title = "Selection, viewport and popup events to the page, and contract 0.4.0"
-description = "Initiative R48 and R49 (gap review item 1; AD-7, AD-9, AD-20): the bidirectional selectedItem prop complete (an id written by the page selects, moves to and opens the item's popup as a click does, a pick-list group or a line with its segment handled, an unknown id clearing the selection with one console warning), onItemSelected on every change with the AD-7 object (null when cleared); the read-only viewport prop {center, zoom, bounds} written once per move end, and onViewportChanged, onPopupOpen {itemId, segment} and onPopupClose fired for the page; editMode's bidirectional behaviour documented; the events declared in the descriptor with their schemas so the Designer lists them; the props and a new events section added to contract 0.4.0, and the dev project's /events page showing each event's last payload. Never per frame: the frame rate of R37 holds."
-verify = "On the dev Gateway: a Perspective table beside the map selects P14 on the map by writing selectedItem and a map click selects a row through onItemSelected; writing a line's id opens its popup; a pan fires one onViewportChanged at its end with the bounds, none during the move; opening and closing a popup fires the two events with the segment for a line; the Designer's component events list shows the four; the contract docs read 0.4.0 and the version check passes; e2e at 1366 and 390 px passes."
-covers = ["R17", "R21", "R22"]
-after = [2]
-hitl = false
-risk = "medium"
-
-[[entry]]
-id = 15
-type = "story"
-title = "You are here and Locate me from the page's geolocation binding"
-description = "Initiative R50 (gap review item 2; owner, 2026-11-03): the userLocation prop in the closed list, in the shape of the session's geolocation property (enabled, permissionGranted, data with latitude, longitude, accuracy, altitude, heading, speed, timestamp) so the page binds it to session.props.geolocation in one binding; the map draws the you-are-here marker as entry 3 designed it (DESIGN.md components.you-are-here: a 14 px dot in the you-are-here token, the theme's qual-1, with a white ring, a soft accuracy circle at the map's scale and, when given, a heading wedge), with \"You are here\" in the legend's States, never a map item, never in Needs you, the list, the export or the batch; Locate me, the zoom card's last button (a navigation arrow), moves the map to it and is off with the reason in its hover text (\"Locate me - location is off for this session\", \"Locate me - location permission not granted\", \"Locate me - no location fix yet\"); the module reads nothing of the session itself and never calls the browser's geolocation API; the prop added to contract 0.4.0 and the dev project's /locate page with the session's geolocation turned on. The marker's look goes to entry 18's ER-27 review."
-verify = "On the dev Gateway with the session's geolocation enabled on the /locate page in a browser granting permission: the marker draws at the device's position with its ring and Locate me centres on it; with permission denied the marker is absent and the button says so; with enabled false the button says it is off in the session; the marker is absent from the list, Needs you and the export; no geolocation call appears in the module's code; e2e with a mocked position at 1366 and 390 px passes."
-covers = ["R23"]
-after = [14, 3, "3.14"]
-hitl = false
-risk = "medium"
-
-[[entry]]
-id = 16
-type = "story"
-title = "Directions in the popup and the sheet, Nearest to me in search, the distance on Needs you rows"
-description = "Initiative R51 and R52 (gap review item 2; owner, 2026-11-03): the directions prop {enabled, urlTemplate} in the closed list; with it on, a Directions button for a point (absent for a line or an area) in the popup card's footer and the phone's bottom sheet, as entry 3 designed it (owner, 2026-11-06): Directions and View alarms side by side, the same height and equal widths, Directions first, View alarms moving out of the desktop card's alarm block into the footer, one alone filling it; on the phone 44 px; the sheet's Edit button, a placeholder for phone editing that does nothing, leaves the sheet (owner, 2026-11-06: phone editing parked as backlog story 30); opening the route there (owner, 2026-11-06: the route, not the pin): the maps app or page opens with directions from the person's current position to the item's coordinates, ready to start; the platform's directions link: Apple Maps on iOS and iPadOS (`https://maps.apple.com/?daddr={lat},{lng}&q={name}`), Google Maps on Android and on a desktop (`https://www.google.com/maps/dir/?api=1&destination={lat},{lng}`, which Android hands to the Google Maps app when it is installed), or the prop's template with {lat}, {lng} and {name} filled instead; in a new tab or the app, with nothing sent to any service by Map Studio; whether the Perspective mobile app hands the link to the device's maps app is checked on a real phone, falling back to the browser; with a position known from userLocation, an A-Z | Nearest switch at the top of the search field's list, Nearest listing the ten nearest items with their distance right-aligned, chosen like any result, and the distance from the user on every Needs you row, right-aligned in the secondary text colour, the ranking by state unchanged; distances geodesic from the shared geometry module, in miles for a browser locale of en-US and kilometres otherwise, feet or metres under one unit (the fallback; entry 19 adds the units setting); the prop added to contract 0.4.0 and the dev pages updated. The distance rows and View alarms' move out of the alarm block go to entry 18's ER-27 review with the marker."
-verify = "On the dev Gateway: with directions on, P14's popup and its 390 px sheet show Directions and the link is the platform's directions link with P14's coordinates as the destination (Apple Maps for an iOS user agent, Google Maps otherwise), opening the route from the current position on a real Android phone and iPhone in the Perspective app and the browser, a template fills the three placeholders, and L-SWD's popup shows none; with a mocked position the search list's Nearest lists the nearest items with distances in order and choosing one zooms to it; every Needs you row shows its distance and the order is still by state; with no position neither appears; e2e at 1366 and 390 px passes."
-covers = ["R24", "R25"]
-after = [15, "3.8", "3.9", "3.3"]
 hitl = false
 risk = "medium"
 
