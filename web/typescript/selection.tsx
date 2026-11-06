@@ -325,9 +325,10 @@ function pagePlace(host: SelectionHost, lngLat: [number, number]): PagePlace | n
  * from the pointer and a press where the item was clicked would land on the ground. Once the stage has narrowed (this runs
  * after the render that docked it), the map takes its new size at once and is panned with no animation by the clicked place's
  * shift on the page, so it, and every other item, keeps its page position and stays under the pointer: it drags at once.
- * If the docked panel then covers it (it was in the stage before and is not now), the map pans just enough, inside the camera
- * padding, to bring it into view (EXPERIENCE.md Responsive, 1366: opening properties keeps the selection in view). A click
- * while Details is already open docks nothing, and nothing moves.
+ * If it then lies outside the stage (the docked panel covers it, or it was outside already, as a popup restored in Edit mode
+ * from a centre saved for a wider map can be), the map pans just enough, inside the camera padding, to bring it into view
+ * (EXPERIENCE.md Responsive, 1366: opening properties keeps the selection in view). A click while Details is already open
+ * docks nothing, and nothing moves.
  */
 function keepPlace(host: SelectionHost, before: PagePlace, lngLat: [number, number]): void {
     const map = host.map;
@@ -351,7 +352,7 @@ function keepPlace(host: SelectionHost, before: PagePlace, lngLat: [number, numb
     // The marker's disc (its radius and ring) inside the stage counts as in view.
     const width = container.clientWidth;
     const height = container.clientHeight;
-    if (insideMap(before.at, before.box.w, before.box.h, POPUP_OFFSET_PX) && !insideMap(at, width, height, POPUP_OFFSET_PX)) {
+    if (!insideMap(at, width, height, POPUP_OFFSET_PX)) {
         const pan = intoView(at, width, height, host.cameraPadding(), IN_VIEW_MARGIN_PX);
         if (pan[0] !== 0 || pan[1] !== 0) {
             map.panBy(pan, { duration: 200 });
@@ -462,7 +463,10 @@ export function navigate(host: SelectionHost, path: string): void {
     }
 }
 
-/** A shared marker clicked (epic 3 entry 7): the pick list of its members opens in the popup. */
+/**
+ * A shared marker clicked (epic 3 entry 7): the pick list of its members opens in the popup. In View mode the selection goes
+ * while it is open; in Edit mode (entry 26) it stays, with Details if it is open, so the stage keeps its width.
+ */
 export function openPick(host: SelectionHost, memberIds: string, lngLat: [number, number]): void {
     const delegate = host.props.delegate;
     if (!delegate) {
@@ -487,6 +491,11 @@ export function openPick(host: SelectionHost, memberIds: string, lngLat: [number
         store.sendPopupClose(before.point.id);
     }
     stopPopupClock(host);
+    if (host.studioOn()) {
+        // In Edit mode (entry 26) the selection and an open Details stay while the list is open, so nothing docks or moves.
+        host.setState({ popup: null, pick: { rows, lngLat } }, () => showPopupAt(host, lngLat));
+        return;
+    }
     host.setState((prev) => ({ popup: null, pick: { rows, lngLat }, ...host.selectionState(prev, null) }), () => showPopupAt(host, lngLat));
 }
 
@@ -714,16 +723,20 @@ export function stopPopupClock(host: SelectionHost): void {
  */
 export function onPopupClosed(host: SelectionHost): void {
     popupGone(host);
-    if (host.state.popup !== null || host.state.pick !== null) {
+    if (host.state.popup !== null) {
         host.setState((prev) => ({ popup: null, pick: null, ...host.selectionState(prev, null) }));
+    } else if (host.state.pick !== null) {
+        // A pick list alone: the selection is the one it opened over (none in View mode; in Edit mode it stays, entry 26).
+        host.setState({ pick: null });
     }
 }
 
 /**
  * Edit mode entered (epic 4 entry 26, MapStudio.tsx `setEditMode`: the Edit switch or the page's prop): the open card, line
  * popup, sheet or pick list goes, since Edit mode opens none, and the Gateway is told with popup.close as when it is closed by
- * hand; the selection stays, so the page sees no change of selection (no `selectedItem: null`), and no Details opens for it. A
- * line keeps its selection without the segment, whose highlighted instruments were its popup's. Nothing open, nothing happens.
+ * hand; the selection stays, so the page sees no change of selection (no `selectedItem: null`), and no Details opens for it
+ * (`panel` cleared). A line keeps its selection without the segment, whose highlighted instruments were its popup's. Nothing
+ * open, nothing happens.
  */
 export function dismissPopup(host: SelectionHost): void {
     if (host.state.popup === null && host.state.pick === null) {
@@ -738,7 +751,10 @@ export function dismissPopup(host: SelectionHost): void {
     popupGone(host);
     host.setState((prev) => ({
         popup: null, pick: null,
-        ...host.selectionState(prev, prev.selected && prev.selected.segment ? { ...prev.selected, segment: null } : prev.selected)
+        ...host.selectionState(prev, prev.selected && prev.selected.segment ? { ...prev.selected, segment: null } : prev.selected),
+        // No Details for it, even one kept from an earlier Edit-mode session (leaving keeps `panel`, a View-mode click on the
+        // same item too).
+        panel: null
     }));
     console.info('[MapStudio] Edit mode: the open popup closed, the selection kept.');
 }

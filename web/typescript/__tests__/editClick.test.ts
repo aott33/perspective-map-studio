@@ -385,6 +385,36 @@ describe('in Edit mode a click selects and opens Details, no popup (entry 26)', 
         expect(h.sent.pointClick).toEqual(['b']);
     });
 
+    test('with Details open, a shared spot\'s pick list keeps the selection and Details: nothing moves; Esc closes the list alone', () => {
+        const h = harness(true);
+        h.click({ markers: [marker('ctb1', 'CTB1', CTB1)] }, CTB1);
+        expect(h.state().panel).toBe('ctb1');
+        expect(h.pans.length).toBe(1);
+        const shared = h.page(SWD1);
+        h.click({ markers: [marker('a', 'Pad A', SWD1, ['a', 'b'])] }, SWD1);
+        expect(h.state().pick!.rows.map((r) => r.id)).toEqual(['a', 'b']);
+        expect(h.state().selected).toEqual({ id: 'ctb1', kind: 'point' });
+        expect(h.state().panel).toBe('ctb1');
+        expect(h.ms.popup!.isOpen()).toBe(true);
+        expect(h.pans.length).toBe(1);
+        samePixel(h.page(SWD1), shared);
+        // Esc closes the pick list, one step: CTB1 stays in Details.
+        escape(h.ms);
+        expect(h.state().pick).toBeNull();
+        expect(h.state().selected).toEqual({ id: 'ctb1', kind: 'point' });
+        expect(h.state().panel).toBe('ctb1');
+        // Again, and a row: Details moves to that pad, nothing docks, nothing moves; the page saw no selection cleared.
+        h.click({ markers: [marker('a', 'Pad A', SWD1, ['a', 'b'])] }, SWD1);
+        h.ms.onPick('b');
+        expect(h.state().pick).toBeNull();
+        expect(h.state().selected).toEqual({ id: 'b', kind: 'point' });
+        expect(h.state().panel).toBe('b');
+        expect(h.pans.length).toBe(1);
+        samePixel(h.page(SWD1), shared);
+        expect(pageSelections(h.sent)).toEqual(['ctb1', 'b']);
+        expect(h.sent.popupOpen).toEqual([]);
+    });
+
     test('a remembered popup restored in Edit mode opens Details instead, for a point and for a line', () => {
         for (const [sel, at] of [[{ id: 'p14', kind: 'point', segment: null }, null], [{ id: 'lswd', kind: 'line', segment: null }, BEND]] as const) {
             const h = harness(true);
@@ -483,6 +513,25 @@ describe('the clicked item keeps its place on the page as Details docks (entry 2
         expect(h.page(WEST)[1]).toBeCloseTo(before[1], 3);
     });
 
+    test('a popup restored in Edit mode from a centre saved for a wider map: P14 outside the stage is brought into view', () => {
+        const h = harness(true);
+        // The camera came back where a 1366 px View-mode map had it: P14 1200 px in, past the 1038 px stage's right edge.
+        h.ms.map!.panBy([-381, 0]);
+        h.pans.length = 0;
+        expect(h.ms.map!.project(P14).x).toBeCloseTo(1200, 3);
+        h.ms.itemsReady = true;
+        h.ms.restore = { center: P14, zoom: 14, selected: { id: 'p14', kind: 'point', segment: null }, popup: true, popupAt: null };
+        h.ms.restoreSince = Date.now();
+        applyRestore(h.ms);
+        expect(h.state().panel).toBe('p14');
+        expect(h.state().popup).toBeNull();
+        // The stage's shift first, with no animation, then just into view: 48 px inside the right edge (no padding there).
+        expect(h.pans.length).toBe(2);
+        expect(h.pans[0]).toEqual({ offset: [PANEL / 2, 0], animate: false });
+        expect(h.pans[1].animate).toBe(true);
+        expect(h.ms.map!.project(P14).x).toBeCloseTo(PAGE_W - DOCK - PANEL - 48, 3);
+    });
+
     test('View mode: a click opens the card and pans nothing for Details, which never docks', () => {
         const h = harness(false);
         const ctb1 = h.page(CTB1);
@@ -524,6 +573,25 @@ describe('the Edit switch turned on closes an open popup or pick list and keeps 
         expect(h.sent.popupClose).toEqual(['lswd']);
         expect(h.state().selected).toEqual({ id: 'lswd', kind: 'line', segment: null });
         expect(pageSelections(h.sent)).toEqual(['lswd']);
+    });
+
+    test('Details kept from an earlier Edit-mode session: CTB1\'s popup in View mode, the switch on, CTB1 selected with no Details', () => {
+        const h = harness(true);
+        h.click({ markers: [marker('ctb1', 'CTB1', CTB1)] }, CTB1);
+        expect(h.state().panel).toBe('ctb1');
+        // Leaving keeps the selection and the panel's id; a View-mode click on the same item keeps it too.
+        h.ms.onEditSwitch(false);
+        expect(h.ms.studioOn()).toBe(false);
+        h.click({ markers: [marker('ctb1', 'CTB1', CTB1)] }, CTB1);
+        expect(h.state().popup && h.state().popup!.point.id).toBe('ctb1');
+        expect(h.state().panel).toBe('ctb1');
+        h.ms.onEditSwitch(true);
+        expect(h.ms.studioOn()).toBe(true);
+        expect(h.state().popup).toBeNull();
+        expect(h.sent.popupClose).toEqual(['ctb1']);
+        expect(h.state().selected).toEqual({ id: 'ctb1', kind: 'point' });
+        expect(h.state().panel).toBeNull();
+        expect(pageSelections(h.sent)).toEqual(['ctb1']);
     });
 
     test('a pick list open in View mode: the switch on closes it; with nothing open nothing is sent', () => {
