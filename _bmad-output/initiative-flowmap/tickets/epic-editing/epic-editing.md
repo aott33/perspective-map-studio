@@ -58,7 +58,7 @@ A map editor new to the Mesa demo field lays it out with the tools alone in unde
 - ER-27: the you-are-here marker's look and the distance on Needs you rows go to the engineering review before this epic's release; alarm presentation is otherwise unchanged.
 - Releases follow RELEASING.md's checks by release type: 0.4.0 is minor, so one rehearsal on the template's test stack with a throwaway-signed build before the tag, the performance run (the write path and the bundle both change) and the smoke after the tag.
 - Banned (EXPERIENCE.md): a Publish step, a save button, free colour pickers, blinking, a control in the bottom-right corner, a first-run tour.
-- Below 768 px no drawing tools and no Kinds screen; the Edit switch is absent on the phone; phone editing is epic-phone's.
+- Below 768 px no drawing tools and no Kinds screen; the Edit switch is absent on the phone; phone editing is parked in the backlog (story 30; owner, 2026-11-06).
 
 ## Done when
 
@@ -74,9 +74,9 @@ A map editor new to the Mesa demo field lays it out with the tools alone in unde
 
 ## Boundaries
 
-- Hands on: the forms, linking, undo, multi-select and properties panel that epic-import-export (the bulk form, import, export) and epic-phone (the edit sheet) reuse, and the edit record read both use.
+- Hands on: the forms, linking, undo, multi-select and properties panel that epic-import-export (the bulk form, import, export) and phone editing (the edit sheet, parked as backlog story 30) would reuse, and the edit record read both use.
 - Where the tools sit on the page was decided in the UX workshop (ux-map-studio, 2026-10-27): Edit mode in the docked layout, direction A (R44, R47; EXPERIENCE.md).
-- Not here: imports, exports, the bulk form and the Import rail item (epic-import-export, R25 to R28, R35); phone editing (epic-phone, R30, R31) and the known phone gap of a snapped-to point's move (docs/contract.md, the role matrix); transient items and stationing (epic-live-field, R53 to R59; the `dynamicItems` prop lands there, beside the props and events this epic adds); reference layers (R29, backlog).
+- Not here: imports, exports, the bulk form and the Import rail item (epic-import-export, R25 to R28, R35); phone editing (R30, R31, parked as backlog story 30 on 2026-11-06; it was epic-phone) and the known phone gap of a snapped-to point's move (docs/contract.md, the role matrix); transient items and stationing (epic-live-field, R53 to R59; the `dynamicItems` prop lands there, beside the props and events this epic adds); reference layers (R29, backlog).
 - Not here: the kind list (read only, from the host adapter) and the Designer setup form.
 
 ## References
@@ -99,6 +99,7 @@ A map editor new to the Mesa demo field lays it out with the tools alone in unde
 
 ## Notes
 
+- Decision: 2026-11-06 Owner ("I think we can remove phone editing ... not part of this mvp"): epic-phone is dropped and phone editing parked as backlog story 30. The phone sheet's Edit button, a placeholder for phone editing that does nothing since epic-viewing entry 8, leaves the sheet in entry 16 with the footer's rebuild, so the phone sheet's footer is Directions and View alarms; the phone editing role and its Gateway level stay as built.
 - Decision: 2026-11-06 Owner (entry 3 workshop, "1B, 2B, 3 qual-1, ... 5B", then 4C with "I would keep the button heights the same and widths equal"; contact sheets in `ux-entry-3/`): (1B) no instrument tool on the toolbar: a selected line's Details holds an Instruments row and Add an instrument (entry 9, R16); (2B) no Box select button: with the Select tool Shift-drag draws a box and Shift+Alt-drag a lasso, the panel showing "3 selected" and Clear (entry 8); (3) the you-are-here marker in the theme's qual-1, which no item state uses, with "You are here" in the legend and Locate me last in the zoom card, off with its reason in words (entry 15); (4C) the popup card ends in a footer like the phone sheet's, Directions and View alarms side by side, the same height and equal widths, View alarms leaving the alarm block on desktop (entry 16; the move goes to entry 18's ER-27 review); (5B) the search list's A-Z | Nearest switch and the distance right-aligned on Needs you rows (entry 16). The 2026-11-03 answers are recorded in the spines: the conflict card's two choices, the override's tag browser opening at the item's own asset folder, toasts 6 s paused on hover or focus (none after an add in Edit mode). EXPERIENCE.md Open Questions 3, 6 and 7 closed; DESIGN.md gains the `you-are-here` token and component.
 - Decision: 2026-11-06 Owner ("the dropdown in Details is enough"): the generic Point, Line and Area tools keep saving as the first kind of their geometry, changed from the Kind dropdown in Details; no "Unassigned" kind.
 - Decision: 2026-11-06 Owner ("go with A as entry 26", testing entries 1 to 5 on the dev stack, where the popup opening on a click in Edit mode got in the way of dragging a point): in Edit mode a click selects and opens Details with no popup, as EXPERIENCE.md Select already says; entry 26, built after 25 and taken out of entry 7. The live values come back in Edit mode with Details' Live now block (entries 6 and 7).

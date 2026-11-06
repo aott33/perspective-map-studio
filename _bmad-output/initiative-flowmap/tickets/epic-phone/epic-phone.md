@@ -8,6 +8,7 @@ companions: []
 after: []
 refined: false
 risk: medium
+status: dropped
 ---
 
 # Operators fix map items from a phone
@@ -44,3 +45,4 @@ An operator corrects a misplaced pin and its properties from the field (prd SM-3
 - Decision: 2026-10-26 Names, licence (Apache-2.0) and the Alarm Metrics answer are recorded in the initiative's Notes and apply here.
 - Waits on epic-editing because: geometry edits, forms and undo.
 - Decision: 2026-10-27 UX workshop (ux-map-studio, 2026-10-27): R30 the crosshair (tap Move, the map pans under a fixed centre crosshair, Done or Cancel) replaces long-press and drag, with an Undo bar after Done; R31 phone editing starts from an Edit button in the item's bottom sheet and edits that one item; popups and properties are bottom sheets, a deliberate change from the template's chip row and top sheets and an engineering review item (ER-27). Behaviour is in EXPERIENCE.md (Bottom sheet, Phone crosshair, UJ-4). Stories are planned when this epic is refined.
+- Dropped: 2026-11-06 Owner ("I think we can remove phone editing, I don't know how much value there is in that. We can backlog that for future (not part of this mvp)"): out of the first version; R30 and R31 are parked as backlog story 30 (`_bmad-output/backlog/story-phone-editing-move-a-point-and-edit-its-properties.md`), which keeps this epic's description, Done when and decisions for when the owner brings it back. Nothing waited on this epic but epic-template-cutover, whose gate is removed.

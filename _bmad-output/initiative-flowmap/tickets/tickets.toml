@@ -1,4 +1,6 @@
 # Map Studio epics in build order. Table order is build order; ids are permanent.
+# Owner, 2026-11-06: after epic 4 the order is files in and out (5), the template cut-over (7), then the live field (8);
+# phone editing (6) is dropped from the first version and parked as backlog story 30, its table kept last.
 
 [[epic]]
 id = 1
@@ -40,6 +42,14 @@ covers = ["R25", "R26", "R27", "R28", "R35"]
 after = [{ epic = 4, needs = "map items, forms, linking and undo" }]
 
 [[epic]]
+id = 7
+slug = "epic-template-cutover"
+title = "The template's map runs on Map Studio"
+description = "The template's /map and /map/edit run on Map Studio with the Mesa field cut over into the map store; prov's map steps, ops.mapedit, the map_draft tables and the Leaflet map retire; generators, byte gates, the Edge example and the load harness follow; alarm presentation passes engineering review."
+covers = []
+after = [{ epic = 3, needs = "parity with today's map" }, { epic = 4, needs = "editing" }]
+
+[[epic]]
 id = 8
 slug = "epic-live-field"
 title = "Operators follow the live field on the map"
@@ -54,11 +64,3 @@ title = "Operators fix map items from a phone"
 description = "On a 390 px phone, touch only, a user with phone editing starts from Edit in the item's bottom sheet, moves a point with a fixed centre crosshair and edits its properties, with an Undo bar and no drawing tools."
 covers = ["R30", "R31"]
 after = [{ epic = 4, needs = "geometry edits, forms and undo" }]
-
-[[epic]]
-id = 7
-slug = "epic-template-cutover"
-title = "The template's map runs on Map Studio"
-description = "The template's /map and /map/edit run on Map Studio with the Mesa field cut over into the map store; prov's map steps, ops.mapedit, the map_draft tables and the Leaflet map retire; generators, byte gates, the Edge example and the load harness follow; alarm presentation passes engineering review."
-covers = []
-after = [{ epic = 3, needs = "parity with today's map" }, { epic = 4, needs = "editing" }, { epic = 6, needs = "phone editing" }]

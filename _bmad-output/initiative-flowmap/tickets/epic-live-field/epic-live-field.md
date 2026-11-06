@@ -60,3 +60,4 @@ A control room sees where a crew, a truck or a pig is on the same map that shows
 - Open question: feet stations' notation (`10+34.05` means 1,034.05 ft) and whether a line's station may run opposite to its drawn direction; both settled with a midstream reviewer at refinement.
 - Open question: geofence enter and exit (ArcGIS Velocity) as a state a Gateway script sets on a dynamic item from backlog story 19's `locate` (the shared geometry module); not in this epic's requirements until the owner asks.
 - Note: stories are planned when this epic is refined; the tracer bullet is likely the `dynamicItems` prop drawn on the dev page with one moving item, then the stationing of L-SWD.
+- Decision: 2026-11-06 Owner ("Epic 8 will be right after cutover"): built after epic-template-cutover; an order only, since it needs nothing from the cut-over.

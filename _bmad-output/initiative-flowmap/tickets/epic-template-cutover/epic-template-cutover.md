@@ -45,4 +45,5 @@ The template's map lives in the map store and the old map is gone (prd SM-1).
 - Decision: 2026-10-26 Names, licence (Apache-2.0) and the Alarm Metrics answer are recorded in the initiative's Notes and apply here.
 - Waits on epic-viewing because: parity with today's map.
 - Waits on epic-editing because: editing.
-- Waits on epic-phone because: phone editing.
+- No longer waits on epic-phone (dropped 2026-11-06; phone editing parked as backlog story 30).
+- Decision: 2026-11-06 Owner ("epic 5 as files in and out then epic 6 can be template cutover"): built after epic-import-export and before epic-live-field; the gate on epic-phone is removed because phone editing left the first version, and the template's editor offers no phone editing today ("Open the editor on a laptop" below 768 px), so the cut-over removes nothing a phone user has.
