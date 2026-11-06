@@ -85,6 +85,22 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 ## Review Triage Log
 
+Quick lens, 2026-11-06, plus one coordinator finding from the renders: 11 findings; high 0, medium 6, low 4, owner's call 1.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| In Edit mode on the Kinds or Layers surface no problem is said anywhere | medium | The row is `ItemList`'s; `renderDock` mounts it for Items only and `chipProblem(facts, true)` gives the connection alone in Edit mode; the Always rule says every problem stays in words | patch: the problem row on every dock surface |
+| False "Not saved" words stay after a Discard (`problems.ts` falls back to `facts.save`, which a Discard never resets) | medium | Two unsent edits, the newest discarded, the older saved by the replay: the queue empties while `save.state` stays `unsent` | patch: the save's words count only while its batch is still waiting |
+| Any problem hides Saving... and Saved; the storage warning never clears, so in that state no save is ever confirmed | medium | `ItemList` renders the title row's status only with no problems; `warnStorage` sets the warning once | patch: the save state beside the title always, the problem row under it |
+| The busy answer to a load blinks across the 15 s retries | medium | The busy reply leaves the store state, so the problem shows only while `load.state === 'failed'`; the unit test pins the blink; the matrix says no blink | patch: a load's problem held until a load succeeds, the unit test to the matrix |
+| The waiting-edit rows give the reason but not which edit, where the approved mock named it ("Rename P14 to P14 North") | medium | The rows reuse `entryText`; the renders show "Not saved - store unreachable ..." on each row | patch: each row names its edit from its batch, as Undo's labels do |
+| The struck cloud marks every problem but the connection: busy, read-only, the storage warning, a setup error | medium | DESIGN.md gives the cloud to Store unreachable and the warning glyph to Busy; a cloud beside "read only" reads as unreachable | patch: the cloud for the store unreachable only, the warning glyph for the rest |
+| `problems.spec.mjs` covers three matrix rows at 1366 px only, and its "Saving..." comment has no assertion | low | The acceptance criterion says each row at 1366 and 390 px | patch: the 390 px rows and the Saving... assertion |
+| `docs/operations.md` (36, 48, 58) and `docs/setup.md` (60) still describe the box and its words | low | Not in the diff; they say "under the map" and the old "Map store: store-unreachable: ..." | patch |
+| Focus drops to the page after a Discard in the waiting list | low | The focused button leaves with its row; only Hide and Esc restore focus | patch: the next row's Discard, else the edits line |
+| Try again and Discard cannot be reached below 768 px or at level `phone` | owner's call | The owner chose the list in the dock, Edit mode only; a refused edit waits there until a desktop session opens Edit mode | asked of the owner; the phone's own list belongs to epic-phone's edit sheet |
+| The waiting edits open on a press, where the approved mock showed them open with Hide | owner's call | The implementer read "opens under it" as a press; the mock showed them open | asked of the owner with the render |
+
 ## Verification
 
 **Commands:**
