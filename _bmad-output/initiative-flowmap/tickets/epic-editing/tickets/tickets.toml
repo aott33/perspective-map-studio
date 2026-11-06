@@ -6,6 +6,7 @@
 # Entries 19 and 20 (units, owner 2026-11-03) follow 16 and precede the sweep. Approved 2026-11-03; entry 1 started. 17 sweeps, 18 releases 0.4.0.
 # Entries 22 and 23 (owner, 2026-11-05, the messages and legend review after entry 21): the legend in Layers, then one place that talks with Undo's history; both ahead of 5.
 # Entry 24 (owner, 2026-11-05): the status box retired after 23; entry 11's Recent changes moves to a History item on the rail.
+# Entry 5 split (owner, 2026-11-06): geometry stays 5; Delete with shortcuts on the controls is 25; duplicate and add-another parked (backlog 28); the ? panel dropped.
 # Cross-epic prerequisites are pinned on the entries that need them ("2.n", "3.n").
 # Entry 21 (owner, 2026-11-05, option B of the layout review after entry 4): Edit mode's top row as DESIGN.md draws it, ahead of 5; entry 7 builds on its list header.
 
@@ -100,13 +101,24 @@ risk = "medium"
 [[entry]]
 id = 5
 type = "story"
-title = "Change geometry and delete: move, vertices, split, non-drag ways, duplicate, add another like this, shortcuts"
-description = "Dragging a point or a vertex, the midpoint handle to insert, delete a vertex, split a line at a point into two lines keeping kind, properties and ends (the shared geometry module re-attaching each instrument to the part it sits on, AD-19), and moving a map item that lines snap to carrying their ends in the same batch; every drag with a non-drag way: Move then tap, or typed values in Details; Delete with no confirmation and one undo restoring the item with its link and properties (a line with its instruments in one step); \"Add another like this\" and duplicate from the panel footer (kind and properties copied, not name, location or link); the ? panel listing every shortcut; and Undo refused on the save status row, naming who, when another editor changed the item since (AD-2; no toast, owner 2026-11-05)."
-verify = "On the dev Gateway: a lateral's vertex dragged, a vertex inserted at a midpoint and one deleted each save and undo; L-SWD split between PT-1 and PT-2 gives two lines with PT-1 on the first and PT-2 on the second at distances from each part's start; moving CTB1 moves the snapped line end with it in one batch; Move then tap moves a point with no drag and a typed latitude and longitude moves it too; Delete then Undo restores a line with its two instruments; Add another like this opens the form prefilled without the link; ? lists the shortcuts; an undo of an item another session changed is refused naming that user; unit tests of the split and e2e pass."
-covers = ["R7", "R9", "R10"]
+title = "Change geometry: move, vertices, insert, split, snapped ends that follow, and the non-drag ways"
+description = "Split by the owner (2026-11-06): geometry only. Dragging a point or a vertex, the midpoint handle to insert, delete a vertex, split a line at a point into two lines keeping kind, properties and ends (the shared geometry module re-attaching each instrument to the part it sits on, AD-19), and moving a map item that lines snap to carrying their ends in the same batch; every drag with a non-drag way: Move then tap, or typed values in Details. The handles, a selected vertex's actions and Move are shown to the owner as mocks before the build (owner's rule, 2026-11-05)."
+verify = "On the dev Gateway: a lateral's vertex dragged, a vertex inserted at a midpoint and one deleted each save and undo; L-SWD split between PT-1 and PT-2 gives two lines with PT-1 on the first and PT-2 on the second at distances from each part's start; moving CTB1 moves the snapped line end with it in one batch; Move then tap moves a point and a vertex with no drag and a typed latitude and longitude moves a point; unit tests of the split and e2e pass."
+covers = ["R7"]
 after = [4, 23, 24]
 hitl = false
 risk = "medium"
+
+[[entry]]
+id = 25
+type = "story"
+title = "Delete, undone in one step, and every shortcut named on its control"
+description = "From the owner's evaluation of entry 5's split (2026-11-06). Delete with no confirmation from the properties panel's footer (a delete icon) or the Delete key outside a field, one undo restoring the item with its link and properties (a line with its instruments in one step, geometry.ts lineDeleteBatch); the undo stack names the step (\"delete L-TEST\"). No `?` panel: each shortcut is named in its control's hover text and accessible description (\"Undo: add Gathering line (Ctrl+Z)\", \"Redo ... (Ctrl+Shift+Z)\", \"Delete (Del)\", Cancel (Esc), Finish (Enter), Backspace on the drawing bar's hint)."
+verify = "On the dev Gateway: a pad and a line with two instruments each deleted with no question asked, one Undo restoring each with its link and properties, Redo deleting again; the Delete key does it with an item selected and does nothing in a field; every toolbar and bar control with a shortcut names it on hover; e2e passes."
+covers = ["R9", "R10"]
+after = [5]
+hitl = false
+risk = "low"
 
 [[entry]]
 id = 6
@@ -258,7 +270,7 @@ title = "Refactor sweep"
 description = "Cleanup only, scoped at its start from the plans and review findings entries 2 to 16 deferred: duplication between the studio's surfaces, the mode and selection model's leftovers, test helpers, the contract docs' wording, and the WCAG checks folded into one accessibility pass of every tool and panel by keyboard at 1366 and 1440 px (R14's evidence for entry 18). Scope pushed out of another story is a new entry, never this one."
 verify = "Every e2e and unit test passes; the keyboard-only pass of every tool, the list, the panel, the Kinds screen and the tag browser is recorded in docs/platform-checks.md with the contrast readings in both themes; no behaviour or contract change."
 covers = ["R14"]
-after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25]
 hitl = false
 risk = "low"
 
