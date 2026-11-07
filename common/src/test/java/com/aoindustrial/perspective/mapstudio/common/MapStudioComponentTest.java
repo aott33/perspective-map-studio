@@ -94,7 +94,8 @@ class MapStudioComponentTest {
         JsonObject schema = resource("/mapstudio.props.json");
         assertFalse(schema.get("additionalProperties").getAsBoolean(), "the list is closed");
         JsonObject props = schema.getAsJsonObject("properties");
-        assertEquals(List.of("startingArea", "previewStyles", "editMode", "selectedItem", "viewport", "userLocation", "style"),
+        assertEquals(List.of("startingArea", "previewStyles", "editMode", "selectedItem", "viewport", "userLocation", "directions",
+            "style"),
             List.copyOf(props.keySet()));
         JsonObject editMode = props.getAsJsonObject("editMode");
         assertEquals("boolean", editMode.get("type").getAsString());
@@ -126,6 +127,13 @@ class MapStudioComponentTest {
         }
         assertEquals(List.of("latitude", "longitude", "accuracy", "altitude", "heading", "speed", "timestamp"),
             List.copyOf(location.getAsJsonObject("properties").getAsJsonObject("data").getAsJsonObject("properties").keySet()));
+        JsonObject directions = props.getAsJsonObject("directions");
+        JsonArray directionsTypes = directions.getAsJsonArray("type");
+        assertEquals("object", directionsTypes.get(0).getAsString());
+        assertEquals("null", directionsTypes.get(1).getAsString());
+        assertTrue(directions.get("default").isJsonNull(), "off by default");
+        assertTrue(directions.get("description").getAsString().contains("sends nothing to any service"));
+        assertEquals(List.of("enabled", "urlTemplate"), List.copyOf(directions.getAsJsonObject("properties").keySet()));
         assertFalse(schema.toString().contains("\u2014"), "no em dash");
     }
 }

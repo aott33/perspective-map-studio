@@ -9,7 +9,8 @@
  */
 
 import { AssetName, Kind } from './adapters';
-import { MapItemRecord } from './contract';
+import { ItemGeometry, MapItemRecord } from './contract';
+import { itemDistanceM } from './geometry';
 
 /** How many results a typed query's pure search returns by default; the control lists every match (item 8). */
 export const SEARCH_LIMIT = 8;
@@ -43,6 +44,8 @@ export interface SearchEntry {
     area: boolean;
     /** The linked asset's name, or null when the item is not linked (or the asset is not listed). */
     assetName: string | null;
+    /** The item's geometry, for its distance from the user (epic 4 entry 16, Nearest). */
+    shape: ItemGeometry;
 }
 
 /** A result: the entry and how it matched. */
@@ -50,7 +53,16 @@ export interface SearchResult extends SearchEntry {
     matched: 'name' | 'asset';
     /** The row's second line: the kind, or the kind and the asset when the asset matched. */
     detail: string;
+    /** Metres from the user, on a Nearest row only (entry 16). */
+    distanceM?: number;
 }
+
+/** How many rows the Nearest list holds (EXPERIENCE.md Search: the ten nearest items). */
+export const NEAREST_COUNT = 10;
+
+/** The two orders of the open list with a position known (entry 16): A-Z first, then Nearest. */
+export type ListOrder = 'az' | 'nearest';
+export const LIST_ORDERS: Array<[ListOrder, string]> = [['az', 'A-Z'], ['nearest', 'Nearest']];
 
 /**
  * The text as the search compares it: lower case, accents stripped (NFD, the combining marks
@@ -89,7 +101,8 @@ export function buildEntries(items: readonly MapItemRecord[], kinds: readonly Ki
             icon: kind ? kind.icon : '',
             geometry: item.geometry.type === 'Point' ? 'point' : 'line',
             area: !!(kind && kind.area),
-            assetName: assetName === undefined ? null : assetName
+            assetName: assetName === undefined ? null : assetName,
+            shape: item.geometry
         });
     }
     return out;
@@ -161,6 +174,26 @@ export function allEntries(entries: readonly SearchEntry[]): SearchResult[] {
         return a.entry.id < b.entry.id ? -1 : a.entry.id > b.entry.id ? 1 : 0;
     });
     return keyed.map((k) => ({ ...k.entry, matched: 'name' as const, detail: resultDetail(k.entry, 'name') }));
+}
+
+/**
+ * The `count` items nearest to the position (entry 16), nearest first (by name, then id, at equal distances), each with its
+ * distance in metres: a point to the position, a line to its nearest point, an area 0 inside and else to its edge.
+ */
+export function nearestEntries(entries: readonly SearchEntry[], position: [number, number], count = NEAREST_COUNT): SearchResult[] {
+    const measured = entries.map((entry) => ({ entry, d: itemDistanceM(position, entry.shape, entry.area), key: fold(entry.name) }))
+        .filter((m) => isFinite(m.d));
+    measured.sort((a, b) => {
+        if (a.d !== b.d) {
+            return a.d - b.d;
+        }
+        if (a.key !== b.key) {
+            return a.key < b.key ? -1 : 1;
+        }
+        return a.entry.id < b.entry.id ? -1 : a.entry.id > b.entry.id ? 1 : 0;
+    });
+    return measured.slice(0, Math.max(0, count)).map((m) => ({ ...m.entry, matched: 'name' as const, detail: resultDetail(m.entry, 'name'),
+        distanceM: m.d }));
 }
 
 /** The rows drawn for a list of `total` rows when `wanted` of them must be in the DOM (a page at a time, at least one page). */

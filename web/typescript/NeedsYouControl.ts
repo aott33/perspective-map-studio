@@ -22,10 +22,14 @@
  * while it is open. The component owns the choice (`onChoose`) and reports open or closed
  * (`onToggle`, for `data-needs-open`). Token colours only, in mapstudio.css; 44 px targets at
  * phone width.
+ *
+ * With a position known (epic 4 entry 16, `setPosition`) every row ends with its distance from the user, right-aligned in
+ * the secondary colour at the small size; the order stays by state. With none, no distance.
  */
 
 import { glyphSvg } from './controls';
-import { EMPTY_SUMMARY, LIST_UNKNOWN, NOTHING_NEEDS_YOU, NeedsYouRow, NeedsYouSummary, RANKED_NOTE, barKey, barModel, total } from './needsyou';
+import { browserLocale, distanceWords } from './linePopup';
+import { EMPTY_SUMMARY, LIST_UNKNOWN, NOTHING_NEEDS_YOU, NeedsYouRow, NeedsYouSummary, RANKED_NOTE, barKey, barModel, rowDistanceM, total } from './needsyou';
 
 /** The sprite the state and kind glyphs come from, as the default popup draws them (DefaultPopup.tsx). */
 const SPRITE_URL = '/res/mapstudio/icons/mapstudio-icons.svg';
@@ -51,6 +55,8 @@ export class NeedsYouControl {
     private panel: HTMLDivElement | null = null;
     private summary: NeedsYouSummary = EMPTY_SUMMARY;
     private unknown = false;
+    /** The user's position `[lng, lat]` (entry 16), or null: the rows' distances show only with one. */
+    private position: [number, number] | null = null;
     /** What the bar last drew (`barKey`), so it redraws only when its counts or look change (owner re-test R1). */
     private drawnKey = '';
     private readonly panelId = 'mapstudio-needs-' + Math.random().toString(36).slice(2, 8);
@@ -106,6 +112,19 @@ export class NeedsYouControl {
         }
         this.unknown = unknown;
         this.renderBar();
+        if (this.panel) {
+            this.renderList();
+        }
+    }
+
+    /** The user's position, or null with none (entry 16; MapStudio.tsx applyUserLocation): an open list is drawn again. */
+    setPosition(position: [number, number] | null): void {
+        const same = position === this.position
+            || (position !== null && this.position !== null && position[0] === this.position[0] && position[1] === this.position[1]);
+        if (same) {
+            return;
+        }
+        this.position = position;
         if (this.panel) {
             this.renderList();
         }
@@ -279,6 +298,15 @@ export class NeedsYouControl {
                 text.appendChild(detail);
             }
             button.appendChild(text);
+            if (this.position) {
+                // The distance from the user (entry 16), right-aligned; the order stays by state.
+                const metres = rowDistanceM(row, this.position);
+                const distance = document.createElement('span');
+                distance.className = 'mapstudio-needs-distance';
+                distance.textContent = distanceWords(metres, browserLocale());
+                button.appendChild(distance);
+                button.setAttribute('data-distance-m', String(Math.round(metres)));
+            }
             button.addEventListener('click', this.handleRowClick);
             item.appendChild(button);
             list.appendChild(item);

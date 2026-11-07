@@ -36,6 +36,46 @@ export function distanceText(metres: number): string {
     return (km >= 10 ? Math.round(km).toString() : (Math.round(km * 10) / 10).toString()) + ' km';
 }
 
+/** Metres in a mile and feet in a metre (international units). */
+const M_PER_MI = 1609.344;
+const FT_PER_M = 3.280839895;
+
+/** Whether a locale counts distances in miles: en-US (and its variants), as the browser's language says it. */
+export function usesMiles(locale: string): boolean {
+    return /^en-US\b/i.test(locale.trim());
+}
+
+/** The tenths below 10 of the large unit, whole numbers from 10: "2.3", "12". */
+function largeUnit(n: number): string {
+    const tenths = Math.round(n * 10) / 10;
+    return tenths >= 10 ? String(Math.round(n)) : tenths.toFixed(1);
+}
+
+/**
+ * A distance from the user in words (epic 4 entry 16; EXPERIENCE.md Search and Needs you): with the locale en-US in miles,
+ * under 0.1 mi in feet ("850 ft", "2.3 mi", "12 mi"); otherwise in kilometres, under 1 km in metres ("420 m", "1.1 km",
+ * "12 km"). Feet and metres round to 10; the large unit takes tenths below 10 and whole numbers above. No units setting.
+ */
+export function distanceWords(metres: number, locale: string): string {
+    const m = metres > 0 && isFinite(metres) ? metres : 0;
+    if (usesMiles(locale)) {
+        if (m < M_PER_MI / 10) {
+            return Math.round((m * FT_PER_M) / 10) * 10 + ' ft';
+        }
+        return largeUnit(m / M_PER_MI) + ' mi';
+    }
+    const roundedM = Math.round(m / 10) * 10;
+    if (roundedM < 1000) {
+        return roundedM + ' m';
+    }
+    return largeUnit(m / 1000) + ' km';
+}
+
+/** The browser's language, the locale distances are written in ('' where there is none, which counts as metric). */
+export function browserLocale(): string {
+    return typeof navigator !== 'undefined' && typeof navigator.language === 'string' ? navigator.language : '';
+}
+
 /** "Gathering line - 6 in, 2.9 km": the kind, then the pipe size where the line has one and the length. */
 export function lineSubline(kindName: string, diameter: unknown, metres: number): string {
     const parts: string[] = [];

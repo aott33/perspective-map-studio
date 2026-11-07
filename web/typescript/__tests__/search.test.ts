@@ -36,7 +36,7 @@ describe('the search (epic 3 entry 9)', () => {
         expect(ENTRIES.map((e) => e.id)).not.toContain('gone');
         const p1 = ENTRIES.find((e) => e.id === 'p1')!;
         expect(p1).toEqual({ id: 'p1', name: 'Point 1', kindId: 'pad', kindName: 'Well pad', icon: 'well-pad', geometry: 'point',
-            area: false, assetName: 'Pad 12' });
+            area: false, assetName: 'Pad 12', shape: { type: 'Point', coordinates: [-104.97, 39.74] } });
         expect(ENTRIES.find((e) => e.id === 'p3')!.assetName).toBeNull();
         const fence = ENTRIES.find((e) => e.id === 'f1')!;
         expect(fence.geometry).toBe('line');

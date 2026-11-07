@@ -113,6 +113,11 @@ export interface MapStudioProps {
      * unbound), so a malformed value is read by the same rules. The component reads nothing of the session itself.
      */
     userLocation: unknown;
+    /**
+     * Directions in a point's popup and sheet (epic 4 entry 16; directions.ts): `{enabled, urlTemplate}`, null or `enabled` not
+     * true meaning off; the raw object (or null), read by `readDirections` where the popup is built.
+     */
+    directions: unknown;
 }
 
 /** The rail's Layers surface's tabs (epic 4 entry 22, the owner's "2, the tabs"): Layers (Show, Basemap) first, then Legend (the key). */
@@ -950,7 +955,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /**
      * The page's userLocation (entry 15; userLocation.ts): read into one state, which draws the marker (moved with each new
      * position, the camera left where it is), sets Locate me and puts the legend's "You are here" row in or out, all three
-     * from the same reading. A re-render with the same value does nothing; `data-you-*` on the map are for the suite.
+     * from the same reading, and from entry 16 the search's Nearest and the Needs you rows' distances. A re-render with the same
+     * value does nothing; `data-you-*` on the map are for the suite.
      */
     private applyUserLocation(): void {
         const loc = readUserLocation(this.props.props.userLocation);
@@ -968,6 +974,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         if (this.legendControl) {
             this.legendControl.setYouAreHere(loc.state === 'fix');
+        }
+        // Nearest in the search and the distances on Needs you rows (entry 16) follow the same reading.
+        const position = loc.state === 'fix' && loc.position ? loc.position : null;
+        if (this.searchControl) {
+            this.searchControl.setPosition(position);
+        }
+        if (this.needsYouControl) {
+            this.needsYouControl.setPosition(position);
         }
         const el = this.mapContainer;
         if (el) {
@@ -1551,7 +1565,8 @@ export class MapStudioMeta implements ComponentMeta {
             previewStyles: tree.readBoolean('previewStyles', false),
             editMode: tree.readBoolean('editMode', false),
             selectedItem: tree.readStringIfExists('selectedItem'),
-            userLocation: tree.isObject('userLocation') ? tree.readObject('userLocation') : null
+            userLocation: tree.isObject('userLocation') ? tree.readObject('userLocation') : null,
+            directions: tree.isObject('directions') ? tree.readObject('directions') : null
         };
     }
 }

@@ -14,7 +14,7 @@ import { lineString, point } from '@turf/helpers';
 import { length } from '@turf/length';
 import { nearestPointOnLine } from '@turf/nearest-point-on-line';
 
-import { EditBatch, EditOp, MapItemData, MapItemRecord } from './contract';
+import { EditBatch, EditOp, ItemGeometry, MapItemData, MapItemRecord } from './contract';
 
 export type Position = [number, number];
 
@@ -518,4 +518,57 @@ export function endsFrom(start: SnapTarget | null, end: SnapTarget | null): MapI
         return null;
     }
     return { ...(start ? { start: { itemId: start.itemId } } : {}), ...(end ? { end: { itemId: end.itemId } } : {}) };
+}
+
+/** The earth's radius Turf measures with, in metres. */
+const EARTH_RADIUS_M = 6371008.8;
+
+/** The great-circle distance between two positions in metres (haversine, Turf's radius). */
+function haversineM(a: Position, b: Position): number {
+    const toRad = (d: number): number => (d * Math.PI) / 180;
+    const dLat = toRad(b[1] - a[1]);
+    const dLng = toRad(b[0] - a[0]);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[1])) * Math.cos(toRad(b[1])) * Math.sin(dLng / 2) ** 2;
+    return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** Whether a position is inside a ring (its points unclosed or closed), by the even-odd rule on longitude and latitude. */
+export function insideRing(ring: Position[], p: Position): boolean {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [xi, yi] = ring[i];
+        const [xj, yj] = ring[j];
+        if ((yi > p[1]) !== (yj > p[1]) && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) {
+            inside = !inside;
+        }
+    }
+    return inside;
+}
+
+/**
+ * How far a map item is from a position, in metres, geodesic (epic 4 entry 16; EXPERIENCE.md Search and Needs you): a point
+ * to the position; a line to its nearest point (how far to reach it, not to its middle); an area 0 inside and else to its
+ * edge. A line or area with too few points is measured to its first point.
+ */
+export function itemDistanceM(position: Position, geometry: ItemGeometry, area: boolean): number {
+    if (geometry.type === 'Point') {
+        return haversineM(position, [geometry.coordinates[0], geometry.coordinates[1]]);
+    }
+    const coords = geometry.coordinates.map((c) => [c[0], c[1]] as Position);
+    if (coords.length === 0) {
+        return Infinity;
+    }
+    if (coords.length === 1) {
+        return haversineM(position, coords[0]);
+    }
+    if (area && coords.length >= 3) {
+        if (insideRing(coords, position)) {
+            return 0;
+        }
+        const first = coords[0];
+        const last = coords[coords.length - 1];
+        const ring = first[0] === last[0] && first[1] === last[1] ? coords : coords.concat([first]);
+        return nearestPointOnLine(lineString(ring), point(position), METRES).properties.pointDistance;
+    }
+    return nearestPointOnLine(lineString(coords), point(position), METRES).properties.pointDistance;
 }

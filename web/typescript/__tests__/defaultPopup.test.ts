@@ -32,7 +32,7 @@ function render(over: Partial<DefaultPopupProps> = {}): string {
     const props: DefaultPopupProps = {
         item: { id: 'p1', name: 'P14', kind: 'pad', kindName: 'Well pad', icon: 'well-pad' },
         display: DISPLAY, values: ALARMED, detail: DETAIL, now: NOW, link: '/pad/P14', alarmPage: '/alarms/P14',
-        mode: 'card', canEdit: false, onClose: () => undefined, onNavigate: () => undefined, ...over
+        mode: 'card', directionsUrl: null, onDirections: () => undefined, onClose: () => undefined, onNavigate: () => undefined, ...over
     };
     return renderToStaticMarkup(React.createElement(DefaultPopup, props));
 }
@@ -40,9 +40,8 @@ function render(over: Partial<DefaultPopupProps> = {}): string {
 const order = (html: string): string[] => (html.match(/data-part="([a-z]+)"/g) || []).map((m) => m.replace(/data-part="|"/g, ''));
 
 describe('the default popup card (epic 3 entry 8, AD-7)', () => {
-    test('the header holds the glyph disc, the name, the kind, the pop-out link and the close, then comms, KPIs, alarms', () => {
+    test('the header holds the glyph disc, the name, the kind, the pop-out link and the close, then comms, KPIs, alarms, the footer', () => {
         const html = render();
-        expect(order(html)).toEqual(['header', 'comms', 'kpis', 'alarms']);
         expect(html).toContain('data-popup-mode="card"');
         expect(html).toContain('class="mapstudio-popup-disc"');
         expect(html).toContain('#ms-well-pad');
@@ -55,7 +54,8 @@ describe('the default popup card (epic 3 entry 8, AD-7)', () => {
         expect(html).toContain('OK - 4 min ago');
         expect(html).toContain('1240 psi');
         expect(html).not.toContain('mapstudio-popup-handle');
-        expect(html).not.toContain('data-part="footer"');
+        // The card ends in the footer (entry 16): View alarms there, never in the alarm block.
+        expect(order(html)).toEqual(['header', 'comms', 'kpis', 'alarms', 'footer']);
     });
 
     test('the pop-out icon is hidden, not disabled, when the link has no value (R8)', () => {
@@ -65,7 +65,7 @@ describe('the default popup card (epic 3 entry 8, AD-7)', () => {
         expect(html).toContain('mapstudio-popup-close');
     });
 
-    test('the alarm block says the count and priority, lists the most important alarm with its age, the rest as more, and offers View alarms', () => {
+    test('the alarm block says the count and priority, lists the most important alarm with its age, the rest as more; View alarms is the footer\'s', () => {
         const html = render();
         expect(html).toContain('mapstudio-popup-alarms--active mapstudio-popup-alarms--p1');
         expect(html).toContain('data-alarm="1:unacked"');
@@ -79,6 +79,12 @@ describe('the default popup card (epic 3 entry 8, AD-7)', () => {
         expect(html).toContain('mapstudio-popup-view-alarms');
         expect(html).toContain('>View alarms</button>');
         expect(html).not.toContain('[default]');
+        // Entry 16: View alarms left the alarm block for the footer.
+        const block = html.substring(html.indexOf('data-part="alarms"'), html.indexOf('data-part="footer"'));
+        expect(block).not.toContain('View alarms');
+        const footer = html.substring(html.indexOf('data-part="footer"'));
+        expect(footer).toContain('>View alarms</button>');
+        expect((html.match(/View alarms/g) || []).length).toBe(1);
     });
 
     test('with no alarm page there is no View alarms; with no alarms the words alone (no check mark, option A), no tint and no button', () => {
@@ -172,8 +178,55 @@ describe('the bottom sheet', () => {
         expect(footer).not.toContain('>Edit<');
     });
 
-    test('Edit shows in the footer only for an editing role; no alarm and no role, no footer', () => {
-        expect(render({ mode: 'sheet', canEdit: true })).toContain('mapstudio-popup-edit');
+    test('no Edit in the sheet (entry 16: phone editing parked); no alarm and no Directions, no footer', () => {
+        expect(render({ mode: 'sheet' })).not.toContain('mapstudio-popup-edit');
         expect(render({ mode: 'sheet', values: QUIET })).not.toContain('data-part="footer"');
+        expect(render({ mode: 'card', values: QUIET })).not.toContain('data-part="footer"');
+    });
+});
+
+describe('the popup footer (epic 4 entry 16)', () => {
+    const URL = 'https://www.google.com/maps/dir/?api=1&destination=32.100000,-103.200000';
+
+    test('Directions then View alarms, side by side, in the card and the sheet alike', () => {
+        for (const mode of ['card', 'sheet'] as const) {
+            const html = render({ mode, directionsUrl: URL });
+            const footer = html.substring(html.indexOf('data-part="footer"'));
+            expect(footer).toContain('data-buttons="2"');
+            expect(footer.indexOf('mapstudio-popup-directions')).toBeGreaterThan(-1);
+            expect(footer.indexOf('mapstudio-popup-directions')).toBeLessThan(footer.indexOf('mapstudio-popup-view-alarms'));
+            expect(footer).toContain('data-directions="' + URL.replace(/&/g, '&amp;') + '"');
+            expect(footer).toContain('>Directions</span>');
+            // Directions is the secondary button, with the route glyph before the word; View alarms the primary.
+            expect(footer).toMatch(/class="mapstudio-popup-button mapstudio-popup-directions"[^>]*><svg class="mapstudio-popup-button-glyph"/);
+            expect(footer).toContain('mapstudio-popup-button mapstudio-popup-button--primary mapstudio-popup-view-alarms');
+        }
+    });
+
+    test('one alone fills the footer: Directions with no alarm, View alarms with Directions off', () => {
+        const quiet = render({ values: QUIET, directionsUrl: URL });
+        expect(quiet).toContain('data-buttons="1"');
+        expect(quiet).toContain('mapstudio-popup-directions');
+        expect(quiet).not.toContain('View alarms');
+        const off = render({ directionsUrl: null });
+        expect(off).toContain('data-buttons="1"');
+        expect(off).not.toContain('mapstudio-popup-directions');
+        expect(off).toContain('View alarms');
+    });
+
+    test('pressing Directions hands the link over; nothing else is fetched', () => {
+        const opened: string[] = [];
+        const props: DefaultPopupProps = {
+            item: { id: 'p1', name: 'P14', kind: 'pad', kindName: 'Well pad', icon: 'well-pad' },
+            display: DISPLAY, values: ALARMED, detail: DETAIL, now: NOW, link: null, alarmPage: null, mode: 'card',
+            directionsUrl: URL, onDirections: (u) => opened.push(u), onClose: () => undefined, onNavigate: () => undefined
+        };
+        const element = new DefaultPopup(props).render() as React.ReactElement;
+        const children = React.Children.toArray((element.props as { children: React.ReactNode }).children) as React.ReactElement[];
+        const footer = children[children.length - 1];
+        const footerTree = (footer.type as (p: unknown) => React.ReactElement)(footer.props);
+        const button = React.Children.toArray((footerTree.props as { children: React.ReactNode }).children)[0] as React.ReactElement;
+        (button.props as { onClick: () => void }).onClick();
+        expect(opened).toEqual([URL]);
     });
 });

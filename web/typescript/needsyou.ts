@@ -9,7 +9,8 @@
  */
 
 import { Kind } from './adapters';
-import { MapItemRecord } from './contract';
+import { ItemGeometry, MapItemRecord } from './contract';
+import { itemDistanceM } from './geometry';
 import { ItemState, ItemValues, KindDisplay, LiveState, ageText, alarmGlyphId, itemState, qualityWords } from './live';
 
 export type NeedsYouState = 'alarm' | 'comms-lost' | 'stale';
@@ -32,6 +33,14 @@ export interface NeedsYouRow {
     words: string;
     /** The detail and age: "1 alarm - 4 min ago", "Last heard 14 min ago", "Pressure - last 22 min ago". */
     detail: string;
+    /** The item's geometry and whether its kind draws it as an area, for the distance from the user (epic 4 entry 16). */
+    shape: ItemGeometry;
+    area: boolean;
+}
+
+/** A row's distance from the user's position `[lng, lat]` in metres (entry 16): to a point, a line's nearest point, an area's edge. */
+export function rowDistanceM(row: NeedsYouRow, position: [number, number]): number {
+    return itemDistanceM(position, row.shape, row.area);
 }
 
 export interface NeedsYouCounts {
@@ -284,7 +293,9 @@ export function needsYou(items: readonly MapItemRecord[], kinds: readonly Kind[]
                 priority: state.alarm ? state.alarm.priority : 0,
                 glyph: stateGlyph(state),
                 words: stateWords(state),
-                detail: stateDetail(state, values, display, now)
+                detail: stateDetail(state, values, display, now),
+                shape: item.geometry,
+                area: !!(kind && kind.area)
             },
             rank: rankOf(state),
             key: item.name.toLowerCase()

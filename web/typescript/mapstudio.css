@@ -637,8 +637,8 @@
 
 /* The bottom sheet (DESIGN.md bottom-sheet, EXPERIENCE.md Bottom sheet; below 768 px every point popup):
    8 px from the sides (phone-float-inset), above the App Bar toggle, 14 px top corners, a handle, 44 px
-   pop-out and close, 16 px side padding, the body scrolling under the header, and a footer with View
-   alarms (and Edit for phone-editing roles, hidden until epic-editing builds the edit sheet). No pointer. */
+   pop-out and close, 16 px side padding, the body scrolling under the header, and the popup footer at 44 px
+   (Directions and View alarms, entry 16). No pointer. */
 .mapstudio-sheet {
     position: absolute;
     left: 8px;
@@ -688,17 +688,42 @@
     min-height: 40px;
 }
 
+/* The popup footer (epic 4 entry 16; DESIGN.md popup-card footer): the card's, the sheet's and a custom view's, under a
+   divider rule. Directions (secondary, the route glyph before the word) then View alarms (primary), 8 px apart, the
+   same height and equal widths (flex-basis 0), one alone filling the row; 32 px on the card, 44 px on the sheet. */
 .mapstudio-popup-footer {
     display: flex;
     flex: 0 0 auto;
     gap: 8px;
-    padding: 8px 16px 16px;
+    padding: 8px 16px 12px;
+    border-top: 1px solid var(--neutral-30, var(--border));
 }
 
 .mapstudio-popup-footer .mapstudio-popup-button {
-    flex: 1 1 auto;
-    height: 44px;
+    display: inline-flex;
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
+    height: 32px;
     margin-top: 0;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.mapstudio-popup-button-glyph {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+}
+
+.mapstudio-popup--sheet .mapstudio-popup-footer {
+    padding: 8px 16px 16px;
+}
+
+.mapstudio-popup--sheet .mapstudio-popup-footer .mapstudio-popup-button {
+    height: 44px;
     font-size: 14px;
 }
 
@@ -1184,6 +1209,60 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* Nearest (epic 4 entry 16; DESIGN.md search-field): the A-Z | Nearest switch at the open list's top with a position known,
+   the chosen part filled attention; a Nearest row's distance right-aligned in text-secondary at the small size. */
+.mapstudio .mapstudio-search-order {
+    display: flex;
+    gap: 0;
+    margin: 8px 12px 4px;
+    border: 1px solid var(--neutral-40);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.mapstudio .mapstudio-search-order-button {
+    flex: 1 1 0;
+    min-height: 28px;
+    padding: 0 12px;
+    border: none;
+    background: var(--mapstudio-surface);
+    color: var(--label);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.mapstudio .mapstudio-search-order-button + .mapstudio-search-order-button {
+    border-left: 1px solid var(--neutral-40);
+}
+
+.mapstudio .mapstudio-search-order-button--on {
+    background: var(--neutral-90);
+    color: var(--neutral-10);
+}
+
+.mapstudio .mapstudio-search-order-button:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -2px;
+}
+
+.mapstudio .mapstudio-search-distance,
+.mapstudio .mapstudio-needs-distance {
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding-left: 8px;
+    color: var(--neutral-70);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    text-align: right;
+}
+
+.mapstudio .mapstudio-needs-row:has(.mapstudio-needs-distance) {
+    grid-template-columns: 16px 20px 1fr auto;
 }
 
 .mapstudio .mapstudio-search-empty {
@@ -1751,6 +1830,12 @@
 
     .mapstudio .mapstudio-needs-row {
         min-height: 52px;
+    }
+
+    /* The A-Z | Nearest switch takes the phone's 44 px targets (entry 16). */
+    .mapstudio .mapstudio-search-order-button {
+        min-height: 44px;
+        font-size: 13px;
     }
 
     .mapstudio .mapstudio-legend-toggle-label {

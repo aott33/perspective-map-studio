@@ -241,6 +241,31 @@
         }
       }
     },
+    "directions": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Directions in a point's popup and sheet (epic 4 entry 16, docs/contract.md). With enabled true the popup footer offers Directions for a point (never a line or an area), which opens the route to the item in a new tab or the device's maps app: Apple Maps on iPhone and iPad, Google Maps elsewhere, or urlTemplate when it is set. The destination is the item's own coordinates; the map draws no route and Map Studio sends nothing to any service. Null or enabled not true: off. Null by default.",
+      "default": null,
+      "additionalProperties": true,
+      "properties": {
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Whether the popup offers Directions; only true turns it on."
+        },
+        "urlTemplate": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Optional link to open instead of the platform's maps link, starting https://, http://, geo: or maps:, with {lat}, {lng} (6 decimals) and {name} (URL-encoded) filled from the item. Any other value is ignored with one console warning and the platform link used."
+        }
+      }
+    },
     "style": {
       "$ref": "urn:ignition-schema:schemas/style-properties.schema.json",
       "default": {

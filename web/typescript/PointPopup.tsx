@@ -36,6 +36,11 @@ export interface PointPopupProps {
     mode: 'card' | 'sheet';
     /** Close the popup (the chrome row's close, 32 px on the card and 44 px on the sheet). */
     onClose: () => void;
+    /**
+     * The popup footer under the view's body (epic 4 entry 16, the planner's pick approved by the owner): the same
+     * Directions and View alarms the default popup ends with (PopupFooter), or null for none.
+     */
+    footer?: React.ReactNode;
 }
 
 interface PointPopupState {
@@ -102,6 +107,7 @@ export class PointPopup extends React.Component<PointPopupProps, PointPopupState
                     onViewStateChange={this.onViewStateChange}
                 />
                 </div>
+                {this.props.footer || null}
             </div>
         );
     }

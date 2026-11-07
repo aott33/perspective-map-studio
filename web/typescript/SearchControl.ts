@@ -21,11 +21,21 @@
  * width the input gives the focus up so the keyboard goes away. The component owns the choice; this
  * control reports it through `onChoose` and takes the entries through `setEntries`. Token colours
  * only, in mapstudio.css; 44 px targets at phone width.
+ *
+ * With a position known (epic 4 entry 16, `setPosition`) the open list of every item (the chevron, no text typed) starts
+ * with an A-Z | Nearest switch, A-Z chosen at first and the choice kept while the control lives; Nearest lists the ten
+ * nearest items with their distance right-aligned, chosen as any result. Typing returns to the usual results. The switch
+ * is two buttons (`aria-pressed`) reached with Tab from the field, or ArrowLeft and ArrowRight in the empty field; with
+ * no position there is no switch.
  */
 
 import { IControl, Map as MapLibreMap } from 'maplibre-gl';
 import { glyphSvg } from './controls';
-import { NO_MATCHES, SEARCH_LABEL, SEARCH_PLACEHOLDER, SearchEntry, SearchResult, allEntries, chosenText, pagedCount, searchEntries } from './search';
+import { browserLocale, distanceWords } from './linePopup';
+import {
+    LIST_ORDERS, ListOrder, NO_MATCHES, SEARCH_LABEL, SEARCH_PLACEHOLDER, SearchEntry, SearchResult, allEntries, chosenText, nearestEntries,
+    pagedCount, searchEntries
+} from './search';
 
 /** The width below which the control is the phone top bar (the stylesheet's phone breakpoint). */
 const PHONE_QUERY = '(max-width: 767px)';
@@ -49,6 +59,12 @@ export class SearchControl implements IControl {
     private entries: SearchEntry[] = [];
     private results: SearchResult[] = [];
     private active = -1;
+    /** The user's position `[lng, lat]` (entry 16), or null: the switch and Nearest show only with one. */
+    private position: [number, number] | null = null;
+    /** The open list's order, A-Z at first and kept while the control lives (entry 16). */
+    private order: ListOrder = 'az';
+    /** The A-Z | Nearest switch while it is in the panel, kept across the list's redraws so its focus stays. */
+    private switchEl: HTMLDivElement | null = null;
     private readonly listId = 'mapstudio-search-list-' + Math.random().toString(36).slice(2, 8);
 
     constructor(private readonly onChoose: (result: SearchResult) => void, private readonly onToggle: (open: boolean) => void) {}
@@ -160,6 +176,27 @@ export class SearchControl implements IControl {
         }
     }
 
+    /**
+     * The user's position `[lng, lat]`, or null with none (entry 16; MapStudio.tsx applyUserLocation): an open list is drawn
+     * again, so the switch comes or goes and Nearest follows the position.
+     */
+    setPosition(position: [number, number] | null): void {
+        const same = position === this.position
+            || (position !== null && this.position !== null && position[0] === this.position[0] && position[1] === this.position[1]);
+        if (same) {
+            return;
+        }
+        this.position = position;
+        if (this.panel) {
+            this.search();
+        }
+    }
+
+    /** The open list's order (A-Z or Nearest), for tests and the e2e suite. */
+    listOrder(): ListOrder {
+        return this.order;
+    }
+
     isOpen(): boolean {
         return this.panel !== null;
     }
@@ -170,8 +207,10 @@ export class SearchControl implements IControl {
             return;
         }
         this.panel.removeEventListener('scroll', this.handleScroll);
+        this.panel.removeEventListener('focusout', this.handlePanelFocusOut);
         this.container.removeChild(this.panel);
         this.panel = null;
+        this.switchEl = null;
         this.results = [];
         this.shown = 0;
         this.listAll = false;
@@ -239,8 +278,11 @@ export class SearchControl implements IControl {
             this.close();
             return;
         }
-        // Every match, not a handful: the list scrolls and is drawn in pages (item 8).
-        this.results = all ? allEntries(this.entries) : searchEntries(this.entries, text, Number.POSITIVE_INFINITY);
+        // Every match, not a handful: the list scrolls and is drawn in pages (item 8). With a position and Nearest chosen, the
+        // open list is the ten nearest items instead (entry 16).
+        this.results = all
+            ? (this.showsSwitch(all) && this.order === 'nearest' && this.position ? nearestEntries(this.entries, this.position) : allEntries(this.entries))
+            : searchEntries(this.entries, text, Number.POSITIVE_INFINITY);
         this.shown = pagedCount(this.results.length, Math.max(this.shown, 0));
         if (!this.panel) {
             const panel = document.createElement('div');
@@ -248,6 +290,7 @@ export class SearchControl implements IControl {
             // A press inside the panel keeps the focus in the input, so a row's click (or tap) reaches it.
             panel.addEventListener('mousedown', this.keepFocus);
             panel.addEventListener('scroll', this.handleScroll);
+            panel.addEventListener('focusout', this.handlePanelFocusOut);
             container.appendChild(panel);
             this.panel = panel;
             input.setAttribute('aria-expanded', 'true');
@@ -261,13 +304,135 @@ export class SearchControl implements IControl {
         this.renderList();
     }
 
+    /** Whether the open list shows the A-Z | Nearest switch: a position is known and no text is typed (entry 16). */
+    private showsSwitch(all: boolean): boolean {
+        return all && this.position !== null;
+    }
+
+    /** The switch in the panel's first place, or out of it; kept across redraws so a focused part keeps the focus. */
+    private renderSwitch(panel: HTMLDivElement): void {
+        const show = this.showsSwitch(this.input !== null && this.input.value.trim() === '');
+        if (!show) {
+            if (this.switchEl && this.switchEl.parentNode) {
+                this.switchEl.parentNode.removeChild(this.switchEl);
+            }
+            this.switchEl = null;
+            panel.removeAttribute('data-order');
+            return;
+        }
+        if (!this.switchEl) {
+            const group = document.createElement('div');
+            group.className = 'mapstudio-search-order';
+            group.setAttribute('role', 'group');
+            group.setAttribute('aria-label', 'Order the list');
+            for (const [order, words] of LIST_ORDERS) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'mapstudio-search-order-button';
+                button.setAttribute('data-order', order);
+                button.textContent = words;
+                button.title = order === 'nearest' ? 'Nearest to you first (Arrow Right in the empty field)' : 'A to Z (Arrow Left in the empty field)';
+                button.addEventListener('click', this.handleOrderClick);
+                button.addEventListener('keydown', this.handleOrderKeyDown);
+                group.appendChild(button);
+            }
+            this.switchEl = group;
+        }
+        if (panel.firstChild !== this.switchEl) {
+            panel.insertBefore(this.switchEl, panel.firstChild);
+        }
+        this.switchEl.querySelectorAll('.mapstudio-search-order-button').forEach((button) => {
+            const on = button.getAttribute('data-order') === this.order;
+            button.setAttribute('aria-pressed', on ? 'true' : 'false');
+            button.classList.toggle('mapstudio-search-order-button--on', on);
+        });
+        panel.setAttribute('data-order', this.order);
+    }
+
+    /** Choose the open list's order (the switch, or ArrowLeft and ArrowRight in the empty field); the list is drawn again. */
+    private setOrder(order: ListOrder): void {
+        if (order === this.order) {
+            return;
+        }
+        this.order = order;
+        this.active = -1;
+        this.shown = 0;
+        if (this.panel) {
+            this.panel.scrollTop = 0;
+        }
+        this.search();
+    }
+
+    private handleOrderClick = (ev: MouseEvent): void => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const order = (ev.currentTarget as HTMLElement).getAttribute('data-order');
+        if (order === 'az' || order === 'nearest') {
+            this.setOrder(order);
+        }
+    };
+
+    /**
+     * Keys on a switch part: ArrowLeft and ArrowRight choose and move between the two, ArrowDown goes back to the field with the
+     * first row active, Shift+Tab goes back to the field, Esc clears and closes as in the field.
+     */
+    private handleOrderKeyDown = (ev: KeyboardEvent): void => {
+        const input = this.input;
+        if (!input) {
+            return;
+        }
+        if (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') {
+            ev.preventDefault();
+            this.setOrder(ev.key === 'ArrowRight' ? 'nearest' : 'az');
+            this.focusOrderButton();
+        } else if (ev.key === 'ArrowDown') {
+            ev.preventDefault();
+            input.focus();
+            if (this.results.length > 0) {
+                this.activate(0);
+            }
+        } else if (ev.key === 'Tab' && ev.shiftKey) {
+            ev.preventDefault();
+            input.focus();
+        } else if (ev.key === 'Escape') {
+            ev.preventDefault();
+            ev.stopPropagation();
+            input.focus();
+            this.clear();
+        }
+    };
+
+    /** Give the chosen switch part the focus (Tab from the empty field, the arrows on the switch). */
+    private focusOrderButton(): void {
+        const button = this.switchEl ? this.switchEl.querySelector('[data-order="' + this.order + '"]') as HTMLElement | null : null;
+        if (button) {
+            button.focus();
+        }
+    }
+
+    /** The focus leaving the panel (a switch part reached with Tab) for somewhere outside the top bar closes the list. */
+    private handlePanelFocusOut = (ev: FocusEvent): void => {
+        const next = ev.relatedTarget as Node | null;
+        if (next && this.container && this.container.contains(next)) {
+            return;
+        }
+        // Wait a tick: a redraw moving the focus inside the panel must not close it.
+        setTimeout(() => {
+            const active = typeof document !== 'undefined' ? document.activeElement : null;
+            if (this.panel && !(active && this.container && this.container.contains(active))) {
+                this.close();
+            }
+        }, 0);
+    };
+
     private renderList(): void {
         const panel = this.panel;
         if (!panel) {
             return;
         }
-        while (panel.firstChild) {
-            panel.removeChild(panel.firstChild);
+        this.renderSwitch(panel);
+        while (panel.lastChild && panel.lastChild !== this.switchEl) {
+            panel.removeChild(panel.lastChild);
         }
         if (this.results.length === 0) {
             const empty = document.createElement('div');
@@ -318,6 +483,14 @@ export class SearchControl implements IControl {
             detail.className = 'mapstudio-search-detail';
             detail.textContent = result.detail;
             li.appendChild(detail);
+            if (result.distanceM !== undefined) {
+                // Nearest (entry 16): the distance from the user, right-aligned in the secondary colour.
+                const distance = document.createElement('span');
+                distance.className = 'mapstudio-search-distance';
+                distance.textContent = distanceWords(result.distanceM, browserLocale());
+                li.appendChild(distance);
+                li.setAttribute('data-distance-m', String(Math.round(result.distanceM)));
+            }
             li.addEventListener('click', this.handleRowClick);
             list.appendChild(li);
         });
@@ -419,7 +592,12 @@ export class SearchControl implements IControl {
         this.search();
     };
 
-    private handleBlur = (): void => {
+    private handleBlur = (ev: FocusEvent): void => {
+        // Tab to the A-Z | Nearest switch keeps the list open (entry 16); anywhere else closes it.
+        const next = ev.relatedTarget as Node | null;
+        if (next && this.panel && this.panel.contains(next)) {
+            return;
+        }
         this.close();
     };
 
@@ -480,6 +658,21 @@ export class SearchControl implements IControl {
                 if (this.panel && n > 0) {
                     ev.preventDefault();
                     this.choose(this.active >= 0 ? this.active : 0);
+                }
+                break;
+            case 'Tab':
+                // Tab from the empty field reaches the A-Z | Nearest switch, which sits in the panel after the bar's row (entry 16).
+                if (!ev.shiftKey && this.switchEl && this.input && this.input.value === '') {
+                    ev.preventDefault();
+                    this.focusOrderButton();
+                }
+                break;
+            case 'ArrowLeft':
+            case 'ArrowRight':
+                // In the empty field with the switch shown, the arrows choose A-Z or Nearest (entry 16).
+                if (this.switchEl && this.input && this.input.value === '') {
+                    ev.preventDefault();
+                    this.setOrder(ev.key === 'ArrowRight' ? 'nearest' : 'az');
                 }
                 break;
             case 'Escape':

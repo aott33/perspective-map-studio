@@ -31,6 +31,7 @@ import { MapStudioStoreDelegate } from './MapStudioStoreDelegate';
 import { RESTORE_WAIT_MS } from './camera';
 import { MapItemRecord } from './contract';
 import { DefaultPopup } from './DefaultPopup';
+import { currentAgent, directionsLink, openDirections, readDirections } from './directions';
 import { SegmentRef, Selection } from './features';
 import { lengthM } from './geometry';
 import { instrumentsOn } from './geometry';
@@ -47,6 +48,7 @@ import { EchoGuard, ITEM_SELECTED_EVENT, firePageEvent, noteWrite, pageId, takeE
 import { PickList, PickRow } from './PickList';
 import { Place } from './place';
 import { PointPopup } from './PointPopup';
+import { PopupFooter } from './popupParts';
 import {
     LINE_POPUP_PX, MAP_ITEM_PARAM, POPUP_WIDTH_PX, PopupPoint, fillLink, fillParams, isSheetWidth, popupItemView, popupMaxHeight, popupMountPath,
     popupViewParams, sheetBasisWidth
@@ -850,6 +852,13 @@ export function popupContentFor(host: SelectionHost, open: OpenPopup): React.Rea
     if (!display) {
         return null;
     }
+    // Directions (entry 16): for a point only, to the item record's own coordinates (never a shared marker's anchor or the
+    // clicked place), while the page's `directions` prop is on. View alarms shows while the item is in alarm and the setup
+    // names an alarm page, in the default popup's footer and a custom view's alike.
+    const record = open.line ? undefined : host.liveItem(open.point.id);
+    const directionsUrl = record && record.geometry.type === 'Point'
+        ? directionsLink(readDirections(host.props.props.directions), record.geometry.coordinates, record.name, currentAgent()) : null;
+    const alarmPage = fillLink(delegate.alarmPage, item);
     const defaultPopup = lineDefault || ((): React.ReactNode => (displayShows(display) ? (
         <DefaultPopup
             key={'default|' + open.point.id}
@@ -860,9 +869,10 @@ export function popupContentFor(host: SelectionHost, open: OpenPopup): React.Rea
             detail={live}
             now={host.state.clock}
             link={fillLink(display.link, item)}
-            alarmPage={fillLink(delegate.alarmPage, item)}
+            alarmPage={alarmPage}
             mode={open.sheet ? 'sheet' : 'card'}
-            canEdit={false}
+            directionsUrl={directionsUrl}
+            onDirections={openDirections}
             onClose={host.closePopup}
             onNavigate={host.navigate}
         />
@@ -889,6 +899,11 @@ export function popupContentFor(host: SelectionHost, open: OpenPopup): React.Rea
             fallback={defaultPopup}
             mode={open.sheet ? 'sheet' : 'card'}
             onClose={host.closePopup}
+            footer={open.line ? null : (
+                <PopupFooter directionsUrl={directionsUrl} onDirections={openDirections}
+                             alarmPage={itemState(values, display).alarm !== null ? alarmPage : null}
+                             onViewAlarms={(): void => { if (alarmPage !== null) { host.navigate(alarmPage); } }} />
+            )}
         />
     );
 }

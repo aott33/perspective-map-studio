@@ -23,7 +23,9 @@ const CHROME = {
     popout: 'M14 4h6v6M20 4l-9 9M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6',
     close: 'M6 6l12 12M18 6L6 18',
     /** A check mark: "No active alarms". */
-    check: 'M5 12.5l4.5 4.5L19 7'
+    check: 'M5 12.5l4.5 4.5L19 7',
+    /** A route: two stops joined by a winding road, Directions in the popup footer (epic 4 entry 16). */
+    route: 'M6 15.5a2.5 2.5 0 1 0 0 5a2.5 2.5 0 1 0 0-5M18 3.5a2.5 2.5 0 1 0 0 5a2.5 2.5 0 1 0 0-5M8.5 18H17a3 3 0 0 0 0-6H7a3 3 0 0 1 0-6h8.5'
 } as const;
 
 export function Chrome(props: { name: keyof typeof CHROME; className: string }): React.ReactElement {
@@ -118,6 +120,37 @@ export function KpiRows(props: { display: KindDisplay; values: ItemValues | unde
                     </NoteRow>
                 );
             })}
+        </div>
+    );
+}
+
+/**
+ * The popup's footer (epic 4 entry 16; DESIGN.md popup-card footer, EXPERIENCE.md Popup card and Bottom sheet), one for the
+ * card, the sheet and a custom view so the three never drift: under a divider rule, Directions (secondary, the route
+ * glyph before the word) then View alarms (primary), the same height and equal widths, one alone filling the row; with
+ * neither, no footer. Directions opens the link it is given on the press; View alarms opens the alarm page.
+ */
+export function PopupFooter(props: { directionsUrl: string | null; onDirections: (url: string) => void;
+    alarmPage: string | null; onViewAlarms: () => void }): React.ReactElement | null {
+    const { directionsUrl, alarmPage } = props;
+    if (directionsUrl === null && alarmPage === null) {
+        return null;
+    }
+    const buttons = (directionsUrl !== null ? 1 : 0) + (alarmPage !== null ? 1 : 0);
+    return (
+        <div className="mapstudio-popup-footer" data-part="footer" data-buttons={String(buttons)}>
+            {directionsUrl !== null ? (
+                <button type="button" className="mapstudio-popup-button mapstudio-popup-directions" data-directions={directionsUrl}
+                        title="Directions - opens the route in your maps app or a new tab"
+                        onClick={(): void => props.onDirections(directionsUrl)}>
+                    <Chrome name="route" className="mapstudio-popup-button-glyph" />
+                    <span>Directions</span>
+                </button>
+            ) : null}
+            {alarmPage !== null ? (
+                <button type="button" className="mapstudio-popup-button mapstudio-popup-button--primary mapstudio-popup-view-alarms"
+                        onClick={props.onViewAlarms}>View alarms</button>
+            ) : null}
         </div>
     );
 }

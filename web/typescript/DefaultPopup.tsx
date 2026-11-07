@@ -3,7 +3,7 @@ import {
     ItemValues, KindDisplay, PopupDetail, alarmCountsText, alarmGlyphId, alarmLineText, alarmStaleNote, alarmsText, alarmsUnknown,
     capitalised, commsText, itemState, NO_DATA, qualityWords
 } from './live';
-import { Chrome, CloseButton, Glyph, KpiRows, NoteRow } from './popupParts';
+import { Chrome, CloseButton, Glyph, KpiRows, NoteRow, PopupFooter } from './popupParts';
 
 /** What the default popup is opened for: the map item and its kind's icon. */
 export interface DefaultPopupItem {
@@ -30,8 +30,13 @@ export interface DefaultPopupProps {
     alarmPage: string | null;
     /** The card over the map with its pointer, or the phone's bottom sheet (DESIGN.md bottom-sheet). */
     mode: 'card' | 'sheet';
-    /** Whether the sheet offers Edit (phone-editing roles, once epic-editing builds the edit sheet). */
-    canEdit: boolean;
+    /**
+     * The Directions link for this item (epic 4 entry 16, directions.ts), or null: Directions shows for a point while the
+     * `directions` prop is on, never for a line or an area.
+     */
+    directionsUrl: string | null;
+    /** Open the Directions link (a new tab or the device's maps app, on the press). */
+    onDirections: (url: string) => void;
     onClose: () => void;
     /** Open a Perspective page of the project (the pop-out link, View alarms). */
     onNavigate: (path: string) => void;
@@ -43,14 +48,15 @@ export interface DefaultPopupProps {
  * in a disc, the name, the kind as subline, the pop-out page link when it has a value, close), comms
  * with its status and age right-aligned, two to three KPIs (a stale value as the hourglass alone before
  * the value, the reason in the tooltip; "No data" before a value), then the alarm block (the counts
- * and the most important alarms in words with their age, from the Gateway's alarm status, and View
- * alarms to the project's alarm page; Map Studio acknowledges nothing; no check mark before "No active
+ * and the most important alarms in words with their age, from the Gateway's alarm status; View alarms
+ * to the project's alarm page is the footer's since entry 16; Map Studio acknowledges nothing; no check mark before "No active
  * alarms", the hourglass before it while comms are lost or the alarms are stale, since no alarm may
  * only mean no fresh data; "Alarm state unknown" with no data). The comms-lost word takes the
  * `comms-lost` token through its class; the alarm hue sits on the glyph and the heading only. The
- * parts follow the kind's display: a part turned off is not drawn. Below 768 px the same body is a
- * bottom sheet with a handle, 44 px header buttons and a footer with View alarms (and Edit for
- * phone-editing roles).
+ * parts follow the kind's display: a part turned off is not drawn. The card and the sheet end in the same
+ * footer (epic 4 entry 16, PopupFooter): Directions and View alarms side by side, equal widths, one alone
+ * filling it, none with neither. Below 768 px the same body is a bottom sheet with a handle and 44 px
+ * header and footer buttons.
  */
 export class DefaultPopup extends React.Component<DefaultPopupProps> {
     private onLink = (): void => {
@@ -65,8 +71,8 @@ export class DefaultPopup extends React.Component<DefaultPopupProps> {
         }
     };
 
-    private renderAlarms(sheet: boolean): React.ReactNode {
-        const { display, values, detail, now, alarmPage } = this.props;
+    private renderAlarms(): React.ReactNode {
+        const { display, values, detail, now } = this.props;
         if (!display.alarms.on) {
             return null;
         }
@@ -82,7 +88,6 @@ export class DefaultPopup extends React.Component<DefaultPopupProps> {
         const first = summary && summary.list.length > 0 ? summary.list[0] : null;
         const more = alarm ? alarm.active - 1 : 0;
         const counts = summary ? alarmCountsText(summary) : '';
-        const viewAlarms = alarm !== null && alarmPage !== null;
         return (
             <div className={'mapstudio-popup-alarms' + (alarm ? ' mapstudio-popup-alarms--active mapstudio-popup-alarms--p' + alarm.priority : '')
                      + (unknown ? ' mapstudio-popup-alarms--unknown' : '')}
@@ -104,16 +109,12 @@ export class DefaultPopup extends React.Component<DefaultPopupProps> {
                     </div>
                 ) : null}
                 {alarm && more > 0 ? <div className="mapstudio-popup-alarm-more">{'+ ' + more + ' more'}</div> : null}
-                {viewAlarms && !sheet ? (
-                    <button type="button" className="mapstudio-popup-button mapstudio-popup-button--primary mapstudio-popup-view-alarms"
-                            onClick={this.onViewAlarms}>View alarms</button>
-                ) : null}
             </div>
         );
     }
 
     render(): React.ReactNode {
-        const { item, display, values, now, link, alarmPage, mode, canEdit } = this.props;
+        const { item, display, values, now, link, alarmPage, mode, directionsUrl } = this.props;
         const sheet = mode === 'sheet';
         const state = itemState(values, display);
         const problem = values ? values.problems.find((p) => p.slot === 'comms') : undefined;
@@ -157,17 +158,10 @@ export class DefaultPopup extends React.Component<DefaultPopupProps> {
                         </NoteRow>
                     ) : null}
                     <KpiRows display={display} values={values} />
-                    {this.renderAlarms(sheet)}
+                    {this.renderAlarms()}
                 </div>
-                {sheet && (viewAlarms || canEdit) ? (
-                    <div className="mapstudio-popup-footer" data-part="footer">
-                        {viewAlarms ? (
-                            <button type="button" className="mapstudio-popup-button mapstudio-popup-button--primary mapstudio-popup-view-alarms"
-                                    onClick={this.onViewAlarms}>View alarms</button>
-                        ) : null}
-                        {canEdit ? <button type="button" className="mapstudio-popup-button mapstudio-popup-edit">Edit</button> : null}
-                    </div>
-                ) : null}
+                <PopupFooter directionsUrl={directionsUrl} onDirections={this.props.onDirections}
+                             alarmPage={viewAlarms ? alarmPage : null} onViewAlarms={this.onViewAlarms} />
             </div>
         );
     }
