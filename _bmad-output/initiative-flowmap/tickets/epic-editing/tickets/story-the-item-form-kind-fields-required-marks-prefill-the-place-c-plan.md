@@ -3,14 +3,14 @@ title: "The item form: kind fields, required marks, prefill, duplicate names, un
 type: 'feature'
 ticket: '6'
 created: '2026-11-06'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '3a971b7b6f9573f6eb48fded79b56e1aee04f360'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md']
 ---
