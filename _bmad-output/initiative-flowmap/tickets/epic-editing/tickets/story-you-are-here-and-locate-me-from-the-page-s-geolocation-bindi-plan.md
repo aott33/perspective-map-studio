@@ -3,7 +3,7 @@ title: "You are here and Locate me from the page's geolocation binding"
 type: 'feature'
 ticket: '15'
 created: '2026-11-07'
-status: 'in-review'
+status: 'built'
 baseline_revision: '7ebffc92a6a11b76fef0a40334bbe53372c95064'
 route: 'full'
 route_source: 'auto'
@@ -102,6 +102,8 @@ Quick lens, 2026-11-07: 6 findings; high 0, medium 1, low 3, false 2.
 | Before the items load, a fix opens a States section holding only "You are here" | low | `LegendControl.ts` 453 opens States on `key.you` alone; `EMPTY_KEY.states` is empty until `drawItems` | patch: States opens only with its rows, the you row at its end |
 | The 390 px block covers only Fix, Locate me, the sheet and Off | false | The matrix's Phone row is "The Fix row at 390 px"; the 390 px test covers it (marker, 44 px Locate me, the sheet's row) | rejected |
 | The Heading test never checks the wedge's direction or map alignment; Not an item names a Needs you check it never makes | low | `locate.spec.mjs` 180-193 reads only `data-you-heading` and the drawn count; 299-336 has no Needs you assertion | patch: assert the rotation and alignment, and the Needs you counts |
+
+Outcome, 2026-11-07: the four patches applied (9dd65a4) and verified by the orchestrator: `tsc` clean, Jest 597 passed in 58 suites, `./gradlew clean build --offline --rerun-tasks` green, the contract check OK at 0.4.0, ignition-lint on `MapStudioLocate/view.json` 0 errors, 0 warnings, 6 naming hints, and `ops/up.sh --fresh` with the whole e2e suite: 210 passed, 7 skipped, 0 failed in 43.6 min (`locate.spec.mjs` 10 of 10). The marker's look goes to entry 18's ER-27 review; a real phone and the Perspective mobile app are the owner's playbook check.
 
 ## Design Notes
 
