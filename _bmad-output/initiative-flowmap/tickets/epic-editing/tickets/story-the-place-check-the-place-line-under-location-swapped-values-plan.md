@@ -3,7 +3,7 @@ title: "The place check: the place line under Location, swapped values flagged, 
 type: 'feature'
 ticket: '27'
 created: '2026-11-07'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '0430d46adaebe24248213c9003e7917ffbd60e59'
 route: 'full'
 route_source: 'auto'
@@ -71,6 +71,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 
 ## Implementation Notes
 
+- Approval (owner, 2026-11-07): "Approved" after a round table on the plan (offshore water named, the data's own county word, border precision A); the plan, a little over size, kept whole; it went ready-for-dev and implementation started in this session.
 - Planner, 2026-11-07: the environment, commit and identity rules are entry 4's plan's (Docker started by hand after a container restart, `ops/up.sh --fresh` before a whole-suite run with nothing else against the stack, the two trailer lines from the session's attribution reminder, `git commit --only` your paths, no em dashes, no model identifier, never a bare `git stash`, never a push). Commit at each working milestone. Natural Earth (naciscdn.org) and GeoNames (download.geonames.org) were reachable from this container on 2026-11-06. Whether the Gateway compresses `/res/` files is unchecked: measure the bytes it sends for the place file.
 
 ## Plan Change Log
