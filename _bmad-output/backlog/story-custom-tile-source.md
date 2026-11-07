@@ -52,3 +52,4 @@ Sketch, settled when refined:
 - Open question: Vector tile sources (a style URL) as well as raster, or raster only at first; a vector source through the proxy needs its style, sprites and glyphs proxied too.
 - Open question: Who may clear the cache (the scripting API trusts its caller as `applyEdits` does; the status page is the Gateway's own permissions) and whether an editor sees the cache from the Layers rail.
 - Note: 2026-11-05 Owner (asked whether Layers would add layers such as weather): in Edit mode the place for overlay toggles and basemap choices is the rail's Layers surface, Layers tab (epic 4 entry 22, two tabs: Layers and Legend); View mode's place stays the Legend or the gear (story 12).
+- Note: 2026-11-07 Owner (the feature review of 2026-11-07, item 4): a WMS endpoint as well as XYZ tile URLs, through the same proxy.

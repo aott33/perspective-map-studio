@@ -7,7 +7,7 @@ What Map Studio 0.3.0 lacks against comparable products, ranked, and where each 
 Three agents' findings, combined by the coordinator, from:
 
 - The Kymera Map Panel Module User Guide (Vision, 94 pages) and the Kymera map-panel `.modl` (Vision, built for Ignition 8.1, id `com.kymerasystems.mappanel`, 8.1 internal-database Gateway config; it may not load on 8.3).
-- A web survey of comparable products: IA's built-in Perspective Map, the vCortex MapLibre component, VTScada, Geo SCADA, Esri Field Maps, Workforce, Velocity and Pipeline Referencing, AVEVA PI Integrator for Esri, CygNet, Wellsite Navigator, IFS Field Operator, DTN WeatherOps, Lygos, Honeywell and Blackline safety maps, KROHNE PipePatrol, Atmos Pig, DNV, WellDatabase and SLB OFM.
+- A web survey of comparable products: IA's built-in Perspective Map, a MapLibre-based Perspective map component, VTScada, Geo SCADA, Esri Field Maps, Workforce, Velocity and Pipeline Referencing, AVEVA PI Integrator for Esri, CygNet, Wellsite Navigator, IFS Field Operator, DTN WeatherOps, Lygos, Honeywell and Blackline safety maps, KROHNE PipePatrol, Atmos Pig, DNV, WellDatabase and SLB OFM.
 
 Against Map Studio 0.3.0 as released: the one project map with icons, lines with instruments, popups, search, the legend, Needs you, basemaps None, OpenStreetMap and Satellite, the scripting API and the versioned contract (docs/contract.md).
 
@@ -26,7 +26,7 @@ Against Map Studio 0.3.0 as released: the one project map with icons, lines with
 | 9 | Map lock and zoom range: `maxBounds`, `zoomRange` | Kymera pinned bounds, maxZoom | Nice, small | backlog story 18 |
 | 10 | Spatial queries from script: `itemsWithin`, `locate` | Kymera containsPoint | Nice | backlog story 19 |
 | 11 | A live view at a map location: a kind's `markerView` as a DOM marker from a zoom, capped | Kymera Data Templates | Nice | backlog story 20 |
-| 12 | Smaller: upstream and downstream trace; project-supplied icons; field notes and photos; a measure tool; Esri World Imagery; size-by-KPI rings; hover tooltip | Repsol on ArcGIS; every surveyed product (icons); Wellsite Navigator and Field Maps (notes, photos); Field Maps and vCortex (measure); Esri (imagery); WellDatabase, OFM and Esri (rings, tooltips) | Niche to nice | backlog stories 21 (trace), 22 (icons), 23 (notes and photos), 24 (measure), 25 (Esri imagery), 26 (rings and tooltip, grouped) |
+| 12 | Smaller: upstream and downstream trace; project-supplied icons; field notes and photos; a measure tool; Esri World Imagery; size-by-KPI rings; hover tooltip | Repsol on ArcGIS; every surveyed product (icons); Wellsite Navigator and Field Maps (notes, photos); Field Maps and a Perspective map component (measure); Esri (imagery); WellDatabase, OFM and Esri (rings, tooltips) | Niche to nice | backlog stories 21 (trace), 22 (icons), 23 (notes and photos), 24 (measure), 25 (Esri imagery), 26 (rings and tooltip, grouped) |
 
 Item 12 was split where the pieces are independent (each is its own store, loader or tool) and the two tiniest, the ring and the tooltip, were grouped as one icon-presentation story because they share one engineering review.
 

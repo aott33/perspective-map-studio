@@ -35,3 +35,4 @@ A map editor uploads context once and toggles it in Layers: lease or unit bounda
 - Open question: Who may add or remove a layer (full editing only?), and whether viewers can toggle layers in View mode.
 - Open question: Which epic takes it back: epic-import-export (the parsers) or epic-viewing (Layers and drawing).
 - Note: 2026-11-05 Owner (asked whether Layers would add layers such as weather): in Edit mode the place for overlay toggles and basemap choices is the rail's Layers surface, Layers tab (epic 4 entry 22, two tabs: Layers and Legend); View mode's place stays the Legend or the gear (story 12).
+- Note: 2026-11-07 Owner (the feature review of 2026-11-07, item 4): georeferenced images include facility plot plans and site drawings over the map, placed by their four corners, with an opacity.

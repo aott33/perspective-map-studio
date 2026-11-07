@@ -14,7 +14,7 @@ risk: low
 
 ## Description
 
-A Measure button in View mode (beside the zoom card, and in the phone's legend sheet) lets any user click or tap points along the map to read the running distance in the project's unit (metres and kilometres, or feet and miles, from the setup), and close the path to read its area; Esc, Done or a tap on the button clears it. From the gap review of 2026-11-03 (item 12): Esri Field Maps and vCortex ship one. The measure path is drawn in the selection look and never saved or counted; the readout is a chip under the top bar in words and numbers, keyboard usable (Enter adds a point at the map's centre crosshair, as the phone's Move does, R30). Nothing of it is an edit, so viewers have it without a role.
+A Measure button in View mode (beside the zoom card, and in the phone's legend sheet) lets any user click or tap points along the map to read the running distance in the project's unit (metres and kilometres, or feet and miles, from the setup), and close the path to read its area; Esc, Done or a tap on the button clears it. From the gap review of 2026-11-03 (item 12): Esri Field Maps and a Perspective map component ship one. The measure path is drawn in the selection look and never saved or counted; the readout is a chip under the top bar in words and numbers, keyboard usable (Enter adds a point at the map's centre crosshair, as the phone's Move does, R30). Nothing of it is an edit, so viewers have it without a role.
 
 ## Requirements
 
@@ -22,7 +22,7 @@ A Measure button in View mode (beside the zoom card, and in the phone's legend s
 
 ## References
 
-- gap review - _bmad-output/initiative-flowmap/gap-review-2026-11-03.md, item 12 (measure; Esri Field Maps, vCortex)
+- gap review - _bmad-output/initiative-flowmap/gap-review-2026-11-03.md, item 12 (measure; Esri Field Maps and a Perspective map component)
 - architecture - AD-19 (the shared geometry module's distance along a line is the arithmetic)
 - initiative - R38 (WCAG 2.2: dragging, target size, keyboard), R30 (the centre crosshair)
 - docs - docs/instruments.md (distance along a line)
