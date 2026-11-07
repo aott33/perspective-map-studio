@@ -59,7 +59,7 @@ export const SOURCES = [
         fields: ['name', 'name_en', 'iso_a2', 'iso_3166_2', 'admin'] },
     { id: 'counties', title: 'Natural Earth 1:10m Admin 2 - Counties (US)', licence: 'Public domain',
         url: NE + 'cultural/ne_10m_admin_2_counties.zip', layer: 'ne_10m_admin_2_counties',
-        fields: ['NAME', 'NAME_ALT', 'TYPE_EN', 'REGION'] },
+        fields: ['NAME', 'NAME_ALT', 'NAME_EN', 'TYPE_EN', 'REGION'] },
     { id: 'marine', title: 'Natural Earth 1:10m Marine Areas', licence: 'Public domain',
         url: NE + 'physical/ne_10m_geography_marine_polys.zip', layer: 'ne_10m_geography_marine_polys',
         fields: ['name', 'name_en'] },
@@ -259,12 +259,21 @@ export function admin1Country(p) {
     return ISO2.test(p.iso_a2 || '') ? p.iso_a2 : (p.admin || '').trim();
 }
 
-/** A county in the data's own words ("Lafourche Parish", "North Slope Borough", "Carson City"). */
+/**
+ * A county in the data's own words ("Lafourche Parish", "North Slope Borough", "Carson City"): `NAME_ALT`, its name spelt as
+ * `NAME_EN` where `NAME` is `NAME_EN` with its accents or its other letters dropped (Puerto Rico's "Mayagez" is "Mayagüez", New
+ * Hampshire's "Coos" is "Coös"), and without a type in brackets (the US Virgin Islands' "Saint Croix (County Equivalent)").
+ */
 export function countyName(p) {
-    const alt = (p.NAME_ALT || '').trim();
-    if (alt !== '') return alt;
-    const type = (p.TYPE_EN || '').replace(/[()]/g, '').trim();
-    return [(p.NAME || '').trim(), type].filter((s) => s !== '').join(' ');
+    const name = (p.NAME || '').trim();
+    const en = (p.NAME_EN || '').trim();
+    const lost = en !== '' && en !== name && (en.normalize('NFD').replace(/[̀-ͯ]/g, '') === name || en.replace(/[^\x20-\x7e]/g, '') === name);
+    let alt = (p.NAME_ALT || '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+    if (alt === '') {
+        const type = (p.TYPE_EN || '').includes('(') ? '' : (p.TYPE_EN || '').trim();
+        alt = [name, type].filter((s) => s !== '').join(' ');
+    }
+    return lost && alt.startsWith(name) ? en + alt.slice(name.length) : alt;
 }
 
 /** A sea's name: Natural Earth's, but its English name where the name is in capitals ("INDIAN OCEAN" reads "Indian Ocean"). */

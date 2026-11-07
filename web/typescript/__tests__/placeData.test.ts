@@ -83,11 +83,28 @@ describe('the words from each source', () => {
 
     test('a county in the data\'s own word; a sea by its English name where its name is in capitals', () => {
         const r = withScript('return [input.counties.map(s.countyName), input.seas.map(s.seaName)];', {
-            counties: [{ NAME: 'Lafourche', NAME_ALT: 'Lafourche Parish', TYPE_EN: 'Parish' }, { NAME: 'North Slope', NAME_ALT: 'North Slope Borough' },
+            counties: [{ NAME: 'Lafourche', NAME_ALT: 'Lafourche Parish', NAME_EN: 'Lafourche Parish', TYPE_EN: 'Parish' },
+                { NAME: 'North Slope', NAME_ALT: 'North Slope Borough', NAME_EN: 'North Slope' },
                 { NAME: 'Saint Croix', NAME_ALT: '', TYPE_EN: '(County Equivalent)' }],
             seas: [{ name: 'INDIAN OCEAN', name_en: 'Indian Ocean' }, { name: 'North Atlantic Ocean', name_en: 'Atlantic Ocean' }, { name: '', name_en: '' }]
         });
-        expect(r).toEqual([['Lafourche Parish', 'North Slope Borough', 'Saint Croix County Equivalent'], ['Indian Ocean', 'North Atlantic Ocean', '']]);
+        expect(r).toEqual([['Lafourche Parish', 'North Slope Borough', 'Saint Croix'], ['Indian Ocean', 'North Atlantic Ocean', '']]);
+    });
+
+    test('the real rows Natural Earth 5.1.1 spells wrong: a lost accent from NAME_EN, no bracketed type, DC as the data names it', () => {
+        // As ne_10m_admin_2_counties.dbf holds them: NAME and NAME_ALT lost Puerto Rico's accented letters; NAME_EN kept them.
+        const r = withScript('return input.map(s.countyName);', [
+            { NAME: 'Mayagez', NAME_ALT: 'Mayagez Municipio', NAME_EN: 'Mayagüez', TYPE_EN: 'Municipio', REGION: 'PR' },
+            { NAME: 'Juana Daz', NAME_ALT: 'Juana Daz Municipio', NAME_EN: 'Juana Díaz', TYPE_EN: 'Municipio', REGION: 'PR' },
+            { NAME: 'Río Grande', NAME_ALT: 'Río Grande Municipio', NAME_EN: 'Río Grande', TYPE_EN: 'Municipio', REGION: 'PR' },
+            { NAME: 'Coos', NAME_ALT: 'Coos County', NAME_EN: 'Coös', TYPE_EN: 'County', REGION: 'NH' },
+            { NAME: 'Saint Croix', NAME_ALT: 'Saint Croix (County Equivalent)', NAME_EN: 'Saint Croix', TYPE_EN: '(County Equivalent)', REGION: 'VI' },
+            { NAME: 'Washington DC', NAME_ALT: 'District of Columbia', NAME_EN: 'Washington', TYPE_EN: 'District of Columbia', REGION: 'DC' },
+            // NAME_EN with an en dash is not a lost letter: the data's hyphen stays.
+            { NAME: 'Hoonah-Angoon', NAME_ALT: 'Hoonah-Angoon Census Area', NAME_EN: 'Hoonah\u2013Angoon', TYPE_EN: 'Census Area', REGION: 'AK' }
+        ]);
+        expect(r).toEqual(['Mayagüez Municipio', 'Juana Díaz Municipio', 'Río Grande Municipio', 'Coös County', 'Saint Croix', 'District of Columbia',
+            'Hoonah-Angoon Census Area']);
     });
 
     test('the towns kept: populated places outside the US, PR and VI, not a section of a town, an abandoned or a historical one', () => {

@@ -2,8 +2,8 @@
     "format": "mapstudio-places",
     "version": 1,
     "file": "places.json",
-    "bytes": 4664353,
-    "sha256": "9f5dcd0d8b4de555a7d40af4c0bca58ce95f287d911d00c52791ec3ee600dc05",
+    "bytes": 4664310,
+    "sha256": "a7a9fa90c4b9ba77f76463d807d882f820bbc9a3a7013712ea35dcc8cfce61c1",
     "maxBytes": 5000000,
     "credit": "Places: Natural Earth, GeoNames (CC BY 4.0)",
     "settings": {

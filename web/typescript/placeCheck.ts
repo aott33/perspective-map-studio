@@ -12,8 +12,8 @@
  * and the sea's 1:10 million outlines leave in neither takes the nearer within 2 km (`SEAM_KM`); "No place found here" only where no
  * area and no sea is found. A point within
  * 1 km of a county or state line names the neighbour ("Lea County (near the Texas line), New Mexico, US"). A latitude past 90 or
- * below -90 whose swap is in range reads "Latitude and longitude look swapped", and a pair in no area whose swap lands in one
- * "Latitude and longitude may be swapped". Never on a line or an area. Pure apart from the loader; unit tested in node with a
+ * below -90 whose swap is in range reads "Latitude and longitude look swapped", and a pair in no area (no land and no sea) whose swap
+ * lands in one "Latitude and longitude may be swapped"; a point in a sea reads its sea. Never on a line or an area. Pure apart from the loader; unit tested in node with a
  * small fixture.
  */
 
@@ -584,7 +584,8 @@ function nearWords(near: string): string {
 export function placeWords(place: PointPlace): string {
     switch (place.kind) {
         case 'county':
-            return join([place.county + nearWords(place.near), place.state, place.country]);
+            // A county named as its state (the District of Columbia, a US Virgin Island) says the name once.
+            return join([place.county + nearWords(place.near), place.state !== place.county ? place.state : '', place.country]);
         case 'land':
             return join([place.town !== '' ? 'Near ' + place.town : '', place.state !== '' ? place.state + nearWords(place.near) : '', place.country]);
         case 'sea':
@@ -597,10 +598,6 @@ export function placeWords(place: PointPlace): string {
     }
 }
 
-/** Whether a place is an area on land (a county, a state or province): what the swap rule looks for. */
-function isArea(place: PointPlace): boolean {
-    return place.kind === 'county' || place.kind === 'land';
-}
 
 /** A typed or stored pair checked: swapped, out of range, waiting for the data, maybe swapped, or its place. */
 export type PairCheck =
@@ -626,7 +623,8 @@ export function lookUpKept(data: PlaceData, lat: number, lng: number): PointPlac
     }
     const place = lookUp(data, lat, lng);
     if (kept.size >= 64) {
-        kept.clear();
+        // The oldest goes (a Map keeps the order its keys were set in), so the last 64 stay.
+        kept.delete(kept.keys().next().value as string);
     }
     kept.set(key, place);
     return place;
@@ -634,8 +632,9 @@ export function lookUpKept(data: PlaceData, lat: number, lng: number): PointPlac
 
 /**
  * The swap rules and the place: a latitude past 90 or below -90 whose swap is in range looks swapped; any other pair out of range is
- * out of range (flagged as before entry 27); a pair in range waits for the data, then is maybe swapped when it lands in no area and
- * its swap lands in one, else its place.
+ * out of range (flagged as before entry 27); a pair in range waits for the data, then is maybe swapped when it lands in no area (no
+ * land and no sea, after the 2 km seam: "No place found here") and its swap lands in one, a sea included, else its place. A point in
+ * a sea reads its sea, whatever its swap.
  */
 export function checkPair(data: PlaceData | null, lat: number, lng: number): PairCheck {
     if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
@@ -645,7 +644,7 @@ export function checkPair(data: PlaceData | null, lat: number, lng: number): Pai
         return { state: 'waiting' };
     }
     const place = lookUpKept(data, lat, lng);
-    if (!isArea(place) && Math.abs(lng) <= 90 && isArea(lookUpKept(data, lng, lat))) {
+    if (place.kind === 'none' && Math.abs(lng) <= 90 && lookUpKept(data, lng, lat).kind !== 'none') {
         return { state: 'maybe-swapped', place };
     }
     return { state: 'place', place };

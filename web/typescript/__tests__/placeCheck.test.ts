@@ -96,9 +96,11 @@ const ADMIN1 = layer([
     [[-120, 60], [-120, 49]],
     [[-120, 60], [-130, 60], [-130, 49], [-120, 49]],
     square(-94, 29, -89, 33),
-    square(10, 40, 20, 50)
-], [[[0, 1]], [[2, ~1]], [[3, 4]], [[5, ~4]], [[6]], [[7]]],
-['New Mexico', 'Texas', 'Alberta', 'British Columbia', 'Louisiana', 'Testland']);
+    square(10, 40, 20, 50),
+    square(50.75, 24.5, 51.65, 26.15),
+    square(25, 50, 28.5, 52)
+], [[[0, 1]], [[2, ~1]], [[3, 4]], [[5, ~4]], [[6]], [[7]], [[8]], [[9]]],
+['New Mexico', 'Texas', 'Alberta', 'British Columbia', 'Louisiana', 'Testland', 'Qatar', 'Rivne']);
 
 // Lea County between Eddy County (same state, x = -104) and Andrews County (Texas, x = -103); Lafourche Parish on the coast.
 const COUNTIES = layer([
@@ -111,9 +113,11 @@ const COUNTIES = layer([
     square(-91, 29, -90, 30)
 ], [[[0, 1, 2, 3]], [[4, 3]], [[5, 1]], [[6]]], ['Lea County', 'Eddy County', 'Andrews County', 'Lafourche Parish']);
 
-// The Gulf with a bay inside it, the Atlantic, an unnamed channel west of British Columbia, and a sea whose swap is Testland.
-const MARINE = layer([square(-98, 18, -80, 29), square(-80, 0, -10, 60), square(-135, 50, -130, 55), square(-92, 28, -91, 29), square(40, 10, 50, 20)],
-    [[[0]], [[1]], [[2]], [[3]], [[4]]], ['Gulf of Mexico', 'North Atlantic Ocean', '', 'Test Bay', 'Test Sea']);
+// The Gulf with a bay inside it, the Atlantic, an unnamed channel west of British Columbia, a sea whose swap is Testland, and the
+// Persian Gulf round Qatar, whose swap is Rivne in Ukraine.
+const MARINE = layer([square(-98, 18, -80, 29), square(-80, 0, -10, 60), square(-135, 50, -130, 55), square(-92, 28, -91, 29), square(40, 10, 50, 20),
+    square(48, 24, 56, 30)],
+[[[0]], [[1]], [[2]], [[3]], [[4]], [[5]]], ['Gulf of Mexico', 'North Atlantic Ocean', '', 'Test Bay', 'Test Sea', 'Persian Gulf']);
 
 const FILE = {
     format: 'mapstudio-places',
@@ -121,7 +125,7 @@ const FILE = {
     credit: PLACE_CREDIT,
     sources: [],
     settings: { quantum: QUANTUM, townQuantum: TOWN_QUANTUM },
-    admin1: { ...ADMIN1, countries: ['US', 'US', 'CA', 'CA', 'US', 'XX'] },
+    admin1: { ...ADMIN1, countries: ['US', 'US', 'CA', 'CA', 'US', 'XX', 'QA', 'UA'] },
     counties: { ...COUNTIES, states: [0, 0, 1, 4] },
     marine: MARINE,
     towns: towns([['Grande Prairie', 55.17, -118.8], ['Edmonton', 53.55, -113.49], ['Far Town', 59.5, -111.0]])
@@ -146,7 +150,7 @@ describe('the file read back', () => {
     });
 
     test('the layers, their names and the towns; a shared line has both its areas as users', () => {
-        expect(DATA.admin1.names).toHaveLength(6);
+        expect(DATA.admin1.names).toHaveLength(8);
         expect(DATA.counties.names).toEqual(['Lea County', 'Eddy County', 'Andrews County', 'Lafourche Parish']);
         expect(Array.from(DATA.states)).toEqual([0, 0, 1, 4]);
         expect(DATA.towns.names).toEqual(['Grande Prairie', 'Edmonton', 'Far Town']);
@@ -211,8 +215,30 @@ describe('the lookups and their words (the matrix)', () => {
         expect(words(0, 100)).toBe(PLACE_NONE);
     });
 
-    test('a pair asked again is answered from the kept lookups', () => {
-        expect(lookUpKept(DATA, 32.7, -103.1)).toBe(lookUpKept(DATA, 32.7, -103.1));
+    test('a county named as its state says the name once: "District of Columbia, US"', () => {
+        expect(placeWords({ kind: 'county', county: 'District of Columbia', state: 'District of Columbia', country: 'US', near: '' }))
+            .toBe('District of Columbia, US');
+        expect(placeWords({ kind: 'county', county: 'Saint Croix', state: 'Saint Croix', country: 'VI', near: '' })).toBe('Saint Croix, VI');
+        expect(placeWords({ kind: 'county', county: 'District of Columbia', state: 'District of Columbia', country: 'US', near: 'Maryland' }))
+            .toBe('District of Columbia (near the Maryland line), US');
+    });
+
+    test('a pair asked again is answered from the kept lookups; the last 64 are kept, the oldest going first', () => {
+        // Data of its own, so the lookups the other tests kept do not count.
+        const data = decodePlaces(FILE);
+        const first = lookUpKept(data, 32.7, -103.1);
+        expect(lookUpKept(data, 32.7, -103.1)).toBe(first);
+        const kept = [];
+        for (let i = 1; i <= 63; i++) {
+            kept.push(lookUpKept(data, 58, -115 + i * 0.01));
+        }
+        // 64 kept: the first is still there.
+        expect(lookUpKept(data, 32.7, -103.1)).toBe(first);
+        // A 65th pair pushes out the oldest, the first, and keeps the other 63.
+        lookUpKept(data, 58, -100);
+        expect(lookUpKept(data, 58, -114.99)).toBe(kept[0]);
+        expect(lookUpKept(data, 58, -115 + 63 * 0.01)).toBe(kept[62]);
+        expect(lookUpKept(data, 32.7, -103.1)).not.toBe(first);
     });
 });
 
@@ -229,18 +255,27 @@ describe('the swap rules', () => {
         expect(checkPair(DATA, -200, 32.7)).toEqual({ state: 'out-of-range' });
     });
 
-    test('a pair in no area whose swap lands in one may be swapped; one on land, or whose swap lands nowhere, is its place', () => {
-        // 15, 45 is in Test Sea; 45, 15 is in Testland.
-        expect(checkPair(DATA, 15, 45)).toMatchObject({ state: 'maybe-swapped', place: { kind: 'sea', sea: 'Test Sea' } });
+    test('a pair in no area (no land, no sea) whose swap lands in one may be swapped; one at sea reads its sea, whatever its swap', () => {
+        // -89.5, 31 is nowhere; 31, -89.5 is in Louisiana. -40, 30 is nowhere too, and its swap 30, -40 in the Atlantic, a sea.
+        expect(checkPair(DATA, -89.5, 31)).toEqual({ state: 'maybe-swapped', place: { kind: 'none' } });
+        expect(checkPair(DATA, -40, 30)).toEqual({ state: 'maybe-swapped', place: { kind: 'none' } });
+        // A Persian Gulf point: its swap, 51.5, 27, is in Rivne, but a sea is an area, so it reads its sea.
+        expect(checkPair(DATA, 27.0, 51.5)).toEqual({ state: 'place', place: { kind: 'sea', sea: 'Persian Gulf', off: { state: 'Qatar', country: 'QA' } } });
+        expect(placeWords(lookUp(DATA, 27.0, 51.5))).toBe('Persian Gulf, off Qatar, QA');
+        // 15, 45 is in Test Sea, its swap in Testland: the sea.
+        expect(checkPair(DATA, 15, 45)).toMatchObject({ state: 'place', place: { kind: 'sea', sea: 'Test Sea' } });
         expect(checkPair(DATA, 45, 15)).toMatchObject({ state: 'place', place: { kind: 'land', state: 'Testland' } });
         expect(checkPair(DATA, 30.0, -40.0)).toMatchObject({ state: 'place', place: { kind: 'sea' } });
+        // Nowhere, and its swap nowhere: no place found.
+        expect(checkPair(DATA, 5, 45)).toEqual({ state: 'place', place: { kind: 'none' } });
         expect(checkPair(null, 32.7, -103.1)).toEqual({ state: 'waiting' });
     });
 
     test('the place line: the words, the flags, nothing out of range, and the loading and failure words', () => {
         expect(placeLine(READY, 32.7, -103.1)).toEqual({ state: 'found', text: 'Lea County, New Mexico, US' });
         expect(placeLine(READY, -103.1, 32.7)).toEqual({ state: 'swapped', text: LOOK_SWAPPED });
-        expect(placeLine(READY, 15, 45)).toEqual({ state: 'maybe-swapped', text: MAY_BE_SWAPPED });
+        expect(placeLine(READY, -89.5, 31)).toEqual({ state: 'maybe-swapped', text: MAY_BE_SWAPPED });
+        expect(placeLine(READY, 27.0, 51.5)).toEqual({ state: 'found', text: 'Persian Gulf, off Qatar, QA' });
         expect(placeLine(READY, 95, 100)).toEqual({ state: 'out-of-range', text: '' });
         expect(placeLine(READY, 0, 100)).toEqual({ state: 'none', text: PLACE_NONE });
         expect(placeLine({ state: 'idle', data: null }, 32.7, -103.1)).toEqual({ state: 'loading', text: PLACE_LOADING });
@@ -373,7 +408,8 @@ describe('the place line under Location (entry 27)', () => {
         expect(placeTag(out)).toBe('');
         expect(out).toContain('>Latitude is -90 to 90 and longitude -180 to 180.</span>');
         expect(out).toContain('data-place="out-of-range"');
-        expect(placeTag(typed('15', '45'))).toContain('>' + MAY_BE_SWAPPED + '<');
+        expect(placeTag(typed('-89.5', '31'))).toContain('>' + MAY_BE_SWAPPED + '<');
+        expect(placeTag(typed('27', '51.5'))).toContain('>Persian Gulf, off Qatar, QA<');
     });
 
     test('Zoom to location beside Move, first, for a point; on while the fields are paused or the kind is unknown', () => {
