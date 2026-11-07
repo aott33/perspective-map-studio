@@ -3,7 +3,7 @@ title: "The item form: kind fields, required marks, prefill, duplicate names, un
 type: 'feature'
 ticket: '6'
 created: '2026-11-06'
-status: 'in-review'
+status: 'built'
 baseline_revision: '3a971b7b6f9573f6eb48fded79b56e1aee04f360'
 route: 'full'
 route_source: 'auto'
@@ -97,6 +97,8 @@ Quick lens, 2026-11-07: 6 findings; high 0, medium 3, low 3.
 | Changing a field and changing it back before the reply loses the second change | low | `sameValue` (307, 333) compares with the stored record, not the value in flight; the delegate's `propertiesFor` knows the in-flight value | patch: compare with the value in flight, so a change back is sent |
 | The duplicate-name words name the asset ("Pad 14"), not its folder as the frozen plan says ("Mesa/P15") | low | `itemForm.ts` 169 reads `assetNames`; at level `full` `lists.assets` carries `basePath` | patch: the words name the other asset's base path without its provider, as the plan's Always says |
 | No ignition-lint result for the changed dev view and script (the session's CLAUDE.md) | low | The plan recorded tsc, Jest, Gradle, the contract check and e2e only | resolved by the orchestrator: ignition-lint-toolkit on both files, 0 errors and 0 warnings; the view's 12 naming hints are advisory and the same as at the baseline (11 there, the new `mode_tank` following the view's own names); `code.py` no issues; both ran live in the e2e |
+
+Outcome, 2026-11-07: the five patches applied (fa03442) and verified by the orchestrator: `tsc` clean, Jest 505 passed in 51 suites, the Gradle clean build offline, the contract check OK at 0.4.0, and `ops/up.sh --fresh` with the whole e2e suite on a fresh dev stack: 187 passed, 7 skipped, 0 failed in 36.8 min.
 
 ## Verification
 
