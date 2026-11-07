@@ -3,7 +3,7 @@ title: "You are here and Locate me from the page's geolocation binding"
 type: 'feature'
 ticket: '15'
 created: '2026-11-07'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '7ebffc92a6a11b76fef0a40334bbe53372c95064'
 route: 'full'
 route_source: 'auto'
@@ -21,7 +21,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 **Problem:** A phone user in the field cannot see where they stand on the map, so finding the nearest pad means reading the map against the landscape; the page has the device's position in `session.props.geolocation` but no way to give it to the map.
 
-**Approach:** Decisions (owner, 2026-11-03: R50 as a prop in the session property's own shape, the module reading nothing of the session and asking the browser for nothing; 2026-11-06, entry 3: the marker in the theme's qual-1, "You are here" in the legend, Locate me last in the zoom card, off with its reason in words). A `userLocation` prop in the closed list, the marker drawn from it, Locate me moving the map to it, contract 0.4.0 and a `/locate` dev page.
+**Approach:** Decisions (owner, 2026-11-03: R50 as a prop in the session property's own shape, the module reading nothing of the session and asking the browser for nothing; 2026-11-06, entry 3: the marker in the theme's qual-1, "You are here" in the legend, Locate me last in the zoom card, off with its reason in words; 2026-11-07, "Approved" on the planner's picks: an unbound prop shows Locate me off with "location is off for this session", the marker sits above areas and lines and below point markers, and it works in both modes). A `userLocation` prop in the closed list, the marker drawn from it, Locate me moving the map to it, contract 0.4.0 and a `/locate` dev page.
 
 ## Boundaries & Constraints
 
@@ -78,6 +78,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 - Planner, 2026-11-07: the environment, commit and identity rules are entry 14's plan's (Docker started by hand after a container restart, `ops/up.sh --fresh` before a whole-suite run with nothing else against the stack, the two trailer lines from the session's attribution reminder, `git commit --only` your paths, no em dashes, no model identifier, never a bare `git stash`, never a push). Commit at each working milestone. ignition-lint: `pip install ignition-lint-toolkit` in a scratch venv, then `ignition-lint --files <view.json or code.py>`; zero errors and warnings, naming hints recorded.
 - Planner: if `session.props.geolocation` cannot be turned on from the page or the mocked position does not reach it on 8.3.10, record it in `docs/platform-checks.md`, turn it on in the project's session props instead, and stop to report if the binding still gets nothing; do not read the store instead.
+
+- Approval (owner, 2026-11-07): "Approved" with the planner's three picks (unbound prop shows Locate me off; marker below point markers; both modes), written into the Approach; the plan, over size, kept whole.
 
 ## Plan Change Log
 
