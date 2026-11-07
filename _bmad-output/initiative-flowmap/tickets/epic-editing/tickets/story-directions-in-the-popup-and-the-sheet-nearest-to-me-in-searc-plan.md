@@ -3,7 +3,7 @@ title: "Directions in the popup and the sheet, Nearest to me in search, the dist
 type: 'feature'
 ticket: '16'
 created: '2026-11-07'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: 'f2a2522f6e0a45296f457c2b33eb5bf1e922b3c6'
 route: 'full'
 route_source: 'auto'
@@ -21,7 +21,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 **Problem:** A field user who has found a pad on the map still has to work out how to drive there, and with a position known the map still cannot say what is nearest or how far each item needing attention is.
 
-**Approach:** Decisions (owner, 2026-11-03: R51 and R52, `directions {enabled, urlTemplate}` a prop, nothing sent to any service by Map Studio; 2026-11-06, entry 3: the popup footer as the sheet's, Directions and View alarms side by side, the route not the pin, A-Z | Nearest, distances right-aligned on Needs you rows; phone editing parked, so the sheet's Edit goes). A `directions` prop, a popup footer, distances from entry 15's position in search and Needs you, contract 0.4.0 and the dev pages.
+**Approach:** Decisions (owner, 2026-11-03: R51 and R52, `directions {enabled, urlTemplate}` a prop, nothing sent to any service by Map Studio; 2026-11-06, entry 3: the popup footer as the sheet's, Directions and View alarms side by side, the route not the pin, A-Z | Nearest, distances right-aligned on Needs you rows; phone editing parked, so the sheet's Edit goes; 2026-11-07, "Approved and continue" on the planner's five picks: a custom popup view gets the footer, a line's or area's distance to its nearest point, the switch on the open list before typing with A-Z first, a template that is not a web or maps link ignored with a warning, Directions shown with no position). A `directions` prop, a popup footer, distances from entry 15's position in search and Needs you, contract 0.4.0 and the dev pages.
 
 ## Boundaries & Constraints
 
@@ -82,6 +82,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 - Planner, 2026-11-07: the environment, commit and identity rules are entry 15's plan's (Docker started by hand after a container restart, `ops/up.sh --fresh` before a whole-suite run with nothing else against the stack, the trailers from the session's attribution reminder, `git commit --only` your paths, no em dashes, no model identifier, never a bare `git stash`, never a push). JDK 17 may need `apt-get install openjdk-17-jdk-headless` after a restart. Commit at each working milestone.
 - Planner: a real phone and the Perspective mobile app handing the link to the maps app are the owner's check (playbook), not this build's; record them as not verified in `docs/platform-checks.md`.
+
+- Approval (owner, 2026-11-07): "Approved and continue" with the five picks, written into the Approach; the plan, over size, kept whole.
 
 ## Plan Change Log
 
