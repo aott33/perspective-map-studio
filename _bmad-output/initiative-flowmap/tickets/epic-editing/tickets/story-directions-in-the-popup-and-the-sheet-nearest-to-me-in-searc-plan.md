@@ -66,13 +66,13 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `common/` schema and test -- the prop.
-- [ ] `directions.ts`, `geometry.ts` and the distance words, with Jest -- the link, the platform, the template, every distance and unit row.
-- [ ] `DefaultPopup.tsx`, `PointPopup.tsx`, `selection.tsx`, CSS, Jest -- the footer.
-- [ ] `search.ts`, `SearchControl.ts`, `needsyou.ts`, `NeedsYouControl.ts`, `itemsLayer.ts`, `MapStudio.tsx`, CSS, Jest -- Nearest and the distances.
-- [ ] `ops/project/` -- the two views, ignition-lint clean.
-- [ ] e2e: the changed specs and `directions.spec.mjs` at 1366 and 390 px, screenshots for the owner.
-- [ ] Docs, CHANGELOG, the playbook section.
+- [x] `common/` schema and test -- the prop.
+- [x] `directions.ts`, `geometry.ts` and the distance words, with Jest -- the link, the platform, the template, every distance and unit row.
+- [x] `DefaultPopup.tsx`, `PointPopup.tsx`, `selection.tsx`, CSS, Jest -- the footer.
+- [x] `search.ts`, `SearchControl.ts`, `needsyou.ts`, `NeedsYouControl.ts`, `itemsLayer.ts`, `MapStudio.tsx`, CSS, Jest -- Nearest and the distances.
+- [x] `ops/project/` -- the two views, ignition-lint clean.
+- [x] e2e: the changed specs and `directions.spec.mjs` at 1366 and 390 px, screenshots for the owner.
+- [x] Docs, CHANGELOG, the playbook section.
 
 **Acceptance Criteria:**
 - Given the dev Gateway as `mapeditor` with a mocked position, when the matrix runs at 1366 and 390 px, then each row holds.
@@ -84,8 +84,11 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 - Planner: a real phone and the Perspective mobile app handing the link to the maps app are the owner's check (playbook), not this build's; record them as not verified in `docs/platform-checks.md`.
 
 - Approval (owner, 2026-11-07): "Approved and continue" with the five picks, written into the Approach; the plan, over size, kept whole.
+- Build, 2026-11-07: tsc and Jest clean (615), Gradle build successful, contract check OK at 0.4.0, ignition-lint zero errors and warnings (style notes only, as before); on a fresh stack the whole e2e suite 220 passed, 7 skipped, 0 failed, directions.spec 10 of 10. A real phone and the mobile app are not verified (playbook 8b).
 
 ## Plan Change Log
+
+- Build, 2026-11-07: the distance words follow the Boundaries' rule (under 0.1 mi, 528 ft, in feet); the example "850 ft" is past it and reads "0.2 mi". Recorded in `docs/platform-checks.md` for the owner. A line's custom popup view gets no footer (a line has no Directions, and the line popup is not changed); a point's and an area's custom view get it. The Nearest switch is reached by keyboard with Tab or ArrowLeft and ArrowRight from the empty field (the panel sits after the Needs you bar in the DOM, so plain tab order would close the list).
 
 ## Review Triage Log
 
