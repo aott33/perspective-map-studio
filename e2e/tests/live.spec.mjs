@@ -98,13 +98,13 @@ editorTest.describe('1440 px', () => {
             await expect(p1).toHaveAttribute('data-state', 'alarm');
             expect(await p1.getAttribute('data-marker')).toContain('"alarm-1-unacknowledged",1,true');
 
-            // The default popup, in order: header, comms with its data age, the KPIs, the alarms.
+            // The default popup, in order: header, comms with its data age, the KPIs, the alarms, the footer (entry 16).
             await clickPoint(page, map, 'p1');
             const popup = page.locator('.maplibregl-popup .mapstudio-popup--default');
             await expect(popup).toBeVisible({ timeout: 30_000 });
             await expect(page.locator('.mapstudio-popup--view')).toHaveCount(0);
             expect(await popup.locator('[data-part]').evaluateAll((els) => els.map((e) => e.getAttribute('data-part'))))
-                .toEqual(['header', 'comms', 'kpis', 'alarms']);
+                .toEqual(['header', 'comms', 'kpis', 'alarms', 'footer']);
             await expect(popup.locator('.mapstudio-popup-name')).toHaveText('Point 1');
             await expect(popup.locator('.mapstudio-popup-subline')).toHaveText('Well pad');
             await expect(popup.locator('[data-part="comms"]')).toHaveAttribute('data-comms', 'ok');
@@ -117,8 +117,8 @@ editorTest.describe('1440 px', () => {
             await expect(popup.locator('[data-part="alarms"]')).toHaveAttribute('data-alarm', '1:unacked');
             await expect(popup.locator('[data-part="alarms"]')).toContainText('1 alarm - Priority 1, unacknowledged');
             // The alarm summary (entry 8, R7): the counts by priority and the alarm in words with its source
-            // below the alarms path and its age, read from the Gateway's alarm status; View alarms opens
-            // the setup's alarm page with {asset.id} filled. Map Studio acknowledges nothing.
+            // below the alarms path and its age, read from the Gateway's alarm status; View alarms, in the
+            // footer since entry 16, opens the setup's alarm page with {asset.id} filled. Map Studio acknowledges nothing.
             const alarms = popup.locator('[data-part="alarms"]');
             await expect(alarms).toHaveAttribute('data-alarm-counts', '1,0,0', { timeout: PUSH_MS });
             await expect(alarms).toHaveAttribute('data-alarm-listed', '1');
@@ -127,7 +127,8 @@ editorTest.describe('1440 px', () => {
             await expect(popup.locator('.mapstudio-popup-link')).toHaveAttribute('data-link', '/pad/Point 1');
             await expect(page.locator('.maplibregl-popup-close-button')).toHaveCount(0);
             await shot(page, 'mapstudio-live-1440.png');
-            await alarms.locator('.mapstudio-popup-view-alarms').click();
+            await expect(alarms.locator('.mapstudio-popup-view-alarms')).toHaveCount(0);
+            await popup.locator('[data-part="footer"] .mapstudio-popup-view-alarms').click();
             await expect(page).toHaveURL(/\/alarms\/P12$/, { timeout: 30_000 });
             await expect(page.locator('#mapstudio-alarms-title')).toHaveText('Alarms of P12', { timeout: 30_000 });
             await expect(page.locator('#mapstudio-alarms-table')).toBeVisible();
@@ -258,12 +259,14 @@ editorTest.describe('390 px', () => {
         await clickPoint(page, map, 'p1');
         // At 390 px every point popup is a bottom sheet (entry 8; DESIGN.md bottom-sheet): 8 px from the
         // sides, above the App Bar toggle, a handle, 44 px pop-out and close, the alarm block with its
-        // line under the glyph, a footer with View alarms, no pointer, and no map label through it.
+        // line under the glyph, a footer with View alarms (no Edit, entry 16), no pointer, and no map label through it.
         const sheet = page.locator('.mapstudio-sheet .mapstudio-popup--default');
         await expect(sheet).toBeVisible({ timeout: 30_000 });
         await expect(map).toHaveAttribute('data-popup-mode', 'sheet');
         await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
         await expect(sheet.locator('[data-part="alarms"]')).toContainText('Priority 1, unacknowledged');
+        await expect(sheet.locator('[data-part="footer"] .mapstudio-popup-view-alarms')).toBeVisible();
+        await expect(sheet.locator('.mapstudio-popup-edit')).toHaveCount(0);
         await expect(sheet.locator('.mapstudio-popup-alarm-line')).toHaveText(/^High pressure - Pressure, /, { timeout: PUSH_MS });
         const geometry = await page.evaluate(() => {
             const r = (s) => { const b = document.querySelector(s).getBoundingClientRect(); return { x: b.x, y: b.y, w: b.width, h: b.height, r: b.right, b: b.bottom }; };

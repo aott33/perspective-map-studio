@@ -211,12 +211,12 @@ test.describe('1366 px', () => {
             await view(page, map, center, 16);
             const popup = await clickPoint(page, map, SHOWCASE.p14, center, 16, '.maplibregl-popup .mapstudio-popup--default');
             await expect(popup).toHaveAttribute('data-point-id', ids.p14);
-            await expect(popup.locator('.mapstudio-popup-view-alarms')).toBeVisible({ timeout: INTERVAL_MS });
+            await expect(popup.locator('[data-part="footer"] .mapstudio-popup-view-alarms')).toBeVisible({ timeout: INTERVAL_MS });
             await page.waitForTimeout(600);
             const before = { center: await map.getAttribute('data-center'), zoom: await map.getAttribute('data-zoom') };
             expect(before.zoom).toBe('16.00');
             // View alarms opens the alarm page; the browser's back returns to the map.
-            await popup.locator('.mapstudio-popup-view-alarms').click();
+            await popup.locator('[data-part="footer"] .mapstudio-popup-view-alarms').click();
             await expect(page).toHaveURL(/\/alarms\//, { timeout: 30_000 });
             await expect(page.locator('.mapstudio-map')).toHaveCount(0);
             await page.goBack();

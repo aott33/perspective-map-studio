@@ -1239,9 +1239,16 @@
     border-left: 1px solid var(--neutral-40);
 }
 
-.mapstudio .mapstudio-search-order-button--on {
-    background: var(--neutral-90);
-    color: var(--neutral-10);
+/* MapLibre's `.maplibregl-ctrl button:not(:disabled):hover` wash is more specific than the rules above: the hover rules
+   name the control class too, so an off part takes the row hover and the chosen part keeps its fill under the pointer. */
+.mapstudio .maplibregl-ctrl .mapstudio-search-order-button:hover:not(:disabled) {
+    background: var(--mapstudio-hover);
+}
+
+.mapstudio .mapstudio-search-order-button--on,
+.mapstudio .maplibregl-ctrl .mapstudio-search-order-button--on:hover:not(:disabled) {
+    background: var(--mapstudio-attention, var(--neutral-90));
+    color: var(--mapstudio-surface, var(--neutral-10));
 }
 
 .mapstudio .mapstudio-search-order-button:focus-visible {

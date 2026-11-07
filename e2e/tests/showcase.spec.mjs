@@ -272,7 +272,9 @@ test.describe('1366 px', () => {
         const kpis = popup.locator('.mapstudio-popup-kpi .mapstudio-popup-value');
         await expect(kpis).toHaveText([/^1,?240 psi$/, '410 psi', '1.8 MMcf/d']);
         await expect(popup.locator('[data-part="alarms"]')).toContainText('1 alarm - Priority 1, unacknowledged');
-        await expect(popup.locator('.mapstudio-popup-view-alarms')).toBeVisible();
+        // View alarms is the footer's since entry 16, not the alarm block's.
+        await expect(popup.locator('[data-part="footer"] .mapstudio-popup-view-alarms')).toBeVisible();
+        await expect(popup.locator('[data-part="alarms"] .mapstudio-popup-view-alarms')).toHaveCount(0);
         await shot(page, 'showcase-view-desktop-popup-1366.png');
         expect(watched.warnings, 'Map Studio warnings').toEqual([]);
     });
@@ -310,7 +312,8 @@ test.describe('390 px', () => {
         await labelsPlaced(map, ['P14', '1240 psi']);
         const sheet = await clickP14(page, map, SHOWCASE.phoneCenter, SHOWCASE.zoom);
         await expect(map).toHaveAttribute('data-popup-mode', 'sheet');
-        await expect(sheet.locator('.mapstudio-popup-view-alarms')).toBeVisible();
+        await expect(sheet.locator('[data-part="footer"] .mapstudio-popup-view-alarms')).toBeVisible();
+        await expect(sheet.locator('.mapstudio-popup-edit')).toHaveCount(0);
         await shot(page, 'showcase-phone-sheet-390.png');
         expect(watched.warnings, 'Map Studio warnings').toEqual([]);
     });
