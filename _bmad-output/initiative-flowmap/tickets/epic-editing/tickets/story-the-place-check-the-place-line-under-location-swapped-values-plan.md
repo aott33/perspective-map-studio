@@ -3,14 +3,14 @@ title: "The place check: the place line under Location, swapped values flagged, 
 type: 'feature'
 ticket: '27'
 created: '2026-11-07'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '0430d46adaebe24248213c9003e7917ffbd60e59'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md']
 ---
