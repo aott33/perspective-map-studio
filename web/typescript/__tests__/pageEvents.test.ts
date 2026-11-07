@@ -44,7 +44,11 @@ jest.mock('@inductiveautomation/perspective-client', () => {
 
 import { AbstractUIElementStore } from '@inductiveautomation/perspective-client';
 import { Kind } from '../adapters';
+import * as basemapLayer from '../basemapLayer';
+import * as cameraModule from '../camera';
 import { applyRestore, publishViewport, RESTORE_WAIT_MS } from '../camera';
+import * as editingModule from '../editing';
+import * as itemsLayer from '../itemsLayer';
 import { MapItemRecord } from '../contract';
 import { LIVE_INITIAL, KindDisplay } from '../live';
 import { LAYER_ITEM_MARKERS } from '../mapLayers';
@@ -171,6 +175,12 @@ interface Harness {
     moveTo(center: [number, number], zoom: number): void;
     /** The delegate's state changed (the items arrived, a batch): componentDidUpdate's page selection step. */
     update(): void;
+    /** From now on setState queues its updates, as React batches them inside componentDidUpdate, until `flush`. */
+    defer(): void;
+    /** Apply the queued updates in order (React's next render), then run componentDidUpdate for it; setState applies at once again. */
+    flush(): void;
+    /** The page writes props (a Perspective prop change), and the component's componentDidUpdate runs for it. */
+    pageWritesProps(next: Record<string, unknown>): void;
 }
 
 interface HarnessOptions {
@@ -229,7 +239,9 @@ function harness(options: HarnessOptions = {}): Harness {
         parentElement: null
     };
     ms.mapContainer = container as unknown as HTMLDivElement;
-    (ms as unknown as { setState: (update: unknown, callback?: () => void) => void }).setState = (update: unknown, callback?: () => void): void => {
+    let deferred = false;
+    const queued: Array<[unknown, (() => void) | undefined]> = [];
+    const apply = (update: unknown, callback?: () => void): void => {
         const next = typeof update === 'function' ? (update as (prev: MapStudioState) => Partial<MapStudioState> | null)(ms.state) : update;
         if (next) {
             ms.state = { ...ms.state, ...(next as Partial<MapStudioState>) };
@@ -238,6 +250,13 @@ function harness(options: HarnessOptions = {}): Harness {
         if (callback) {
             callback();
         }
+    };
+    (ms as unknown as { setState: (update: unknown, callback?: () => void) => void }).setState = (update: unknown, callback?: () => void): void => {
+        if (deferred) {
+            queued.push([update, callback]);
+            return;
+        }
+        apply(update, callback);
     };
     let center: [number, number] = [-105.0, 39.73];
     let zoom = 12;
@@ -317,6 +336,20 @@ function harness(options: HarnessOptions = {}): Harness {
             setProps({ ...ms.props, delegate: { ...delegate, items: ITEMS, load: { state: 'loaded', message: '' }, itemsRevision: 1,
                 live: { ...delegate.live, fulls: 1 } } });
             update();
+        },
+        defer: (): void => { deferred = true; },
+        flush: (): void => {
+            const prev = ms.props;
+            deferred = false;
+            for (const [u, cb] of queued.splice(0)) {
+                apply(u, cb);
+            }
+            ms.componentDidUpdate(prev);
+        },
+        pageWritesProps: (next: Record<string, unknown>): void => {
+            const prev = ms.props;
+            setProps({ ...ms.props, props: { ...ms.props.props, ...next } });
+            ms.componentDidUpdate(prev);
         }
     };
 }
@@ -585,6 +618,32 @@ describe('selectedItem written by the page, in Edit mode', () => {
         h.pageWrites(null);
         expect(h.state().selected).toBeNull();
         expect(h.state().panel).toBeNull();
+    });
+
+    test('editMode and selectedItem written together: the item is chosen once Edit mode is in force, with Details and no popup', () => {
+        // componentDidUpdate's other steps (the layers, the tools, the starting area) have nothing to do here.
+        jest.spyOn(basemapLayer, 'applyBasemap').mockImplementation(() => undefined);
+        jest.spyOn(itemsLayer, 'drawItems').mockImplementation(() => undefined);
+        jest.spyOn(itemsLayer, 'dropQueuedFeatures').mockImplementation(() => undefined);
+        jest.spyOn(editingModule, 'applyEditing').mockImplementation(() => undefined);
+        jest.spyOn(editingModule, 'applyHandles').mockImplementation(() => undefined);
+        jest.spyOn(cameraModule, 'applyStartingArea').mockImplementation(() => undefined);
+        const h = harness();
+        (h.ms.map as unknown as { addControl: () => void }).addControl = (): void => undefined;
+        expect(h.ms.studioOn()).toBe(false);
+        // As React does inside componentDidUpdate: the mode's setState lands on the next render.
+        h.defer();
+        h.pageWritesProps({ editMode: true, selectedItem: 'ctb1' });
+        expect(h.state().selected).toBeNull();
+        expect(h.state().popup).toBeNull();
+        expect(h.popupOpen).toEqual([]);
+        h.flush();
+        expect(h.ms.studioOn()).toBe(true);
+        expect(h.state().selected).toEqual({ id: 'ctb1', kind: 'point' });
+        expect(h.state().panel).toBe('ctb1');
+        expect(h.state().popup).toBeNull();
+        expect(h.popupOpen).toEqual([]);
+        expect(h.moves).toEqual(['easeTo ' + CTB1.join(',')]);
     });
 });
 
