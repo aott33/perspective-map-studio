@@ -50,9 +50,13 @@ module.exports = (env, argv) => ({
         // (WORKER_URL in typescript/MapStudio.tsx). Published as .js: the
         // gateway serves .mjs with no content type and nosniff, which the
         // browser refuses to run as a worker.
+        // The place check's data (epic 4 entry 27, docs/place-check.md) is copied the same way, out of the bundle: made once by
+        // scripts/place-data.mjs and committed under assets/place/, so the build downloads nothing, and served as .json (the
+        // browser fetches it when Details first shows a point's location, PLACES_URL in typescript/placeCheck.ts).
         new CopyPlugin({
             patterns: [
-                { from: path.join(__dirname, 'node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs'), to: 'maplibre-gl-worker.js' }
+                { from: path.join(__dirname, 'node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs'), to: 'maplibre-gl-worker.js' },
+                { from: path.join(__dirname, 'assets/place/places.json'), to: 'places.json' }
             ]
         })
     ],

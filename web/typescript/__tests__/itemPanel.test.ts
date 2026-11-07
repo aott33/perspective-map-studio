@@ -8,6 +8,7 @@ import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AdapterStatus, Asset, AssetName, FormField, Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
+import { createPlaceSource } from '../placeCheck';
 import { PropertiesPanel, PropertiesPanelProps } from '../studio/PropertiesPanel';
 
 const FIELDS: FormField[] = [
@@ -60,7 +61,8 @@ function props(overrides: Partial<PropertiesPanelProps> = {}): PropertiesPanelPr
         item, kind: PAD, kinds: [PAD], assets: [], assetNames: NAMES, assetStatus: OK, items: [item], assetRows: ASSETS, kindStatus: KINDS_OK,
         saving: false, newest: item.properties, pending: false, paused: false, autoFocusName: false, onNameFocused: noop, onClose: noop,
         onRename: noop, onMove: noop, canMoveByClick: true, moving: false, onMoveStart: noop, onLink: noop, onKind: noop, onProperty: noop,
-        onDelete: noop, toolInHand: false, delKey: true, ...overrides
+        onDelete: noop, toolInHand: false, delKey: true, places: createPlaceSource(() => new Promise(() => undefined)), onZoomTo: noop,
+        ...overrides
     };
 }
 

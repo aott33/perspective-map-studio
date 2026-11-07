@@ -2874,6 +2874,33 @@
     color: var(--callToAction);
 }
 
+/* Zoom to location beside Move (entry 27; DESIGN.md Properties panel "location with the place line and Zoom to location"): the
+   two small buttons together at the label row's right, Zoom to location first so Move keeps its place at the end. */
+.mapstudio-field-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+}
+
+.mapstudio-field-zoom {
+    height: 24px;
+    padding: 0 10px;
+}
+
+/* The place line under the hint (entry 27): where the point lands, in the secondary text colour, its tooltip naming the sources;
+   a swap flag reads in the text colour, as a field's problem does. Words only, no hue. */
+.mapstudio-field-place {
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-field-place[data-place="swapped"],
+.mapstudio-field-place[data-place="maybe-swapped"] {
+    color: var(--label);
+}
+
 .mapstudio-field-pair {
     display: flex;
     gap: 8px;

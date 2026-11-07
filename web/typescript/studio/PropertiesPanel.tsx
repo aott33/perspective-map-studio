@@ -5,6 +5,7 @@ import {
     FieldValue, REQUIRED_TEXT, UNKNOWN_KIND, assetListNote, assetVanished, fieldText, isUnset, kindListKnown, kindListNote, missingRequired,
     missingText, nameTwins, readField, twinText, unknownKindText, vanishedText
 } from '../itemForm';
+import { PLACE_CREDIT, PlaceSource, placeLine } from '../placeCheck';
 import { Glyph } from '../popupParts';
 import { roundCoordinate } from '../save';
 import { ChromeGlyph } from './ChromeGlyph';
@@ -18,6 +19,17 @@ export const NOT_SAVED_TEXT = 'Not saved yet';
 
 /** Why the footer's delete is off while the Point, Line or Area tool is in hand (entry 25's review): Esc puts the tool down. */
 export const TOOL_IN_HAND_TEXT = 'Off while a tool is in hand - Esc puts it down';
+
+/** Zoom to location beside Move (entry 27): its words and its hover text. */
+export const ZOOM_TO_TEXT = 'Zoom to location';
+export const ZOOM_TO_TITLE = 'Zoom to location: the map moves to the saved point';
+
+/** Whether a typed latitude or longitude reads as a number (in range or not): the place line follows a typed pair once both do. */
+export function readsAsNumber(text: string): number | null {
+    const t = text.trim();
+    const n = Number(t);
+    return t !== '' && Number.isFinite(n) ? n : null;
+}
 
 /** The footer's delete icon as it shows: why it is off ('' when on), its hover words, and whether it names the Delete key. */
 export interface DeleteButton {
@@ -71,6 +83,15 @@ export function deleteButton(paused: boolean, pending: boolean, toolInHand: bool
  * failing, slow or not configured. A finished field is compared with the newest value sent for it (`newest`), and once the
  * item's saves settle (`saving` goes false) a field sent and not held by the record (a refused or dropped save) shows the
  * record's value again.
+ *
+ * From entry 27 (R13; placeCheck.ts holds the rules, docs/place-check.md the data) a point item's Location carries the place line
+ * under the hint, in the secondary text colour, its tooltip naming the sources: the place of the typed pair once both fields read
+ * as numbers, else of the saved point ("Lea County, New Mexico, US", "Near Grande Prairie, Alberta, CA", "Gulf of Mexico, off
+ * Louisiana, US"); "Latitude and longitude look swapped" for a latitude past 90 whose swap is in range (nothing saved, as any pair
+ * out of range), "Latitude and longitude may be swapped" for a pair in no area whose swap lands in one; "Looking up the place..."
+ * while the data loads and "The place check is not available" if it failed, never stopping a save. The data is asked for when the
+ * panel first shows a point (`places`, one fetch per page); a line or an area never asks. Zoom to location, beside Move, moves the
+ * map to the saved point at zoom 15 or more, the selection and Details kept (`onZoomTo`).
  */
 export interface PropertiesPanelProps {
     item: MapItemRecord;
@@ -121,6 +142,10 @@ export interface PropertiesPanelProps {
     toolInHand: boolean;
     /** The Delete key deletes this item now (no point chosen, no Move waiting): the footer names it. */
     delKey: boolean;
+    /** The page's place data (entry 27): loaded when the panel first shows a point, its status read for the place line. */
+    places: PlaceSource;
+    /** Zoom to location (entry 27): the map moves to the saved point at zoom 15 or more; the selection and Details stay. */
+    onZoomTo: () => void;
 }
 
 interface Drafts {
@@ -174,6 +199,8 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
     private escaped: string | null = null;
     /** The kind fields sent and not yet settled, with the text each showed when sent (entry 6's review). */
     private sent = new Map<string, string>();
+    /** False once unmounted: the place data's load may settle after the panel has gone. */
+    private mounted = false;
 
     constructor(props: PropertiesPanelProps) {
         super(props);
@@ -181,7 +208,26 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
     }
 
     componentDidMount(): void {
+        this.mounted = true;
         this.focusName();
+        this.watchPlaces();
+    }
+
+    componentWillUnmount(): void {
+        this.mounted = false;
+    }
+
+    /** A point's Location asks for the place data (once per page; a later panel waits on the same load) and draws again when it settles. */
+    private watchPlaces(): void {
+        const places = this.props.places;
+        if (this.props.item.geometry.type !== 'Point' || places.status().state === 'ready' || places.status().state === 'failed') {
+            return;
+        }
+        places.load().then(() => {
+            if (this.mounted) {
+                this.forceUpdate();
+            }
+        });
     }
 
     componentDidUpdate(prev: PropertiesPanelProps): void {
@@ -487,6 +533,18 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         const remove = deleteButton(paused, pending, this.props.toolInHand, this.props.delKey);
         const latProblem = this.state.lat !== '' && readCoordinate(this.state.lat, 90) === null;
         const lngProblem = this.state.lng !== '' && readCoordinate(this.state.lng, 180) === null;
+        // The place line (entry 27): the typed pair once both read as numbers, else the saved point. A pair that looks swapped says so
+        // there and the hint keeps its instruction; any other pair out of range is flagged by the hint, as before, with no place line.
+        const typedLat = readsAsNumber(this.state.lat);
+        const typedLng = readsAsNumber(this.state.lng);
+        const geometry = item.geometry;
+        const place = geometry.type === 'Point'
+            ? typedLat !== null && typedLng !== null
+                ? placeLine(this.props.places.status(), typedLat, typedLng)
+                : placeLine(this.props.places.status(), geometry.coordinates[1], geometry.coordinates[0])
+            : null;
+        const swapped = place !== null && place.state === 'swapped';
+        const placeId = 'mapstudio-place-' + item.id;
         const missing = missingText(missingRequired(kind, item.properties));
         const twin = twinText(nameTwins(this.state.name, item, this.props.items, this.props.assetRows));
         const twinId = 'mapstudio-twin-' + item.id;
@@ -536,14 +594,21 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                             <span id={'mapstudio-kind-hint-' + item.id} className="mapstudio-field-hint mapstudio-field-kind-hint">{kindHint}</span>
                         ) : null}
                     </div>
-                    <div className="mapstudio-field mapstudio-field--location">
+                    <div className="mapstudio-field mapstudio-field--location" data-place={place ? place.state : ''}>
                         <div className="mapstudio-field-label-row">
                             <span className="mapstudio-field-label">Location</span>
-                            {point && this.props.canMoveByClick ? (
-                                <button type="button" className="mapstudio-button mapstudio-field-move" aria-pressed={this.props.moving} disabled={frozen}
-                                        title={this.props.moving ? 'Move waits for a click on the map; press again or Esc to cancel'
-                                            : 'Move: click the new place on the map'} aria-keyshortcuts={this.props.moving ? 'Escape' : undefined}
-                                        onClick={this.props.onMoveStart}>Move</button>
+                            {point ? (
+                                <span className="mapstudio-field-actions">
+                                    {/* Zoom to location moves the map only, so it stays on while the fields are paused or frozen. */}
+                                    <button type="button" className="mapstudio-button mapstudio-field-zoom" title={ZOOM_TO_TITLE}
+                                            onClick={this.props.onZoomTo}>{ZOOM_TO_TEXT}</button>
+                                    {this.props.canMoveByClick ? (
+                                        <button type="button" className="mapstudio-button mapstudio-field-move" aria-pressed={this.props.moving} disabled={frozen}
+                                                title={this.props.moving ? 'Move waits for a click on the map; press again or Esc to cancel'
+                                                    : 'Move: click the new place on the map'} aria-keyshortcuts={this.props.moving ? 'Escape' : undefined}
+                                                onClick={this.props.onMoveStart}>Move</button>
+                                    ) : null}
+                                </span>
                             ) : null}
                         </div>
                         {point ? (
@@ -551,13 +616,15 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                                 <label className="mapstudio-field-half">
                                     <span className="mapstudio-field-sublabel">Latitude</span>
                                     <input className="mapstudio-input mapstudio-field-lat" type="number" step="any" inputMode="decimal" value={this.state.lat}
-                                           disabled={frozen} aria-invalid={latProblem} onChange={(ev) => this.setState({ lat: ev.target.value })}
+                                           disabled={frozen} aria-invalid={latProblem} aria-describedby={place && place.text !== '' ? placeId : undefined}
+                                           onChange={(ev) => this.setState({ lat: ev.target.value })}
                                            onBlur={this.commitLocation('lat')} onKeyDown={this.onKey('lat')} />
                                 </label>
                                 <label className="mapstudio-field-half">
                                     <span className="mapstudio-field-sublabel">Longitude</span>
                                     <input className="mapstudio-input mapstudio-field-lng" type="number" step="any" inputMode="decimal" value={this.state.lng}
-                                           disabled={frozen} aria-invalid={lngProblem} onChange={(ev) => this.setState({ lng: ev.target.value })}
+                                           disabled={frozen} aria-invalid={lngProblem} aria-describedby={place && place.text !== '' ? placeId : undefined}
+                                           onChange={(ev) => this.setState({ lng: ev.target.value })}
                                            onBlur={this.commitLocation('lng')} onKeyDown={this.onKey('lng')} />
                                 </label>
                             </div>
@@ -565,10 +632,13 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                             <span className="mapstudio-field-text">A line of {item.geometry.coordinates.length} points</span>
                         )}
                         <span className="mapstudio-field-hint">
-                            {latProblem || lngProblem
+                            {(latProblem || lngProblem) && !swapped
                                 ? 'Latitude is -90 to 90 and longitude -180 to 180.'
                                 : point ? 'Drag the pin to fine-tune, or type latitude and longitude.' : ''}
                         </span>
+                        {place && place.text !== '' ? (
+                            <span id={placeId} className="mapstudio-field-place" data-place={place.state} title={PLACE_CREDIT}>{place.text}</span>
+                        ) : null}
                     </div>
                     {kind ? kind.fields.map((field, i) => this.renderField(field, i)) : this.renderStored()}
                     <div className="mapstudio-field mapstudio-field--asset" data-vanished={vanished ? 'true' : 'false'}>

@@ -96,6 +96,30 @@ The glyphs are rendered at build time by web/scripts/glyphs.mjs with
 opentype.js (MIT) and pbf (BSD-3-Clause), which are build tools and are not
 redistributed.
 
+This product includes place data for the place check in Details
+(web/assets/place/places.json, served at /res/mapstudio/places.json; its
+sources, versions and SHA-256 sums are in web/assets/place/sources.json),
+made by web/scripts/place-data.mjs from the following, simplified and
+re-encoded:
+
+Natural Earth (https://www.naturalearthdata.com): the 1:10m Admin 1 states
+and provinces 5.1.1, the 1:10m Admin 2 counties of the United States 5.1.1
+and the 1:10m marine areas 5.1.0.
+    Public domain. Made with Natural Earth. Free vector and raster map
+    data at naturalearthdata.com.
+
+GeoNames (https://www.geonames.org): the cities5000 export of 2026-11-07,
+the names and positions of the towns outside the United States.
+    Licensed under the Creative Commons Attribution 4.0 International
+    License (https://creativecommons.org/licenses/by/4.0/). GeoNames
+    provides the data as is, without warranty of any kind, and does not
+    endorse this product. The towns were selected (populated places
+    outside the United States, Puerto Rico and the US Virgin Islands) and
+    their positions rounded to 0.001 degree.
+
+The borders are simplified, when the data is made, by mapshaper (MPL-2.0),
+a development tool that is not redistributed.
+
 This product builds against, but does not redistribute, Inductive Automation's
 Ignition SDK and the @inductiveautomation/perspective-client package, which the
 Ignition platform provides at runtime.

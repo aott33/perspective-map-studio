@@ -31,7 +31,8 @@ import { PresetPalette, StylePreview, TintPalette } from './StylePreview';
 import { MapFeatures, SegmentRef, Selection } from './features';
 import { ZoomControl } from './ZoomControl';
 import { SearchControl } from './SearchControl';
-import { SearchResult } from './search';
+import { CHOSEN_POINT_ZOOM, SearchResult } from './search';
+import { PLACES } from './placeCheck';
 import { STORE_UNKNOWN, storeStateAttribute } from './storeState';
 import { SAVE_IDLE } from './save';
 import { unsavedItems } from './unsaved';
@@ -889,6 +890,24 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.publishFit();
     };
 
+    /**
+     * Details' Zoom to location (entry 27): the map moves to the selected point as saved, at zoom 15 or more (the search's chosen
+     * point zoom), centred in what a person sees (the camera padding, as a row's pan); the selection and Details stay. A move of
+     * the component's own, so a kept Fit ends here.
+     */
+    onZoomToLocation = (): void => {
+        const selected = this.state.selected;
+        const item = selected ? this.itemFor(selected.id) : undefined;
+        const map = this.map;
+        if (!item || !map || item.geometry.type !== 'Point') {
+            return;
+        }
+        this.fitKey = null;
+        map.easeTo({ center: [item.geometry.coordinates[0], item.geometry.coordinates[1]], zoom: Math.max(map.getZoom(), CHOSEN_POINT_ZOOM),
+            padding: camera.cameraPadding(this), duration: 300 });
+        this.publishFit();
+    };
+
     /** The properties panel's close (EXPERIENCE.md: closes with close or Esc): the selection goes. */
     onPanelClose = (): void => selection.clearSelection(this);
     onNameFocused = (): void => { this.focusNameId = null; };
@@ -1282,7 +1301,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              onProperty={this.onProperty}
                              onDelete={this.onDeleteItem}
                              toolInHand={this.state.studio.tool !== null || this.state.drawing !== null}
-                             delKey={!(pick && pick.itemId === item.id)} />
+                             delKey={!(pick && pick.itemId === item.id)}
+                             places={PLACES}
+                             onZoomTo={this.onZoomToLocation} />
         );
     }
 

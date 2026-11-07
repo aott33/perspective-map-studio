@@ -14,6 +14,7 @@ import { DrawingBar } from '../studio/DrawingBar';
 import { GeometryBar } from '../studio/GeometryBar';
 import { CloseButton } from '../popupParts';
 import { ItemList } from '../studio/ItemList';
+import { createPlaceSource } from '../placeCheck';
 import { DELETE_TITLE, NOT_SAVED_TEXT, PropertiesPanel, PropertiesPanelProps, TOOL_IN_HAND_TEXT, deleteButton } from '../studio/PropertiesPanel';
 import { PAUSED_TEXT, REDO_KEY, UNDO_KEY, withKey } from '../studio/UndoGroup';
 import { UNDO_EMPTY, UndoStack, finishPending, pushStep, startUndo } from '../undoStack';
@@ -52,7 +53,8 @@ function panel(overrides: Partial<PropertiesPanelProps> = {}): string {
         item: PAD, kind: KINDS[0], kinds: [KINDS[0]], assets: [], assetNames: [], assetStatus: null, items: [PAD], assetRows: [], kindStatus: null, saving: false,
         newest: PAD.properties, pending: false, paused: false,
         autoFocusName: false, onNameFocused: noop, onClose: noop, onRename: noop, onMove: noop, canMoveByClick: true, moving: false,
-        onMoveStart: noop, onLink: noop, onKind: noop, onProperty: noop, onDelete: noop, toolInHand: false, delKey: true, ...overrides
+        onMoveStart: noop, onLink: noop, onKind: noop, onProperty: noop, onDelete: noop, toolInHand: false, delKey: true,
+        places: createPlaceSource(() => new Promise(() => undefined)), onZoomTo: noop, ...overrides
     }));
 }
 

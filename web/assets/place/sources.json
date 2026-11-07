@@ -1,0 +1,96 @@
+{
+    "format": "mapstudio-places",
+    "version": 1,
+    "file": "places.json",
+    "bytes": 4664353,
+    "sha256": "9f5dcd0d8b4de555a7d40af4c0bca58ce95f287d911d00c52791ec3ee600dc05",
+    "maxBytes": 5000000,
+    "credit": "Places: Natural Earth, GeoNames (CC BY 4.0)",
+    "settings": {
+        "intervalMeters": 100,
+        "quantum": 0.0001,
+        "townQuantum": 0.001,
+        "townKm": 50,
+        "offKm": 200,
+        "lineKm": 1,
+        "townCodesLeftOut": [
+            "PPLX",
+            "PPLH",
+            "PPLQ",
+            "PPLW",
+            "PPLCH",
+            "PPLR"
+        ],
+        "townCountriesLeftOut": [
+            "US",
+            "PR",
+            "VI"
+        ],
+        "simplifier": "mapshaper 0.6.121 (Douglas-Peucker, interval=100 m, keep-shapes)"
+    },
+    "counts": {
+        "admin1": {
+            "features": 4596,
+            "arcs": 16971,
+            "vertices": 718722
+        },
+        "counties": {
+            "features": 3224,
+            "arcs": 9959,
+            "vertices": 89327
+        },
+        "marine": {
+            "features": 306,
+            "arcs": 2169,
+            "vertices": 57780
+        },
+        "towns": 57461
+    },
+    "sources": [
+        {
+            "id": "admin1",
+            "title": "Natural Earth 1:10m Admin 1 - States, Provinces",
+            "url": "https://naciscdn.org/naturalearth/10m/cultural/ne_10m_admin_1_states_provinces.zip",
+            "licence": "Public domain",
+            "sha256": "efc59726337323058f9446210adc96673179cd344e053666ee3d28cb58ba2b05",
+            "bytes": 14909524,
+            "lastModified": "Fri, 13 May 2022 05:20:49 GMT",
+            "retrieved": "2026-11-07",
+            "version": "5.1.1"
+        },
+        {
+            "id": "counties",
+            "title": "Natural Earth 1:10m Admin 2 - Counties (US)",
+            "url": "https://naciscdn.org/naturalearth/10m/cultural/ne_10m_admin_2_counties.zip",
+            "licence": "Public domain",
+            "sha256": "ecd4881eb618ab623d522f25ab16efe7c984b35890586b5f5646df020d2ab2be",
+            "bytes": 1919144,
+            "lastModified": "Fri, 13 May 2022 05:20:49 GMT",
+            "retrieved": "2026-11-07",
+            "version": "5.1.1"
+        },
+        {
+            "id": "marine",
+            "title": "Natural Earth 1:10m Marine Areas",
+            "url": "https://naciscdn.org/naturalearth/10m/physical/ne_10m_geography_marine_polys.zip",
+            "licence": "Public domain",
+            "sha256": "a2d3395904c41e718e02c3ec5bc988712164c524c236fad32d95d282ca303b2a",
+            "bytes": 940563,
+            "lastModified": "Fri, 13 May 2022 05:21:36 GMT",
+            "retrieved": "2026-11-07",
+            "version": "5.1.0"
+        },
+        {
+            "id": "towns",
+            "title": "GeoNames cities5000 (populated places of 5,000 people or more)",
+            "url": "https://download.geonames.org/export/dump/cities5000.zip",
+            "licence": "CC BY 4.0",
+            "sha256": "6e761cfb75a68d70d2a082ef757e83a41c11f0474497681b774f2787134c2729",
+            "bytes": 5725971,
+            "lastModified": "Sat, 07 Nov 2026 02:54:40 GMT",
+            "retrieved": "2026-11-07",
+            "version": "export of 2026-11-07"
+        }
+    ],
+    "made": "web/scripts/place-data.mjs (npm run place-data); see docs/place-check.md"
+}

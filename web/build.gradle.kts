@@ -41,6 +41,8 @@ val webpack = tasks.register<NpmTask>("webpack") {
     // The glyph source (epic 3 entry 7): the fonts scripts/glyphs.mjs renders into mounted/glyphs/.
     inputs.dir("fonts")
     inputs.dir("scripts")
+    // The place check's data (epic 4 entry 27): committed, copied by webpack into mounted/places.json.
+    inputs.dir("assets")
     inputs.file("../common/src/main/resources/com/aoindustrial/perspective/mapstudio/common/icons.json")
     inputs.files("package.json", "package-lock.json", "webpack.config.js", "tsconfig.json")
     outputs.dir(projectOutput)
@@ -55,6 +57,7 @@ val jestTest = tasks.register<NpmTask>("jestTest") {
     inputs.dir("icons")
     inputs.dir("fonts")
     inputs.dir("scripts")
+    inputs.dir("assets")
     inputs.file("../common/src/main/resources/com/aoindustrial/perspective/mapstudio/common/icons.json")
     inputs.files("package.json", "package-lock.json", "jest.config.js", "tsconfig.json", "tsconfig.test.json")
 }
