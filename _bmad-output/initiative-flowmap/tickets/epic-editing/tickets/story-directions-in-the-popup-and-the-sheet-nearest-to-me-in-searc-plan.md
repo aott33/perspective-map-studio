@@ -3,14 +3,14 @@ title: "Directions in the popup and the sheet, Nearest to me in search, the dist
 type: 'feature'
 ticket: '16'
 created: '2026-11-07'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: 'f2a2522f6e0a45296f457c2b33eb5bf1e922b3c6'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
@@ -89,8 +89,18 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 ## Plan Change Log
 
 - Build, 2026-11-07: the distance words follow the Boundaries' rule (under 0.1 mi, 528 ft, in feet); the example "850 ft" is past it and reads "0.2 mi". Recorded in `docs/platform-checks.md` for the owner. A line's custom popup view gets no footer (a line has no Directions, and the line popup is not changed); a point's and an area's custom view get it. The Nearest switch is reached by keyboard with Tab or ArrowLeft and ArrowRight from the empty field (the panel sits after the Needs you bar in the DOM, so plain tab order would close the list).
+- 2026-11-07 (owner, "Keep the rule as built"): feet only under 0.1 mi; the Boundaries' example "850 ft" reads "0.2 mi".
+
+- Review fix, 2026-11-07: a new position redraws an open search list only while it shows Nearest or the switch must come or go (`positionRedraws`, Jest), keeping its scroll, so an A-Z list or typed results no longer jump to the top on each fix; Tab and the arrows reach the switch on the same trimmed empty-text test that shows it.
 
 ## Review Triage Log
+
+Quick lens, 2026-11-07: 2 findings; high 0, medium 1, low 1, false 0.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| Each new position rebuilds an open search list, A-Z or typed results included, and sends it back to the top | medium | `SearchControl.ts` `setPosition` (183) calls `search()` whenever the panel is open; `renderList` empties the panel; `showMore` keeps `scrollTop`, `setPosition` does not; a phone sends a fix every few seconds | patch: redraw only for Nearest or the switch appearing, the scroll kept |
+| With spaces typed the switch shows but Tab and the arrows cannot reach it | low | The keys test `input.value === ''` (665, 673); the switch shows on `value.trim() === ''` (314) | patch: the same trimmed test |
 
 ## Design Notes
 

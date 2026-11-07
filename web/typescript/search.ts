@@ -177,6 +177,16 @@ export function allEntries(entries: readonly SearchEntry[]): SearchResult[] {
 }
 
 /**
+ * Whether a new position redraws an open list (entry 16): only when the switch must appear or go (no text typed and a
+ * position known, against whether it shows now), or while it shows Nearest. An A-Z list or typed results never use the
+ * position, so a new fix leaves them alone.
+ */
+export function positionRedraws(emptyText: boolean, hasPosition: boolean, switchShown: boolean, order: ListOrder): boolean {
+    const wanted = emptyText && hasPosition;
+    return wanted !== switchShown || (wanted && order === 'nearest');
+}
+
+/**
  * The `count` items nearest to the position (entry 16), nearest first (by name, then id, at equal distances), each with its
  * distance in metres: a point to the position, a line to its nearest point, an area 0 inside and else to its edge.
  */

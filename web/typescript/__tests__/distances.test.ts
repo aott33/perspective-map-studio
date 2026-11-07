@@ -4,7 +4,7 @@ import { insideRing, itemDistanceM } from '../geometry';
 import { distanceWords, usesMiles } from '../linePopup';
 import { KindDisplay, LIVE_INITIAL, LiveState } from '../live';
 import { needsYou, rowDistanceM } from '../needsyou';
-import { NEAREST_COUNT, buildEntries, nearestEntries } from '../search';
+import { NEAREST_COUNT, buildEntries, nearestEntries, positionRedraws } from '../search';
 
 /** Metres in 0.001 degree of latitude (Turf's radius). */
 const MILLI_DEG_M = (6371008.8 * Math.PI) / 180 / 1000;
@@ -118,5 +118,19 @@ describe('the distance on Needs you rows (needsyou.ts)', () => {
         expect(summary.rows[0].area).toBe(false);
         expect(rowDistanceM(summary.rows[0], [0, 0])).toBeCloseTo(50 * MILLI_DEG_M, 0);
         expect(rowDistanceM(summary.rows[1], [0, 0])).toBeCloseTo(MILLI_DEG_M, 0);
+    });
+});
+
+describe('a new position and an open list (search.ts positionRedraws)', () => {
+    test('an A-Z list or typed results are left alone; Nearest follows; the switch comes and goes', () => {
+        // A new fix with A-Z shown, or with text typed: no redraw, so the list keeps its scroll.
+        expect(positionRedraws(true, true, true, 'az')).toBe(false);
+        expect(positionRedraws(false, true, false, 'nearest')).toBe(false);
+        expect(positionRedraws(false, false, false, 'az')).toBe(false);
+        // Nearest shown: it follows the position.
+        expect(positionRedraws(true, true, true, 'nearest')).toBe(true);
+        // The first fix puts the switch in; losing it takes the switch out.
+        expect(positionRedraws(true, true, false, 'az')).toBe(true);
+        expect(positionRedraws(true, false, true, 'az')).toBe(true);
     });
 });

@@ -34,7 +34,7 @@ import { glyphSvg } from './controls';
 import { browserLocale, distanceWords } from './linePopup';
 import {
     LIST_ORDERS, ListOrder, NO_MATCHES, SEARCH_LABEL, SEARCH_PLACEHOLDER, SearchEntry, SearchResult, allEntries, chosenText, nearestEntries,
-    pagedCount, searchEntries
+    pagedCount, positionRedraws, searchEntries
 } from './search';
 
 /** The width below which the control is the phone top bar (the stylesheet's phone breakpoint). */
@@ -187,8 +187,16 @@ export class SearchControl implements IControl {
             return;
         }
         this.position = position;
-        if (this.panel) {
+        const panel = this.panel;
+        const empty = this.input !== null && this.input.value.trim() === '';
+        // Only the Nearest list and the switch follow the position: an A-Z list or typed results are left as they are, so a new
+        // fix never rebuilds them or moves their scroll.
+        if (panel && positionRedraws(empty, position !== null, this.switchEl !== null, this.order)) {
+            const scroll = panel.scrollTop;
             this.search();
+            if (this.panel) {
+                this.panel.scrollTop = scroll;
+            }
         }
     }
 
@@ -662,7 +670,7 @@ export class SearchControl implements IControl {
                 break;
             case 'Tab':
                 // Tab from the empty field reaches the A-Z | Nearest switch, which sits in the panel after the bar's row (entry 16).
-                if (!ev.shiftKey && this.switchEl && this.input && this.input.value === '') {
+                if (!ev.shiftKey && this.switchEl && this.input && this.input.value.trim() === '') {
                     ev.preventDefault();
                     this.focusOrderButton();
                 }
@@ -670,7 +678,7 @@ export class SearchControl implements IControl {
             case 'ArrowLeft':
             case 'ArrowRight':
                 // In the empty field with the switch shown, the arrows choose A-Z or Nearest (entry 16).
-                if (this.switchEl && this.input && this.input.value === '') {
+                if (this.switchEl && this.input && this.input.value.trim() === '') {
                     ev.preventDefault();
                     this.setOrder(ev.key === 'ArrowRight' ? 'nearest' : 'az');
                 }
