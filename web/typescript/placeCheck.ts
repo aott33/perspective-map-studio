@@ -8,7 +8,9 @@
  * In the US the county in the data's own words, the state and the country ("Lea County, New Mexico, US"); elsewhere the nearest
  * town within 50 km, the state or province and the country ("Near Grande Prairie, Alberta, CA"), or the state or province and
  * the country alone; offshore the sea, then "off" the nearest state or province within 200 km ("Gulf of Mexico, off Louisiana,
- * US"), or the sea alone ("North Atlantic Ocean"); "No place found here" only where no area and no sea is found. A point within
+ * US"), or the sea alone ("North Atlantic Ocean"), an unnamed channel by its shore ("Off British Columbia, CA"); a point the land's
+ * and the sea's 1:10 million outlines leave in neither takes the nearer within 2 km (`SEAM_KM`); "No place found here" only where no
+ * area and no sea is found. A point within
  * 1 km of a county or state line names the neighbour ("Lea County (near the Texas line), New Mexico, US"). A latitude past 90 or
  * below -90 whose swap is in range reads "Latitude and longitude look swapped", and a pair in no area whose swap lands in one
  * "Latitude and longitude may be swapped". Never on a line or an area. Pure apart from the loader; unit tested in node with a

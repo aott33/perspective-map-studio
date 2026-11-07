@@ -59,8 +59,8 @@ export function deleteButton(paused: boolean, pending: boolean, toolInHand: bool
  * assets, Unlink). Every field saves when it is finished (blur, Enter or a choice) through the component's
  * callbacks, one batch each; a field finished while the item's create is still being saved (the item just
  * added with the cursor already in Name) goes to the delegate like any other, which sends it right after the
- * create's reply at the right version. The Style tab, the place check (entry 27), the page
- * link and the Live now block are later entries. The panel is keyed by the item's id, so its drafts
+ * create's reply at the right version. The Style tab, the page
+ * link and the Live now block are later entries (the place check is entry 27's, below). The panel is keyed by the item's id, so its drafts
  * start from the record; a new version of the record (a save, an undo, another editor's change) resets
  * the fields the user has not touched and keeps a draft being typed. While map.load says the store is
  * unreachable the fields are paused, as the toolbar is. From entry 25 (DESIGN.md Properties panel: "Footer: a delete icon",

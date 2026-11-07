@@ -9,8 +9,12 @@
 // Name underlined with the tooltip and description naming its folder, the save gone through. An item made in the dev adapter's mode tank,
 // once the mode is ok again, shows "Unknown kind" with its values read only and Kind alone taking input; one linked to P99 says it is
 // no longer in the asset list and counts as unlinked. The asset list's status message under Asset with the dev adapter empty, then
-// incomplete. Renders of Details for the docs under E2E_DOCS=1 (AD-15). The spec puts the dev adapter back to ok and leaves the seed
-// as it found it (the seed run again and the strays removed).
+// incomplete. The place check (epic 4 entry 27, R13; docs/place-check.md), the plan's matrix: the place line under Location following
+// the saved point and a typed pair (Lea County, Grande Prairie, Lafourche Parish, the Texas line, the Gulf, the Atlantic), swapped values
+// flagged and not saved until they read; no request for the data before a point's Details, one after (at most 5 MB as the Gateway sends
+// it) and none again; Zoom to location on CTB1; the data missing, the form still saving. Renders of Details for the docs under
+// E2E_DOCS=1 (AD-15). The spec puts the dev adapter back to ok and leaves the seed as it found it (the seed run again and the strays
+// removed).
 
 import { TRACER, pagePixel } from '../lib/geo.mjs';
 import { randomUUID } from 'node:crypto';
