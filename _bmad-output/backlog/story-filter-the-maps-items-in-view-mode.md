@@ -30,3 +30,4 @@ From the feature review of 2026-11-07 (item 2). An operator or a page wants to s
 - Open question: Whether a filtered-out item still counts in Needs you (a hidden alarm should not be missed: probably yes, with a word that the filter hides it).
 - Open question: Filter words a user picks from lists only, or a page-written expression; no free expressions from a viewer.
 - Note: 2026-11-07 Owner: backlog, not scheduled.
+- Note: 2026-11-07 Owner (the feature review addendum, item D): the filter can also be set and cleared from a script (a component method), not only from a control or a prop.

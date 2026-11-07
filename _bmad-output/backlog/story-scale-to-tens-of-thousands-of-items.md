@@ -28,3 +28,4 @@ From the feature review of 2026-11-07 (item 7). Map Studio's first version targe
 ## Notes
 
 - Note: 2026-11-07 Owner: backlog, after 0.4.0's performance run (epic 4 entry 18) shows where the limits are today.
+- Note: 2026-11-07 Owner (the feature review addendum, item E): very large collections may load from a URL in pages (JSON lines, paged) rather than in one map load.

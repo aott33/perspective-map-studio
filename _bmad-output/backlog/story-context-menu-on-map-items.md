@@ -28,3 +28,4 @@ From the feature review of 2026-11-07 (item 8). A right-click (or a long press o
 
 - Open question: Whether the menu earns its place beside the popup and Details, which already hold most of these actions.
 - Note: 2026-11-07 Owner: backlog, low.
+- Note: 2026-11-07 Owner (the feature review addendum, item C): the lighter option first: a right-click (or long press) event sent to the page with the item and its coordinates, so a page builds its own menu; the built-in menu only if pages ask for one.

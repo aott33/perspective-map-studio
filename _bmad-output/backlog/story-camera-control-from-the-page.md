@@ -30,3 +30,4 @@ From the feature review of 2026-11-07 (item 1, the owner: "I'm good with your re
 - Open question: Component methods called from a script (Perspective's component functions) or a writable camera prop the page sets; a prop is bindable, a method is not.
 - Open question: Whether a command moves the camera while Edit mode has a tool in hand (entry 14 holds a page's selection until the tool is down).
 - Note: 2026-11-07 Owner: backlog, not scheduled.
+- Decision: 2026-11-07 Owner (the feature review addendum, items B and F): camera commands are component methods a script calls (fly to, fit bounds, pan to, zoom in and out, read the bounds and centre), not a writable prop, which settles the first open question; and a click on empty ground is sent to the page with its coordinates (for "add something here" or "show the coordinates").
