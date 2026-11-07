@@ -49,7 +49,8 @@ function toolbar(undo: UndoStack, paused = false): string {
 
 function panel(overrides: Partial<PropertiesPanelProps> = {}): string {
     return renderToStaticMarkup(React.createElement(PropertiesPanel, {
-        item: PAD, kind: KINDS[0], kinds: [KINDS[0]], assets: [], assetNames: [], assetStatus: null, items: [PAD], pending: false, paused: false,
+        item: PAD, kind: KINDS[0], kinds: [KINDS[0]], assets: [], assetNames: [], assetStatus: null, items: [PAD], assetRows: [], kindStatus: null, saving: false,
+        newest: PAD.properties, pending: false, paused: false,
         autoFocusName: false, onNameFocused: noop, onClose: noop, onRename: noop, onMove: noop, canMoveByClick: true, moving: false,
         onMoveStart: noop, onLink: noop, onKind: noop, onProperty: noop, onDelete: noop, toolInHand: false, delKey: true, ...overrides
     }));

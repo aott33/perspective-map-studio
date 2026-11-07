@@ -128,6 +128,12 @@ export interface MapStudioDelegateState {
      * of those items are made again from the stored shape), and in words the later changes it took with it ('' for none).
      */
     shapeRefused: ShapeRefusal;
+    /**
+     * Every map item with a batch in flight or waiting its turn (entry 6's review), with the newest `properties` those batches
+     * carry (null when none carries any): Details compares a finished field with it, and once the item is left out (its saves
+     * settled, saved or given up) puts back a field the record does not hold.
+     */
+    inFlight: Record<string, Record<string, unknown> | null>;
 }
 
 /** `localStorage`, or null when the browser refuses it (a private window, blocked site data). */
@@ -307,7 +313,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             connection: this.connection,
             undo: this.undoStack,
             editInFlight: this.editInFlight(),
-            shapeRefused: this.shapeRefused
+            shapeRefused: this.shapeRefused,
+            inFlight: this.inFlightItems()
         };
     }
 
@@ -601,7 +608,11 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             console.info('[MapStudio] The change to ' + id + ' was dropped: the item is not on the map.');
             return;
         }
-        this.sendUpdate(id, { properties: withValue(this.propertiesFor(item), key, value) }, stepLabel('edit', item.name));
+        // A key the kind no longer defines, or a value it no longer takes (a choice dropped from its list), goes in the same
+        // update, as a kind change drops them: ItemCheck refuses them, so every field save of the item would be refused.
+        const kind = this.lists.kinds.find((k) => k.id === item.kind);
+        const merged = withValue(this.propertiesFor(item), key, value);
+        this.sendUpdate(id, { properties: kind ? keptProperties(merged, kind) : merged }, stepLabel('edit', item.name));
         rememberValue(this.storage, prefillKey(this.projectName(), item.kind), key, value);
     }
 
@@ -611,23 +622,44 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * field's old value. A batch given up drops what waited on it, so the record's are the newest again.
      */
     private propertiesFor(item: MapItemRecord): Record<string, unknown> {
+        const sent = this.sentProperties(item.id);
+        return sent !== null ? sent : item.properties;
+    }
+
+    /** The `properties` of an item's latest batch in flight or waiting its turn, or null when none carries any. */
+    private sentProperties(id: string): Record<string, unknown> | null {
         const batches: EditBatch[] = [];
-        const flight = this.inFlightByItem.get(item.id);
+        const flight = this.inFlightByItem.get(id);
         const inFlight = flight !== undefined ? this.batchesInFlight.get(flight) : undefined;
         if (inFlight) {
             batches.push(inFlight);
         }
-        const own = this.heldByItem.get(item.id) || [];
+        const own = this.heldByItem.get(id) || [];
         own.forEach((h) => batches.push(h.batch));
-        let properties = item.properties;
+        let properties: Record<string, unknown> | null = null;
         for (const batch of batches) {
             for (const op of batch.ops) {
-                if (op.entity === 'item' && op.id === item.id && op.op !== 'delete' && op.data && op.data.properties) {
+                if (op.entity === 'item' && op.id === id && op.op !== 'delete' && op.data && op.data.properties) {
                     properties = op.data.properties;
                 }
             }
         }
         return properties;
+    }
+
+    /** The state's `inFlight`: every item a batch in flight or waiting its turn touches, with its newest properties sent. */
+    private inFlightItems(): Record<string, Record<string, unknown> | null> {
+        const ids = new Set<string>(Array.from(this.inFlightByItem.keys()));
+        this.heldByItem.forEach((held) => held.forEach((h) => h.batch.ops.forEach((op) => {
+            if (op.entity === 'item') {
+                ids.add(op.id);
+            }
+        })));
+        const out: Record<string, Record<string, unknown> | null> = {};
+        ids.forEach((id) => {
+            out[id] = this.sentProperties(id);
+        });
+        return out;
     }
 
     /**

@@ -7,7 +7,7 @@
  * item of that kind (name, location and link are never kept). Pure apart from the store it is handed; unit tested in node.
  */
 
-import { AdapterStatus, AssetName, FormField, Kind } from './adapters';
+import { AdapterStatus, Asset, FormField, Kind } from './adapters';
 import { MapItemRecord } from './contract';
 import { isRecord } from './json';
 
@@ -146,8 +146,13 @@ export function sameName(a: string, b: string): boolean {
 export interface NameTwin {
     id: string;
     assetId: string | null;
-    /** The asset's name from the asset names, or its id when they do not list it. */
+    /** The asset's folder (its base path without the provider, "Mesa/P15"), or its id when the asset list does not list it. */
     assetLabel: string | null;
+}
+
+/** An asset's folder as the duplicate's words name it: its base path without the `[provider]` ("Mesa/P15"). */
+export function assetFolder(basePath: string): string {
+    return basePath.replace(/^\[[^\]]*\]/, '');
 }
 
 /**
@@ -156,7 +161,7 @@ export interface NameTwin {
  * saves; Details underlines it and says which.
  */
 export function nameTwins(name: string, self: { id: string; assetId: string | null }, items: readonly MapItemRecord[],
-    assetNames: readonly AssetName[]): NameTwin[] {
+    assets: readonly Asset[]): NameTwin[] {
     if (name.trim() === '') {
         return [];
     }
@@ -165,13 +170,13 @@ export function nameTwins(name: string, self: { id: string; assetId: string | nu
         if (other.deleted || other.id === self.id || other.assetId === self.assetId || !sameName(other.name, name)) {
             continue;
         }
-        const listed = other.assetId !== null ? assetNames.find((a) => a.id === other.assetId) : undefined;
-        out.push({ id: other.id, assetId: other.assetId, assetLabel: other.assetId === null ? null : listed ? listed.name : other.assetId });
+        const listed = other.assetId !== null ? assets.find((a) => a.id === other.assetId) : undefined;
+        out.push({ id: other.id, assetId: other.assetId, assetLabel: other.assetId === null ? null : listed ? assetFolder(listed.basePath) : other.assetId });
     }
     return out;
 }
 
-/** The underlined Name's tooltip and accessible description ("Also the name of the item linked to Pad 15"), '' with no twin. */
+/** The underlined Name's tooltip and accessible description ("Also the name of the item linked to Mesa/P15"), '' with no twin. */
 export function twinText(twins: readonly NameTwin[]): string {
     if (twins.length === 0) {
         return '';
@@ -194,11 +199,11 @@ export function assetListNote(status: AdapterStatus | null): string {
 }
 
 /**
- * Whether the asset list in use is one an item's link can be checked against: read and in use (ok, incomplete, or empty: a
+ * Whether a host list (kinds or assets) is one an item can be checked against: read and in use (ok, incomplete, or empty: a
  * real answer with no rows), or a failing or slow refresh that keeps a last good list. Not while it loads, is not configured,
- * or failed with no list kept, and not from a Gateway that sends no status: then no link reads as vanished.
+ * or failed with no list kept, and not from a Gateway that sends no status.
  */
-export function assetListKnown(status: AdapterStatus | null): boolean {
+function listInUse(status: AdapterStatus | null): boolean {
     if (status === null) {
         return false;
     }
@@ -215,8 +220,23 @@ export function assetListKnown(status: AdapterStatus | null): boolean {
     }
 }
 
+/** Whether an item's link can be checked against the asset list: else no link reads as vanished. */
+export function assetListKnown(status: AdapterStatus | null): boolean {
+    return listInUse(status);
+}
+
+/** Whether an item's kind can be checked against the kind list (entry 6's review): else no kind reads as unknown. */
+export function kindListKnown(status: AdapterStatus | null): boolean {
+    return listInUse(status);
+}
+
+/** What the Kind row says while the kind list cannot be checked against (loading, not configured, failing with none kept). */
+export function kindListNote(status: AdapterStatus | null): string {
+    return status !== null ? status.message : '';
+}
+
 /** Whether the item's asset left the asset list (R3): linked, the list known, and the asset not in it. It keeps its stored link. */
-export function assetVanished(assetId: string | null, assetNames: readonly AssetName[], status: AdapterStatus | null): boolean {
+export function assetVanished(assetId: string | null, assetNames: readonly { id: string }[], status: AdapterStatus | null): boolean {
     return assetId !== null && assetListKnown(status) && !assetNames.some((a) => a.id === assetId);
 }
 

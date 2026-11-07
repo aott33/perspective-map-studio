@@ -2,8 +2,8 @@ import * as React from 'react';
 import { AdapterStatus, Asset, AssetName, FormField, Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import {
-    FieldValue, REQUIRED_TEXT, UNKNOWN_KIND, assetListNote, assetVanished, fieldText, isUnset, missingRequired, missingText, nameTwins,
-    readField, twinText, unknownKindText, vanishedText
+    FieldValue, REQUIRED_TEXT, UNKNOWN_KIND, assetListNote, assetVanished, fieldText, isUnset, kindListKnown, kindListNote, missingRequired,
+    missingText, nameTwins, readField, twinText, unknownKindText, vanishedText
 } from '../itemForm';
 import { Glyph } from '../popupParts';
 import { roundCoordinate } from '../save';
@@ -64,10 +64,13 @@ export function deleteButton(paused: boolean, pending: boolean, toolInHand: bool
  * update of the whole `properties` (the delegate's `editProperty`), "edit <name>". A required field shows "Required" by its
  * label and, while it is not set, the line at the top names every missing one ("Missing: Status"); nothing stops a save.
  * Name is underlined in the `error` token while another live item with the same name (case and outer spaces aside) is
- * linked to a different asset, its tooltip and description naming it; the name still saves. An item whose kind left the
- * kind list shows "Unknown kind" with its stored values read only, Kind alone editable; one whose asset left the asset list
- * says so under Asset and keeps its stored link; the asset list's status message shows under Asset while it is empty,
- * incomplete, failing, slow or not configured.
+ * linked to a different asset, its tooltip and description naming it by its folder; the name still saves. An item whose kind
+ * left the kind list shows "Unknown kind" with its stored values read only, Kind alone editable (while the kind list cannot be
+ * checked against, the list's status message instead, the fields off as well); one whose asset left the asset list says so
+ * under Asset and keeps its stored link; the asset list's status message shows under Asset while it is empty, incomplete,
+ * failing, slow or not configured. A finished field is compared with the newest value sent for it (`newest`), and once the
+ * item's saves settle (`saving` goes false) a field sent and not held by the record (a refused or dropped save) shows the
+ * record's value again.
  */
 export interface PropertiesPanelProps {
     item: MapItemRecord;
@@ -82,6 +85,14 @@ export interface PropertiesPanelProps {
     assetStatus: AdapterStatus | null;
     /** The map's items, for the duplicate name check (entry 6). */
     items: MapItemRecord[];
+    /** Every asset of the asset list (level `full`), for the duplicate's words, which name the other asset's folder. */
+    assetRows: Asset[];
+    /** The kind list's status (map.load's `adapters.kinds`), or null: an item's kind reads unknown only while the list is in use. */
+    kindStatus: AdapterStatus | null;
+    /** A batch of the item is in flight or waiting its turn (the delegate's `inFlight`). */
+    saving: boolean;
+    /** The item's newest properties: those of its batch in flight or waiting, else the record's. */
+    newest: Record<string, unknown>;
     /** The item's create is still being saved (no stored version yet): a finished field goes right after it. */
     pending: boolean;
     /** The map store is unreachable (map.load): the fields take no input, as the toolbar does. */
@@ -161,6 +172,8 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
      * that follows in the same handler still reads the typed draft.
      */
     private escaped: string | null = null;
+    /** The kind fields sent and not yet settled, with the text each showed when sent (entry 6's review). */
+    private sent = new Map<string, string>();
 
     constructor(props: PropertiesPanelProps) {
         super(props);
@@ -173,6 +186,7 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
 
     componentDidUpdate(prev: PropertiesPanelProps): void {
         if (prev.item.id !== this.props.item.id) {
+            this.sent.clear();
             this.setState(draftsOf(this.props.item));
         } else if (prev.item.version !== this.props.item.version) {
             // The record moved on (this field's save, a drag's move, an undo, another editor): a field the user has not
@@ -200,6 +214,24 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
             next.fields = fields;
             next.problems = problems;
             this.setState(next as Pick<Drafts, keyof Drafts>);
+        }
+        if (prev.item.id === this.props.item.id && prev.saving && !this.props.saving && this.sent.size > 0) {
+            // The item's saves settled: a field sent and not held by the record (refused, or dropped behind a refusal) shows the
+            // record's value again; one typed since it was sent keeps its keystrokes.
+            const sent = new Map(this.sent);
+            this.sent.clear();
+            const properties = this.props.item.properties;
+            this.setState((state) => {
+                const fields = { ...state.fields };
+                const problems = { ...state.problems };
+                sent.forEach((text, key) => {
+                    if (fields[key] === text && text !== fieldText(properties[key])) {
+                        delete fields[key];
+                        delete problems[key];
+                    }
+                });
+                return { fields, problems };
+            });
         }
         if (!prev.autoFocusName && this.props.autoFocusName) {
             this.focusName();
@@ -304,12 +336,21 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
             this.setState((prev) => ({ problems: { ...prev.problems, [field.key]: problem } }));
             return;
         }
-        if (sameValue(read.value, this.props.item.properties[field.key])) {
-            this.setState((prev) => ({ fields: without(prev.fields, field.key), problems: without(prev.problems, field.key) }));
+        if (sameValue(read.value, this.props.newest[field.key])) {
+            // The value sent last (or stored): nothing to send; the draft shows it until the record holds it.
+            const shown = fieldText(read.value);
+            this.setState((prev) => ({
+                fields: this.sent.has(field.key) ? { ...prev.fields, [field.key]: shown } : without(prev.fields, field.key),
+                problems: without(prev.problems, field.key)
+            }));
+            if (this.sent.has(field.key)) {
+                this.sent.set(field.key, shown);
+            }
             return;
         }
         const shown = fieldText(read.value);
         this.setState((prev) => ({ fields: { ...prev.fields, [field.key]: shown }, problems: without(prev.problems, field.key) }));
+        this.sent.set(field.key, shown);
         this.props.onProperty(field.key, read.value);
     };
 
@@ -330,11 +371,12 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
 
     /** A choice or a checkbox (entry 6): saved at once, the draft showing it until the record holds it. */
     private chooseField(field: FormField, value: FieldValue): void {
-        if (this.props.paused || !this.props.kind || sameValue(value, this.props.item.properties[field.key])) {
+        if (this.props.paused || !this.props.kind || sameValue(value, this.props.newest[field.key])) {
             return;
         }
         const shown = fieldText(value);
         this.setState((prev) => ({ fields: { ...prev.fields, [field.key]: shown } }));
+        this.sent.set(field.key, shown);
         this.props.onProperty(field.key, value);
     }
 
@@ -430,24 +472,30 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         const { item, kind, kinds, assets, assetNames, assetStatus, pending, paused } = this.props;
         const point = item.geometry.type === 'Point';
         const known = kind !== undefined;
+        // "Unknown kind" only while the kind list is in use; while it loads, is not configured or failed with none kept, its
+        // status message says why the kind is not found (entry 6's review).
+        const listKnown = kindListKnown(this.props.kindStatus);
+        const kindHint = known ? '' : listKnown ? unknownKindText(item.kind) : kindListNote(this.props.kindStatus);
+        const kindLabel = kind ? kind.name : listKnown ? UNKNOWN_KIND : item.kind;
         // Only Kind takes input while the kind is not in the kind list: the Gateway refuses any other change to the item.
         const frozen = paused || !known;
         const assetId = item.assetId;
         const vanished = assetVanished(assetId, assetNames, assetStatus);
         const listed = assetId !== null ? assetNames.find((a) => a.id === assetId) : undefined;
         const linkWords = assetId === null || vanished ? 'not linked' : 'linked to ' + (listed ? listed.name : assetId);
-        const subline = (kind ? kind.name : UNKNOWN_KIND) + ' - ' + linkWords;
+        const subline = kindLabel + ' - ' + linkWords;
         const remove = deleteButton(paused, pending, this.props.toolInHand, this.props.delKey);
         const latProblem = this.state.lat !== '' && readCoordinate(this.state.lat, 90) === null;
         const lngProblem = this.state.lng !== '' && readCoordinate(this.state.lng, 180) === null;
         const missing = missingText(missingRequired(kind, item.properties));
-        const twin = twinText(nameTwins(this.state.name, item, this.props.items, assetNames));
+        const twin = twinText(nameTwins(this.state.name, item, this.props.items, this.props.assetRows));
         const twinId = 'mapstudio-twin-' + item.id;
         const assetNote = assetListNote(assetStatus);
         const kindWords = kind ? kind.name.toLowerCase() : item.kind;
         return (
             <section className="mapstudio-panel" aria-label={item.name} data-item-id={item.id} data-pending={pending ? 'true' : 'false'}
-                     data-paused={paused ? 'true' : 'false'} data-kind-known={known ? 'true' : 'false'} data-missing={missing}>
+                     data-paused={paused ? 'true' : 'false'} data-kind-known={known ? 'true' : 'false'}
+                     data-kind-list={listKnown ? 'known' : 'unknown'} data-missing={missing}>
                 <header className="mapstudio-panel-header">
                     <span className="mapstudio-popup-disc">
                         {kind && kind.icon !== '' ? <Glyph id={kind.icon} className="mapstudio-popup-glyph" size={18} /> : null}
@@ -480,14 +528,12 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                     <div className="mapstudio-field mapstudio-field--kind">
                         <label className="mapstudio-field-label" htmlFor={'mapstudio-kind-' + item.id}>Kind</label>
                         <select id={'mapstudio-kind-' + item.id} className="mapstudio-input mapstudio-field-kind" value={item.kind} disabled={paused}
-                                aria-describedby={known ? undefined : 'mapstudio-kind-hint-' + item.id} onChange={this.onKindChange}>
-                            {!known || !kinds.some((k) => k.id === item.kind) ? <option value={item.kind}>{UNKNOWN_KIND}</option> : null}
+                                aria-describedby={kindHint !== '' ? 'mapstudio-kind-hint-' + item.id : undefined} onChange={this.onKindChange}>
+                            {!known || !kinds.some((k) => k.id === item.kind) ? <option value={item.kind}>{kindLabel}</option> : null}
                             {kinds.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
                         </select>
-                        {!known ? (
-                            <span id={'mapstudio-kind-hint-' + item.id} className="mapstudio-field-hint mapstudio-field-kind-hint">
-                                {unknownKindText(item.kind)}
-                            </span>
+                        {kindHint !== '' ? (
+                            <span id={'mapstudio-kind-hint-' + item.id} className="mapstudio-field-hint mapstudio-field-kind-hint">{kindHint}</span>
                         ) : null}
                     </div>
                     <div className="mapstudio-field mapstudio-field--location">

@@ -1,10 +1,11 @@
 // The item form's rules (epic 4 entry 6, R3, R12; itemForm.ts): a typed field read as the Gateway's ItemCheck types it, the
 // values a kind change keeps, the required fields missing, the other items sharing a name on a different asset, the asset
 // list's state under Asset, a vanished asset and an unknown kind in words, and the last values kept per project and kind.
-import { AdapterStatus, AssetName, FormField, Kind } from '../adapters';
+import { AdapterStatus, Asset, AssetName, FormField, Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import {
-    FormStore, assetListKnown, assetListNote, assetVanished, fieldText, fitsField, isUnset, keptProperties, missingRequired, missingText,
+    FormStore, assetFolder, assetListKnown, assetListNote, assetVanished, fieldText, fitsField, isUnset, keptProperties, kindListKnown, kindListNote,
+    missingRequired, missingText,
     nameTwins, prefillFor, prefillKey, readField, readPrefill, rememberValue, sameName, twinText, unknownKindText, vanishedText, withValue
 } from '../itemForm';
 
@@ -129,7 +130,8 @@ describe('the required fields still missing', () => {
 });
 
 describe('two items sharing a name on different assets (R3)', () => {
-    const names: AssetName[] = [{ id: 'P14', name: 'Pad 14' }, { id: 'P15', name: 'Pad 15' }];
+    const names: Asset[] = [{ id: 'P14', name: 'Pad 14', kind: 'pad', basePath: '[default]Mesa/P14' },
+        { id: 'P15', name: 'Pad 15', kind: 'pad', basePath: '[edge-p12]Mesa/P15' }];
     const items = [
         item('a', 'P14', 'P14'), item('b', ' p14 ', 'P15'), item('c', 'P14', null), item('d', 'P14', 'P14'),
         item('gone', 'P14', 'P12', { deleted: true }), item('e', 'Other', 'P12')
@@ -139,17 +141,20 @@ describe('two items sharing a name on different assets (R3)', () => {
         expect(sameName(' P14', 'p14 ')).toBe(true);
         expect(sameName('P14', 'P 14')).toBe(false);
         const twins = nameTwins('P14', { id: 'a', assetId: 'P14' }, items, names);
-        expect(twins).toEqual([{ id: 'b', assetId: 'P15', assetLabel: 'Pad 15' }, { id: 'c', assetId: null, assetLabel: null }]);
-        expect(twinText(twins)).toBe('Also the name of the item linked to Pad 15 and an unlinked item');
+        expect(twins).toEqual([{ id: 'b', assetId: 'P15', assetLabel: 'Mesa/P15' }, { id: 'c', assetId: null, assetLabel: null }]);
+        expect(twinText(twins)).toBe('Also the name of the item linked to Mesa/P15 and an unlinked item');
         expect(twinText(nameTwins('p14', { id: 'b', assetId: 'P15' }, items, names)))
-            .toBe('Also the name of the item linked to Pad 14, the item linked to Pad 14 and an unlinked item');
+            .toBe('Also the name of the item linked to Mesa/P14, the item linked to Mesa/P14 and an unlinked item');
         // Two unlinked items share no asset, so they are not twins of each other: nothing to underline.
         expect(nameTwins('P14', { id: 'x', assetId: null }, [item('c', 'P14', null)], names)).toEqual([]);
         expect(twinText([])).toBe('');
         expect(nameTwins('  ', { id: 'x', assetId: null }, [item('y', ' ', 'P14')], names)).toEqual([]);
     });
 
-    test('an asset the names do not list is named by its id; several unlinked are counted', () => {
+    test('the folder is the base path without its provider; an asset the list does not list is named by its id; several unlinked are counted', () => {
+        expect(assetFolder('[default]Mesa/P14')).toBe('Mesa/P14');
+        expect(assetFolder('[edge-p12]Mesa/Lines/L3')).toBe('Mesa/Lines/L3');
+        expect(assetFolder('Mesa/P99')).toBe('Mesa/P99');
         const twins = nameTwins('Other', { id: 'z', assetId: null }, [item('e', 'Other', 'P12'), item('f', 'other', 'P12')], names);
         expect(twinText(twins)).toBe('Also the name of the item linked to P12 and the item linked to P12');
         expect(twinText(nameTwins('Q', { id: 'z', assetId: 'P14' }, [item('g', 'Q', null), item('h', 'q', null)], names)))
@@ -177,6 +182,22 @@ describe('the asset list under Asset, a vanished asset and an unknown kind', () 
         expect(assetListKnown(status('loading', 0))).toBe(false);
         expect(assetListKnown(status('not-configured', 0))).toBe(false);
         expect(assetListKnown(null)).toBe(false);
+    });
+
+    test('a kind is checked against the kind list only while one is in use; else the list\'s message says why it is not found', () => {
+        const kinds = (word: AdapterStatus['status'], count: number): AdapterStatus => ({ ...status(word, count, 'The kind words.'),
+            function: 'mapstudio_dev.kinds' });
+        expect(kindListKnown(kinds('ok', 5))).toBe(true);
+        expect(kindListKnown(kinds('incomplete', 5))).toBe(true);
+        expect(kindListKnown(kinds('empty', 0))).toBe(true);
+        expect(kindListKnown(kinds('failing', 5))).toBe(true);
+        expect(kindListKnown(kinds('failing', 0))).toBe(false);
+        expect(kindListKnown(kinds('slow', 0))).toBe(false);
+        expect(kindListKnown(kinds('loading', 0))).toBe(false);
+        expect(kindListKnown(kinds('not-configured', 0))).toBe(false);
+        expect(kindListKnown(null)).toBe(false);
+        expect(kindListNote(kinds('loading', 0))).toBe('The kind words.');
+        expect(kindListNote(null)).toBe('');
     });
 
     test('P99 linked but not in the list reads not linked, with the reason; the kind out of the list says its values are kept', () => {

@@ -216,3 +216,57 @@ describe('a kind change keeps the values the new kind defines (entry 6)', () => 
         expect(last().body.ops[0].data).toEqual({ kind: 'valve', properties: { tag: 'PT-7' } });
     });
 });
+
+describe('a field save keeps only what the kind defines (entry 6\'s review)', () => {
+    test('a stored key the kind no longer defines and a choice no longer listed go in the same update, so the save is not refused', () => {
+        // The pad as stored before the kind list dropped its depth field and the choice "drilling" (map.load brings it).
+        const stale: MapItemRecord = { id: 'stale', kind: 'pad', name: 'Old pad', geometry: { type: 'Point', coordinates: AT },
+            properties: { operator: 'Acme', depth: 900, status: 'drilling' }, assetId: null, overrides: {}, ends: null, attachment: null,
+            version: 4, deleted: false };
+        delegate.sendMapLoad();
+        const load = ((delegate as unknown as { fired: Array<{ id: string; type: string }> }).fired).filter((m) => m.type === MessageTypes.MAP_LOAD);
+        delegate.handleEvent(MESSAGE_EVENT, { v: 1, type: MessageTypes.MAP_LOAD_REPLY, id: load[load.length - 1].id,
+            body: { level: 'full', seq: 1, items: [stale], kinds: [PAD, TAP, VALVE] } });
+        expect(record('stale').properties).toEqual({ operator: 'Acme', depth: 900, status: 'drilling' });
+        delegate.editProperty('stale', 'wells', 2);
+        expect(last().body.ops).toEqual([{ op: 'update', entity: 'item', id: 'stale', baseVersion: 4,
+            data: { properties: { operator: 'Acme', wells: 2 } } }]);
+        // Cleared the same way by setting the field that holds an unlisted choice.
+        save(last());
+        delegate.editProperty('stale', 'status', 'producing');
+        expect(last().body.ops[0].data).toEqual({ properties: { operator: 'Acme', wells: 2, status: 'producing' } });
+    });
+
+    test('an item whose kind is not in the kind list keeps its properties as they are', () => {
+        const tank = delegate.createPoint(AT, { id: 'tank', name: 'Tank', geometry: 'point', icon: '', labelRank: 0, fields: [] });
+        save(last());
+        delegate.editProperty(tank, 'capacity', 400);
+        expect(last().body.ops[0].data).toEqual({ properties: { capacity: 400 } });
+    });
+});
+
+describe('the saves in flight the panel reads (entry 6\'s review)', () => {
+    test('an item with a batch in flight or waiting is listed with the newest properties sent; once saved or refused, not at all', () => {
+        const pad = delegate.createPoint(AT, PAD);
+        expect(delegate.mapStateToProps().inFlight).toEqual({ [pad]: null });
+        save(last());
+        expect(delegate.mapStateToProps().inFlight).toEqual({});
+        delegate.editProperty(pad, 'operator', 'Acme');
+        const first = last();
+        delegate.editProperty(pad, 'wells', 3);
+        expect(delegate.mapStateToProps().inFlight[pad]).toEqual({ operator: 'Acme', wells: 3 });
+        save(first);
+        save(last());
+        expect(delegate.mapStateToProps().inFlight).toEqual({});
+        // A rename in flight carries no properties.
+        delegate.renameItem(pad, 'P41');
+        expect(delegate.mapStateToProps().inFlight).toEqual({ [pad]: null });
+        save(last());
+        // Refused for good (invalid): given up, so nothing is in flight and the record keeps its values.
+        delegate.editProperty(pad, 'operator', 'Zed');
+        delegate.handleEvent(MESSAGE_EVENT, { v: 1, type: MessageTypes.ERROR, id: last().id,
+            body: { code: 'invalid', message: 'Refused.', batchId: last().body.batchId } });
+        expect(delegate.mapStateToProps().inFlight).toEqual({});
+        expect(record(pad).properties).toEqual({ operator: 'Acme', wells: 3 });
+    });
+});

@@ -1,10 +1,12 @@
 // Details as the item form draws it (epic 4 entry 6, R3, R12; DESIGN.md Properties panel): the kind's fields after Location
 // in the kind list's order and as their types, "Required" by a required label and the missing ones named at the top, Name
 // underlined with its tooltip and description while another item has the name on a different asset, an unknown kind's
-// values read only with Kind alone taking input, a vanished asset said under Asset, and the asset list's status message.
+// values read only with Kind alone taking input (while the kind list is in use; else its status message), a vanished asset said
+// under Asset, and the asset list's status message. From the review: a kind field sent and refused shows the record's value
+// again once the item's saves settle, and a field changed and changed back before the first reply sends the change back.
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { AdapterStatus, AssetName, FormField, Kind } from '../adapters';
+import { AdapterStatus, Asset, AssetName, FormField, Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import { PropertiesPanel, PropertiesPanelProps } from '../studio/PropertiesPanel';
 
@@ -18,7 +20,11 @@ const LINE: Kind = { id: 'line', name: 'Gathering line', geometry: 'line', icon:
     { key: 'diameter', label: 'Diameter (in)', type: 'number', required: false, choices: [] },
     { key: 'buried', label: 'Buried', type: 'boolean', required: false, choices: [] }] };
 const NAMES: AssetName[] = [{ id: 'P14', name: 'Pad 14' }, { id: 'P15', name: 'Pad 15' }];
+const ASSETS: Asset[] = [{ id: 'P14', name: 'Pad 14', kind: 'pad', basePath: '[default]Mesa/P14' },
+    { id: 'P15', name: 'Pad 15', kind: 'pad', basePath: '[default]Mesa/P15' }];
 const OK: AdapterStatus = { status: 'ok', message: '10 assets from mapstudio_dev.assets.', function: 'mapstudio_dev.assets', count: 10, left: 0,
+    refreshedAt: null };
+const KINDS_OK: AdapterStatus = { status: 'ok', message: '5 kinds from mapstudio_dev.kinds.', function: 'mapstudio_dev.kinds', count: 5, left: 0,
     refreshedAt: null };
 
 const noop = (): void => undefined;
@@ -48,13 +54,18 @@ function record(extra: Partial<MapItemRecord> = {}): MapItemRecord {
         overrides: {}, ends: null, attachment: null, version: 2, deleted: false, ...extra };
 }
 
-function panel(overrides: Partial<PropertiesPanelProps> = {}): string {
+function props(overrides: Partial<PropertiesPanelProps> = {}): PropertiesPanelProps {
     const item = overrides.item || record();
-    return renderToStaticMarkup(React.createElement(PropertiesPanel, {
-        item, kind: PAD, kinds: [PAD], assets: [], assetNames: NAMES, assetStatus: OK, items: [item], pending: false, paused: false,
-        autoFocusName: false, onNameFocused: noop, onClose: noop, onRename: noop, onMove: noop, canMoveByClick: true, moving: false,
-        onMoveStart: noop, onLink: noop, onKind: noop, onProperty: noop, onDelete: noop, toolInHand: false, delKey: true, ...overrides
-    }));
+    return {
+        item, kind: PAD, kinds: [PAD], assets: [], assetNames: NAMES, assetStatus: OK, items: [item], assetRows: ASSETS, kindStatus: KINDS_OK,
+        saving: false, newest: item.properties, pending: false, paused: false, autoFocusName: false, onNameFocused: noop, onClose: noop,
+        onRename: noop, onMove: noop, canMoveByClick: true, moving: false, onMoveStart: noop, onLink: noop, onKind: noop, onProperty: noop,
+        onDelete: noop, toolInHand: false, delKey: true, ...overrides
+    };
+}
+
+function panel(overrides: Partial<PropertiesPanelProps> = {}): string {
+    return renderToStaticMarkup(React.createElement(PropertiesPanel, props(overrides)));
 }
 
 describe('the kind\'s fields (entry 6)', () => {
@@ -119,13 +130,16 @@ describe('a duplicate name (R3)', () => {
         const html = panel({ items: [self, record({ id: 'p2', name: ' p31', assetId: 'P14' })] });
         const name = tag(html, 'mapstudio-field-name');
         for (const a of ['class="mapstudio-input mapstudio-field-name mapstudio-field-name--twin"', 'value="P31"',
-            'title="Also the name of the item linked to Pad 14"', 'aria-describedby="mapstudio-twin-p1"',
-            'data-twin="Also the name of the item linked to Pad 14"']) {
+            'title="Also the name of the item linked to Mesa/P14"', 'aria-describedby="mapstudio-twin-p1"',
+            'data-twin="Also the name of the item linked to Mesa/P14"']) {
             expect(name).toContain(a);
         }
-        expect(html).toContain('<span id="mapstudio-twin-p1" class="mapstudio-visually-hidden">Also the name of the item linked to Pad 14</span>');
+        expect(html).toContain('<span id="mapstudio-twin-p1" class="mapstudio-visually-hidden">Also the name of the item linked to Mesa/P14</span>');
         // Outside the label: the description is not part of Name's name.
         expect(html.indexOf('<span id="mapstudio-twin-p1"')).toBeGreaterThan(html.indexOf('</label>', html.indexOf('mapstudio-field-name')));
+        // An asset the asset list does not list is named by its id.
+        expect(panel({ items: [self, record({ id: 'p2', name: 'P31', assetId: 'P99' })] }))
+            .toContain('title="Also the name of the item linked to P99"');
         const same = panel({ items: [self, record({ id: 'p2', name: 'P31', assetId: 'P15' })] });
         expect(same).not.toContain('mapstudio-field-name--twin');
         expect(same).toContain('data-twin=""');
@@ -178,5 +192,147 @@ describe('an unknown kind, a vanished asset and the asset list\'s status (R3)', 
         const incomplete = panel({ assetStatus: { ...OK, status: 'incomplete', message: '2 of 12 assets from mapstudio_dev.assets left out: ...' } });
         expect(incomplete).toContain('data-status="incomplete">2 of 12 assets from mapstudio_dev.assets left out: ...</span>');
         expect(panel()).not.toContain('mapstudio-field-asset-status');
+    });
+});
+
+describe('the kind list not in use (entry 6\'s review)', () => {
+    test('while it loads: no "Unknown kind", the kind list\'s message instead; the item\'s values read only and its fields off as for an unknown kind', () => {
+        const loading: AdapterStatus = { ...KINDS_OK, status: 'loading', count: 0, message: 'Loading the kind list from mapstudio_dev.kinds.' };
+        const html = panel({ item: record({ properties: { status: 'producing' } }), kind: undefined, kinds: [], kindStatus: loading });
+        expect(html).not.toContain('Unknown kind');
+        expect(html).not.toContain('no longer in the kind list');
+        expect(html).toContain('data-kind-known="false"');
+        expect(html).toContain('data-kind-list="unknown"');
+        expect(html).toContain('<span id="mapstudio-kind-hint-p1" class="mapstudio-field-hint mapstudio-field-kind-hint">'
+            + 'Loading the kind list from mapstudio_dev.kinds.</span>');
+        expect(option(html, 'mapstudio-kind-p1', 'pad')).toMatch(/selected=""[^>]*>pad<\/option>$/);
+        expect(html).toContain('pad - linked to Pad 15');
+        expect(html).toContain('data-field="status"><span class="mapstudio-field-label">status</span>');
+        expect(tag(html, 'mapstudio-field-name')).toContain('disabled=""');
+        expect(tag(html, 'id="mapstudio-asset-p1"')).toContain('disabled=""');
+    });
+
+    test('not configured, or failing with no list kept: its message; failing with a list kept, the kind is unknown', () => {
+        const none: AdapterStatus = { ...KINDS_OK, status: 'not-configured', count: 0, message: 'The setup names no kind function.' };
+        expect(panel({ kind: undefined, kinds: [], kindStatus: none })).toContain('mapstudio-field-kind-hint">The setup names no kind function.</span>');
+        const failing: AdapterStatus = { ...KINDS_OK, status: 'failing', count: 0, message: 'The kind function mapstudio_dev.kinds failed.' };
+        expect(panel({ kind: undefined, kinds: [], kindStatus: failing })).toContain('mapstudio-field-kind-hint">The kind function mapstudio_dev.kinds failed.</span>');
+        const kept = panel({ item: record({ kind: 'tank' }), kind: undefined, kindStatus: { ...failing, count: 5 } });
+        expect(kept).toContain('data-kind-list="known"');
+        expect(kept).toContain('tank is no longer in the kind list; its values are kept');
+        // No status at all (an older Gateway): nothing said, nothing called unknown.
+        const older = panel({ kind: undefined, kinds: [], kindStatus: null });
+        expect(older).not.toContain('Unknown kind');
+        expect(older).not.toContain('mapstudio-field-kind-hint');
+        expect(tag(older, 'id="mapstudio-kind-p1"')).not.toContain('aria-describedby');
+    });
+});
+
+/**
+ * The panel driven as React would, without a DOM: its state changes applied at once, in order, and a props change followed by
+ * componentDidUpdate. What a field shows is read from its render.
+ */
+function mounted(initial: PropertiesPanelProps): {
+    sent: Array<[string, unknown]>;
+    type: (key: string, text: string) => void;
+    finish: (field: FormField) => void;
+    choose: (field: FormField, value: string | boolean | null) => void;
+    update: (next: Partial<PropertiesPanelProps>) => void;
+    shown: (index: number) => string;
+} {
+    const sent: Array<[string, unknown]> = [];
+    const panelProps = { ...initial, onProperty: (key: string, value: unknown) => { sent.push([key, value]); } };
+    const inst = new PropertiesPanel(panelProps);
+    const raw = inst as unknown as {
+        state: object;
+        props: PropertiesPanelProps;
+        setState: (u: unknown) => void;
+        onFieldText: (key: string) => (ev: { target: { value: string } }) => void;
+        commitField: (field: FormField) => () => void;
+        chooseField: (field: FormField, value: string | boolean | null) => void;
+    };
+    raw.setState = (u: unknown) => {
+        const patch = typeof u === 'function' ? (u as (s: object, p: object) => object)(raw.state, raw.props) : u;
+        raw.state = { ...raw.state, ...(patch as object) };
+    };
+    return {
+        sent,
+        type: (key, text) => raw.onFieldText(key)({ target: { value: text } }),
+        finish: (field) => raw.commitField(field)(),
+        choose: (field, value) => raw.chooseField(field, value),
+        update: (next) => {
+            const prev = raw.props;
+            raw.props = { ...prev, ...next };
+            inst.componentDidUpdate(prev);
+        },
+        shown: (index) => {
+            const html = renderToStaticMarkup(inst.render());
+            const t = tag(html, 'id="mapstudio-prop-p1-' + index + '"');
+            if (t.startsWith('<select')) {
+                const m = html.slice(html.indexOf(t)).match(/<option selected="" value="([^"]*)"/);
+                return m ? m[1] : '';
+            }
+            const m = t.match(/ value="([^"]*)"/);
+            return m ? m[1] : '';
+        }
+    };
+}
+
+describe('a kind field\'s save settling (entry 6\'s review)', () => {
+    const [OPERATOR, , STATUS] = FIELDS;
+
+    test('Operator sent and refused: once the item\'s saves settle, the field shows the record\'s value again', () => {
+        const base = record({ properties: { status: 'producing' } });
+        const p = mounted(props({ item: base }));
+        p.type('operator', 'Acme');
+        p.finish(OPERATOR);
+        expect(p.sent).toEqual([['operator', 'Acme']]);
+        p.update({ saving: true, newest: { status: 'producing', operator: 'Acme' } });
+        expect(p.shown(0)).toBe('Acme');
+        // Refused for good: the batch is given up, nothing in flight; the record never held Acme.
+        p.update({ saving: false, newest: base.properties });
+        expect(p.shown(0)).toBe('');
+    });
+
+    test('a choice sent and dropped goes back too; a field typed again since it was sent keeps its keystrokes; a saved one stays', () => {
+        const base = record({ properties: { status: 'producing' } });
+        const p = mounted(props({ item: base }));
+        p.choose(STATUS, 'shut in');
+        p.type('operator', 'Acme');
+        p.finish(OPERATOR);
+        p.update({ saving: true, newest: { status: 'shut in', operator: 'Acme' } });
+        p.type('operator', 'Acme Oil');
+        p.update({ saving: false, newest: base.properties });
+        expect(p.shown(2)).toBe('producing');
+        expect(p.shown(0)).toBe('Acme Oil');
+
+        // Saved: the record holds it, and it stays when the saves settle.
+        const q = mounted(props({ item: base }));
+        q.choose(STATUS, 'shut in');
+        q.update({ saving: true, newest: { status: 'shut in' } });
+        const saved = record({ version: 3, properties: { status: 'shut in' } });
+        q.update({ item: saved, saving: false, newest: saved.properties });
+        expect(q.shown(2)).toBe('shut in');
+    });
+
+    test('changed and changed back before the first reply: the change back is sent, compared with the value in flight', () => {
+        const base = record({ properties: { operator: 'X', status: 'producing' } });
+        const p = mounted(props({ item: base }));
+        p.type('operator', 'A');
+        p.finish(OPERATOR);
+        p.update({ saving: true, newest: { operator: 'A', status: 'producing' } });
+        p.type('operator', 'X');
+        p.finish(OPERATOR);
+        expect(p.sent).toEqual([['operator', 'A'], ['operator', 'X']]);
+        p.choose(STATUS, 'abandoned');
+        p.update({ newest: { operator: 'X', status: 'abandoned' } });
+        p.choose(STATUS, 'producing');
+        expect(p.sent).toEqual([['operator', 'A'], ['operator', 'X'], ['status', 'abandoned'], ['status', 'producing']]);
+        // The value in flight finished again: nothing more is sent, and the field keeps showing it.
+        p.update({ newest: { operator: 'X', status: 'producing' } });
+        p.type('operator', ' X ');
+        p.finish(OPERATOR);
+        expect(p.sent).toHaveLength(4);
+        expect(p.shown(0)).toBe('X');
     });
 });

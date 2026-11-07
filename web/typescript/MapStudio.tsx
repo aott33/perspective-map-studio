@@ -1249,6 +1249,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             return null;
         }
         const assets = delegate.lists.assets || [];
+        // The item's batch in flight or waiting, with the newest properties it carries (entry 6's review).
+        const flight = delegate.inFlight[item.id];
         const geometry = item.geometry.type === 'Point' ? 'point' : 'line';
         const kind = delegate.lists.kinds.find((k) => k.id === item.kind);
         const pick = this.state.geometry;
@@ -1261,6 +1263,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              assetNames={delegate.lists.assetNames}
                              assetStatus={delegate.lists.adapters ? delegate.lists.adapters.assets : null}
                              items={delegate.items}
+                             assetRows={assets}
+                             kindStatus={delegate.lists.adapters ? delegate.lists.adapters.kinds : null}
+                             saving={flight !== undefined}
+                             newest={flight ? flight : item.properties}
                              pending={item.version === 0}
                              paused={delegate.editing === 'off'}
                              autoFocusName={this.focusNameId === item.id}

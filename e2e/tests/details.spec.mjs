@@ -6,7 +6,7 @@
 // Buried each save at once, one batch and one undo step each. A refused save shows on the save status row. Operator Acme finished on a
 // pad, the next pad placed with the Point tool starts with Operator Acme, named "Well pad" and unlinked. A tap with Tag set changed to
 // a line valve keeps Tag; a pad changed to a tap drops its values, and Undo puts them back. A second item named P14 on another asset:
-// Name underlined with the tooltip and description naming it, the save gone through. An item made in the dev adapter's mode tank,
+// Name underlined with the tooltip and description naming its folder, the save gone through. An item made in the dev adapter's mode tank,
 // once the mode is ok again, shows "Unknown kind" with its values read only and Kind alone taking input; one linked to P99 says it is
 // no longer in the asset list and counts as unlinked. The asset list's status message under Asset with the dev adapter empty, then
 // incomplete. Renders of Details for the docs under E2E_DOCS=1 (AD-15). The spec puts the dev adapter back to ok and leaves the seed
@@ -430,8 +430,8 @@ test.describe('1366 px', () => {
             await expectOneBatch(page, map, seq, 'rename p14');
             expect((await stored(page, b)).name).toBe('p14');
             await expect(name).toHaveValue('p14');
-            await expect(name).toHaveAttribute('title', 'Also the name of the item linked to Pad 14');
-            await expect(name).toHaveAccessibleDescription('Also the name of the item linked to Pad 14');
+            await expect(name).toHaveAttribute('title', 'Also the name of the item linked to Mesa/P14');
+            await expect(name).toHaveAccessibleDescription('Also the name of the item linked to Mesa/P14');
             await expect(name).toHaveAccessibleName('Name');
             const underline = await name.evaluate((el) => {
                 const s = getComputedStyle(el);
@@ -451,7 +451,7 @@ test.describe('1366 px', () => {
 
             // The other one says so too, naming this one's asset.
             await selectRow(page, a);
-            await expect(name).toHaveAttribute('title', 'Also the name of the item linked to Pad 15');
+            await expect(name).toHaveAttribute('title', 'Also the name of the item linked to Mesa/P15');
             // On the same asset, nothing: B linked to P14 as well.
             await selectRow(page, b);
             await page.locator('.mapstudio-field-asset').selectOption('P14');
