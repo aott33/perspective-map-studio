@@ -156,18 +156,6 @@ export interface MapStudioState {
 
 export type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
 
-/** What the third SDK check of epic 4 entry 2 reads of the client store: the session's geolocation store, if a component reaches it. */
-function clientLocationWords(store: AbstractUIElementStore): string {
-    const client = clientOf(store) as (ReturnType<typeof clientOf> & { location?: { geolocationEnabled?: unknown } }) | null;
-    if (!client) {
-        return 'no client';
-    }
-    if (!client.location || typeof client.location !== 'object') {
-        return 'absent';
-    }
-    return 'reachable: geolocationEnabled=' + String(client.location.geolocationEnabled);
-}
-
 /**
  * The Map Studio component: a MapLibre map on a blank style that draws the
  * project's map items from the map store. Clicking a point item sends
@@ -332,8 +320,6 @@ export class MapStudio extends Component<Props, MapStudioState> {
         // The colours this map was built with, for the e2e suite (item 29); applyTheme updates them.
         this.mapContainer.setAttribute('data-theme-revision', '0');
         this.mapContainer.setAttribute('data-blank', colors.background);
-        // The third SDK check of entry 2 (docs/platform-checks.md): what of the client store a component reaches.
-        this.mapContainer.setAttribute('data-client-location', clientLocationWords(this.props.store));
         selection.makePopup(this);
         const map = createMap(this.mapContainer, colors.background, camera.startCamera(place, area));
         // The View-mode controls (epic 3 entry 14; viewControls.ts): the zoom card, the search field with the

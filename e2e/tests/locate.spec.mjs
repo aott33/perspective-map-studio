@@ -6,10 +6,11 @@
 //
 // On 8.3.10 a browser session's `geolocation.permissionGranted` stays null after a position arrives: the client writes it
 // only on a watch error (false, for any error) and from the Perspective mobile app's "native/gpsPermission" message
-// (docs/platform-checks.md, "Epic 4 entry 15"). By the plan's rule a position counts only with permissionGranted true, so the
-// suite stands in for the mobile app's grant through the client's own bridge (`window.__webInterface.submitData`), and its
-// "not granted" the same way; the plain browser's own path (a position with permissionGranted null; a denial, which turns
-// the session's location off) is checked as it is.
+// (docs/platform-checks.md, "Epic 4 entry 15"). The owner's rule (2026-11-07, "Go with recommendations"): a position counts
+// unless permissionGranted is false, so a plain browser shows the marker (checked as it is), and only a false, which a
+// browser session reaches with enabled true only through the mobile app's refusal, reads "permission not granted". The
+// suite sends the mobile app's grant and refusal through the client's own bridge (`window.__webInterface.submitData`); a
+// browser that refuses fails the watch and the client turns the location off, which reads Off.
 //
 // Matrix: Fix (the dot, its ring and a 40 m circle near CTB1, the legend row, Locate me active), Locate me (the map panned
 // away, centred on the position at zoom 15 or more), Heading (the wedge for heading 90), Moves (the marker follows a new
@@ -214,7 +215,7 @@ test.describe('1366 px', () => {
         }
     });
 
-    test('Denied: permission not granted draws no marker and no legend row; Locate me off, "location permission not granted"', async ({ browser }) => {
+    test('Denied: permission refused (the mobile app\'s false) draws no marker and no legend row; Locate me off, "location permission not granted"', async ({ browser }) => {
         const { context, page, map, watched } = await openLocate(browser);
         try {
             await expect(map).toHaveAttribute('data-you-are-here', 'fix', { timeout: BIND_MS });
@@ -231,14 +232,20 @@ test.describe('1366 px', () => {
         }
     });
 
-    test('a plain browser: its position reaches the binding with permissionGranted null, and a denial turns the location off', async ({ browser }) => {
-        // As 8.3.10 has it (docs/platform-checks.md): a granted browser alone gives a position but no grant, so by the rule Locate
-        // me says "permission not granted"; a browser that refuses fails the watch and the client turns the location off.
+    test('a plain browser: its position with permissionGranted null draws the marker and Locate me is active; a refusal turns the location off', async ({ browser }) => {
+        // As 8.3.10 has it (docs/platform-checks.md): a granted browser alone gives a position and leaves permissionGranted null,
+        // which counts (owner, 2026-11-07); a browser that refuses fails the watch and the client turns the location off.
         const granted = await openLocate(browser, { grant: false });
         try {
             await expect(value(granted.page)).toContainText('"permissionGranted":null');
-            await expectLocate(granted.page, 'denied');
-            await expectDrawn(granted.map, '0,0,0');
+            await expect(granted.map).toHaveAttribute('data-you-are-here', 'fix', { timeout: BIND_MS });
+            await expectLocate(granted.page, 'fix');
+            await view(granted.page, granted.map, NEAR.center, NEAR.zoom);
+            await expectDrawn(granted.map, '1,1,0');
+            const states = await legendStates(granted.page);
+            expect(states[states.length - 1]).toBe('You are here');
+            await shot(granted.page, 'mapstudio-locate-browser-1366.png');
+            expect(granted.watched.errors).toEqual([]);
         } finally {
             await granted.context.close();
         }

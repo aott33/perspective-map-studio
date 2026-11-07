@@ -125,6 +125,13 @@ describe('you are here on the component (epic 4 entry 15)', () => {
         expect(r.locate).toEqual(['fix', 'denied', 'nofix']);
     });
 
+    test('a plain browser: permissionGranted null with a position draws the marker and makes Locate me active', () => {
+        const r = rig({ enabled: true, permissionGranted: null, data: { latitude: 32.5, longitude: -103.5, accuracy: 40 } });
+        expect((r.data[0] as Features).features.map((x) => x.properties.part)).toEqual(['accuracy', 'dot']);
+        expect(r.locate).toEqual(['fix']);
+        expect(r.legend).toEqual([true]);
+    });
+
     test('Locate me: centred on the position at zoom 15, or the current zoom if closer; nothing without a position', () => {
         const r = rig(fix(32.5, -103.5));
         r.ms.onLocate();

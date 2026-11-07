@@ -45,10 +45,9 @@ describe('the userLocation prop (epic 4 entry 15)', () => {
         expect(locateWords('off')).toBe('Locate me - location is off for this session');
     });
 
-    test('Denied: enabled but permission not granted', () => {
-        for (const raw of [geo({ permissionGranted: false }), geo({ permissionGranted: undefined }), geo({ permissionGranted: 1 })]) {
-            expect(readUserLocation(raw)).toEqual({ state: 'denied' });
-        }
+    test('Denied: enabled but permission refused (false only)', () => {
+        expect(readUserLocation(geo({ permissionGranted: false }))).toEqual({ state: 'denied' });
+        expect(readUserLocation({ enabled: true, permissionGranted: false })).toEqual({ state: 'denied' });
         expect(locateWords('denied')).toBe('Locate me - location permission not granted');
     });
 
@@ -64,6 +63,15 @@ describe('the userLocation prop (epic 4 entry 15)', () => {
         expect(readUserLocation(geo({}, { latitude: 999 }))).toEqual({ state: 'nofix' });
         expect(readUserLocation({ enabled: true, permissionGranted: true })).toEqual({ state: 'nofix' });
         expect(locateWords('nofix')).toBe('Locate me - no location fix yet');
+    });
+
+    test('a browser\'s permissionGranted null, absent or not a boolean counts (owner, 2026-11-07); only false is a refusal', () => {
+        for (const permissionGranted of [null, undefined, 1, 'granted']) {
+            expect(readUserLocation(geo({ permissionGranted })).state).toBe('fix');
+        }
+        const { permissionGranted: _drop, ...noKey } = geo();
+        expect(readUserLocation(noKey).state).toBe('fix');
+        expect(readUserLocation({ enabled: true, permissionGranted: null, data: { latitude: null, longitude: null } })).toEqual({ state: 'nofix' });
     });
 
     test('the edges of the ranges are a fix', () => {

@@ -174,10 +174,6 @@ test.describe('1366 px', () => {
         await expect(sw).toHaveAttribute('aria-checked', 'true');
         await expect(sw).toContainText('Editing');
         await expect(page.locator('#mapstudio-dev-editmode')).toHaveText('editMode: true', { timeout: REPLY_MS });
-        // The third SDK check (docs/platform-checks.md, "Epic 4 entry 2"): what of the client store a component reaches.
-        const location = await map.getAttribute('data-client-location');
-        console.log('client location from the component: ' + location);
-        expect(location).toMatch(/^(reachable|absent|no client)/);
         // The layout (DESIGN.md Layout & Spacing at 1366): the rail 72 px, the list 256 px, the map the rest of the component.
         const root = await page.locator('.mapstudio').boundingBox();
         expect(Math.abs(root.width - 1366)).toBeLessThanOrEqual(1);

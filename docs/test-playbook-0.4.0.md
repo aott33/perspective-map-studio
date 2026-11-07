@@ -128,8 +128,8 @@ Notes:
 
 On `/locate`: the map's `userLocation` is bound to `{session.props.geolocation}`; the page turns the location on as it opens and has a Location off checkbox; the line under the toolbar shows the bound value. Your browser asks for location permission: allow it.
 
-- [ ] The line under the toolbar shows your position (`latitude`, `longitude`, `accuracy`) and `"enabled":true`. Note what `permissionGranted` reads: in a desktop or phone browser on 8.3.10 it stays `null` (only the Perspective mobile app sets it), and then the map shows no marker and Locate me says "Locate me - location permission not granted" (the plan's rule; see docs/platform-checks.md, "Epic 4 entry 15"). Decide whether a browser's position with `permissionGranted` null should count.
-- [ ] In the Perspective mobile app (or wherever `permissionGranted` reads `true`): a violet dot with a white ring sits at your position over a soft circle the size of the accuracy; with a heading (moving, on a phone) a wedge points your way and turns as the map turns.
+- [ ] The line under the toolbar shows your position (`latitude`, `longitude`, `accuracy`) and `"enabled":true`; in a browser `permissionGranted` reads `null` (only the Perspective mobile app sets it), which counts.
+- [ ] In a browser and in the Perspective mobile app: a violet dot with a white ring sits at your position over a soft circle the size of the accuracy; with a heading (moving, on a phone) a wedge points your way and turns as the map turns.
 - [ ] The zoom card's last button, after Return, is Locate me (a navigation arrow). Pan away and press it: the map centres on you at zoom 15, or keeps a closer zoom. The map never follows you on its own.
 - [ ] Open the Legend: States end with the dot and "You are here". In Edit mode, the rail's Layers, Legend tab ends the same way.
 - [ ] Click the dot: nothing is selected and no popup opens; search for "You are here": nothing; the item list in Edit mode has no row for it.

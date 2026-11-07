@@ -9,7 +9,7 @@
 
 import { isRecord } from './json';
 
-/** Off (no prop, or the session's location not enabled), denied (no permission), no fix yet, or a fix. */
+/** Off (no prop, or the session's location not enabled), denied (permission refused), no fix yet, or a fix. */
 export type LocationState = 'off' | 'denied' | 'nofix' | 'fix';
 
 export interface UserLocation {
@@ -29,15 +29,16 @@ function finite(value: unknown): value is number {
 }
 
 /**
- * The prop read by the rules of the plan: a position is known when `enabled` and `permissionGranted` are both true and
- * `data` holds a finite latitude in [-90, 90] and longitude in [-180, 180]. Every key is optional, extra keys are
+ * The prop read by the rules of the plan: a position is known when `enabled` is true, `permissionGranted` is not false
+ * (null or absent counts: a browser session leaves it null on 8.3.10, only the Perspective mobile app sets it; owner,
+ * 2026-11-07) and `data` holds a finite latitude in [-90, 90] and longitude in [-180, 180]. Every key is optional, extra keys are
  * ignored and a malformed value is read by the same rules, never thrown.
  */
 export function readUserLocation(raw: unknown): UserLocation {
     if (!isRecord(raw) || raw.enabled !== true) {
         return NO_LOCATION;
     }
-    if (raw.permissionGranted !== true) {
+    if (raw.permissionGranted === false) {
         return { state: 'denied' };
     }
     const data = isRecord(raw.data) ? raw.data : null;

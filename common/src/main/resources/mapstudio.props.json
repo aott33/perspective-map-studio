@@ -153,7 +153,7 @@
         "object",
         "null"
       ],
-      "description": "The device's position for the you-are-here marker and Locate me (epic 4 entry 15, docs/contract.md). Bind it in one binding to {session.props.geolocation}, whose shape it takes: {enabled, permissionGranted, options, data: {latitude, longitude, accuracy, altitude, heading, speed, timestamp}}; every key is optional and extra keys are ignored. A position is known when enabled and permissionGranted are true and data holds a latitude from -90 to 90 and a longitude from -180 to 180: the marker is drawn there (the accuracy in metres as a circle, the heading as a wedge) and Locate me centres the map on it. Otherwise Locate me is off and says why. The component reads nothing of the session and asks the browser for nothing. Null (unbound) by default.",
+      "description": "The device's position for the you-are-here marker and Locate me (epic 4 entry 15, docs/contract.md). Bind it in one binding to {session.props.geolocation}, whose shape it takes: {enabled, permissionGranted, options, data: {latitude, longitude, accuracy, altitude, heading, speed, timestamp}}; every key is optional and extra keys are ignored. A position is known when enabled is true, permissionGranted is not false (null counts: a browser session leaves it null, only the Perspective mobile app sets it) and data holds a latitude from -90 to 90 and a longitude from -180 to 180: the marker is drawn there (the accuracy in metres as a circle, the heading as a wedge) and Locate me centres the map on it. Otherwise Locate me is off and says why. The component reads nothing of the session and asks the browser for nothing. Null (unbound) by default.",
       "default": null,
       "additionalProperties": true,
       "properties": {
@@ -163,7 +163,7 @@
         },
         "permissionGranted": {
           "type": "boolean",
-          "description": "Whether the browser granted location permission (session.props.geolocation.permissionGranted)."
+          "description": "Whether location permission was granted (session.props.geolocation.permissionGranted): only false stops the marker; null, as a browser session leaves it, counts."
         },
         "options": {
           "type": [
