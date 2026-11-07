@@ -43,7 +43,7 @@ import {
     LAYER_AREA_FILL, LAYER_AREA_LINE, LAYER_AREA_LINE_DASHED, LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED, LAYER_ITEM_MARKERS
 } from './mapLayers';
 import { NeedsYouControl } from './NeedsYouControl';
-import { ITEM_SELECTED_EVENT, firePageEvent, noteWrite, pageId, takeEcho, writePageProp } from './pageEvents';
+import { EchoGuard, ITEM_SELECTED_EVENT, firePageEvent, noteWrite, pageId, takeEcho, writePageProp } from './pageEvents';
 import { PickList, PickRow } from './PickList';
 import { Place } from './place';
 import { PointPopup } from './PointPopup';
@@ -116,8 +116,8 @@ export interface SelectionHost {
     openedBy: 'search' | 'needsyou' | null;
     /** The selection last written to the page (the item's id, '' for none), so a redraw with the same selection writes nothing. */
     publishedSelection: string;
-    /** The component's own `selectedItem` writes whose echo has not come back yet, oldest first ('' for null; pageEvents.ts). */
-    ownSelectedWrites: string[];
+    /** The echo guard of `selectedItem` (pageEvents.ts): the component's own writes still to come back, and the value last written. */
+    selectedEcho: EchoGuard;
     /** The page's choice waiting to be applied (entry 14): until the items have come, or while a tool is in hand; else null. */
     pageSelection: PageSelection | null;
     /** A remembered selection still to put back (camera.ts applyRestore), which a page's choice replaces. */
@@ -964,11 +964,11 @@ function publishToPage(host: SelectionHost, id: string | null): void {
     const store = host.props.store;
     const item = id !== null ? itemFor(host, id) : undefined;
     const payload = item ? selectedItemObject(host, item) : null;
-    const before = host.ownSelectedWrites;
-    host.ownSelectedWrites = noteWrite(before, id, pageId(host.props.props.selectedItem));
+    const before = host.selectedEcho;
+    host.selectedEcho = noteWrite(before, id, Date.now());
     if (!writePageProp(store.props, 'selectedItem', id)) {
         // Nothing written, so nothing comes back.
-        host.ownSelectedWrites = before;
+        host.selectedEcho = before;
     }
     firePageEvent(store.componentEvents, ITEM_SELECTED_EVENT, { mapItem: payload });
     console.debug('[MapStudio] Selection published to the page: ' + (id === null ? 'none' : id));
@@ -976,13 +976,12 @@ function publishToPage(host: SelectionHost, id: string | null): void {
 
 /**
  * The page's `selectedItem` as the component mounts (entry 14): a value set before then is the page's choice, applied once the
- * items have come (`applyPageSelection`), and it wins over the remembered place's selection, which is dropped. The remembered
- * selection's own id is left to the restore (the place's camera with it): it is this component's earlier write, which the page's
- * Gateway session keeps across a browser reload.
+ * items have come (`applyPageSelection`) as a click on the item does, and it wins over the remembered place's selection, which
+ * is dropped, the same id included.
  */
 export function readMountSelection(host: SelectionHost): void {
     const id = pageId(host.props.props.selectedItem);
-    if (id === null || (host.restore && host.restore.selected && host.restore.selected.id === id)) {
+    if (id === null) {
         return;
     }
     host.pageSelection = { id, since: Date.now() };
@@ -1001,8 +1000,8 @@ export function readPageSelection(host: SelectionHost, prev: unknown): void {
     if (id === pageId(prev)) {
         return;
     }
-    const taken = takeEcho(host.ownSelectedWrites, id);
-    host.ownSelectedWrites = taken.pending;
+    const taken = takeEcho(host.selectedEcho, id, Date.now());
+    host.selectedEcho = taken.guard;
     if (taken.echo) {
         return;
     }

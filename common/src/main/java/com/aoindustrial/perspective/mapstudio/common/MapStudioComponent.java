@@ -35,8 +35,8 @@ public final class MapStudioComponent {
     public static final String EVENT_ITEM_SELECTED = "onItemSelected";
 
     /**
-     * Fired when the map first settles and at every move end, never during a move, with the viewport object the
-     * component also writes to its {@code viewport} prop ({@code mapstudio.events.viewport.json}).
+     * Fired when the map first settles and then once its moves settle, never during a move, with the viewport object
+     * the component also writes to its {@code viewport} prop ({@code mapstudio.events.viewport.json}).
      */
     public static final String EVENT_VIEWPORT_CHANGED = "onViewportChanged";
 
@@ -57,8 +57,8 @@ public final class MapStudioComponent {
         + "selected map item (id, name, kind, assetId, properties, basePath, alarmsPath, values), or null when the "
         + "selection was cleared. The selectedItem prop carries the id.";
 
-    static final String EVENT_VIEWPORT_CHANGED_DESCRIPTION = "Fired when the map first settles and at every move end, "
-        + "never during a move: event.center is [lng, lat], event.zoom the zoom and event.bounds "
+    static final String EVENT_VIEWPORT_CHANGED_DESCRIPTION = "Fired when the map first settles and then once its moves "
+        + "settle, never during a move: event.center is [lng, lat], event.zoom the zoom and event.bounds "
         + "[[west, south], [east, north]]. The viewport prop carries the same object.";
 
     static final String EVENT_POPUP_OPEN_DESCRIPTION = "Fired when a popup opens in View mode: event.itemId is the map "

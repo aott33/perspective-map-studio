@@ -51,26 +51,59 @@ function echoKey(id: string | null): string {
 
 /** How many writes of the component's own the guard keeps waiting for their echo, at most (the oldest go first). */
 export const ECHO_LIMIT = 16;
+/**
+ * How long a write of the component's own waits for its echo (ms): a sync brings it back well within this, and a write whose
+ * echo never comes (Perspective coalesced it away: A then null before a sync leaves the prop as it was) goes, so nothing stale
+ * outlives a sync and later swallows the page's own write of the same id.
+ */
+export const ECHO_EXPIRY_MS = 1500;
 
 /**
- * The component is about to write `id` to `selectedItem` while the prop holds `propNow`: the writes whose echo is still to come
- * (`pending`, oldest first) with this one added, unless the prop already holds it (then nothing comes back).
+ * The echo guard of `selectedItem`: the component's own writes whose echo has not come back yet, oldest first, each with when
+ * it was written, and the value last written to the prop as far as the component knows (its own last write, or the page's last
+ * value it read), which a write is compared with: writing the value the prop already holds changes nothing, so nothing comes back.
  */
-export function noteWrite(pending: string[], id: string | null, propNow: string | null): string[] {
-    if (id === propNow) {
-        return pending;
+export interface EchoGuard {
+    pending: Array<{ key: string; at: number }>;
+    last: string | null;
+}
+
+/** A guard with nothing pending, the prop holding `value`. */
+export function echoGuard(value: string | null): EchoGuard {
+    return { pending: [], last: value };
+}
+
+/** The pending writes still waiting at `now`. */
+function unexpired(guard: EchoGuard, now: number): EchoGuard['pending'] {
+    return guard.pending.filter((p) => now - p.at < ECHO_EXPIRY_MS);
+}
+
+/** The component is about to write `id` to `selectedItem` at `now`: noted, unless it is the value last written (no change comes back). */
+export function noteWrite(guard: EchoGuard, id: string | null, now: number): EchoGuard {
+    const pending = unexpired(guard, now);
+    if (id === guard.last) {
+        return { pending, last: id };
     }
-    const next = pending.concat(echoKey(id));
-    return next.length > ECHO_LIMIT ? next.slice(next.length - ECHO_LIMIT) : next;
+    const next = pending.concat({ key: echoKey(id), at: now });
+    return { pending: next.length > ECHO_LIMIT ? next.slice(next.length - ECHO_LIMIT) : next, last: id };
 }
 
 /**
- * The prop changed to `id`: the component's own write coming back (`echo`, that write and every earlier one dropped from the
- * pending, since props arrive in order and a later write may be the only one seen), or a value the page wrote.
+ * The prop changed to `id` at `now`: the component's own write coming back (`echo`), which drops every pending write through the
+ * last one of that value (writes of A, B and A again before one sync come back as one change to A), or a value the page wrote,
+ * which is then the value last written.
  */
-export function takeEcho(pending: string[], id: string | null): { echo: boolean; pending: string[] } {
-    const i = pending.indexOf(echoKey(id));
-    return i < 0 ? { echo: false, pending } : { echo: true, pending: pending.slice(i + 1) };
+export function takeEcho(guard: EchoGuard, id: string | null, now: number): { echo: boolean; guard: EchoGuard } {
+    const pending = unexpired(guard, now);
+    const key = echoKey(id);
+    let i = -1;
+    for (let j = pending.length - 1; j >= 0; j--) {
+        if (pending[j].key === key) {
+            i = j;
+            break;
+        }
+    }
+    return i < 0 ? { echo: false, guard: { pending, last: id } } : { echo: true, guard: { pending: pending.slice(i + 1), last: guard.last } };
 }
 
 /** A write to the component's property tree, as Perspective's `PropertyTree` takes it. */

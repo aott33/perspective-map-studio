@@ -46,7 +46,7 @@ import { AbstractUIElementStore } from '@inductiveautomation/perspective-client'
 import { Kind } from '../adapters';
 import * as basemapLayer from '../basemapLayer';
 import * as cameraModule from '../camera';
-import { applyRestore, publishViewport, RESTORE_WAIT_MS } from '../camera';
+import { applyRestore, publishViewport, RESTORE_WAIT_MS, VIEWPORT_SETTLE_MS } from '../camera';
 import * as editingModule from '../editing';
 import * as itemsLayer from '../itemsLayer';
 import { MapItemRecord } from '../contract';
@@ -56,8 +56,8 @@ import { MapStudio, MapStudioState } from '../MapStudio';
 import { MapStudioStoreDelegate } from '../MapStudioStoreDelegate';
 import { MESSAGE_EVENT, MessageTypes } from '../messages';
 import {
-    ECHO_LIMIT, ITEM_SELECTED_EVENT, POPUP_CLOSE_EVENT, POPUP_OPEN_EVENT, VIEWPORT_CHANGED_EVENT, firePageEvent, noteWrite, pageId,
-    takeEcho, viewportKey, viewportOf, writePageProp
+    ECHO_EXPIRY_MS, ECHO_LIMIT, EchoGuard, ITEM_SELECTED_EVENT, POPUP_CLOSE_EVENT, POPUP_OPEN_EVENT, VIEWPORT_CHANGED_EVENT, echoGuard,
+    firePageEvent, noteWrite, pageId, takeEcho, viewportKey, viewportOf, writePageProp
 } from '../pageEvents';
 import { Place } from '../place';
 import { applyPageSelection, readMountSelection, readPageSelection } from '../selection';
@@ -78,26 +78,36 @@ describe('the pure helpers (pageEvents.ts)', () => {
         expect(pageId(14)).toBeNull();
     });
 
-    test('the echo guard: a write is noted unless the prop holds it already; its echo drops it and every earlier one', () => {
-        let pending = noteWrite([], 'ctb1', null);
-        expect(pending).toEqual(['ctb1']);
-        // The prop holds it already (the page wrote it): nothing comes back.
-        expect(noteWrite(pending, 'p14', 'p14')).toEqual(['ctb1']);
-        pending = noteWrite(pending, 'p14', 'ctb1');
-        pending = noteWrite(pending, null, 'p14');
-        expect(pending).toEqual(['ctb1', 'p14', '']);
-        // Only the later write's echo seen (two writes before one sync): both go.
-        expect(takeEcho(pending, 'p14')).toEqual({ echo: true, pending: [''] });
-        expect(takeEcho([''], null)).toEqual({ echo: true, pending: [] });
+    test('the echo guard: a write is noted unless it is the value last written; its echo drops it and every earlier one', () => {
+        const keys = (g: EchoGuard): string[] => g.pending.map((p) => p.key);
+        let g = noteWrite(echoGuard(null), 'ctb1', 0);
+        expect(keys(g)).toEqual(['ctb1']);
+        // The page wrote P14 (read as the page's: the value last written), and the component publishes it: no change comes back.
+        const page = takeEcho(g, 'p14', 10);
+        expect(page.echo).toBe(false);
+        expect(keys(noteWrite(page.guard, 'p14', 20))).toEqual(['ctb1']);
+        // Compared with the value last written, not the prop delivered: A, then null before a sync, are both noted.
+        g = noteWrite(noteWrite(echoGuard(null), 'a', 0), null, 5);
+        expect(keys(g)).toEqual(['a', '']);
+        // Writes of A, B and A again come back as one change to A: everything through the last A goes.
+        g = noteWrite(noteWrite(noteWrite(echoGuard(null), 'a', 0), 'b', 1), 'a', 2);
+        const once = takeEcho(g, 'a', 3);
+        expect(once.echo).toBe(true);
+        expect(keys(once.guard)).toEqual([]);
+        // ... so a later B is the page's.
+        expect(takeEcho(once.guard, 'b', 4).echo).toBe(false);
+        // A note expires: a write whose echo never came does not swallow the page's write of the same id after it.
+        expect(takeEcho(noteWrite(echoGuard(null), 'a', 0), 'a', ECHO_EXPIRY_MS - 1).echo).toBe(true);
+        expect(takeEcho(noteWrite(echoGuard(null), 'a', 0), 'a', ECHO_EXPIRY_MS).echo).toBe(false);
         // A value the component never wrote is the page's.
-        expect(takeEcho(['ctb1'], 'nope')).toEqual({ echo: false, pending: ['ctb1'] });
+        expect(takeEcho(noteWrite(echoGuard(null), 'ctb1', 0), 'nope', 1).echo).toBe(false);
         // Never more than ECHO_LIMIT waiting, the oldest first to go.
-        let many: string[] = [];
+        let many = echoGuard(null);
         for (let i = 0; i < ECHO_LIMIT + 3; i++) {
-            many = noteWrite(many, 'id' + i, null);
+            many = noteWrite(many, 'id' + i, i);
         }
-        expect(many.length).toBe(ECHO_LIMIT);
-        expect(many[0]).toBe('id3');
+        expect(many.pending.length).toBe(ECHO_LIMIT);
+        expect(many.pending[0].key).toBe('id3');
     });
 
     test('a write or a fire that fails is one warning and nothing else', () => {
@@ -167,10 +177,15 @@ interface Harness {
     state(): MapStudioState;
     /** The page writes `selectedItem` (a Perspective prop change): read and applied as componentDidUpdate does. */
     pageWrites(id: unknown): void;
-    /** The component's own selectedItem writes not yet seen come back as prop changes, in order (the next sync). */
-    syncEchoes(): void;
+    /**
+     * The component's own selectedItem writes come back as prop changes (the next sync): each in order, or with `coalesce` as one
+     * change to the value Perspective's tree holds now, or none when it holds the value the component last saw.
+     */
+    syncEchoes(coalesce?: boolean): void;
     /** A marker clicked on the map. */
     clickMarker(id: string, name: string, at: [number, number]): void;
+    /** The ground clicked: nothing under the pointer. */
+    clickGround(): void;
     /** The map moved: its centre and zoom now, then MapLibre's moveend. */
     moveTo(center: [number, number], zoom: number): void;
     /** The delegate's state changed (the items arrived, a batch): componentDidUpdate's page selection step. */
@@ -200,7 +215,9 @@ function harness(options: HarnessOptions = {}): Harness {
     const popupClose: string[] = [];
     const pointClick: string[] = [];
     const moves: string[] = [];
-    // The writes that change the prop, to come back on the next sync (a write of the value the prop holds changes nothing).
+    // Perspective's tree: the value it holds now (the component's writes and the page's), and the component's writes that changed
+    // it, to come back on the next sync; the prop the component reads (`ms.props.props.selectedItem`) lags until then.
+    let tree: unknown = options.selectedItem || null;
     const echoes: unknown[] = [];
     const store = {
         delegate: {
@@ -211,7 +228,8 @@ function harness(options: HarnessOptions = {}): Harness {
         props: {
             write: (key: string, value: unknown): void => {
                 props.push([key, value]);
-                if (key === 'selectedItem' && value !== ms.props.props.selectedItem) {
+                if (key === 'selectedItem' && value !== tree) {
+                    tree = value;
                     echoes.push(value);
                 }
             }
@@ -310,13 +328,19 @@ function harness(options: HarnessOptions = {}): Harness {
         state: () => ms.state,
         pageWrites: (id: unknown): void => {
             const prev = ms.props.props.selectedItem;
+            tree = id;
             setProps({ ...ms.props, props: { ...ms.props.props, selectedItem: id } });
             readPageSelection(ms, prev);
             update();
         },
-        syncEchoes: (): void => {
-            for (const value of echoes.splice(0)) {
+        syncEchoes: (coalesce = false): void => {
+            const values = coalesce ? [tree] : echoes.slice();
+            echoes.length = 0;
+            for (const value of values) {
                 const prev = ms.props.props.selectedItem;
+                if (value === prev) {
+                    continue;
+                }
                 setProps({ ...ms.props, props: { ...ms.props.props, selectedItem: value } });
                 readPageSelection(ms, prev);
                 update();
@@ -326,6 +350,10 @@ function harness(options: HarnessOptions = {}): Harness {
             hit = [{ geometry: { type: 'Point', coordinates: at }, properties: { id, kind: 'pad', name, members: 1, memberIds: '' } }];
             const p = project(at);
             (ms as unknown as { onMapClick: (ev: unknown) => void }).onMapClick({ point: { x: p.x, y: p.y }, lngLat: { lng: at[0], lat: at[1] } });
+        },
+        clickGround: (): void => {
+            hit = [];
+            (ms as unknown as { onMapClick: (ev: unknown) => void }).onMapClick({ point: { x: 1, y: 1 }, lngLat: { lng: -105.05, lat: 39.7 } });
         },
         moveTo: (c: [number, number], z: number): void => {
             center = c;
@@ -433,7 +461,7 @@ describe('selectedItem written by the page, in View mode', () => {
         const mapItem = h.events[0][1].mapItem as Record<string, unknown>;
         expect(mapItem).toMatchObject({ id: 'p14', name: 'Point 2', kind: 'pad', assetId: null });
         // The prop already holds the id the page wrote: the component's write changes nothing and is not awaited back.
-        expect(h.ms.ownSelectedWrites).toEqual([]);
+        expect(h.ms.selectedEcho.pending).toEqual([]);
         expect(warn).not.toHaveBeenCalled();
     });
 
@@ -501,14 +529,57 @@ describe('selectedItem written by the page, in View mode', () => {
         const h = harness();
         h.clickMarker('ctb1', 'CTB1', CTB1);
         h.clickMarker('p14', 'Point 2', P14);
-        expect(h.ms.ownSelectedWrites).toEqual(['ctb1', 'p14']);
+        expect(h.ms.selectedEcho.pending.map((p) => p.key)).toEqual(['ctb1', 'p14']);
         h.syncEchoes();
-        expect(h.ms.ownSelectedWrites).toEqual([]);
+        expect(h.ms.selectedEcho.pending).toEqual([]);
         expect(h.ms.pageSelection).toBeNull();
         expect(h.state().selected).toEqual({ id: 'p14', kind: 'point' });
         // No camera move: the clicks moved nothing and nothing was applied from the echoes.
         expect(h.moves).toEqual([]);
         expect(selectedEvents(h)).toEqual(['ctb1', 'p14']);
+    });
+
+    test('clicks on A, B and A again before one sync come back as one change to A: nothing stale is left, the table\'s B applied', () => {
+        const h = harness();
+        h.clickMarker('ctb1', 'CTB1', CTB1);
+        h.clickMarker('p14', 'Point 2', P14);
+        h.clickMarker('ctb1', 'CTB1', CTB1);
+        h.syncEchoes(true);
+        expect(h.ms.selectedEcho.pending).toEqual([]);
+        expect(h.ms.pageSelection).toBeNull();
+        expect(h.state().selected).toEqual({ id: 'ctb1', kind: 'point' });
+        // The table chooses P14 at once: the page's, applied.
+        h.pageWrites('p14');
+        expect(h.state().selected).toEqual({ id: 'p14', kind: 'point' });
+        expect(h.moves).toEqual(['jumpTo ' + P14.join(',') + ' z15']);
+    });
+
+    test('a click on A, then the ground, before a sync: no change comes back; once the notes expire the table\'s A is applied', () => {
+        const h = harness();
+        h.clickMarker('ctb1', 'CTB1', CTB1);
+        h.clickGround();
+        expect(h.state().selected).toBeNull();
+        expect(h.ms.selectedEcho.pending.map((p) => p.key)).toEqual(['ctb1', '']);
+        // Perspective's tree holds null again, as the component last saw it: nothing comes back.
+        h.syncEchoes(true);
+        expect(h.ms.selectedEcho.pending.map((p) => p.key)).toEqual(['ctb1', '']);
+        jest.advanceTimersByTime(ECHO_EXPIRY_MS);
+        h.pageWrites('ctb1');
+        expect(h.state().selected).toEqual({ id: 'ctb1', kind: 'point' });
+        expect(h.state().popup!.point.id).toBe('ctb1');
+        expect(h.ms.selectedEcho.pending).toEqual([]);
+    });
+
+    test('a click on A, then the ground, each coming back in order: both echoes taken, and the table\'s A applied at once', () => {
+        const h = harness();
+        h.clickMarker('ctb1', 'CTB1', CTB1);
+        h.clickGround();
+        expect(h.state().selected).toBeNull();
+        h.syncEchoes();
+        expect(h.ms.selectedEcho.pending).toEqual([]);
+        expect(h.ms.pageSelection).toBeNull();
+        h.pageWrites('ctb1');
+        expect(h.state().selected).toEqual({ id: 'ctb1', kind: 'point' });
     });
 
     test('the table and the map answering each other settle with one onItemSelected and one camera move', () => {
@@ -528,6 +599,7 @@ describe('selectedItem written by the page, in View mode', () => {
         const h = harness({ loading: true, selectedItem: 'p14', restore: remembered });
         expect(h.ms.restore).toBeNull();
         expect(h.ms.pageSelection).toEqual({ id: 'p14', since: expect.any(Number) });
+        // Its echo from the Gateway session: no change.
         h.pageWrites('p14');
         expect(h.state().selected).toBeNull();
         h.update();
@@ -547,15 +619,16 @@ describe('selectedItem written by the page, in View mode', () => {
         expect(h.state().selected).toEqual({ id: 'lswd', kind: 'line', segment: { fromId: 'pt1', toId: 'pt2' } });
     });
 
-    test('the remembered selection\'s own id at mount is this component\'s earlier write: the restore puts it back', () => {
-        const remembered: Place = { center: CTB1, zoom: 16, selected: { id: 'ctb1', kind: 'point', segment: null }, popup: true, popupAt: null };
+    test('a value at mount equal to the remembered selection is the page\'s too: chosen as a click does, the camera going to it', () => {
+        const remembered: Place = { center: CTB1, zoom: 13, selected: { id: 'ctb1', kind: 'point', segment: null }, popup: true, popupAt: null };
         const h = harness({ loading: true, selectedItem: 'ctb1', restore: remembered });
-        expect(h.ms.pageSelection).toBeNull();
-        expect(h.ms.restore).toBe(remembered);
+        expect(h.ms.pageSelection).toEqual({ id: 'ctb1', since: expect.any(Number) });
+        expect(h.ms.restore).toBeNull();
         h.update();
         expect(h.state().selected).toEqual({ id: 'ctb1', kind: 'point' });
-        // The restore keeps the remembered camera: no move.
-        expect(h.moves).toEqual([]);
+        expect(h.state().popup!.point.id).toBe('ctb1');
+        expect(h.moves).toEqual(['jumpTo ' + CTB1.join(',') + ' z15']);
+        expect(selectedEvents(h)).toEqual(['ctb1']);
     });
 
     test('a value the page set waits for the first full batch, not past the restore\'s wait', () => {
@@ -648,19 +721,45 @@ describe('selectedItem written by the page, in Edit mode', () => {
 });
 
 describe('the viewport prop and onViewportChanged', () => {
-    test('nothing before the map first settles; then the same object written and fired once per move end that changes it', () => {
+    const written = (h: Harness): unknown[] => h.props.filter(([key]) => key === 'viewport').map(([, v]) => v);
+    const fired = (h: Harness): unknown[] => h.events.filter(([name]) => name === VIEWPORT_CHANGED_EVENT).map(([, v]) => v);
+
+    test('nothing before the map first settles; then the same object written and fired once the moves settle, if it changed', () => {
         const h = harness();
         h.moveTo([-104.98, 39.74], 13);
-        expect(h.props.filter(([key]) => key === 'viewport')).toEqual([]);
+        jest.advanceTimersByTime(VIEWPORT_SETTLE_MS);
+        expect(written(h)).toEqual([]);
         publishViewport(h.ms, h.ms.map!, true);
+        expect(written(h).length).toBe(1);
+        // A pan: one write once it has settled, none before.
         h.moveTo([-104.97, 39.75], 14.256);
+        jest.advanceTimersByTime(VIEWPORT_SETTLE_MS - 1);
+        expect(written(h).length).toBe(1);
+        jest.advanceTimersByTime(1);
+        expect(written(h).length).toBe(2);
+        // A move end that leaves the same view writes nothing.
         h.moveTo([-104.97, 39.75], 14.256);
-        const written = h.props.filter(([key]) => key === 'viewport').map(([, v]) => v);
-        const fired = h.events.filter(([name]) => name === VIEWPORT_CHANGED_EVENT).map(([, v]) => v);
-        expect(written.length).toBe(2);
-        expect(fired).toEqual(written);
-        expect(written[1]).toEqual({ center: [-104.97, 39.75], zoom: 14.26, bounds: [[-105.0383, 39.715], [-104.9017, 39.785]] });
-        expect(h.ms.mapContainer!.getAttribute('data-viewport')).toBe(JSON.stringify(written[1]));
+        jest.advanceTimersByTime(VIEWPORT_SETTLE_MS);
+        expect(written(h).length).toBe(2);
+        expect(fired(h)).toEqual(written(h));
+        expect(written(h)[1]).toEqual({ center: [-104.97, 39.75], zoom: 14.26, bounds: [[-105.0383, 39.715], [-104.9017, 39.785]] });
+        expect(h.ms.mapContainer!.getAttribute('data-viewport')).toBe(JSON.stringify(written(h)[1]));
+    });
+
+    test('a burst of move ends (a continuous resize, one per frame) gives one write and one event, of where it settled', () => {
+        const h = harness();
+        publishViewport(h.ms, h.ms.map!, true);
+        for (let i = 1; i <= 30; i++) {
+            h.moveTo([-104.98 + i * 0.0001, 39.74], 13);
+            jest.advanceTimersByTime(16);
+        }
+        expect(written(h).length).toBe(1);
+        jest.advanceTimersByTime(VIEWPORT_SETTLE_MS);
+        expect(written(h).length).toBe(2);
+        expect(fired(h).length).toBe(2);
+        expect((written(h)[1] as { center: number[] }).center).toEqual([-104.977, 39.74]);
+        jest.advanceTimersByTime(VIEWPORT_SETTLE_MS * 5);
+        expect(written(h).length).toBe(2);
     });
 });
 

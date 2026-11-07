@@ -36,7 +36,8 @@ class ProjectListsTest {
         assertTrue(s.functions().contains("mapstudio_dev._globals"));
         assertTrue(s.offeredFunctions().contains("mapstudio_dev.kinds"));
         assertFalse(s.offeredFunctions().contains("mapstudio_dev._globals"));
-        assertEquals(List.of("/", "/adapters", "/alarms/:item", "/edit", "/live", "/pad/:name", "/styles", "/two"), s.pages());
+        assertEquals(List.of("/", "/adapters", "/alarms/:item", "/edit", "/events", "/events/:select", "/live", "/pad/:name",
+            "/styles", "/two"), s.pages());
         assertEquals("default", s.identityProvider());
     }
 

@@ -114,7 +114,7 @@
         "object",
         "null"
       ],
-      "description": "Read-only (output). Where the map is looking (epic 4 entry 14, docs/contract.md), written by the component when the map first settles and at every move end, never during a move: {center: [lng, lat], zoom, bounds: [[west, south], [east, north]]}, WGS 84 to 6 decimals, the zoom to 2. The onViewportChanged event carries the same object. A value the page writes is not read, and the next move end writes it again; null until the map has settled.",
+      "description": "Read-only (output). Where the map is looking (epic 4 entry 14, docs/contract.md), written by the component when the map first settles and then once its moves settle (200 ms after the last move end), never during a move or once per frame: {center: [lng, lat], zoom, bounds: [[west, south], [east, north]]}, WGS 84 to 6 decimals, the zoom to 2. The onViewportChanged event carries the same object. A value the page writes is not read, and the next move that changes the view writes it again; null until the map has settled.",
       "default": null,
       "readOnly": true,
       "additionalProperties": false,

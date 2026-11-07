@@ -54,6 +54,7 @@ import { Bounds } from './camera';
 import * as items from './itemsLayer';
 import * as selection from './selection';
 import type { OpenPick, OpenPopup, PageSelection } from './selection';
+import { EchoGuard, echoGuard, pageId } from './pageEvents';
 import * as editing from './editing';
 import * as basemap from './basemapLayer';
 import { TilesState } from './basemapLayer';
@@ -217,12 +218,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
     focusNameId: string | null = null;
     /** The selection last written to the page (selection.tsx publishSelection): the item's id, '' for none. */
     publishedSelection = '';
-    /** The component's own selectedItem writes whose echo has not come back yet (entry 14, pageEvents.ts), oldest first. */
-    ownSelectedWrites: string[] = [];
+    /** The echo guard of selectedItem (entry 14, pageEvents.ts): the component's own writes still to come back, the value last written. */
+    selectedEcho: EchoGuard = echoGuard(pageId(this.props.props.selectedItem));
     /** The page's choice of an item waiting to be applied (entry 14, selection.tsx applyPageSelection), or null. */
     pageSelection: PageSelection | null = null;
     /** The viewport last written to the page (entry 14, camera.ts publishViewport), '' before the map first settled. */
     publishedViewport = '';
+    /** The wait for the moves to settle before the viewport is written (entry 14, camera.ts publishViewport), or null. */
+    viewportTimer: ReturnType<typeof setTimeout> | null = null;
     /** The theme colours the marker images are drawn with, read at mount and again on a theme change (item 29). */
     markerColors: MarkerColors | null = null;
     /** Re-reads the tokens when the theme changes and redraws (item 29). */
@@ -343,7 +346,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         map.on('idle', this.onMapIdle);
         map.on('moveend', () => {
             camera.publishView(this, map);
-            // The page's viewport and onViewportChanged at every move end, never during a move (entry 14).
+            // The page's viewport and onViewportChanged once the moves settle, never during a move or per frame (entry 14).
             camera.publishViewport(this, map);
             camera.savePlace(this);
         });
@@ -714,6 +717,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     componentWillUnmount(): void {
         this.unmounting = true;
         selection.stopPopupClock(this);
+        camera.stopViewport(this);
         if (typeof window !== 'undefined') {
             window.removeEventListener('storage', this.onStorage);
         }

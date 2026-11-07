@@ -66,7 +66,8 @@ class ProjectResourcesTest {
         assertTrue(s.functions().contains("mapstudio_dev.assets"), s.functions().toString());
         assertTrue(s.offeredFunctions().contains("mapstudio_dev.kinds"));
         assertFalse(s.offeredFunctions().contains("mapstudio_dev._globals"));
-        assertEquals(List.of("/", "/adapters", "/alarms/:item", "/edit", "/live", "/pad/:name", "/styles", "/two"), s.pages());
+        assertEquals(List.of("/", "/adapters", "/alarms/:item", "/edit", "/events", "/events/:select", "/live", "/pad/:name",
+            "/styles", "/two"), s.pages());
         assertEquals("default", s.identityProvider());
         // So the dev setup's kindsFunction and assetsFunction give no warning.
         FormLists lists = FormLists.none().withProject(s);
@@ -84,8 +85,9 @@ class ProjectResourcesTest {
         List<Resource> all = devProject();
         assertEquals(new ResourceType("ignition", "script-python"), ProjectResources.SCRIPTS);
         assertEquals("code.py", ProjectResources.CODE);
-        // mapstudio_dev, mapstudio_live, mapstudio_seed and mapstudio_showcase_seed (epic 3 entry 15).
-        assertEquals(4, ofType(all, ProjectResources.SCRIPTS).size());
+        // mapstudio_dev, mapstudio_live, mapstudio_seed, mapstudio_showcase_seed (epic 3 entry 15) and mapstudio_events (epic 4
+        // entry 14).
+        assertEquals(5, ofType(all, ProjectResources.SCRIPTS).size());
         assertEquals("ignition/script-app-library", ScriptLibrary.RESOURCE_TYPE.toString());
         assertTrue(ofType(all, ScriptLibrary.RESOURCE_TYPE).isEmpty());
     }

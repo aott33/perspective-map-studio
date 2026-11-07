@@ -69,6 +69,8 @@ export interface CameraHost {
     unmounting: boolean;
     /** The viewport last written to the page (pageEvents.ts `viewportKey`), '' before the map first settled (entry 14). */
     publishedViewport: string;
+    /** The wait for the moves to settle before the viewport is written (entry 14, VIEWPORT_SETTLE_MS), or null. */
+    viewportTimer: ReturnType<typeof setTimeout> | null;
     /** What opened the popup (item 14): Esc returns the focus there; null for a click on the map. */
     openedBy: 'search' | 'needsyou' | null;
     zoomControl: ZoomControl | null;
@@ -435,15 +437,44 @@ export function publishReadiness(host: CameraHost, map: MapLibreMap): void {
     el.setAttribute('data-map-ready', 'true');
 }
 
+/** How long the map stays still after a move end before the viewport is written (ms): a burst of move ends gives one write. */
+export const VIEWPORT_SETTLE_MS = 200;
+
 /**
  * The page's window on the camera (epic 4 entry 14, contract 0.4.0, R49): the read-only `viewport` prop written through the
  * component's property tree and the `onViewportChanged` event fired with the same object, `{center: [lng, lat], zoom, bounds:
- * [[west, south], [east, north]]}`, when the map first settles (`first`, its first idle with the items' layers) and then at every
- * move end, never during a move (R37: nothing per frame); a move end that leaves the same viewport writes and fires nothing. Each
- * write and fire is guarded as the selection's are (pageEvents.ts).
+ * [[west, south], [east, north]]}`, when the map first settles (`first`, its first idle with the items' layers, at once) and then
+ * once the moves settle: each move end waits VIEWPORT_SETTLE_MS, a later one starting the wait again, so a pan gives one write and
+ * a burst of move ends (a continuous resize, whose every `map.resize()` ends a move) gives one too, never one per frame (R37); a
+ * settled viewport the same as the last writes and fires nothing. Each write and fire is guarded as the selection's are
+ * (pageEvents.ts).
  */
 export function publishViewport(host: CameraHost, map: MapLibreMap, first = false): void {
     if (host.map !== map || (!first && host.publishedViewport === '')) {
+        return;
+    }
+    stopViewport(host);
+    if (first) {
+        writeViewport(host, map);
+        return;
+    }
+    host.viewportTimer = setTimeout(() => {
+        host.viewportTimer = null;
+        writeViewport(host, map);
+    }, VIEWPORT_SETTLE_MS);
+}
+
+/** A viewport still waiting for the moves to settle is dropped (the component unmounts, or a later move end waits again). */
+export function stopViewport(host: CameraHost): void {
+    if (host.viewportTimer !== null) {
+        clearTimeout(host.viewportTimer);
+        host.viewportTimer = null;
+    }
+}
+
+/** The viewport now, written and fired when it differs from the last one written. */
+function writeViewport(host: CameraHost, map: MapLibreMap): void {
+    if (host.map !== map) {
         return;
     }
     const b = map.getBounds();
@@ -461,4 +492,3 @@ export function publishViewport(host: CameraHost, map: MapLibreMap, first = fals
         host.mapContainer.setAttribute('data-viewport', key);
     }
 }
-

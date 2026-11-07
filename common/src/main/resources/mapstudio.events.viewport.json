@@ -1,7 +1,7 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "description": "The event object of onViewportChanged (epic 4 entry 14, docs/contract.md): where the map is looking, fired when the map first settles and at every move end, never during a move. The same object the component writes to its viewport prop.",
+  "description": "The event object of onViewportChanged (epic 4 entry 14, docs/contract.md): where the map is looking, fired when the map first settles and then once its moves settle (200 ms after the last move end, so a burst of move ends gives one), never during a move. The same object the component writes to its viewport prop.",
   "properties": {
     "center": {
       "type": "array",

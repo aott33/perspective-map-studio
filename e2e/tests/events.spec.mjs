@@ -30,6 +30,8 @@ const SWD1 = [-104.983671, 39.715476];
 const P14 = [-104.975, 39.75];
 // CTB1 in the middle at zoom 15: a full disc to click.
 const CTB1_VIEW = { center: CTB1, zoom: 15 };
+// South-west of the dev field at zoom 13: P14 (Point 2) well off the map.
+const AWAY_VIEW = { center: [-105.06, 39.7], zoom: 13 };
 // The line in view, its points apart (as editclick.spec.mjs views it): the ground south of it for the Line tool's points.
 const SWD_VIEW = { center: [(CTB1[0] + SWD1[0]) / 2, (CTB1[1] + SWD1[1]) / 2 + 0.001], zoom: 13.5 };
 
@@ -61,9 +63,9 @@ async function openEvents(page, path = '/events') {
     return map;
 }
 
-/** A label an event script writes as `count|payload`: how many came and the last one's words. */
+/** A label an event script writes as `count|payload`: how many came and the last one's words (in the DOM while hidden too). */
 async function counted(page, id) {
-    const text = await page.locator('#' + id).innerText();
+    const text = await page.locator('#' + id).textContent();
     const i = text.indexOf('|');
     return { count: Number(text.slice(0, i)), last: text.slice(i + 1) };
 }
@@ -407,7 +409,7 @@ test.describe('1366 px', () => {
             expect(watched.warnings, 'Map Studio warnings').toEqual([]);
         });
 
-    editorTest('before the items load: /events/<id> selects P14 as the view starts, and it wins over the place the map remembers',
+    editorTest('before the items load: /events/<id> selects P14 as the view starts, over the place the map remembers, the same item or another',
         async ({ page, watched }) => {
             const map = await openEvents(page, '/events/' + ids.p14);
             const card = page.locator('.maplibregl-popup .mapstudio-popup--default');
@@ -415,19 +417,25 @@ test.describe('1366 px', () => {
             await expect(map).toHaveAttribute('data-selected', ids.p14);
             expect(await countIs(page, LABELS.item, 1)).toBe(ids.p14 + '|Point 2|pad');
 
-            // Then CTB1 with its popup, from its row: the place the map remembers for this page.
-            await row(page, 'CTB1').click();
-            await expect(card).toHaveAttribute('data-point-id', ids.ctb1, { timeout: POPUP_MS });
-            await expect(map).toHaveAttribute('data-selected', ids.ctb1);
+            // The map remembers P14 with its popup at a view far from it. Back on the page, the page's P14 (the same item) is chosen
+            // again as a click does: the camera goes to it rather than staying where the place was left.
+            await view(page, map, AWAY_VIEW.center, AWAY_VIEW.zoom);
             await page.waitForTimeout(600);
+            let back = await backFromEdit(page);
+            await expect(page.locator('.maplibregl-popup .mapstudio-popup--default')).toHaveAttribute('data-point-id', ids.p14, { timeout: POPUP_MS });
+            await expect(back).toHaveAttribute('data-selected', ids.p14);
+            expect(Number(await back.getAttribute('data-zoom')), 'chosen at zoom 15 or more').toBeGreaterThanOrEqual(15);
+            const box = await back.boundingBox();
+            const [x, y] = await pixelNow(back, P14);
+            expect(x > box.x && x < box.x + box.width && y > box.y && y < box.y + box.height, 'P14 on the map').toBe(true);
+            expect(await countIs(page, LABELS.item, 1)).toBe(ids.p14 + '|Point 2|pad');
 
-            // Away and back with the browser's back: the view starts again and the page chooses P14 before the items load.
-            await page.locator('#mapstudio-events-open-edit').click();
-            await expect(page).toHaveURL(/\/edit$/, { timeout: 30_000 });
-            await page.goBack();
-            await expect(page).toHaveURL(new RegExp('/events/' + ids.p14 + '$'));
-            const back = page.locator('.mapstudio-map');
-            await expect(back).toHaveAttribute('data-map-ready', 'true', { timeout: 60_000 });
+            // Then CTB1 with its popup, from its row: the place the map remembers. Back again, the page's P14 wins over it.
+            await row(page, 'CTB1').click();
+            await expect(page.locator('.maplibregl-popup .mapstudio-popup--default')).toHaveAttribute('data-point-id', ids.ctb1, { timeout: POPUP_MS });
+            await expect(back).toHaveAttribute('data-selected', ids.ctb1);
+            await page.waitForTimeout(600);
+            back = await backFromEdit(page);
             await expect(page.locator('.maplibregl-popup .mapstudio-popup--default')).toHaveAttribute('data-point-id', ids.p14, { timeout: POPUP_MS });
             await expect(back).toHaveAttribute('data-selected', ids.p14);
             await page.waitForTimeout(SETTLE_MS);
@@ -436,26 +444,65 @@ test.describe('1366 px', () => {
         });
 });
 
+/** Away to /edit and back with the browser's back: the /events view starts again (the page's choice before the items load). */
+async function backFromEdit(page) {
+    const url = page.url();
+    await page.locator('#mapstudio-events-open-edit').click();
+    await expect(page).toHaveURL(/\/edit$/, { timeout: 30_000 });
+    await page.goBack();
+    await expect(page).toHaveURL(url);
+    const back = page.locator('.mapstudio-map');
+    await expect(back).toHaveAttribute('data-map-ready', 'true', { timeout: 60_000 });
+    return back;
+}
+
 test.describe('390 px', () => {
     test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
 
-    editorTest('phone: the same writes open the bottom sheet as a tap does, and null closes it', async ({ page, watched }) => {
-        const map = await openEvents(page);
-        // The table and the labels make room for the map at phone width.
-        await expect(page.locator('#mapstudio-events-table')).toBeHidden();
-        await pageWrites(page, ids.p14);
-        const sheet = page.locator('.mapstudio-sheet');
-        await expect(sheet).toHaveAttribute('data-point-id', ids.p14, { timeout: POPUP_MS });
-        await expect(map).toHaveAttribute('data-popup-mode', 'sheet');
-        await expect(map).toHaveAttribute('data-selected', ids.p14);
-        await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
-        await pageWritesNull(page);
-        await expect(map).toHaveAttribute('data-selected', '');
-        await expect(sheet).toHaveCount(0);
-        // A line's popup is a card at every width, as a tap opens it.
-        await pageWrites(page, ids.line);
-        await expect(page.locator('.maplibregl-popup .mapstudio-popup--line')).toBeVisible({ timeout: POPUP_MS });
-        await expect(map).toHaveAttribute('data-popup-mode', 'card');
-        expect(watched.warnings, 'Map Studio warnings').toEqual([]);
-    });
+    editorTest('phone: the same writes open the bottom sheet as a tap does and fire the same events; null closes it; an unknown id warns once',
+        async ({ page, watched }) => {
+            const map = await openEvents(page);
+            // The table and the labels make room for the map at phone width (the labels stay in the page, hidden, and are read there).
+            await expect(page.locator('#mapstudio-events-table')).toBeHidden();
+            await expect.poll(async () => (await counted(page, LABELS.viewport)).count, { timeout: REPLY_MS }).toBeGreaterThanOrEqual(1);
+            expect((await counted(page, LABELS.viewport)).last).toBe(viewportWords(await map.getAttribute('data-viewport')));
+            const before = await counts(page);
+            await pageWrites(page, ids.p14);
+            const sheet = page.locator('.mapstudio-sheet');
+            await expect(sheet).toHaveAttribute('data-point-id', ids.p14, { timeout: POPUP_MS });
+            await expect(map).toHaveAttribute('data-popup-mode', 'sheet');
+            await expect(map).toHaveAttribute('data-selected', ids.p14);
+            await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
+            expect(await countIs(page, LABELS.item, before.item + 1)).toBe(ids.p14 + '|Point 2|pad');
+            expect(await countIs(page, LABELS.open, before.open + 1)).toBe(ids.p14 + '|none');
+            await expect(page.locator('#mapstudio-events-selected')).toHaveText('selectedItem: ' + ids.p14, { timeout: REPLY_MS });
+            // The map went to P14: the viewport followed, once the move settled.
+            await expect.poll(async () => (await counted(page, LABELS.viewport)).count, { timeout: REPLY_MS }).toBeGreaterThan(before.viewport);
+            await expect.poll(async () => (await counted(page, LABELS.viewport)).last, { timeout: REPLY_MS })
+                .toBe(viewportWords(await map.getAttribute('data-viewport')));
+
+            await pageWritesNull(page);
+            await expect(map).toHaveAttribute('data-selected', '');
+            await expect(sheet).toHaveCount(0);
+            expect(await countIs(page, LABELS.close, before.close + 1)).toBe(ids.p14);
+            expect(await countIs(page, LABELS.item, before.item + 2)).toBe('none');
+
+            // A line's popup is a card at every width, as a tap opens it; onPopupOpen names its segment.
+            await pageWrites(page, ids.line);
+            await expect(page.locator('.maplibregl-popup .mapstudio-popup--line')).toBeVisible({ timeout: POPUP_MS });
+            await expect(map).toHaveAttribute('data-popup-mode', 'card');
+            expect(await countIs(page, LABELS.open, before.open + 2)).toBe(ids.line + '|' + ids.pt1 + ',' + ids.pt2);
+            expect(await countIs(page, LABELS.item, before.item + 3)).toBe(ids.line + '|L-SWD|line');
+            expect(watched.warnings, 'Map Studio warnings').toEqual([]);
+
+            // An id not on the map: the selection cleared and the popup closed, one warning naming it.
+            await pageWrites(page, 'nope');
+            await expect(map).toHaveAttribute('data-selected', '');
+            await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
+            expect(await countIs(page, LABELS.close, before.close + 2)).toBe(ids.line);
+            expect(await countIs(page, LABELS.item, before.item + 4)).toBe('none');
+            await page.waitForTimeout(WARNING_SETTLE_MS);
+            expect(watched.warnings.length, watched.warnings.join('\n')).toBe(1);
+            expect(watched.warnings[0]).toContain('The page selected nope, which is not on the map');
+        });
 });
