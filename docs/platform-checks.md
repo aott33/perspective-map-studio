@@ -1093,3 +1093,20 @@ Labels: **[live 8.3.10]** seen on the dev stack above; **[read in the 8.3.10 cli
 | The module asks nothing of the browser | No source under `web/typescript` (the tests aside) names `navigator.geolocation`, `getCurrentPosition`, `watchPosition` or `permissions.query`; the component reads `userLocation` only. Entry 2's SDK check (`data-client-location`, the client store's `geolocationEnabled`) stands as recorded under "Epic 4 entry 2", but its diagnostic is removed (owner, 2026-11-07): the component no longer reads the client store's location | **[build]** (`noGeolocation.test.ts`) |
 
 **Closed by the owner** (2026-11-07, "Go with recommendations"): a position with `permissionGranted` null (every browser on 8.3.10) counts; only `false` reads "permission not granted". **[not verified]**: the Perspective mobile app itself, a real phone browser, the Designer's property editor showing `userLocation`'s nested schema.
+
+## Epic 4 entry 16 - Directions, Nearest and the distance on Needs you rows, live
+
+**Question (epic 4 entry 16, R51 and R52; the plan's I/O matrix):** does the popup's Directions open the route to the item, on the right maps service for the device, from a browser on 8.3.10 without Map Studio sending anything anywhere, and do the search's Nearest and the Needs you distances follow the page's `userLocation`? **Answer:** yes in Chromium with each user agent; the hand-over to a real phone's maps app is not verified.
+
+Labels: **[live 8.3.10]** seen on the dev stack by `e2e/tests/directions.spec.mjs`; **[build]** the Jest tests; **[not verified]** not seen.
+
+| Check | Fact | Evidence |
+| --- | --- | --- |
+| The footer | On `/locate` (`directions {enabled: true}`) Point 1 in alarm: the card's footer holds Directions (secondary, the route glyph) then View alarms (primary), 32 px tall, equal widths, 8 px apart; no View alarms in the alarm block. At 390 px the sheet's footer is the same at 44 px, with no Edit. On `/live` (`directions` null) View alarms alone fills the footer. The tracer line's popup has no Directions | **[live 8.3.10]** |
+| The link | `window.open` (captured in the page, so nothing left the browser) received `(url, '_blank', 'noopener')` once per press: the Google route `https://www.google.com/maps/dir/?api=1&destination=39.739200,-104.990300` with a desktop and an Android user agent, the Apple route `https://maps.apple.com/?daddr=39.739200,-104.990300&q=Point%201` with an iPhone user agent, the page's template `https://x.example/r?to={lat},{lng}&n={name}` filled and encoded, and `javascript:alert(1)` ignored with one console warning and the Google route used | **[live 8.3.10]**, **[build]** (`directions.test.ts`) |
+| Nothing sent | `directions.ts` holds no `fetch`, `XMLHttpRequest`, `sendBeacon` or `WebSocket`; the link is opened on the press only; `noGeolocation.test.ts` still passes (the user agent, touch points and language are read, never the browser's location) | **[build]** |
+| Nearest | With the position about 432 m north-east of CTB1, the chevron's list opens with A-Z chosen; Nearest lists ten rows by distance, CTB1 first ("0.3 mi" in en-US, "430 m" in en-GB), and Enter on a row selects it and opens its card; typing returns to the usual results; Tab and ArrowLeft and ArrowRight in the empty field reach and turn the switch; at 390 px the switch is a 44 px target | **[live 8.3.10]** |
+| Needs you | Every row ends with its distance (Point 1 "1.2 mi"), 12 px, right-aligned; the row order is the same with the location off, when no row has a distance and the search has no switch | **[live 8.3.10]** |
+| A real phone and the mobile app | Whether the Perspective mobile app or a phone's browser hands the link to Apple Maps or Google Maps (rather than a browser tab), and starts the route from the person's position, is the owner's check in the test playbook ("Directions, Nearest and distances") | **[not verified]** |
+
+**Noted for the owner:** the plan's words "850 ft" sit past its own rule (under 0.1 mi, 528 ft, in feet), so 850 ft reads "0.2 mi"; the rule was built, not the example.

@@ -2,7 +2,7 @@
 
 A walk through what epic 4 has built so far, grouped by what you do, on the local development stack. Tick each box and note anything that looks or feels off in the Notes line under each section (a screenshot helps). Each note goes into `_bmad-output/initiative-flowmap/tickets/epic-editing/epic-editing.md` Notes or a new entry. The playbook grows as entries land; entry 18 (the 0.4.0 release) finishes it for the release test and the 30-minute test.
 
-Built so far (2026-11-07): entries 1 to 6, 21 to 27, 14 and 15. Still to come: 16 (Directions, Nearest, distances), 7 (the item list as designed, the checklist), 8 (selecting several), 9 (instruments), 10 (save problems), 11 (Recent changes and History), 12 and 13 (the Kinds screen, the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
+Built so far (2026-11-07): entries 1 to 6, 21 to 27, 14, 15 and 16. Still to come: 7 (the item list as designed, the checklist), 8 (selecting several), 9 (instruments), 10 (save problems), 11 (Recent changes and History), 12 and 13 (the Kinds screen, the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
 
 ## Results so far
 
@@ -18,6 +18,7 @@ Built so far (2026-11-07): entries 1 to 6, 21 to 27, 14 and 15. Still to come: 1
 | 7. The place check | | |
 | 8. The page's events | | |
 | 8a. You are here and Locate me | | |
+| 8b. Directions, Nearest and distances | | |
 | 9. View mode, unchanged | | |
 | 10. Phone (390 px) | | |
 | 11. Designer | | |
@@ -142,11 +143,29 @@ Browsers give a position only on `https` or `localhost`: `http://localhost:9088`
 
 Notes:
 
+## 8b. Directions, Nearest and distances
+
+On `/locate` (Directions on, the template field empty) with your position as in 8a; `/` has Directions on too, `/live` has it off. Make a pad's alarm on `/live` (pressure high on P12, which is Point 1) for the View alarms rows, and put it back after (pressure low, ack).
+
+- [ ] Click Point 1: the card ends in a footer under a rule, **Directions** (a route glyph and the word, a plain button) then **View alarms** (the filled button), side by side, the same height and width. View alarms is no longer inside the red alarm block.
+- [ ] Press Directions on a computer: a new tab opens Google Maps with the route to Point 1 from where you are, ready to start. Nothing on the map changes and no route is drawn.
+- [ ] Click the Tracer line: its popup has no Directions. Click a pad with no alarm: Directions alone fills the footer. On `/live`, Point 1's footer is View alarms alone, filling the row.
+- [ ] Type `https://www.openstreetmap.org/directions?route=;{lat},{lng}` in the template field, press Tab, open Point 1 again and press Directions: that link opens with Point 1's coordinates. Type `javascript:alert(1)` instead: the Google route opens, and the browser console has one Map Studio warning that the template is ignored. Empty the field.
+- [ ] Open the search's chevron with no text: an **A-Z | Nearest** switch sits at the top, A-Z chosen. Press Nearest: ten items, the nearest first, each with its distance at the right in grey (miles and feet in an en-US browser, kilometres and metres otherwise). Choose one: the map zooms to it and opens it, as a search result does. Type a letter: the usual results, no switch; clear it: Nearest is still chosen.
+- [ ] Keyboard only: in the empty field, ArrowRight and ArrowLeft turn the switch; Tab reaches it; ArrowDown goes back to the list; Enter chooses.
+- [ ] Open Needs you: every row ends with its distance at the right; the order is still alarms, then comms lost, then stale.
+- [ ] Tick Location off: no switch on the search list and no distances on Needs you; Directions still shows in the popup.
+- [ ] At 390 px: the sheet's footer is Directions and View alarms at 44 px, with no Edit button; the switch parts are 44 px tall.
+- [ ] **On a real iPhone or iPad** (the Perspective mobile app, or Safari on an `https` address): Directions opens Apple Maps with the route to the pad, named. **On an Android phone**: Google Maps opens with the route. Note what opens (the app, or a browser tab) and whether the route starts from where you are; this hand-over is not checked by the suite.
+- [ ] Your browser's language set to English (UK) or another language: distances read in metres and kilometres ("430 m", "1.1 km"); English (US): feet and miles ("330 ft", "2.3 mi").
+
+Notes:
+
 ## 9. View mode, unchanged
 
 On `/` (View mode), a quick pass over 0.3.0's behaviour.
 
-- [ ] A click on a pad opens its popup card; on a line, the line popup at the clicked segment; Esc closes it.
+- [ ] A click on a pad opens its popup card (View alarms in its footer since entry 16, with Directions where the page turns it on); on a line, the line popup at the clicked segment; Esc closes it.
 - [ ] Search and Needs you work as in 0.3.0; the Legend button opens the key.
 - [ ] Live values update (use `/live` to change a tag).
 
