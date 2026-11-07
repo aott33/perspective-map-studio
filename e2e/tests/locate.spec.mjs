@@ -184,6 +184,8 @@ test.describe('1366 px', () => {
             await expect(map).toHaveAttribute('data-you-heading', '90');
             await view(page, map, NEAR.center, NEAR.zoom);
             await expectDrawn(map, '1,1,1');
+            // The wedge turned to 90 degrees (east) and aligned to the map, so the map's bearing turns it too.
+            await expect(map).toHaveAttribute('data-you-wedge', '90|map', { timeout: BIND_MS });
             await shot(page, 'mapstudio-locate-heading-1366.png');
             expect(watched.errors).toEqual([]);
         } finally {
@@ -302,6 +304,14 @@ test.describe('1366 px', () => {
             await expect(map).toHaveAttribute('data-you-are-here', 'fix', { timeout: BIND_MS });
             const items = await map.getAttribute('data-items-loaded');
             await view(page, map, NEAR.center, NEAR.zoom);
+            await expectDrawn(map, '1,1,0');
+            // The Needs you bar's counts are the same with the marker drawn and with the location off.
+            const needs = await page.locator('.mapstudio-needs').getAttribute('aria-label');
+            await toggleLocation(page);
+            await expectDrawn(map, '0,0,0');
+            await expect(page.locator('.mapstudio-needs')).toHaveAttribute('aria-label', needs);
+            await toggleLocation(page);
+            await expect(map).toHaveAttribute('data-you-are-here', 'fix', { timeout: BIND_MS });
             await expectDrawn(map, '1,1,0');
             // The dot is at the map's centre.
             const box = await map.boundingBox();

@@ -3,14 +3,14 @@ title: "You are here and Locate me from the page's geolocation binding"
 type: 'feature'
 ticket: '15'
 created: '2026-11-07'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '7ebffc92a6a11b76fef0a40334bbe53372c95064'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
@@ -88,8 +88,20 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 - 2026-11-07 (implementer): the suite. `locate.spec.mjs` stands in for the mobile app's grant through the client's own bridge (`window.__webInterface.submitData({type: 'native/gpsPermission', data: {granted}})`), gives a heading through CDP's `Emulation.setGeolocationOverride`, makes No fix a watch that never answers (an init script), and moves the position with the location turned off and on around it (Chromium fails a running watch when its override changes, POSITION_UNAVAILABLE). A further test checks the plain browser's path as it is (position with `permissionGranted` null: "permission not granted"; a refusal: Off). The dev page's "Write geolocation" control was dropped once the Gateway refused a script's write to those keys. ignition-lint was not run: installing `ignition-lint-toolkit` was refused in this session's sandbox, so `MapStudioLocate/view.json` is unlinted (its scripts follow `/events`' pattern, each in a try with `java.lang.Throwable` and `Exception`).
 - 2026-11-07 (implementer): verified. `cd web && npx tsc --noEmit && npm test`: clean, 594 tests in 58 suites (565 before). `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew clean build --offline --rerun-tasks`: BUILD SUCCESSFUL, 520 JVM tests, none failed (`MapStudioComponentTest` 4 of 4 with `userLocation`; `ProjectListsTest` and `ProjectResourcesTest` with `/locate`); the container had lost its JDK 17, reinstalled with apt (`openjdk-17-jdk-headless`). `bash scripts/ci/check-contract-versions.sh`: OK at 0.4.0. `ops/up.sh --fresh` then the whole e2e suite: 210 passed, 7 skipped (the opt-in ones), none failed, in 42.0 min; `locate.spec.mjs` 10 of 10 among them. ignition-lint: not run (see above).
 - 2026-11-07 (implementer, after the owner's decision "Go with recommendations"): `readUserLocation` now treats `permissionGranted` null or absent as granted and only `false` as denied, so a plain browser shows the marker; the unit tests, `locate.spec.mjs` (the plain-browser test expects the marker, an active Locate me and the legend row; the bridge's grant and refusal kept; the browser's refusal still Off), the prop's description, `docs/contract.md`, `docs/platform-checks.md` (the open question closed), `CHANGELOG.md` and the playbook follow. Entry 2's `clientLocationWords` and `data-client-location` are removed from `MapStudio.tsx`, and their check from `studio.spec.mjs`. Verified: `tsc` clean, Jest 596 in 58 suites, `:common:test` green, and on the stack (Docker restarted by hand, `ops/up.sh`) `locate.spec.mjs` and `studio.spec.mjs` 30 of 30.
+- 2026-11-07 (implementer, after the coordinator's review): `userLocation.enabled` and `permissionGranted` take a boolean or null in the schema (a browser binds null), asserted in `MapStudioComponentTest`; the `/locate` Location off script is in the same try as the startup's; the legend draws the you-are-here row only at the end of the fixed States (`legend.ts` `showsYouRow`), so a fix before the items load opens no section holding it alone; the map publishes `data-you-wedge` (the wedge's evaluated rotation and its alignment), and `locate.spec.mjs`'s Heading test checks `90|map` and its Not an item test checks the Needs you bar's label is the same with the marker drawn and with the location off. Verified: `tsc` clean, Jest `legend`, `userLocation` and `youAreHere` 33 of 33, `:common:test` green, `locate.spec.mjs` 10 of 10 on the stack (the first `ops/up.sh` build failed once on `SetupLookupsTest` `aHungSecretProviderHoldsOneThreadAndNeverTheOtherLists`, a timing test in `gateway/` untouched here, and passed on the rerun).
 
 ## Review Triage Log
+
+Quick lens, 2026-11-07: 6 findings; high 0, medium 1, low 3, false 2.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| `permissionGranted` and `enabled` typed boolean only, while the prescribed binding gives null in every browser session | medium | `mapstudio.props.json` `userLocation.properties`: both `"boolean"`; the data leaves allow null; platform-checks records null in a browser | patch: both `["boolean","null"]`, the component test asserting it |
+| ignition-lint never run on `MapStudioLocate/view.json` | false | Run by the orchestrator, ignition-lint-toolkit in a scratch venv: 0 errors, 0 warnings, 6 naming hints (the dev views' lower camel case names) | rejected |
+| The `locationOff` onChange script writes the session prop with no try, against the plan's claim | low | `view.json` `props.selected.onChange`: a bare write; onStartup has the try | patch: the same try and log as onStartup |
+| Before the items load, a fix opens a States section holding only "You are here" | low | `LegendControl.ts` 453 opens States on `key.you` alone; `EMPTY_KEY.states` is empty until `drawItems` | patch: States opens only with its rows, the you row at its end |
+| The 390 px block covers only Fix, Locate me, the sheet and Off | false | The matrix's Phone row is "The Fix row at 390 px"; the 390 px test covers it (marker, 44 px Locate me, the sheet's row) | rejected |
+| The Heading test never checks the wedge's direction or map alignment; Not an item names a Needs you check it never makes | low | `locate.spec.mjs` 180-193 reads only `data-you-heading` and the drawn count; 299-336 has no Needs you assertion | patch: assert the rotation and alignment, and the Needs you counts |
 
 ## Design Notes
 

@@ -2,7 +2,7 @@ import { Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import { KindDisplay } from '../live';
 import {
-    KINDS_COLLAPSE_OVER, LINE_ROWS, STATE_ROWS, STYLE_ROWS, TOGGLE_KEYS, ToggleStore, kindsHeading, kindsStartCollapsed, legendKey, readToggle, sameLegendKey,
+    KINDS_COLLAPSE_OVER, LINE_ROWS, STATE_ROWS, STYLE_ROWS, TOGGLE_KEYS, ToggleStore, kindsHeading, kindsStartCollapsed, legendKey, readToggle, sameLegendKey, showsYouRow,
     writeToggle
 } from '../legend';
 
@@ -133,5 +133,11 @@ describe('the you-are-here row (epic 4 entry 15)', () => {
         expect(withYou.states).toBe(STATE_ROWS);
         expect(sameLegendKey(without, withYou)).toBe(false);
         expect(sameLegendKey(withYou, legendKey(ITEMS, [PAD], {}, true))).toBe(true);
+    });
+
+    test('the row is drawn only at the end of States: a fix before the items load shows no section holding it alone', () => {
+        expect(showsYouRow(legendKey(ITEMS, [PAD], {}, true))).toBe(true);
+        expect(showsYouRow(legendKey(ITEMS, [PAD], {}))).toBe(false);
+        expect(showsYouRow({ kinds: [], states: [], lines: [], styles: [], tints: [], you: true })).toBe(false);
     });
 });

@@ -136,7 +136,7 @@
        "props.selected": {
         "onChange": {
          "enabled": null,
-         "script": "\t# Dev only (epic 4 entry 15): the session's location turned off and on again from the page, as a\n\t# project would offer it; the map's userLocation follows through its one binding.\n\tif origin != 'Browser':\n\t\treturn\n\tself.session.props.geolocation.enabled = not currentValue.value"
+         "script": "\t# Dev only (epic 4 entry 15): the session's location turned off and on again from the page, as a\n\t# project would offer it; the map's userLocation follows through its one binding.\n\timport java.lang\n\t\n\tif origin != 'Browser':\n\t\treturn\n\tlogger = system.util.getLogger('MapStudio.devlocate')\n\ttry:\n\t\tself.session.props.geolocation.enabled = not currentValue.value\n\texcept java.lang.Throwable as ex:\n\t\tlogger.warn('Location off failed: %s' % ex.getMessage())\n\texcept Exception as ex:\n\t\tlogger.warn('Location off failed: %s' % ex)"
         }
        }
       }

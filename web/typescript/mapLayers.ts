@@ -447,6 +447,17 @@ function setWedgeImage(map: MapLibreMap, color: string): void {
 export function publishYouAreHere(map: MapLibreMap, el: HTMLElement): void {
     const drawn = (layer: string): number => (map.getLayer(layer) ? Math.min(1, map.queryRenderedFeatures({ layers: [layer] }).length) : 0);
     el.setAttribute('data-you-drawn', [LAYER_YOU_DOT, LAYER_YOU_ACCURACY_FILL, LAYER_YOU_WEDGE].map(drawn).join(','));
+    // The wedge as drawn: its rotation as MapLibre evaluated it for the feature, and its alignment (the map's bearing turns it).
+    let wedge = '';
+    if (map.getLayer(LAYER_YOU_WEDGE)) {
+        const f = map.queryRenderedFeatures({ layers: [LAYER_YOU_WEDGE] })[0];
+        if (f) {
+            const layout = ((f as unknown as { layer?: { layout?: Record<string, unknown> } }).layer || {}).layout || {};
+            const rotate = typeof layout['icon-rotate'] === 'number' ? layout['icon-rotate'] : (f.properties || {}).heading;
+            wedge = String(rotate) + '|' + String(map.getLayoutProperty(LAYER_YOU_WEDGE, 'icon-rotation-alignment'));
+        }
+    }
+    el.setAttribute('data-you-wedge', wedge);
 }
 
 /** The marker at the read location, or nothing (epic 4 entry 15): the source's data replaced, the camera left alone. */

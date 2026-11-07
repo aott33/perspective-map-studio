@@ -157,6 +157,14 @@ export function withYou(on: boolean): Pick<LegendKey, 'you'> {
     return on ? { you: true } : {};
 }
 
+/**
+ * Whether the legend draws the you-are-here row: with a position, at the end of the fixed States rows, so a key built
+ * before the items load (no States yet) shows no section holding the row alone.
+ */
+export function showsYouRow(key: LegendKey): boolean {
+    return key.you === true && key.states.length > 0;
+}
+
 /** Two plain values (the key's rows: strings, numbers, booleans, null, arrays and objects) alike, field by field. */
 function sameValue(a: unknown, b: unknown): boolean {
     if (a === b) {

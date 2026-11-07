@@ -158,11 +158,17 @@
       "additionalProperties": true,
       "properties": {
         "enabled": {
-          "type": "boolean",
+          "type": [
+            "boolean",
+            "null"
+          ],
           "description": "Whether the session's location is on (session.props.geolocation.enabled)."
         },
         "permissionGranted": {
-          "type": "boolean",
+          "type": [
+            "boolean",
+            "null"
+          ],
           "description": "Whether location permission was granted (session.props.geolocation.permissionGranted): only false stops the marker; null, as a browser session leaves it, counts."
         },
         "options": {

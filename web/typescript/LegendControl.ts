@@ -33,7 +33,7 @@
 import { IControl, Map as MapLibreMap, ScaleControl } from 'maplibre-gl';
 import { BASEMAP_LABELS, BasemapId, offersBasemapSwitch } from './basemaps';
 import { glyphSvg } from './controls';
-import { LegendKey, LegendToggle, ZOOM_NOTE, kindsHeading, kindsStartCollapsed, sameLegendKey, withYou } from './legend';
+import { LegendKey, LegendToggle, ZOOM_NOTE, kindsHeading, kindsStartCollapsed, sameLegendKey, showsYouRow, withYou } from './legend';
 import { DIMMED_OPACITY } from './markers';
 import { YOU_ARE_HERE_WORDS } from './userLocation';
 
@@ -450,7 +450,7 @@ export class LegendControl implements IControl {
     /** The key's sections: States, Kinds, Lines, and Styles and Areas when a kind setup turns them on. */
     private renderKey(host: LegendHost, panel: HTMLElement): void {
         const key = this.key;
-        if (key.states.length > 0 || key.you) {
+        if (key.states.length > 0) {
             const states = this.section(panel, 'States', 'mapstudio-legend-section--states');
             for (const state of key.states) {
                 // The glyph as the marker's badge draws it (markers.ts badgeAt, entry 15): the state glyph itself
@@ -459,7 +459,7 @@ export class LegendControl implements IControl {
                 box.appendChild(use(state.glyph, 3, 3, 18));
                 this.row(states, box, state.words, 'mapstudio-legend-state', { 'data-glyph': state.glyph });
             }
-            if (key.you) {
+            if (showsYouRow(key)) {
                 // The you-are-here marker as the map draws it (epic 4 entry 15, DESIGN.md you-are-here): the dot with its
                 // white ring over a soft accuracy circle, in the marker's token (mapstudio.css), last in States.
                 const box = sample('mapstudio-legend-sample mapstudio-legend-token--you');

@@ -119,6 +119,11 @@ class MapStudioComponentTest {
         assertTrue(location.get("description").getAsString().contains("{session.props.geolocation}"));
         assertEquals(List.of("enabled", "permissionGranted", "options", "data"),
             List.copyOf(location.getAsJsonObject("properties").keySet()));
+        for (String key : List.of("enabled", "permissionGranted")) {
+            // A browser session binds permissionGranted null (8.3.10): both flags take a boolean or null.
+            JsonArray flag = location.getAsJsonObject("properties").getAsJsonObject(key).getAsJsonArray("type");
+            assertEquals(List.of("boolean", "null"), List.of(flag.get(0).getAsString(), flag.get(1).getAsString()), key);
+        }
         assertEquals(List.of("latitude", "longitude", "accuracy", "altitude", "heading", "speed", "timestamp"),
             List.copyOf(location.getAsJsonObject("properties").getAsJsonObject("data").getAsJsonObject("properties").keySet()));
         assertFalse(schema.toString().contains("\u2014"), "no em dash");
