@@ -67,6 +67,10 @@
        "east": null,
        "north": null
       }
+     },
+     "directions": {
+      "enabled": true,
+      "urlTemplate": ""
      }
     },
     "meta": {

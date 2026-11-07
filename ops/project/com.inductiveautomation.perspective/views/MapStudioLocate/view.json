@@ -140,6 +140,27 @@
         }
        }
       }
+     },
+     {
+      "type": "ia.input.text-field",
+      "version": 0,
+      "props": {
+       "text": "",
+       "placeholder": "Directions link template (off when empty)"
+      },
+      "meta": {
+       "name": "template",
+       "domId": "mapstudio-locate-template",
+       "tooltip": {
+        "enabled": true,
+        "text": "Dev only (epic 4 entry 16): a directions.urlTemplate such as https://x.example/r?to={lat},{lng}&n={name}; empty uses the platform's maps link."
+       }
+      },
+      "position": {
+       "basis": "360px",
+       "shrink": 0
+      },
+      "custom": {}
      }
     ]
    },
@@ -198,6 +219,10 @@
        "east": null,
        "north": null
       }
+     },
+     "directions": {
+      "enabled": true,
+      "urlTemplate": ""
      }
     },
     "meta": {
@@ -214,6 +239,14 @@
        "type": "property",
        "config": {
         "path": "session.props.geolocation"
+       }
+      }
+     },
+     "props.directions.urlTemplate": {
+      "binding": {
+       "type": "property",
+       "config": {
+        "path": "../toolbar/template.props.text"
        }
       }
      }
