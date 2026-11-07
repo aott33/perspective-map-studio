@@ -12,10 +12,11 @@
 // incomplete. Renders of Details for the docs under E2E_DOCS=1 (AD-15). The spec puts the dev adapter back to ok and leaves the seed
 // as it found it (the seed run again and the strays removed).
 
-import { TRACER } from '../lib/geo.mjs';
+import { TRACER, pagePixel } from '../lib/geo.mjs';
 import { randomUUID } from 'node:crypto';
 import {
-    EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot as shotNow, signedInContext, test, view
+    DRAW_MS, EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot as shotNow, signedInContext, test,
+    view
 } from './fixtures.mjs';
 
 /** The Gateway's answer to a save. */
@@ -132,6 +133,16 @@ async function expectOneBatch(page, map, seqBefore, step) {
 async function expectNothingSent(page, map, seqBefore) {
     await page.waitForTimeout(NOTHING_MS);
     await expect(map).toHaveAttribute('data-store-seq', String(seqBefore));
+}
+
+/** The saves a typed pair made settled (a latitude finished as the cursor moves to Longitude saves too): nothing saving, the seq still. */
+async function settled(page, map) {
+    await expect(map).not.toHaveAttribute('data-save-state', 'saving', { timeout: REPLY_MS });
+    await expect.poll(async () => {
+        const seq = await seqOf(map);
+        await page.waitForTimeout(NOTHING_MS);
+        return (await seqOf(map)) === seq && (await map.getAttribute('data-save-state')) !== 'saving';
+    }, { timeout: REPLY_MS }).toBe(true);
 }
 
 /** A page pixel `dx` from the map's centre and `fromTop` below its top edge now: at the tracer's view, the clear ground north of its points. */
@@ -554,4 +565,205 @@ test.describe('1366 px', () => {
         await expect(page.locator('.mapstudio-panel .mapstudio-field--asset')).toBeVisible();
         await expect(note).toHaveCount(0);
     });
+
+    // The place check (epic 4 entry 27, R13; EXPERIENCE.md Place a point; docs/place-check.md): the plan's matrix.
+
+    editorTest('the place line follows a typed pair and the saved point: a county, a town, a parish, a state line, the sea; swapped values flagged and nothing saved until they read',
+        async ({ page }) => {
+            const map = await openEditor(page);
+            const id = randomUUID();
+            await create(page, [pointOp(id, 'pad', 'Place pad', 8)]);
+            await selectRow(page, id);
+            const location = page.locator('.mapstudio-panel .mapstudio-field--location');
+            const place = location.locator('.mapstudio-field-place');
+            const lat = location.locator('.mapstudio-field-lat');
+            const lng = location.locator('.mapstudio-field-lng');
+            const pair = async (a, b) => {
+                await lat.fill(String(a));
+                await lng.fill(String(b));
+            };
+
+            // The saved point first (Aurora, Colorado), under the hint, in the secondary text colour, the sources in its tooltip.
+            await expect(place).toHaveText('Arapahoe County, Colorado, US', { timeout: REPLY_MS });
+            await expect(place).toHaveAttribute('data-place', 'found');
+            await expect(place).toHaveAttribute('title', 'Places: Natural Earth, GeoNames (CC BY 4.0)');
+            await expect(lat).toHaveAccessibleDescription('Arapahoe County, Colorado, US');
+            const below = await location.evaluate((el) => el.querySelector('.mapstudio-field-place').getBoundingClientRect().top
+                - el.querySelector('.mapstudio-field-hint').getBoundingClientRect().bottom);
+            expect(below).toBeGreaterThanOrEqual(0);
+            const colours = await place.evaluate((el) => {
+                const probe = document.createElement('span');
+                probe.style.color = 'var(--neutral-70)';
+                el.parentElement.appendChild(probe);
+                const secondary = getComputedStyle(probe).color;
+                probe.remove();
+                return { line: getComputedStyle(el).color, secondary };
+            });
+            expect(colours.line).toBe(colours.secondary);
+
+            // A US county, as typed and before it is finished; then finished with Enter: saved, and the saved point reads the same.
+            await pair(32.7, -103.1);
+            await expect(place).toHaveText('Lea County, New Mexico, US');
+            await shot(page, 'mapstudio-details-place-1366.png');
+            await lng.press('Enter');
+            await expect.poll(async () => (await stored(page, id)).geometry.coordinates, { timeout: REPLY_MS }).toEqual([-103.1, 32.7]);
+            await expect(page.locator('.mapstudio-toolbar .mapstudio-undo')).toHaveAttribute('data-step', 'Undo: move Place pad', { timeout: REPLY_MS });
+            await expect(place).toHaveText('Lea County, New Mexico, US');
+
+            // Elsewhere, a parish, a point by the Texas line, offshore with a shore within 200 km, and offshore with none.
+            await pair(55.17, -118.8);
+            await expect(place).toHaveText('Near Grande Prairie, Alberta, CA');
+            await pair(29.64, -90.54);
+            await expect(place).toHaveText('Lafourche Parish, Louisiana, US');
+            await pair(32.5, -103.07);
+            await expect(place).toHaveText('Lea County (near the Texas line), New Mexico, US');
+            await pair(28.5, -90.5);
+            await expect(place).toHaveText('Gulf of Mexico, off Louisiana, US');
+            await pair(30.0, -40.0);
+            await expect(place).toHaveText('North Atlantic Ocean');
+            // Esc puts the saved longitude back (the latitude, 30, was saved as the cursor left it), and the place line follows the saved
+            // point again: 30, -90.5, in Louisiana.
+            await settled(page, map);
+            await lng.press('Escape');
+            await expect(lng).toHaveValue('-90.5');
+            await expect(place).toContainText('Louisiana, US');
+            expect((await stored(page, id)).geometry.coordinates).toEqual([-90.5, 30]);
+
+            // Swapped: flagged in words, the hint keeps its instruction, nothing is saved until the pair reads.
+            const before = (await stored(page, id)).geometry.coordinates;
+            const seq = await seqOf(map);
+            await pair(-103.1, 32.7);
+            await expect(place).toHaveText('Latitude and longitude look swapped');
+            await expect(place).toHaveAttribute('data-place', 'swapped');
+            await expect(location.locator('.mapstudio-field-hint')).toHaveText('Drag the pin to fine-tune, or type latitude and longitude.');
+            await expect(lat).toHaveAttribute('aria-invalid', 'true');
+            await lng.press('Enter');
+            await expectNothingSent(page, map, seq);
+            expect((await stored(page, id)).geometry.coordinates).toEqual(before);
+            await shot(page, 'mapstudio-details-place-swapped-1366.png');
+            // Out of range otherwise: the hint as before, no place line.
+            await pair(95, 100);
+            await expect(location.locator('.mapstudio-field-hint')).toHaveText('Latitude is -90 to 90 and longitude -180 to 180.');
+            await expect(place).toHaveCount(0);
+            await expect(location).toHaveAttribute('data-place', 'out-of-range');
+            await lng.press('Enter');
+            await expectNothingSent(page, map, seq);
+            // Read: saved.
+            await pair(32.7, -103.1);
+            await lng.press('Enter');
+            await expect.poll(async () => (await stored(page, id)).geometry.coordinates, { timeout: REPLY_MS }).toEqual([-103.1, 32.7]);
+            await expect(place).toHaveText('Lea County, New Mexico, US');
+        });
+
+    editorTest('the place data: no request before Details, one when CTB1\'s Details first shows its location and none after, at most 5 MB as served; a line asks nothing',
+        async ({ page }) => {
+            const asked = [];
+            page.on('request', (request) => {
+                if (new URL(request.url()).pathname === '/res/mapstudio/places.json') {
+                    asked.push(request);
+                }
+            });
+            await openEditor(page);
+            // The editor open with no Details yet, a line's Details opened: nothing asked.
+            await selectRow(page, seed.ids['swd/line']);
+            await expect(page.locator('.mapstudio-panel .mapstudio-field-place')).toHaveCount(0);
+            await page.waitForTimeout(NOTHING_MS);
+            expect(asked).toHaveLength(0);
+
+            await selectRow(page, seed.ids['swd/ctb1']);
+            const place = page.locator('.mapstudio-panel .mapstudio-field-place');
+            await expect(place).toHaveText('Denver County, Colorado, US', { timeout: REPLY_MS });
+            expect(asked).toHaveLength(1);
+            const response = await asked[0].response();
+            expect(response.status()).toBe(200);
+            expect(response.headers()['content-type'] || '').toContain('json');
+            const sizes = await asked[0].sizes();
+            const encoding = response.headers()['content-encoding'] || 'none';
+            test.info().annotations.push({ type: 'places.json as served', description: sizes.responseBodySize + ' bytes, content-encoding '
+                + encoding + ', ' + (await response.body()).length + ' bytes decoded' });
+            expect(sizes.responseBodySize).toBeGreaterThan(0);
+            expect(sizes.responseBodySize).toBeLessThanOrEqual(5_000_000);
+
+            // Another point's Details, and CTB1's again: the data kept, nothing asked.
+            await selectRow(page, seed.ids['swd/swd1']);
+            await expect(place).toHaveAttribute('data-place', 'found');
+            await selectRow(page, seed.ids['swd/ctb1']);
+            await expect(place).toHaveText('Denver County, Colorado, US');
+            await page.waitForTimeout(NOTHING_MS);
+            expect(asked).toHaveLength(1);
+        });
+
+    editorTest('Zoom to location on CTB1: the map at CTB1 at zoom 15 or more, the point in view, CTB1 still selected with Details open',
+        async ({ page }) => {
+            const map = await openEditor(page);
+            const ctb1 = seed.ids['swd/ctb1'];
+            await selectRow(page, ctb1);
+            const at = (await stored(page, ctb1)).geometry.coordinates;
+            // Away from CTB1 and zoomed out, with Details open.
+            await view(page, map, [at[0] + 0.6, at[1] - 0.4], 9);
+            const zoom = page.locator('.mapstudio-panel .mapstudio-field-zoom');
+            await expect(zoom).toHaveText('Zoom to location');
+            await expect(zoom).toHaveAttribute('title', 'Zoom to location: the map moves to the saved point');
+            // Beside Move, before it.
+            const [zoomBox, moveBox] = [await zoom.boundingBox(), await page.locator('.mapstudio-panel .mapstudio-field-move').boundingBox()];
+            expect(Math.abs(zoomBox.y - moveBox.y)).toBeLessThan(2);
+            expect(zoomBox.x + zoomBox.width).toBeLessThanOrEqual(moveBox.x);
+            const seq = await seqOf(map);
+            await zoom.click();
+            await expect.poll(async () => Number(await map.getAttribute('data-zoom')), { timeout: DRAW_MS }).toBeGreaterThanOrEqual(15);
+            // The point in the map's view, clear of the top row, once the move has settled.
+            await expect.poll(async () => {
+                const box = await map.boundingBox();
+                const center = (await map.getAttribute('data-center')).split(',').map(Number);
+                const [x, y] = pagePixel(box, at, center, Number(await map.getAttribute('data-zoom')));
+                return x > box.x + 40 && x < box.x + box.width - 40 && y > box.y + 80 && y < box.y + box.height - 40;
+            }, { timeout: DRAW_MS }).toBe(true);
+            await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', ctb1);
+            await expect(page.locator('.mapstudio-list-row--selected')).toHaveAttribute('data-item-id', ctb1);
+            // A camera move only: nothing saved.
+            await expectNothingSent(page, map, seq);
+        });
+
+    editorTest('the place data missing: "The place check is not available", swapped values still flagged, and the form still saves',
+        async ({ page, watched }) => {
+            // The file answered 404, as from a module built without it.
+            await page.route('**/res/mapstudio/places.json', (route) => route.fulfill({ status: 404, contentType: 'text/plain', body: 'Not found' }));
+            await missingPlaces(page);
+            // The browser's own line for the 404 is the case under test: exactly one, taken out; any other error still fails the test.
+            const missing = watched.errors.filter((e) => /Failed to load resource: the server responded with a status of 404/.test(e));
+            expect(missing, 'the browser\'s line for the missing place data').toHaveLength(1);
+            watched.errors.splice(watched.errors.indexOf(missing[0]), 1);
+            expect(watched.warnings.filter((w) => w.includes('The place check is not available: /res/mapstudio/places.json answered 404')))
+                .toHaveLength(1);
+        });
 });
+
+/** The missing-data case's steps (the test above routes the file to a 404 first). */
+async function missingPlaces(page) {
+    const map = await openEditor(page);
+    const id = randomUUID();
+    await create(page, [pointOp(id, 'pad', 'No place pad', 9)]);
+    await selectRow(page, id);
+    const place = page.locator('.mapstudio-panel .mapstudio-field-place');
+    await expect(place).toHaveText('The place check is not available', { timeout: REPLY_MS });
+    await expect(place).toHaveAttribute('data-place', 'unavailable');
+    // A field saves as ever: one batch.
+    let seq = await seqOf(map);
+    const operator = field(page, 'operator');
+    await operator.input.fill('Acme');
+    await operator.input.press('Enter');
+    await expectOneBatch(page, map, seq, 'edit No place pad');
+    // So does a typed place; the swap rule needs no data.
+    const lat = page.locator('.mapstudio-panel .mapstudio-field-lat');
+    const lng = page.locator('.mapstudio-panel .mapstudio-field-lng');
+    await lat.fill('-103.1');
+    await lng.fill('32.7');
+    await expect(place).toHaveText('Latitude and longitude look swapped');
+    await lat.fill('32.7');
+    await lng.fill('-103.1');
+    await expect(place).toHaveText('The place check is not available');
+    seq = await seqOf(map);
+    await lng.press('Enter');
+    await expect.poll(async () => (await stored(page, id)).geometry.coordinates, { timeout: REPLY_MS }).toEqual([-103.1, 32.7]);
+    expect(await seqOf(map)).toBeGreaterThan(seq);
+}

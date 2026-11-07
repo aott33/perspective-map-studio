@@ -15,7 +15,7 @@ Requirements: JDK 17 and Docker. Node 22 is downloaded by the build; nothing els
 cd web && npx tsc --noEmit && npm test   # type check and the Jest unit tests alone
 ```
 
-The build fails when the web bundle does not compile or a unit test fails. The bundle is `MapStudio.js` and `MapStudio.css`, served at `/res/mapstudio/`, with MapLibre's worker beside them as `maplibre-gl-worker.js` (MapLibre 6 runs its worker from a separate file; the component points it there). Signing happens only when `-Pignition.signing.*` properties are passed (release jobs); a plain build stays unsigned.
+The build fails when the web bundle does not compile or a unit test fails. The bundle is `MapStudio.js` and `MapStudio.css`, served at `/res/mapstudio/`, with MapLibre's worker beside them as `maplibre-gl-worker.js` (MapLibre 6 runs its worker from a separate file; the component points it there) and the place check's data as `places.json` (epic 4 entry 27, [place-check.md](place-check.md)): committed under `web/assets/place/`, made by hand with `cd web && npm run place-data` (it downloads its sources; the build never does), and checked offline by `npm test`. Signing happens only when `-Pignition.signing.*` properties are passed (release jobs); a plain build stays unsigned.
 
 Layout:
 
