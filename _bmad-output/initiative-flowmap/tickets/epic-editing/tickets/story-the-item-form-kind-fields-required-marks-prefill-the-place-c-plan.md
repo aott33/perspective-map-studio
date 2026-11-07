@@ -87,6 +87,17 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 
 ## Review Triage Log
 
+Quick lens, 2026-11-07: 6 findings; high 0, medium 3, low 3.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| Every item reads "Unknown kind ... is no longer in the kind list" while the kind list is loading, not configured, failing or slow with none kept | medium | `MapStudio.tsx` 1253 finds the kind in an empty `lists.kinds`; the panel (432) has no guard like the asset side's `assetListKnown` | patch: "Unknown kind" only when the kind list is known; otherwise the kind list's status message, inputs off as the Gateway refuses saves then |
+| A refused or dropped save leaves a kind field showing a value that is not stored, with nothing marked | medium | `commitField` and `chooseField` write the sent value into the draft; `componentDidUpdate` (188-201) keeps a draft equal to neither record value | patch: when the item's save settles, a draft the record does not hold goes back to the record's value |
+| A field save resends keys the kind no longer defines (or a choice no longer listed), which the Gateway refuses, and Details cannot clear them | medium | `editProperty` (604) merges onto `propertiesFor` unfiltered; `ItemCheck.check` throws on an unknown key or an unlisted choice | patch: the merged properties pass through `keptProperties` with the item's kind, as a kind change does |
+| Changing a field and changing it back before the reply loses the second change | low | `sameValue` (307, 333) compares with the stored record, not the value in flight; the delegate's `propertiesFor` knows the in-flight value | patch: compare with the value in flight, so a change back is sent |
+| The duplicate-name words name the asset ("Pad 14"), not its folder as the frozen plan says ("Mesa/P15") | low | `itemForm.ts` 169 reads `assetNames`; at level `full` `lists.assets` carries `basePath` | patch: the words name the other asset's base path without its provider, as the plan's Always says |
+| No ignition-lint result for the changed dev view and script (the session's CLAUDE.md) | low | The plan recorded tsc, Jest, Gradle, the contract check and e2e only | resolved by the orchestrator: ignition-lint-toolkit on both files, 0 errors and 0 warnings; the view's 12 naming hints are advisory and the same as at the baseline (11 there, the new `mode_tank` following the view's own names); `code.py` no issues; both ran live in the e2e |
+
 ## Verification
 
 **Commands:**
