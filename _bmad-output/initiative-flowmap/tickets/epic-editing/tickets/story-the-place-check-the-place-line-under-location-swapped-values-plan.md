@@ -3,7 +3,7 @@ title: "The place check: the place line under Location, swapped values flagged, 
 type: 'feature'
 ticket: '27'
 created: '2026-11-07'
-status: 'in-review'
+status: 'built'
 baseline_revision: '0430d46adaebe24248213c9003e7917ffbd60e59'
 route: 'full'
 route_source: 'auto'
@@ -94,6 +94,8 @@ Quick lens, 2026-11-07: 3 findings; high 0, medium 1, low 2.
 | An offshore point whose swap lands on land reads "may be swapped" and never gets its sea named, every time its Details opens (Persian Gulf, Qatar's North Field, the Caspian, offshore Angola and Congo) | medium | `placeCheck.ts` `checkPair` flags any pair not on land whose swap is on land; the frozen rule flags only "a pair in no area", and a sea is an area | patch: "may be swapped" only for a pair in no land and no sea area whose swap lands in one; a point in a sea reads its sea |
 | Some US county lines are misspelt or awkward: seven Puerto Rico municipios lost a letter ("Mayagez"), the US Virgin Islands read "Saint Croix (County Equivalent), Saint Croix, VI", DC reads "District of Columbia, District of Columbia, US" | low | `place-data.mjs` `countyName` takes `NAME_ALT` unchecked; Natural Earth's `NAME_EN` is correct in those rows but not kept | patch: the generator takes the right name field, drops a parenthesised type and never repeats the state; the data regenerated |
 | `docs/place-check.md` says the last 64 lookups are kept; the code clears the cache at 64, keeping one | low | `lookUpKept` calls `kept.clear()` | patch: the cache drops its oldest entry, keeping the last 64 as the doc says |
+
+Outcome, 2026-11-07: the three patches applied (d564309: the sea named whatever the swap, the county names from the right field with the data regenerated, the last 64 lookups kept) and verified by the orchestrator: `tsc` clean, Jest 537 passed in 53 suites, the Gradle clean build offline, the contract check OK at 0.4.0, and `ops/up.sh --fresh` with the whole e2e suite on a fresh dev stack: 190 passed, 7 skipped, 1 failed in 37.4 min, the failure the known review 390 px flake ("No Connection to Gateway" in its snapshot, light theme this time), which passed rerun alone in both themes. Carried to entry 18: the place file is served uncompressed (4.7 MB, 3.1 MB gzipped) with no cache headers.
 
 ## Verification
 
