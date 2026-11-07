@@ -89,6 +89,18 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 
 ## Review Triage Log
 
+Quick lens, 2026-11-07: 7 findings; high 0, medium 3, low 3, false 1.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| A continuous resize (the window dragged, a host dock animating) writes `viewport` and fires `onViewportChanged` once per frame | medium | The component's `ResizeObserver` calls `map.resize()` unthrottled; MapLibre's `resize()` fires `moveend`, which runs `publishViewport`, deduped only on an identical viewport (`MapStudio.tsx` 344-349, 402-404; `camera.ts` 445-463) | patch: the viewport is published once the moves settle, a burst of move ends from a resize giving one write and one event |
+| The echo guard can keep stale entries that swallow a later page write of the same id, so a table's choice is ignored | medium | `takeEcho` cuts at the first match, not the last; `noteWrite` compares with the last delivered prop, not the last written value (`pageEvents.ts` 71-73, `selection.tsx` 968) | patch: compare with the last value written, consume through the last match, and let entries expire |
+| At mount a page value equal to the remembered selection is left to the restore, against the frozen rule that the page's value wins | medium | `readMountSelection` (`selection.tsx` 983-990); `docs/contract.md` states the exception, `CHANGELOG.md` 12 the rule | patch: the page's value always does what a click does, the docs agreeing |
+| At 390 px nothing checks that the events fire or the unknown-id warning | low | `events.spec.mjs` 439-460 reads no event payload at phone width | patch: the 390 px test reads the payloads and the warning |
+| `viewport`'s description says the next move end writes it again after a page write; an unchanged view writes nothing | low | `publishViewport` returns on an equal rounded viewport | patch: the words say the next move that changes the view |
+| The Designer listing the four events is not verified, against CLAUDE.md's validation step 4 | low | `docs/platform-checks.md` 1076 records it as not verified; no Designer runs in this container | defer: an owner check in the Designer (the map's event list shows four), recorded in deferred-work.md and entry 18 |
+| The recorded whole-suite run has one failure, so every spec did not pass | false | The failure is the known review 390 px flake the plan's Verification allows, which passed rerun alone, as for entries 26, 6 and 27 | rejected |
+
 ## Verification
 
 **Commands:**
