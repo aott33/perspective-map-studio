@@ -3,14 +3,14 @@ title: "Selection, viewport and popup events to the page, and contract 0.4.0"
 type: 'feature'
 ticket: '14'
 created: '2026-11-07'
-status: 'built'
+status: 'in-review'
 baseline_revision: '2859994be52e3c0f4679ac9f9725e4c91c62ae79'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
