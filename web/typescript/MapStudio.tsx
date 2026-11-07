@@ -43,9 +43,10 @@ import { SHARED_M } from './shared';
 import { registerTestView } from './testHook';
 import { MapboxLogoControl } from './mapboxLogo';
 import {
-    SPRITE_URL, THEME_TOKENS, addItemLayers, addPointerCursor, addTextLayers, addUnsavedLayers, applyLayerToggles, applyThemePaint, blankColors,
-    createMap, markerColors, publishLabels
+    SPRITE_URL, THEME_TOKENS, addItemLayers, addPointerCursor, addTextLayers, addUnsavedLayers, addYouAreHereLayers, applyLayerToggles,
+    applyThemePaint, blankColors, createMap, markerColors, publishLabels, setYouAreHere
 } from './mapLayers';
+import { LOCATE_ZOOM, NO_LOCATION, UserLocation, readUserLocation, userLocationKey } from './userLocation';
 import { addViewControls } from './viewControls';
 import { Kind } from './adapters';
 import { MapStudioDelegateState, MapStudioStoreDelegate, clientOf } from './MapStudioStoreDelegate';
@@ -106,6 +107,12 @@ export interface MapStudioProps {
      * the component's own write coming back left out. The read-only `viewport` prop is written (camera.ts) and never read.
      */
     selectedItem: string | null;
+    /**
+     * The device's position (epic 4 entry 15): the page binds it to `{session.props.geolocation}` and it takes that shape,
+     * read by userLocation.ts into the you-are-here marker, the legend's row and Locate me; the raw object (or null when
+     * unbound), so a malformed value is read by the same rules. The component reads nothing of the session itself.
+     */
+    userLocation: unknown;
 }
 
 /** The rail's Layers surface's tabs (epic 4 entry 22, the owner's "2, the tabs"): Layers (Show, Basemap) first, then Legend (the key). */
@@ -228,6 +235,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
     viewportTimer: ReturnType<typeof setTimeout> | null = null;
     /** The theme colours the marker images are drawn with, read at mount and again on a theme change (item 29). */
     markerColors: MarkerColors | null = null;
+    /** The page's userLocation as last read (entry 15, userLocation.ts) and the key it was last drawn with ('' before). */
+    userLocation: UserLocation = NO_LOCATION;
+    private drawnLocation = '';
     /** Re-reads the tokens when the theme changes and redraws (item 29). */
     private themeWatch: ThemeWatch | null = null;
     /** How many times the theme was re-read, for tests. */
@@ -337,6 +347,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             // The Layers surface mounted before the control existed (entry 22): the docked legend is drawn into it now.
             this.legendControl.dock(this.layersHost, this.dockPart());
         }
+        // Locate me and the legend's row from the page's userLocation now; the marker once the layers exist (entry 15).
+        this.applyUserLocation();
         // Mapbox's "Improve this map" carries the map's position (its attribution guide): after the control
         // rebuilds its links (its listeners run first) and after every move.
         map.on('sourcedata', this.updateFeedbackLinks);
@@ -360,8 +372,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
             map.setMissingStyleImageResolver((id) => items.makeImage(this, id));
             items.loadSprite(this);
             addUnsavedLayers(map, colors);
+            // The you-are-here marker above the areas and lines, below the point text and markers (entry 15).
+            addYouAreHereLayers(map, root);
             addTextLayers(map, mc);
             this.itemsReady = true;
+            this.applyUserLocation();
             this.applyLayerToggles();
             basemap.applyBasemap(this);
             this.drawItems();
@@ -465,6 +480,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         // The page's selectedItem, beside its editMode (entry 14): a write of its own is read now and applied below, once the mode
         // it was written with is in force (a mode set here takes effect on the next update).
         selection.readPageSelection(this, prevProps.props.selectedItem);
+        this.applyUserLocation();
         this.applyStudioControls();
         this.applyTopBar();
         this.dropDeadSelection();
@@ -941,6 +957,53 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.fitKey = null;
         map.easeTo({ center: [item.geometry.coordinates[0], item.geometry.coordinates[1]], zoom: Math.max(map.getZoom(), CHOSEN_POINT_ZOOM),
             padding: camera.cameraPadding(this), duration: 300 });
+        this.publishFit();
+    };
+
+    /**
+     * The page's userLocation (entry 15; userLocation.ts): read into one state, which draws the marker (moved with each new
+     * position, the camera left where it is), sets Locate me and puts the legend's "You are here" row in or out, all three
+     * from the same reading. A re-render with the same value does nothing; `data-you-*` on the map are for the suite.
+     */
+    private applyUserLocation(): void {
+        const loc = readUserLocation(this.props.props.userLocation);
+        const key = userLocationKey(loc) + (this.itemsReady ? '|drawn' : '');
+        if (key === this.drawnLocation) {
+            return;
+        }
+        this.drawnLocation = key;
+        this.userLocation = loc;
+        if (this.map && this.itemsReady) {
+            setYouAreHere(this.map, loc);
+        }
+        if (this.zoomControl) {
+            this.zoomControl.setLocate(loc.state);
+        }
+        if (this.legendControl) {
+            this.legendControl.setYouAreHere(loc.state === 'fix');
+        }
+        const el = this.mapContainer;
+        if (el) {
+            el.setAttribute('data-you-are-here', loc.state);
+            el.setAttribute('data-you-at', loc.position ? JSON.stringify(loc.position) : '');
+            el.setAttribute('data-you-accuracy', loc.accuracy === undefined ? '' : String(loc.accuracy));
+            el.setAttribute('data-you-heading', loc.heading === undefined ? '' : String(loc.heading));
+        }
+    }
+
+    /**
+     * Locate me (entry 15, the zoom card's last button): with a position the map eases to it at zoom 15, or the current zoom
+     * if closer, centred in what a person sees (the camera padding), as Zoom to location does; a move of the component's own,
+     * so a kept Fit ends here. Without a position the button is inert and this does nothing. The map never follows.
+     */
+    onLocate = (): void => {
+        const loc = this.userLocation;
+        const map = this.map;
+        if (!map || loc.state !== 'fix' || !loc.position) {
+            return;
+        }
+        this.fitKey = null;
+        map.easeTo({ center: loc.position, zoom: Math.max(map.getZoom(), LOCATE_ZOOM), padding: camera.cameraPadding(this), duration: 300 });
         this.publishFit();
     };
 
@@ -1500,7 +1563,8 @@ export class MapStudioMeta implements ComponentMeta {
             startingArea: tree.readObject('startingArea', {}),
             previewStyles: tree.readBoolean('previewStyles', false),
             editMode: tree.readBoolean('editMode', false),
-            selectedItem: tree.readStringIfExists('selectedItem')
+            selectedItem: tree.readStringIfExists('selectedItem'),
+            userLocation: tree.isObject('userLocation') ? tree.readObject('userLocation') : null
         };
     }
 }

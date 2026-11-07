@@ -29,6 +29,7 @@ import { SearchControl } from './SearchControl';
 import { buildEntries } from './search';
 import { sharedWithinM } from './shared';
 import { unsavedItems } from './unsaved';
+import { UserLocation } from './userLocation';
 
 /** What the items layer reads and writes on the component. */
 export interface ItemsHost {
@@ -70,6 +71,8 @@ export interface ItemsHost {
     searchControl: SearchControl | null;
     needsYouControl: NeedsYouControl | null;
     legendControl: LegendControl | null;
+    /** The page's userLocation as read (entry 15): the legend's "You are here" row with a position. */
+    readonly userLocation: UserLocation;
     /** The selection's attributes and Return (selection.tsx); a kept Fit's follow and its attribute (camera.ts). */
     publishSelection(): void;
     fitTo(bounds: [number, number, number, number]): void;
@@ -120,7 +123,7 @@ export function drawItems(host: ItemsHost): void {
         }
         if (host.legendControl && (delegate.itemsRevision !== host.drawnRevision || delegate.live.fulls !== host.drawnFulls)) {
             // The legend's key follows the kinds on the map and the kind display of the last full batch (entry 3).
-            host.legendControl.setKey(legendKey(items, delegate.lists.kinds, delegate.live.display));
+            host.legendControl.setKey(legendKey(items, delegate.lists.kinds, delegate.live.display, host.userLocation.state === 'fix'));
             host.drawnFulls = delegate.live.fulls;
         }
         host.drawnRevision = delegate.itemsRevision;

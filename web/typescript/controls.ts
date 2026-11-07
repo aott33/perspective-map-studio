@@ -21,6 +21,8 @@ export const GLYPH_PATHS = {
     fit: 'M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4',
     /** Return: a target ring round a dot, re-centring on the selected item. */
     return: 'M12 3v3M12 18v3M3 12h3M18 12h3M12 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10',
+    /** Navigate: a navigation arrow, the zoom card's Locate me (epic 4 entry 15; DESIGN.md zoom-control). */
+    navigate: 'M3 11l18-8-8 18-2-8z',
     /** Layers: the legend's glyph (DESIGN.md: a "Legend" button with a layers glyph). */
     layers: 'M12 4l8 4.5-8 4.5-8-4.5L12 4zM4 13l8 4.5 8-4.5M4 16.5L12 21l8-4.5',
     /** Search: a lens and its handle (DESIGN.md search-field, entry 9). */

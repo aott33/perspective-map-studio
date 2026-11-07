@@ -21,7 +21,8 @@ import {
     ZOOM_NAME, lineHaloDash, textWidthPx
 } from './markers';
 import { itemsToGeoJson } from './save';
-import { themeColor } from './theme';
+import { themeColor, toHexColor } from './theme';
+import { UserLocation, WEDGE_SIZE, wedgePixels, youAreHereFeatures } from './userLocation';
 
 /** The basemap's raster source and layer (epic 3 entry 6), drawn under the item layers. */
 export const SOURCE_BASEMAP = 'mapstudio-basemap';
@@ -78,6 +79,26 @@ export const SOURCE_UNSAVED_LINES = 'mapstudio-unsaved-line';
 export const SOURCE_UNSAVED_POINTS = 'mapstudio-unsaved-point';
 export const LAYER_UNSAVED_LINES = 'mapstudio-unsaved-line';
 export const LAYER_UNSAVED_POINTS = 'mapstudio-unsaved-point';
+
+/**
+ * The you-are-here marker (epic 4 entry 15; DESIGN.md you-are-here): one source holding the accuracy circle (a polygon on
+ * the ground) and the dot, drawn above the areas, the lines and the unsaved items and below the point text and markers,
+ * the arrow and the popup. Never a map item: these layers are in no click, hover or label query.
+ */
+export const SOURCE_YOU_ARE_HERE = 'mapstudio-you-are-here';
+export const LAYER_YOU_ACCURACY_FILL = 'mapstudio-you-accuracy-fill';
+export const LAYER_YOU_ACCURACY_EDGE = 'mapstudio-you-accuracy-edge';
+export const LAYER_YOU_WEDGE = 'mapstudio-you-wedge';
+export const LAYER_YOU_DOT = 'mapstudio-you-dot';
+/** The heading wedge's image, drawn in the token's colour and added again after a theme change. */
+export const WEDGE_IMAGE = 'mapstudio-you-wedge';
+/** The marker's token (DESIGN.md colors.you-are-here) and its accuracy circle's fill, 14% (MapLibre takes no color-mix). */
+export const YOU_TOKEN = '--qual-1';
+export const YOU_ACCURACY_OPACITY = 0.14;
+/** The dot: 14 px across (a 7 px radius) with a 2 px white ring outside it (DESIGN.md components.you-are-here dot-ring). */
+export const YOU_DOT_RADIUS = 7;
+export const YOU_RING_WIDTH = 2;
+export const YOU_RING_COLOR = '#ffffff';
 
 /** The layers a pointer turns into a hand over: the markers and every line pattern. */
 const POINTER_LAYERS = [LAYER_ITEM_MARKERS, LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED];
@@ -138,7 +159,7 @@ export function markerColors(root: HTMLElement | undefined): MarkerColors {
 }
 
 /** Every token the map draws with (item 29): the marker tokens and the blank map's, the theme watch's snapshot. */
-export const THEME_TOKENS: readonly string[] = ['--neutral-20', '--neutral-70', '--label', '--containerRoot', '--container']
+export const THEME_TOKENS: readonly string[] = ['--neutral-20', '--neutral-70', '--label', '--containerRoot', '--container', YOU_TOKEN]
     .concat(...Object.values(MARKER_TOKENS).map((tokens) => tokens.slice()));
 
 /** A style expression as the layer definitions take it (the spec's own type is too narrow for the ones built here). */
@@ -346,6 +367,86 @@ export function addUnsavedLayers(map: MapLibreMap, colors: BlankColors): void {
             'circle-stroke-width': 2
         }
     });
+}
+
+/**
+ * The you-are-here source, empty, and its layers (epic 4 entry 15), added after the unsaved layers and before the text
+ * layers, so the marker sits above the areas and lines and below the point markers: the accuracy circle's fill (the
+ * token at 14%) and its 1 px edge, the heading wedge (an image turned by the heading, aligned to the map so the bearing
+ * turns it too) and the dot with its white ring.
+ */
+export function addYouAreHereLayers(map: MapLibreMap, root: HTMLElement | undefined): void {
+    const color = themeColor(root, YOU_TOKEN);
+    map.addSource(SOURCE_YOU_ARE_HERE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({
+        id: LAYER_YOU_ACCURACY_FILL,
+        type: 'fill',
+        source: SOURCE_YOU_ARE_HERE,
+        filter: ['==', ['get', 'part'], 'accuracy'],
+        paint: { 'fill-color': color, 'fill-opacity': YOU_ACCURACY_OPACITY }
+    });
+    map.addLayer({
+        id: LAYER_YOU_ACCURACY_EDGE,
+        type: 'line',
+        source: SOURCE_YOU_ARE_HERE,
+        filter: ['==', ['get', 'part'], 'accuracy'],
+        paint: { 'line-color': color, 'line-width': 1 }
+    });
+    setWedgeImage(map, color);
+    map.addLayer({
+        id: LAYER_YOU_WEDGE,
+        type: 'symbol',
+        source: SOURCE_YOU_ARE_HERE,
+        filter: ['all', ['==', ['get', 'part'], 'dot'], ['has', 'heading']],
+        layout: {
+            'icon-image': WEDGE_IMAGE,
+            'icon-rotate': ['get', 'heading'],
+            'icon-rotation-alignment': 'map',
+            'icon-pitch-alignment': 'map',
+            'icon-anchor': 'center',
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true
+        }
+    });
+    map.addLayer({
+        id: LAYER_YOU_DOT,
+        type: 'circle',
+        source: SOURCE_YOU_ARE_HERE,
+        filter: ['==', ['get', 'part'], 'dot'],
+        paint: {
+            'circle-radius': YOU_DOT_RADIUS,
+            'circle-color': color,
+            'circle-stroke-color': YOU_RING_COLOR,
+            'circle-stroke-width': YOU_RING_WIDTH,
+            'circle-pitch-alignment': 'map'
+        }
+    });
+}
+
+/**
+ * The wedge image in the token's colour, replaced in place when it is there; transparent while the token does not
+ * resolve to a colour (no colour is invented, AD-11), so the layer never asks the missing image resolver for it.
+ */
+function setWedgeImage(map: MapLibreMap, color: string): void {
+    const hex = toHexColor(color);
+    const data = hex
+        ? wedgePixels([parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)])
+        : new Uint8Array(WEDGE_SIZE * WEDGE_SIZE * 4);
+    const image = { width: WEDGE_SIZE, height: WEDGE_SIZE, data };
+    if (map.hasImage(WEDGE_IMAGE)) {
+        map.updateImage(WEDGE_IMAGE, image);
+    } else {
+        map.addImage(WEDGE_IMAGE, image);
+    }
+}
+
+/** The marker at the read location, or nothing (epic 4 entry 15): the source's data replaced, the camera left alone. */
+export function setYouAreHere(map: MapLibreMap, loc: UserLocation): void {
+    const source = typeof map.getSource === 'function'
+        ? map.getSource(SOURCE_YOU_ARE_HERE) as { setData?: (d: unknown) => void } | undefined : undefined;
+    if (source && typeof source.setData === 'function') {
+        source.setData(youAreHereFeatures(loc));
+    }
 }
 
 /**
@@ -569,6 +670,14 @@ export function applyThemePaint(map: MapLibreMap, root: HTMLElement | undefined,
     }
     for (const layer of [LAYER_ITEM_KPI, LAYER_ITEM_NAMES]) {
         setPaint(layer, 'text-halo-color', mc.halo);
+    }
+    // The you-are-here marker in the token read now (entry 15), its wedge image drawn again in it.
+    const you = themeColor(root, YOU_TOKEN);
+    setPaint(LAYER_YOU_ACCURACY_FILL, 'fill-color', you);
+    setPaint(LAYER_YOU_ACCURACY_EDGE, 'line-color', you);
+    setPaint(LAYER_YOU_DOT, 'circle-color', you);
+    if (map.getLayer(LAYER_YOU_WEDGE)) {
+        setWedgeImage(map, you);
     }
     return blank;
 }

@@ -94,7 +94,7 @@ class MapStudioComponentTest {
         JsonObject schema = resource("/mapstudio.props.json");
         assertFalse(schema.get("additionalProperties").getAsBoolean(), "the list is closed");
         JsonObject props = schema.getAsJsonObject("properties");
-        assertEquals(List.of("startingArea", "previewStyles", "editMode", "selectedItem", "viewport", "style"),
+        assertEquals(List.of("startingArea", "previewStyles", "editMode", "selectedItem", "viewport", "userLocation", "style"),
             List.copyOf(props.keySet()));
         JsonObject editMode = props.getAsJsonObject("editMode");
         assertEquals("boolean", editMode.get("type").getAsString());
@@ -110,6 +110,17 @@ class MapStudioComponentTest {
         assertTrue(viewport.get("readOnly").getAsBoolean(), "the component writes it; the page does not");
         assertTrue(viewport.get("default").isJsonNull());
         assertEquals(List.of("center", "zoom", "bounds"), List.copyOf(viewport.getAsJsonObject("properties").keySet()));
+        JsonObject location = props.getAsJsonObject("userLocation");
+        JsonArray locationTypes = location.getAsJsonArray("type");
+        assertEquals("object", locationTypes.get(0).getAsString());
+        assertEquals("null", locationTypes.get(1).getAsString());
+        assertTrue(location.get("default").isJsonNull(), "unbound by default");
+        assertTrue(location.get("additionalProperties").getAsBoolean(), "extra keys tolerated");
+        assertTrue(location.get("description").getAsString().contains("{session.props.geolocation}"));
+        assertEquals(List.of("enabled", "permissionGranted", "options", "data"),
+            List.copyOf(location.getAsJsonObject("properties").keySet()));
+        assertEquals(List.of("latitude", "longitude", "accuracy", "altitude", "heading", "speed", "timestamp"),
+            List.copyOf(location.getAsJsonObject("properties").getAsJsonObject("data").getAsJsonObject("properties").keySet()));
         assertFalse(schema.toString().contains("\u2014"), "no em dash");
     }
 }

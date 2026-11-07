@@ -61,6 +61,11 @@ export interface LegendKey {
     lines: LegendLineRow[];
     styles: LegendStyleRow[];
     tints: LegendTintRow[];
+    /**
+     * With a position known (epic 4 entry 15, the page's `userLocation`), States end with the you-are-here dot and
+     * "You are here" (owner, 2026-11-06); absent or false otherwise.
+     */
+    you?: boolean;
 }
 
 /**
@@ -113,8 +118,9 @@ export const STYLE_ROWS: LegendStyleRow[] = [
     { preset: 'dimmed', words: PRESET_WORDS.dimmed }
 ];
 
-/** The key for the loaded map. Pure. */
-export function legendKey(items: readonly MapItemRecord[], kinds: readonly Kind[], display: Readonly<Record<string, KindDisplay>>): LegendKey {
+/** The key for the loaded map, with the you-are-here row when `youAreHere` (a position known, userLocation.ts). Pure. */
+export function legendKey(items: readonly MapItemRecord[], kinds: readonly Kind[], display: Readonly<Record<string, KindDisplay>>,
+                          youAreHere = false): LegendKey {
     const inUse = new Set<string>();
     for (const item of items) {
         if (!item.deleted) {
@@ -143,7 +149,12 @@ export function legendKey(items: readonly MapItemRecord[], kinds: readonly Kind[
             tints.push({ kindName: kind.name, category: 'No category', tint: null });
         }
     }
-    return { kinds: kindRows, states: STATE_ROWS, lines: LINE_ROWS, styles: anyRule ? STYLE_ROWS : [], tints };
+    return { kinds: kindRows, states: STATE_ROWS, lines: LINE_ROWS, styles: anyRule ? STYLE_ROWS : [], tints, ...withYou(youAreHere) };
+}
+
+/** The key's `you` field: present (true) only with a position, so a key without one equals the keys built before entry 15. */
+export function withYou(on: boolean): Pick<LegendKey, 'you'> {
+    return on ? { you: true } : {};
 }
 
 /** Two plain values (the key's rows: strings, numbers, booleans, null, arrays and objects) alike, field by field. */

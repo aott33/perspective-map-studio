@@ -160,6 +160,15 @@
     cursor: not-allowed;
 }
 
+/* Locate me without a position (epic 4 entry 15): faded and inert as Return disabled looks, still focusable so its reason
+   (its title and accessible description) can be read. */
+.mapstudio .maplibregl-ctrl .mapstudio-ctrl-button.mapstudio-ctrl-button--inert,
+.mapstudio .maplibregl-ctrl .mapstudio-ctrl-button.mapstudio-ctrl-button--inert:hover {
+    background: var(--mapstudio-surface);
+    color: var(--label--disabled);
+    cursor: not-allowed;
+}
+
 .mapstudio .mapstudio-ctrl-button--on {
     background: var(--callToActionHighlight);
     color: var(--callToAction);
@@ -1613,6 +1622,23 @@
 .mapstudio .mapstudio-legend-token--tint-4 { color: var(--mapstudio-tint-4); }
 .mapstudio .mapstudio-legend-token--tint-5 { color: var(--mapstudio-tint-5); }
 .mapstudio .mapstudio-legend-token--tint-6 { color: var(--mapstudio-tint-6); }
+
+/* The you-are-here row (epic 4 entry 15; DESIGN.md you-are-here): the dot in the marker's token with the 2 px white ring
+   DESIGN.md names (dot-ring: 2px white), over the accuracy circle at 14% with a 1 px edge in the same token. */
+.mapstudio .mapstudio-legend-token--you {
+    color: var(--qual-1);
+}
+
+.mapstudio .mapstudio-legend-you-accuracy {
+    fill: color-mix(in srgb, var(--qual-1) 14%, transparent);
+    stroke: currentColor;
+    stroke-width: 1;
+}
+
+.mapstudio .mapstudio-legend-you-dot {
+    fill: currentColor;
+    stroke: white;
+}
 
 /* A kind's disc as the marker draws it: the panel fill with the neutral ring, the glyph in the text colour. */
 .mapstudio .mapstudio-legend-disc {

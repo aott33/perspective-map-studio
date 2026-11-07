@@ -24,9 +24,10 @@ import { ZoomControl } from './ZoomControl';
 export interface ViewControlsHost {
     /** The map's element, which carries the `data-*-open` attributes the suite reads; null once unmounted. */
     mapContainer: HTMLDivElement | null;
-    /** The zoom card's Fit and Return. */
+    /** The zoom card's Fit, Return and Locate me (epic 4 entry 15). */
     onFit(): void;
     onReturn(): void;
+    onLocate(): void;
     /** A search result or a Needs you row chosen. */
     onSearchChoose(result: SearchResult): void;
     onNeedsYouChoose(row: NeedsYouRow): void;
@@ -45,12 +46,12 @@ export interface ViewControls {
 
 /**
  * The View-mode controls as designed (epic 3 entry 14, DESIGN.md View mode): one zoom card top-right
- * (plus, the level, minus, Fit, Return), and bottom-left the Legend button with the scale bar and the
+ * (plus, the level, minus, Fit, Return, Locate me), and bottom-left the Legend button with the scale bar and the
  * attribution beside it, whose panel holds the basemap choice; the bottom-right corner stays clear
  * for the Perspective App Bar toggle.
  */
 export function addViewControls(map: MapLibreMap, host: ViewControlsHost, toggles: Record<LegendToggle, boolean>): ViewControls {
-    const zoom = new ZoomControl(host.onFit, host.onReturn);
+    const zoom = new ZoomControl(host.onFit, host.onReturn, host.onLocate);
     map.addControl(zoom, 'top-right');
     // The search field top-left (entry 9, DESIGN.md search-field): the top bar entry 3 shares with Needs you.
     const search = new SearchControl(host.onSearchChoose, (open) => {

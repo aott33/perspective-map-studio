@@ -33,8 +33,9 @@
 import { IControl, Map as MapLibreMap, ScaleControl } from 'maplibre-gl';
 import { BASEMAP_LABELS, BasemapId, offersBasemapSwitch } from './basemaps';
 import { glyphSvg } from './controls';
-import { LegendKey, LegendToggle, ZOOM_NOTE, kindsHeading, kindsStartCollapsed, sameLegendKey } from './legend';
+import { LegendKey, LegendToggle, ZOOM_NOTE, kindsHeading, kindsStartCollapsed, sameLegendKey, withYou } from './legend';
 import { DIMMED_OPACITY } from './markers';
+import { YOU_ARE_HERE_WORDS } from './userLocation';
 
 /** The sprite the kind and state glyphs come from, as the default popup draws them (DefaultPopup.tsx). */
 const SPRITE_URL = '/res/mapstudio/icons/mapstudio-icons.svg';
@@ -424,6 +425,15 @@ export class LegendControl implements IControl {
         this.fillAll();
     }
 
+    /**
+     * The you-are-here row (epic 4 entry 15): shown at the end of States while a position is known, in both places (the
+     * panel and the rail's Legend tab); drawn again only when it changed.
+     */
+    setYouAreHere(on: boolean): void {
+        const { you: _was, ...rest } = this.key;
+        this.setKey({ ...rest, ...withYou(on) });
+    }
+
     /** The Lines and Names toggles' state (the component remembers them). */
     setToggles(lines: boolean, names: boolean): void {
         this.toggles = { lines, names };
@@ -440,7 +450,7 @@ export class LegendControl implements IControl {
     /** The key's sections: States, Kinds, Lines, and Styles and Areas when a kind setup turns them on. */
     private renderKey(host: LegendHost, panel: HTMLElement): void {
         const key = this.key;
-        if (key.states.length > 0) {
+        if (key.states.length > 0 || key.you) {
             const states = this.section(panel, 'States', 'mapstudio-legend-section--states');
             for (const state of key.states) {
                 // The glyph as the marker's badge draws it (markers.ts badgeAt, entry 15): the state glyph itself
@@ -448,6 +458,14 @@ export class LegendControl implements IControl {
                 const box = sample('mapstudio-legend-sample mapstudio-legend-token--' + state.token);
                 box.appendChild(use(state.glyph, 3, 3, 18));
                 this.row(states, box, state.words, 'mapstudio-legend-state', { 'data-glyph': state.glyph });
+            }
+            if (key.you) {
+                // The you-are-here marker as the map draws it (epic 4 entry 15, DESIGN.md you-are-here): the dot with its
+                // white ring over a soft accuracy circle, in the marker's token (mapstudio.css), last in States.
+                const box = sample('mapstudio-legend-sample mapstudio-legend-token--you');
+                box.appendChild(svgEl('circle', { cx: '12', cy: '12', r: '11', class: 'mapstudio-legend-you-accuracy' }));
+                box.appendChild(svgEl('circle', { cx: '12', cy: '12', r: '6', class: 'mapstudio-legend-you-dot', 'stroke-width': '2' }));
+                this.row(states, box, YOU_ARE_HERE_WORDS, 'mapstudio-legend-state mapstudio-legend-you', { 'data-glyph': 'you-are-here' });
             }
         }
         if (key.kinds.length > 0) {

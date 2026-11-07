@@ -1,14 +1,18 @@
 /**
  * The zoom card (epic 3 entry 14, DESIGN.md zoom-control; R5): one MapLibre control group top-right
- * with plus, the zoom level ("z 15"), minus, Fit and Return, each a glyph with its words in
+ * with plus, the zoom level ("z 15"), minus, Fit, Return and Locate me, each a glyph with its words in
  * `aria-label` and `title`. Fit fits every map item's bounds and stays pressed while it keeps; Return
- * re-centres on the selected map item and is disabled while nothing is selected. It replaces
+ * re-centres on the selected map item and is disabled while nothing is selected; Locate me (epic 4
+ * entry 15, a navigation arrow) centres the map on the page's `userLocation` and, without a position,
+ * is faded and inert (`aria-disabled`, still focusable) with its reason in its `title` and accessible
+ * description (userLocation.ts LOCATE_WORDS). It replaces
  * MapLibre's NavigationControl and entry 7's FitControl. Token colours only, in mapstudio.css;
  * 44 px targets at phone width.
  */
 
 import { IControl, Map as MapLibreMap } from 'maplibre-gl';
 import { glyphSvg, returnGlyphSvg, zoomLevelText } from './controls';
+import { LOCATE_LABEL, LocationState, locateWords } from './userLocation';
 
 export class ZoomControl implements IControl {
     private container: HTMLDivElement | null = null;
@@ -16,8 +20,10 @@ export class ZoomControl implements IControl {
     private level: HTMLDivElement | null = null;
     private fitButton: HTMLButtonElement | null = null;
     private returnButton: HTMLButtonElement | null = null;
+    private locateButton: HTMLButtonElement | null = null;
+    private locateState: LocationState = 'off';
 
-    constructor(private readonly onFit: () => void, private readonly onReturn: () => void) {}
+    constructor(private readonly onFit: () => void, private readonly onReturn: () => void, private readonly onLocate: () => void = () => undefined) {}
 
     onAdd(map: MapLibreMap): HTMLElement {
         this.map = map;
@@ -40,6 +46,10 @@ export class ZoomControl implements IControl {
         this.returnButton = this.button(container, 'mapstudio-return-button', 'Return to the selected item',
             returnGlyphSvg('mapstudio-ctrl-glyph'), this.onReturn);
         this.returnButton.disabled = true;
+        // Locate me, last (owner, 2026-11-06): inert while there is no position; a press then does nothing.
+        this.locateButton = this.button(container, 'mapstudio-locate-button', LOCATE_LABEL, glyphSvg('navigate', 'mapstudio-ctrl-glyph'),
+            () => { if (this.locateState === 'fix') { this.onLocate(); } });
+        this.applyLocate();
         this.container = container;
         map.on('zoom', this.onZoom);
         this.onZoom();
@@ -79,6 +89,7 @@ export class ZoomControl implements IControl {
         this.level = null;
         this.fitButton = null;
         this.returnButton = null;
+        this.locateButton = null;
     }
 
     /** Fit is disabled with nothing to fit; `kept` marks the button pressed while the fit keeps. */
@@ -95,5 +106,26 @@ export class ZoomControl implements IControl {
         if (this.returnButton) {
             this.returnButton.disabled = !enabled;
         }
+    }
+
+    /** Locate me's state from the read location: active with a fix, else faded and inert with its reason in words. */
+    setLocate(state: LocationState): void {
+        this.locateState = state;
+        this.applyLocate();
+    }
+
+    private applyLocate(): void {
+        const button = this.locateButton;
+        if (!button) {
+            return;
+        }
+        const on = this.locateState === 'fix';
+        const words = locateWords(this.locateState);
+        button.title = words;
+        button.setAttribute('aria-label', LOCATE_LABEL);
+        button.setAttribute('aria-description', words);
+        button.setAttribute('aria-disabled', on ? 'false' : 'true');
+        button.setAttribute('data-locate', this.locateState);
+        button.classList.toggle('mapstudio-ctrl-button--inert', !on);
     }
 }

@@ -115,3 +115,23 @@ describe('the Kinds section (owner review, item 24)', () => {
         expect(kindsHeading(9)).toBe('Kinds (9)');
     });
 });
+
+describe('the you-are-here row (epic 4 entry 15)', () => {
+    const ITEMS = [item('a', 'pad')];
+
+    test('without a position the key has no row and equals the key built before entry 15', () => {
+        const key = legendKey(ITEMS, [PAD], {});
+        expect(key.you).toBeUndefined();
+        expect(sameLegendKey(key, legendKey(ITEMS, [PAD], {}, false))).toBe(true);
+        expect(key.states).toBe(STATE_ROWS);
+    });
+
+    test('with a position States end with the row, and the two keys differ, so the legend is drawn again', () => {
+        const without = legendKey(ITEMS, [PAD], {});
+        const withYou = legendKey(ITEMS, [PAD], {}, true);
+        expect(withYou.you).toBe(true);
+        expect(withYou.states).toBe(STATE_ROWS);
+        expect(sameLegendKey(without, withYou)).toBe(false);
+        expect(sameLegendKey(withYou, legendKey(ITEMS, [PAD], {}, true))).toBe(true);
+    });
+});

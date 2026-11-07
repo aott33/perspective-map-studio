@@ -148,6 +148,93 @@
         }
       }
     },
+    "userLocation": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "The device's position for the you-are-here marker and Locate me (epic 4 entry 15, docs/contract.md). Bind it in one binding to {session.props.geolocation}, whose shape it takes: {enabled, permissionGranted, options, data: {latitude, longitude, accuracy, altitude, heading, speed, timestamp}}; every key is optional and extra keys are ignored. A position is known when enabled and permissionGranted are true and data holds a latitude from -90 to 90 and a longitude from -180 to 180: the marker is drawn there (the accuracy in metres as a circle, the heading as a wedge) and Locate me centres the map on it. Otherwise Locate me is off and says why. The component reads nothing of the session and asks the browser for nothing. Null (unbound) by default.",
+      "default": null,
+      "additionalProperties": true,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the session's location is on (session.props.geolocation.enabled)."
+        },
+        "permissionGranted": {
+          "type": "boolean",
+          "description": "Whether the browser granted location permission (session.props.geolocation.permissionGranted)."
+        },
+        "options": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "The session's location options, not read by the component.",
+          "additionalProperties": true
+        },
+        "data": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "The last position fix (session.props.geolocation.data).",
+          "additionalProperties": true,
+          "properties": {
+            "latitude": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "Latitude, WGS 84, -90 to 90."
+            },
+            "longitude": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "Longitude, WGS 84, -180 to 180."
+            },
+            "accuracy": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "The fix's accuracy in metres, drawn as a circle on the ground; none when missing or not positive."
+            },
+            "altitude": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "Altitude in metres, not read by the component."
+            },
+            "heading": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "Heading in degrees clockwise from north, drawn as a wedge from the dot when it is a number."
+            },
+            "speed": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "Speed in metres per second, not read by the component."
+            },
+            "timestamp": {
+              "type": [
+                "number",
+                "string",
+                "null"
+              ],
+              "description": "When the fix was taken, not read by the component."
+            }
+          }
+        }
+      }
+    },
     "style": {
       "$ref": "urn:ignition-schema:schemas/style-properties.schema.json",
       "default": {
