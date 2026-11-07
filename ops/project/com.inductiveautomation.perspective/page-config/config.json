@@ -8,6 +8,14 @@
    "viewPath": "MapStudioEdit",
    "viewParams": {}
   },
+  "/events": {
+   "viewPath": "MapStudioEvents",
+   "viewParams": {}
+  },
+  "/events/:select": {
+   "viewPath": "MapStudioEvents",
+   "viewParams": {}
+  },
   "/adapters": {
    "viewPath": "MapStudioAdapters",
    "viewParams": {}

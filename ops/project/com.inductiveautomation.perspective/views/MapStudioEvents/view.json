@@ -1,0 +1,589 @@
+{
+ "custom": {},
+ "events": {
+  "system": {
+   "onStartup": [
+    {
+     "config": {
+      "script": "\t# Dev only (epic 4 entry 14): /events/<id> has the page choose that map item as the view starts,\n\t# before the map's items have loaded; the component applies it once they have, over the place\n\t# the map remembers.\n\tselect = self.params.select\n\tif select:\n\t\tself.rootContainer.getChild('main').getChild('map').props.selectedItem = select"
+     },
+     "scope": "G",
+     "type": "script"
+    }
+   ]
+  }
+ },
+ "params": {
+  "select": ""
+ },
+ "propConfig": {
+  "params.select": {
+   "paramDirection": "input",
+   "persistent": true
+  }
+ },
+ "props": {
+  "defaultSize": {
+   "width": 1366,
+   "height": 768
+  }
+ },
+ "root": {
+  "type": "ia.container.flex",
+  "version": 0,
+  "props": {
+   "direction": "column"
+  },
+  "meta": {
+   "name": "root"
+  },
+  "position": {},
+  "custom": {},
+  "children": [
+   {
+    "type": "ia.container.flex",
+    "version": 0,
+    "props": {
+     "direction": "row",
+     "alignItems": "center",
+     "wrap": "wrap"
+    },
+    "meta": {
+     "name": "toolbar"
+    },
+    "position": {
+     "shrink": 0
+    },
+    "custom": {},
+    "children": [
+     {
+      "type": "ia.display.label",
+      "version": 0,
+      "props": {
+       "text": "",
+       "style": {
+        "padding": "4px 12px"
+       }
+      },
+      "meta": {
+       "name": "user",
+       "domId": "mapstudio-dev-user"
+      },
+      "position": {
+       "basis": "auto",
+       "shrink": 0
+      },
+      "custom": {},
+      "propConfig": {
+       "props.text": {
+        "binding": {
+         "type": "expr",
+         "config": {
+          "expression": "if({session.props.auth.authenticated}, 'Signed in as ' + {session.props.auth.user.userName}, 'Not signed in (viewer)')"
+         }
+        }
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Log in"
+      },
+      "meta": {
+       "name": "login",
+       "domId": "mapstudio-dev-login"
+      },
+      "position": {
+       "basis": "120px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\tif self.session.props.auth.authenticated:\n\t\tsystem.perspective.logout()\n\telse:\n\t\tsystem.perspective.login()"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      },
+      "propConfig": {
+       "props.text": {
+        "binding": {
+         "type": "expr",
+         "config": {
+          "expression": "if({session.props.auth.authenticated}, 'Log out', 'Log in')"
+         }
+        }
+       }
+      }
+     },
+     {
+      "type": "ia.input.text-field",
+      "version": 0,
+      "props": {
+       "text": "",
+       "placeholder": "A map item id",
+       "deferUpdates": false
+      },
+      "meta": {
+       "name": "writeId",
+       "domId": "mapstudio-events-write-id"
+      },
+      "position": {
+       "basis": "320px",
+       "shrink": 1
+      },
+      "custom": {}
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Write selectedItem"
+      },
+      "meta": {
+       "name": "write",
+       "domId": "mapstudio-events-write"
+      },
+      "position": {
+       "basis": "160px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 4 entry 14): the page writes the map's selectedItem, the id typed beside the\n\t# button, or null when the field is empty.\n\ttext = self.getSibling('writeId').props.text\n\tstudio = self.view.rootContainer.getChild('main').getChild('map')\n\tstudio.props.selectedItem = text.strip() if text and text.strip() else None"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Write null"
+      },
+      "meta": {
+       "name": "writeNull",
+       "domId": "mapstudio-events-write-null"
+      },
+      "position": {
+       "basis": "120px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 4 entry 14): the page writes null to the map's selectedItem.\n\tself.view.rootContainer.getChild('main').getChild('map').props.selectedItem = None"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Open /edit"
+      },
+      "meta": {
+       "name": "openEdit",
+       "domId": "mapstudio-events-open-edit"
+      },
+      "position": {
+       "basis": "120px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 4 entry 14): leave for /edit, so the browser's back opens /events again with\n\t# the view started anew (the map's remembered place, and the page's choice from the address).\n\tsystem.perspective.navigate(page='/edit')"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     }
+    ]
+   },
+   {
+    "type": "ia.container.flex",
+    "version": 0,
+    "props": {
+     "direction": "row"
+    },
+    "meta": {
+     "name": "main"
+    },
+    "position": {
+     "basis": "0px",
+     "grow": 1
+    },
+    "custom": {},
+    "children": [
+     {
+      "type": "ia.container.flex",
+      "version": 0,
+      "props": {
+       "direction": "column"
+      },
+      "meta": {
+       "name": "side"
+      },
+      "position": {
+       "basis": "420px",
+       "shrink": 0
+      },
+      "custom": {},
+      "propConfig": {
+       "position.display": {
+        "binding": {
+         "type": "expr",
+         "config": {
+          "expression": "try({page.props.dimensions.viewport.width}, 1024) >= 768"
+         }
+        }
+       }
+      },
+      "children": [
+       {
+        "type": "ia.display.table",
+        "version": 0,
+        "props": {
+         "data": [],
+         "virtualized": false,
+         "pager": {
+          "bottom": false,
+          "activeOption": 100
+         },
+         "selection": {
+          "mode": "single",
+          "enableRowSelection": true,
+          "enableColumnSelection": false,
+          "selectedColumn": null,
+          "selectedRow": null
+         }
+        },
+        "meta": {
+         "name": "table",
+         "domId": "mapstudio-events-table"
+        },
+        "position": {
+         "basis": "0px",
+         "grow": 1
+        },
+        "custom": {},
+        "events": {
+         "component": {
+          "onSelectionChange": [
+           {
+            "config": {
+             "script": "\t# Dev only (epic 4 entry 14): a row chosen in the table writes its map item's id to the map's\n\t# selectedItem, which selects it on the map as a click on it does; no row writes null.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devevents')\n\ttry:\n\t\trows = event.data\n\t\tchosen = rows[0]['id'] if rows else None\n\t\tstudio = self.parent.getSibling('map')\n\t\tif studio.props.selectedItem != chosen:\n\t\t\tstudio.props.selectedItem = chosen\n\texcept java.lang.Throwable as ex:\n\t\tlogger.warn('The table selection failed: %s' % ex.getMessage())\n\texcept Exception as ex:\n\t\tlogger.warn('The table selection failed: %s' % ex)"
+            },
+            "scope": "G",
+            "type": "script"
+           }
+          ]
+         }
+        },
+        "propConfig": {
+         "props.data": {
+          "binding": {
+           "type": "expr",
+           "config": {
+            "expression": "runScript('mapstudio_events.itemRows', 0)"
+           }
+          }
+         }
+        }
+       },
+       {
+        "type": "ia.display.label",
+        "version": 0,
+        "props": {
+         "text": "",
+         "style": {
+          "padding": "2px 12px",
+          "fontSize": "12px"
+         }
+        },
+        "meta": {
+         "name": "tableSelected",
+         "domId": "mapstudio-events-table-selected"
+        },
+        "position": {
+         "basis": "24px",
+         "shrink": 0
+        },
+        "custom": {},
+        "propConfig": {
+         "props.text": {
+          "binding": {
+           "type": "property",
+           "config": {
+            "path": "../table.props.selection.selectedRow"
+           },
+           "transforms": [
+            {
+             "code": "\t# The table's chosen row by its name, from selectedRow: a row clicked, or the one the map's\n\t# onItemSelected selected (the table keeps the last row's selection data when a script clears it).\n\trows = self.getSibling('table').props.data\n\tif value is None or value < 0 or value >= len(rows):\n\t\treturn 'table: '\n\treturn 'table: ' + rows[value]['name']",
+             "type": "script"
+            }
+           ]
+          }
+         }
+        }
+       },
+       {
+        "type": "ia.display.label",
+        "version": 0,
+        "props": {
+         "text": "",
+         "style": {
+          "padding": "2px 12px",
+          "fontSize": "12px"
+         }
+        },
+        "meta": {
+         "name": "selected",
+         "domId": "mapstudio-events-selected"
+        },
+        "position": {
+         "basis": "24px",
+         "shrink": 0
+        },
+        "custom": {},
+        "propConfig": {
+         "props.text": {
+          "binding": {
+           "type": "expr",
+           "config": {
+            "expression": "'selectedItem: ' + coalesce({../../map.props.selectedItem}, '')"
+           }
+          }
+         }
+        }
+       },
+       {
+        "type": "ia.display.label",
+        "version": 0,
+        "props": {
+         "text": "0|none",
+         "style": {
+          "padding": "2px 12px",
+          "fontSize": "12px"
+         }
+        },
+        "meta": {
+         "name": "itemSelected",
+         "domId": "mapstudio-events-item-selected"
+        },
+        "position": {
+         "basis": "24px",
+         "shrink": 0
+        },
+        "custom": {
+         "count": 0
+        }
+       },
+       {
+        "type": "ia.display.label",
+        "version": 0,
+        "props": {
+         "text": "",
+         "style": {
+          "padding": "2px 12px",
+          "fontSize": "12px"
+         }
+        },
+        "meta": {
+         "name": "viewport",
+         "domId": "mapstudio-events-viewport"
+        },
+        "position": {
+         "basis": "24px",
+         "shrink": 0
+        },
+        "custom": {},
+        "propConfig": {
+         "props.text": {
+          "binding": {
+           "type": "property",
+           "config": {
+            "path": "../../map.props.viewport"
+           },
+           "transforms": [
+            {
+             "code": "\t# The viewport prop in the words of the onViewportChanged label (mapstudio_events.viewportText).\n\tif value is None:\n\t\treturn 'viewport: '\n\treturn 'viewport: ' + mapstudio_events.viewportText(value['center'], value['zoom'], value['bounds'])",
+             "type": "script"
+            }
+           ]
+          }
+         }
+        }
+       },
+       {
+        "type": "ia.display.label",
+        "version": 0,
+        "props": {
+         "text": "0|",
+         "style": {
+          "padding": "2px 12px",
+          "fontSize": "12px"
+         }
+        },
+        "meta": {
+         "name": "viewportChanged",
+         "domId": "mapstudio-events-viewport-changed"
+        },
+        "position": {
+         "basis": "24px",
+         "shrink": 0
+        },
+        "custom": {
+         "count": 0
+        }
+       },
+       {
+        "type": "ia.display.label",
+        "version": 0,
+        "props": {
+         "text": "0|",
+         "style": {
+          "padding": "2px 12px",
+          "fontSize": "12px"
+         }
+        },
+        "meta": {
+         "name": "popupOpen",
+         "domId": "mapstudio-events-popup-open"
+        },
+        "position": {
+         "basis": "24px",
+         "shrink": 0
+        },
+        "custom": {
+         "count": 0
+        }
+       },
+       {
+        "type": "ia.display.label",
+        "version": 0,
+        "props": {
+         "text": "0|",
+         "style": {
+          "padding": "2px 12px",
+          "fontSize": "12px"
+         }
+        },
+        "meta": {
+         "name": "popupClose",
+         "domId": "mapstudio-events-popup-close"
+        },
+        "position": {
+         "basis": "24px",
+         "shrink": 0
+        },
+        "custom": {
+         "count": 0
+        }
+       }
+      ]
+     },
+     {
+      "type": "ao.mapstudio",
+      "version": 0,
+      "props": {
+       "editMode": false,
+       "startingArea": {
+        "center": {
+         "lng": -104.9725,
+         "lat": 39.7445
+        },
+        "zoom": 12,
+        "bounds": {
+         "west": null,
+         "south": null,
+         "east": null,
+         "north": null
+        }
+       }
+      },
+      "meta": {
+       "name": "map"
+      },
+      "position": {
+       "basis": "0px",
+       "grow": 1
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onItemSelected": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 4 entry 14): onItemSelected for the page. The label shows how many came and\n\t# the last one's id, name and kind (event.mapItem, or 'none' when the selection was cleared),\n\t# and the table follows the map: the map item's row selected, or none. Selecting a row that is\n\t# selected already, or writing the map's selectedItem with the id it holds, changes nothing, so\n\t# the table and the map answering each other settle at once.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devevents')\n\ttry:\n\t\tside = self.getSibling('side')\n\t\tout = side.getChild('itemSelected')\n\t\titem = event.mapItem\n\t\tcount = out.custom.count + 1\n\t\tout.custom.count = count\n\t\tif item is None:\n\t\t\tout.props.text = '%d|none' % count\n\t\t\trow = None\n\t\telse:\n\t\t\tout.props.text = u'%d|%s|%s|%s' % (count, item['id'], item['name'], item['kind'])\n\t\t\trow = mapstudio_events.rowOf(side.getChild('table').props.data, item['id'])\n\t\ttable = side.getChild('table')\n\t\tif table.props.selection.selectedRow != row:\n\t\t\ttable.props.selection.selectedRow = row\n\t\tlogger.info('onItemSelected: %s' % out.props.text)\n\texcept java.lang.Throwable as ex:\n\t\tlogger.warn('onItemSelected failed: %s' % ex.getMessage())\n\texcept Exception as ex:\n\t\tlogger.warn('onItemSelected failed: %s' % ex)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ],
+        "onViewportChanged": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 4 entry 14): onViewportChanged for the page, fired when the map first settles\n\t# and at every move end. The label shows how many came and the last viewport, as the viewport\n\t# prop's label shows the prop, so the two can be compared.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devevents')\n\ttry:\n\t\tout = self.getSibling('side').getChild('viewportChanged')\n\t\tcount = out.custom.count + 1\n\t\tout.custom.count = count\n\t\tout.props.text = '%d|%s' % (count, mapstudio_events.viewportText(event.center, event.zoom, event.bounds))\n\texcept java.lang.Throwable as ex:\n\t\tlogger.warn('onViewportChanged failed: %s' % ex.getMessage())\n\texcept Exception as ex:\n\t\tlogger.warn('onViewportChanged failed: %s' % ex)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ],
+        "onPopupOpen": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 4 entry 14): onPopupOpen for the page. The label shows how many came and the\n\t# last one's item id and segment (fromId,toId, or none for a point).\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devevents')\n\ttry:\n\t\tout = self.getSibling('side').getChild('popupOpen')\n\t\tcount = out.custom.count + 1\n\t\tout.custom.count = count\n\t\tsegment = event.segment\n\t\twords = 'none' if segment is None else '%s,%s' % (segment['fromId'], segment['toId'])\n\t\tout.props.text = '%d|%s|%s' % (count, event.itemId, words)\n\texcept java.lang.Throwable as ex:\n\t\tlogger.warn('onPopupOpen failed: %s' % ex.getMessage())\n\texcept Exception as ex:\n\t\tlogger.warn('onPopupOpen failed: %s' % ex)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ],
+        "onPopupClose": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 4 entry 14): onPopupClose for the page. The label shows how many came and the\n\t# last one's item id.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devevents')\n\ttry:\n\t\tout = self.getSibling('side').getChild('popupClose')\n\t\tcount = out.custom.count + 1\n\t\tout.custom.count = count\n\t\tout.props.text = '%d|%s' % (count, event.itemId)\n\texcept java.lang.Throwable as ex:\n\t\tlogger.warn('onPopupClose failed: %s' % ex.getMessage())\n\texcept Exception as ex:\n\t\tlogger.warn('onPopupClose failed: %s' % ex)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  ]
+ }
+}
