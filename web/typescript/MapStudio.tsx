@@ -44,7 +44,7 @@ import { registerTestView } from './testHook';
 import { MapboxLogoControl } from './mapboxLogo';
 import {
     SPRITE_URL, THEME_TOKENS, addItemLayers, addPointerCursor, addTextLayers, addUnsavedLayers, addYouAreHereLayers, applyLayerToggles,
-    applyThemePaint, blankColors, createMap, markerColors, publishLabels, setYouAreHere
+    applyThemePaint, blankColors, createMap, markerColors, publishLabels, publishYouAreHere, setYouAreHere
 } from './mapLayers';
 import { LOCATE_ZOOM, NO_LOCATION, UserLocation, readUserLocation, userLocationKey } from './userLocation';
 import { addViewControls } from './viewControls';
@@ -650,6 +650,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
             return;
         }
         publishLabels(map, el);
+        publishYouAreHere(map, el);
     }
 
     /** Where a point item's popup anchors: the marker drawn for it, which for a member of a shared marker is the group's (item 20). */

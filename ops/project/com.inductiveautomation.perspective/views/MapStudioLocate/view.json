@@ -1,0 +1,224 @@
+{
+ "custom": {},
+ "events": {
+  "system": {
+   "onStartup": [
+    {
+     "config": {
+      "script": "\t# Dev only (epic 4 entry 15): the page turns the session's location on as the view starts, so the\n\t# browser is asked for a position; the map's userLocation is bound to session.props.geolocation.\n\timport java.lang\n\t\n\tlogger = system.util.getLogger('MapStudio.devlocate')\n\ttry:\n\t\tself.session.props.geolocation.enabled = True\n\texcept java.lang.Throwable as ex:\n\t\tlogger.warn('Turning the location on failed: %s' % ex.getMessage())\n\texcept Exception as ex:\n\t\tlogger.warn('Turning the location on failed: %s' % ex)"
+     },
+     "scope": "G",
+     "type": "script"
+    }
+   ]
+  }
+ },
+ "params": {},
+ "props": {
+  "defaultSize": {
+   "width": 1366,
+   "height": 768
+  }
+ },
+ "root": {
+  "type": "ia.container.flex",
+  "version": 0,
+  "props": {
+   "direction": "column"
+  },
+  "meta": {
+   "name": "root"
+  },
+  "position": {},
+  "custom": {},
+  "children": [
+   {
+    "type": "ia.container.flex",
+    "version": 0,
+    "props": {
+     "direction": "row",
+     "alignItems": "center",
+     "wrap": "wrap"
+    },
+    "meta": {
+     "name": "toolbar"
+    },
+    "position": {
+     "shrink": 0
+    },
+    "custom": {},
+    "children": [
+     {
+      "type": "ia.display.label",
+      "version": 0,
+      "props": {
+       "text": "",
+       "style": {
+        "padding": "4px 12px"
+       }
+      },
+      "meta": {
+       "name": "user",
+       "domId": "mapstudio-dev-user"
+      },
+      "position": {
+       "basis": "auto",
+       "shrink": 0
+      },
+      "custom": {},
+      "propConfig": {
+       "props.text": {
+        "binding": {
+         "type": "expr",
+         "config": {
+          "expression": "if({session.props.auth.authenticated}, 'Signed in as ' + {session.props.auth.user.userName}, 'Not signed in (viewer)')"
+         }
+        }
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Log in"
+      },
+      "meta": {
+       "name": "login",
+       "domId": "mapstudio-dev-login"
+      },
+      "position": {
+       "basis": "120px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\tif self.session.props.auth.authenticated:\n\t\tsystem.perspective.logout()\n\telse:\n\t\tsystem.perspective.login()"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      },
+      "propConfig": {
+       "props.text": {
+        "binding": {
+         "type": "expr",
+         "config": {
+          "expression": "if({session.props.auth.authenticated}, 'Log out', 'Log in')"
+         }
+        }
+       }
+      }
+     },
+     {
+      "type": "ia.input.checkbox",
+      "version": 0,
+      "props": {
+       "text": "Location off",
+       "selected": false
+      },
+      "meta": {
+       "name": "locationOff",
+       "domId": "mapstudio-locate-off"
+      },
+      "position": {
+       "basis": "140px",
+       "shrink": 0
+      },
+      "custom": {},
+      "propConfig": {
+       "props.selected": {
+        "onChange": {
+         "enabled": null,
+         "script": "\t# Dev only (epic 4 entry 15): the session's location turned off and on again from the page, as a\n\t# project would offer it; the map's userLocation follows through its one binding.\n\tif origin != 'Browser':\n\t\treturn\n\tself.session.props.geolocation.enabled = not currentValue.value"
+        }
+       }
+      }
+     }
+    ]
+   },
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {
+     "text": "",
+     "style": {
+      "padding": "2px 12px",
+      "fontSize": "12px",
+      "overflow": "hidden",
+      "whiteSpace": "nowrap"
+     }
+    },
+    "meta": {
+     "name": "value",
+     "domId": "mapstudio-locate-value"
+    },
+    "position": {
+     "basis": "24px",
+     "shrink": 0
+    },
+    "custom": {},
+    "propConfig": {
+     "props.text": {
+      "binding": {
+       "type": "property",
+       "config": {
+        "path": "../map.props.userLocation"
+       },
+       "transforms": [
+        {
+         "type": "script",
+         "code": "\t# Dev only (epic 4 entry 15): the map's userLocation as bound, in JSON for the suite.\n\timport java.lang\n\t\n\tif value is None:\n\t\treturn 'userLocation: null'\n\ttry:\n\t\treturn 'userLocation: ' + system.util.jsonEncode(value)\n\texcept java.lang.Throwable as ex:\n\t\treturn 'userLocation: unreadable (%s)' % ex.getMessage()\n\texcept Exception as ex:\n\t\treturn 'userLocation: unreadable (%s)' % ex"
+        }
+       ]
+      }
+     }
+    }
+   },
+   {
+    "type": "ao.mapstudio",
+    "version": 0,
+    "props": {
+     "editMode": false,
+     "startingArea": {
+      "center": {
+       "lng": -105.0,
+       "lat": 39.722
+      },
+      "zoom": 14,
+      "bounds": {
+       "west": null,
+       "south": null,
+       "east": null,
+       "north": null
+      }
+     }
+    },
+    "meta": {
+     "name": "map"
+    },
+    "position": {
+     "basis": "0px",
+     "grow": 1
+    },
+    "custom": {},
+    "propConfig": {
+     "props.userLocation": {
+      "binding": {
+       "type": "property",
+       "config": {
+        "path": "session.props.geolocation"
+       }
+      }
+     }
+    }
+   }
+  ]
+ }
+}

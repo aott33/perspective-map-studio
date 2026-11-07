@@ -440,6 +440,15 @@ function setWedgeImage(map: MapLibreMap, color: string): void {
     }
 }
 
+/**
+ * For the e2e suite (entry 15): what MapLibre drew of the you-are-here marker, as `data-you-drawn` on the map's element,
+ * `dot,accuracy,wedge` counts (0 or 1 each). Read at idle beside the labels; not a click or hover query.
+ */
+export function publishYouAreHere(map: MapLibreMap, el: HTMLElement): void {
+    const drawn = (layer: string): number => (map.getLayer(layer) ? Math.min(1, map.queryRenderedFeatures({ layers: [layer] }).length) : 0);
+    el.setAttribute('data-you-drawn', [LAYER_YOU_DOT, LAYER_YOU_ACCURACY_FILL, LAYER_YOU_WEDGE].map(drawn).join(','));
+}
+
 /** The marker at the read location, or nothing (epic 4 entry 15): the source's data replaced, the camera left alone. */
 export function setYouAreHere(map: MapLibreMap, loc: UserLocation): void {
     const source = typeof map.getSource === 'function'

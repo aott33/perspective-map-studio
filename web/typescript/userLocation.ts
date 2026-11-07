@@ -144,10 +144,10 @@ export function youAreHereFeatures(loc: UserLocation): YouFeatures {
 }
 
 /** The wedge image's side, in px, and its apex at the centre (the dot's), pointing north before MapLibre turns it. */
-export const WEDGE_SIZE = 48;
+export const WEDGE_SIZE = 64;
 /** The wedge's half angle, in degrees, and its reach from the centre, in px. */
 const WEDGE_HALF_ANGLE = 30;
-const WEDGE_REACH = 22;
+const WEDGE_REACH = 30;
 /** The wedge's opacity: firm at the dot, fading to its reach. */
 const WEDGE_ALPHA = 0.85;
 

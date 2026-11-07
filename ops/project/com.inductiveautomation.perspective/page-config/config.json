@@ -16,6 +16,10 @@
    "viewPath": "MapStudioEvents",
    "viewParams": {}
   },
+  "/locate": {
+   "viewPath": "MapStudioLocate",
+   "viewParams": {}
+  },
   "/adapters": {
    "viewPath": "MapStudioAdapters",
    "viewParams": {}
