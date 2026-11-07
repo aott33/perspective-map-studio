@@ -3,7 +3,7 @@ title: "Selection, viewport and popup events to the page, and contract 0.4.0"
 type: 'feature'
 ticket: '14'
 created: '2026-11-07'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '2859994be52e3c0f4679ac9f9725e4c91c62ae79'
 route: 'full'
 route_source: 'auto'
@@ -72,6 +72,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 
 ## Implementation Notes
 
+- Approval (owner, 2026-11-07): "Approved" after a round table on the plan (the page's choice waits for a tool to go down; the table and map loop settles with one event; the `mapItem` rename agreed; the viewport's Gateway cost carried to entry 18); the plan, over size, kept whole; it went ready-for-dev and implementation started in this session.
 - Planner, 2026-11-07: the environment, commit and identity rules are entry 4's plan's (Docker started by hand after a container restart, `ops/up.sh --fresh` before a whole-suite run with nothing else against the stack, the two trailer lines from the session's attribution reminder, `git commit --only` your paths, no em dashes, no model identifier, never a bare `git stash`, never a push). Commit at each working milestone. ignition-lint: `pip install ignition-lint-toolkit` in a scratch venv, then `ignition-lint --files <view.json or code.py>`; zero errors and zero warnings, naming hints recorded.
 
 ## Plan Change Log
