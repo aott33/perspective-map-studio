@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "description": "The event object of onPopupOpen (epic 4 entry 14, docs/contract.md): fired wherever the Gateway is told popup.open, so a new segment of the same line is a new open. Edit mode opens no popup and fires none.",
+  "properties": {
+    "itemId": {
+      "type": "string",
+      "description": "The id of the map item whose popup opened."
+    },
+    "segment": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "For a line, the segment its popup opened at: the ids of the items at its two ends (start and end for a floating end), or null for a point or a line with no measuring instrument.",
+      "properties": {
+        "fromId": {
+          "type": "string",
+          "description": "The segment's first end."
+        },
+        "toId": {
+          "type": "string",
+          "description": "The segment's second end."
+        }
+      }
+    }
+  }
+}

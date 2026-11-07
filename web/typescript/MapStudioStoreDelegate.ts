@@ -18,6 +18,8 @@
  * onto the newest the page knows, saves still in flight included), "edit <name>", and keeps the value as the kind's last for
  * the next item of that kind (itemForm.ts, per project and kind in localStorage), which `createPoint` and `createLine` start
  * with; `setKind` carries the values the new kind defines and drops the rest in the same update.
+ * From entry 14 `sendPopupOpen` and `sendPopupClose` also fire the page's `onPopupOpen` and `onPopupClose` (pageEvents.ts), so every
+ * popup the Gateway is told of the page is told of too.
  */
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
@@ -47,6 +49,7 @@ import { UnsavedSender } from './unsavedSender';
 import { registerTestHook, takeTestReply } from './testHook';
 import { NO_SHAPE_REFUSAL, ShapeRefusal, droppedText } from './problems';
 import { FieldValue, keptProperties, prefillFor, prefillKey, readPrefill, rememberValue, withValue } from './itemForm';
+import { EventFirer, POPUP_CLOSE_EVENT, POPUP_OPEN_EVENT, firePageEvent } from './pageEvents';
 
 /** The basemap the map draws (epic 3 entry 6, basemaps.ts): what the setup offers, the choice, its source. */
 export interface BasemapState {
@@ -408,13 +411,27 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     /**
      * The popup of a map item opened: the Gateway pushes its values on change until popup.close
      * (AD-7); for a line (entry 2) the segment it opened at, and every instrument on it is pushed too.
+     * The page is told too (epic 4 entry 14, contract 0.4.0): `onPopupOpen {itemId, segment}`, the segment null for a point, beside
+     * every popup.open the Gateway is told, so a new segment of the same line is a new open; Edit mode opens no popup and sends none.
      */
     sendPopupOpen(itemId: string, segment: SegmentRef | null = null): void {
         this.fireEvent(MESSAGE_EVENT, popupOpen(itemId, segment) as unknown as JsObject);
+        firePageEvent(this.pageEvents(), POPUP_OPEN_EVENT, { itemId, segment: segment ? { fromId: segment.fromId, toId: segment.toId } : null });
     }
 
+    /** The popup closed: the Gateway stops its pushes (AD-7), and the page is told with `onPopupClose {itemId}` (entry 14). */
     sendPopupClose(itemId: string): void {
         this.fireEvent(MESSAGE_EVENT, popupClose(itemId) as unknown as JsObject);
+        firePageEvent(this.pageEvents(), POPUP_CLOSE_EVENT, { itemId });
+    }
+
+    /**
+     * The component store's events (entry 14): the store this delegate was made for (`createDelegate`) is the component's
+     * `ComponentStore`, which holds them, though the SDK types it as the element store it extends; null when it does not.
+     */
+    private pageEvents(): EventFirer | null {
+        const events = (this.component as unknown as { componentEvents?: EventFirer } | undefined);
+        return events && events.componentEvents ? events.componentEvents : null;
     }
 
     /** A values.batch: merged into the live state (a full one replaces it); an unreadable one is ignored. */

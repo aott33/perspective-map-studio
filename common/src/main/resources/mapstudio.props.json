@@ -106,8 +106,47 @@
         "string",
         "null"
       ],
-      "description": "The selected map item's id, written by the component on every selection change (epic 4 entry 2, docs/contract.md): a marker click, a list row, a search or Needs you choice sets it, a tap on the ground clears it to null. Read it from a binding or the onItemSelected event; a value the page writes is not read yet (entry 14).",
+      "description": "The selected map item's id, both ways (epic 4 entries 2 and 14, docs/contract.md): the component writes it on every selection change (a marker click, a list row, a search or Needs you choice; a tap on the ground clears it to null), and an id the page writes selects that item as a click on it does (in View mode centred or fitted with its popup, in Edit mode with Details open); null clears the selection, and an id not on the map clears it with one console warning. The component's own write coming back is ignored. Read it from a binding or the onItemSelected event.",
       "default": null
+    },
+    "viewport": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Read-only (output). Where the map is looking (epic 4 entry 14, docs/contract.md), written by the component when the map first settles and at every move end, never during a move: {center: [lng, lat], zoom, bounds: [[west, south], [east, north]]}, WGS 84 to 6 decimals, the zoom to 2. The onViewportChanged event carries the same object. A value the page writes is not read, and the next move end writes it again; null until the map has settled.",
+      "default": null,
+      "readOnly": true,
+      "additionalProperties": false,
+      "properties": {
+        "center": {
+          "type": "array",
+          "description": "The map's centre, [lng, lat], WGS 84, to 6 decimals.",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "zoom": {
+          "type": "number",
+          "description": "The zoom, 0 (the world) to 24, to 2 decimals."
+        },
+        "bounds": {
+          "type": "array",
+          "description": "The visible bounds, [[west, south], [east, north]], WGS 84, to 6 decimals.",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
     },
     "style": {
       "$ref": "urn:ignition-schema:schemas/style-properties.schema.json",

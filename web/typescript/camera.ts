@@ -4,7 +4,9 @@
  * place.ts), the camera padding of the moment (item 27, popupPlacement.ts), Fit and Return (epic 3
  * entry 7), a search or Needs you choice (entries 9 and 3), the place remembered on every move and
  * selection change and put back once the items have come (owner re-test R4 (a)), and the view,
- * fit and readiness attributes the e2e suite reads. DOM-bound (the map, its controls and the
+ * fit and readiness attributes the e2e suite reads, and (epic 4 entry 14, contract 0.4.0) the page's `viewport` prop and
+ * `onViewportChanged` event, written when the map first settles and at every move end, never during a move, and a page's
+ * choice of an item (`selectedItem`), made as the search's choice with the popup. DOM-bound (the map, its controls and the
  * popup's element are measured); every function takes the component as its host (CameraHost names
  * the fields and callbacks it reads), and the component keeps the state: `fitKey`, `itemBounds`,
  * `appliedArea`, `placeKey`, `restore` and `savedSelection` live there, as do `setState` and the
@@ -14,10 +16,13 @@
 import { Map as MapLibreMap, Popup } from 'maplibre-gl';
 import type { MapStudioState, Props } from './MapStudio';
 import { MapItemRecord } from './contract';
-import { MapFeatures, SegmentRef, Selection } from './features';
+import { MapFeatures, SegmentRef, Selection, lineNodes, segmentAt } from './features';
+import { Position, instrumentsOn, lengthM, pointAt } from './geometry';
+import { LiveState } from './live';
 import { StartCamera } from './mapLayers';
 import { MapStudioStoreDelegate } from './MapStudioStoreDelegate';
 import { NeedsYouRow } from './needsyou';
+import { VIEWPORT_CHANGED_EVENT, firePageEvent, viewportKey, viewportOf, writePageProp } from './pageEvents';
 import { Place, placeKey, readPlace, writePlace } from './place';
 import { PopupPoint } from './popupParams';
 import { CameraPadding, PopupAnchor, Rect, cameraPadding as paddingFor } from './popupPlacement';
@@ -62,6 +67,8 @@ export interface CameraHost {
     savedSelection: string;
     /** Set as the component unmounts: closing the popup and removing the map then must not overwrite the place. */
     unmounting: boolean;
+    /** The viewport last written to the page (pageEvents.ts `viewportKey`), '' before the map first settled (entry 14). */
+    publishedViewport: string;
     /** What opened the popup (item 14): Esc returns the focus there; null for a click on the map. */
     openedBy: 'search' | 'needsyou' | null;
     zoomControl: ZoomControl | null;
@@ -336,8 +343,12 @@ export function onNeedsYouChoose(host: CameraHost, row: NeedsYouRow): void {
     }
 }
 
-/** Zoom to a map item and select it as a click on it does (the search's and the Needs you list's choice). */
-export function goToItem(host: CameraHost, id: string, via: string, how: string): void {
+/**
+ * Zoom to a map item and select it as a click on it does (the search's and the Needs you list's choice). With `linePopup` (the
+ * page's choice, epic 4 entry 14) a line, not an area, also opens its line popup once fitted, at its middle and the segment there,
+ * as a click there would; an area is fitted and selected, as a View-mode click on one opens nothing.
+ */
+export function goToItem(host: CameraHost, id: string, via: string, how: string, linePopup = false): void {
     const map = host.map;
     const delegate = host.props.delegate;
     const store = host.props.store.delegate as MapStudioStoreDelegate | undefined;
@@ -361,10 +372,28 @@ export function goToItem(host: CameraHost, id: string, via: string, how: string)
         }
     } else {
         fitTo(host, boundsOf(item.geometry.coordinates));
-        host.selectLine(item.id);
+        const kind = delegate.lists.kinds.find((k) => k.id === item.kind);
+        if (linePopup && !(kind && kind.area)) {
+            const middle = lineMiddle(item, delegate.items, delegate.live);
+            host.openLinePopup(item.id, middle.segment, middle.lngLat);
+        } else {
+            host.selectLine(item.id);
+        }
     }
     publishFit(host);
     console.info('[MapStudio] ' + via + ': ' + item.name + ' chosen ' + how + '.');
+}
+
+/**
+ * The place halfway along a line and the segment it falls in between the line's measuring instruments (features.ts
+ * `segmentAt`), where the page's choice opens the line popup (entry 14); the line popup drops the segment when nothing measures.
+ */
+export function lineMiddle(line: MapItemRecord, items: MapItemRecord[], live: LiveState): { lngLat: [number, number]; segment: SegmentRef } {
+    const coords = (line.geometry.type === 'LineString' ? line.geometry.coordinates : []) as Position[];
+    const metres = coords.length >= 2 ? lengthM(coords) : 0;
+    const at = coords.length >= 2 ? pointAt(coords, metres / 2) : coords.length === 1 ? coords[0] : [0, 0];
+    const nodes = lineNodes(line, instrumentsOn(items, line.id), live, metres);
+    return { lngLat: [at[0], at[1]], segment: segmentAt(nodes, metres / 2) };
 }
 
 /** A move the user began (a drag, a wheel, a zoom button) ends a kept Fit; a programmatic one does not. */
@@ -404,5 +433,32 @@ export function publishReadiness(host: CameraHost, map: MapLibreMap): void {
     }
     publishView(host, map);
     el.setAttribute('data-map-ready', 'true');
+}
+
+/**
+ * The page's window on the camera (epic 4 entry 14, contract 0.4.0, R49): the read-only `viewport` prop written through the
+ * component's property tree and the `onViewportChanged` event fired with the same object, `{center: [lng, lat], zoom, bounds:
+ * [[west, south], [east, north]]}`, when the map first settles (`first`, its first idle with the items' layers) and then at every
+ * move end, never during a move (R37: nothing per frame); a move end that leaves the same viewport writes and fires nothing. Each
+ * write and fire is guarded as the selection's are (pageEvents.ts).
+ */
+export function publishViewport(host: CameraHost, map: MapLibreMap, first = false): void {
+    if (host.map !== map || (!first && host.publishedViewport === '')) {
+        return;
+    }
+    const b = map.getBounds();
+    const viewport = viewportOf(map.getCenter(), map.getZoom(), { west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() });
+    const key = viewportKey(viewport);
+    if (key === host.publishedViewport) {
+        return;
+    }
+    host.publishedViewport = key;
+    const store = host.props.store;
+    writePageProp(store.props, 'viewport', viewport);
+    firePageEvent(store.componentEvents, VIEWPORT_CHANGED_EVENT, { ...viewport });
+    if (host.mapContainer) {
+        // For the e2e suite: the viewport last given to the page.
+        host.mapContainer.setAttribute('data-viewport', key);
+    }
 }
 

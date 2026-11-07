@@ -53,7 +53,7 @@ import * as camera from './camera';
 import { Bounds } from './camera';
 import * as items from './itemsLayer';
 import * as selection from './selection';
-import type { OpenPick, OpenPopup } from './selection';
+import type { OpenPick, OpenPopup, PageSelection } from './selection';
 import * as editing from './editing';
 import * as basemap from './basemapLayer';
 import { TilesState } from './basemapLayer';
@@ -99,7 +99,11 @@ export interface MapStudioProps {
      * when the page writes true after it, left when the page writes false; the Edit switch writes it back.
      */
     editMode: boolean;
-    /** The selected map item's id, which the component writes (epic 4 entry 2); never read back into the model (entry 14's). */
+    /**
+     * The selected map item's id, both ways (epic 4 entries 2 and 14): the component writes it on every selection change, and a
+     * value the page writes selects that item as a click on it does (selection.tsx `readPageSelection`, `applyPageSelection`),
+     * the component's own write coming back left out. The read-only `viewport` prop is written (camera.ts) and never read.
+     */
     selectedItem: string | null;
 }
 
@@ -213,6 +217,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
     focusNameId: string | null = null;
     /** The selection last written to the page (selection.tsx publishSelection): the item's id, '' for none. */
     publishedSelection = '';
+    /** The component's own selectedItem writes whose echo has not come back yet (entry 14, pageEvents.ts), oldest first. */
+    ownSelectedWrites: string[] = [];
+    /** The page's choice of an item waiting to be applied (entry 14, selection.tsx applyPageSelection), or null. */
+    pageSelection: PageSelection | null = null;
+    /** The viewport last written to the page (entry 14, camera.ts publishViewport), '' before the map first settled. */
+    publishedViewport = '';
     /** The theme colours the marker images are drawn with, read at mount and again on a theme change (item 29). */
     markerColors: MarkerColors | null = null;
     /** Re-reads the tokens when the theme changes and redraws (item 29). */
@@ -299,6 +309,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         // The place this page's map had earlier in the browser session (owner re-test R4 (a)): its camera instead of
         // the starting area, and its selection and open popup put back once the items have come (applyRestore).
         const place = camera.rememberedPlace(this, this.projectName());
+        // A selectedItem the page set before the component mounted wins over the remembered selection (entry 14).
+        selection.readMountSelection(this);
         const root = this.props.store.element as HTMLElement | undefined;
         // The blank map and the halos are the blank-map token (DESIGN.md basemap-blank, `--neutral-20`).
         const colors = blankColors(root);
@@ -331,6 +343,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         map.on('idle', this.onMapIdle);
         map.on('moveend', () => {
             camera.publishView(this, map);
+            // The page's viewport and onViewportChanged at every move end, never during a move (entry 14).
+            camera.publishViewport(this, map);
             camera.savePlace(this);
         });
         map.on('movestart', this.onMoveStart);
@@ -363,7 +377,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
             editing.applyHandles(this);
             // Readiness for the e2e suite: set once the map has gone idle with
             // its sources and layers added.
-            map.once('idle', () => camera.publishReadiness(this, map));
+            map.once('idle', () => {
+                camera.publishReadiness(this, map);
+                // The map first settled: the page's first viewport (entry 14).
+                camera.publishViewport(this, map, true);
+            });
         });
         this.map = map;
         // The Edit switch and the studio wait for map.load's level (applyStudioControls, componentDidUpdate).
@@ -440,7 +458,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (this.props.delegate && this.props.delegate.level !== null) {
             this.lastLevel = this.props.delegate.level;
         }
-        this.applyEditMode(prevProps);
+        const modeChanged = this.applyEditMode(prevProps);
+        // The page's selectedItem, beside its editMode (entry 14): a write of its own is read now and applied below, once the mode
+        // it was written with is in force (a mode set here takes effect on the next update).
+        selection.readPageSelection(this, prevProps.props.selectedItem);
         this.applyStudioControls();
         this.applyTopBar();
         this.dropDeadSelection();
@@ -450,6 +471,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
         editing.applyEditing(this);
         editing.applyHandles(this);
         camera.applyStartingArea(this);
+        if (!modeChanged) {
+            selection.applyPageSelection(this);
+        }
         camera.applyRestore(this);
         camera.saveSelection(this);
     }
@@ -458,10 +482,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * Edit mode from the level and the prop (epic 4 entry 2, contract 0.4.0): a session at level `phone` or `none`
      * is in View mode whatever the prop says, which is left as written; at level `full` the prop's change enters
      * or leaves Edit mode when it differs from the model, so the component's own write coming back (the switch,
-     * the rail's View), which already matches the model, never re-enters it. `selectedItem` is read here too and
-     * does nothing: the page-to-component direction is entry 14's.
+     * the rail's View), which already matches the model, never re-enters it. `selectedItem` is read beside it (entry 14,
+     * componentDidUpdate). True when the mode was set here, so a page's choice of an item written with it waits for it.
      */
-    private applyEditMode(prevProps: Readonly<Props>): void {
+    private applyEditMode(prevProps: Readonly<Props>): boolean {
         const delegate = this.props.delegate;
         const level = delegate ? delegate.level : null;
         const editing = isEditing(this.state.studio);
@@ -469,13 +493,16 @@ export class MapStudio extends Component<Props, MapStudioState> {
             // A phone or viewer session (and phone widths, which keep View mode) stays in View mode, the prop as written.
             if (editing) {
                 this.setEditMode(false, false);
+                return true;
             }
-            return;
+            return false;
         }
         const wanted = this.props.props.editMode;
         if (prevProps.props.editMode !== wanted && wanted !== editing) {
             this.setEditMode(wanted, false);
+            return true;
         }
+        return false;
     }
 
     /**
@@ -626,6 +653,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
 
     /** A search result or a Needs you row chosen (entries 9 and 3; camera.ts goToItem). */
     onSearchChoose = (result: SearchResult): void => camera.onSearchChoose(this, result);
+    /** The page's choice in View mode (entry 14, selection.tsx applyPageSelection): as the search's, a line with its popup too. */
+    goToPageItem(id: string): void {
+        this.openedBy = null;
+        camera.goToItem(this, id, 'The page', '(selectedItem)', true);
+    }
     onNeedsYouChoose = (row: NeedsYouRow): void => camera.onNeedsYouChoose(this, row);
 
     /** The legend's basemap choice (epic 3 entry 6): the delegate selects it and remembers it. */

@@ -27,17 +27,46 @@ public final class MapStudioComponent {
     public static final String COMPONENT_ID = "ao.mapstudio";
 
     /**
-     * The component's one event (epic 4 entry 2, contract 0.4.0, docs/contract.md "The component's
-     * events"): fired by the browser on every selection change with the selected map item as the
-     * AD-7 map item object, or null when the selection was cleared. Its payload schema is
-     * {@code mapstudio.events.json}; the browser fires it as {@code componentEvents.fireComponentEvent}.
+     * The component's events (epic 4 entries 2 and 14, contract 0.4.0, docs/contract.md "The component's
+     * events"), fired by the browser through {@code componentEvents.fireComponentEvent}, each with its payload
+     * schema: {@code onItemSelected} on every selection change with the selected map item as the AD-7 map item
+     * object under {@code mapItem}, or null when the selection was cleared ({@code mapstudio.events.json}).
      */
     public static final String EVENT_ITEM_SELECTED = "onItemSelected";
 
-    /** The event's description, as the Designer's event editor shows it. */
-    static final String EVENT_ITEM_SELECTED_DESCRIPTION = "Fired on every selection change: event.item is the "
+    /**
+     * Fired when the map first settles and at every move end, never during a move, with the viewport object the
+     * component also writes to its {@code viewport} prop ({@code mapstudio.events.viewport.json}).
+     */
+    public static final String EVENT_VIEWPORT_CHANGED = "onViewportChanged";
+
+    /**
+     * Fired wherever the Gateway is told {@code popup.open}, with {@code {itemId, segment}}
+     * ({@code mapstudio.events.popup-open.json}).
+     */
+    public static final String EVENT_POPUP_OPEN = "onPopupOpen";
+
+    /**
+     * Fired wherever the Gateway is told {@code popup.close}, with {@code {itemId}}
+     * ({@code mapstudio.events.popup-close.json}).
+     */
+    public static final String EVENT_POPUP_CLOSE = "onPopupClose";
+
+    /** The events' descriptions, as the Designer's event editor shows them. */
+    static final String EVENT_ITEM_SELECTED_DESCRIPTION = "Fired on every selection change: event.mapItem is the "
         + "selected map item (id, name, kind, assetId, properties, basePath, alarmsPath, values), or null when the "
         + "selection was cleared. The selectedItem prop carries the id.";
+
+    static final String EVENT_VIEWPORT_CHANGED_DESCRIPTION = "Fired when the map first settles and at every move end, "
+        + "never during a move: event.center is [lng, lat], event.zoom the zoom and event.bounds "
+        + "[[west, south], [east, north]]. The viewport prop carries the same object.";
+
+    static final String EVENT_POPUP_OPEN_DESCRIPTION = "Fired when a popup opens in View mode: event.itemId is the map "
+        + "item's id and event.segment the line segment it opened at ({fromId, toId}), or null for a point. A new "
+        + "segment of the same line is a new open; Edit mode opens no popup.";
+
+    static final String EVENT_POPUP_CLOSE_DESCRIPTION = "Fired when a popup closes: event.itemId is the map item "
+        + "whose popup closed.";
 
     /** The descriptor registered with Perspective's component registries. */
     public static final ComponentDescriptor DESCRIPTOR;
@@ -49,8 +78,15 @@ public final class MapStudioComponent {
             .setId(COMPONENT_ID)
             .setModuleId(MapStudioModule.MODULE_ID)
             .setSchema(MapStudioModule.schema("/mapstudio.props.json"))
-            .setEvents(List.of(new ComponentEventDescriptor(EVENT_ITEM_SELECTED, EVENT_ITEM_SELECTED_DESCRIPTION,
-                MapStudioModule.schema("/mapstudio.events.json"))))
+            .setEvents(List.of(
+                new ComponentEventDescriptor(EVENT_ITEM_SELECTED, EVENT_ITEM_SELECTED_DESCRIPTION,
+                    MapStudioModule.schema("/mapstudio.events.json")),
+                new ComponentEventDescriptor(EVENT_VIEWPORT_CHANGED, EVENT_VIEWPORT_CHANGED_DESCRIPTION,
+                    MapStudioModule.schema("/mapstudio.events.viewport.json")),
+                new ComponentEventDescriptor(EVENT_POPUP_OPEN, EVENT_POPUP_OPEN_DESCRIPTION,
+                    MapStudioModule.schema("/mapstudio.events.popup-open.json")),
+                new ComponentEventDescriptor(EVENT_POPUP_CLOSE, EVENT_POPUP_CLOSE_DESCRIPTION,
+                    MapStudioModule.schema("/mapstudio.events.popup-close.json"))))
             .setName("Map Studio")
             .setIcon(new ImageIcon(icon))
             .addPaletteEntry("", "Map Studio",

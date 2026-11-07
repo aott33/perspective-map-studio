@@ -8,7 +8,9 @@
  * popup.open and popup.close the Gateway is told, the selection attributes the e2e suite reads, and
  * (epic 4 entry 2, contract 0.4.0) the page's window on the selection: `selectedItem` written to the
  * component's props and `onItemSelected` fired with the AD-7 map item object on every selection
- * change, in `publishSelection`, which every selection path reaches. In Edit mode (epic 4 entry 26, the owner's choice A;
+ * change, in `publishSelection`, which every selection path reaches; from entry 14 the other way too, a page's write to
+ * `selectedItem` read (`readPageSelection`, the component's own write coming back left out) and applied as a click on the item
+ * (`applyPageSelection`), and the payload's key `mapItem`. In Edit mode (epic 4 entry 26, the owner's choice A;
  * EXPERIENCE.md Select) no popup, line popup or sheet opens: every way into one (a marker, a line, a pick list's row, the
  * restore of a remembered place, a choice), and a click on an area, selects the item and opens Details instead
  * (`selectWithDetails`), the item keeping its place on the page as Details docks; entering Edit mode closes an open one
@@ -26,6 +28,7 @@ import { PageStore } from '@inductiveautomation/perspective-client';
 import { Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent, Popup } from 'maplibre-gl';
 import type { MapStudioState, Props } from './MapStudio';
 import { MapStudioStoreDelegate } from './MapStudioStoreDelegate';
+import { RESTORE_WAIT_MS } from './camera';
 import { MapItemRecord } from './contract';
 import { DefaultPopup } from './DefaultPopup';
 import { SegmentRef, Selection } from './features';
@@ -40,7 +43,9 @@ import {
     LAYER_AREA_FILL, LAYER_AREA_LINE, LAYER_AREA_LINE_DASHED, LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED, LAYER_ITEM_MARKERS
 } from './mapLayers';
 import { NeedsYouControl } from './NeedsYouControl';
+import { ITEM_SELECTED_EVENT, firePageEvent, noteWrite, pageId, takeEcho, writePageProp } from './pageEvents';
 import { PickList, PickRow } from './PickList';
+import { Place } from './place';
 import { PointPopup } from './PointPopup';
 import {
     LINE_POPUP_PX, MAP_ITEM_PARAM, POPUP_WIDTH_PX, PopupPoint, fillLink, fillParams, isSheetWidth, popupItemView, popupMaxHeight, popupMountPath,
@@ -70,6 +75,12 @@ export interface OpenPopup {
 export interface OpenPick {
     rows: PickRow[];
     lngLat: [number, number];
+}
+
+/** A value the page wrote to `selectedItem` (epic 4 entry 14) waiting to be applied: the id, or null, and when it was read. */
+export interface PageSelection {
+    id: string | null;
+    since: number;
 }
 
 /** How long a custom popup view waits for the popup detail (the base path) before it opens without it. */
@@ -105,14 +116,27 @@ export interface SelectionHost {
     openedBy: 'search' | 'needsyou' | null;
     /** The selection last written to the page (the item's id, '' for none), so a redraw with the same selection writes nothing. */
     publishedSelection: string;
+    /** The component's own `selectedItem` writes whose echo has not come back yet, oldest first ('' for null; pageEvents.ts). */
+    ownSelectedWrites: string[];
+    /** The page's choice waiting to be applied (entry 14): until the items have come, or while a tool is in hand; else null. */
+    pageSelection: PageSelection | null;
+    /** A remembered selection still to put back (camera.ts applyRestore), which a page's choice replaces. */
+    restore: Place | null;
+    /** Whether the items sources exist (after the map's load). */
+    itemsReady: boolean;
     zoomControl: ZoomControl | null;
     searchControl: SearchControl | null;
     needsYouControl: NeedsYouControl | null;
     legendControl: LegendControl | null;
     liveItem(id: string): MapItemRecord | undefined;
+    /** The map item on the map, or the one this page placed and has not yet saved. */
+    itemFor(id: string): MapItemRecord | undefined;
     anchorFor(id: string, lngLat: [number, number]): [number, number];
     /** A selection with the studio model that goes with it (studio.ts), built from the pending state, for a functional setState. */
     selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio' | 'panel' | 'geometry'>;
+    /** The page's choice moved to as a list row's in Edit mode (Details, no popup) and as the search's in View mode (entry 14). */
+    onRowSelect(id: string): void;
+    goToPageItem(id: string): void;
     /**
      * Whether the studio's surfaces show (epic 4 entry 2): Edit mode at level `full`, 768 px and wider. A click then selects and opens
      * Details, with no popup (entry 26).
@@ -902,8 +926,8 @@ export function renderPopup(host: SelectionHost): React.ReactNode {
     return ReactDOM.createPortal(popupContentFor(host, open), host.popupContent);
 }
 
-/** The event the component fires on every selection change (MapStudioComponent.EVENT_ITEM_SELECTED, contract 0.4.0). */
-export const ITEM_SELECTED_EVENT = 'onItemSelected';
+/** The event the component fires on every selection change (MapStudioComponent.EVENT_ITEM_SELECTED, contract 0.4.0; pageEvents.ts). */
+export { ITEM_SELECTED_EVENT };
 
 /**
  * The selection for the zoom card's Return and the e2e suite: the id and kind, and an open segment's ends (entry 2);
@@ -932,26 +956,102 @@ export function publishSelection(host: SelectionHost): void {
 /**
  * The page's window on the selection (epic 4 entry 2, contract 0.4.0, AD-7): the `selectedItem` prop
  * written through the component's property tree (a binding on the page follows it) and the
- * `onItemSelected` component event fired with `{item}`, the AD-7 map item object or null when the
- * selection was cleared. Both at every level: a viewer's page may follow the selection too. The
- * page-to-component direction (the page writing `selectedItem`) is entry 14's: the component never
- * reads the prop back into its model, so its own write coming back changes nothing.
+ * `onItemSelected` component event fired with `{mapItem}` (entry 14; entry 2 shipped `item`, unreleased), the AD-7 map item
+ * object or null when the selection was cleared. Both at every level: a viewer's page may follow the selection too. The write
+ * is noted first (pageEvents.ts `noteWrite`), so its echo is told from a page's write when it comes back (`readPageSelection`).
  */
 function publishToPage(host: SelectionHost, id: string | null): void {
     const store = host.props.store;
     const item = id !== null ? itemFor(host, id) : undefined;
     const payload = item ? selectedItemObject(host, item) : null;
-    try {
-        store.props.write('selectedItem', id);
-    } catch (err) {
-        console.warn('[MapStudio] The selectedItem prop could not be written: ' + (err instanceof Error ? err.message : String(err)));
+    const before = host.ownSelectedWrites;
+    host.ownSelectedWrites = noteWrite(before, id, pageId(host.props.props.selectedItem));
+    if (!writePageProp(store.props, 'selectedItem', id)) {
+        // Nothing written, so nothing comes back.
+        host.ownSelectedWrites = before;
     }
-    try {
-        store.componentEvents.fireComponentEvent(ITEM_SELECTED_EVENT, { item: payload });
-    } catch (err) {
-        console.warn('[MapStudio] The onItemSelected event could not be fired: ' + (err instanceof Error ? err.message : String(err)));
-    }
+    firePageEvent(store.componentEvents, ITEM_SELECTED_EVENT, { mapItem: payload });
     console.debug('[MapStudio] Selection published to the page: ' + (id === null ? 'none' : id));
+}
+
+/**
+ * The page's `selectedItem` as the component mounts (entry 14): a value set before then is the page's choice, applied once the
+ * items have come (`applyPageSelection`), and it wins over the remembered place's selection, which is dropped. The remembered
+ * selection's own id is left to the restore (the place's camera with it): it is this component's earlier write, which the page's
+ * Gateway session keeps across a browser reload.
+ */
+export function readMountSelection(host: SelectionHost): void {
+    const id = pageId(host.props.props.selectedItem);
+    if (id === null || (host.restore && host.restore.selected && host.restore.selected.id === id)) {
+        return;
+    }
+    host.pageSelection = { id, since: Date.now() };
+    host.restore = null;
+    console.info('[MapStudio] The page selected ' + id + ' before the map was made.');
+}
+
+/**
+ * The page's `selectedItem` changed (entry 14; MapStudio.componentDidUpdate, beside the editMode prop, with the same `prevProps`
+ * pattern): the component's own write coming back is left out (pageEvents.ts `takeEcho`); anything else is the page's choice,
+ * which waits in `pageSelection` until it can be applied (the latest write wins) and wins over a remembered selection not yet put
+ * back.
+ */
+export function readPageSelection(host: SelectionHost, prev: unknown): void {
+    const id = pageId(host.props.props.selectedItem);
+    if (id === pageId(prev)) {
+        return;
+    }
+    const taken = takeEcho(host.ownSelectedWrites, id);
+    host.ownSelectedWrites = taken.pending;
+    if (taken.echo) {
+        return;
+    }
+    host.pageSelection = { id, since: Date.now() };
+    host.restore = null;
+    console.info('[MapStudio] The page selected ' + (id === null ? 'nothing' : id) + '.');
+}
+
+/**
+ * Apply the page's choice (entry 14) once it can be: the map made, its items drawn and map.load answered, and no Point, Line or
+ * Area tool in hand (a choice made while one is waits for it to go down, and the drawing is never touched). Null clears the
+ * selection and closes the popup (and Details); an id not on the map clears it with one warning naming it; any other id does
+ * what a click on the item does: in View mode the search's choice with the popup (camera.ts `goToItem`: a point centred with its
+ * popup or sheet, a member of a shared marker with its own popup at the shared marker, a line fitted with its line popup), in
+ * Edit mode a list row's (`onRowSelect`: Details open, no popup, the item in view). In View mode it waits for the first full
+ * batch, the kind display a popup is drawn from, as the restore does, but not past RESTORE_WAIT_MS.
+ */
+export function applyPageSelection(host: SelectionHost): void {
+    const want = host.pageSelection;
+    const delegate = host.props.delegate;
+    if (!want || !host.map || !host.itemsReady || !delegate || host.state.studio.tool !== null) {
+        return;
+    }
+    if (want.id === null) {
+        host.pageSelection = null;
+        host.openedBy = null;
+        clearSelection(host);
+        return;
+    }
+    if (delegate.load.state !== 'loaded') {
+        return;
+    }
+    const studio = host.studioOn();
+    const item = studio ? host.itemFor(want.id) : host.liveItem(want.id);
+    if (!item) {
+        host.pageSelection = null;
+        console.warn('[MapStudio] The page selected ' + want.id + ', which is not on the map: the selection was cleared.');
+        clearSelection(host);
+        return;
+    }
+    if (!studio && delegate.live.fulls === 0 && Date.now() - want.since < RESTORE_WAIT_MS) {
+        return;
+    }
+    host.pageSelection = null;
+    if (studio) {
+        host.onRowSelect(item.id);
+    } else {
+        host.goToPageItem(item.id);
+    }
 }
 
 /** The map item on the map, or the one this page has placed and not yet saved (the Point tool's create in flight). */

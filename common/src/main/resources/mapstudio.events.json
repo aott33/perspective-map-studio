@@ -1,9 +1,9 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "description": "The event object of onItemSelected (epic 4 entry 2, docs/contract.md): the selected map item as the AD-7 map item object, or null when the selection was cleared.",
+  "description": "The event object of onItemSelected (epic 4 entries 2 and 14, docs/contract.md): the selected map item as the AD-7 map item object, under mapItem, or null when the selection was cleared.",
   "properties": {
-    "item": {
+    "mapItem": {
       "type": [
         "object",
         "null"

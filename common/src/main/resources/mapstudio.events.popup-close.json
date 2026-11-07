@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "description": "The event object of onPopupClose (epic 4 entry 14, docs/contract.md): fired wherever the Gateway is told popup.close.",
+  "properties": {
+    "itemId": {
+      "type": "string",
+      "description": "The id of the map item whose popup closed."
+    }
+  }
+}
