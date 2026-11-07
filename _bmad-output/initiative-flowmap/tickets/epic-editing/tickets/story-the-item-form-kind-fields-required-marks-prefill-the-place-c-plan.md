@@ -75,6 +75,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIEN
 ## Implementation Notes
 
 - Approval (owner, 2026-11-06): "Keep full plan, approve and continue" (the plan about 2,400 tokens, kept whole); it went ready-for-dev and implementation started in this session.
+- Implementation, 2026-11-07: verified as the Verification section says. `npx tsc --noEmit` clean and `npx jest` 51 suites, 496 tests passed (new: `itemForm.test.ts`, `itemFormSave.test.ts`, `itemPanel.test.ts`; added cases in `itemList.test.ts` and `save.test.ts`); `./gradlew clean build --offline` BUILD SUCCESSFUL; `check-contract-versions.sh` OK at 0.4.0; `ops/up.sh --fresh` then the whole e2e suite: 187 passed, 7 skipped (the opt-in ones), none failed, `details.spec.mjs` 8 of 8 among them; the spec alone again after its latitude Esc check, 8 passed. Not run: the quick review (`lenses_ran` empty), and the owner's look at the renders.
 - Planner, 2026-11-06: the environment, commit and identity rules are entry 4's plan's (Docker started by hand after a container restart, `ops/up.sh --fresh` before a whole-suite run with nothing else against the stack, the two trailer lines from the session's attribution reminder, `git commit --only` your paths, no em dashes, no model identifier, never a bare `git stash`, never a push). Commit at each working milestone. A layout that departs from DESIGN.md's Properties panel is rendered for the owner before it is built (owner's rule, 2026-11-05).
 
 ## Plan Change Log

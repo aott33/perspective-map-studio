@@ -232,6 +232,12 @@ test.describe('1366 px', () => {
             await page.locator('.mapstudio-field-name').fill('Not this');
             await page.locator('.mapstudio-field-name').press('Escape');
             await expect(page.locator('.mapstudio-field-name')).toHaveValue('Form pad');
+            // And a typed latitude's: the point stays.
+            const lat = page.locator('.mapstudio-field-lat');
+            const latBefore = await lat.inputValue();
+            await lat.fill('39.7');
+            await lat.press('Escape');
+            await expect(lat).toHaveValue(latBefore);
             await expectNothingSent(page, map, seq);
 
             // Status chosen: saved at once, one batch and one undo step; Missing goes.
