@@ -2,7 +2,7 @@
 
 A walk through what epic 4 has built so far, grouped by what you do, on the local development stack. Tick each box and note anything that looks or feels off in the Notes line under each section (a screenshot helps). Each note goes into `_bmad-output/initiative-flowmap/tickets/epic-editing/epic-editing.md` Notes or a new entry. The playbook grows as entries land; entry 18 (the 0.4.0 release) finishes it for the release test and the 30-minute test.
 
-Built so far (2026-11-07): entries 1 to 6, 21 to 27 and 14. Still to come: 15 (you are here, Locate me), 16 (Directions, Nearest, distances), 7 (the item list as designed, the checklist), 8 (selecting several), 9 (instruments), 10 (save problems), 11 (Recent changes and History), 12 and 13 (the Kinds screen, the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
+Built so far (2026-11-07): entries 1 to 6, 21 to 27, 14 and 15. Still to come: 16 (Directions, Nearest, distances), 7 (the item list as designed, the checklist), 8 (selecting several), 9 (instruments), 10 (save problems), 11 (Recent changes and History), 12 and 13 (the Kinds screen, the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
 
 ## Results so far
 
@@ -17,6 +17,7 @@ Built so far (2026-11-07): entries 1 to 6, 21 to 27 and 14. Still to come: 15 (y
 | 6. The item form | | |
 | 7. The place check | | |
 | 8. The page's events | | |
+| 8a. You are here and Locate me | | |
 | 9. View mode, unchanged | | |
 | 10. Phone (390 px) | | |
 | 11. Designer | | |
@@ -29,7 +30,7 @@ Built so far (2026-11-07): entries 1 to 6, 21 to 27 and 14. Still to come: 15 (y
 - [ ] A window at least 1366 px wide for sections 1 to 8 (below 768 px the map keeps View mode).
 - [ ] The Gateway trial has time left.
 
-Pages used below, in the dev project: `/` (View mode), `/edit` (opens in Edit mode), `/adapters` (the kind and asset list modes), `/events` (the page's events), `/styles`, `/live`.
+Pages used below, in the dev project: `/` (View mode), `/edit` (opens in Edit mode), `/adapters` (the kind and asset list modes), `/events` (the page's events), `/locate` (you are here), `/styles`, `/live`.
 
 Notes:
 
@@ -120,6 +121,21 @@ On `/events`: a table of items beside the map, and a label per event.
 - [ ] Pan the map: `onViewportChanged` and the viewport label change once, when the pan ends, never while panning.
 - [ ] `/events/<an item id>` opens with that item chosen once the map loads.
 - [ ] In Edit mode, a row chosen while the Line tool is in hand waits until the tool is put down; the drawing is not touched.
+
+Notes:
+
+## 8a. You are here and Locate me
+
+On `/locate`: the map's `userLocation` is bound to `{session.props.geolocation}`; the page turns the location on as it opens and has a Location off checkbox; the line under the toolbar shows the bound value. Your browser asks for location permission: allow it.
+
+- [ ] The line under the toolbar shows your position (`latitude`, `longitude`, `accuracy`) and `"enabled":true`. Note what `permissionGranted` reads: in a desktop or phone browser on 8.3.10 it stays `null` (only the Perspective mobile app sets it), and then the map shows no marker and Locate me says "Locate me - location permission not granted" (the plan's rule; see docs/platform-checks.md, "Epic 4 entry 15"). Decide whether a browser's position with `permissionGranted` null should count.
+- [ ] In the Perspective mobile app (or wherever `permissionGranted` reads `true`): a violet dot with a white ring sits at your position over a soft circle the size of the accuracy; with a heading (moving, on a phone) a wedge points your way and turns as the map turns.
+- [ ] The zoom card's last button, after Return, is Locate me (a navigation arrow). Pan away and press it: the map centres on you at zoom 15, or keeps a closer zoom. The map never follows you on its own.
+- [ ] Open the Legend: States end with the dot and "You are here". In Edit mode, the rail's Layers, Legend tab ends the same way.
+- [ ] Click the dot: nothing is selected and no popup opens; search for "You are here": nothing; the item list in Edit mode has no row for it.
+- [ ] Tick Location off: the marker and the legend row go; Locate me fades, its hover text "Locate me - location is off for this session", and a press does nothing. Untick: it comes back.
+- [ ] Block the site's location permission in the browser and reload: Locate me says the location is off (the client turns it off when the browser refuses).
+- [ ] At 390 px: the marker shows, Locate me is a 44 px target, and the Legend sheet's States end with "You are here".
 
 Notes:
 

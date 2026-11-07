@@ -99,7 +99,7 @@ describe('the userLocation prop (epic 4 entry 15)', () => {
 
     test('the words have no em dash, and Locate me zooms as Zoom to location', () => {
         for (const words of [...Object.values(LOCATE_WORDS), YOU_ARE_HERE_WORDS]) {
-            expect(words).not.toContain('—');
+            expect(words).not.toContain('\u2014');
         }
         expect(LOCATE_ZOOM).toBe(CHOSEN_POINT_ZOOM);
     });
