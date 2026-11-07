@@ -3,7 +3,7 @@ title: "You are here and Locate me from the page's geolocation binding"
 type: 'feature'
 ticket: '15'
 created: '2026-11-07'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '7ebffc92a6a11b76fef0a40334bbe53372c95064'
 route: 'full'
 route_source: 'auto'
@@ -62,13 +62,13 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `common/` schema and its test -- the prop declared and documented.
-- [ ] `web/typescript/userLocation.ts` + `__tests__/userLocation.test.ts` -- every matrix input parsed, the words, the circle.
-- [ ] `mapLayers.ts`, `MapStudio.tsx`, `ZoomControl.ts`, `controls.ts`, `viewControls.ts`, `legend.ts`, `LegendControl.ts`, `mapstudio.css` + Jest (legend key with and without a position, zoom card state words) -- the marker, the legend row and Locate me.
-- [ ] `web/typescript/__tests__/noGeolocation.test.ts` -- fails if any `web/typescript` source (tests excluded) names `navigator.geolocation`, `getCurrentPosition`, `watchPosition` or `permissions.query`.
-- [ ] `ops/project/` -- `/locate`, ignition-lint clean; the two Designer tests list it.
-- [ ] `e2e/tests/locate.spec.mjs` -- the matrix at 1366 and 390 px with a mocked position, screenshots for the owner.
-- [ ] Docs, CHANGELOG and the playbook section.
+- [x] `common/` schema and its test -- the prop declared and documented.
+- [x] `web/typescript/userLocation.ts` + `__tests__/userLocation.test.ts` -- every matrix input parsed, the words, the circle.
+- [x] `mapLayers.ts`, `MapStudio.tsx`, `ZoomControl.ts`, `controls.ts`, `viewControls.ts`, `legend.ts`, `LegendControl.ts`, `mapstudio.css` + Jest (legend key with and without a position, zoom card state words) -- the marker, the legend row and Locate me.
+- [x] `web/typescript/__tests__/noGeolocation.test.ts` -- fails if any `web/typescript` source (tests excluded) names `navigator.geolocation`, `getCurrentPosition`, `watchPosition` or `permissions.query`.
+- [x] `ops/project/` -- `/locate`, ignition-lint clean; the two Designer tests list it.
+- [x] `e2e/tests/locate.spec.mjs` -- the matrix at 1366 and 390 px with a mocked position, screenshots for the owner.
+- [x] Docs, CHANGELOG and the playbook section.
 
 **Acceptance Criteria:**
 - Given the dev Gateway as `mapeditor` and a browser granting a mocked position, when `/locate` opens, then the matrix holds at 1366 and 390 px.
@@ -82,6 +82,11 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 - Approval (owner, 2026-11-07): "Approved" with the planner's three picks (unbound prop shows Locate me off; marker below point markers; both modes), written into the Approach; the plan, over size, kept whole.
 
 ## Plan Change Log
+
+- 2026-11-07 (implementer): the code. `userLocation.ts` reads the prop into `{state, position, accuracy, heading}` (a heading wrapped to 0 to 360), gives Locate me's words, the accuracy ring (64 vertices by the great-circle destination formula, closed, longitudes wrapped) and the wedge image's RGBA pixels (a 64 px cone pointing north, reaching 30 px, drawn in the token's colour; transparent while the token resolves to no colour, so the missing image resolver is never asked). `mapLayers.ts` adds the source `mapstudio-you-are-here` and the layers `mapstudio-you-accuracy-fill`, `-accuracy-edge`, `mapstudio-you-wedge` (symbol, `icon-rotate` from the heading, `icon-rotation-alignment: map`) and `mapstudio-you-dot` (one circle layer: a 7 px radius in `--qual-1` with a 2 px white stroke) after the unsaved layers and before the text layers, so the marker sits above areas, lines and the unsaved items and below the point text, markers and arrow; `--qual-1` joins `THEME_TOKENS` and `applyThemePaint` repaints the three paints and updates the wedge image in place. `MapStudio.tsx` `applyUserLocation` (mount, map load and every `componentDidUpdate`) draws the marker, sets Locate me and the legend's row from one reading, keyed so an equal value does nothing; `onLocate` eases as `onZoomToLocation` does with `LOCATE_ZOOM` (15, the search's chosen point zoom). Locate me is inert with `aria-disabled` (still focusable, so its reason is read) rather than `disabled`, and styled as Return disabled. The legend's key gains an optional `you` (present only when true, so a key without a position equals the keys built before); `LegendControl.setYouAreHere` and `legendKey`'s fourth argument set it. `data-you-are-here`, `-at`, `-accuracy`, `-heading` and `-drawn` are on the map for the suite.
+- 2026-11-07 (implementer): the platform. On 8.3.10 a page script turns `session.props.geolocation.enabled` on and the browser's position reaches the binding, but a browser session's `permissionGranted` stays null after a position arrives (the client writes it only from the Perspective mobile app's `native/gpsPermission` message, and false on any watch error, which also turns `enabled` off; a script may not write `data` or `permissionGranted`). By the frozen rule a plain browser therefore shows no marker and Locate me reads "permission not granted"; a browser's refusal reads Off. Recorded in `docs/platform-checks.md`, "Epic 4 entry 15"; the rule was not changed (human-owned intent): the owner decides whether a position with `permissionGranted` null counts. Nothing went into the project's session props, since the page's script works.
+- 2026-11-07 (implementer): the suite. `locate.spec.mjs` stands in for the mobile app's grant through the client's own bridge (`window.__webInterface.submitData({type: 'native/gpsPermission', data: {granted}})`), gives a heading through CDP's `Emulation.setGeolocationOverride`, makes No fix a watch that never answers (an init script), and moves the position with the location turned off and on around it (Chromium fails a running watch when its override changes, POSITION_UNAVAILABLE). A further test checks the plain browser's path as it is (position with `permissionGranted` null: "permission not granted"; a refusal: Off). The dev page's "Write geolocation" control was dropped once the Gateway refused a script's write to those keys. ignition-lint was not run: installing `ignition-lint-toolkit` was refused in this session's sandbox, so `MapStudioLocate/view.json` is unlinted (its scripts follow `/events`' pattern, each in a try with `java.lang.Throwable` and `Exception`).
+- 2026-11-07 (implementer): verified. `cd web && npx tsc --noEmit && npm test`: clean, 594 tests in 58 suites (565 before). `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew clean build --offline --rerun-tasks`: BUILD SUCCESSFUL, 520 JVM tests, none failed (`MapStudioComponentTest` 4 of 4 with `userLocation`; `ProjectListsTest` and `ProjectResourcesTest` with `/locate`); the container had lost its JDK 17, reinstalled with apt (`openjdk-17-jdk-headless`). `bash scripts/ci/check-contract-versions.sh`: OK at 0.4.0. `ops/up.sh --fresh` then the whole e2e suite: 210 passed, 7 skipped (the opt-in ones), none failed, in 42.0 min; `locate.spec.mjs` 10 of 10 among them. ignition-lint: not run (see above).
 
 ## Review Triage Log
 
