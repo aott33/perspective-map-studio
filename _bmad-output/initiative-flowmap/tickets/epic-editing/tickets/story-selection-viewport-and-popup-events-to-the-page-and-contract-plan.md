@@ -3,7 +3,7 @@ title: "Selection, viewport and popup events to the page, and contract 0.4.0"
 type: 'feature'
 ticket: '14'
 created: '2026-11-07'
-status: 'in-review'
+status: 'built'
 baseline_revision: '2859994be52e3c0f4679ac9f9725e4c91c62ae79'
 route: 'full'
 route_source: 'auto'
@@ -101,6 +101,8 @@ Quick lens, 2026-11-07: 7 findings; high 0, medium 3, low 3, false 1.
 | `viewport`'s description says the next move end writes it again after a page write; an unchanged view writes nothing | low | `publishViewport` returns on an equal rounded viewport | patch: the words say the next move that changes the view |
 | The Designer listing the four events is not verified, against CLAUDE.md's validation step 4 | low | `docs/platform-checks.md` 1076 records it as not verified; no Designer runs in this container | defer: an owner check in the Designer (the map's event list shows four), recorded in deferred-work.md and entry 18 |
 | The recorded whole-suite run has one failure, so every spec did not pass | false | The failure is the known review 390 px flake the plan's Verification allows, which passed rerun alone, as for entries 26, 6 and 27 | rejected |
+
+Outcome, 2026-11-07: the five patches applied (72d6a85; the Designer's dev-project tests given the new pages and library, no expectation weakened) and verified by the orchestrator: `tsc` clean, Jest 565 passed in 54 suites, `./gradlew clean build --offline --rerun-tasks` green (every test run, the Designer's included), the contract check OK at 0.4.0, and `ops/up.sh --fresh` with the whole e2e suite on a fresh dev stack: 199 passed, 7 skipped, 1 failed in 37.2 min, the failure the known review 390 px flake ("No Connection to Gateway" in its snapshot), which passed rerun alone (dark once, light twice after one more flake). The Designer listing of the four events is the owner's check, carried to entry 18.
 
 ## Verification
 
