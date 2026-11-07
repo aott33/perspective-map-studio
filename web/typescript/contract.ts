@@ -1,5 +1,5 @@
 /**
- * The shared contracts of Map Studio 0.4.0, browser side (0.3.0 plus epic 4 entry 2's page contract: the bidirectional editMode, selectedItem and onItemSelected, MapStudio.tsx and selection.tsx). Mirrors
+ * The shared contracts of Map Studio 0.4.0, browser side (0.3.0 plus epic 4 entries 2 and 14's page contract: the bidirectional editMode and selectedItem, the viewport prop and the four component events, MapStudio.tsx, selection.tsx, camera.ts and pageEvents.ts). Mirrors
  * common/.../Messages.java and common/.../contract/*.java; docs/contract.md is
  * the reference. Pure types and readers only, unit tested in node.
  */
