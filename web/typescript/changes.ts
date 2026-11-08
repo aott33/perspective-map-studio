@@ -12,7 +12,7 @@
  */
 
 import { isRecord } from './json';
-import { MapItemRecord, MapLoadReplyBody, readMapItem } from './contract';
+import { KindSetupRecord, MapItemRecord, MapLoadReplyBody, readKindSetup, readMapItem } from './contract';
 
 /** One op of a `map.changed`: the op as saved, the new version, and the stored record after it. */
 export interface ChangedOp {
@@ -43,6 +43,11 @@ export interface ChangeState {
     /** True when an unreadable map.changed (or a buffer overflow) arrived while not loaded. */
     stale: boolean;
     items: MapItemRecord[];
+    /**
+     * The project's live kind setups (epic 4 entry 7b): map.load.reply's `kindSetups` (editors only), then every map.changed
+     * kind setup op by the version rule, a deleted one dropped. Empty for a viewer (the Gateway sends none at level none).
+     */
+    kindSetups: KindSetupRecord[];
 }
 
 /** What the delegate does after a step: redraw, nothing, or send map.load. */
@@ -56,7 +61,7 @@ export interface ChangeStep {
 /** Bodies held while not loaded; beyond this the state is marked stale and reloads once loaded. */
 export const MAX_BUFFER = 500;
 
-export const CHANGES_INITIAL: ChangeState = { seq: 0, loaded: false, buffer: [], stale: false, items: [] };
+export const CHANGES_INITIAL: ChangeState = { seq: 0, loaded: false, buffer: [], stale: false, items: [], kindSetups: [] };
 
 /** The body of a map.changed, or null when it is unreadable (missing seq or ops, or a bad item record). */
 export function readMapChanged(body: unknown): MapChangedBody | null {
@@ -104,15 +109,38 @@ export function applyRecord(items: MapItemRecord[], record: MapItemRecord): MapI
     return out;
 }
 
-function applyBody(items: MapItemRecord[], body: MapChangedBody): MapItemRecord[] {
-    let out = items;
-    for (const op of body.ops) {
-        // kindSetup records advance seq only: epic-viewing draws kind setups.
-        if (op.entity === 'item') {
-            out = applyRecord(out, op.record as MapItemRecord);
-        }
+/**
+ * The kind setups with one stored kind setup record applied by the same version rule (entry 7b): applied only when its
+ * version is above the held one (or none is held); a deleted one drops the kind's setup. Returns the same array when nothing
+ * changed. A record without its setup (a viewer's map.changed) is not one and changes nothing.
+ */
+export function applyKindSetup(setups: KindSetupRecord[], raw: unknown): KindSetupRecord[] {
+    const record = readKindSetup(raw);
+    if (!record) {
+        return setups;
+    }
+    const held = setups.find((k) => k.kindId === record.kindId);
+    if (held && held.version >= record.version) {
+        return setups;
+    }
+    const out = setups.filter((k) => k.kindId !== record.kindId);
+    if (!record.deleted) {
+        out.push(record);
     }
     return out;
+}
+
+function applyBody(state: ChangeState, body: MapChangedBody): Pick<ChangeState, 'items' | 'kindSetups'> {
+    let items = state.items;
+    let kindSetups = state.kindSetups;
+    for (const op of body.ops) {
+        if (op.entity === 'item') {
+            items = applyRecord(items, op.record as MapItemRecord);
+        } else if (op.entity === 'kindSetup') {
+            kindSetups = applyKindSetup(kindSetups, op.record);
+        }
+    }
+    return { items, kindSetups };
 }
 
 /** One loaded-state step for a readable body. */
@@ -121,7 +149,7 @@ function step(state: ChangeState, body: MapChangedBody): ChangeStep {
         return { state, action: 'ignore' };
     }
     if (body.seq === state.seq + 1) {
-        return { state: { ...state, seq: body.seq, items: applyBody(state.items, body) }, action: 'apply' };
+        return { state: { ...state, seq: body.seq, ...applyBody(state, body) }, action: 'apply' };
     }
     return { state: { ...state, loaded: false, buffer: [body], stale: false }, action: 'reload' };
 }
@@ -146,7 +174,8 @@ export function onChanged(state: ChangeState, body: MapChangedBody | null): Chan
  * stale buffer, asks for one more reload.
  */
 export function onLoad(state: ChangeState, reply: MapLoadReplyBody): ChangeStep {
-    let next: ChangeState = { seq: reply.seq, loaded: true, buffer: [], stale: false, items: reply.items };
+    const kindSetups = (reply.kindSetups || []).filter((k) => !k.deleted);
+    let next: ChangeState = { seq: reply.seq, loaded: true, buffer: [], stale: false, items: reply.items, kindSetups };
     if (state.stale) {
         return { state: { ...next, loaded: false }, action: 'reload' };
     }

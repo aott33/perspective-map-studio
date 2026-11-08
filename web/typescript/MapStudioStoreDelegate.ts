@@ -24,7 +24,7 @@
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
 import { MapChanges, MapChangedBody } from './changes';
-import { EditBatch, EditLevel, LastChange, MapItemData, MapItemRecord } from './contract';
+import { EditBatch, EditLevel, KindSetupRecord, LastChange, MapItemData, MapItemRecord } from './contract';
 import { Position, itemDeleteBatch, lineGeometryBatch, pointMoveBatch, splitAtBatch, vertexDeleteBatch, vertexMoveBatch } from './geometry';
 import { HostLists, NO_HOST_LISTS } from './adapters';
 import { MESSAGE_EVENT, Reply, basemapSource, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText } from './messages';
@@ -147,6 +147,14 @@ export interface MapStudioDelegateState {
      * undone leaves it; the page's reload clears it.
      */
     justAdded: string[];
+    /**
+     * The project's live kind setups (entry 7b): map.load.reply's `kindSetups` (editors only), kept live by map.changed's kind
+     * setup ops (changes.ts), so a setup saved anywhere, a script's `system.mapstudio.applyEdits` included, shows here. Empty
+     * for a viewer. The first-run checklist's step 1 is done while one exists.
+     */
+    kindSetups: KindSetupRecord[];
+    /** The session user map.load named, '' when none (a viewer, an anonymous session): the first-run checklist's kept flags are per project and user. */
+    user: string;
 }
 
 /** `localStorage`, or null when the browser refuses it (a private window, blocked site data). */
@@ -335,7 +343,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             shapeRefused: this.shapeRefused,
             inFlight: this.inFlightItems(),
             changed: this.changed,
-            justAdded: this.justAdded
+            justAdded: this.justAdded,
+            kindSetups: this.changes.state.kindSetups,
+            user: this.user
         };
     }
 

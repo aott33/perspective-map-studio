@@ -49,7 +49,7 @@ import {
 import { LOCATE_ZOOM, NO_LOCATION, UserLocation, readUserLocation, userLocationKey } from './userLocation';
 import { addViewControls } from './viewControls';
 import { Kind } from './adapters';
-import { MapStudioDelegateState, MapStudioStoreDelegate, clientOf } from './MapStudioStoreDelegate';
+import { MapStudioDelegateState, MapStudioStoreDelegate, browserStorage, clientOf } from './MapStudioStoreDelegate';
 import * as camera from './camera';
 import { Bounds } from './camera';
 import * as items from './itemsLayer';
@@ -72,6 +72,8 @@ import { DrawingBar } from './studio/DrawingBar';
 import { GeometryBar } from './studio/GeometryBar';
 import { ChromeGlyph } from './studio/ChromeGlyph';
 import { ProblemStatus } from './studio/SaveStatus';
+import { FirstRunChecklist, ViewerNote } from './studio/FirstRunChecklist';
+import { FIRST_RUN_NONE, FirstRunKept, VIEWER_NOTE, checklistShows, firstRunKey, keepFlag, readKept, stepsDone, viewerNoteShows } from './firstRun';
 
 /** Must match MapStudioComponent.COMPONENT_ID on the Java side. */
 export const COMPONENT_TYPE = 'ao.mapstudio';
@@ -1612,6 +1614,82 @@ export class MapStudio extends Component<Props, MapStudioState> {
         );
     }
 
+    /** The first-run checklist's kept flags (entry 7b), read once per project and user key; null before a key is known. */
+    private firstRunKept: { key: string | null; kept: FirstRunKept } | null = null;
+
+    /** The key of this project's and user's first-run flags, or null while the project is unknown (nothing kept then). */
+    private firstRunKey(delegate: MapStudioDelegateState): string | null {
+        const project = this.projectName();
+        return project !== null ? firstRunKey(project, delegate.user) : null;
+    }
+
+    /** The kept flags for this project and user (localStorage, null-safe; firstRun.ts). */
+    private keptFirstRun(delegate: MapStudioDelegateState): FirstRunKept {
+        const key = this.firstRunKey(delegate);
+        if (!this.firstRunKept || this.firstRunKept.key !== key) {
+            this.firstRunKept = { key, kept: key !== null ? readKept(browserStorage(), key) : FIRST_RUN_NONE };
+        }
+        return this.firstRunKept.kept;
+    }
+
+    /** Keep one first-run flag (Hide, or step 3's Open view mode) for this project and user, then redraw. */
+    private keepFirstRun(flag: keyof FirstRunKept): void {
+        const delegate = this.props.delegate;
+        if (!delegate) {
+            return;
+        }
+        const key = this.firstRunKey(delegate);
+        const kept = key !== null ? keepFlag(browserStorage(), key, flag) : { ...this.keptFirstRun(delegate), [flag]: true };
+        this.firstRunKept = { key, kept };
+        this.forceUpdate();
+    }
+
+    /** The card's Open Kinds: the rail's Kinds surface, as the rail opens it. */
+    onFirstRunKinds = (): void => this.onRailSurface('kinds');
+    /** The card's Open view mode: step 3 kept as done, then Edit mode left as the rail's View leaves it. */
+    onFirstRunView = (): void => {
+        this.keepFirstRun('viewed');
+        this.setEditMode(false, true);
+    };
+    /** Hide checklist: kept hidden for this project and user; the focus goes to the map, the card being gone. */
+    onFirstRunHide = (): void => {
+        this.keepFirstRun('hidden');
+        const canvas = this.mapContainer ? this.mapContainer.querySelector('canvas') as HTMLElement | null : null;
+        if (canvas && typeof canvas.focus === 'function') {
+            canvas.focus();
+        }
+    };
+
+    /**
+     * The first-run checklist in Edit mode and the viewer's note in View mode (entry 7b; firstRun.ts decides): an empty
+     * loaded map, its items counted with this page's unsaved creates, so a point just placed ends it before its save returns.
+     */
+    private renderFirstRun(delegate: MapStudioDelegateState, studioOn: boolean): React.ReactNode {
+        const loaded = delegate.load.state === 'loaded';
+        const itemCount = loaded ? delegate.items.filter((i) => !i.deleted).length + unsavedItems(delegate.unsaved).length : 0;
+        const toolInHand = this.state.studio.tool !== null || this.state.drawing !== null;
+        if (viewerNoteShows({ studioOn, loaded, itemCount })) {
+            return <ViewerNote text={VIEWER_NOTE} />;
+        }
+        if (!studioOn) {
+            return null;
+        }
+        const kept = this.keptFirstRun(delegate);
+        if (!checklistShows({ studioOn, loaded, itemCount, toolInHand, kept })) {
+            return null;
+        }
+        return (
+            <FirstRunChecklist project={this.projectName() || 'Map'}
+                               kindCount={delegate.lists.kinds.length}
+                               done={stepsDone(delegate.kindSetups.length, itemCount, kept)}
+                               addDisabled={delegate.editing === 'off'}
+                               onOpenKinds={this.onFirstRunKinds}
+                               onAddItem={this.onAddItem}
+                               onOpenView={this.onFirstRunView}
+                               onHide={this.onFirstRunHide} />
+        );
+    }
+
     private setMapContainer = (el: HTMLDivElement | null): void => {
         this.mapContainer = el;
     };
@@ -1744,6 +1822,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                                      onSplit={this.onSplitHere}
                                      onDelete={this.onDeletePoint} />
                     ) : null}
+                    {delegate ? this.renderFirstRun(delegate, studioOn) : null}
                     {studioOn && delegate ? this.renderListOverlay(delegate) : null}
                     {this.renderStylePanel()}
                     {selection.renderPopup(this)}

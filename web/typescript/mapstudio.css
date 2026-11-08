@@ -3450,6 +3450,138 @@
     width: auto;
 }
 
+/* The ghost button (DESIGN.md first-run-checklist's "Hide checklist"): no edge or fill until hovered. */
+.mapstudio-button--ghost {
+    border-color: transparent;
+    background: transparent;
+    color: var(--mapstudio-secondary);
+}
+
+/* The first-run checklist (epic 4 entry 7b; DESIGN.md first-run-checklist, key screen 8): a floating card centred on the
+   stage over the empty map in Edit mode, 400 px and narrower when the map is (at 1200 px it shrinks to fit), on the panel
+   surface with radius lg and the one soft shadow; never in the bottom-right corner. Above the map and the popup layer with
+   the controls, under the collapsed list open over the map (8). Each step a numbered ring (line-pipeline, 1.5 px; a check
+   once done), a bold label, a help line and a button; the footer counts and offers a ghost Hide checklist. */
+.mapstudio-firstrun {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 6;
+    box-sizing: border-box;
+    width: min(400px, calc(100% - 2 * var(--mapstudio-map-inset)));
+    max-height: calc(100% - 2 * var(--mapstudio-map-inset));
+    overflow-y: auto;
+    padding: 18px 18px 12px;
+    border-radius: 10px;
+    background: var(--mapstudio-surface);
+    color: var(--label);
+    box-shadow: var(--mapstudio-float-shadow);
+    font-size: 13px;
+    line-height: 1.4;
+    transform: translate(-50%, -50%);
+}
+
+.mapstudio-firstrun-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.mapstudio-firstrun-subline {
+    margin: 2px 0 10px;
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
+}
+
+.mapstudio-firstrun-steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.mapstudio-firstrun-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--mapstudio-divider);
+}
+
+.mapstudio-firstrun-ring {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 24px;
+    height: 24px;
+    border: 1.5px solid var(--neutral-60, var(--border));
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.mapstudio-firstrun-words {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.mapstudio-firstrun-label {
+    font-weight: 600;
+}
+
+.mapstudio-firstrun-help {
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
+}
+
+/* Words for assistive technology only: a done step says so, not the check alone. */
+.mapstudio-firstrun-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.mapstudio-firstrun-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px solid var(--mapstudio-divider);
+}
+
+.mapstudio-firstrun-count {
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+}
+
+/* The viewer's note (entry 7b; EXPERIENCE.md Empty map, viewer): View mode on an empty loaded map, for every user, a small
+   centred note in text-secondary on the panel surface, floating (the one soft shadow); it takes no pointer. */
+.mapstudio-empty-note {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 4;
+    box-sizing: border-box;
+    max-width: calc(100% - 2 * var(--mapstudio-map-inset));
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: var(--mapstudio-surface);
+    color: var(--mapstudio-secondary);
+    box-shadow: var(--mapstudio-float-shadow);
+    font-size: 12px;
+    line-height: 1.4;
+    text-align: center;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+}
+
 .mapstudio-toolbar-float--paused .mapstudio-toolbar {
     opacity: 0.42;
 }

@@ -50,6 +50,8 @@ export const GLYPH_PATHS = {
     magnet: 'M6 3v9a6 6 0 0 0 12 0V3M6 3h4v9a2 2 0 0 0 4 0V3h4M6 7h4M14 7h4',
     /** Trash: the properties panel's footer delete (epic 4 entry 25; DESIGN.md Properties panel, the key screens' trash). */
     trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+    /** Check: a first-run checklist step done, in its ring (epic 4 entry 7b; DESIGN.md first-run-checklist). */
+    check: 'M5.5 12.5l4 4 9-9',
     /** Undo and Redo: an arrow curling back, and forward. */
     undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
     redo: 'M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3',
