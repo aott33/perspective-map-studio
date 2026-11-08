@@ -2,7 +2,7 @@
 
 A walk through what epic 4 has built so far, grouped by what you do, on the local development stack. Tick each box and note anything that looks or feels off in the Notes line under each section (a screenshot helps). Each note goes into `_bmad-output/initiative-flowmap/tickets/epic-editing/epic-editing.md` Notes or a new entry. The playbook grows as entries land; entry 18 (the 0.4.0 release) finishes it for the release test and the 30-minute test.
 
-Built so far (2026-11-08): entries 1 to 6, 21 to 27, 14, 15, 16 and 7a (the item list as designed). Still to come: 7c and 7b (the list's layout and collapse, the checklist), 8 (selecting several), 9 (instruments), 10 (save problems), 11 (Recent changes and History), 12 and 13 (the Kinds screen, the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
+Built so far (2026-11-08): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed) and 7c (the layout). Still to come: 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems), 11 (Recent changes and History), 12 and 13 (the Kinds screen, the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
 
 ## Results so far
 
@@ -20,6 +20,7 @@ Built so far (2026-11-08): entries 1 to 6, 21 to 27, 14, 15, 16 and 7a (the item
 | 8a. You are here and Locate me | | |
 | 8b. Directions, Nearest and distances | | |
 | 8c. The item list | | |
+| 8d. The layout | | |
 | 9. View mode, unchanged | | |
 | 10. Phone (390 px) | | |
 | 11. Designer | | |
@@ -82,7 +83,7 @@ Notes:
 - [ ] A click on L-SWD selects it with its handles and Details; a click on an area (the North fence) does the same.
 - [ ] A shared spot opens its pick list; a row selects that item with Details; with Details already open for another item, nothing on the map moves.
 - [ ] With the Line tool in hand and Details open, Esc puts the tool down and Details stays; a second Esc closes Details.
-- [ ] Known and logged for entry 7: a point placed with the Point tool, and closing Details, still shift the map sideways.
+- [ ] A point placed with the Point tool, and closing Details, no longer shift the map sideways (entry 7c, section 8d).
 
 Notes:
 
@@ -176,6 +177,24 @@ On `/edit`, at 1366 or 1440 px, after **Seed the dev map** (it adds `P14 lease`,
 - [ ] "N unlinked" in the footer: pressing it leaves only the Not linked rows, with a cross to show everything again.
 - [ ] Rename an item, then sort by Last changed: it is first, with your user name and "Today" and the time.
 - [ ] Badges still change live (an alarm, comms lost, stale) and a row click still selects the item, opens Details and pans the map.
+
+Notes:
+
+## 8d. The layout
+
+On `/edit` after **Seed the dev map**, in a browser window you can resize (or the browser's device toolbar at a fixed width). The rule: whenever a panel docks or undocks beside the map, nothing on the map moves on the page.
+
+- [ ] At 1440 px or wider: the rail 72 px, the list 280 px, Details 340 px; the map about 748 px wide with an item selected.
+- [ ] At 1366 px: the list 256 px and Details 320 px; the map about 718 px with a selection, 1038 px without.
+- [ ] Pick the Point tool and click the ground: Details opens beside the map and the new pad stays exactly where you clicked (no jump of about 160 px). Undo.
+- [ ] Place a pad near the map's left edge, where Details lands: it slides just into view, about 48 px inside the map's left edge.
+- [ ] Draw a two-point line and press Enter: its points stay where you clicked as Details opens. Undo.
+- [ ] Click CTB1, then close Details three ways (a click on the ground, its close, Esc): each time CTB1 and every other item stay where they are as the map widens.
+- [ ] Narrow the window below 1280 px (1200): the list leaves the dock, the map widens, and nothing on the map moves. The toolbar is on the top row beside the Editing switch, clear of it.
+- [ ] Below 1280 px, the rail's **Items** opens the list over the map's left edge (header, groups, footer, the same list). Items again closes it; so do Esc (the focus back on Items) and a click on the map. Choose a row: the list closes and that item opens in Details.
+- [ ] Below 1280 px, Layers and Kinds still dock in the list's place (the map moves nothing as they come and go); with Details also open the toolbar drops to the row under the Editing switch.
+- [ ] Widen the window past 1280 px again: the list docks, and the items stay where they were on the page.
+- [ ] At 1440, 1366 and 1200 px with Details open: nothing but the small attribution text in the map's bottom-right corner (the Perspective App Bar toggle's spot).
 
 Notes:
 
