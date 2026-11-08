@@ -3,7 +3,7 @@ title: "Directions in the popup and the sheet, Nearest to me in search, the dist
 type: 'feature'
 ticket: '16'
 created: '2026-11-07'
-status: 'in-review'
+status: 'built'
 baseline_revision: 'f2a2522f6e0a45296f457c2b33eb5bf1e922b3c6'
 route: 'full'
 route_source: 'auto'
@@ -101,6 +101,8 @@ Quick lens, 2026-11-07: 2 findings; high 0, medium 1, low 1, false 0.
 | --- | --- | --- | --- |
 | Each new position rebuilds an open search list, A-Z or typed results included, and sends it back to the top | medium | `SearchControl.ts` `setPosition` (183) calls `search()` whenever the panel is open; `renderList` empties the panel; `showMore` keeps `scrollTop`, `setPosition` does not; a phone sends a fix every few seconds | patch: redraw only for Nearest or the switch appearing, the scroll kept |
 | With spaces typed the switch shows but Tab and the arrows cannot reach it | low | The keys test `input.value === ''` (665, 673); the switch shows on `value.trim() === ''` (314) | patch: the same trimmed test |
+
+Outcome, 2026-11-08: both patches applied (a035b38) and verified by the orchestrator: `tsc` clean, Jest 616 passed in 60 suites, `./gradlew clean build --offline --rerun-tasks` green, the contract check OK at 0.4.0, ignition-lint on `MapStudioDev` and `MapStudioLocate` 0 errors and 0 warnings (naming hints only), and `ops/up.sh --fresh` with the whole e2e suite: 220 passed, 7 skipped, 0 failed in 39.9 min (`directions.spec.mjs` 10 of 10). The scroll kept on a new position is covered by Jest only (`positionRedraws`): Chromium's emulation cannot send a new fix with the location on. A real phone and the Perspective mobile app opening the maps app are the owner's playbook check; the distance rows and View alarms' move go to entry 18's ER-27 review.
 
 ## Design Notes
 
