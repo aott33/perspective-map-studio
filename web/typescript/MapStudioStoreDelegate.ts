@@ -636,7 +636,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
     /**
      * A batch of this session saved (entry 7a): each map item it touched was last changed by the session user, now (to the
-     * second, as the Gateway's `at`); an item it deleted leaves Just added (an add undone, or the new item deleted).
+     * second, as the Gateway's `at`); an item it created joins Just added (a Redo of an undone add too), and an item it
+     * deleted leaves it (an add undone, or the new item deleted).
      */
     private noteSaved(batch: EditBatch, now: Date): void {
         const at = new Date(Math.floor(now.getTime() / 1000) * 1000).toISOString().replace('.000Z', 'Z');
@@ -649,6 +650,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             changed[op.id] = { actor: this.user, at };
             if (op.op === 'delete') {
                 deleted.add(op.id);
+            } else if (op.op === 'create' && this.justAdded.indexOf(op.id) < 0) {
+                // A create this session saved (a Redo of an undone add among them) is added (entry 7a's review).
+                this.justAdded = [op.id].concat(this.justAdded);
             }
         }
         this.changed = changed;

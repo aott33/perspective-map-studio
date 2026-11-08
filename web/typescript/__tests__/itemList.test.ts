@@ -235,6 +235,12 @@ describe('the list grouped by place, sorted, filtered (entry 7a)', () => {
             '## Field-wide', 'L-SWD', 'Lease',
             '# Not linked', 'Ghost', 'Scale 1', 'Scale 2'
         ]);
+        // Only a Field-wide line needing attention: the header counts it, and no divider stands before the first site.
+        const lineStale: LiveState = { ...LIVE_INITIAL, display: { line: { ...LIVE.display.pad, kindId: 'line' } },
+            items: { lswd: { ...LIVE.items.p3, id: 'lswd' } } };
+        const wideOnly = lines(groupRows(rows(lineStale), view()));
+        expect(wideOnly.slice(2, 4)).toEqual(['# MESA FIELD | 1 NEED ATTENTION', 'CTB1']);
+        expect(wideOnly).not.toContain('-- All normal');
         // The default sort with nothing needing attention: no count and no divider.
         expect(lines(groupRows(rows(), view())).slice(2, 4)).toEqual(['# MESA FIELD', 'CTB1']);
         // Rows keep the badge they have, live: the alarm row is the alarm.
@@ -247,6 +253,10 @@ describe('the list grouped by place, sorted, filtered (entry 7a)', () => {
             expect(lines(items).slice(0, 3)).toEqual(['# Just added', 'Scale 2', 'L-SWD']);
             expect(entriesOf(items).filter((e) => e.row.id === 's2' || e.row.id === 'lswd')).toHaveLength(2);
         }
+        // A parent just added keeps its children under it in their field, shown there as context (entry 7a's review).
+        expect(lines(groupRows(rows(), view({ sort: 'place', justAdded: ['p14'] }))).slice(0, 2)).toEqual(['# Just added', 'P14']);
+        expect(lines(groupRows(rows(), view({ sort: 'place', justAdded: ['p14'] })))).toEqual(expect.arrayContaining(['P14 [context]',
+            '  P14 lateral (on P14)', '  P14-2H (on P14)']));
         // An id no longer on the map (an add undone, the delegate dropping it later) shows nothing.
         expect(lines(groupRows(rows(), view({ justAdded: ['gone'] })))[0]).toBe('# KERMIT FIELD');
     });
@@ -281,12 +291,17 @@ describe('the list grouped by place, sorted, filtered (entry 7a)', () => {
             'Well 1', 'Well pad 8']);
         expect(kindChips(rows())[0].id).toBeNull();
         for (const sort of ['attention', 'place', 'kind', 'name', 'changed'] as ListSort[]) {
-            const shown = entriesOf(groupRows(rows(), view({ sort, kind: 'line', justAdded: ['s1'] }))).map((e) => e.row.kindId);
+            // Every row the Filter keeps is a line; a parent of another kind shows only as context, in the place sorts.
+            const shown = entriesOf(groupRows(rows(), view({ sort, kind: 'line', justAdded: ['s1'] }))).filter((e) => !e.context)
+                .map((e) => e.row.kindId);
             expect(shown.length).toBeGreaterThan(0);
             expect(shown.every((k) => k === 'line')).toBe(true);
         }
-        // A well with its pad filtered out stands as a site (no parent item among the kept rows).
-        expect(lines(groupRows(rows(), view({ sort: 'place', kind: 'well' })))).toEqual(['# MESA FIELD', 'P14-2H']);
+        // A well whose pad the Filter leaves out keeps its place: under its pad, shown as context (entry 7a's review).
+        expect(lines(groupRows(rows(), view({ sort: 'place', kind: 'well' })))).toEqual(['# MESA FIELD', 'P14 [context]', '  P14-2H (on P14)']);
+        // A line child (P14 lateral) under Filter Gathering line stays under P14, not in Field-wide.
+        expect(lines(groupRows(rows(), view({ sort: 'place', kind: 'line' })))).toEqual(['# MESA FIELD', 'P14 [context]',
+            '  P14 lateral (on P14)', '## Field-wide', 'L-SWD']);
     });
 
     test('Search items filters within the grouping; a matching child shows under its site row', () => {

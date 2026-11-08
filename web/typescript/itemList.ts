@@ -358,7 +358,8 @@ function treeAttention(row: ListRow, children: Map<string, ListRow[]>): number |
 
 /**
  * The list laid out (entry 7a; EXPERIENCE.md Item list): the rows the kind Filter keeps (every sort), then the Search items
- * text (in the place sorts a matching child shows under its site row, which comes along as context), then:
+ * text (in the place sorts a matching child shows under its site row, which comes along as context, as does a parent the
+ * Filter, the unlinked filter or Just added leaves out: parents are worked out from every row), then:
  *
  * - **Just added** first in every sort: the items this session added, newest first, and nowhere else.
  * - **Needs attention** (default) and **Place**: one group per field (`MESA FIELD`, the first segment of the asset path, by
@@ -416,7 +417,10 @@ export function groupRows(all: readonly ListRow[], view: ListView): ListItem[] {
         return out;
     }
     // The place sorts: the tree among the rows the filters keep, then the search keeps a match and the rows above it.
-    const parents = parentsOf(rows);
+    // The parents come from every row, before the filters: a parent the Filter, the unlinked filter or Just added leaves out
+    // still holds its children, shown above them as context (as a search's), so a child never loses its place.
+    const parents = parentsOf(all);
+    const kept = new Set(rows.map((r) => r.id));
     const shown = new Set<string>();
     const contextOnly = new Set<string>();
     for (const r of rows) {
@@ -428,12 +432,12 @@ export function groupRows(all: readonly ListRow[], view: ListView): ListItem[] {
             shown.add(p.id);
         }
     }
-    rows.forEach((r) => {
-        if (shown.has(r.id) && !matches(r)) {
+    all.forEach((r) => {
+        if (shown.has(r.id) && !(kept.has(r.id) && matches(r))) {
             contextOnly.add(r.id);
         }
     });
-    const visible = rows.filter((r) => shown.has(r.id));
+    const visible = all.filter((r) => shown.has(r.id));
     const children = new Map<string, ListRow[]>();
     const tops: ListRow[] = [];
     for (const r of visible) {
@@ -481,7 +485,8 @@ export function groupRows(all: readonly ListRow[], view: ListView): ListItem[] {
         const needing = f.sites.concat(f.wide).filter((r) => rank.get(r.id) !== null && rank.get(r.id) !== undefined).length;
         out.push({ type: 'header', key: 'h:field:' + field, label: fieldLabel(field), right: attention ? attentionLabel(needing) : '', level: 'group' });
         const sites = f.sites.slice().sort(ranked);
-        let divided = !attention || needing === 0;
+        // The divider follows the sites needing attention: none of them, no divider (a Field-wide row may still be counted).
+        let divided = !attention || !sites.some((r) => rank.get(r.id) !== null && rank.get(r.id) !== undefined);
         for (const site of sites) {
             if (!divided && (rank.get(site.id) === null || rank.get(site.id) === undefined)) {
                 out.push({ type: 'divider', key: 'd:' + field, label: ALL_NORMAL });

@@ -120,6 +120,14 @@ describe('the delegate keeps changed and Just added (entry 7a)', () => {
         save(last());
         expect(last().body.ops).toEqual([expect.objectContaining({ op: 'delete', id: line })]);
         expect(delegate.mapStateToProps().justAdded).toEqual([pad]);
+        // Redo of the undone add creates the line again: it is back in Just added (entry 7a's review).
+        delegate.redo();
+        expect(last().body.ops).toEqual([expect.objectContaining({ op: 'create', id: line })]);
+        save(last());
+        expect(delegate.mapStateToProps().justAdded).toEqual([line, pad]);
+        delegate.undo();
+        save(last());
+        expect(delegate.mapStateToProps().justAdded).toEqual([pad]);
         // A map.load (a gap, a reconnect) keeps the session's Just added: only the page's reload clears it.
         load({});
         expect(delegate.mapStateToProps().justAdded).toEqual([pad]);

@@ -3,14 +3,14 @@ title: "7a: The item list as designed (grouped by place, Sort by, Filter, the fo
 type: 'feature'
 ticket: '7'
 created: '2026-11-08'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '7613c87bd13da873fb6473b0f9b8198403dfa799'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
@@ -83,7 +83,20 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 ## Plan Change Log
 
+- 2026-11-08, review fixes: the divider follows the sites needing attention; parents are worked out from every row, a filtered-out or just-added parent shown as context over its children; a saved create (Redo of an undone add) rejoins Just added; docs/kinds-and-assets.md names eleven dev assets.
+
 ## Review Triage Log
+
+Quick lens, 2026-11-08: 6 findings; high 0, medium 2, low 3, false 1.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| With only a Field-wide row needing attention, "All normal" heads the field with nothing above it | medium | `groupRows`: `needing` counts `f.sites.concat(f.wide)`, `divided` starts false, the first normal site pushes the divider | patch: the divider follows the sites that need attention |
+| The parent tree is built after the kind filter, the unlinked filter and the Just added removal | medium | `parentsOf(rows)` runs on the filtered rows; under Filter Geofence "P14 lease" loses Point 2 and lands in Field-wide | patch: parents from all rows, a filtered-out parent shown as context |
+| Without the asset list every linked item lands in Not linked and the footer count, while its badge stays normal | low | `assetPath` null when `lists.assets` lacks the asset, `vanished` false when `assetsKnown` is false | rejected: met only when the adapter's asset list fails for an editor, which the tools already report (entry 5); the fix adds a group for places unknown |
+| Redo of an undone add does not return the item to Just added | low | Undo sends `delete` (dropped by `noteSaved`), Redo a `create` that only `createPoint`/`createLine` would note | patch: every saved create of this session noted |
+| `docs/kinds-and-assets.md:124` still names ten dev assets | low | The seed adds `P14L`; specs expect 11 | patch: eleven named |
+| ignition-lint not run on the two dev scripts | false | Run by the orchestrator: `mapstudio_dev/code.py` and `mapstudio_seed/code.py` "No issues found" | rejected |
 
 ## Design Notes
 
