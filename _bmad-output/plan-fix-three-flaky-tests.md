@@ -3,7 +3,7 @@ title: "Fix the three flaky tests: the view helper waits for the map, the lookup
 type: 'bugfix'
 ticket: ''
 created: '2026-11-08'
-status: 'in-review'
+status: 'built'
 baseline_revision: '478adb6dfb6e92e1177d079ea87138291ec7fe3f'
 route: 'full'
 route_source: 'auto'
@@ -70,6 +70,8 @@ Quick lens, 2026-11-08: 3 findings; high 0, medium 1, low 2, false 0.
 | The R4 (a) trace drops the remembered place's "came back ... with its popup" line | medium | `selectionTrace` keeps `[MapStudio]` lines matching /select/; `camera.ts:221` logs the popup restore without that word; the investigator's logs show it | patch: the filter keeps it |
 | The test view's wait has no limit, so a map that never goes idle hangs until the test timeout; the idle listener stays on the shortcut | low | The promise settles only on `idle` or the no-move shortcut | patch: bounded with a named failure, the listener removed |
 | A test comment still says the hook's pools have no queue | low | `SetupLookupsTest.java:189`; `LookupPool` queues and limits by permits | patch: the comment corrected |
+
+Outcome, 2026-11-08: the three patches applied (fa2534f) and verified by the orchestrator: `tsc` clean, Jest 659 passed, `./gradlew clean build --offline --rerun-tasks` green, the contract check OK at 0.4.0, and `ops/up.sh --fresh` with the whole e2e suite: 260 passed, 7 skipped, 0 failed in 45.2 min, the second clean whole-suite run in a row (the implementer's was the first). R4 (a) stays watched through its diagnostics.
 
 ## Verification
 
