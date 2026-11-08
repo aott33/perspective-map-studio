@@ -1,10 +1,6 @@
 package com.aoindustrial.perspective.mapstudio.gateway;
 
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import com.inductiveautomation.ignition.common.licensing.LicenseState;
 import com.inductiveautomation.ignition.common.rpc.proto.ProtoRpcSerializer;
@@ -22,6 +18,7 @@ import com.aoindustrial.perspective.mapstudio.common.MapStudioComponent;
 import com.aoindustrial.perspective.mapstudio.common.MapStudioModule;
 import com.aoindustrial.perspective.mapstudio.gateway.setuplookup.DesignerCaller;
 import com.aoindustrial.perspective.mapstudio.gateway.setuplookup.IgnitionLookupSource;
+import com.aoindustrial.perspective.mapstudio.gateway.setuplookup.LookupPool;
 import com.aoindustrial.perspective.mapstudio.gateway.setuplookup.SetupLookups;
 
 /**
@@ -37,30 +34,22 @@ public class MapStudioGatewayHook extends AbstractGatewayModuleHook {
     private ComponentModelDelegateRegistry delegateRegistry;
     private MapStudioServices services;
     /** Threads of the setup form's lookups (epic 2 story 16): connections, roles, providers. */
-    private ExecutorService lookupPool;
+    private LookupPool lookupPool;
     /** Threads of secret names, apart, so a hung secret provider never holds the other lists. */
-    private ExecutorService secretNamesPool;
+    private LookupPool secretNamesPool;
     private GatewayRpcImplementation rpc;
 
     @Override
     public void setup(GatewayContext context) {
         this.gatewayContext = context;
         this.services = new MapStudioServices(context);
-        this.lookupPool = lookupPool(6, "MapStudio-setup-lookups");
-        this.secretNamesPool = lookupPool(4, "MapStudio-setup-secret-names");
+        // A few daemon threads each, limited by permits: a call takes a free permit or its list is unavailable now.
+        this.lookupPool = new LookupPool(6, "MapStudio-setup-lookups");
+        this.secretNamesPool = new LookupPool(4, "MapStudio-setup-secret-names");
         SetupLookups lookups = new SetupLookups(new IgnitionLookupSource(context.getDatasourceManager(),
             context.getUserSourceManager(), context.getSecretProviderManager()), lookupPool, secretNamesPool,
             new DesignerCaller());
         this.rpc = GatewayRpcImplementation.of(ProtoRpcSerializer.DEFAULT_INSTANCE, lookups);
-    }
-
-    /** A few daemon threads and no queue: a call finds a thread or its list is unavailable now. */
-    private static ExecutorService lookupPool(int threads, String name) {
-        return new ThreadPoolExecutor(0, threads, 30, TimeUnit.SECONDS, new SynchronousQueue<>(), r -> {
-            Thread t = new Thread(r, name);
-            t.setDaemon(true);
-            return t;
-        });
     }
 
     /**

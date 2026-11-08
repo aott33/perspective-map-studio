@@ -7,11 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -21,7 +20,7 @@ import com.aoindustrial.perspective.mapstudio.common.contract.SetupLists.Status;
 
 class SetupLookupsTest {
 
-    private final ExecutorService pool = Executors.newCachedThreadPool();
+    private final LookupPool pool = new LookupPool(8, "test-setup-lookups");
     private final CountDownLatch never = new CountDownLatch(1);
 
     @AfterEach
@@ -170,7 +169,7 @@ class SetupLookupsTest {
 
     @Test
     void aFullPoolGivesUnavailableListsNotAnError() {
-        ThreadPoolExecutor full = new ThreadPoolExecutor(0, 1, 1, TimeUnit.SECONDS, new SynchronousQueue<>());
+        LookupPool full = new LookupPool(1, "test-full");
         try {
             Fake fake = new Fake();
             fake.connectionsHang = true;
@@ -188,8 +187,8 @@ class SetupLookupsTest {
     @Test
     void aHungSecretProviderHoldsOneThreadAndNeverTheOtherLists() {
         // The hook's shape: a small lists pool and a small secret names pool, no queue.
-        ThreadPoolExecutor lists = new ThreadPoolExecutor(0, 3, 1, TimeUnit.SECONDS, new SynchronousQueue<>());
-        ThreadPoolExecutor secrets = new ThreadPoolExecutor(0, 2, 1, TimeUnit.SECONDS, new SynchronousQueue<>());
+        LookupPool lists = new LookupPool(3, "test-lists");
+        LookupPool secrets = new LookupPool(2, "test-secrets");
         try {
             Fake fake = new Fake();
             fake.namesHang = "Vault";
@@ -207,7 +206,7 @@ class SetupLookupsTest {
             }
             // Ten asks, one call: the later asks waited on the one in flight.
             assertEquals(1, fake.namesAsked.get());
-            assertEquals(1, secrets.getActiveCount());
+            assertEquals(1, secrets.inUse());
             assertEquals(List.of("api-key", "mapbox-token"),
                 SetupLists.Part.fromJson(healthy.secretNames("Internal")).names());
             for (int i = 0; i < 10; i++) {
@@ -227,7 +226,7 @@ class SetupLookupsTest {
 
     @Test
     void aHungListIsAskedOnceWhileInFlight() {
-        ThreadPoolExecutor lists = new ThreadPoolExecutor(0, 3, 1, TimeUnit.SECONDS, new SynchronousQueue<>());
+        LookupPool lists = new LookupPool(3, "test-lists");
         try {
             Fake fake = new Fake();
             fake.connectionsHang = true;
@@ -242,6 +241,68 @@ class SetupLookupsTest {
         } finally {
             never.countDown();
             lists.shutdownNow();
+        }
+    }
+
+    /**
+     * A pool whose worker is slow to come back: after each call the worker waits until the
+     * caller's next call has been handed to the executor (up to a second), as a busy machine can
+     * leave it. A call that completes its future before the worker is back waiting for work used to
+     * find no idle thread and come back UNAVAILABLE though nothing was slow (2026-11-08).
+     */
+    private static final class SlowReturningExecutor extends ThreadPoolExecutor {
+        private final AtomicInteger handed = new AtomicInteger();
+        private final AtomicInteger finished = new AtomicInteger();
+
+        SlowReturningExecutor(int threads) {
+            super(threads, threads, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+        }
+
+        @Override
+        public void execute(Runnable command) {
+            try {
+                super.execute(command);
+            } finally {
+                synchronized (this) {
+                    handed.incrementAndGet();
+                    notifyAll();
+                }
+            }
+        }
+
+        @Override
+        protected void afterExecute(Runnable r, Throwable t) {
+            int done = finished.incrementAndGet();
+            long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+            synchronized (this) {
+                while (handed.get() <= done && System.nanoTime() < until && !isShutdown()) {
+                    try {
+                        wait(Math.max(1, TimeUnit.NANOSECONDS.toMillis(until - System.nanoTime())));
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void backToBackCallsAtFullCapacityAllAnswer() {
+        // One thread, one permit: each ask needs the whole pool, and the next ask comes while the
+        // worker of the last one has not yet gone back to wait for work.
+        SlowReturningExecutor slow = new SlowReturningExecutor(1);
+        LookupPool one = new LookupPool(slow, 1);
+        try {
+            SetupLookups lookups = new SetupLookups(new Fake(), one, one, () -> true, SetupLookups.TIMEOUT_MS);
+            for (int i = 0; i < 20; i++) {
+                SetupLists.Part part = SetupLists.Part.fromJson(lookups.secretNames("Internal"));
+                assertEquals(Status.OK, part.status(), "ask " + i);
+                assertEquals(List.of("api-key", "mapbox-token"), part.names());
+            }
+            assertEquals(0, lookups.inFlightForTests());
+        } finally {
+            slow.shutdownNow();
         }
     }
 

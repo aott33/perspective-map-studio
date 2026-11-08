@@ -9,7 +9,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -29,7 +28,8 @@ import com.aoindustrial.perspective.mapstudio.common.contract.SetupLookupRpc;
  * so each list (connections, one identity provider's roles, the providers, one provider's secret
  * names) has at most one call in flight, which a later ask waits on again instead of starting
  * another; and secret names run on a pool of their own, so a hung secret provider never takes the
- * threads connections and roles need. Names only: {@link LookupSource} has no way to read
+ * threads connections and roles need. Each pool's limit is its {@link LookupPool} permits, so a list
+ * is unavailable at once only when every permit is held by a running call. Names only: {@link LookupSource} has no way to read
  * a secret's value. Logs counts and failure classes at debug or warn, never a secret name above
  * debug and never a value.
  *
@@ -50,8 +50,8 @@ public final class SetupLookups implements SetupLookupRpc {
     static final String REFUSED = "Only a Designer may ask for the setup lists.";
 
     private final LookupSource source;
-    private final ExecutorService listsPool;
-    private final ExecutorService secretsPool;
+    private final LookupPool listsPool;
+    private final LookupPool secretsPool;
     private final BooleanSupplier designerCaller;
     private final long timeoutMs;
     /** The one call in flight per list; a key is internal and never logged. */
@@ -61,12 +61,12 @@ public final class SetupLookups implements SetupLookupRpc {
      * @param listsPool   threads for connections, roles and secret providers
      * @param secretsPool threads for one provider's secret names, apart from the others
      */
-    public SetupLookups(LookupSource source, ExecutorService listsPool, ExecutorService secretsPool,
+    public SetupLookups(LookupSource source, LookupPool listsPool, LookupPool secretsPool,
                         BooleanSupplier designerCaller) {
         this(source, listsPool, secretsPool, designerCaller, TIMEOUT_MS);
     }
 
-    SetupLookups(LookupSource source, ExecutorService listsPool, ExecutorService secretsPool,
+    SetupLookups(LookupSource source, LookupPool listsPool, LookupPool secretsPool,
                  BooleanSupplier designerCaller, long timeoutMs) {
         this.source = source;
         this.listsPool = listsPool;
@@ -125,27 +125,44 @@ public final class SetupLookups implements SetupLookupRpc {
 
     /**
      * Starts {@code call} on {@code pool}, or hands back the call of the same key still running:
-     * a list whose source ignores the cancel holds one thread, never one per ask.
+     * a list whose source ignores the cancel holds one thread, never one per ask. A permit is taken
+     * before the call is handed to the executor; with none free, every permit is held by a running
+     * call and the list is unavailable now. The worker gives the permit back and leaves
+     * {@code inFlight} before it completes the future, so the caller's next ask finds both free.
      */
-    private Future<SetupLists.Part> submit(ExecutorService pool, String key, Callable<SetupLists.Part> call) {
+    private Future<SetupLists.Part> submit(LookupPool pool, String key, Callable<SetupLists.Part> call) {
         CompletableFuture<SetupLists.Part> mine = new CompletableFuture<>();
         CompletableFuture<SetupLists.Part> running = inFlight.putIfAbsent(key, mine);
         if (running != null) {
             return running;
         }
+        if (!pool.tryAcquire()) {
+            inFlight.remove(key, mine);
+            // Every permit of this pool is held by a running call: this list is unavailable now.
+            return CompletableFuture.completedFuture(SetupLists.Part.unavailable(UNAVAILABLE));
+        }
         try {
-            pool.execute(() -> {
+            pool.executor().execute(() -> {
+                SetupLists.Part part = null;
+                Throwable failure = null;
                 try {
-                    mine.complete(call.call());
+                    part = call.call();
                 } catch (Throwable t) {
-                    mine.completeExceptionally(t);
+                    failure = t;
                 } finally {
                     inFlight.remove(key, mine);
+                    pool.release();
+                    if (failure == null) {
+                        mine.complete(part);
+                    } else {
+                        mine.completeExceptionally(failure);
+                    }
                 }
             });
         } catch (RejectedExecutionException ex) {
+            // Only a pool shut down rejects: the queue takes every call a permit lets through.
             inFlight.remove(key, mine);
-            // Every thread of this pool is held by a slow source: this list is unavailable now.
+            pool.release();
             return CompletableFuture.completedFuture(SetupLists.Part.unavailable(UNAVAILABLE));
         }
         return mine;
@@ -156,7 +173,7 @@ public final class SetupLookups implements SetupLookupRpc {
         return inFlight.size();
     }
 
-    private static SetupLists.Part await(Future<SetupLists.Part> f, long deadline, String what) {
+    private SetupLists.Part await(Future<SetupLists.Part> f, long deadline, String what) {
         try {
             long left = Math.max(0, deadline - System.nanoTime());
             return f.get(left, TimeUnit.NANOSECONDS);
@@ -164,7 +181,7 @@ public final class SetupLookups implements SetupLookupRpc {
             // Not cancelled: the call stays the one in flight for its list, and a later ask waits
             // on it again rather than taking another thread (cancel would not free a thread that
             // ignores interrupts anyway).
-            log.warnf("Setup lists: the %s did not answer within %d ms.", what, TIMEOUT_MS);
+            log.warnf("Setup lists: the %s did not answer within %d ms.", what, timeoutMs);
             return SetupLists.Part.unavailable(UNAVAILABLE);
         } catch (ExecutionException ex) {
             Throwable cause = ex.getCause() == null ? ex : ex.getCause();
