@@ -21,6 +21,7 @@ Built so far (2026-11-08): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item li
 | 8b. Directions, Nearest and distances | | |
 | 8c. The item list | | |
 | 8d. The layout | | |
+| 8e. First run | | |
 | 9. View mode, unchanged | | |
 | 10. Phone (390 px) | | |
 | 11. Designer | | |
@@ -196,6 +197,21 @@ On `/edit` after **Seed the dev map**, in a browser window you can resize (or th
 - [ ] At 1024 px, open an item in Details: the map is too narrow for the toolbar beside the Editing switch, so it drops to the row under the switch and never covers it; close Details and it goes back up.
 - [ ] Widen the window past 1280 px again: the list docks, and the items stay where they were on the page.
 - [ ] At 1440, 1366 and 1200 px with Details open: nothing but the small attribution text in the map's bottom-right corner (the Perspective App Bar toggle's spot).
+
+Notes:
+
+## 8e. First run
+
+On the empty project `mapstudio-empty` (the dev project mounted a second time, with a map of its own; `ops/up.sh` mounts it, a stack from before entry 7b is recreated once): `http://localhost:9088/data/perspective/client/mapstudio-empty/empty`, at 1366 or 1440 px. Sign in as the map editor first with **Log in** on that project's `/edit` page. If the map is not empty (an earlier try), delete its items in Edit mode and press **Delete the kind setup**. The kept flags are per project and user in this browser: a private window starts fresh.
+
+- [ ] In Edit mode the card **Get mapstudio-empty on the map** sits centred over the map (never bottom-right): "Three steps. Edits save as you go.", the three steps with their buttons, "0 of 3 done" and **Hide checklist**. The list says "No items yet - Items you add or import are listed here, grouped by place."
+- [ ] **Open Kinds** opens the rail's Kinds surface (still "Nothing here yet"). Press **Save a kind setup** on the page: step 1 gets a check and the footer reads "1 of 3 done" within a second or two, with no reload. **Delete the kind setup**: it unticks.
+- [ ] **Open view mode**: View mode, and a small note "Nothing on this map yet." in the middle of the map. Turn the Edit switch on: step 3 is ticked.
+- [ ] **Add an item**: the Point tool is in hand and the card goes; **Done** on the bar brings it back. Pick it up again and click the map: the pad is placed and saved, and the card does not come back. Delete the pad: the card is back.
+- [ ] Tab moves through the card's four buttons; Esc does not hide the card. **Hide checklist**, then reload the page: no card. (A private window, or another user, still sees it.)
+- [ ] Sign out (or a private window, not signed in): View mode only, the empty map and "Nothing on this map yet.", no Edit switch.
+- [ ] Narrow the window to 1200 px: the card still fits the map, centred.
+- [ ] On the dev project's `/edit` after **Seed the dev map**: no card in Edit mode, no note in View mode.
 
 Notes:
 

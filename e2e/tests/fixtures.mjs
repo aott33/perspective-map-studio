@@ -200,21 +200,23 @@ export async function removeStrays(page, seedIds) {
 
 export { EDITOR_USER, OPERATOR_USER };
 
-/** Sign a dev user in, in its own node process (lib/signInCli.mjs); returns the state file. */
-function signInFresh(user) {
-    const run = spawnSync(process.execPath, [signInCli, user], { encoding: 'utf8', env: process.env, timeout: 180_000 });
+/** Sign a dev user in, in its own node process (lib/signInCli.mjs), on the suite's project or `project`; returns the state file. */
+function signInFresh(user, project = undefined) {
+    const args = project ? [signInCli, user, project] : [signInCli, user];
+    const run = spawnSync(process.execPath, args, { encoding: 'utf8', env: process.env, timeout: 180_000 });
     if (run.status !== 0) {
         throw new Error((run.stderr || '').trim() || 'The dev user ' + user + ' could not sign in (lib/signInCli.mjs).');
     }
-    return stateFile(user);
+    return project ? stateFile(user, project) : stateFile(user);
 }
 
 /**
  * A second browser context signed in as `user` (epic 2 story 2: the phone editor beside
- * the map editor), signed in the same way as editorTest. The caller closes it.
+ * the map editor), signed in the same way as editorTest. The caller closes it. With `project`
+ * the sign-in is on that project's /edit page (the empty project, epic 4 entry 7b).
  */
-export async function signedInContext(browser, user, options = {}) {
-    return browser.newContext({ ...options, storageState: signInFresh(user) });
+export async function signedInContext(browser, user, options = {}, project = undefined) {
+    return browser.newContext({ ...options, storageState: signInFresh(user, project) });
 }
 
 /**

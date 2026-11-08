@@ -1,4 +1,4 @@
-// Sign a dev user in (argument: the user name, default the map editor) and save the
+// Sign a dev user in (arguments: the user name, default the map editor; the project, default the suite's) and save the
 // browser state (lib/editorAuth.mjs), as its
 // own node process: the editor tests' fixture runs it right before each editor test,
 // so the sign-in is fresh and happens outside the test runner's process, where no
@@ -6,7 +6,7 @@
 
 import { signInEditorOnce } from './editorAuth.mjs';
 
-const problem = await signInEditorOnce(process.argv[2] || undefined);
+const problem = await signInEditorOnce(process.argv[2] || undefined, process.argv[3] || undefined);
 if (problem) {
     console.error(problem);
     process.exit(1);

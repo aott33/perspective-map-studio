@@ -43,6 +43,13 @@ if [[ -n "${running}" ]] && [[ "$(docker inspect -f '{{.Config.User}}' "${CONTAI
   running=""
 fi
 
+# A running Gateway container made before the empty project's mount (epic 4 entry 7b) is recreated too.
+if [[ -n "${running}" ]] && ! docker inspect -f '{{range .Mounts}}{{.Destination}} {{end}}' "${CONTAINER_NAME}" 2>/dev/null \
+    | grep -q '/projects/mapstudio-empty'; then
+  info "The running Gateway container predates the empty project's mount; recreating it ..."
+  running=""
+fi
+
 if [[ -n "${running}" ]]; then
   info "Restarting the Gateway to load the staged build..."
   "${COMPOSE[@]}" restart gateway
@@ -65,6 +72,7 @@ echo
 ok "Map Studio dev Gateway is running."
 echo "    Gateway:  ${GATEWAY_URL}  (user ${ADMIN_USER}; password in .env)"
 echo "    Session:  ${SESSION_URL}  (map editor: user mapeditor, MAPSTUDIO_EDITOR_PASSWORD; phone editor: user mapoperator, MAPSTUDIO_OPERATOR_PASSWORD; both in .env)"
+echo "    Empty:    ${GATEWAY_URL}/data/perspective/client/mapstudio-empty/empty  (a second, empty map for the first-run checklist)"
 echo "    Map store: ops/psql.sh  (psql in the PostgreSQL container)"
 echo "    Logs:     ops/logs.sh        Tests: cd e2e && npm test"
 echo "    Stop:     ops/down.sh        Wipe: ops/down.sh --purge"

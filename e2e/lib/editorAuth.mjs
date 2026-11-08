@@ -17,6 +17,8 @@ import { e2eProject, envFileValue, repoRoot, sessionUrl } from './env.mjs';
 export const EDITOR_USER = 'mapeditor';
 /** The dev phone editor (ops/users.py, epic 2 story 2): user mapoperator, role MapOperator. */
 export const OPERATOR_USER = 'mapoperator';
+/** The dev Gateway's empty project (epic 4 entry 7b): ops/project mounted a second time, its map kept empty by firstrun.spec.mjs. */
+export const EMPTY_PROJECT = 'mapstudio-empty';
 
 /** Each dev user's .env key for its password. */
 const PASSWORD_KEYS = { [EDITOR_USER]: 'MAPSTUDIO_EDITOR_PASSWORD', [OPERATOR_USER]: 'MAPSTUDIO_OPERATOR_PASSWORD' };
@@ -24,9 +26,13 @@ const PASSWORD_KEYS = { [EDITOR_USER]: 'MAPSTUDIO_EDITOR_PASSWORD', [OPERATOR_US
 const stateDir = path.join(os.tmpdir(),
     'mapstudio-e2e-' + createHash('sha256').update(repoRoot).digest('hex').slice(0, 8));
 
-/** Where a user's signed-in state lives for this checkout's run. */
-export function stateFile(user = EDITOR_USER) {
-    return path.join(stateDir, (user === EDITOR_USER ? 'editor' : user) + '-state.json');
+/**
+ * Where a user's signed-in state lives for this checkout's run; signed in on another project than the suite's (the empty
+ * project, epic 4 entry 7b), its own file named after the project.
+ */
+export function stateFile(user = EDITOR_USER, project = e2eProject()) {
+    const suffix = project === e2eProject() ? '' : '-' + project;
+    return path.join(stateDir, (user === EDITOR_USER ? 'editor' : user) + suffix + '-state.json');
 }
 
 /** The map editor's state file (entry 1's name). */
@@ -75,8 +81,8 @@ export function launchOptions() {
  * Writes the signed-in browser state to stateFile(user) (mode 0600). Returns null,
  * or the reason it could not sign in (no password in .env, or the sign-in failed).
  */
-export async function signInEditorOnce(user = EDITOR_USER) {
-    const file = stateFile(user);
+export async function signInEditorOnce(user = EDITOR_USER, project = e2eProject()) {
+    const file = stateFile(user, project);
     rmSync(file, { force: true });
     const password = userPassword(user);
     if (!password) {
@@ -87,7 +93,7 @@ export async function signInEditorOnce(user = EDITOR_USER) {
     try {
         const context = await browser.newContext();
         const page = await context.newPage();
-        await page.goto(sessionUrl('/edit'), { waitUntil: 'load' });
+        await page.goto(sessionUrl('/edit', project), { waitUntil: 'load' });
         const login = page.locator('#mapstudio-dev-login');
         await login.waitFor({ state: 'visible', timeout: 90_000 });
         await login.click();
@@ -98,7 +104,7 @@ export async function signInEditorOnce(user = EDITOR_USER) {
         await field.waitFor({ state: 'visible', timeout: 30_000 });
         await field.fill(password);
         await page.keyboard.press('Enter');
-        await page.waitForURL(new RegExp('/data/perspective/client/' + e2eProject() + '/edit'), { timeout: 30_000 });
+        await page.waitForURL(new RegExp('/data/perspective/client/' + project + '/edit'), { timeout: 30_000 });
         await page.locator('#mapstudio-dev-user').filter({ hasText: 'Signed in as ' + user })
             .waitFor({ timeout: 60_000 });
         const state = await context.storageState();

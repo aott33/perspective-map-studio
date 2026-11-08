@@ -1,0 +1,215 @@
+{
+ "custom": {},
+ "params": {},
+ "props": {
+  "defaultSize": {
+   "width": 1440,
+   "height": 900
+  }
+ },
+ "root": {
+  "type": "ia.container.flex",
+  "version": 0,
+  "props": {
+   "direction": "column"
+  },
+  "meta": {
+   "name": "root"
+  },
+  "position": {},
+  "custom": {},
+  "children": [
+   {
+    "type": "ia.container.flex",
+    "version": 0,
+    "props": {
+     "direction": "row",
+     "alignItems": "center",
+     "wrap": "wrap"
+    },
+    "meta": {
+     "name": "toolbar"
+    },
+    "position": {
+     "shrink": 0
+    },
+    "custom": {},
+    "children": [
+     {
+      "type": "ia.display.label",
+      "version": 0,
+      "props": {
+       "text": "",
+       "style": {
+        "padding": "4px 12px"
+       }
+      },
+      "meta": {
+       "name": "user",
+       "domId": "mapstudio-empty-user"
+      },
+      "position": {
+       "basis": "auto",
+       "shrink": 0
+      },
+      "custom": {},
+      "propConfig": {
+       "props.text": {
+        "binding": {
+         "type": "expr",
+         "config": {
+          "expression": "if({session.props.auth.authenticated}, 'Signed in as ' + {session.props.auth.user.userName}, 'Not signed in (viewer)')"
+         }
+        }
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Log in"
+      },
+      "meta": {
+       "name": "login",
+       "domId": "mapstudio-empty-login"
+      },
+      "position": {
+       "basis": "160px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\tif self.session.props.auth.authenticated:\n\t\tsystem.perspective.logout()\n\telse:\n\t\tsystem.perspective.login()"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      },
+      "propConfig": {
+       "props.text": {
+        "binding": {
+         "type": "expr",
+         "config": {
+          "expression": "if({session.props.auth.authenticated}, 'Log out', 'Log in')"
+         }
+        }
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Save a kind setup"
+      },
+      "meta": {
+       "name": "kindSave",
+       "domId": "mapstudio-empty-kind-save"
+      },
+      "position": {
+       "basis": "200px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 4 entry 7b): saves the empty map's geofence kind setup through system.mapstudio.applyEdits\n\t# (project library mapstudio_empty), always on the project mapstudio-empty, never the dev map. The\n\t# scripting API trusts its caller (docs/contract.md), so this view checks the role itself.\n\tout = self.view.rootContainer.getChild('kindResult')\n\tif not mapstudio_dev.holdsMapEditor(self.session):\n\t\tresult = {'refused': 'Writing the kind setup needs the MapEditor role. Sign in as a map editor first.'}\n\telse:\n\t\tresult = mapstudio_empty.save_kind_setup()\n\t# ranAt tells two runs with the same result apart.\n\tresult['ranAt'] = system.date.toMillis(system.date.now())\n\tout.props.text = system.util.jsonEncode(result)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "type": "ia.input.button",
+      "version": 0,
+      "props": {
+       "text": "Delete the kind setup"
+      },
+      "meta": {
+       "name": "kindDelete",
+       "domId": "mapstudio-empty-kind-delete"
+      },
+      "position": {
+       "basis": "200px",
+       "shrink": 0
+      },
+      "custom": {},
+      "events": {
+       "component": {
+        "onActionPerformed": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 4 entry 7b): deletes the empty map's geofence kind setup through system.mapstudio.applyEdits\n\t# (project library mapstudio_empty), always on the project mapstudio-empty, never the dev map. The\n\t# scripting API trusts its caller (docs/contract.md), so this view checks the role itself.\n\tout = self.view.rootContainer.getChild('kindResult')\n\tif not mapstudio_dev.holdsMapEditor(self.session):\n\t\tresult = {'refused': 'Writing the kind setup needs the MapEditor role. Sign in as a map editor first.'}\n\telse:\n\t\tresult = mapstudio_empty.delete_kind_setup()\n\t# ranAt tells two runs with the same result apart.\n\tresult['ranAt'] = system.date.toMillis(system.date.now())\n\tout.props.text = system.util.jsonEncode(result)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ]
+       }
+      }
+     }
+    ]
+   },
+   {
+    "type": "ao.mapstudio",
+    "version": 0,
+    "props": {
+     "editMode": true,
+     "startingArea": {
+      "center": {
+       "lng": -104.9725,
+       "lat": 39.7445
+      },
+      "zoom": 12,
+      "bounds": {
+       "west": null,
+       "south": null,
+       "east": null,
+       "north": null
+      }
+     }
+    },
+    "meta": {
+     "name": "map"
+    },
+    "position": {
+     "basis": "0px",
+     "grow": 1
+    },
+    "custom": {}
+   },
+   {
+    "type": "ia.display.label",
+    "version": 0,
+    "props": {
+     "text": "",
+     "style": {
+      "padding": "4px 12px"
+     }
+    },
+    "meta": {
+     "name": "kindResult",
+     "domId": "mapstudio-empty-kind-result"
+    },
+    "position": {
+     "basis": "24px",
+     "shrink": 0
+    },
+    "custom": {}
+   }
+  ]
+ }
+}

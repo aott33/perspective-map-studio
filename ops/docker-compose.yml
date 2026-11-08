@@ -126,6 +126,11 @@ services:
       # The committed dev project, mounted in so a browser session can render it.
       # Designer saves write straight back into the repo.
       - ./project:/usr/local/bin/ignition/data/projects/mapstudio-dev
+      # The same files a second time as the project mapstudio-empty (epic 4 entry 7b): the dev project's views,
+      # setup and kind list with a map of its own, which the e2e suite keeps empty for the first-run checklist
+      # (e2e/tests/firstrun.spec.mjs). Its title reads mapstudio-dev, as the files are the same; a Designer save
+      # in either project writes the shared files.
+      - ./project:/usr/local/bin/ignition/data/projects/mapstudio-empty
       # The showcase project (epic 3 entry 15): the component alone on the mockups' demo field, seeded
       # from the dev project's /edit page ("Seed the dev map" seeds both maps).
       - ./showcase/project:/usr/local/bin/ignition/data/projects/mapstudio-showcase

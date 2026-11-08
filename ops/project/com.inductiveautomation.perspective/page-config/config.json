@@ -43,6 +43,10 @@
   "/pad/:name": {
    "viewPath": "MapStudioPad",
    "viewParams": {}
+  },
+  "/empty": {
+   "viewPath": "MapStudioEmpty",
+   "viewParams": {}
   }
  },
  "shared": {},
