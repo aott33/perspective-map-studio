@@ -3,14 +3,14 @@ title: "7b: The first-run checklist on an empty map and the viewer's note"
 type: 'feature'
 ticket: '7'
 created: '2026-11-08'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '3a34b954c09bb78f76dda242fa3b829fffa8c1d5'
 route: 'full'
 route_source: 'auto'
 risk: 'low'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
@@ -75,9 +75,20 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 ## Plan Change Log
 
+- Review, 2026-11-08: with the host's kind list empty or failed, step 1's help drops the count ("Choose icons, key values, comms and alarms for this project's kinds."), not "for the 0 kinds"; Jest case in `firstRun.test.ts`.
 - Build, 2026-11-08: the empty project is `ops/project` mounted a second time as `mapstudio-empty`, not a child project inheriting `mapstudio-dev`: the module makes a setup lifecycle only for runnable projects (enabled and not inheritable, `SetupLifecycleFactory`), so making `mapstudio-dev` inheritable would have taken the dev map's setup away. Same views, setup, kind list and scripts; its own map. The kind setup buttons are on a new page `/empty` (view `MapStudioEmpty`, library `mapstudio_empty`, always writing `mapstudio-empty`'s geofence kind setup). The suite signs in per project (`editorAuth.mjs` `stateFile(user, project)`, `signInEditorOnce(user, project)`). Step 1's help says "kind" for one kind. The ring's check is a new chrome glyph `check` (`controls.ts`); a ghost button style `mapstudio-button--ghost` is new. The second mount made `adapters.spec.mjs`' call count double (the empty project refreshes its lists through the same `mapstudio_dev` functions), so the dev adapter counts only `mapstudio-dev`'s calls (`system.util.getProjectName()`); the designer tests listing the dev project's pages and libraries take `/empty` and `mapstudio_empty`. Save a kind setup restores at a tombstone's version, as the seed does.
 
 ## Review Triage Log
+
+Quick lens, 2026-11-08: 5 findings; high 0, medium 0, low 2, false 3.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| The whole suite was not rerun after the last fixes, so "every spec passes" is unproven | false | The orchestrator's whole-suite run on a fresh stack is the plan's Verification and runs after the review, as for every entry | rejected |
+| The ignition-lint task is ticked though lint was not run | false | Run by the orchestrator: `mapstudio_dev/code.py` and `mapstudio_empty/code.py` "No issues found", `MapStudioEmpty/view.json` 0 errors, 0 warnings, 7 naming hints | rejected |
+| A backlog story outside the plan is in the diff | false | `story-industry-neutral-words-in-the-module.md` (backlog 36) was added by the orchestrator at the owner's request in its own commit (10cc1af); it falls in the range only by date | rejected |
+| A kind-setup-only `map.changed` bumps `itemsRevision` | low | `onMapChanged` bumps it on any applied change; items are unchanged, so it costs one redraw per kind setup save, which is rare | rejected: rare, and the fix adds a branch to the change path |
+| Step 1's help reads "for the 0 kinds" when the host's kind list is empty or failed | low | `kindsHelp` pluralises any count but 1; `lists.kinds` is empty on a failed list | patch: the count phrase dropped at 0 |
 
 ## Verification
 

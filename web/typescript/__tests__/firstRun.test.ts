@@ -55,6 +55,7 @@ describe('the steps and the words', () => {
         expect(checklistTitle('mapstudio-empty')).toBe('Get mapstudio-empty on the map');
         expect(kindsHelp(7)).toBe('Choose icons, key values, comms and alarms for the 7 kinds this project defines.');
         expect(kindsHelp(1)).toContain('for the 1 kind this project defines.');
+        expect(kindsHelp(0)).toBe('Choose icons, key values, comms and alarms for this project\'s kinds.');
     });
 });
 

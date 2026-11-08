@@ -68,8 +68,12 @@ export function checklistTitle(project: string): string {
 
 export const CHECKLIST_SUBLINE = 'Three steps. Edits save as you go.';
 
-/** Step 1's help, with the number of kinds the host's kind list defines. */
+/** Step 1's help, with the number of kinds the host's kind list defines (no count while the list is empty or failed). */
 export function kindsHelp(kindCount: number): string {
+    if (kindCount <= 0) {
+        // The host's kind list empty or failed: no count to give.
+        return 'Choose icons, key values, comms and alarms for this project\'s kinds.';
+    }
     return 'Choose icons, key values, comms and alarms for the ' + kindCount + (kindCount === 1 ? ' kind' : ' kinds')
         + ' this project defines.';
 }
