@@ -251,7 +251,7 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
                         <div id={this.listId + '-chips'} className="mapstudio-list-chips" role="group" aria-label="Filter by kind">
                             {chips.map((c) => (
                                 <button key={c.id === null ? '*' : c.id} type="button"
-                                        className={'mapstudio-chip' + (c.id === chosen ? ' mapstudio-chip--on' : '')}
+                                        className={'mapstudio-kind-chip' + (c.id === chosen ? ' mapstudio-kind-chip--on' : '')}
                                         aria-pressed={c.id === chosen} data-kind={c.id === null ? '' : c.id} onClick={() => this.onChip(c.id)}>
                                     {c.label + ' ' + c.count}
                                 </button>

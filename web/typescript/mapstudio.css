@@ -2951,7 +2951,7 @@
     margin-top: 8px;
 }
 
-.mapstudio-chip {
+.mapstudio-kind-chip {
     box-sizing: border-box;
     height: 26px;
     padding: 0 10px;
@@ -2965,16 +2965,16 @@
     cursor: pointer;
 }
 
-.mapstudio-chip:hover {
+.mapstudio-kind-chip:hover {
     background: var(--mapstudio-hover);
 }
 
-.mapstudio-chip:focus-visible {
+.mapstudio-kind-chip:focus-visible {
     outline: 2px solid var(--callToAction);
     outline-offset: 1px;
 }
 
-.mapstudio-chip.mapstudio-chip--on {
+.mapstudio-kind-chip.mapstudio-kind-chip--on {
     border-color: var(--mapstudio-attention);
     background: var(--mapstudio-attention);
     color: var(--mapstudio-surface);

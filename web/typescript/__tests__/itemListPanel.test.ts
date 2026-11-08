@@ -51,10 +51,10 @@ describe('the Items list panel (entry 7a)', () => {
     test('Filter opens the kind chips with their counts; the chosen one is pressed and named on the button', () => {
         const open = render({ chipsOpen: true });
         expect(open).toContain('aria-label="Filter by kind"');
-        expect(open.match(/class="mapstudio-chip[^"]*"[^>]*>[^<]+</g)!.map((c) => c.replace(/.*>/, '').replace('<', ''))).toEqual([
+        expect(open.match(/class="mapstudio-kind-chip[^"]*"[^>]*>[^<]+</g)!.map((c) => c.replace(/.*>/, '').replace('<', ''))).toEqual([
             'All 5', 'Gathering line 1', 'Well pad 4']);
         const chosen = render({ chipsOpen: true, kind: 'line' });
-        expect(chosen).toContain('class="mapstudio-chip mapstudio-chip--on" aria-pressed="true" data-kind="line"');
+        expect(chosen).toContain('class="mapstudio-kind-chip mapstudio-kind-chip--on" aria-pressed="true" data-kind="line"');
         expect(chosen).toContain('<span class="mapstudio-list-filter-words">Gathering line</span>');
         expect(chosen).toContain('data-rows="1"');
         // A kind no longer on the map reads as All.

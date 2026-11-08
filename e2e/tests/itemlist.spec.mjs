@@ -256,10 +256,10 @@ for (const [width, height] of [[1440, 900], [1366, 768]]) {
             await expect(filter).toHaveAttribute('aria-expanded', 'false');
             await filter.click();
             await expect(filter).toHaveAttribute('aria-expanded', 'true');
-            const chips = page.locator('.mapstudio-list-chips .mapstudio-chip');
+            const chips = page.locator('.mapstudio-list-chips .mapstudio-kind-chip');
             const rowsCount = Number(await page.locator('.mapstudio-list').getAttribute('data-rows'));
             await expect(chips.first()).toHaveText('All ' + rowsCount);
-            const pad = page.locator('.mapstudio-chip[data-kind="pad"]');
+            const pad = page.locator('.mapstudio-kind-chip[data-kind="pad"]');
             await expect(pad).toHaveText(/^Well pad \d+$/);
             const padCount = Number((await pad.textContent()).replace('Well pad ', ''));
             const chipBox = await pad.boundingBox();
@@ -275,7 +275,7 @@ for (const [width, height] of [[1440, 900], [1366, 768]]) {
                 expect(rows.length, sort).toBe(padCount);
                 expect(rows.every((e) => e.kind === 'pad'), sort).toBe(true);
             }
-            await page.locator('.mapstudio-list-chips .mapstudio-chip').first().click();
+            await page.locator('.mapstudio-list-chips .mapstudio-kind-chip').first().click();
             await expect(filter).toHaveText('Filter');
             await expect(page.locator('.mapstudio-list')).toHaveAttribute('data-rows', String(rowsCount));
         });
@@ -343,16 +343,15 @@ test.describe('map.load.reply changed (contract 0.4.0)', () => {
         } finally {
             await phone.close();
         }
+    });
 
-        const viewerContext = await browser.newContext();
-        try {
-            const v = await viewerContext.newPage();
-            await mapLoaded(await openMap(v, '/'));
-            const body = (await send(v, 'map.load', {})).body;
-            expect(body.level).toBe('none');
-            expect(body.changed).toBeUndefined();
-        } finally {
-            await viewerContext.close();
-        }
+    test('a viewer gets no changed', async ({ page }) => {
+        const map = await openMap(page, '/');
+        await mapLoaded(map);
+        await expect(map).toHaveAttribute('data-edit-level', 'none');
+        const body = (await send(page, 'map.load', {})).body;
+        expect(body.level).toBe('none');
+        expect(body.changed).toBeUndefined();
+        expect(body.items.length).toBeGreaterThan(0);
     });
 });
