@@ -2,6 +2,7 @@ package com.aoindustrial.perspective.mapstudio.gateway.load;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 import com.inductiveautomation.ignition.common.gson.JsonArray;
@@ -24,7 +25,7 @@ import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
 
 /**
  * Assembles {@code map.load}'s reply, {@code {level, seq, items, kinds, assets,
- * adapters, readOnly, setup}}, and {@code getMap}'s list from the map store and the host
+ * adapters, readOnly, setup, changed}}, and {@code getMap}'s list from the map store and the host
  * adapters' cache. {@code assets} (with their tag paths) go only to sessions that may link
  * items, {@code phone} and {@code full} (owner decision, 2026-10-26); every level
  * gets the kinds, {@code assetNames} (the assets' ids and names alone, for the search of
@@ -34,14 +35,24 @@ import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
  * when saving works (epic 2 story 5). {@code setup} is the part of the project setup
  * the browser needs (epic 2 story 6). {@code kindSetups}, the project's live kind setups
  * (they hold tag paths), go to {@code phone} and {@code full} only, like the assets (owner
- * decision, 2026-10-27, epic 2 story 9).
+ * decision, 2026-10-27, epic 2 story 9). {@code changed}, who last changed each item and when (epic 4 entry 7a, 0.4.0),
+ * goes to {@code phone} and {@code full} only, read in the load's transaction in one query.
  */
 public final class MapLoader {
 
     private static final LoggerEx log = LoggerEx.newBuilder().build("MapStudio.load");
 
-    /** A project's live map items, live kind setups and last change sequence number, read in one transaction. */
-    public record Snapshot(long seq, List<MapItemRecord> items, List<KindSetupRecord> kindSetups) {
+    /**
+     * A project's live map items, live kind setups and last change sequence number, read in one transaction, and, when
+     * asked for (an editor's map.load, entry 7a), who last changed each item and when ({@code changed}, else empty).
+     */
+    public record Snapshot(long seq, List<MapItemRecord> items, List<KindSetupRecord> kindSetups,
+                           Map<String, MapStore.LastEdit> changed) {
+
+        /** A snapshot with no last edits. */
+        public Snapshot(long seq, List<MapItemRecord> items, List<KindSetupRecord> kindSetups) {
+            this(seq, items, kindSetups, Map.of());
+        }
 
         /** A snapshot with no kind setups. */
         public Snapshot(long seq, List<MapItemRecord> items) {
@@ -70,14 +81,16 @@ public final class MapLoader {
 
     /** @throws MapStudioException {@code store-unreachable} when the project's map store cannot be read */
     public Loaded load(String project) {
-        return load(project, gate.requireReadable(project));
+        return load(project, gate.requireReadable(project), false);
     }
 
-    private Loaded load(String project, StoreGate.Readable readable) {
+    /** {@code withChanged}: the items' last edits are read too, in the same transaction, in one query (entry 7a). */
+    private Loaded load(String project, StoreGate.Readable readable, boolean withChanged) {
         Setup setup = readable.setup();
         try {
             return new Loaded(store.inTransaction(setup.connection(),
-                tx -> new Snapshot(tx.currentSeq(project), tx.liveItems(project), tx.liveKindSetups(project))),
+                tx -> new Snapshot(tx.currentSeq(project), tx.liveItems(project), tx.liveKindSetups(project),
+                    withChanged ? tx.lastEdits(project) : Map.of())),
                 readable.readOnly());
         } catch (SQLException ex) {
             log.errorf("Map Studio could not read the map of project %s on database connection %s (SQLState %s): %s",
@@ -101,12 +114,12 @@ public final class MapLoader {
         StoreGate.Readable readable = gate.requireReadable(project);
         Setup setup = readable.setup();
         String level = levelOf.apply(setup);
-        Loaded loaded = load(project, readable);
+        boolean editor = RoleMatrix.isEditor(level);
+        Loaded loaded = load(project, readable, editor);
         Snapshot snapshot = loaded.snapshot();
         JsonObject body = new JsonObject();
         body.addProperty("level", level);
         body.addProperty("seq", snapshot.seq());
-        boolean editor = RoleMatrix.isEditor(level);
         JsonArray items = toJson(snapshot.items());
         if (!editor) {
             // An item's overrides hold full tag paths, which viewers do not get (as kindSetups).
@@ -120,6 +133,7 @@ public final class MapLoader {
         if (editor) {
             body.add("assets", Asset.toJson(lists.assets()));
             body.add("kindSetups", kindSetupsJson(snapshot.kindSetups()));
+            body.add("changed", changedJson(snapshot.items(), snapshot.changed()));
         }
         // Every level gets the asset names (no base path), so a viewer's search finds a map item by its asset (entry 9).
         body.add("assetNames", Asset.namesJson(lists.assets()));
@@ -145,6 +159,25 @@ public final class MapLoader {
         setup.basemaps().forEach(basemaps::add);
         o.add("basemaps", basemaps);
         o.addProperty("alarmPage", setup.alarmPage());
+        return o;
+    }
+
+    /**
+     * {@code map.load.reply}'s {@code changed} (entry 7a, 0.4.0): {@code {<itemId>: {actor, at}}} for each live item with an
+     * edit record, {@code at} ISO 8601 UTC to the second; an item with none (or no time) is left out.
+     */
+    public static JsonObject changedJson(List<MapItemRecord> items, Map<String, MapStore.LastEdit> edits) {
+        JsonObject o = new JsonObject();
+        for (MapItemRecord item : items) {
+            MapStore.LastEdit edit = edits.get(item.id());
+            if (edit == null || edit.actor() == null || edit.at() == null) {
+                continue;
+            }
+            JsonObject e = new JsonObject();
+            e.addProperty("actor", edit.actor());
+            e.addProperty("at", edit.at());
+            o.add(item.id(), e);
+        }
         return o;
     }
 

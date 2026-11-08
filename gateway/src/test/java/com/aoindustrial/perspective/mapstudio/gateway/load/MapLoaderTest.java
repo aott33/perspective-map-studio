@@ -205,6 +205,49 @@ class MapLoaderTest {
         assertTrue(!loader.mapLoadReply("mapstudio-dev", Messages.LEVEL_NONE).toString().contains("Pressure"));
     }
 
+    @Test
+    void editorsGetWhoLastChangedEachItemAndViewersDoNot() {
+        String a = UUID.randomUUID().toString();
+        String b = UUID.randomUUID().toString();
+        String deleted = UUID.randomUUID().toString();
+        store.now = "2026-11-07T09:15:00Z";
+        writes.apply("mapstudio-dev", JsonParser.parseString("{\"batchId\":\"" + UUID.randomUUID() + "\",\"ops\":["
+            + create(a, "P12") + "," + create(b, "P14") + "," + create(deleted, "P15") + "]}"), Actor.session("sam"),
+            Messages.LEVEL_FULL);
+        store.now = "2026-11-08T10:42:07Z";
+        writes.apply("mapstudio-dev", JsonParser.parseString("{\"batchId\":\"" + UUID.randomUUID() + "\",\"ops\":["
+            + "{\"op\":\"update\",\"entity\":\"item\",\"id\":\"" + b + "\",\"baseVersion\":1,\"data\":{\"name\":\"P14b\"}},"
+            + "{\"op\":\"delete\",\"entity\":\"item\",\"id\":\"" + deleted + "\",\"baseVersion\":1}]}"),
+            Actor.session("alex"), Messages.LEVEL_FULL);
+        for (String level : List.of(Messages.LEVEL_PHONE, Messages.LEVEL_FULL)) {
+            int before = store.lastEditsQueries;
+            JsonObject changed = loader.mapLoadReply("mapstudio-dev", level).getAsJsonObject("changed");
+            assertEquals(1, store.lastEditsQueries - before, "one query per load, never one per item");
+            assertEquals(JsonParser.parseString("{\"actor\":\"sam\",\"at\":\"2026-11-07T09:15:00Z\"}"), changed.get(a), level);
+            assertEquals(JsonParser.parseString("{\"actor\":\"alex\",\"at\":\"2026-11-08T10:42:07Z\"}"), changed.get(b), level);
+            assertTrue(!changed.has(deleted), "a deleted item is not on the map, so it has no entry");
+            assertEquals(2, changed.size(), level);
+        }
+        int before = store.lastEditsQueries;
+        JsonObject viewer = loader.mapLoadReply("mapstudio-dev", Messages.LEVEL_NONE);
+        assertTrue(!viewer.has("changed"), "a viewer never learns who changed what");
+        assertEquals(before, store.lastEditsQueries, "nothing is read for a viewer");
+        assertTrue(!viewer.toString().contains("alex"));
+    }
+
+    @Test
+    void anItemWithNoEditRecordIsLeftOutOfChanged() {
+        JsonObject changed = MapLoader.changedJson(List.of(), java.util.Map.of("x",
+            new com.aoindustrial.perspective.mapstudio.gateway.store.MapStore.LastEdit("sam", "2026-11-08T10:42:00Z")));
+        assertEquals(new JsonObject(), changed, "only live items are named");
+        assertEquals(new JsonObject(), loader.mapLoadReply("mapstudio-dev", Messages.LEVEL_FULL).getAsJsonObject("changed"));
+    }
+
+    private static String create(String id, String name) {
+        return "{\"op\":\"create\",\"entity\":\"item\",\"id\":\"" + id + "\",\"baseVersion\":0,\"data\":{"
+            + "\"kind\":\"pad\",\"name\":\"" + name + "\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[-104.97,39.74]}}}";
+    }
+
     private static JsonObject item(JsonObject body, String id) {
         for (var e : body.getAsJsonArray("items")) {
             if (id.equals(e.getAsJsonObject().get("id").getAsString())) {

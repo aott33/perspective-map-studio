@@ -130,3 +130,183 @@ describe('a vanished asset counts as unlinked (entry 6, R3)', () => {
         expect(alarmed[0]).toMatchObject({ badge: 'alarm', reason: 'P99 is no longer in the asset list' });
     });
 });
+
+// Entry 7a: the list as designed (EXPERIENCE.md Item list; DESIGN.md list-row, group-header, filter-chip).
+import { Asset } from '../adapters';
+import { LastChange } from '../contract';
+import {
+    ListItem, ListSort, ListView, changedText, entriesOf, groupRows, kindChips, parentsOf, placePath, unlinkedCount, unlinkedLabel, whenText
+} from '../itemList';
+
+describe('the list grouped by place, sorted, filtered (entry 7a)', () => {
+    const AREA: Kind = { id: 'geofence', name: 'Geofence', geometry: 'line', icon: 'geofence', labelRank: 0, fields: [], area: true };
+    const TAP: Kind = { id: 'tap', name: 'Tap', geometry: 'point', icon: 'tap', labelRank: 2, fields: [], instrument: true };
+    const WELL: Kind = { id: 'well', name: 'Well', geometry: 'point', icon: 'well', labelRank: 3, fields: [] };
+    const KINDS = [PAD, LINE, AREA, TAP, WELL];
+    const ASSETS: Asset[] = [
+        { id: 'CTB1', name: 'CTB 1', kind: 'pad', basePath: '[default]Mesa/CTB1' },
+        { id: 'SWD1', name: 'SWD 1', kind: 'pad', basePath: '[default]Mesa/SWD1' },
+        { id: 'P12', name: 'Pad 12', kind: 'pad', basePath: '[default]Mesa/P12' },
+        { id: 'P14', name: 'Pad 14', kind: 'pad', basePath: '[default]Mesa/P14' },
+        { id: 'P14-2H', name: 'P14-2H', kind: 'well', basePath: '[default]Mesa/P14/P14-2H' },
+        { id: 'P14-L', name: 'P14 lateral', kind: 'line', basePath: '[default]Mesa/P14/Lateral' },
+        { id: 'PT1', name: 'PT-1', kind: 'tap', basePath: '[default]Mesa/PT1' },
+        { id: 'LSWD', name: 'L-SWD', kind: 'line', basePath: '[default]Mesa/Lines/LSWD' },
+        { id: 'FENCE', name: 'Lease', kind: 'geofence', basePath: '[edge]Mesa/Lease/' },
+        { id: 'K1', name: 'Kermit 1', kind: 'pad', basePath: '[default]Kermit/K1' }
+    ];
+    const NAMES: AssetName[] = ASSETS.map((a) => ({ id: a.id, name: a.name }));
+    const ITEMS = [
+        item('ctb', 'CTB1', 'pad', { assetId: 'CTB1' }), item('swd', 'SWD1', 'pad', { assetId: 'SWD1' }),
+        item('p12', 'Point 1', 'pad', { assetId: 'P12' }), item('p14', 'P14', 'pad', { assetId: 'P14' }),
+        item('well', 'P14-2H', 'well', { assetId: 'P14-2H' }), item('lat', 'P14 lateral', 'line', { assetId: 'P14-L' }),
+        item('pt1', 'PT-1', 'tap', { assetId: 'PT1' }), item('lswd', 'L-SWD', 'line', { assetId: 'LSWD' }),
+        item('fence', 'Lease', 'geofence', { assetId: 'FENCE' }), item('k1', 'K1', 'pad', { assetId: 'K1' }),
+        item('s1', 'Scale 1', 'pad', { assetId: null }), item('s2', 'Scale 2', 'pad', { assetId: null }),
+        item('ghost', 'Ghost', 'pad', { assetId: 'P99' })
+    ];
+    const CHANGED: Record<string, LastChange> = {
+        ctb: { actor: 'sam', at: '2026-11-08T16:42:00Z' }, swd: { actor: 'alex', at: '2026-11-07T15:00:00Z' },
+        p12: { actor: 'sam', at: '2026-11-01T12:00:00Z' }
+    };
+    // Point 1 in alarm, P14-2H (a child of P14) stale.
+    const ALARM_LIVE: LiveState = {
+        ...LIVE_INITIAL,
+        display: { pad: LIVE.display.pad, well: { ...LIVE.display.pad, kindId: 'well' } },
+        items: { p12: { ...LIVE.items.p1, id: 'p12' }, well: { ...LIVE.items.p3, id: 'well' } }
+    };
+    const NOW = new Date('2026-11-08T18:00:00Z');
+    const rows = (live: LiveState = LIVE_INITIAL) => listRows(ITEMS, KINDS, live, NAMES, true, { assets: ASSETS, changed: CHANGED });
+    const view = (extra: Partial<ListView> = {}): ListView =>
+        ({ sort: 'attention', kind: null, query: '', justAdded: [], unlinkedOnly: false, now: NOW, ...extra });
+    /** The layout in short: "# LABEL | right", "-- All normal", or "<indent>name (note)". */
+    const lines = (items: ListItem[]): string[] => items.map((i) => i.type === 'header'
+        ? (i.level === 'sub' ? '## ' : '# ') + i.label + (i.right ? ' | ' + i.right : '')
+        : i.type === 'divider' ? '-- ' + i.label
+            : '  '.repeat(i.depth) + i.row.name + (i.note ? ' (' + i.note + ')' : '') + (i.context ? ' [context]' : ''));
+
+    test('a place is the asset base path without the provider prefix', () => {
+        expect(placePath('[default]Mesa/P14/P14-2H')).toBe('Mesa/P14/P14-2H');
+        expect(placePath('[edge]Mesa/Lease/')).toBe('Mesa/Lease');
+        expect(placePath('Mesa//P12')).toBe('Mesa/P12');
+        expect(placePath('[default]')).toBeNull();
+        expect(placePath(undefined)).toBeNull();
+        const byId = Object.fromEntries(rows().map((r) => [r.id, r]));
+        expect(byId.well.assetPath).toBe('Mesa/P14/P14-2H');
+        expect(byId.s1.assetPath).toBeNull();
+        expect(byId.ghost.assetPath).toBeNull();
+        expect(byId.fence.area).toBe(true);
+        expect(byId.ctb.changed).toEqual(CHANGED.ctb);
+        expect(byId.k1.changed).toBeNull();
+    });
+
+    test('the parent is the item whose asset path is the longest proper prefix, segment by segment', () => {
+        const parents = parentsOf(rows());
+        expect(parents.get('well')?.id).toBe('p14');
+        expect(parents.get('lat')?.id).toBe('p14');
+        expect(parents.get('pt1')).toBeUndefined();
+        expect(parents.has('p14')).toBe(false);
+        // A deeper item nests under the nearest one: P14-2H/Tubing under P14-2H, not P14.
+        const deep = listRows(ITEMS.concat([item('tub', 'Tubing', 'well', { assetId: 'TUB' })]), KINDS, LIVE_INITIAL,
+            NAMES.concat([{ id: 'TUB', name: 'Tubing' }]), true,
+            { assets: ASSETS.concat([{ id: 'TUB', name: 'Tubing', kind: 'well', basePath: '[default]Mesa/P14/P14-2H/Tubing' }]) });
+        expect(parentsOf(deep).get('tub')?.id).toBe('well');
+        // Mesa/P1 is no prefix of Mesa/P14: whole segments only.
+        const p1 = listRows([item('a', 'P1', 'pad', { assetId: 'A1' }), item('b', 'P14', 'pad', { assetId: 'A2' })], KINDS, LIVE_INITIAL, [], false,
+            { assets: [{ id: 'A1', name: 'a', kind: 'pad', basePath: 'Mesa/P1' }, { id: 'A2', name: 'b', kind: 'pad', basePath: 'Mesa/P14' }] });
+        expect(parentsOf(p1).size).toBe(0);
+    });
+
+    test('Place: fields by name, sites with their children indented, Field-wide for lines and areas, Not linked last', () => {
+        expect(lines(groupRows(rows(), view({ sort: 'place' })))).toEqual([
+            '# KERMIT FIELD', 'K1',
+            '# MESA FIELD', 'CTB1', 'P14', '  P14 lateral (on P14)', '  P14-2H (on P14)', 'Point 1', 'PT-1', 'SWD1',
+            '## Field-wide', 'L-SWD', 'Lease',
+            '# Not linked', 'Ghost', 'Scale 1', 'Scale 2'
+        ]);
+    });
+
+    test('Needs attention: the sites needing attention first, ranked as Needs you, the count, then All normal', () => {
+        const items = groupRows(rows(ALARM_LIVE), view());
+        expect(lines(items)).toEqual([
+            '# KERMIT FIELD', 'K1',
+            '# MESA FIELD | 2 NEED ATTENTION', 'Point 1', 'P14', '  P14 lateral (on P14)', '  P14-2H (on P14)',
+            '-- All normal', 'CTB1', 'PT-1', 'SWD1',
+            '## Field-wide', 'L-SWD', 'Lease',
+            '# Not linked', 'Ghost', 'Scale 1', 'Scale 2'
+        ]);
+        // The default sort with nothing needing attention: no count and no divider.
+        expect(lines(groupRows(rows(), view())).slice(2, 4)).toEqual(['# MESA FIELD', 'CTB1']);
+        // Rows keep the badge they have, live: the alarm row is the alarm.
+        expect(entriesOf(items).find((e) => e.row.id === 'p12')?.row.badge).toBe('alarm');
+    });
+
+    test('Just added heads the list newest first in every sort, and is nowhere else', () => {
+        for (const sort of ['attention', 'place', 'kind', 'name', 'changed'] as ListSort[]) {
+            const items = groupRows(rows(), view({ sort, justAdded: ['s2', 'lswd'] }));
+            expect(lines(items).slice(0, 3)).toEqual(['# Just added', 'Scale 2', 'L-SWD']);
+            expect(entriesOf(items).filter((e) => e.row.id === 's2' || e.row.id === 'lswd')).toHaveLength(2);
+        }
+        // An id no longer on the map (an add undone, the delegate dropping it later) shows nothing.
+        expect(lines(groupRows(rows(), view({ justAdded: ['gone'] })))[0]).toBe('# KERMIT FIELD');
+    });
+
+    test('Kind, Name and Last changed are flat; Last changed newest first with who and when', () => {
+        expect(lines(groupRows(rows(), view({ sort: 'name' })))).toEqual(['CTB1', 'Ghost', 'K1', 'L-SWD', 'Lease', 'P14', 'P14 lateral',
+            'P14-2H', 'Point 1', 'PT-1', 'Scale 1', 'Scale 2', 'SWD1']);
+        expect(lines(groupRows(rows(), view({ sort: 'kind' })))).toEqual(['# Gathering line', 'L-SWD', 'P14 lateral', '# Geofence', 'Lease',
+            '# Tap', 'PT-1', '# Well', 'P14-2H', '# Well pad', 'CTB1', 'Ghost', 'K1', 'P14', 'Point 1', 'Scale 1', 'Scale 2', 'SWD1']);
+        const changed = entriesOf(groupRows(rows(), view({ sort: 'changed' })));
+        expect(changed.slice(0, 3).map((e) => e.row.name)).toEqual(['CTB1', 'SWD1', 'Point 1']);
+        expect(changed[0].note).toBe('sam - ' + whenText('2026-11-08T16:42:00Z', NOW));
+        expect(changed[3].note).toBe('');
+        expect(changed.slice(3).map((e) => e.row.name)).toEqual(['Ghost', 'K1', 'L-SWD', 'Lease', 'P14', 'P14 lateral', 'P14-2H', 'PT-1',
+            'Scale 1', 'Scale 2']);
+    });
+
+    test('the when of a change: Today, Yesterday, else the locale short date', () => {
+        const now = new Date(2026, 10, 8, 18, 0);
+        expect(whenText(new Date(2026, 10, 8, 10, 42).toISOString(), now)).toBe('Today 10:42');
+        expect(whenText(new Date(2026, 10, 7, 9, 5).toISOString(), now)).toBe('Yesterday 09:05');
+        const older = new Date(2026, 10, 1, 9, 5);
+        expect(whenText(older.toISOString(), now)).toBe(older.toLocaleDateString(undefined, { dateStyle: 'short' } as Intl.DateTimeFormatOptions));
+        expect(whenText('nonsense', now)).toBe('');
+        expect(changedText({ actor: 'Sam', at: new Date(2026, 10, 8, 10, 42).toISOString() }, now)).toBe('Sam - Today 10:42');
+        expect(changedText({ actor: '', at: new Date(2026, 10, 8, 10, 42).toISOString() }, now)).toBe('Today 10:42');
+        expect(changedText(null, now)).toBe('');
+    });
+
+    test('Filter keeps one kind in every sort; the chips name each kind on the map with its count', () => {
+        expect(kindChips(rows()).map((c) => c.label + ' ' + c.count)).toEqual(['All 13', 'Gathering line 2', 'Geofence 1', 'Tap 1',
+            'Well 1', 'Well pad 8']);
+        expect(kindChips(rows())[0].id).toBeNull();
+        for (const sort of ['attention', 'place', 'kind', 'name', 'changed'] as ListSort[]) {
+            const shown = entriesOf(groupRows(rows(), view({ sort, kind: 'line', justAdded: ['s1'] }))).map((e) => e.row.kindId);
+            expect(shown.length).toBeGreaterThan(0);
+            expect(shown.every((k) => k === 'line')).toBe(true);
+        }
+        // A well with its pad filtered out stands as a site (no parent item among the kept rows).
+        expect(lines(groupRows(rows(), view({ sort: 'place', kind: 'well' })))).toEqual(['# MESA FIELD', 'P14-2H']);
+    });
+
+    test('Search items filters within the grouping; a matching child shows under its site row', () => {
+        expect(lines(groupRows(rows(), view({ sort: 'place', query: 'swd' })))).toEqual(['# MESA FIELD', 'SWD1', '## Field-wide', 'L-SWD']);
+        expect(lines(groupRows(rows(), view({ sort: 'place', query: '2h' })))).toEqual(['# MESA FIELD', 'P14 [context]', '  P14-2H (on P14)']);
+        expect(lines(groupRows(rows(), view({ sort: 'name', query: 'swd' })))).toEqual(['L-SWD', 'SWD1']);
+        expect(groupRows(rows(), view({ query: 'zzz' }))).toEqual([]);
+    });
+
+    test('the footer counts the Not linked rows, and its filter keeps them alone', () => {
+        expect(unlinkedCount(rows())).toBe(3);
+        expect(unlinkedLabel(3)).toBe('3 unlinked');
+        expect(lines(groupRows(rows(), view({ unlinkedOnly: true })))).toEqual(['# Not linked', 'Ghost', 'Scale 1', 'Scale 2']);
+        expect(lines(groupRows(rows(), view({ sort: 'name', unlinkedOnly: true })))).toEqual(['Ghost', 'Scale 1', 'Scale 2']);
+    });
+
+    test('without the asset list every row is Not linked; keys are unique', () => {
+        const bare = listRows(ITEMS, KINDS, LIVE_INITIAL);
+        expect(lines(groupRows(bare, view({ sort: 'place' })))[0]).toBe('# Not linked');
+        const keys = groupRows(rows(), view({ justAdded: ['s1'] })).map((i) => i.key);
+        expect(new Set(keys).size).toBe(keys.length);
+    });
+});

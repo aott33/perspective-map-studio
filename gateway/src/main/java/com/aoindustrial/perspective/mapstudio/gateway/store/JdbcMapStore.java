@@ -10,7 +10,9 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.inductiveautomation.ignition.common.gson.JsonElement;
@@ -34,6 +36,16 @@ public final class JdbcMapStore implements MapStore {
         + "attachment::text";
 
     static final String KIND_SETUP_COLUMNS = "kind_id, setup::text, version, deleted";
+
+    /** Each map item's newest edit record (epic 4 entry 7a): one row per item id, its actor and time. */
+    static final String LAST_EDITS_SQL = "SELECT DISTINCT ON (entity_id) entity_id, actor, at FROM mapstudio_edit"
+        + " WHERE project = ? AND entity = 'item' ORDER BY entity_id, edit_id DESC";
+
+    /** A database time as ISO 8601 UTC to the second ({@code LastEdit}'s form), null for null. */
+    static String isoSecond(OffsetDateTime at) {
+        return at == null ? null : DateTimeFormatter.ISO_INSTANT.format(at.withOffsetSameInstant(ZoneOffset.UTC)
+            .truncatedTo(ChronoUnit.SECONDS).toInstant());
+    }
 
     private final ConnectionSource connections;
 
@@ -226,12 +238,24 @@ public final class JdbcMapStore implements MapStore {
                     if (!rs.next()) {
                         return Optional.empty();
                     }
-                    OffsetDateTime at = rs.getObject(2, OffsetDateTime.class);
-                    return Optional.of(new LastEdit(rs.getString(1), at == null ? null
-                        : DateTimeFormatter.ISO_INSTANT.format(at.withOffsetSameInstant(ZoneOffset.UTC)
-                            .truncatedTo(ChronoUnit.SECONDS).toInstant())));
+                    return Optional.of(new LastEdit(rs.getString(1), isoSecond(rs.getObject(2, OffsetDateTime.class))));
                 }
             }
+        }
+
+        @Override
+        public Map<String, LastEdit> lastEdits(String project) throws SQLException {
+            Map<String, LastEdit> out = new LinkedHashMap<>();
+            // One query per load (entry 7a): the newest edit record of each map item, served by mapstudio_edit_project_entity.
+            try (PreparedStatement ps = c.prepareStatement(LAST_EDITS_SQL)) {
+                ps.setString(1, project);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.put(rs.getString(1), new LastEdit(rs.getString(2), isoSecond(rs.getObject(3, OffsetDateTime.class))));
+                    }
+                }
+            }
+            return out;
         }
 
         @Override

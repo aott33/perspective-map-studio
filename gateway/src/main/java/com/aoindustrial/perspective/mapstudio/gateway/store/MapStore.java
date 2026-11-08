@@ -2,6 +2,7 @@ package com.aoindustrial.perspective.mapstudio.gateway.store;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.inductiveautomation.ignition.common.gson.JsonObject;
@@ -65,6 +66,12 @@ public interface MapStore {
 
         /** The last edit record of one entity, or empty when it has none. */
         Optional<LastEdit> lastEdit(String project, String entity, String entityId) throws SQLException;
+
+        /**
+         * Who last changed each map item of the project and when, by item id (epic 4 entry 7a, {@code map.load.reply}'s
+         * {@code changed}): the newest edit record of every item, in one query; an item with no record is absent.
+         */
+        Map<String, LastEdit> lastEdits(String project) throws SQLException;
 
         /**
          * The live map items attached to this line ({@code attachment.lineId}), ordered by

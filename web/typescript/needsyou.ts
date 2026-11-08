@@ -189,8 +189,11 @@ export function stateDetail(state: ItemState, values: ItemValues | undefined, di
     return '';
 }
 
-/** The rank key of a row: alarms by priority (unacknowledged first), then comms lost, then stale; by name within each. */
-function rankOf(state: ItemState): number {
+/**
+ * The rank key of a row: alarms by priority (unacknowledged first), then comms lost, then stale; by name within each. The item
+ * list's Needs attention sort ranks its sites by it too (epic 4 entry 7a).
+ */
+export function rankOf(state: ItemState): number {
     if (state.alarm) {
         return (state.alarm.priority - 1) * 2 + (state.alarm.unacked ? 0 : 1);
     }

@@ -52,6 +52,8 @@ public class FakeMapStore implements MapStore {
     public State committed = new State();
     /** The time every edit record of the fake carries (the database's now()). */
     public String now = "2026-10-26T14:02:00Z";
+    /** How many times {@code lastEdits} was called (entry 7a: one query per load, never one per item). */
+    public int lastEditsQueries;
     /**
      * When set, the next insertBatch finds this row already committed by another transaction
      * (a concurrent send of the same batchId): it is added to the committed state and the
@@ -192,6 +194,19 @@ public class FakeMapStore implements MapStore {
                 }
             }
             return Optional.empty();
+        }
+
+        @Override
+        public Map<String, LastEdit> lastEdits(String project) {
+            lastEditsQueries++;
+            Map<String, LastEdit> out = new TreeMap<>();
+            for (int i = 0; i < s.edits.size(); i++) {
+                EditRow row = s.edits.get(i);
+                if (row.project().equals(project) && row.entity().equals("item")) {
+                    out.put(row.entityId(), new LastEdit(row.actor(), s.editTimes.get(i)));
+                }
+            }
+            return out;
         }
 
         @Override

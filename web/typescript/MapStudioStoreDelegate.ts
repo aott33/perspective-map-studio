@@ -24,7 +24,7 @@
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
 import { MapChanges, MapChangedBody } from './changes';
-import { EditBatch, EditLevel, MapItemData, MapItemRecord } from './contract';
+import { EditBatch, EditLevel, LastChange, MapItemData, MapItemRecord } from './contract';
 import { Position, itemDeleteBatch, lineGeometryBatch, pointMoveBatch, splitAtBatch, vertexDeleteBatch, vertexMoveBatch } from './geometry';
 import { HostLists, NO_HOST_LISTS } from './adapters';
 import { MESSAGE_EVENT, Reply, basemapSource, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText } from './messages';
@@ -137,6 +137,16 @@ export interface MapStudioDelegateState {
      * settled, saved or given up) puts back a field the record does not hold.
      */
     inFlight: Record<string, Record<string, unknown> | null>;
+    /**
+     * Who last changed each map item and when (epic 4 entry 7a), by item id: map.load's `changed` (other editors' changes as of
+     * the last load), then this session's own saves (the session user, now). Empty for a viewer.
+     */
+    changed: Record<string, LastChange>;
+    /**
+     * The items this session added (the Point, Line and Area tools), newest first (entry 7a, the list's Just added): an add
+     * undone leaves it; the page's reload clears it.
+     */
+    justAdded: string[];
 }
 
 /** `localStorage`, or null when the browser refuses it (a private window, blocked site data). */
@@ -210,6 +220,12 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private storage: KeyValueStore | null;
     /** The undo stack (entry 2): one step per saved edit of this session, the reverse sent through the same queue. */
     private undoStack: UndoStack = UNDO_EMPTY;
+    /** Who last changed each item and when (entry 7a): map.load's `changed`, then this session's saves. */
+    private changed: Record<string, LastChange> = {};
+    /** The session user map.load named ('' when none), the actor of this session's own saves in `changed`. */
+    private user = '';
+    /** The items this session added, newest first (entry 7a, Just added). */
+    private justAdded: string[] = [];
     /**
      * The history's undo-to-here in progress (entry 23, owner 2026-11-05), or null: the single undos still to send, the
      * next one only after the last reverse saved; a refusal of its reverse or another edit ends it.
@@ -317,7 +333,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             undo: this.undoStack,
             editInFlight: this.editInFlight(),
             shapeRefused: this.shapeRefused,
-            inFlight: this.inFlightItems()
+            inFlight: this.inFlightItems(),
+            changed: this.changed,
+            justAdded: this.justAdded
         };
     }
 
@@ -479,6 +497,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         const itemId = newId();
         this.sendBatch(lineCreateBatch(itemId, newId(), kind.id, kind.name, coordinates, ends, this.prefillOf(kind)), itemId,
             stepLabel('add', kind.name));
+        this.noteAdded(itemId);
         return itemId;
     }
 
@@ -606,7 +625,36 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         const itemId = newId();
         this.sendBatch(pointCreateBatch(itemId, newId(), kind.id, kind.name, lngLat, this.prefillOf(kind)), itemId,
             stepLabel('add', kind.name));
+        this.noteAdded(itemId);
         return itemId;
+    }
+
+    /** A tool's add (entry 7a): the item heads the list's Just added, newest first, until the add is undone or the page reloads. */
+    private noteAdded(itemId: string): void {
+        this.justAdded = [itemId].concat(this.justAdded.filter((id) => id !== itemId));
+    }
+
+    /**
+     * A batch of this session saved (entry 7a): each map item it touched was last changed by the session user, now (to the
+     * second, as the Gateway's `at`); an item it deleted leaves Just added (an add undone, or the new item deleted).
+     */
+    private noteSaved(batch: EditBatch, now: Date): void {
+        const at = new Date(Math.floor(now.getTime() / 1000) * 1000).toISOString().replace('.000Z', 'Z');
+        const changed = { ...this.changed };
+        const deleted = new Set<string>();
+        for (const op of batch.ops) {
+            if (op.entity !== 'item') {
+                continue;
+            }
+            changed[op.id] = { actor: this.user, at };
+            if (op.op === 'delete') {
+                deleted.add(op.id);
+            }
+        }
+        this.changed = changed;
+        if (deleted.size > 0 && this.justAdded.some((id) => deleted.has(id))) {
+            this.justAdded = this.justAdded.filter((id) => !deleted.has(id));
+        }
     }
 
     /** A finished Name field (entry 2): one update at the stored version, the step "rename <new name>". */
@@ -1167,6 +1215,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         if (reply.kind === 'map.load.reply') {
             this.level = reply.body.level;
             this.lists = reply.body.lists;
+            // Other editors' changes as of this load (entry 7a); this session's saves since then are set as they save.
+            this.changed = reply.body.changed || {};
+            this.user = reply.body.user || '';
             this.refreshIntervalSeconds = reply.body.setup ? reply.body.setup.refreshIntervalSeconds : null;
             this.alarmPage = reply.body.setup ? reply.body.setup.alarmPage : '';
             this.load = { state: 'loaded', message: '' };
@@ -1229,6 +1280,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             // The undo a run waits on (entry 23): read before the stack settles it.
             const runStep = this.undoRun !== null && this.isPendingUndo(reply.body.batchId);
             if (outcome.entry) {
+                this.noteSaved(outcome.entry.batch, new Date());
                 for (const record of savedRecords(outcome.entry.batch, reply.body.results)) {
                     if (this.changes.saved(record)) {
                         this.itemsRevision++;

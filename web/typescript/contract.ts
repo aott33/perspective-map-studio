@@ -134,6 +134,32 @@ export interface MapLoadReplyBody {
      * at level `none`, for an anonymous session, or from an older Gateway.
      */
     user?: string;
+    /**
+     * Who last changed each map item and when (epic 4 entry 7a, 0.4.0), by item id: `at` is ISO 8601 UTC to the second.
+     * Sent at level `phone` and `full` only; absent for a viewer or from an older Gateway. Malformed entries are left out.
+     */
+    changed?: Record<string, LastChange>;
+}
+
+/** One item's last change: the actor the edit record names and when (ISO 8601, UTC). */
+export interface LastChange {
+    actor: string;
+    at: string;
+}
+
+/** map.load.reply's `changed`, entries that are not `{actor, at}` strings left out; null when absent or not an object. */
+export function readChanged(value: unknown): Record<string, LastChange> | null {
+    if (!isRecord(value)) {
+        return null;
+    }
+    const out: Record<string, LastChange> = {};
+    for (const id of Object.keys(value)) {
+        const entry = value[id];
+        if (isRecord(entry) && typeof entry.actor === 'string' && typeof entry.at === 'string' && isFinite(Date.parse(entry.at))) {
+            out[id] = { actor: entry.actor, at: entry.at };
+        }
+    }
+    return out;
 }
 
 export interface EditsApplyReplyBody {
@@ -232,6 +258,10 @@ export function readMapLoadReply(body: Record<string, unknown>): MapLoadReplyBod
     }
     if (typeof body.user === 'string' && body.user !== '') {
         reply.user = body.user;
+    }
+    const changed = readChanged(body.changed);
+    if (changed) {
+        reply.changed = changed;
     }
     return reply;
 }
