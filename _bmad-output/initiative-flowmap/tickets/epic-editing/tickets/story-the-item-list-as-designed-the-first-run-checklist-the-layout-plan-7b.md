@@ -57,11 +57,11 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] Delegate and `changes.ts` -- kind setups held and kept live, Jest.
-- [ ] `firstRun.ts`, `FirstRunChecklist.tsx`, `MapStudio.tsx`, CSS -- the card, the note, Jest.
-- [ ] Dev empty project and the kind-setup buttons, ignition-lint clean.
-- [ ] e2e `firstrun.spec.mjs`.
-- [ ] Docs, CHANGELOG, deferred-work, the playbook section.
+- [x] Delegate and `changes.ts` -- kind setups held and kept live, Jest.
+- [x] `firstRun.ts`, `FirstRunChecklist.tsx`, `MapStudio.tsx`, CSS -- the card, the note, Jest.
+- [x] Dev empty project and the kind-setup buttons, ignition-lint clean.
+- [x] e2e `firstrun.spec.mjs`.
+- [x] Docs, CHANGELOG, deferred-work, the playbook section.
 
 **Acceptance Criteria:**
 - Given the empty dev project as `mapeditor` and as a viewer at 1366 px, when the matrix runs, then each row holds.
@@ -75,6 +75,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 ## Plan Change Log
 
+- Build, 2026-11-08: the empty project is `ops/project` mounted a second time as `mapstudio-empty`, not a child project inheriting `mapstudio-dev`: the module makes a setup lifecycle only for runnable projects (enabled and not inheritable, `SetupLifecycleFactory`), so making `mapstudio-dev` inheritable would have taken the dev map's setup away. Same views, setup, kind list and scripts; its own map. The kind setup buttons are on a new page `/empty` (view `MapStudioEmpty`, library `mapstudio_empty`, always writing `mapstudio-empty`'s geofence kind setup). The suite signs in per project (`editorAuth.mjs` `stateFile(user, project)`, `signInEditorOnce(user, project)`). Step 1's help says "kind" for one kind. The ring's check is a new chrome glyph `check` (`controls.ts`); a ghost button style `mapstudio-button--ghost` is new. The second mount made `adapters.spec.mjs`' call count double (the empty project refreshes its lists through the same `mapstudio_dev` functions), so the dev adapter counts only `mapstudio-dev`'s calls (`system.util.getProjectName()`); the designer tests listing the dev project's pages and libraries take `/empty` and `mapstudio_empty`. Save a kind setup restores at a tombstone's version, as the seed does.
+
 ## Review Triage Log
 
 ## Verification
@@ -84,3 +86,5 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 - `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew clean build --offline --rerun-tasks` -- expected: BUILD SUCCESSFUL (the `SetupLookupsTest` timing flake may fail once; rerun).
 - `ignition-lint --files` on changed dev scripts and views -- expected: zero errors and warnings.
 - `ops/up.sh --fresh` then `cd e2e && PW_CHROMIUM_PATH=/opt/pw-browsers/chromium npm test -- --trace off` -- expected: green (the review 390 px flake may fail once; rerun it alone).
+
+Build, 2026-11-08: `tsc` clean, Jest 659 passed in 63 suites (`firstRun.test.ts` new); `./gradlew clean build --offline --rerun-tasks` BUILD SUCCESSFUL. On `ops/up.sh --fresh` the whole e2e suite: 258 passed, 7 skipped, 2 failed in 49.6 min: `adapters.spec.mjs`' call count (the second mount, fixed as above, then adapters.spec 3 of 3) and the known review 390 px flake (passed rerun with its theme's group, 5 of 5). After the fixes `firstrun.spec.mjs` 16 of 16 with `--repeat-each 2`. A whole-suite rerun after the fixes was not done. ignition-lint not run: installing it was not permitted in this session; the changed scripts and view scripts were parsed with Python's `ast` only.

@@ -130,8 +130,24 @@ def calls():
     return {'kinds': store.get(CALLS_KEY + '.kinds', 0), 'assets': store.get(CALLS_KEY + '.assets', 0)}
 
 
+def _calling_project():
+    """The project whose script manager runs this call, or None when it cannot be read."""
+    try:
+        return system.util.getProjectName()
+    except java.lang.Throwable as ex:
+        logger.debug('Dev adapter could not read the project name: %s' % ex.getClass().getSimpleName())
+        return None
+    except Exception as ex:
+        logger.debug('Dev adapter could not read the project name: %s' % type(ex).__name__)
+        return None
+
+
 def _count(what):
     # One key per function: Map Studio runs at most one call per function at a time.
+    # Only the dev project's calls count (epic 4 entry 7b): the empty project, mapstudio-empty, runs
+    # these same files and its own refreshes would add to the counts the /adapters page reads.
+    if _calling_project() not in (None, 'mapstudio-dev'):
+        return
     store = _globals('count a dev adapter call')
     key = CALLS_KEY + '.' + what
     store[key] = store.get(key, 0) + 1

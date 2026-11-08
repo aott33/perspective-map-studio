@@ -54,7 +54,16 @@ def save_kind_setup(api=None):
         else:
             op = {'op': 'update', 'entity': 'kindSetup', 'id': KIND_ID, 'baseVersion': int(held['version']),
                   'data': {'setup': SETUP}}
-        result = _apply(api, [op])
+        try:
+            result = _apply(api, [op])
+        except java.lang.Throwable as ex:
+            # A kind setup deleted before (a tombstone): the create again at the tombstone's version, as the dev
+            # seed restores (mapstudio_seed._conflicts).
+            tombstones = [c for c in mapstudio_seed._conflicts(ex) if c['deleted']]
+            if op['op'] != 'create' or not tombstones:
+                raise
+            op = dict(op, baseVersion=tombstones[0]['version'])
+            result = _apply(api, [op])
         result['saved'] = op['op'] + 'd'
         logger.info('Empty map: the %s kind setup %s as seq %s' % (KIND_ID, result['saved'], result['seq']))
         return result
