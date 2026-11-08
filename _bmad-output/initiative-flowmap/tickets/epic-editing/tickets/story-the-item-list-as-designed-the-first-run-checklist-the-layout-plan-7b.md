@@ -3,7 +3,7 @@ title: "7b: The first-run checklist on an empty map and the viewer's note"
 type: 'feature'
 ticket: '7'
 created: '2026-11-08'
-status: 'in-review'
+status: 'built'
 baseline_revision: '3a34b954c09bb78f76dda242fa3b829fffa8c1d5'
 route: 'full'
 route_source: 'auto'
@@ -89,6 +89,8 @@ Quick lens, 2026-11-08: 5 findings; high 0, medium 0, low 2, false 3.
 | A backlog story outside the plan is in the diff | false | `story-industry-neutral-words-in-the-module.md` (backlog 36) was added by the orchestrator at the owner's request in its own commit (10cc1af); it falls in the range only by date | rejected |
 | A kind-setup-only `map.changed` bumps `itemsRevision` | low | `onMapChanged` bumps it on any applied change; items are unchanged, so it costs one redraw per kind setup save, which is rare | rejected: rare, and the fix adds a branch to the change path |
 | Step 1's help reads "for the 0 kinds" when the host's kind list is empty or failed | low | `kindsHelp` pluralises any count but 1; `lists.kinds` is empty on a failed list | patch: the count phrase dropped at 0 |
+
+Outcome, 2026-11-08: the patch applied (d2600c1) and verified by the orchestrator: `tsc` clean, Jest 659 passed, `./gradlew clean build --offline --rerun-tasks` green, the contract check OK at 0.4.0, ignition-lint clean on the changed scripts and the new view, and `ops/up.sh --fresh` with the whole e2e suite: 259 passed, 7 skipped, 1 failed in 47.1 min (`firstrun.spec.mjs` among the passes; the review 390 px test passed this run). The failure was `retest.spec.mjs` R4 (a), the card open after a reload just after its close (the page's kept `selectedItem` racing the close's write), which passed rerun alone 3 of 3; it joins the flaky-test fix the owner approved before entry 8.
 
 ## Verification
 
