@@ -3,7 +3,7 @@ title: "7a: The item list as designed (grouped by place, Sort by, Filter, the fo
 type: 'feature'
 ticket: '7'
 created: '2026-11-08'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '7613c87bd13da873fb6473b0f9b8198403dfa799'
 route: 'full'
 route_source: 'auto'
@@ -21,7 +21,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 **Problem:** The Edit-mode Items list is one flat list by name: on a field of 30 pads an editor cannot see what is where, what needs attention, what was just added or changed, or what is unlinked.
 
-**Approach:** Decisions (owner, 2026-11-03: grouped by place from the linked asset's base path, Field-wide, Not linked, Just added; 2026-11-08: entry 7 split, this is 7a, then 7c the layout, then 7b the checklist). The list as EXPERIENCE.md's Item list and DESIGN.md's list row, group header and filter chip describe it, with `changed {actor, at}` added to `map.load.reply` for the phone and full levels in contract 0.4.0. Checkboxes and Select all are entry 8; the layout and the collapse are 7c.
+**Approach:** Decisions (owner, 2026-11-03: grouped by place from the linked asset's base path, Field-wide, Not linked, Just added; 2026-11-08: entry 7 split, this is 7a, then 7c the layout, then 7b the checklist; 2026-11-08, "Approved and continue" on the planner's five picks: the longest asset path prefix as the parent, field lines in Field-wide, Just added on top in every sort and cleared on reload, Add item arming the Point tool, other editors' changes as of the last load). The list as EXPERIENCE.md's Item list and DESIGN.md's list row, group header and filter chip describe it, with `changed {actor, at}` added to `map.load.reply` for the phone and full levels in contract 0.4.0. Checkboxes and Select all are entry 8; the layout and the collapse are 7c.
 
 ## Boundaries & Constraints
 
@@ -75,6 +75,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 ## Implementation Notes
 
 - Planner, 2026-11-08: the environment, commit and identity rules are entry 16's plan's (Docker by hand after a restart, JDK 17 by apt if gone, `ops/up.sh --fresh` before a whole-suite run, the session's trailers, `git commit --only`, no em dashes, no model identifier, never a bare `git stash`, never a push). Commit at each working milestone.
+
+- Approval (owner, 2026-11-08): "Approved and continue" with the five picks, written into the Approach; the plan, over size, kept whole.
 
 ## Plan Change Log
 
