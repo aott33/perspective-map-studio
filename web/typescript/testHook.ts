@@ -67,14 +67,17 @@ export interface TestView {
 /**
  * Put `window.__mapStudioTestView(view)` up for the e2e suite (epic 3 entry 7): it moves the map
  * that registered last to a centre and zoom, as a user's pan and zoom would, so a spec can check the
- * labels at a zoom without a handle on the map. It changes no data and is not part of the contract.
+ * labels at a zoom without a handle on the map. It returns a promise resolved once the map has drawn
+ * the moved view (its next `idle`), so a spec's click is hit-tested on the new frame even when the zoom
+ * does not change (the 390 px review flake, 2026-11-08). It changes no data and is not part of the contract.
  */
-export function registerTestView(jump: (view: TestView) => void): void {
+export function registerTestView(jump: (view: TestView) => Promise<void>): void {
     if (typeof window !== 'undefined') {
-        (window as unknown as { __mapStudioTestView?: (view: TestView) => void }).__mapStudioTestView = (view) => {
+        (window as unknown as { __mapStudioTestView?: (view: TestView) => Promise<void> }).__mapStudioTestView = (view) => {
             if (view && Array.isArray(view.center) && view.center.length === 2 && typeof view.zoom === 'number') {
-                jump({ center: [Number(view.center[0]), Number(view.center[1])], zoom: view.zoom });
+                return jump({ center: [Number(view.center[0]), Number(view.center[1])], zoom: view.zoom });
             }
+            return Promise.resolve();
         };
     }
 }

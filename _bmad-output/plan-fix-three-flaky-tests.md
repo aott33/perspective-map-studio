@@ -42,10 +42,10 @@ context: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] The view hook and `view()`; `review.spec.mjs` 390 px passes 12 of 12 under CPU load (as the investigation's repro).
-- [ ] `SetupLookups` race, the new unit test, 50 runs of `SetupLookupsTest`.
-- [ ] R4 (a) diagnostics.
-- [ ] `deferred-work.md` entries.
+- [x] The view hook and `view()`; `review.spec.mjs` 390 px passes 12 of 12 under CPU load (as the investigation's repro).
+- [x] `SetupLookups` race, the new unit test, 50 runs of `SetupLookupsTest`.
+- [x] R4 (a) diagnostics.
+- [x] `deferred-work.md` entries.
 
 **Acceptance Criteria:**
 - Given a fresh dev stack, when the whole e2e suite runs, then every spec passes.
@@ -55,6 +55,10 @@ context: []
 - Planner: the environment, commit and identity rules are 7b's plan's (Docker by hand after a restart, `ops/up.sh --fresh` before a whole-suite run, the session's trailers, `git commit --only`, no em dashes, no model identifier, never a bare `git stash`, never a push).
 
 ## Plan Change Log
+
+- Build, 2026-11-08: each lookup pool and its permits are one object, `setuplookup/LookupPool.java` (a queueing `ThreadPoolExecutor`, core equal to max, idle threads let go after 30 s, and a `Semaphore` of one permit per thread), so two `SetupLookups` over the same pools share one limit, as the tests' do; `SetupLookups` and `MapStudioGatewayHook` take it in place of `ExecutorService`. `submit` takes a permit with `tryAcquire` (UNAVAILABLE at once when none is free); a `RejectedExecutionException` now comes only from a pool shut down and gives the permit back. The test's `secrets.getActiveCount()` became `secrets.inUse()` (permits held). The new test is `backToBackCallsAtFullCapacityAllAnswer`: a one-thread, one-permit pool whose worker, after each call, waits until the next call has been handed to the executor; it fails on the old `SynchronousQueue` pool shape (checked) and passes now. In the view hook, "nothing moves" compares centre, zoom and camera padding before and after the `jumpTo`.
+
+- Verified, 2026-11-08: tsc clean, Jest 659 passed in 63 suites; `SetupLookupsTest` 50 of 50 with `--rerun`, and 20 of 20 under CPU load; `./gradlew clean build --offline --rerun-tasks` BUILD SUCCESSFUL; `review.spec.mjs` 390 px 12 of 12 under CPU load (`--repeat-each=6`, both themes); `ops/up.sh --fresh` and the whole e2e suite: 260 passed, 7 skipped, 0 failed in 45.3 min (R4 (a) among the passes, so its diagnostics have not yet had a failure to attach to).
 
 ## Review Triage Log
 

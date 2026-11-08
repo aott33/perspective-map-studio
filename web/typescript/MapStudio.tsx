@@ -431,12 +431,22 @@ export class MapStudio extends Component<Props, MapStudioState> {
         // The Edit switch and the studio wait for map.load's level (applyStudioControls, componentDidUpdate).
         this.themeWatch = new ThemeWatch(root, THEME_TOKENS, () => this.applyTheme());
         this.themeWatch.start();
-        registerTestView((view) => {
-            if (this.map === map) {
-                // A test's move centres on the whole map: the camera padding of the last choice (item 27) is cleared.
-                map.jumpTo({ center: view.center, zoom: view.zoom, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
+        registerTestView((view) => new Promise<void>((resolve) => {
+            if (this.map !== map) {
+                resolve();
+                return;
             }
-        });
+            const before = [map.getCenter().lng, map.getCenter().lat, map.getZoom(), JSON.stringify(map.getPadding())];
+            // Resolved when the map has drawn the moved view, so a spec's next click hits the new frame.
+            map.once('idle', () => resolve());
+            // A test's move centres on the whole map: the camera padding of the last choice (item 27) is cleared.
+            map.jumpTo({ center: view.center, zoom: view.zoom, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
+            const after = [map.getCenter().lng, map.getCenter().lat, map.getZoom(), JSON.stringify(map.getPadding())];
+            if (before.every((v, i) => v === after[i]) && map.loaded() && !map.isMoving()) {
+                // Nothing moved and nothing is left to draw: no idle may come, and the frame is already the view's.
+                resolve();
+            }
+        }));
         editing.applyEditing(this);
         if (typeof window !== 'undefined') {
             window.addEventListener('storage', this.onStorage);

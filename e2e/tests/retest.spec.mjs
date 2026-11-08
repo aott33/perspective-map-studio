@@ -64,6 +64,60 @@ async function onTopAt(page, locator, classes) {
     }, [b.x + b.width / 2, b.y + b.height / 2, classes]);
 }
 
+/**
+ * R4 (a)'s diagnostics (the flaky-test fix, 2026-11-08; the cause of its one failure is unproven): every
+ * `[MapStudio]` console line about a page selection, and each `selectedItem` the Gateway's `session-init`
+ * holds once `armed()` is true (after the reload), attached to the test only when it fails.
+ */
+function selectionTrace(page, armed) {
+    const lines = [];
+    const inits = [];
+    const t0 = Date.now();
+    page.on('console', (msg) => {
+        const text = msg.text();
+        if (text.startsWith('[MapStudio]') && /select/i.test(text)) {
+            lines.push(`${Date.now() - t0} ms ${msg.type()}: ${text}`);
+        }
+    });
+    page.on('websocket', (ws) => {
+        ws.on('framereceived', ({ payload }) => {
+            const text = typeof payload === 'string' ? payload : payload.toString('utf8');
+            if (!armed() || !text.startsWith('session-init:')) {
+                return;
+            }
+            const found = [];
+            const walk = (node, path) => {
+                if (node === null || typeof node !== 'object') {
+                    return;
+                }
+                for (const [key, value] of Object.entries(node)) {
+                    if (key === 'selectedItem') {
+                        found.push({ path: path.concat(key).join('.'), value });
+                    } else {
+                        walk(value, path.concat(key));
+                    }
+                }
+            };
+            try {
+                walk(JSON.parse(text.slice('session-init:'.length)), []);
+            } catch (err) {
+                found.push({ error: String(err) });
+            }
+            inits.push({ at: `${Date.now() - t0} ms`, selectedItem: found });
+        });
+    });
+    return {
+        attach: async () => {
+            await test.info().attach('R4 (a) session-init selectedItem after the reload', {
+                body: JSON.stringify(inits, null, 2), contentType: 'application/json'
+            });
+            await test.info().attach('R4 (a) [MapStudio] page selection console lines', {
+                body: lines.join('\n') || '(none)', contentType: 'text/plain'
+            });
+        }
+    };
+}
+
 const radii = (locator) => locator.evaluate((el) => {
     const cs = getComputedStyle(el);
     return { tl: cs.borderTopLeftRadius, tr: cs.borderTopRightRadius, bl: cs.borderBottomLeftRadius, br: cs.borderBottomRightRadius };
@@ -203,6 +257,8 @@ test.describe('1366 px', () => {
 
     test('R4 (a): View alarms and the browser\'s back bring the map back where it was, P14\'s card open; a new session opens on the starting area',
         async ({ page, browser, watched }) => {
+            let reloaded = false;
+            const trace = selectionTrace(page, () => reloaded);
             const map = await openShowcase(page);
             // The page's own starting area the first time.
             await expect(map).toHaveAttribute('data-zoom', SHOWCASE.zoom.toFixed(2));
@@ -233,15 +289,22 @@ test.describe('1366 px', () => {
             await expect(again).toHaveAttribute('data-point-id', ids.p14);
             await shot(page, 'retest-place-kept-1366.png');
             // Closed, the card stays closed on the next return; a new browser session opens on the starting area.
-            await again.locator('.mapstudio-popup-close').click();
-            await expect(card(page)).toHaveCount(0);
-            await page.reload();
-            const reloaded = page.locator('.mapstudio-map');
-            await expect(reloaded).toHaveAttribute('data-map-ready', 'true', { timeout: 60_000 });
-            await expect(reloaded).toHaveAttribute('data-zoom', '16.00');
-            await expect(reloaded).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
-            await page.waitForTimeout(1000);
-            await expect(card(page)).toHaveCount(0);
+            try {
+                await again.locator('.mapstudio-popup-close').click();
+                await expect(card(page)).toHaveCount(0);
+                reloaded = true;
+                await page.reload();
+                const afterReload = page.locator('.mapstudio-map');
+                await expect(afterReload).toHaveAttribute('data-map-ready', 'true', { timeout: 60_000 });
+                await expect(afterReload).toHaveAttribute('data-zoom', '16.00');
+                await expect(afterReload).toHaveAttribute('data-live-full', /^[1-9][0-9]*$/, { timeout: 30_000 });
+                await page.waitForTimeout(1000);
+                await expect(card(page)).toHaveCount(0);
+            } catch (err) {
+                // The next failure names its cause: what the Gateway handed the reloaded page, and what the map did with it.
+                await trace.attach();
+                throw err;
+            }
             const fresh = await browser.newContext({ viewport: { width: 1366, height: 768 } });
             try {
                 const other = await fresh.newPage();

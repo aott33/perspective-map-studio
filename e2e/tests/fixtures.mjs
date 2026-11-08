@@ -158,7 +158,10 @@ export async function shot(page, name) {
 /** How long a spec gives the map to draw and publish a moved view or a changed layer. */
 export const DRAW_MS = 20_000;
 
-/** Move the map (the component's e2e view hook) and wait for the labels of that zoom to be published. */
+/**
+ * Move the map (the component's e2e view hook), wait for the map to draw the moved view (the hook's
+ * promise, on the map's next idle) and for the labels of that zoom to be published.
+ */
 export async function view(page, map, center, zoom) {
     await page.waitForFunction(() => Boolean(window.__mapStudioTestView));
     await page.evaluate(([c, z]) => window.__mapStudioTestView({ center: c, zoom: z }), [center, zoom]);
