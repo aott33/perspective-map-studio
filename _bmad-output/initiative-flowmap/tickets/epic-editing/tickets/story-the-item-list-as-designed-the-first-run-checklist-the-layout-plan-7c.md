@@ -58,10 +58,10 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `selection.tsx`, `editing.ts`, `MapStudio.tsx` -- one keep-place path for every dock change, with Jest.
-- [ ] `MapStudio.tsx`, `ItemList.tsx`, CSS -- the collapse below 1280, the toolbar back on the top row, with Jest where pure.
-- [ ] e2e `layout.spec.mjs` and the changed specs.
-- [ ] Docs, CHANGELOG, deferred-work, the playbook section.
+- [x] `selection.tsx`, `editing.ts`, `MapStudio.tsx` -- one keep-place path for every dock change, with Jest.
+- [x] `MapStudio.tsx`, `ItemList.tsx`, CSS -- the collapse below 1280, the toolbar back on the top row, with Jest where pure.
+- [x] e2e `layout.spec.mjs` and the changed specs.
+- [x] Docs, CHANGELOG, deferred-work, the playbook section.
 
 **Acceptance Criteria:**
 - Given the seeded dev map as `mapeditor` at 1440, 1366 and 1200 px, when the matrix runs, then each row holds.
@@ -72,6 +72,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 - Planner, 2026-11-08: the environment, commit and identity rules are 7a's plan's (Docker by hand after a restart, JDK 17 by apt if gone, `ops/up.sh --fresh` before a whole-suite run, the session's trailers, `git commit --only`, no em dashes, no model identifier, never a bare `git stash`, never a push). Commit at each working milestone.
 
 - Approval (owner, 2026-11-08): "Go with recommendations" (option A, written into the Approach); the plan kept whole.
+- Build, 2026-11-08: `selection.tsx` exports `dockChange(host, update, place?)`; the component and the editing host carry it as a method (`editing.ts` stays free of selection.tsx's imports). Callers: an Edit-mode click, the Point tool's placement, a finished line or area (its last point is the place eased into view), a split (the split point), `clearSelection` (ground, close, Esc, a selected item leaving the map) and Details' delete (shift only), the 1280 px crossing and a rail surface change (the selected point, if any). The collapse is component state (`listCollapsed`, `listOpen`) from `matchMedia('(max-width: 1279px)')`; the stylesheet's 1279 px media block is gone. Implementer's reading: below 1280 px only the Items list leaves the dock; Kinds and Layers still dock in its place, and with Details docked too the toolbar keeps the row under the switch there (`mapstudio--narrow-dock`), since 552 px of map cannot hold it beside the switch. A map click closes the open list and goes on as a click. The Jest case "the ground closing Details does not pan" now expects the shift (the matrix's Close row). `layout.spec.mjs` waits 1 s before clicking CTB1 again after a close: on the software-GL box MapLibre re-places its symbols over the next frames and an earlier click takes L-SWD under the marker. `docs/contract.md` gains "The Edit-mode layout".
+- Verified, 2026-11-08: tsc clean, Jest 646 passed in 62 suites; `./gradlew clean build --offline --rerun-tasks` green; the contract check OK at 0.4.0; on a fresh stack the whole e2e suite 249 passed, 7 skipped, 1 failed (`review.spec.mjs` light 390 px, the known flake: "No Connection to Gateway" in its snapshot, deferred-work.md), which failed twice more alone in either theme, then passed with each theme's group rerun (4 of 4 and 5 of 5); `layout.spec.mjs` 14 of 14.
 
 ## Plan Change Log
 
