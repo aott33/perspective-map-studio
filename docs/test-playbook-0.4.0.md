@@ -2,7 +2,7 @@
 
 A walk through what epic 4 has built so far, grouped by what you do, on the local development stack. Tick each box and note anything that looks or feels off in the Notes line under each section (a screenshot helps). Each note goes into `_bmad-output/initiative-flowmap/tickets/epic-editing/epic-editing.md` Notes or a new entry. The playbook grows as entries land; entry 18 (the 0.4.0 release) finishes it for the release test and the 30-minute test.
 
-Built so far (2026-11-07): entries 1 to 6, 21 to 27, 14, 15 and 16. Still to come: 7 (the item list as designed, the checklist), 8 (selecting several), 9 (instruments), 10 (save problems), 11 (Recent changes and History), 12 and 13 (the Kinds screen, the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
+Built so far (2026-11-08): entries 1 to 6, 21 to 27, 14, 15, 16 and 7a (the item list as designed). Still to come: 7c and 7b (the list's layout and collapse, the checklist), 8 (selecting several), 9 (instruments), 10 (save problems), 11 (Recent changes and History), 12 and 13 (the Kinds screen, the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
 
 ## Results so far
 
@@ -19,6 +19,7 @@ Built so far (2026-11-07): entries 1 to 6, 21 to 27, 14, 15 and 16. Still to com
 | 8. The page's events | | |
 | 8a. You are here and Locate me | | |
 | 8b. Directions, Nearest and distances | | |
+| 8c. The item list | | |
 | 9. View mode, unchanged | | |
 | 10. Phone (390 px) | | |
 | 11. Designer | | |
@@ -158,6 +159,23 @@ On `/locate` (Directions on, the template field empty) with your position as in 
 - [ ] At 390 px: the sheet's footer is Directions and View alarms at 44 px, with no Edit button; the switch parts are 44 px tall.
 - [ ] **On a real iPhone or iPad** (the Perspective mobile app, or Safari on an `https` address): Directions opens Apple Maps with the route to the pad, named. **On an Android phone**: Google Maps opens with the route. Note what opens (the app, or a browser tab) and whether the route starts from where you are; this hand-over is not checked by the suite.
 - [ ] Your browser's language set to English (UK) or another language: distances read in metres and kilometres ("430 m", "1.1 km"); English (US): feet and miles ("330 ft", "2.3 mi").
+
+Notes:
+
+## 8c. The item list
+
+On `/edit`, at 1366 or 1440 px, after **Seed the dev map** (it adds `P14 lease`, the one child on the dev map). Make Point 1's alarm on `/live` (pressure high) for the Needs attention check, and put it back after (pressure low, ack).
+
+- [ ] The list opens grouped by place, sorted by **Needs attention**: a `MESA FIELD` header (with "N NEED ATTENTION" on its right while something needs attention), the sites (CTB1, SWD1, Point 1, Point 2, Point 3, PT-1, PT-2, LV-1), then a **Field-wide** sub-group with L-SWD and the Tracer line, then **Not linked** with the 30 scale pads, their lines, the shared pair and the North and South fences.
+- [ ] `P14 lease` sits indented under Point 2 with "on Point 2" under its name (its asset folder `Mesa/P14/Lease` is inside P14's).
+- [ ] With Point 1 in alarm: Point 1 is the first row under `MESA FIELD`, Point 3 (comms lost) after it, then an **All normal** divider and the rest by name. When the alarm clears the divider and the count go.
+- [ ] **Sort by** Place: the same groups by name, no divider. Kind: one header per kind ("Gathering line", "Geofence", ...). Name: one flat list A-Z. Last changed: newest first, each row with who and when under its name ("seed-script - Today 10:42"; Yesterday, or a date, for older changes).
+- [ ] **Filter**: the button opens the kind chips ("All 75", "Well pad 37", ...). Pick Well pad: only pads are listed, in every sort, and the button reads "Well pad". All brings everything back.
+- [ ] Type "swd" in Search items: SWD1 under `MESA FIELD` and L-SWD under Field-wide, nothing else. Type "lease": Point 2 shows too (in grey) with P14 lease under it.
+- [ ] The footer: **Add item** picks up the Point tool (the toolbar's Point lights up); click the map: the new pad heads a **Just added** group at the top, in every sort. Undo removes it from the list. A page reload empties Just added.
+- [ ] "N unlinked" in the footer: pressing it leaves only the Not linked rows, with a cross to show everything again.
+- [ ] Rename an item, then sort by Last changed: it is first, with your user name and "Today" and the time.
+- [ ] Badges still change live (an alarm, comms lost, stale) and a row click still selects the item, opens Details and pans the map.
 
 Notes:
 
