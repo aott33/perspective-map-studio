@@ -3,7 +3,7 @@ title: "7a: The item list as designed (grouped by place, Sort by, Filter, the fo
 type: 'feature'
 ticket: '7'
 created: '2026-11-08'
-status: 'in-review'
+status: 'built'
 baseline_revision: '7613c87bd13da873fb6473b0f9b8198403dfa799'
 route: 'full'
 route_source: 'auto'
@@ -98,6 +98,8 @@ Quick lens, 2026-11-08: 6 findings; high 0, medium 2, low 3, false 1.
 | Redo of an undone add does not return the item to Just added | low | Undo sends `delete` (dropped by `noteSaved`), Redo a `create` that only `createPoint`/`createLine` would note | patch: every saved create of this session noted |
 | `docs/kinds-and-assets.md:124` still names ten dev assets | low | The seed adds `P14L`; specs expect 11 | patch: eleven named |
 | ignition-lint not run on the two dev scripts | false | Run by the orchestrator: `mapstudio_dev/code.py` and `mapstudio_seed/code.py` "No issues found" | rejected |
+
+Outcome, 2026-11-08: the four patches applied (8e60994) and verified; the orchestrator's whole-suite run then caught a regression from the parent fix (a just-added pad that is a parent listed twice, `studio.spec.mjs:255`), fixed in a5df142 (a parent in Just added is never repeated as a context row). Final verification by the orchestrator: `tsc` clean, Jest 636 passed, `./gradlew clean build --offline --rerun-tasks` green, the contract check OK at 0.4.0, ignition-lint on both dev scripts no issues, and `ops/up.sh --fresh` with the whole e2e suite: 236 passed, 7 skipped, 0 failed in 40.0 min. An item restored by undoing a delete joins Just added (every saved create of the session), the implementer's reading, told to the owner.
 
 ## Design Notes
 
