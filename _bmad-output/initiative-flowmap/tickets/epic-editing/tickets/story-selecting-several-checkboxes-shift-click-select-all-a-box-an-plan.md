@@ -3,7 +3,7 @@ title: "Selecting several: checkboxes, Shift-click, Select all, a box and a lass
 type: 'feature'
 ticket: '8'
 created: '2026-11-08'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '62b8146b667506415703c83f12b46b140e8a3280'
 route: 'full'
 route_source: 'auto'
@@ -21,7 +21,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 **Problem:** An editor can select only one item at a time, so clearing out ten test pads or picking every pad on a route means ten round trips, and a page cannot see a selection of several.
 
-**Approach:** Decisions (owner, 2026-11-03: multi-select here, the bulk form in epic-import-export; 2026-11-05: no mode pill, the count in the panel; 2026-11-06, entry 3: no Box select button, Shift-drag a box and Shift+Alt-drag a lasso with the Select tool; 2026-11-07: the page learns a selection of several, settled here). Selection becomes a set in Edit mode, made in the list and on the map, shown as a count with Clear and Delete, and published to the page.
+**Approach:** Decisions (owner, 2026-11-03: multi-select here, the bulk form in epic-import-export; 2026-11-05: no mode pill, the count in the panel; 2026-11-06, entry 3: no Box select button, Shift-drag a box and Shift+Alt-drag a lasso with the Select tool; 2026-11-07: the page learns a selection of several, settled here; 2026-11-08, "Approved and continue" on the planner's five picks: both a read-only `selectedItems` prop and an `onSelectionChanged` event, a box and a lasso adding with any part crossing, Select all replacing, "N selected", the dashed edge and tint on the box and lasso while dragging). Selection becomes a set in Edit mode, made in the list and on the map, shown as a count with Clear and Delete, and published to the page.
 
 ## Boundaries & Constraints
 
@@ -80,6 +80,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 ## Implementation Notes
 
 - Planner, 2026-11-08: the environment, commit and identity rules are 7b's plan's (Docker by hand after a restart, JDK 17 by apt if gone, `ops/up.sh --fresh` before a whole-suite run, the session's trailers, `git commit --only`, no em dashes, no model identifier, never a bare `git stash`, never a push). Commit at each working milestone.
+
+- Approval (owner, 2026-11-08): "Approved and continue" with the five picks, written into the Approach; the plan kept whole.
 
 ## Plan Change Log
 
