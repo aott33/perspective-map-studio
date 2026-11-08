@@ -3,7 +3,7 @@ title: "7b: The first-run checklist on an empty map and the viewer's note"
 type: 'feature'
 ticket: '7'
 created: '2026-11-08'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '3a34b954c09bb78f76dda242fa3b829fffa8c1d5'
 route: 'full'
 route_source: 'auto'
@@ -21,7 +21,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 **Problem:** A map editor who opens Edit mode on a new, empty map sees a blank map and an empty list with no idea where to start, and a viewer on that map sees nothing at all and cannot tell whether it is broken.
 
-**Approach:** Decisions (owner, 2026-10-27: the checklist is the only first-run aid, the tour dropped; 2026-11-08: entry 7 split, 7b last). The card DESIGN.md `components.first-run-checklist` and key screen 8 draw, on an empty map in Edit mode, with steps that tick from what the map really holds, and a short note for View mode on an empty map.
+**Approach:** Decisions (owner, 2026-10-27: the checklist is the only first-run aid, the tour dropped; 2026-11-08: entry 7 split, 7b last; "Approved and continue" on the planner's four picks: Add an item for step 2 until import, the card gone once an item lands or on Hide and hidden while a tool is in hand, the note "Nothing on this map yet.", an empty dev project for the tests). The card DESIGN.md `components.first-run-checklist` and key screen 8 draw, on an empty map in Edit mode, with steps that tick from what the map really holds, and a short note for View mode on an empty map.
 
 ## Boundaries & Constraints
 
@@ -70,6 +70,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 ## Implementation Notes
 
 - Planner, 2026-11-08: the environment, commit and identity rules are 7c's plan's (Docker by hand after a restart, JDK 17 by apt if gone, `ops/up.sh --fresh` before a whole-suite run, the session's trailers, `git commit --only`, no em dashes, no model identifier, never a bare `git stash`, never a push). Commit at each working milestone.
+
+- Approval (owner, 2026-11-08): "Approved and continue" with the four picks, written into the Approach; the plan kept whole.
 
 ## Plan Change Log
 
