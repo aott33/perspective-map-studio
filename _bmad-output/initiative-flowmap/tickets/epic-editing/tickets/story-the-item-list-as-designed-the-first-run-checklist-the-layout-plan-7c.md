@@ -3,7 +3,7 @@ title: "7c: The Edit-mode layout at 1440, 1366 and below 1280 px, the map kept s
 type: 'feature'
 ticket: '7'
 created: '2026-11-08'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '6917ebbef614a0bfe51d3b8668d758d8697cb00d'
 route: 'full'
 route_source: 'auto'
@@ -21,7 +21,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 **Problem:** In Edit mode the map jumps about 160 px when Details docks after a placement and again when Details closes, so the item an editor just placed or was looking at slides away; and below about 1280 px the docked list leaves the map too narrow to work in.
 
-**Approach:** Decisions (owner, 2026-10-27: Direction A, the list collapsing to a button below about 1280 px, the bottom-right corner reserved; 2026-11-08: entry 7 split, this is 7c after 7a). One rule for every panel that docks or undocks beside the map: the ground stays where it is on the page. Below 1280 px the list leaves the dock and opens from a button.
+**Approach:** Decisions (owner, 2026-10-27: Direction A, the list collapsing to a button below about 1280 px, the bottom-right corner reserved; 2026-11-08: entry 7 split, this is 7c after 7a; 2026-11-08, "Go with recommendations": option A, the rail's Items button opens the collapsed list over the map, no new button and no render). One rule for every panel that docks or undocks beside the map: the ground stays where it is on the page. Below 1280 px the list leaves the dock and opens from a button.
 
 ## Boundaries & Constraints
 
@@ -70,6 +70,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 ## Implementation Notes
 
 - Planner, 2026-11-08: the environment, commit and identity rules are 7a's plan's (Docker by hand after a restart, JDK 17 by apt if gone, `ops/up.sh --fresh` before a whole-suite run, the session's trailers, `git commit --only`, no em dashes, no model identifier, never a bare `git stash`, never a push). Commit at each working milestone.
+
+- Approval (owner, 2026-11-08): "Go with recommendations" (option A, written into the Approach); the plan kept whole.
 
 ## Plan Change Log
 
