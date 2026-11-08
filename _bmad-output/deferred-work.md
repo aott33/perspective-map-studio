@@ -179,3 +179,6 @@
 - source_plan: none
   summary: Entry 7b, the first-run checklist on an empty map (Set up your kinds, Add or import items, Check the operator view; ticked when done; Hide checklist) and the viewer's note.
   evidence: Split from entry 7 by the owner on 2026-11-08 ("Split"; 7a, then 7c, then 7b, each its own plan under entry 7, built back to back in epic 4).
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-editing/tickets/story-the-item-list-as-designed-the-first-run-checklist-the-layout-plan-7c.md`
+  summary: The Gateway unit test `SetupLookupsTest.aHungSecretProviderHoldsOneThreadAndNeverTheOtherLists` fails now and then (UNAVAILABLE where OK was expected) and passes on a rerun.
+  evidence: Seen in entry 15's `ops/up.sh` build and in entry 7c's `./gradlew clean build --rerun-tasks` (2026-11-08); `gateway/` untouched by both; timing-based, so a candidate for the sweep (entry 17) beside the review 390 px flake.

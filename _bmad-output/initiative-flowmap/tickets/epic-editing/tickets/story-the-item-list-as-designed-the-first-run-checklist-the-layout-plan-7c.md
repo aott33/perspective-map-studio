@@ -3,7 +3,7 @@ title: "7c: The Edit-mode layout at 1440, 1366 and below 1280 px, the map kept s
 type: 'feature'
 ticket: '7'
 created: '2026-11-08'
-status: 'in-review'
+status: 'built'
 baseline_revision: '6917ebbef614a0bfe51d3b8668d758d8697cb00d'
 route: 'full'
 route_source: 'auto'
@@ -91,6 +91,8 @@ Quick lens, 2026-11-08: 6 findings; high 0, medium 4, low 2, false 0.
 | A row chosen in the overlay drops focus to the body; Esc, Delete and Ctrl+Z stop working | medium | The focused row unmounts as `listOpen` turns false; nothing moves focus, unlike the Esc close | patch: focus to the map container |
 | Esc in a Details select closes the overlay and moves focus to the rail | low | The overlay Esc branch lacks `inField`; the choice selects have no `onKeyDown` | patch: the `inField` guard |
 | The Jest crossing cases keep the page width fixed, so the event order the comment claims is untested at unit level | low | `editClick.test.ts` "the 1280 px line crossed"; the e2e Crossing row (1200 to 1366) covers the real path and passes | rejected: covered by `layout.spec.mjs`; a unit test would add a fake window resize |
+
+Outcome, 2026-11-08: the four patches applied (b4403df) and verified by the orchestrator: `tsc` clean, Jest 647 passed, `./gradlew clean build --offline --rerun-tasks` green on the second run (the first failed on `SetupLookupsTest.aHungSecretProviderHoldsOneThreadAndNeverTheOtherLists`, a timing test in `gateway/` this entry does not touch, also seen in entry 15's build; recorded in deferred-work), the contract check OK at 0.4.0, and `ops/up.sh --fresh` with the whole e2e suite: 251 passed, 7 skipped, 1 failed in 56.3 min, the failure the known review 390 px flake (dark theme), which passed rerun with its theme's group, 5 of 5.
 
 ## Design Notes
 
