@@ -186,7 +186,7 @@ class SetupLookupsTest {
 
     @Test
     void aHungSecretProviderHoldsOneThreadAndNeverTheOtherLists() {
-        // The hook's shape: a small lists pool and a small secret names pool, no queue.
+        // The hook's shape: a small lists pool and a small secret names pool, each limited by its permits.
         LookupPool lists = new LookupPool(3, "test-lists");
         LookupPool secrets = new LookupPool(2, "test-secrets");
         try {

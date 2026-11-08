@@ -3,14 +3,14 @@ title: "Fix the three flaky tests: the view helper waits for the map, the lookup
 type: 'bugfix'
 ticket: ''
 created: '2026-11-08'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '478adb6dfb6e92e1177d079ea87138291ec7fe3f'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: []
 ---
@@ -58,9 +58,18 @@ context: []
 
 - Build, 2026-11-08: each lookup pool and its permits are one object, `setuplookup/LookupPool.java` (a queueing `ThreadPoolExecutor`, core equal to max, idle threads let go after 30 s, and a `Semaphore` of one permit per thread), so two `SetupLookups` over the same pools share one limit, as the tests' do; `SetupLookups` and `MapStudioGatewayHook` take it in place of `ExecutorService`. `submit` takes a permit with `tryAcquire` (UNAVAILABLE at once when none is free); a `RejectedExecutionException` now comes only from a pool shut down and gives the permit back. The test's `secrets.getActiveCount()` became `secrets.inUse()` (permits held). The new test is `backToBackCallsAtFullCapacityAllAnswer`: a one-thread, one-permit pool whose worker, after each call, waits until the next call has been handed to the executor; it fails on the old `SynchronousQueue` pool shape (checked) and passes now. In the view hook, "nothing moves" compares centre, zoom and camera padding before and after the `jumpTo`.
 
+- Review fixes, 2026-11-08: the view hook's promise rejects after `TEST_VIEW_TIMEOUT_MS` (20 s, `testHook.ts`) with a message naming the view, and the no-move shortcut removes its `idle` listener; R4 (a)'s trace keeps every `[MapStudio]` line about a selection, a popup or the place coming back (`camera.ts`' "The map's place came back" was dropped before); `SetupLookupsTest`'s comment says the hook's pools are limited by permits, not "no queue".
 - Verified, 2026-11-08: tsc clean, Jest 659 passed in 63 suites; `SetupLookupsTest` 50 of 50 with `--rerun`, and 20 of 20 under CPU load; `./gradlew clean build --offline --rerun-tasks` BUILD SUCCESSFUL; `review.spec.mjs` 390 px 12 of 12 under CPU load (`--repeat-each=6`, both themes); `ops/up.sh --fresh` and the whole e2e suite: 260 passed, 7 skipped, 0 failed in 45.3 min (R4 (a) among the passes, so its diagnostics have not yet had a failure to attach to).
 
 ## Review Triage Log
+
+Quick lens, 2026-11-08: 3 findings; high 0, medium 1, low 2, false 0.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| The R4 (a) trace drops the remembered place's "came back ... with its popup" line | medium | `selectionTrace` keeps `[MapStudio]` lines matching /select/; `camera.ts:221` logs the popup restore without that word; the investigator's logs show it | patch: the filter keeps it |
+| The test view's wait has no limit, so a map that never goes idle hangs until the test timeout; the idle listener stays on the shortcut | low | The promise settles only on `idle` or the no-move shortcut | patch: bounded with a named failure, the listener removed |
+| A test comment still says the hook's pools have no queue | low | `SetupLookupsTest.java:189`; `LookupPool` queues and limits by permits | patch: the comment corrected |
 
 ## Verification
 

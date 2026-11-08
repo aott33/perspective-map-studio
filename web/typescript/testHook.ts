@@ -58,6 +58,9 @@ export function registerTestHook(fire: Fire): void {
     }
 }
 
+/** How long the view hook waits for the map to draw a moved view before its promise rejects. */
+export const TEST_VIEW_TIMEOUT_MS = 20_000;
+
 /** A view the e2e suite may ask for: the map's centre and zoom (epic 3 entry 7, the label checks). */
 export interface TestView {
     center: [number, number];
@@ -69,7 +72,8 @@ export interface TestView {
  * that registered last to a centre and zoom, as a user's pan and zoom would, so a spec can check the
  * labels at a zoom without a handle on the map. It returns a promise resolved once the map has drawn
  * the moved view (its next `idle`), so a spec's click is hit-tested on the new frame even when the zoom
- * does not change (the 390 px review flake, 2026-11-08). It changes no data and is not part of the contract.
+ * does not change (the 390 px review flake, 2026-11-08); it rejects, naming the view, if the map has not
+ * gone idle within {@link TEST_VIEW_TIMEOUT_MS}. It changes no data and is not part of the contract.
  */
 export function registerTestView(jump: (view: TestView) => Promise<void>): void {
     if (typeof window !== 'undefined') {

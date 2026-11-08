@@ -66,7 +66,7 @@ async function onTopAt(page, locator, classes) {
 
 /**
  * R4 (a)'s diagnostics (the flaky-test fix, 2026-11-08; the cause of its one failure is unproven): every
- * `[MapStudio]` console line about a page selection, and each `selectedItem` the Gateway's `session-init`
+ * `[MapStudio]` console line about a selection, a popup or the map's place coming back, and each `selectedItem` the Gateway's `session-init`
  * holds once `armed()` is true (after the reload), attached to the test only when it fails.
  */
 function selectionTrace(page, armed) {
@@ -75,7 +75,7 @@ function selectionTrace(page, armed) {
     const t0 = Date.now();
     page.on('console', (msg) => {
         const text = msg.text();
-        if (text.startsWith('[MapStudio]') && /select/i.test(text)) {
+        if (text.startsWith('[MapStudio]') && /select|popup|place came back/i.test(text)) {
             lines.push(`${Date.now() - t0} ms ${msg.type()}: ${text}`);
         }
     });
@@ -111,7 +111,7 @@ function selectionTrace(page, armed) {
             await test.info().attach('R4 (a) session-init selectedItem after the reload', {
                 body: JSON.stringify(inits, null, 2), contentType: 'application/json'
             });
-            await test.info().attach('R4 (a) [MapStudio] page selection console lines', {
+            await test.info().attach('R4 (a) [MapStudio] selection, popup and place console lines', {
                 body: lines.join('\n') || '(none)', contentType: 'text/plain'
             });
         }

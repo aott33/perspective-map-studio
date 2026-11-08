@@ -40,7 +40,7 @@ import { ProblemFacts, chipProblem, editProblems, headerSaveWords } from './prob
 import { PopupPoint, isSheetWidth, sheetBasisWidth } from './popupParams';
 import { CameraPadding, PopupAnchor, Rect } from './popupPlacement';
 import { SHARED_M } from './shared';
-import { registerTestView } from './testHook';
+import { TEST_VIEW_TIMEOUT_MS, registerTestView } from './testHook';
 import { MapboxLogoControl } from './mapboxLogo';
 import {
     SPRITE_URL, THEME_TOKENS, addItemLayers, addPointerCursor, addTextLayers, addUnsavedLayers, addYouAreHereLayers, applyLayerToggles,
@@ -431,19 +431,31 @@ export class MapStudio extends Component<Props, MapStudioState> {
         // The Edit switch and the studio wait for map.load's level (applyStudioControls, componentDidUpdate).
         this.themeWatch = new ThemeWatch(root, THEME_TOKENS, () => this.applyTheme());
         this.themeWatch.start();
-        registerTestView((view) => new Promise<void>((resolve) => {
+        registerTestView((view) => new Promise<void>((resolve, reject) => {
             if (this.map !== map) {
                 resolve();
                 return;
             }
             const before = [map.getCenter().lng, map.getCenter().lat, map.getZoom(), JSON.stringify(map.getPadding())];
-            // Resolved when the map has drawn the moved view, so a spec's next click hits the new frame.
-            map.once('idle', () => resolve());
+            // Resolved when the map has drawn the moved view, so a spec's next click hits the new frame;
+            // rejected, naming the view, if the map never goes idle (replaced, or repainting without end).
+            const onIdle = () => {
+                window.clearTimeout(timer);
+                resolve();
+            };
+            const timer = window.setTimeout(() => {
+                map.off('idle', onIdle);
+                reject(new Error('The map did not go idle within ' + TEST_VIEW_TIMEOUT_MS + ' ms after the test view to centre '
+                    + view.center.join(',') + ' at zoom ' + view.zoom + '.'));
+            }, TEST_VIEW_TIMEOUT_MS);
+            map.once('idle', onIdle);
             // A test's move centres on the whole map: the camera padding of the last choice (item 27) is cleared.
             map.jumpTo({ center: view.center, zoom: view.zoom, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
             const after = [map.getCenter().lng, map.getCenter().lat, map.getZoom(), JSON.stringify(map.getPadding())];
             if (before.every((v, i) => v === after[i]) && map.loaded() && !map.isMoving()) {
                 // Nothing moved and nothing is left to draw: no idle may come, and the frame is already the view's.
+                map.off('idle', onIdle);
+                window.clearTimeout(timer);
                 resolve();
             }
         }));
