@@ -84,6 +84,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 ## Plan Change Log
 
 - 2026-11-08, review fixes: the divider follows the sites needing attention; parents are worked out from every row, a filtered-out or just-added parent shown as context over its children; a saved create (Redo of an undone add) rejoins Just added; docs/kinds-and-assets.md names eleven dev assets.
+- 2026-11-08, second review fix: a parent in Just added is not shown again as a context row (one row per item id, studio.spec's P31 linked to P14); its children keep their indent and "on <parent>" line.
 
 ## Review Triage Log
 

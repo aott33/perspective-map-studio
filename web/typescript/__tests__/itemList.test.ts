@@ -253,9 +253,19 @@ describe('the list grouped by place, sorted, filtered (entry 7a)', () => {
             expect(lines(items).slice(0, 3)).toEqual(['# Just added', 'Scale 2', 'L-SWD']);
             expect(entriesOf(items).filter((e) => e.row.id === 's2' || e.row.id === 'lswd')).toHaveLength(2);
         }
-        // A parent just added keeps its children under it in their field, shown there as context (entry 7a's review).
+        // A parent just added shows once, in Just added; its children keep their indent and "on P14" in its field, with no second
+        // P14 row (entry 7a's review: one row per item id), in every sort and under a search or a filter too.
+        for (const sort of ['attention', 'place'] as ListSort[]) {
+            for (const extra of [{}, { query: '2h' }, { kind: 'well' }] as Array<Partial<ListView>>) {
+                const items = groupRows(rows(), view({ sort, justAdded: ['p14'], ...extra }));
+                const ids = entriesOf(items).map((e) => e.row.id);
+                expect(new Set(ids).size).toBe(ids.length);
+                expect(lines(items)).not.toContain('P14 [context]');
+                expect(lines(items)).toContain('  P14-2H (on P14)');
+            }
+        }
         expect(lines(groupRows(rows(), view({ sort: 'place', justAdded: ['p14'] }))).slice(0, 2)).toEqual(['# Just added', 'P14']);
-        expect(lines(groupRows(rows(), view({ sort: 'place', justAdded: ['p14'] })))).toEqual(expect.arrayContaining(['P14 [context]',
+        expect(lines(groupRows(rows(), view({ sort: 'place', justAdded: ['p14'] })))).toEqual(expect.arrayContaining([
             '  P14 lateral (on P14)', '  P14-2H (on P14)']));
         // An id no longer on the map (an add undone, the delegate dropping it later) shows nothing.
         expect(lines(groupRows(rows(), view({ justAdded: ['gone'] })))[0]).toBe('# KERMIT FIELD');

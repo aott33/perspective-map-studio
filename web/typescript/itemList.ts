@@ -428,7 +428,8 @@ export function groupRows(all: readonly ListRow[], view: ListView): ListItem[] {
             continue;
         }
         shown.add(r.id);
-        for (let p = parents.get(r.id); p && !shown.has(p.id); p = parents.get(p.id)) {
+        // A parent in Just added is never shown again here (one row per item): its children keep their indent and "on <parent>".
+        for (let p = parents.get(r.id); p && !added.has(p.id) && !shown.has(p.id); p = parents.get(p.id)) {
             shown.add(p.id);
         }
     }
@@ -465,6 +466,12 @@ export function groupRows(all: readonly ListRow[], view: ListView): ListItem[] {
         return byName(a, b);
     };
     const pushTree = (r: ListRow, depth: number, parentName: string): void => {
+        const up = depth === 0 ? parents.get(r.id) : undefined;
+        if (up && added.has(up.id)) {
+            // A top row whose parent heads Just added: indented under it, as a child, with no second row for the parent.
+            pushTree(r, 1, up.name);
+            return;
+        }
         out.push(entry(r, depth, depth > 0 ? 'on ' + parentName : '', contextOnly.has(r.id), 'r:'));
         (children.get(r.id) || []).slice().sort(byName).forEach((c) => pushTree(c, depth + 1, r.name));
     };
