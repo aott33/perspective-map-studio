@@ -1,7 +1,8 @@
 ---
 title: "7b: The first-run checklist on an empty map and the viewer's note"
 type: 'feature'
-ticket: '7'
+ticket: ''
+part_of: '7'
 created: '2026-11-08'
 status: 'built'
 baseline_revision: '3a34b954c09bb78f76dda242fa3b829fffa8c1d5'

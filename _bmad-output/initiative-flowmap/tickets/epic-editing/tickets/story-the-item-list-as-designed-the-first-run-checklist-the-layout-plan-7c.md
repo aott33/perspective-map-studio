@@ -1,7 +1,8 @@
 ---
 title: "7c: The Edit-mode layout at 1440, 1366 and below 1280 px, the map kept still as panels dock"
 type: 'feature'
-ticket: '7'
+ticket: ''
+part_of: '7'
 created: '2026-11-08'
 status: 'built'
 baseline_revision: '6917ebbef614a0bfe51d3b8668d758d8697cb00d'
