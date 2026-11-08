@@ -319,24 +319,65 @@ export function selectLine(host: SelectionHost, id: string, segment: SegmentRef 
  * opens: one still open (a pick list whose row was chosen) closes, the Gateway told with popup.close as when it is closed by
  * hand, and no popup.open is sent. Nothing covers the item, so a point drags at once and a line or an area shows its handles
  * (entry 5, editing.ts). `lngLat` is the clicked place (a marker's, or the spot on a line or an area), which keeps its place on
- * the page as Details docks (`keepPlace`). A line is selected with no segment, the segment being its popup's.
+ * the page as Details docks (`dockChange`). A line is selected with no segment, the segment being its popup's.
  */
 export function selectWithDetails(host: SelectionHost, selected: Selection, lngLat: [number, number]): void {
     host.openedBy = null;
     closePopup(host);
     const id = selected.id;
-    // Where the clicked place is on the page before Details docks: once the stage has narrowed, the map is panned to put it back.
-    const before = pagePlace(host, lngLat);
-    host.setState((prev) => ({ ...host.selectionState(prev, selected), pick: null, panel: id }), () => {
-        if (before) {
-            keepPlace(host, before, lngLat);
-        }
-    });
+    // The clicked place keeps its place on the page as Details docks (`dockChange`), and is brought into view if the panel covers it.
+    dockChange(host, (prev) => ({ ...host.selectionState(prev, selected), pick: null, panel: id }), lngLat);
     console.info('[MapStudio] ' + (selected.kind === 'line' ? 'Line ' : 'Point ') + id + ' selected in Edit mode, Details open.');
 }
 
+/** What a dock change reads and writes on the component (the selection's host, the editing host and the component itself). */
+export interface DockHost {
+    readonly state: Readonly<MapStudioState>;
+    setState<K extends keyof MapStudioState>(
+        state: Pick<MapStudioState, K> | null | ((prev: Readonly<MapStudioState>) => Pick<MapStudioState, K> | null), callback?: () => void): void;
+    map: MapLibreMap | null;
+    mapContainer: HTMLDivElement | null;
+    /** The camera padding of the moment (camera.ts): what an item brought into view as a panel docks keeps clear of (entry 26). */
+    cameraPadding(): CameraPadding;
+}
+
+/**
+ * A change of state that may dock, undock, collapse or open a studio panel beside the map (epic 4 entry 7c, "keep place"; the
+ * plan's Design Notes): Details after a click, a placement, a finished line or area and a split; Details closed by a ground click,
+ * its close, Esc or a delete; the list leaving or rejoining the dock at the 1280 px line, or a rail surface docking in its place.
+ * The map's box on the page and a reference place are read now, the update is applied, and once the component has drawn it the
+ * map takes its new size and is panned by the box's page shift with no animation, so every item keeps its page position (the
+ * ground stays where it is). With `place` (the item just placed, clicked or selected) the reference is that place, and if the
+ * docked panel then covers it, it is eased just into view inside the camera padding (`keepPlace`); without one (a close) the
+ * reference is the map's centre and nothing more moves. An update that moves no box moves nothing. A window resize, a View-mode
+ * change and a row choice (which eases to its item) do not come here.
+ */
+export function dockChange<K extends keyof MapStudioState>(host: DockHost,
+    update: Pick<MapStudioState, K> | null | ((prev: Readonly<MapStudioState>) => Pick<MapStudioState, K> | null),
+    place: [number, number] | null = null, after?: () => void): void {
+    const ref = place || mapCentre(host);
+    const before = ref ? pagePlace(host, ref) : null;
+    host.setState(update, () => {
+        if (before && ref) {
+            keepPlace(host, before, ref, place !== null);
+        }
+        if (after) {
+            after();
+        }
+    });
+}
+
+/** The map's centre as a place, or null before the map is made. */
+function mapCentre(host: DockHost): [number, number] | null {
+    if (!host.map) {
+        return null;
+    }
+    const c = host.map.getCenter();
+    return [c.lng, c.lat];
+}
+
 /** The map's box on the page and a place's pixel in the map, now; null before the map is made. */
-function pagePlace(host: SelectionHost, lngLat: [number, number]): PagePlace | null {
+function pagePlace(host: DockHost, lngLat: [number, number]): PagePlace | null {
     if (!host.map || !host.mapContainer) {
         return null;
     }
@@ -346,17 +387,17 @@ function pagePlace(host: SelectionHost, lngLat: [number, number]): PagePlace | n
 }
 
 /**
- * The camera as an Edit-mode click docks Details (entry 26, the plan's Design Notes): the panel docks left of the stage, which
- * narrows, and MapLibre keeps its centre, so every item would slide about half the panel's width (some 160 px at 1366) away
- * from the pointer and a press where the item was clicked would land on the ground. Once the stage has narrowed (this runs
- * after the render that docked it), the map takes its new size at once and is panned with no animation by the clicked place's
+ * The camera as a panel docks or undocks beside the map (entry 26 for Details after a click, every dock change from entry 7c): the
+ * stage narrows or widens, and MapLibre keeps its centre, so every item would slide about half the panel's width (some 160 px at
+ * 1366) and a press where an item was clicked would land on the ground. Once the stage has its new box (this runs after the render
+ * that docked or undocked the panel), the map takes its new size at once and is panned with no animation by the reference place's
  * shift on the page, so it, and every other item, keeps its page position and stays under the pointer: it drags at once.
- * If it then lies outside the stage (the docked panel covers it, or it was outside already, as a popup restored in Edit mode
- * from a centre saved for a wider map can be), the map pans just enough, inside the camera padding, to bring it into view
- * (EXPERIENCE.md Responsive, 1366: opening properties keeps the selection in view). A click while Details is already open
- * docks nothing, and nothing moves.
+ * With `intoViewToo` (a place that was clicked, placed or selected), if it then lies outside the stage (the docked panel covers it,
+ * or it was outside already, as a popup restored in Edit mode from a centre saved for a wider map can be), the map pans just
+ * enough, inside the camera padding, to bring it into view (EXPERIENCE.md Responsive, 1366: opening properties keeps the
+ * selection in view). A change that moves no box (a click while Details is already open) moves nothing.
  */
-function keepPlace(host: SelectionHost, before: PagePlace, lngLat: [number, number]): void {
+function keepPlace(host: DockHost, before: PagePlace, lngLat: [number, number], intoViewToo: boolean): void {
     const map = host.map;
     const el = host.mapContainer;
     if (!map || !el) {
@@ -372,6 +413,9 @@ function keepPlace(host: SelectionHost, before: PagePlace, lngLat: [number, numb
     const shift = pageShift(before, { box, at: map.project(lngLat) });
     if (shift[0] !== 0 || shift[1] !== 0) {
         map.panBy(shift, { animate: false });
+    }
+    if (!intoViewToo) {
+        return;
     }
     const container = map.getContainer();
     const at = map.project(lngLat);
@@ -435,11 +479,15 @@ export function openLinePopup(host: SelectionHost, id: string, segment: SegmentR
     console.info('[MapStudio] Line ' + id + ' selected' + (segment ? ' at ' + segment.fromId + ' to ' + segment.toId : '') + '.');
 }
 
-/** The ground tapped: the selection and the popup go. */
+/**
+ * The ground tapped (and Details' close, Esc, a selected item leaving the map): the selection and the popup go. In Edit mode an
+ * open Details undocks as the selection goes and the stage widens: the whole ground keeps its place on the page (entry 7c,
+ * `dockChange` with no place); in View mode no box moves, so nothing pans.
+ */
 export function clearSelection(host: SelectionHost): void {
     closePopup(host);
     if (host.state.selected !== null || host.state.pick !== null) {
-        host.setState((prev) => ({ ...host.selectionState(prev, null), pick: null }));
+        dockChange(host, (prev) => ({ ...host.selectionState(prev, null), pick: null }));
     }
 }
 

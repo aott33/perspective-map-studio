@@ -9,6 +9,10 @@
 // the page sees no change. Esc with the Line, Area or Point tool in hand puts it down and Details stays (the map container's
 // capture listener marks the press handled, so the component's own Esc skips it); a second Esc closes Details. View mode's clicks
 // open the popups as before.
+// Entry 7c ("keep place"): every dock change keeps the ground on the page: a pad placed with the Point tool and a finished line as
+// Details docks (a pad the panel covers eased into view), Details closed by a ground click, its close or Esc (the shift alone),
+// the 1280 px line crossed either way (the list leaving or rejoining the dock) and a rail surface docking in the list's place
+// below it; below 1280 px the rail's Items opens and closes the list over the map, and a row choice, Esc and a map click close it.
 
 jest.mock('maplibre-gl', () => ({
     Popup: class {}, Map: class {}, AttributionControl: class {}, ScaleControl: class {}, setWorkerUrl: (): void => undefined
@@ -78,7 +82,8 @@ function display(kindId: string): KindDisplay {
 // The page at 1366 px: the rail and the list docked left of the stage in Edit mode, the properties panel between them and the
 // stage when Details is open (DESIGN.md spacing); the map 700 px tall under a 60 px header.
 const PAGE_W = 1366;
-const DOCK = 72 + 256;
+const RAIL = 72;
+const DOCK = RAIL + 256;
 const PANEL = 320;
 const MAP_TOP = 60;
 const MAP_H = 700;
@@ -120,6 +125,8 @@ interface Harness {
     queried: string[];
     /** The map's own size (MapLibre's transform), which follows its container on resize only. */
     size(): [number, number];
+    /** Terra Draw's finish of a feature with this geometry in this mode (`point`, `linestring`), as the tools report it. */
+    finish(geometry: unknown, mode: string): void;
 }
 
 function harness(editMode: boolean): Harness {
@@ -128,7 +135,10 @@ function harness(editMode: boolean): Harness {
         delegate: {
             sendPointClick: (id: string): void => { sent.pointClick.push(id); },
             sendPopupOpen: (id: string): void => { sent.popupOpen.push(id); },
-            sendPopupClose: (id: string): void => { sent.popupClose.push(id); }
+            sendPopupClose: (id: string): void => { sent.popupClose.push(id); },
+            // The Point and Line tools' saves (entry 7c's placement cases): the new item's id.
+            createPoint: (): string => 'new-pad',
+            createLine: (): string => 'new-line'
         },
         props: { write: (key: string, value: unknown): void => { sent.props.push([key, value]); } },
         componentEvents: { fireComponentEvent: (): void => undefined }
@@ -141,11 +151,13 @@ function harness(editMode: boolean): Harness {
     const props = { props: { editMode, startingArea: {}, previewStyles: false, selectedItem: null }, store, delegate } as unknown as
         ConstructorParameters<typeof MapStudio>[0];
     const ms = new MapStudio(props);
-    // The stage on the page: the map's box beside the docked studio, narrower while Details is open for the selected item.
+    // The stage on the page: the map's box beside the docked studio, narrower while Details is open for the selected item; below
+    // 1280 px (entry 7c) the Items list is not docked, the rail alone left of the stage (and Details while it is open).
     const box = (): { left: number; top: number; width: number; height: number } => {
         const docked = ms.studioOn();
         const details = docked && ms.state.panel !== null && ms.state.selected !== null && ms.state.selected.id === ms.state.panel;
-        const left = docked ? DOCK + (details ? PANEL : 0) : 0;
+        const list = ms.state.listCollapsed && ms.state.studio.surface === 'items' ? RAIL : DOCK;
+        const left = docked ? list + (details ? PANEL : 0) : 0;
         return { left, top: MAP_TOP, width: PAGE_W - left, height: MAP_H };
     };
     const attrs: Record<string, string> = {};
@@ -188,6 +200,9 @@ function harness(editMode: boolean): Harness {
                 : hit.areas || [];
         },
         project,
+        getCenter: () => ({ lng: center[0], lat: center[1] }),
+        // A row choice's ease to its item (its camera, unchanged by entry 7c): not followed here.
+        easeTo: (): void => undefined,
         // MapLibre's resize keeps the centre and takes the container's size.
         resize: (): void => { size = [box().width, box().height]; },
         // panBy moves the camera by the offset: the content moves by minus it.
@@ -206,6 +221,12 @@ function harness(editMode: boolean): Harness {
     };
     return {
         ms, sent, pans, queried,
+        finish: (geometry: unknown, mode: string): void => {
+            // Terra Draw's finished feature (the Point or Line tool's, entry 7c's placement cases), as `draw` reports it.
+            const drawn = { geometry };
+            (ms as unknown as { draw: unknown }).draw = { getSnapshotFeature: () => drawn, removeFeatures: (): void => undefined };
+            ms.onDrawFinish('td-1', { mode, action: 'draw' });
+        },
         state: () => ms.state,
         page,
         size: () => size,
@@ -461,7 +482,7 @@ describe('the clicked item keeps its place on the page as Details docks (entry 2
         samePixel(h.page(SWD1), swd1);
     });
 
-    test('a click while Details is open docks nothing and moves nothing; the ground closing Details does not pan either', () => {
+    test('a click while Details is open docks nothing and moves nothing; the ground closing Details keeps the ground (entry 7c)', () => {
         const h = harness(true);
         h.click({ markers: [marker('ctb1', 'CTB1', CTB1)] }, CTB1);
         expect(h.pans.length).toBe(1);
@@ -472,9 +493,12 @@ describe('the clicked item keeps its place on the page as Details docks (entry 2
         expect(h.state().panel).toBe('lswd');
         expect(h.pans.length).toBe(1);
         samePixel(h.page(P14), p14);
+        // Entry 7c: the ground clicked closes Details and the stage widens; the map pans by the shift, so nothing moves on the page.
         h.click({}, P14);
         expect(h.state().panel).toBeNull();
-        expect(h.pans.length).toBe(1);
+        expect(h.pans.length).toBe(2);
+        expect(h.pans[1]).toEqual({ offset: [-PANEL / 2, 0], animate: false });
+        samePixel(h.page(P14), p14);
     });
 
     test('a line, an area and a pick list\'s row keep their place too: the spot clicked, the shared marker', () => {
@@ -539,6 +563,158 @@ describe('the clicked item keeps its place on the page as Details docks (entry 2
         expect(h.state().popup && h.state().popup!.point.id).toBe('ctb1');
         expect(h.pans).toEqual([]);
         samePixel(h.page(CTB1), ctb1);
+    });
+});
+
+describe('every dock change keeps the ground in place (entry 7c, "keep place")', () => {
+    test('a pad placed with the Point tool stays where it was placed on the page as Details docks', () => {
+        const h = harness(true);
+        h.ms.setState((prev) => ({ studio: pickTool(prev.studio, 'point', null) }));
+        const at = h.page(P14);
+        const ctb1 = h.page(CTB1);
+        h.finish({ type: 'Point', coordinates: P14 }, 'point');
+        expect(h.state().selected).toEqual({ id: 'new-pad', kind: 'point' });
+        expect(h.state().panel).toBe('new-pad');
+        expect(h.pans).toEqual([{ offset: [PANEL / 2, 0], animate: false }]);
+        samePixel(h.page(P14), at);
+        samePixel(h.page(CTB1), ctb1);
+    });
+
+    test('a pad placed where the docked panel lands is eased into view, just enough', () => {
+        const h = harness(true);
+        h.ms.setState((prev) => ({ studio: pickTool(prev.studio, 'point', null) }));
+        h.finish({ type: 'Point', coordinates: WEST }, 'point');
+        expect(h.state().panel).toBe('new-pad');
+        expect(h.pans.length).toBe(2);
+        expect(h.pans[0]).toEqual({ offset: [PANEL / 2, 0], animate: false });
+        expect(h.pans[1].animate).toBe(true);
+        expect(h.ms.map!.project(WEST).x).toBeCloseTo(48, 3);
+    });
+
+    test('a line finished: its points keep their page spots as Details docks', () => {
+        const h = harness(true);
+        h.ms.setState((prev) => ({ studio: pickTool(prev.studio, 'line', null) }));
+        const a = h.page(CTB1);
+        const b = h.page(SWD1);
+        h.finish({ type: 'LineString', coordinates: [CTB1, SWD1] }, 'linestring');
+        expect(h.state().selected).toEqual({ id: 'new-line', kind: 'line', segment: null });
+        expect(h.state().panel).toBe('new-line');
+        expect(h.pans).toEqual([{ offset: [PANEL / 2, 0], animate: false }]);
+        samePixel(h.page(CTB1), a);
+        samePixel(h.page(SWD1), b);
+    });
+
+    test('Details on CTB1 closed by a ground click, by its close and by Esc: every item keeps its page spot as the stage widens', () => {
+        for (const how of ['ground', 'close', 'esc'] as const) {
+            const h = harness(true);
+            h.click({ markers: [marker('ctb1', 'CTB1', CTB1)] }, CTB1);
+            expect(h.state().panel).toBe('ctb1');
+            const spots = [CTB1, P14, SWD1, WEST].map((p) => h.page(p));
+            if (how === 'ground') {
+                h.click({}, P14);
+            } else if (how === 'close') {
+                h.ms.onPanelClose();
+            } else {
+                escape(h.ms);
+            }
+            expect(h.state().panel).toBeNull();
+            expect(h.size()).toEqual([PAGE_W - DOCK, MAP_H]);
+            // The shift alone, no easing: the whole ground stays.
+            expect(h.pans.slice(1)).toEqual([{ offset: [-PANEL / 2, 0], animate: false }]);
+            [CTB1, P14, SWD1, WEST].forEach((p, i) => samePixel(h.page(p), spots[i]));
+        }
+    });
+
+    test('the 1280 px line crossed: below it the list leaves the dock, above it docks again, the items keep their page spots', () => {
+        const h = harness(true);
+        const collapse = (matches: boolean): void => (h.ms as unknown as { onCollapseChange: (ev: { matches: boolean }) => void }).onCollapseChange({ matches });
+        const spots = [CTB1, P14, SWD1].map((p) => h.page(p));
+        collapse(true);
+        expect(h.state().listCollapsed).toBe(true);
+        expect(h.size()).toEqual([PAGE_W - RAIL, MAP_H]);
+        expect(h.pans).toEqual([{ offset: [-128, 0], animate: false }]);
+        [CTB1, P14, SWD1].forEach((p, i) => samePixel(h.page(p), spots[i]));
+        collapse(false);
+        expect(h.state().listCollapsed).toBe(false);
+        expect(h.size()).toEqual([PAGE_W - DOCK, MAP_H]);
+        expect(h.pans.length).toBe(2);
+        [CTB1, P14, SWD1].forEach((p, i) => samePixel(h.page(p), spots[i]));
+        // The same answer twice moves nothing.
+        collapse(false);
+        expect(h.pans.length).toBe(2);
+    });
+
+    test('a selected pad the list docking again would cover is eased into view', () => {
+        const h = harness(true);
+        const collapse = (matches: boolean): void => (h.ms as unknown as { onCollapseChange: (ev: { matches: boolean }) => void }).onCollapseChange({ matches });
+        collapse(true);
+        // With no list docked, a pad 40 px into the stage, selected with Details.
+        h.ms.map!.panBy([h.ms.map!.project(WEST).x - 40 - 0, 0]);
+        h.click({ markers: [marker('w1', 'West pad', WEST)] }, WEST);
+        expect(h.state().panel).toBe('w1');
+        h.pans.length = 0;
+        collapse(false);
+        expect(h.pans.length).toBe(2);
+        expect(h.pans[0].animate).toBe(false);
+        expect(h.pans[1].animate).toBe(true);
+        expect(h.ms.map!.project(WEST).x).toBeCloseTo(48, 3);
+    });
+
+    test('below 1280 px the rail\'s Items opens the list over the map and closes it; a row chosen closes it and opens Details', () => {
+        const h = harness(true);
+        (h.ms as unknown as { onCollapseChange: (ev: { matches: boolean }) => void }).onCollapseChange({ matches: true });
+        h.pans.length = 0;
+        expect(h.state().listOpen).toBe(false);
+        h.ms.onRailSurface('items');
+        expect(h.state().listOpen).toBe(true);
+        // Nothing docked: the map's box did not move.
+        expect(h.pans).toEqual([]);
+        h.ms.onRailSurface('items');
+        expect(h.state().listOpen).toBe(false);
+        h.ms.onRailSurface('items');
+        expect(h.state().listOpen).toBe(true);
+        h.ms.onRowSelect('p14');
+        expect(h.state().listOpen).toBe(false);
+        expect(h.state().selected).toEqual({ id: 'p14', kind: 'point' });
+        expect(h.state().panel).toBe('p14');
+    });
+
+    test('below 1280 px Esc and a click on the map close the open list, one step each; Details stays for the next Esc', () => {
+        const h = harness(true);
+        (h.ms as unknown as { onCollapseChange: (ev: { matches: boolean }) => void }).onCollapseChange({ matches: true });
+        h.click({ markers: [marker('ctb1', 'CTB1', CTB1)] }, CTB1);
+        expect(h.state().panel).toBe('ctb1');
+        h.ms.onRailSurface('items');
+        expect(h.state().listOpen).toBe(true);
+        escape(h.ms);
+        expect(h.state().listOpen).toBe(false);
+        expect(h.state().panel).toBe('ctb1');
+        h.ms.onRailSurface('items');
+        h.click({ markers: [marker('p14', 'P14', P14)] }, P14);
+        expect(h.state().listOpen).toBe(false);
+        expect(h.state().panel).toBe('p14');
+    });
+
+    test('below 1280 px another surface docks in the list\'s place, a dock change too: the ground keeps its place', () => {
+        const h = harness(true);
+        (h.ms as unknown as { onCollapseChange: (ev: { matches: boolean }) => void }).onCollapseChange({ matches: true });
+        const spots = [CTB1, P14].map((p) => h.page(p));
+        h.pans.length = 0;
+        h.ms.onRailSurface('layers');
+        expect(h.size()).toEqual([PAGE_W - DOCK, MAP_H]);
+        expect(h.pans).toEqual([{ offset: [128, 0], animate: false }]);
+        [CTB1, P14].forEach((p, i) => samePixel(h.page(p), spots[i]));
+        h.ms.onRailSurface('items');
+        expect(h.state().listOpen).toBe(true);
+        expect(h.size()).toEqual([PAGE_W - RAIL, MAP_H]);
+        [CTB1, P14].forEach((p, i) => samePixel(h.page(p), spots[i]));
+    });
+
+    test('View mode: no dock changes, nothing pans for the collapse', () => {
+        const h = harness(false);
+        (h.ms as unknown as { onCollapseChange: (ev: { matches: boolean }) => void }).onCollapseChange({ matches: true });
+        expect(h.state().listCollapsed).toBe(true);
+        expect(h.pans).toEqual([]);
     });
 });
 

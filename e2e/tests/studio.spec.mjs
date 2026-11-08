@@ -8,8 +8,9 @@
 // the top row level with the Editing switch and clear of it and the zoom card, the pill and then the connection
 // chip under it; leaving Edit mode brings the View-mode top bar back with its lists closed, and a list open on
 // entry closes; the Items list's Search items field filters the rows, Esc and Clear bring them back with the
-// selection kept, and a filtered row picked is a row click; at 1200 px, below the list's collapse width, the toolbar
-// stays on the row under the Editing switch; at 390 px the editor keeps View mode's top bar.
+// selection kept, and a filtered row picked is a row click; at 1200 px, below the list's collapse width, the list is not
+// docked (entry 7c: the rail's Items opens it over the map) and the toolbar is back on the top row beside the Editing
+// switch, clear of it; at 390 px the editor keeps View mode's top bar.
 // The legend in the rail's Layers surface (entry 22, the owner's render C of the legend review): in Edit mode no Legend
 // button over the map and the scale bar bottom-left alone; Layers holds the panel's own content in the dock under two tabs,
 // Layers (Show, Basemap) open first and Legend (the key), the tab kept while Edit mode stays, and a map click leaves it; Lines turned off there hides the lines, stays off after a reload and shows off
@@ -1004,18 +1005,23 @@ for (const [width, height, listWidth, panelWidth] of [[1366, 768, 256, 320], [14
 test.describe('1200 px, below the list\'s collapse width', () => {
     test.use({ viewport: { width: 1200, height: 768 }, deviceScaleFactor: 1 });
 
-    editorTest('with Details docked the toolbar keeps the row under the Editing switch and never covers it (entry 7\'s list collapse returns the top row)',
+    editorTest('with Details docked the toolbar is back on the top row beside the Editing switch and never covers it (entry 7c: the list is not docked below 1280 px)',
         async ({ page }) => {
             const map = await openEditor(page);
             await expect(map).toHaveAttribute('data-studio', 'on');
+            // The list is not docked (entry 7c): the rail's Items opens it over the map, and a row chosen there docks Details.
+            await expect(page.locator('.mapstudio-dock--items')).toHaveCount(0);
             const p2 = seed.ids[TRACER.points.p2.key];
-            await page.locator('.mapstudio-list-row[data-item-id="' + p2 + '"]').click();
+            await page.locator('.mapstudio-rail-item[data-surface="items"]').click();
+            await page.locator('.mapstudio-list-overlay .mapstudio-list-row[data-item-id="' + p2 + '"]').click();
             await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', p2);
-            await expectStageWidth(map, 1200 - 72 - 256 - 320);
+            await expectStageWidth(map, 1200 - 72 - 320);
+            const box = await map.boundingBox();
             const toolbar = await page.locator('.mapstudio-toolbar').boundingBox();
             const sw = await page.locator('.mapstudio-edit-switch').boundingBox();
             expect(overlaps(toolbar, sw), 'the toolbar clear of the Editing switch').toBe(false);
-            expect(toolbar.y, 'the toolbar under the switch').toBeGreaterThanOrEqual(sw.y + sw.height);
+            expect(Math.abs(toolbar.y - (box.y + INSET)), 'the toolbar on the top row, at the map inset').toBeLessThanOrEqual(1);
+            expect(sw.x - (toolbar.x + toolbar.width), 'clear of the Editing switch').toBeGreaterThanOrEqual(INSET);
         });
 });
 

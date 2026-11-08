@@ -157,6 +157,26 @@ export interface MapStudioState {
      * for a click; kept only for the selected item (selectionState) and dropped when a tool is picked (toolState).
      */
     geometry: GeometryPick | null;
+    /**
+     * Below 1280 px (entry 7c, the owner's Direction A, 2026-10-27; DESIGN.md Layout): the item list is not docked, and the rail's
+     * Items opens it over the map's left edge (`listOpen`). From a `matchMedia('(max-width: 1279px)')` listener, never the
+     * stylesheet, so the box the map had before the line was crossed can still be read (selection.tsx `dockChange`).
+     */
+    listCollapsed: boolean;
+    /** The collapsed list open over the map (entry 7c): the rail's Items toggles it; a row choice, Esc and a map click close it. */
+    listOpen: boolean;
+}
+
+/** The width under which the item list leaves the dock (entry 7c; DESIGN.md Layout & Spacing: "below about 1280 px"). */
+export const LIST_COLLAPSE_QUERY = '(max-width: 1279px)';
+
+/** Whether the window is under the list's collapse width now; false where the browser cannot say (tests, old engines). */
+function listCollapsedNow(): boolean {
+    try {
+        return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(LIST_COLLAPSE_QUERY).matches;
+    } catch (err) {
+        return false;
+    }
 }
 
 export type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
@@ -172,12 +192,14 @@ export type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
 export class MapStudio extends Component<Props, MapStudioState> {
     state: MapStudioState = {
         drawing: null, snap: false, snapHint: '', popup: null, clock: Date.now(), pick: null, selected: null, panel: null,
-        studio: fromProps(this.props.props.editMode), layersTab: 'layers', geometry: null
+        studio: fromProps(this.props.props.editMode), layersTab: 'layers', geometry: null, listCollapsed: listCollapsedNow(), listOpen: false
     };
 
     mapContainer: HTMLDivElement | null = null;
     map: MapLibreMap | null = null;
     private resizeObserver: ResizeObserver | null = null;
+    /** The list's collapse width watched (entry 7c), or null where the browser has no matchMedia. */
+    private collapseQuery: MediaQueryList | null = null;
     draw: TerraDraw | null = null;
     /** Terra Draw's line and polygon modes (entry 4), kept for Backspace (the mode's undo). */
     lineMode: TerraDrawLineStringMode | null = null;
@@ -419,6 +441,50 @@ export class MapStudio extends Component<Props, MapStudioState> {
             });
             this.resizeObserver.observe(this.mapContainer);
         }
+        if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+            this.collapseQuery = window.matchMedia(LIST_COLLAPSE_QUERY);
+            if (typeof this.collapseQuery.addEventListener === 'function') {
+                this.collapseQuery.addEventListener('change', this.onCollapseChange);
+            }
+            if (this.collapseQuery.matches !== this.state.listCollapsed) {
+                this.onCollapseChange({ matches: this.collapseQuery.matches });
+            }
+        }
+    }
+
+    /**
+     * The window crossed the list's collapse width (entry 7c): below it the list leaves the dock (and an open overlay of it closes
+     * as it docks again above it), a dock change like any other, so every item keeps its page spot (selection.tsx `dockChange`)
+     * and a selected point the docked list would cover is eased into view. The listener runs as the media query changes, before
+     * the resize observer, with the map still the size it last drew at, so the spots kept are the ones on screen then.
+     */
+    private onCollapseChange = (ev: { matches: boolean }): void => {
+        const collapsed = ev.matches;
+        if (collapsed === this.state.listCollapsed) {
+            return;
+        }
+        console.info('[MapStudio] The window ' + (collapsed ? 'narrowed below' : 'widened past') + ' 1280 px: the item list '
+            + (collapsed ? 'leaves the dock (the rail\'s Items opens it).' : 'docks again.'));
+        this.dockChange(() => ({ listCollapsed: collapsed, listOpen: false }), this.selectedPlace());
+    };
+
+    /**
+     * An update that may dock, undock or collapse a studio panel (entry 7c; selection.tsx `dockChange`): the ground keeps its place
+     * on the page, and `place` is eased into view if the docked panel covers it.
+     */
+    dockChange<K extends keyof MapStudioState>(
+        update: (prev: Readonly<MapStudioState>) => Pick<MapStudioState, K> | null, place: [number, number] | null = null): void {
+        selection.dockChange(this, update, place);
+    }
+
+    /** The selected point's place (its drawn marker's), the place a dock change keeps in view; null for none or a line. */
+    private selectedPlace(): [number, number] | null {
+        const selected = this.state.selected;
+        const item = selected ? this.itemFor(selected.id) : undefined;
+        if (!item || item.geometry.type !== 'Point') {
+            return null;
+        }
+        return this.anchorFor(item.id, [item.geometry.coordinates[0], item.geometry.coordinates[1]]);
     }
 
     /** The map's height as a CSS variable, so a floating panel (the legend, entry 3) never grows past the map. */
@@ -528,7 +594,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         } else {
             editing.putToolDown(this);
         }
-        this.setState((prev) => ({ studio: on ? enterEdit(prev.studio) : leaveEdit(prev.studio), layersTab: on ? 'layers' : prev.layersTab }));
+        this.setState((prev) => ({ studio: on ? enterEdit(prev.studio) : leaveEdit(prev.studio), layersTab: on ? 'layers' : prev.layersTab, listOpen: false }));
         if (writeProp) {
             try {
                 this.props.store.props.write('editMode', on);
@@ -737,6 +803,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.resizeObserver.disconnect();
             this.resizeObserver = null;
         }
+        if (this.collapseQuery) {
+            if (typeof this.collapseQuery.removeEventListener === 'function') {
+                this.collapseQuery.removeEventListener('change', this.onCollapseChange);
+            }
+            this.collapseQuery = null;
+        }
         if (this.themeWatch) {
             this.themeWatch.stop();
             this.themeWatch = null;
@@ -838,6 +910,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 return;
             }
         }
+        if (ev.key === 'Escape' && !ev.defaultPrevented && this.state.listOpen && this.listOverlayShown()) {
+            // The collapsed list open over the map closes first (entry 7c), one press one step; the focus back on the rail's Items.
+            ev.preventDefault();
+            this.closeListOverlay(true);
+            return;
+        }
         if (ev.key === 'Escape' && !ev.defaultPrevented && !inField(ev.target) && editing.escapeGeometry(this)) {
             // Esc puts down Move, then the chosen point (entry 5), before it closes a popup or Details.
             ev.preventDefault();
@@ -852,6 +930,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * Details too, entry 26), or the ground clearing the selection.
      */
     private onMapClick = (ev: MapMouseEvent): void => {
+        if (this.state.listOpen) {
+            // A click on the map closes the collapsed list open over it (entry 7c), as it closes the legend, and goes on as a click.
+            this.closeListOverlay(false);
+        }
         if (editing.onGeometryClick(this, ev)) {
             return;
         }
@@ -911,7 +993,39 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /** The Edit switch (entry 2) and the rail's View: the mode, written back to the editMode prop. */
     onEditSwitch = (on: boolean): void => this.setEditMode(on, true);
     onRailView = (): void => this.setEditMode(false, true);
-    onRailSurface = (surface: StudioSurface): void => this.setState((prev) => ({ studio: showSurface(prev.studio, surface) }));
+    /**
+     * The rail's surfaces (entry 2). Above 1280 px each docks in the list's place. Below it (entry 7c, the owner's option A) the list
+     * is not docked: Items opens it over the map's left edge, and Items again closes it; another surface docks in its place as
+     * before. A surface that docks or leaves moves the map's box, so it is a dock change (the ground keeps its place).
+     */
+    onRailSurface = (surface: StudioSurface): void => {
+        const collapsed = this.state.listCollapsed;
+        if (collapsed && surface === 'items' && this.state.studio.surface === 'items') {
+            if (this.state.listOpen) {
+                this.closeListOverlay(false);
+            } else {
+                this.setState({ listOpen: true });
+            }
+            return;
+        }
+        const open = collapsed && surface === 'items';
+        this.dockChange((prev) => ({ studio: showSurface(prev.studio, surface), listOpen: open }), this.selectedPlace());
+    };
+
+    /** Whether the collapsed list shows over the map: Edit mode's studio on, below 1280 px, on Items, opened from the rail. */
+    private listOverlayShown(): boolean {
+        return this.state.listCollapsed && this.state.listOpen && this.state.studio.surface === 'items' && this.studioOn();
+    }
+
+    /** The collapsed list closed (entry 7c); after Esc the focus goes back to the rail's Items, which opened it. */
+    private closeListOverlay(focusRail: boolean): void {
+        this.setState({ listOpen: false });
+        const root = this.mapContainer && typeof this.mapContainer.closest === 'function' ? this.mapContainer.closest('.mapstudio') : null;
+        const items = focusRail && root ? root.querySelector('.mapstudio-rail-item[data-surface="items"]') as HTMLElement | null : null;
+        if (items) {
+            items.focus();
+        }
+    }
 
     /** A list row clicked (EXPERIENCE.md List row): the item selected, properties open, the map panned to it; no popup. */
     onRowSelect = (id: string): void => {
@@ -922,6 +1036,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         selection.closePopup(this);
         this.fitKey = null;
+        if (this.state.listOpen) {
+            // A row chosen in the collapsed list closes it (entry 7c); the row's selection, Details and camera are as today.
+            this.setState({ listOpen: false });
+        }
         if (item.geometry.type === 'Point') {
             this.setState((prev) => ({ ...this.selectionState(prev, { id, kind: 'point' }), pick: null, panel: id }));
             const at = this.anchorFor(id, [item.geometry.coordinates[0], item.geometry.coordinates[1]]);
@@ -1088,14 +1206,18 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (!pick || pick.index === null || !delegate) {
             return;
         }
+        const line = this.itemFor(pick.itemId);
+        const at: [number, number] | null = line && line.geometry.type === 'LineString' && line.geometry.coordinates[pick.index]
+            ? [line.geometry.coordinates[pick.index][0], line.geometry.coordinates[pick.index][1]] : null;
         const partId = delegate.splitLine(pick.itemId, pick.index);
         if (partId === null) {
             return;
         }
-        // The new part opens in Details with Name focused, as an added item does (owner, 2026-11-06).
+        // The new part opens in Details with Name focused, as an added item does (owner, 2026-11-06); if Details docks for it, the
+        // ground keeps its place and the split point is eased into view if the panel covers it (entry 7c).
         this.focusNameId = partId;
         selection.closePopup(this);
-        this.setState((prev) => ({ ...this.selectionState(prev, { id: partId, kind: 'line', segment: null }), pick: null, panel: partId, geometry: null }));
+        this.dockChange((prev) => ({ ...this.selectionState(prev, { id: partId, kind: 'line', segment: null }), pick: null, panel: partId, geometry: null }), at);
     };
     onDeletePoint = (): void => editing.deletePoint(this);
     /** The properties panel's footer delete (entry 25): the selected item deleted, no question asked, one undo step. */
@@ -1339,9 +1461,35 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 </section>
             );
         }
+        if (this.state.listCollapsed) {
+            // Below 1280 px the list is not docked (entry 7c): the rail's Items opens it over the map (renderListOverlay).
+            return null;
+        }
+        return this.renderItemList(delegate, facts, false);
+    }
+
+    /**
+     * The collapsed list (entry 7c, the owner's option A): below 1280 px, opened by the rail's Items, the 7a list whole (header,
+     * groups, footer) as a panel over the map's left edge at the list's width, floating (the one soft shadow); it closes on a row
+     * choice, Esc, the rail's Items again or a click on the map. Nothing docks, so the map's box does not move.
+     */
+    private renderListOverlay(delegate: MapStudioDelegateState): React.ReactNode {
+        if (!this.listOverlayShown()) {
+            return null;
+        }
+        return (
+            <div className="mapstudio-list-overlay" data-list="open">
+                {this.renderItemList(delegate, this.problemFacts(delegate), true)}
+            </div>
+        );
+    }
+
+    /** The item list (entry 7a), docked or (below 1280 px) over the map. */
+    private renderItemList(delegate: MapStudioDelegateState, facts: ProblemFacts, overlay: boolean): React.ReactNode {
         const selected = this.state.selected;
         return (
             <ItemList title={this.projectName() || 'Map'}
+                      overlay={overlay}
                       rows={listRows(delegate.items, delegate.lists.kinds, delegate.live, delegate.lists.assetNames,
                           assetListKnown(delegate.lists.adapters ? delegate.lists.adapters.assets : null),
                           { assets: delegate.lists.assets, changed: delegate.changed })}
@@ -1441,9 +1589,22 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const pick = studioOn && studio.tool === null ? this.state.geometry : null;
         const picked = pick ? this.itemFor(pick.itemId) : undefined;
         const pickedKind = picked ? kinds.find((k) => k.id === picked.kind) : undefined;
+        // Below 1280 px (entry 7c) the list is not docked; a rail surface other than Items (Kinds, Layers) still docks in its place,
+        // and with it and Details docked the map is too narrow for the toolbar beside the Editing switch, so the toolbar keeps
+        // the row under the switch there (`mapstudio--narrow-dock`, the stylesheet).
+        const narrowDock = studioOn && this.state.listCollapsed && studio.surface !== 'items';
+        const rootClasses = studioOn ? ['mapstudio', 'mapstudio--editing'] : ['mapstudio'];
+        if (narrowDock) {
+            rootClasses.push('mapstudio--narrow-dock');
+        }
+        // The list's place for the suite (entry 7c): docked, collapsed (below 1280 px, closed) or open over the map.
+        const listPlace = !studioOn || studio.surface !== 'items' ? '' : !this.state.listCollapsed ? 'docked' : this.state.listOpen ? 'open' : 'collapsed';
         return (
-            <div {...this.props.emit({ classes: studioOn ? ['mapstudio', 'mapstudio--editing'] : ['mapstudio'] })} onKeyDown={this.onRootKeyDown}>
-                {studioOn ? <Rail surface={studio.surface} onView={this.onRailView} onSurface={this.onRailSurface} /> : null}
+            <div {...this.props.emit({ classes: rootClasses })} onKeyDown={this.onRootKeyDown}>
+                {studioOn ? (
+                    <Rail surface={studio.surface} onView={this.onRailView} onSurface={this.onRailSurface}
+                          collapsed={this.state.listCollapsed} listOpen={this.state.listOpen} />
+                ) : null}
                 {studioOn && delegate ? this.renderDock(delegate) : null}
                 {studioOn && delegate ? this.renderPanel(delegate) : null}
                 <div className="mapstudio-stage">
@@ -1452,6 +1613,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                          data-mode={isEditing(studio) ? 'edit' : 'view'}
                          data-studio={studioOn ? 'on' : 'off'}
                          data-surface={studio.surface}
+                         data-list={listPlace}
                          data-tool={studio.tool || ''}
                          data-tool-kind={studio.toolKind || ''}
                          data-snap={this.state.snap ? 'on' : 'off'}
@@ -1538,6 +1700,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                                      onSplit={this.onSplitHere}
                                      onDelete={this.onDeletePoint} />
                     ) : null}
+                    {studioOn && delegate ? this.renderListOverlay(delegate) : null}
                     {this.renderStylePanel()}
                     {selection.renderPopup(this)}
                 </div>

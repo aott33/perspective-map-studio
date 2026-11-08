@@ -75,7 +75,8 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
                 await expect(panel.locator('.mapstudio-panel-name')).toHaveText('Point 1');
                 await expect(map).toHaveAttribute('data-popup-mode', '');
                 await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
-                // Closed before drawing, so the map has the room the draw offsets were read for again.
+                // Closed before drawing, so the map has the room the draw offsets were read for again, and (entry 7c: every dock
+                // change keeps the ground in place) the view it had before the click, so the line lands where it did before entry 26.
                 await panel.locator('.mapstudio-panel-close').click();
                 await expect(panel).toHaveCount(0);
                 await expect.poll(async () => Math.round((await map.boundingBox()).width), { timeout: 10_000 }).toBe(Math.round(box.width));

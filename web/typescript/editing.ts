@@ -136,6 +136,12 @@ export interface EditingHost {
     toolState(prev: Readonly<MapStudioState>, tool: StudioTool | null, kindId: string | null): Pick<MapStudioState, 'drawing' | 'snapHint' | 'studio' | 'geometry'>;
     /** A selection with the studio model that goes with it (studio.ts), from the pending state. */
     selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio' | 'panel' | 'geometry'>;
+    /**
+     * An update that docks or undocks Details (entry 7c, selection.tsx `dockChange`): the ground keeps its place on the page, and
+     * `place` (the item just added) is eased into view if the docked panel covers it.
+     */
+    dockChange<K extends keyof MapStudioState>(
+        update: (prev: Readonly<MapStudioState>) => Pick<MapStudioState, K> | null, place?: [number, number] | null): void;
     /** Close the open popup, card or sheet (selection.tsx): an added item takes the selection. */
     closePopup: () => void;
     /** A finished line is queued and drawn from the unsaved layer: remove Terra Draw's copy of it (itemsLayer.ts). */
@@ -834,7 +840,8 @@ export function deleteSelected(host: EditingHost): boolean {
     }
     clearPlacedPoints(host);
     host.closePopup();
-    host.setState((prev) => (prev.selected && prev.selected.id === selected.id ? { ...host.selectionState(prev, null), pick: null } : null));
+    // Details undocks: the ground keeps its place on the page (entry 7c).
+    host.dockChange((prev) => (prev.selected && prev.selected.id === selected.id ? { ...host.selectionState(prev, null), pick: null } : null));
     if (host.map) {
         host.map.getCanvas().focus({ preventScroll: true });
     }
@@ -1137,9 +1144,10 @@ function onLineFinish(host: EditingHost, id: string | number, tool: DrawingTool)
     setTimeout(() => host.dropQueuedFeatures(), 0);
     host.focusNameId = itemId;
     host.closePopup();
-    host.setState((prev) => ({
+    // Details docks for it: its points keep their page spots, its last point (where the pointer finished) eased into view if covered.
+    host.dockChange((prev) => ({
         ...host.selectionState(prev, { id: itemId, kind: 'line', segment: null }), pick: null, panel: itemId, ...host.drawingState(prev, null)
-    }));
+    }), coordinates[coordinates.length - 1]);
     console.info('[MapStudio] ' + (tool === 'area' ? 'Area' : 'Line') + ' drawn with ' + coordinates.length + ' points as ' + kind.id + ': ' + itemId
         + (ends ? ' (ends ' + JSON.stringify(ends) + ')' : ' (ends floating)'));
 }
@@ -1192,7 +1200,8 @@ function onPointFinish(host: EditingHost, id: string | number, action: string): 
         host.focusNameId = itemId;
         // The new item takes the selection (an open popup goes); its Details open beside the map.
         host.closePopup();
-        host.setState((prev) => ({ ...host.selectionState(prev, { id: itemId, kind: 'point' }), pick: null, panel: itemId }));
+        // Details docks for it: the new pad stays where it was placed on the page (entry 7c), eased into view if the panel covers it.
+        host.dockChange((prev) => ({ ...host.selectionState(prev, { id: itemId, kind: 'point' }), pick: null, panel: itemId }), lngLat);
         console.info('[MapStudio] Point placed with the Point tool: ' + itemId + ' at ' + lngLat[0].toFixed(6) + ', ' + lngLat[1].toFixed(6));
     }
 }

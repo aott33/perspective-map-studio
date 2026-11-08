@@ -3416,18 +3416,38 @@
     }
 }
 
-/* Below 1280 px the rail, the list and the properties panel (648 px together) leave too little map for the toolbar
-   beside the Editing switch (376 px of map at 1024 px), so the toolbar keeps entry 4's row under the switch's and
-   the chip moves down with it. DESIGN.md gives these widths the list's collapse to a button, which entry 7 builds;
-   that collapse returns the toolbar to the top row here. */
-@media (max-width: 1279px) {
-    .mapstudio-toolbar-float {
-        top: calc(var(--mapstudio-map-inset) + 40px + 8px);
-    }
+/* Below 1280 px (entry 7c, the owner's Direction A: "the list collapsing to a button below about 1280 px") the item list is
+   not docked: the rail's Items opens it over the map (.mapstudio-list-overlay), so the rail and the properties panel leave the
+   map 808 px at 1200 px and the toolbar is back on the top row beside the Editing switch, clear of it. The collapse is the
+   component's state from a matchMedia listener, not a media query here, so the box the map had before the line was crossed can
+   be read and the ground kept in place (selection.tsx dockChange). Kinds and Layers still dock in the list's place below it,
+   and with Details docked too (648 px together) they leave too little map for the toolbar beside the switch: there it keeps
+   entry 4's row under the switch's and the chip moves down with it (mapstudio--narrow-dock, MapStudio.tsx). */
+.mapstudio--narrow-dock .mapstudio-toolbar-float {
+    top: calc(var(--mapstudio-map-inset) + 40px + 8px);
+}
 
-    .mapstudio--editing .mapstudio-chip {
-        top: calc(var(--mapstudio-map-inset) + 40px + 8px + 36px + 10px);
-    }
+.mapstudio--narrow-dock.mapstudio--editing .mapstudio-chip {
+    top: calc(var(--mapstudio-map-inset) + 40px + 8px + 36px + 10px);
+}
+
+/* The collapsed list open over the map's left edge (entry 7c): the 7a list whole at the list's width, the stage's full height,
+   floating (the one soft shadow, DESIGN.md Elevation) over the map and its controls. */
+.mapstudio-list-overlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 8;
+    display: flex;
+    width: var(--mapstudio-list-width);
+    max-width: 100%;
+    box-shadow: var(--mapstudio-float-shadow);
+}
+
+.mapstudio-list-overlay .mapstudio-dock--overlay {
+    flex: 1 1 auto;
+    width: auto;
 }
 
 .mapstudio-toolbar-float--paused .mapstudio-toolbar {

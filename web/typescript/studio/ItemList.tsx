@@ -33,7 +33,8 @@ import { ProblemStatus } from './SaveStatus';
  * group headers (`MESA FIELD` with "4 NEED ATTENTION", "Field-wide", "Not linked", "Just added", a kind), the "All normal"
  * divider, children indented 26 px with "on P14", Last changed's "Sam - Today 10:42". The footer: **Add item** (the toolbar's
  * generic Point tool) and "N unlinked" while N > 0, which keeps the Not linked rows alone until its clear. Sort, Filter and
- * the unlinked filter are the list's own, as the search text is. Checkboxes and Select all are entry 8's; the collapse 7c's.
+ * the unlinked filter are the list's own, as the search text is. Checkboxes and Select all are entry 8's. Below 1280 px (entry 7c) the same list
+ * opens over the map from the rail's Items (`overlay`).
  *
  * The save status beside the title always says the save state (Saving..., Not saved while edits wait, else Saved); a
  * problem shows on its own row under the title (entry 24, owner 2026-11-05: the status box retired, its problems said
@@ -60,6 +61,11 @@ export interface ItemListProps {
     onAddItem: () => void;
     addDisabled: boolean;
     onSelect: (id: string) => void;
+    /**
+     * Below 1280 px (entry 7c) the list is shown over the map's left edge, not docked: the same list whole, in a floating panel
+     * (`mapstudio-dock--overlay`); the component closes it on a row choice.
+     */
+    overlay?: boolean;
     onRetry: (batchId: string) => void;
     onDiscard: (batchId: string) => void;
 }
@@ -209,7 +215,7 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
         const chosenChip = chips.find((c) => c.id === chosen);
         const filterWords = chosen !== null && chosenChip ? chosenChip.label : 'Filter';
         return (
-            <section className="mapstudio-dock mapstudio-dock--items" aria-label="Items">
+            <section className={'mapstudio-dock mapstudio-dock--items' + (props.overlay ? ' mapstudio-dock--overlay' : '')} aria-label="Items">
                 <header className="mapstudio-dock-header">
                     <div className="mapstudio-dock-title-row">
                         <h2 className="mapstudio-dock-title">{props.title}</h2>
