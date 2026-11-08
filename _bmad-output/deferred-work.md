@@ -170,3 +170,9 @@
 - source_plan: `_bmad-output/initiative-flowmap/tickets/epic-editing/tickets/story-selection-viewport-and-popup-events-to-the-page-and-contract-plan.md`
   summary: The Designer listing the map component's four events (onItemSelected, onViewportChanged, onPopupOpen, onPopupClose) with their payload trees is not verified; no Designer runs in the build container.
   evidence: Entry 14's review (2026-11-07) against the session's CLAUDE.md validation step 4; `docs/platform-checks.md` records it as not verified; only the unit test of `DESCRIPTOR.events()` backs it. An owner check in the Designer settles it, before entry 18's release.
+- source_plan: none
+  summary: Entry 7c, the layout at 1440 and 1366 px, the list collapsing to a button below about 1280 px, nothing bottom-right, and the two 160 px map shifts when Details docks after a Point placement and when Details closes.
+  evidence: Split from entry 7 by the owner on 2026-11-08 ("Split"; 7a, then 7c, then 7b, each its own plan under entry 7, built back to back in epic 4).
+- source_plan: none
+  summary: Entry 7b, the first-run checklist on an empty map (Set up your kinds, Add or import items, Check the operator view; ticked when done; Hide checklist) and the viewer's note.
+  evidence: Split from entry 7 by the owner on 2026-11-08 ("Split"; 7a, then 7c, then 7b, each its own plan under entry 7, built back to back in epic 4).
