@@ -52,9 +52,9 @@ test.describe('1440 px', () => {
             expect(r.kinds.status).toBe('ok');
             let s = await statusAfterReload(page);
             expect(s.kinds).toEqual({ status: 'ok', count: '5', message: `5 kinds from ${KINDS_FN}.` });
-            expect(s.assets).toEqual({ status: 'ok', count: '10', message: `10 assets from ${ASSETS_FN}.` });
+            expect(s.assets).toEqual({ status: 'ok', count: '11', message: `11 assets from ${ASSETS_FN}.` });
             expect(s.kindsRows).toBe('5');
-            expect(s.assetsRows).toBe('10');
+            expect(s.assetsRows).toBe('11');
             await shot(page, 'mapstudio-adapters-ok-1440.png');
 
             // Bad rows: the good ones are kept, the first reasons named.
@@ -65,10 +65,10 @@ test.describe('1440 px', () => {
             expect(s.kinds.message).toBe(`2 of 7 kinds from ${KINDS_FN} left out: row 6 (id tank): geometry must be point`
                 + ' or line; row 7 (id pad): the id appears twice.');
             expect(s.assets.status).toBe('incomplete');
-            expect(s.assets.count).toBe('10');
-            expect(s.assets.message).toBe(`2 of 12 assets from ${ASSETS_FN} left out: row 11 (id P99): basePath does not`
-                + ' start with a [provider]; row 12 (id T1): kind tank is not in the kind list.');
-            expect(s.assetsRows).toBe('10');
+            expect(s.assets.count).toBe('11');
+            expect(s.assets.message).toBe(`2 of 13 assets from ${ASSETS_FN} left out: row 12 (id P99): basePath does not`
+                + ' start with a [provider]; row 13 (id T1): kind tank is not in the kind list.');
+            expect(s.assetsRows).toBe('11');
 
             // Raises: failing, naming the function and the error; the last good list is kept and said so.
             await press(page, 'broken', 'broken');
@@ -131,7 +131,7 @@ test.describe('1440 px', () => {
             s = await statusAfterReload(page);
             expect(s.kinds.status).toBe('ok');
             expect(s.assets.status).toBe('ok');
-            expect(s.assetsRows).toBe('10');
+            expect(s.assetsRows).toBe('11');
         } finally {
             await press(page, 'ok', 'ok');
         }
@@ -170,7 +170,7 @@ test.describe('1440 px', () => {
         await expect(el).toHaveAttribute('data-kinds-status', 'ok');
         await expect(el).toHaveAttribute('data-kinds-rows', '5');
         await expect(el).toHaveAttribute('data-assets-status', 'ok');
-        await expect(el).toHaveAttribute('data-assets-count', '10');
+        await expect(el).toHaveAttribute('data-assets-count', '11');
         await expect(el).toHaveAttribute('data-assets-rows', '');
 
         await page.locator('#mapstudio-dev-adapter-broken').click();

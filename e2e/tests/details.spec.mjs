@@ -555,8 +555,8 @@ test.describe('1366 px', () => {
             await press(page, 'incomplete', 'incomplete');
             await openEditor(page);
             await selectRow(page, point2);
-            await expect(note).toHaveText(`2 of 12 assets from ${ASSETS_FN} left out: row 11 (id P99): basePath does not start with a`
-                + ' [provider]; row 12 (id T1): kind tank is not in the kind list.');
+            await expect(note).toHaveText(`2 of 13 assets from ${ASSETS_FN} left out: row 12 (id P99): basePath does not start with a`
+                + ' [provider]; row 13 (id T1): kind tank is not in the kind list.');
             await expect(note).toHaveAttribute('data-status', 'incomplete');
             await expect(page.locator('.mapstudio-panel .mapstudio-field-asset-hint')).toHaveText('Live values come from the linked asset\'s tags.');
             await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-kind-known', 'true');

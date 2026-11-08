@@ -55,6 +55,9 @@ ASSETS = [
     {'id': 'P12', 'name': 'Pad 12', 'kind': 'pad', 'basePath': '[default]Mesa/P12'},
     {'id': 'P14', 'name': 'Pad 14', 'kind': 'pad', 'basePath': '[default]Mesa/P14'},
     {'id': 'P15', 'name': 'Pad 15', 'kind': 'pad', 'basePath': '[default]Mesa/P15'},
+    # A nested asset (epic 4 entry 7a): P14's lease under P14's folder, so the item list shows a child under its site.
+    # A geofence, whose kind setup reads no tag, so it adds no comms lost or stale state to the dev map.
+    {'id': 'P14L', 'name': 'P14 lease', 'kind': 'geofence', 'basePath': '[default]Mesa/P14/Lease'},
     {'id': 'L3', 'name': 'Line 3', 'kind': 'line', 'basePath': '[default]Mesa/Lines/L3'},
     # The L-SWD set (epic 3 entry 2): the two pads its ends snap to, its taps and line valve, and the
     # line itself (ops/config/core: the Pad, Tap and Valve UDT instances and Lines/LSWD).

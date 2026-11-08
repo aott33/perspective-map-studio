@@ -135,13 +135,13 @@ def check(condition, text):
 def row_first_run():
     api, r = seeded()
     check('error' not in r, 'error %s' % r.get('error'))
-    check((r['created'], r['updated'], r['restored'], r['unchanged'], r['seq']) == (74, 0, 0, 0, 1), str(r))
-    check(len(api.batches) == 1 and len(api.batches[0]['ops']) == 79, 'one batch of 74 item ops and the five kind setups')
+    check((r['created'], r['updated'], r['restored'], r['unchanged'], r['seq']) == (75, 0, 0, 0, 1), str(r))
+    check(len(api.batches) == 1 and len(api.batches[0]['ops']) == 80, 'one batch of 75 item ops and the five kind setups')
     check(all([op['op'] == 'create' and op['baseVersion'] == 0 for op in api.batches[0]['ops']]), 'creates at 0')
-    check(api.batches[0]['ops'][74] == {'op': 'create', 'entity': 'kindSetup', 'id': 'pad', 'baseVersion': 0,
+    check(api.batches[0]['ops'][75] == {'op': 'create', 'entity': 'kindSetup', 'id': 'pad', 'baseVersion': 0,
                                         'data': {'setup': PAD_SETUP}}, 'the kind setup ops are last')
-    check(api.batches[0]['ops'][75]['id'] == 'line' and api.batches[0]['ops'][76]['id'] == 'geofence'
-          and api.batches[0]['ops'][77]['id'] == 'tap' and api.batches[0]['ops'][78]['id'] == 'valve', 'the line, geofence, tap and valve setups')
+    check(api.batches[0]['ops'][76]['id'] == 'line' and api.batches[0]['ops'][77]['id'] == 'geofence'
+          and api.batches[0]['ops'][78]['id'] == 'tap' and api.batches[0]['ops'][79]['id'] == 'valve', 'the line, geofence, tap and valve setups')
     check(r['kindSetup'] == 'created' and api.kind_setups['pad']['setup'] == PAD_SETUP, 'the pad kind setup is seeded')
     check(r['kindSetups'] == {'pad': 'created', 'line': 'created', 'geofence': 'created', 'tap': 'created', 'valve': 'created'},
           str(r['kindSetups']))
@@ -157,11 +157,15 @@ def row_first_run():
     check(api.records['areas/north']['kind'] == 'geofence' and api.records['areas/north']['properties'] == {'operator': 'North'}
           and api.records['areas/south']['properties'] == {'operator': 'South'}, 'the geofences')
     check(len(api.records['areas/north']['geometry']['coordinates']) == 4, 'a closed ring of four corners')
+    # Epic 4 entry 7a: P14 lease, a geofence linked to the nested asset P14L ([default]Mesa/P14/Lease), no operator.
+    lease = api.records['areas/p14-lease']
+    check(lease['kind'] == 'geofence' and lease['name'] == 'P14 lease' and lease['assetId'] == 'P14L'
+          and lease['properties'] == {} and len(lease['geometry']['coordinates']) == 4, str(lease))
     # The tracer's points are linked to the dev assets; the scale set's pads are not.
     check(api.records['tracer/p1']['assetId'] == 'P12' and api.records['tracer/p3']['assetId'] == 'P15', 'asset links')
     check('assetId' not in api.records['scale/pad-7'], 'the scale set stays unlinked')
     check(r['scale'] == {'pads': 30, 'lines': 30}, 'scale %s' % r['scale'])
-    check(r['ids']['tracer/p1'] == 'tracer/p1' and len(r['ids']) == 74, 'ids')
+    check(r['ids']['tracer/p1'] == 'tracer/p1' and len(r['ids']) == 75, 'ids')
     # Entry 2: the L-SWD set, its ends snapped to the two pads and its instruments attached at their distances.
     swd = api.records['swd/line']
     check(swd['assetId'] == 'LSWD' and swd['properties'] == {'diameter': 6} and swd['overrides'] == SWD_LINE_OVERRIDES, str(swd))
@@ -182,7 +186,7 @@ def row_first_run():
 def row_rerun_unchanged():
     api, first = seeded()
     r = run(api=api, make_id=make_id, new_batch=_Batches())
-    check((r['unchanged'], r['seq'], r['created'], r['updated']) == (74, None, 0, 0), str(r))
+    check((r['unchanged'], r['seq'], r['created'], r['updated']) == (75, None, 0, 0), str(r))
     check(len(api.batches) == 1, 'no batch sent')
     check(r['kindSetup'] == 'unchanged', 'the kind setup compares equal: %s' % r['kindSetup'])
     check(r['kindSetups'] == {'pad': 'unchanged', 'line': 'unchanged', 'geofence': 'unchanged', 'tap': 'unchanged', 'valve': 'unchanged'},
@@ -196,7 +200,7 @@ def row_rerun_unchanged():
     check(len(ops) == 2 and ops[0]['id'] == 'tracer/p2' and ops[0]['data']['assetId'] == 'P14', str(ops))
     check(ops[1] == {'op': 'update', 'entity': 'kindSetup', 'id': 'pad', 'baseVersion': 5, 'data': {'setup': PAD_SETUP}},
           str(ops[1]))
-    check(again['kindSetup'] == 'updated' and again['updated'] == 1 and again['unchanged'] == 73, str(again))
+    check(again['kindSetup'] == 'updated' and again['updated'] == 1 and again['unchanged'] == 74, str(again))
     # An editor's change to an override is put back too.
     api.records['tracer/p2'].update({'overrides': {}, 'version': 5})
     third = run(api=api, make_id=make_id, new_batch=_Batches())
@@ -213,7 +217,7 @@ def row_rerun_edited():
     ops = api.batches[-1]['ops']
     check(len(ops) == 1 and ops[0]['op'] == 'update' and ops[0]['baseVersion'] == 3, str(ops))
     check(sorted(ops[0]['data'].keys()) == ['geometry', 'kind', 'name', 'properties'], str(ops[0]['data']))
-    check((r['updated'], r['unchanged'], r['created'], r['seq']) == (1, 73, 0, 2), str(r))
+    check((r['updated'], r['unchanged'], r['created'], r['seq']) == (1, 74, 0, 2), str(r))
     pad = api.records['scale/pad-7']
     check(pad['name'] == 'Pad 7' and pad['properties'] == {'status': 'producing'} and pad['version'] == 4, str(pad))
     return 'ok'
@@ -229,7 +233,7 @@ def row_rerun_deleted():
     check(refused['op'] == 'create' and refused['baseVersion'] == 0, str(refused))
     check(restore['op'] == 'create' and restore['baseVersion'] == 4 and restore['id'] == 'scale/pad-7', str(restore))
     check(api.batches[1]['batchId'] != api.batches[2]['batchId'], 'a new batchId for the restore')
-    check((r['restored'], r['created'], r['updated'], r['unchanged'], r['seq']) == (1, 0, 0, 73, 2), str(r))
+    check((r['restored'], r['created'], r['updated'], r['unchanged'], r['seq']) == (1, 0, 0, 74, 2), str(r))
     pad = api.records['scale/pad-7']
     check(not pad['deleted'] and pad['version'] == 5 and pad['name'] == 'Pad 7', str(pad))
     check(r['scale'] == {'pads': 30, 'lines': 30}, 'scale %s' % r['scale'])
@@ -266,17 +270,17 @@ def row_kind_list_down():
 def plan_is_pure():
     seed = seed_items(make_id)
     plan = plan_ops([], seed)
-    check(len(plan['ops']) == 74 and plan['unchanged'] == 0, 'all creates')
+    check(len(plan['ops']) == 75 and plan['unchanged'] == 0, 'all creates')
     stored = [dict(op['data'], id=op['id'].upper(), version=1, deleted=False) for op in plan['ops']]
     # Letter case of ids does not matter (the Gateway answers lower case), and coordinates compare at 6 decimals.
     stored[0]['geometry'] = {'type': 'Point', 'coordinates': [stored[0]['geometry']['coordinates'][0] + 0.0000001,
                                                              stored[0]['geometry']['coordinates'][1]]}
     again = plan_ops(stored, [dict(i, id=i['id'].upper()) for i in seed])
-    check(again['ops'] == [] and again['unchanged'] == 74, str(again['ops'][:1]))
+    check(again['ops'] == [] and again['unchanged'] == 75, str(again['ops'][:1]))
     names = [i['name'] for i in seed]
     check(names.count('Pad 1') == 1 and 'Line to Pad 30' in names and 'Tracer line' in names, 'names')
     check(len([i for i in seed if i['kind'] == 'pad']) == 37 and len([i for i in seed if i['kind'] == 'line']) == 32
-          and len([i for i in seed if i['kind'] == 'geofence']) == 2 and len([i for i in seed if i['kind'] == 'tap']) == 2
+          and len([i for i in seed if i['kind'] == 'geofence']) == 3 and len([i for i in seed if i['kind'] == 'tap']) == 2
           and len([i for i in seed if i['kind'] == 'valve']) == 1, 'kinds')
     return 'ok'
 

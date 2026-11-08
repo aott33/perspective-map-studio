@@ -2764,7 +2764,7 @@
     flex: 1 1 auto;
     min-height: 0;
     margin: 0;
-    padding: 6px 6px 76px;
+    padding: 6px 6px 12px;
     overflow-y: auto;
     list-style: none;
 }
@@ -2821,6 +2821,198 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* Entry 7a: the name and, under it, its second line in the secondary text ("on P14", "Sam - Today 10:42"). */
+.mapstudio-list-text {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.mapstudio-list-text .mapstudio-list-name {
+    flex: 0 0 auto;
+}
+
+.mapstudio-list-note {
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* A child (a well on its pad, a lateral) indents 26 px under its site (DESIGN.md list-row child-indent). */
+.mapstudio-list-item--child {
+    padding-left: 26px;
+}
+
+/* A site shown only so a matching child reads under it (Search items): the row, quieter. */
+.mapstudio-list-row--context .mapstudio-list-name {
+    color: var(--mapstudio-secondary);
+}
+
+/* Group headers (DESIGN.md group-header): the section label, 12 px semibold, tracked, upper case, in the secondary text;
+   the field's "4 NEED ATTENTION" on its right. Field-wide is a sub-group of its field. */
+.mapstudio-list-group,
+.mapstudio-list-divider {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0;
+    padding: 12px 8px 4px 9px;
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.mapstudio-list-group:first-child {
+    padding-top: 4px;
+}
+
+.mapstudio-list-group--sub {
+    padding-top: 8px;
+}
+
+.mapstudio-list-group-right {
+    flex: 0 0 auto;
+    color: var(--label);
+}
+
+/* The "All normal" divider: the label over a rule. */
+.mapstudio-list-divider {
+    padding-top: 8px;
+    border-top: 1px solid var(--mapstudio-divider);
+    margin-top: 6px;
+}
+
+/* Sort by and Filter, side by side under the search. */
+.mapstudio-list-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.mapstudio-list-sort {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.mapstudio-list-sort-label {
+    flex: 0 0 auto;
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
+}
+
+.mapstudio-input.mapstudio-list-sort-select {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 32px;
+}
+
+.mapstudio-button.mapstudio-list-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 50%;
+    padding: 0 8px 0 10px;
+}
+
+.mapstudio-list-filter-words {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mapstudio-list-filter[aria-expanded="true"] .mapstudio-list-filter-chevron {
+    transform: rotate(180deg);
+}
+
+.mapstudio-button.mapstudio-list-filter--on {
+    border-color: var(--mapstudio-attention);
+}
+
+/* The kind chips behind Filter (DESIGN.md filter-chip): 26 px, round, the border token; the chosen one filled attention. */
+.mapstudio-list-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.mapstudio-chip {
+    box-sizing: border-box;
+    height: 26px;
+    padding: 0 10px;
+    border: 1px solid var(--neutral-40, var(--border));
+    border-radius: 9999px;
+    background: var(--mapstudio-surface);
+    color: var(--label);
+    font: inherit;
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.mapstudio-chip:hover {
+    background: var(--mapstudio-hover);
+}
+
+.mapstudio-chip:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: 1px;
+}
+
+.mapstudio-chip.mapstudio-chip--on {
+    border-color: var(--mapstudio-attention);
+    background: var(--mapstudio-attention);
+    color: var(--mapstudio-surface);
+}
+
+/* The footer: Add item, then "N unlinked" with its clear while it filters. */
+.mapstudio-list-footer {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--mapstudio-divider);
+}
+
+.mapstudio-button.mapstudio-list-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px 0 8px;
+}
+
+.mapstudio-button.mapstudio-list-add:disabled {
+    opacity: 0.42;
+    cursor: default;
+}
+
+.mapstudio-list-unlinked-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.mapstudio-button.mapstudio-list-unlinked--on {
+    border-color: var(--mapstudio-attention);
+    background: var(--mapstudio-attention);
+    color: var(--mapstudio-surface);
 }
 
 /* The state badge: the alarm glyph with its digit in the priority token, Comms lost in its token, Stale in the text

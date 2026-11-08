@@ -1049,6 +1049,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     onSelectTool = (): void => editing.putToolDown(this);
     onTool = (tool: StudioTool, kindId: string | null): void => editing.pickTool(this, tool, kindId);
     onSnap = (): void => editing.toggleSnap(this);
+    /** The list footer's Add item (entry 7a): the generic Point tool picked up, as the toolbar's Point does. */
+    onAddItem = (): void => editing.pickTool(this, 'point', null);
 
     /** The drawing bar (entry 4): Finish as Enter, Cancel as Esc. */
     onFinishDrawing = (): void => editing.finishDrawing(this);
@@ -1341,7 +1343,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
         return (
             <ItemList title={this.projectName() || 'Map'}
                       rows={listRows(delegate.items, delegate.lists.kinds, delegate.live, delegate.lists.assetNames,
-                          assetListKnown(delegate.lists.adapters ? delegate.lists.adapters.assets : null))}
+                          assetListKnown(delegate.lists.adapters ? delegate.lists.adapters.assets : null),
+                          { assets: delegate.lists.assets, changed: delegate.changed })}
+                      justAdded={delegate.justAdded}
+                      onAddItem={this.onAddItem}
+                      addDisabled={delegate.editing === 'off'}
                       selectedId={selected ? selected.id : null}
                       save={delegate.save}
                       saveWords={headerSaveWords(facts)}

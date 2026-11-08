@@ -163,7 +163,8 @@ describe('the other controls with a key name it (entry 25\'s review)', () => {
 
     test('the Items list\'s Clear the search (Esc), shown while the field holds text', () => {
         const list = new ItemList({ title: 'Map', rows: [], selectedId: null, save: { state: 'idle' }, saveWords: '', problems: [], unsaved: [],
-            records: [], level: 'full', sending: [], onSelect: noop, onRetry: noop, onDiscard: noop });
+            records: [], level: 'full', sending: [], justAdded: [], onAddItem: noop, addDisabled: false, onSelect: noop, onRetry: noop,
+            onDiscard: noop });
         list.state = { ...list.state, query: 'P1' };
         expect(renderToStaticMarkup(list.render())).toContain('mapstudio-list-search-clear" title="Clear the search (Esc)" aria-label="Clear the search" '
             + 'aria-keyshortcuts="Escape"');

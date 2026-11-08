@@ -13,7 +13,9 @@
 #   shared  two pads 15 m apart (Shared A, Shared B; epic 3 entry 7), so the map draws one shared
 #           marker whose pick list opens either.
 #   areas   two geofences (North, South; epic 3 entry 1) whose operator property picks a category
-#           tint from the geofence kind setup.
+#           tint from the geofence kind setup, and P14 lease (epic 4 entry 7a), a small geofence east of
+#           Point 2 linked to the nested dev asset P14L ([default]Mesa/P14/Lease), so the item list shows
+#           it as a child under Point 2 (linked to P14).
 #   swd     the L-SWD set (epic 3 entry 2): the pads CTB1 and SWD1 (linked to the dev assets CTB1
 #           and SWD1), the line L-SWD between them (diameter 6, 2,922 m, linked to LSWD, its ends
 #           snapped to both pads, an override style rule {instruments: "worst"}), and on it the taps
@@ -137,6 +139,9 @@ GEOFENCES = (
     ('south', 'South fence', 'South', ((-104.9860, 39.7340), (-104.9780, 39.7340), (-104.9780, 39.7300), (-104.9860, 39.7300))),
 )
 
+# P14's lease (epic 4 entry 7a): a ring about 100 m east of Point 2, linked to the nested asset P14L, no operator (no tint).
+P14_LEASE = ('p14-lease', 'P14 lease', 'P14L', ((-104.9738, 39.7514), (-104.9726, 39.7514), (-104.9726, 39.7506), (-104.9738, 39.7506)))
+
 # The pad kind setup the dev map seeds (docs/kind-setup.md): the live values the tracer draws, and
 # a States rule on the dev Status tag (epic 3 entry 1): 1 attention, 2 warning, 3 fault, 4 dimmed.
 PAD_SETUP = {
@@ -247,7 +252,7 @@ def _item(make_id, set_name, key, kind, name, geometry, properties, asset_id=Non
 
 
 def seed_items(make_id=seed_id):
-    """The 74 seed items: {key, id, kind, name, geometry, properties}, scale set first."""
+    """The 75 seed items: {key, id, kind, name, geometry, properties}, scale set first."""
     items = []
     for n, lng, lat in SCALE_PADS:
         items.append(_item(make_id, 'scale', 'pad-%d' % n, 'pad', 'Pad %d' % n, _point(lng, lat), PAD_PROPERTIES))
@@ -261,6 +266,8 @@ def seed_items(make_id=seed_id):
         items.append(_item(make_id, 'shared', key, 'pad', name, _point(lng, lat), PAD_PROPERTIES))
     for key, name, operator, coords in GEOFENCES:
         items.append(_item(make_id, 'areas', key, 'geofence', name, _line(coords), {'operator': operator}))
+    key, name, asset_id, coords = P14_LEASE
+    items.append(_item(make_id, 'areas', key, 'geofence', name, _line(coords), {}, asset_id))
     # The L-SWD set (entry 2): the pads first, so the line's ends and the instruments' attachment name
     # ids of the same batch; the ends and the attachments are seed fields, put back on a re-run.
     for key, name, asset_id, lng, lat in SWD_PADS:
