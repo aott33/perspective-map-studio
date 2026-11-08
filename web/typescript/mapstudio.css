@@ -3417,17 +3417,17 @@
 }
 
 /* Below 1280 px (entry 7c, the owner's Direction A: "the list collapsing to a button below about 1280 px") the item list is
-   not docked: the rail's Items opens it over the map (.mapstudio-list-overlay), so the rail and the properties panel leave the
-   map 808 px at 1200 px and the toolbar is back on the top row beside the Editing switch, clear of it. The collapse is the
-   component's state from a matchMedia listener, not a media query here, so the box the map had before the line was crossed can
-   be read and the ground kept in place (selection.tsx dockChange). Kinds and Layers still dock in the list's place below it,
-   and with Details docked too (648 px together) they leave too little map for the toolbar beside the switch: there it keeps
-   entry 4's row under the switch's and the chip moves down with it (mapstudio--narrow-dock, MapStudio.tsx). */
-.mapstudio--narrow-dock .mapstudio-toolbar-float {
+   not docked: the rail's Items opens it over the map (.mapstudio-list-overlay). The collapse is the component's state from a
+   matchMedia listener, not a media query here, so the box the map had before the line was crossed can be read and the ground
+   kept in place (selection.tsx dockChange). The toolbar's row follows the map's measured width, whatever is docked (entry 7c's
+   review; MapStudio.tsx placeToolbar): on the top row when it fits there, centred, 12 px clear of the map's left edge and of
+   the Editing switch (at 1200 px with Details, or with Layers alone); else entry 4's row under the switch, the chip moving
+   down with it (at 1024 px with Details, 632 px of map). */
+.mapstudio-stage[data-toolbar-row="under"] .mapstudio-toolbar-float {
     top: calc(var(--mapstudio-map-inset) + 40px + 8px);
 }
 
-.mapstudio--narrow-dock.mapstudio--editing .mapstudio-chip {
+.mapstudio--editing .mapstudio-stage[data-toolbar-row="under"] .mapstudio-chip {
     top: calc(var(--mapstudio-map-inset) + 40px + 8px + 36px + 10px);
 }
 

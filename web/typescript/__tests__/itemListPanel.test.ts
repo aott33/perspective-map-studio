@@ -7,7 +7,7 @@ import { Asset, Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import { ListRow, listRows } from '../itemList';
 import { LIVE_INITIAL } from '../live';
-import { ItemList, ItemListProps } from '../studio/ItemList';
+import { ItemList, ItemListProps, newListView } from '../studio/ItemList';
 
 const noop = (): void => undefined;
 const PAD: Kind = { id: 'pad', name: 'Well pad', geometry: 'point', icon: 'well-pad', labelRank: 10, fields: [] };
@@ -99,5 +99,34 @@ describe('the Items list panel (entry 7a)', () => {
 
     test('an empty map says so, grouped by place', () => {
         expect(render({}, { rows: [] })).toContain('No items yet - Items you add or import are listed here, grouped by place.');
+    });
+});
+
+describe('the list\'s view held by the component (entry 7c\'s review)', () => {
+    /** A list as mounted with the held view (never mounted here: its setState is React's no-op, the held view is what counts). */
+    function mount(view: ReturnType<typeof newListView>): ItemList {
+        return new ItemList({ title: 'Map', rows: ROWS, selectedId: null, save: { state: 'idle' }, saveWords: '', problems: [], unsaved: [],
+            records: [], level: 'full', sending: [], justAdded: [], onAddItem: noop, addDisabled: false, onSelect: noop, onRetry: noop,
+            onDiscard: noop, view });
+    }
+
+    test('Sort by Name, a kind chosen and text typed, a row chosen (the list closed), reopened: still Name, the kind and the text', () => {
+        jest.spyOn(console, 'error').mockImplementation(() => undefined);
+        const view = newListView();
+        const first = mount(view) as unknown as Record<string, (ev: unknown) => void>;
+        first.onSort({ target: { value: 'name' } });
+        first.onChip('line');
+        first.onQuery({ target: { value: 'swd' } });
+        expect(view).toEqual({ query: 'swd', sort: 'name', kind: 'line', chipsOpen: false, unlinkedOnly: false });
+        // The list over the map closed on the row's choice and opened again (or the docked one after the 1280 px crossing): a new mount.
+        const again = mount(view);
+        expect(again.state).toEqual(view);
+        const html = renderToStaticMarkup(again.render());
+        expect(html).toMatch(/<option selected="" value="name">|<option value="name" selected="">/);
+        expect(html).toContain('value="swd"');
+        expect(html).toContain('<span class="mapstudio-list-filter-words">Gathering line</span>');
+        // Without a held view a mount starts fresh, as before.
+        expect(new ItemList({ ...again.props, view: undefined }).state).toEqual(newListView());
+        jest.restoreAllMocks();
     });
 });

@@ -6,7 +6,9 @@
 // lands is eased into view. At 1440 px the rail is 72, the list 280 and Details 340, the map 748 with a selection. Below 1280 px
 // (1200) the list is not docked: the rail's Items opens it over the map's left edge, whole, at the list's width, and Items again,
 // Esc, a click on the map and a row choice close it (the row's Details docking); the toolbar is back on the top row, level with the
-// Editing switch and clear of it. The window widened from 1200 to 1366 docks the list again and the items keep their page spots.
+// Editing switch and clear of it; the list's Sort by outlives a close; a row chosen leaves the focus on the map (Esc closes
+// Details); with Layers alone docked the toolbar stays on the top row. At 1024 px with Details the toolbar takes the row under
+// the switch (its row follows the map's measured width). The window widened from 1200 to 1366 docks the list again and the items keep their page spots.
 // With Details open, nothing but the attribution lies within the App Bar clearance (76 px) of the stage's bottom-right corner at
 // 1440, 1366 and 1200 px. The spec leaves the seed as it found it (its pads and line undone, then the seed run again and the
 // strays removed).
@@ -370,13 +372,30 @@ test.describe('1200 px, below the list\'s collapse width', () => {
             await expect(overlay).toHaveCount(0);
             await expect(page.locator('.mapstudio-panel')).toHaveCount(0);
 
-            // A row chosen closes it and opens that item's Details, docked: the map 1200 - 72 - 320 px.
+            // A row chosen closes it and opens that item's Details, docked: the map 1200 - 72 - 320 px. Sort by Name first: the
+            // list's view outlives the close (entry 7c's review).
             const p2 = seed.ids['tracer/p2'];
             await items.click();
+            await overlay.locator('.mapstudio-list-sort-select').selectOption('name');
             await overlay.locator('.mapstudio-list-row[data-item-id="' + p2 + '"]').click();
             await expect(overlay).toHaveCount(0);
             await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', p2);
             await expect(map).toHaveAttribute('data-selected', p2);
+            await expectStageWidth(map, stage - 320);
+            // Reopened: still sorted by Name.
+            await items.click();
+            await expect(overlay.locator('.mapstudio-list-sort-select')).toHaveValue('name');
+            await expect(overlay.locator('.mapstudio-list')).toHaveAttribute('data-sort', 'name');
+            await overlay.locator('.mapstudio-list-row[data-item-id="' + p2 + '"]').click();
+            await expect(overlay).toHaveCount(0);
+            // The focus went to the map with the row: Esc closes Details at once, no click needed.
+            await page.keyboard.press('Escape');
+            await expect(page.locator('.mapstudio-panel')).toHaveCount(0);
+            await expect(map).toHaveAttribute('data-selected', '');
+            await expectStageWidth(map, stage);
+            await items.click();
+            await overlay.locator('.mapstudio-list-row[data-item-id="' + p2 + '"]').click();
+            await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', p2);
             await expectStageWidth(map, stage - 320);
 
             // The toolbar back on the top row: at the map inset, level with the Editing switch and clear of it and of the zoom card.
@@ -389,6 +408,20 @@ test.describe('1200 px, below the list\'s collapse width', () => {
             expect(sw.x - (toolbar.x + toolbar.width), 'clear of the Editing switch').toBeGreaterThanOrEqual(INSET);
             expect(zoom.x - (toolbar.x + toolbar.width), 'clear of the zoom card').toBeGreaterThanOrEqual(INSET);
             expect(toolbar.x - docked.x, 'clear of the map\'s left edge').toBeGreaterThanOrEqual(INSET);
+        });
+
+    editorTest('Layers alone docked in the list\'s place (the map 872 px): the toolbar stays on the top row, clear of the Editing switch',
+        async ({ page }) => {
+            const map = await openEditor(page);
+            await page.locator('.mapstudio-rail-item[data-surface="layers"]').click();
+            await expect(page.locator('.mapstudio-dock--layers')).toBeVisible();
+            await expectStageWidth(map, 1200 - RAIL - 256);
+            await expect(page.locator('.mapstudio-stage')).toHaveAttribute('data-toolbar-row', 'top');
+            const box = await map.boundingBox();
+            const toolbar = await page.locator('.mapstudio-toolbar').boundingBox();
+            const sw = await page.locator('.mapstudio-edit-switch').boundingBox();
+            expect(Math.abs(toolbar.y - (box.y + INSET)), 'the toolbar on the top row').toBeLessThanOrEqual(1);
+            expect(sw.x - (toolbar.x + toolbar.width), 'clear of the Editing switch').toBeGreaterThanOrEqual(INSET);
         });
 
     editorTest('the window widened from 1200 to 1366 px: the list docks again and the items keep their page spots, and back', async ({ page }) => {
@@ -410,5 +443,30 @@ test.describe('1200 px, below the list\'s collapse width', () => {
         await expectStageWidth(map, 1200 - RAIL);
         expectKept(await pixelNow(map, CTB1), ctb1, 'CTB1 kept its page spot, narrowed');
         expectKept(await pixelNow(map, BEND), bend, 'the bend kept its page spot, narrowed');
+    });
+});
+
+test.describe('1024 px, the toolbar\'s row from the map\'s width', () => {
+    test.use({ viewport: { width: 1024, height: 768 }, deviceScaleFactor: 1 });
+
+    editorTest('Items with Details docked (the map 632 px): the toolbar takes the row under the Editing switch and never covers it', async ({ page }) => {
+        const map = await openEditor(page);
+        await expect(map).toHaveAttribute('data-list', 'collapsed');
+        await expect(page.locator('.mapstudio-stage')).toHaveAttribute('data-toolbar-row', 'top');
+        const p2 = seed.ids['tracer/p2'];
+        await page.locator('.mapstudio-rail-item[data-surface="items"]').click();
+        await page.locator('.mapstudio-list-overlay .mapstudio-list-row[data-item-id="' + p2 + '"]').click();
+        await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', p2);
+        await expectStageWidth(map, 1024 - RAIL - 320);
+        await expect(page.locator('.mapstudio-stage')).toHaveAttribute('data-toolbar-row', 'under');
+        const toolbar = await page.locator('.mapstudio-toolbar').boundingBox();
+        const sw = await page.locator('.mapstudio-edit-switch').boundingBox();
+        const apart = toolbar.x >= sw.x + sw.width || sw.x >= toolbar.x + toolbar.width || toolbar.y >= sw.y + sw.height || sw.y >= toolbar.y + toolbar.height;
+        expect(apart, 'the toolbar clear of the Editing switch').toBe(true);
+        expect(toolbar.y, 'the toolbar under the switch').toBeGreaterThanOrEqual(sw.y + sw.height);
+        // Details closed: the map 952 px, the toolbar back on the top row.
+        await page.locator('.mapstudio-panel .mapstudio-panel-close').click();
+        await expectStageWidth(map, 1024 - RAIL);
+        await expect(page.locator('.mapstudio-stage')).toHaveAttribute('data-toolbar-row', 'top');
     });
 });

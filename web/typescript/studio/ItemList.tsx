@@ -25,7 +25,8 @@ import { ProblemStatus } from './SaveStatus';
  * text; typing keeps the rows whose name, kind name or linked asset name holds the text, in the list's order
  * (itemList.ts `filterRows`), "No matches" with none; Esc in the field empties it and goes no further (the
  * Details panel and the selection stay). A filtered row is the same row button, so choosing it is a row click.
- * The text is the list's own: it starts empty each time the list mounts (entering Edit mode, the rail's Items).
+ * The text, with Sort by and the Filter, is the list's view, which the component holds (`view`, entry 7c): it starts empty as Edit
+ * mode is entered and outlives the list's mounts (the rail's surfaces, the list over the map below 1280 px, the 1280 px crossing).
  *
  * Entry 7a (EXPERIENCE.md Item list; DESIGN.md list-row, group-header, filter-chip): beside the search, **Sort by** (a native
  * select: Needs attention, the default, Place, Kind, Name, Last changed) and a **Filter** button that opens the kind chips
@@ -66,6 +67,12 @@ export interface ItemListProps {
      * (`mapstudio-dock--overlay`); the component closes it on a row choice.
      */
     overlay?: boolean;
+    /**
+     * The list's view (search text, Sort by, Filter kind, chips open, unlinked only) held by the component (entry 7c), so the docked
+     * list and the list over the map share it and it outlives a close, a reopen and the 1280 px crossing; without it the list keeps
+     * its own, starting fresh on each mount.
+     */
+    view?: ListView;
     onRetry: (batchId: string) => void;
     onDiscard: (batchId: string) => void;
 }
@@ -99,6 +106,20 @@ function Badge(props: { row: ListRow }): React.ReactElement | null {
     );
 }
 
+/** The list's view, as the component holds it for every mount of the list (entry 7c): the same fields as the list's own state. */
+export interface ListView {
+    query: string;
+    sort: ListSort;
+    kind: string | null;
+    chipsOpen: boolean;
+    unlinkedOnly: boolean;
+}
+
+/** A fresh view: no search, Needs attention, every kind, the chips closed. */
+export function newListView(): ListView {
+    return { query: '', sort: 'attention', kind: null, chipsOpen: false, unlinkedOnly: false };
+}
+
 interface ItemListState {
     /** The Search items field's text, as typed. */
     query: string;
@@ -126,13 +147,21 @@ function Heading(props: { item: Exclude<ListItem, ListEntry> }): React.ReactElem
 }
 
 export class ItemList extends React.Component<ItemListProps, ItemListState> {
-    state: ItemListState = { query: '', sort: 'attention', kind: null, chipsOpen: false, unlinkedOnly: false };
+    state: ItemListState = this.props.view ? { ...this.props.view } : newListView();
+
+    /** A change of the view: into the held view first (entry 7c), so the next mount of the list starts from it, then the state. */
+    private update(patch: Partial<ListView>): void {
+        if (this.props.view) {
+            Object.assign(this.props.view, patch);
+        }
+        this.setState(patch as ItemListState);
+    }
 
     private readonly input = React.createRef<HTMLInputElement>();
     private readonly listId = 'mapstudio-item-list-' + Math.random().toString(36).slice(2, 8);
 
     private onQuery = (ev: React.ChangeEvent<HTMLInputElement>): void => {
-        this.setState({ query: ev.target.value });
+        this.update({ query: ev.target.value });
     };
 
     /** Esc empties the field and goes no further: the root's Esc (closing Details) never sees it. With no text it goes on. */
@@ -140,37 +169,37 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
         if (ev.key === 'Escape' && this.state.query !== '') {
             ev.preventDefault();
             ev.stopPropagation();
-            this.setState({ query: '' });
+            this.update({ query: '' });
         }
     };
 
     /** Clear empties the field; the focus goes back into it. */
     private onClear = (): void => {
-        this.setState({ query: '' });
+        this.update({ query: '' });
         if (this.input.current) {
             this.input.current.focus();
         }
     };
 
     private onSort = (ev: React.ChangeEvent<HTMLSelectElement>): void => {
-        this.setState({ sort: ev.target.value as ListSort });
+        this.update({ sort: ev.target.value as ListSort });
     };
 
     private onFilterButton = (): void => {
-        this.setState((prev) => ({ chipsOpen: !prev.chipsOpen }));
+        this.update({ chipsOpen: !this.state.chipsOpen });
     };
 
     /** A chip chosen: its kind filters the list (All clears it); the chips stay open, so another can be chosen. */
     private onChip = (kind: string | null): void => {
-        this.setState({ kind });
+        this.update({ kind });
     };
 
     private onUnlinked = (): void => {
-        this.setState((prev) => ({ unlinkedOnly: !prev.unlinkedOnly }));
+        this.update({ unlinkedOnly: !this.state.unlinkedOnly });
     };
 
     private onClearUnlinked = (): void => {
-        this.setState({ unlinkedOnly: false });
+        this.update({ unlinkedOnly: false });
     };
 
     /** One row: the kind glyph, the name with its second line ("on P14", "Sam - Today 10:42"), the badge. */

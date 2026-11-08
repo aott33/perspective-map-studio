@@ -3,14 +3,14 @@ title: "7c: The Edit-mode layout at 1440, 1366 and below 1280 px, the map kept s
 type: 'feature'
 ticket: '7'
 created: '2026-11-08'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '6917ebbef614a0bfe51d3b8668d758d8697cb00d'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
@@ -72,12 +72,25 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 - Planner, 2026-11-08: the environment, commit and identity rules are 7a's plan's (Docker by hand after a restart, JDK 17 by apt if gone, `ops/up.sh --fresh` before a whole-suite run, the session's trailers, `git commit --only`, no em dashes, no model identifier, never a bare `git stash`, never a push). Commit at each working milestone.
 
 - Approval (owner, 2026-11-08): "Go with recommendations" (option A, written into the Approach); the plan kept whole.
-- Build, 2026-11-08: `selection.tsx` exports `dockChange(host, update, place?)`; the component and the editing host carry it as a method (`editing.ts` stays free of selection.tsx's imports). Callers: an Edit-mode click, the Point tool's placement, a finished line or area (its last point is the place eased into view), a split (the split point), `clearSelection` (ground, close, Esc, a selected item leaving the map) and Details' delete (shift only), the 1280 px crossing and a rail surface change (the selected point, if any). The collapse is component state (`listCollapsed`, `listOpen`) from `matchMedia('(max-width: 1279px)')`; the stylesheet's 1279 px media block is gone. Implementer's reading: below 1280 px only the Items list leaves the dock; Kinds and Layers still dock in its place, and with Details docked too the toolbar keeps the row under the switch there (`mapstudio--narrow-dock`), since 552 px of map cannot hold it beside the switch. A map click closes the open list and goes on as a click. The Jest case "the ground closing Details does not pan" now expects the shift (the matrix's Close row). `layout.spec.mjs` waits 1 s before clicking CTB1 again after a close: on the software-GL box MapLibre re-places its symbols over the next frames and an earlier click takes L-SWD under the marker. `docs/contract.md` gains "The Edit-mode layout".
+- Build, 2026-11-08: `selection.tsx` exports `dockChange(host, update, place?)`; the component and the editing host carry it as a method (`editing.ts` stays free of selection.tsx's imports). Callers: an Edit-mode click, the Point tool's placement, a finished line or area (its last point is the place eased into view), a split (the split point), `clearSelection` (ground, close, Esc, a selected item leaving the map) and Details' delete (shift only), the 1280 px crossing and a rail surface change (the selected point, if any). The collapse is component state (`listCollapsed`, `listOpen`) from `matchMedia('(max-width: 1279px)')`; the stylesheet's 1279 px media block is gone. Implementer's reading: below 1280 px only the Items list leaves the dock; Kinds and Layers still dock in its place (the toolbar's row from the map's width, after the review). A map click closes the open list and goes on as a click. The Jest case "the ground closing Details does not pan" now expects the shift (the matrix's Close row). `layout.spec.mjs` waits 1 s before clicking CTB1 again after a close: on the software-GL box MapLibre re-places its symbols over the next frames and an earlier click takes L-SWD under the marker. `docs/contract.md` gains "The Edit-mode layout".
 - Verified, 2026-11-08: tsc clean, Jest 646 passed in 62 suites; `./gradlew clean build --offline --rerun-tasks` green; the contract check OK at 0.4.0; on a fresh stack the whole e2e suite 249 passed, 7 skipped, 1 failed (`review.spec.mjs` light 390 px, the known flake: "No Connection to Gateway" in its snapshot, deferred-work.md), which failed twice more alone in either theme, then passed with each theme's group rerun (4 of 4 and 5 of 5); `layout.spec.mjs` 14 of 14.
 
 ## Plan Change Log
 
+- 2026-11-08, review fixes: the toolbar's row follows the map's measured width (top row only when it fits 12 px clear of the switch, else under it; `mapstudio--narrow-dock` gone); the list's view (search, Sort by, Filter, unlinked only) held by the component across mounts; a row chosen over the map moves the focus to the map; the open list's Esc skips fields outside it. Jest `itemListPanel.test.ts`, e2e `layout.spec.mjs` at 1024 and 1200 px (16 of 16), `studio.spec.mjs` and `itemlist.spec.mjs` 36 of 36.
+
 ## Review Triage Log
+
+Quick lens, 2026-11-08: 6 findings; high 0, medium 4, low 2, false 0.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| Below about 1085 px with Items and Details docked the top-row toolbar runs into the Editing switch | medium | The 1279 px block that held it under the switch is gone; `.mapstudio--narrow-dock` applies only with Kinds or Layers; the toolbar is centred and 396 px wide; only 1200 px is tested | patch (grouped with the next row): the row decided by the map's measured width |
+| With only Kinds or Layers docked at 1200 px the toolbar drops a row it does not need | low | `narrowDock` has no Details check; the map is 872 px there; the docs name Details as the condition | patch (same root cause as above) |
+| The overlay list forgets its search, Sort by, Filter and unlinked-only on every close and on crossing 1280 px | medium | `ItemList` holds them in its own state (102-129); the overlay unmounts on each close; docked and overlay are different instances | patch: the view state held once, shared |
+| A row chosen in the overlay drops focus to the body; Esc, Delete and Ctrl+Z stop working | medium | The focused row unmounts as `listOpen` turns false; nothing moves focus, unlike the Esc close | patch: focus to the map container |
+| Esc in a Details select closes the overlay and moves focus to the rail | low | The overlay Esc branch lacks `inField`; the choice selects have no `onKeyDown` | patch: the `inField` guard |
+| The Jest crossing cases keep the page width fixed, so the event order the comment claims is untested at unit level | low | `editClick.test.ts` "the 1280 px line crossed"; the e2e Crossing row (1200 to 1366) covers the real path and passes | rejected: covered by `layout.spec.mjs`; a unit test would add a fake window resize |
 
 ## Design Notes
 

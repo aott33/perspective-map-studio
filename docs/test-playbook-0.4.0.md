@@ -190,9 +190,10 @@ On `/edit` after **Seed the dev map**, in a browser window you can resize (or th
 - [ ] Place a pad near the map's left edge, where Details lands: it slides just into view, about 48 px inside the map's left edge.
 - [ ] Draw a two-point line and press Enter: its points stay where you clicked as Details opens. Undo.
 - [ ] Click CTB1, then close Details three ways (a click on the ground, its close, Esc): each time CTB1 and every other item stay where they are as the map widens.
-- [ ] Narrow the window below 1280 px (1200): the list leaves the dock, the map widens, and nothing on the map moves. The toolbar is on the top row beside the Editing switch, clear of it.
-- [ ] Below 1280 px, the rail's **Items** opens the list over the map's left edge (header, groups, footer, the same list). Items again closes it; so do Esc (the focus back on Items) and a click on the map. Choose a row: the list closes and that item opens in Details.
-- [ ] Below 1280 px, Layers and Kinds still dock in the list's place (the map moves nothing as they come and go); with Details also open the toolbar drops to the row under the Editing switch.
+- [ ] Narrow the window below 1280 px (1200): the list leaves the dock, the map widens, and nothing on the map moves. The toolbar is on the top row beside the Editing switch, clear of it, with or without Details open.
+- [ ] Below 1280 px, the rail's **Items** opens the list over the map's left edge (header, groups, footer, the same list). Items again closes it; so do Esc (the focus back on Items) and a click on the map. Choose a row: the list closes and that item opens in Details; press Esc straight away and Details closes (no click needed). Sort the open list by Name, choose a row, open the list again: still by Name.
+- [ ] Below 1280 px, Layers and Kinds still dock in the list's place (the map moves nothing as they come and go); at 1200 px with Layers alone the toolbar stays on the top row.
+- [ ] At 1024 px, open an item in Details: the map is too narrow for the toolbar beside the Editing switch, so it drops to the row under the switch and never covers it; close Details and it goes back up.
 - [ ] Widen the window past 1280 px again: the list docks, and the items stay where they were on the page.
 - [ ] At 1440, 1366 and 1200 px with Details open: nothing but the small attribution text in the map's bottom-right corner (the Perspective App Bar toggle's spot).
 

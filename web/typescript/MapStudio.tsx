@@ -65,7 +65,7 @@ import {
 import { listRows } from './itemList';
 import { FieldValue, assetListKnown } from './itemForm';
 import { Rail } from './studio/Rail';
-import { ItemList } from './studio/ItemList';
+import { ItemList, ListView, newListView } from './studio/ItemList';
 import { PropertiesPanel } from './studio/PropertiesPanel';
 import { DrawToolbar } from './studio/DrawToolbar';
 import { DrawingBar } from './studio/DrawingBar';
@@ -167,6 +167,15 @@ export interface MapStudioState {
     listOpen: boolean;
 }
 
+/** The map inset the toolbar keeps from the map's left edge and the Editing switch on the top row (DESIGN.md spacing map-inset). */
+const TOOLBAR_INSET_PX = 12;
+
+/** Whether a key's target is inside the item list open over the map (entry 7c). */
+function inListOverlay(target: EventTarget | null): boolean {
+    const el = target as HTMLElement | null;
+    return !!el && typeof el.closest === 'function' && el.closest('.mapstudio-list-overlay') !== null;
+}
+
 /** The width under which the item list leaves the dock (entry 7c; DESIGN.md Layout & Spacing: "below about 1280 px"). */
 export const LIST_COLLAPSE_QUERY = '(max-width: 1279px)';
 
@@ -200,6 +209,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private resizeObserver: ResizeObserver | null = null;
     /** The list's collapse width watched (entry 7c), or null where the browser has no matchMedia. */
     private collapseQuery: MediaQueryList | null = null;
+    /** The item list's view (search, Sort by, Filter), held for every mount of the list, docked or over the map (entry 7c). */
+    listView: ListView = newListView();
     draw: TerraDraw | null = null;
     /** Terra Draw's line and polygon modes (entry 4), kept for Backspace (the mode's undo). */
     lineMode: TerraDrawLineStringMode | null = null;
@@ -434,6 +445,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.resizeObserver = new ResizeObserver(() => {
                 map.resize();
                 this.publishHeight();
+                this.placeToolbar();
                 // The stage grew or shrank (a panel docked or left, entry 2): an open card is placed again in the new room.
                 if (this.studioOn()) {
                     selection.replacePopup(this);
@@ -485,6 +497,34 @@ export class MapStudio extends Component<Props, MapStudioState> {
             return null;
         }
         return this.anchorFor(item.id, [item.geometry.coordinates[0], item.geometry.coordinates[1]]);
+    }
+
+    /**
+     * The toolbar's row (entry 7c's review), from the map's measured width, whatever is docked: on the top row, centred over the
+     * map, only when it fits there with the map inset (12 px) clear of the map's left edge and of the Editing switch; else on the
+     * row under the switch, the chip moving down with it (`data-toolbar-row="under"` on the stage, the stylesheet). Read from
+     * the layout (the toolbar's own width, the switch's place), so a change of width, panel or toolbar is followed; written only
+     * when it changes.
+     */
+    private placeToolbar(): void {
+        const el = this.mapContainer;
+        const stage = el ? el.parentElement : null;
+        if (!el || !stage || typeof stage.querySelector !== 'function') {
+            return;
+        }
+        const toolbar = stage.querySelector('.mapstudio-toolbar') as HTMLElement | null;
+        const sw = el.querySelector('.mapstudio-edit-switch') as HTMLElement | null;
+        let row = 'top';
+        if (toolbar && sw && toolbar.offsetWidth > 0) {
+            const width = el.clientWidth;
+            const left = width / 2 - toolbar.offsetWidth / 2;
+            const right = width / 2 + toolbar.offsetWidth / 2;
+            const switchLeft = sw.getBoundingClientRect().left - el.getBoundingClientRect().left;
+            row = left >= TOOLBAR_INSET_PX && switchLeft - right >= TOOLBAR_INSET_PX ? 'top' : 'under';
+        }
+        if (stage.getAttribute('data-toolbar-row') !== row) {
+            stage.setAttribute('data-toolbar-row', row);
+        }
     }
 
     /** The map's height as a CSS variable, so a floating panel (the legend, entry 3) never grows past the map. */
@@ -546,6 +586,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.dropQueuedFeatures();
         editing.applyEditing(this);
         editing.applyHandles(this);
+        this.placeToolbar();
         camera.applyStartingArea(this);
         if (!modeChanged) {
             selection.applyPageSelection(this);
@@ -591,6 +632,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private setEditMode(on: boolean, writeProp: boolean): void {
         if (on) {
             selection.dismissPopup(this);
+            // The list's view starts fresh with each Edit-mode session, and is kept while it lasts (entry 7c).
+            this.listView = newListView();
         } else {
             editing.putToolDown(this);
         }
@@ -910,7 +953,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 return;
             }
         }
-        if (ev.key === 'Escape' && !ev.defaultPrevented && this.state.listOpen && this.listOverlayShown()) {
+        if (ev.key === 'Escape' && !ev.defaultPrevented && (!inField(ev.target) || inListOverlay(ev.target)) && this.state.listOpen
+            && this.listOverlayShown()) {
+            // A field elsewhere (a Details select) keeps its own Esc; the list's own search field, emptied, lets it close the list.
             // The collapsed list open over the map closes first (entry 7c), one press one step; the focus back on the rail's Items.
             ev.preventDefault();
             this.closeListOverlay(true);
@@ -1037,8 +1082,13 @@ export class MapStudio extends Component<Props, MapStudioState> {
         selection.closePopup(this);
         this.fitKey = null;
         if (this.state.listOpen) {
-            // A row chosen in the collapsed list closes it (entry 7c); the row's selection, Details and camera are as today.
+            // A row chosen in the collapsed list closes it (entry 7c); the row's selection, Details and camera are as today. The row
+            // goes with the list, so the focus moves to the map first, where Esc, Delete and Ctrl+Z act on the selection.
             this.setState({ listOpen: false });
+            const canvas = typeof map.getCanvas === 'function' ? map.getCanvas() : null;
+            if (canvas) {
+                canvas.focus({ preventScroll: true });
+            }
         }
         if (item.geometry.type === 'Point') {
             this.setState((prev) => ({ ...this.selectionState(prev, { id, kind: 'point' }), pick: null, panel: id }));
@@ -1490,6 +1540,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         return (
             <ItemList title={this.projectName() || 'Map'}
                       overlay={overlay}
+                      view={this.listView}
                       rows={listRows(delegate.items, delegate.lists.kinds, delegate.live, delegate.lists.assetNames,
                           assetListKnown(delegate.lists.adapters ? delegate.lists.adapters.assets : null),
                           { assets: delegate.lists.assets, changed: delegate.changed })}
@@ -1589,14 +1640,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const pick = studioOn && studio.tool === null ? this.state.geometry : null;
         const picked = pick ? this.itemFor(pick.itemId) : undefined;
         const pickedKind = picked ? kinds.find((k) => k.id === picked.kind) : undefined;
-        // Below 1280 px (entry 7c) the list is not docked; a rail surface other than Items (Kinds, Layers) still docks in its place,
-        // and with it and Details docked the map is too narrow for the toolbar beside the Editing switch, so the toolbar keeps
-        // the row under the switch there (`mapstudio--narrow-dock`, the stylesheet).
-        const narrowDock = studioOn && this.state.listCollapsed && studio.surface !== 'items';
         const rootClasses = studioOn ? ['mapstudio', 'mapstudio--editing'] : ['mapstudio'];
-        if (narrowDock) {
-            rootClasses.push('mapstudio--narrow-dock');
-        }
         // The list's place for the suite (entry 7c): docked, collapsed (below 1280 px, closed) or open over the map.
         const listPlace = !studioOn || studio.surface !== 'items' ? '' : !this.state.listCollapsed ? 'docked' : this.state.listOpen ? 'open' : 'collapsed';
         return (
