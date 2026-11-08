@@ -61,12 +61,12 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] Gateway `lastEdits`, `MapLoader` `changed`, Java tests -- the reply.
-- [ ] `contract.ts`, the delegate's `changed` and Just added, Jest.
-- [ ] `itemList.ts` grouping and sorts, Jest for every Boundaries rule.
-- [ ] `ItemList.tsx`, `MapStudio.tsx`, CSS -- header, chips, groups, footer.
-- [ ] Dev seed nested asset; e2e `itemlist.spec.mjs` and the changed specs.
-- [ ] Docs, CHANGELOG, the playbook section.
+- [x] Gateway `lastEdits`, `MapLoader` `changed`, Java tests -- the reply.
+- [x] `contract.ts`, the delegate's `changed` and Just added, Jest.
+- [x] `itemList.ts` grouping and sorts, Jest for every Boundaries rule.
+- [x] `ItemList.tsx`, `MapStudio.tsx`, CSS -- header, chips, groups, footer.
+- [x] Dev seed nested asset; e2e `itemlist.spec.mjs` and the changed specs.
+- [x] Docs, CHANGELOG, the playbook section.
 
 **Acceptance Criteria:**
 - Given the seeded dev map as `mapeditor` at 1440 and 1366 px, when the matrix runs, then each row holds.
@@ -77,6 +77,9 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 - Planner, 2026-11-08: the environment, commit and identity rules are entry 16's plan's (Docker by hand after a restart, JDK 17 by apt if gone, `ops/up.sh --fresh` before a whole-suite run, the session's trailers, `git commit --only`, no em dashes, no model identifier, never a bare `git stash`, never a push). Commit at each working milestone.
 
 - Approval (owner, 2026-11-08): "Approved and continue" with the five picks, written into the Approach; the plan, over size, kept whole.
+
+- Build, 2026-11-08: the dev child is `P14 lease`, a geofence linked to the new dev asset `P14L` at `[default]Mesa/P14/Lease`, not a well at `Mesa/P14/P14-2H`: the dev tag provider cannot hold a folder inside the P14 UDT instance, so a pad or well there would read comms lost and change every Needs you count the specs check; a geofence reads no tag. The seed is 75 items and the dev asset list 11 (seed harness, scale, adapters and details specs follow). The kind chips are `.mapstudio-kind-chip` (`.mapstudio-chip` is the map's status chip). ignition-lint was not run: installing it was refused in this session (the two dev scripts parse, and the seed runs under Jython in `DevSeedTest`).
+- Verified, 2026-11-08: tsc clean, Jest 636 passed in 62 suites; `./gradlew build --offline` green (MapLoaderTest 11, LastEditsTest 2, DevSeedTest 9); the contract check OK at 0.4.0; on a fresh stack the whole e2e suite 235 passed, 7 skipped, 1 failed (`events.spec.mjs` "before the items load", the zoom read during the back navigation's reconnect, 13 for 15; the page does not use the list), which passed with its file rerun alone (9 of 9); `itemlist.spec.mjs` 16 of 16 at 1440 and 1366 px.
 
 ## Plan Change Log
 
