@@ -1311,6 +1311,12 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             console.info('[MapStudio] Apply mine on top is not offered for batch ' + batchId + '.');
             return;
         }
+        if (this.touchesBusy(entry.batch)) {
+            // Another batch of its items is in flight or waiting (as Discard waits): the new batch would be held behind it and
+            // dropped with it if it were refused, and the entry is already gone. The card stays; press it again after.
+            console.info('[MapStudio] Apply mine on top waits: another save of ' + batchId + "'s items is in flight.");
+            return;
+        }
         if (!this.sender.discard(batchId)) {
             console.info('[MapStudio] Batch ' + batchId + ' is being sent; Apply mine on top waits for its answer.');
             return;
@@ -1370,6 +1376,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     /** A `storage` event: another tab may have changed this queue. */
     onStorage(key: string | null): void {
         this.sender.storage(key);
+        // Another tab saved or discarded this tab's entries while saves were paused (entry 10): map.load checks the store.
+        this.checkStoreAfterDiscard();
     }
 
     /** Stop the replay, load retry and connection timers (the component unmounted). */
@@ -1583,6 +1591,11 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
                 this.giveUp(outcome.batchId);
             }
             this.store = storeStateFromSaveError(this.store, reply.body);
+            if (outcome.kind === 'failed' && !(reply.body.code === ErrorCodes.STORE_UNREACHABLE && !isBusy(reply.body)) && this.savePaused) {
+                // Any other answer (a conflict, invalid, role, read-only, busy) came from the store's side: the pause ends, so the
+                // conflict card is not hidden under the unreachable one (entry 10).
+                this.savePaused = false;
+            }
             if (outcome.kind === 'failed' && reply.body.code === ErrorCodes.STORE_UNREACHABLE && !isBusy(reply.body)) {
                 // The store is out of reach for saves (entry 10, R4, decision 4: a lost connection is not this): the tools and
                 // Undo pause, the items and the live values stay, the queue replays every 15 s until a save or a load succeeds.

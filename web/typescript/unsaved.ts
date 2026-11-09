@@ -648,7 +648,8 @@ function blockedWhy(op: EditOp, c: Conflict): 'deleted' | 'exists' | 'gone' | ''
         return 'gone';
     }
     if (c.current.deleted) {
-        return op.op === 'delete' ? '' : 'deleted';
+        // Their delete meets any op of mine, my delete included: there is nothing to go on top of.
+        return 'deleted';
     }
     return op.op === 'create' ? 'exists' : '';
 }
@@ -662,10 +663,12 @@ function opOf(entry: UnsavedEntry, c: Conflict): EditOp | undefined {
  * at 10:42", "Sam changed P14's name and Gas rate at 10:42", "Sam deleted P14 at 10:42"; with no `before` (an older entry) or
  * nothing it can name, "Sam changed P14 at 10:42". The first stale op is named, "and 2 more" after it when there are more.
  */
-export function theirChangeText(entry: UnsavedEntry, kinds: Kind[] = [], locale: string = ''): string {
+export function theirChangeText(entry: UnsavedEntry, kinds: Kind[] = [], locale: string = '', records: MapItemRecord[] = []): string {
     const conflicts = entry.conflict || [];
     if (conflicts.length === 0) {
-        return entry.reason ? entry.reason.message : '';
+        // Refused before entry 10 kept the conflict (decision 3's fallback): who, and the item as Undo names it.
+        const who = entry.reason && entry.reason.changedBy ? entry.reason.changedBy : 'Another editor';
+        return who + ' changed ' + itemName(entry, records) + ' since you loaded it';
     }
     const c = conflicts[0];
     const who = c.changedBy || (entry.reason && entry.reason.changedBy) || 'Another editor';
@@ -711,7 +714,21 @@ export function theirChangeText(entry: UnsavedEntry, kinds: Kind[] = [], locale:
 }
 
 /** Why only "Use <name>'s version" is offered, in words, or '' when Apply mine on top is (entry 10, decision 1). */
+/** The first map item an entry's batch touches, by name: from the batch, else `before`, else the records; "an item" otherwise. */
+function itemName(entry: UnsavedEntry, records: MapItemRecord[]): string {
+    const op = entry.batch.ops.find((o) => o.entity === 'item');
+    if (!op) {
+        return 'a kind setup';
+    }
+    const named = op.data && typeof op.data.name === 'string' && op.data.name !== '' ? op.data.name : '';
+    const record = beforeOf(entry, op.id) || records.find((r) => r.id === op.id);
+    return named !== '' ? named : record && record.name !== '' ? record.name : 'an item';
+}
+
 export function onTopBlockedText(entry: UnsavedEntry): string {
+    if (isConflict(entry) && (!entry.conflict || entry.conflict.length === 0)) {
+        return 'The stored version was not kept with this edit, so it cannot go on top.';
+    }
     for (const c of entry.conflict || []) {
         const op = opOf(entry, c);
         const why = op ? blockedWhy(op, c) : '';
@@ -875,8 +892,10 @@ export interface SaveCardData {
     /** Whether Apply mine on top is offered (conflict); when not, `blocked` says why. */
     onTop: boolean;
     blocked: string;
-    /** The edits waiting (unreachable: "Show my 2 edits"). */
+    /** The edits waiting to save when the store is back, unsent ones only (unreachable: "Show my 2 edits"). */
     count: number;
+    /** What Esc closes the card for (`dismissKey`); '' for the unreachable card, which does not close. */
+    closeKey: string;
 }
 
 /** The facts a card is worked out from. */
@@ -884,11 +903,20 @@ export interface SaveCardFacts {
     unsaved: UnsavedEntry[];
     /** A save was answered store-unreachable (not busy): the tools are paused until a save or a load succeeds. */
     paused: boolean;
-    /** The conflict and busy cards closed with Esc, by batchId: their entries stay on the row. */
+    /** The conflict and busy cards closed with Esc, by `dismissKey` (the batch and its refusal): their entries stay on the row. */
     dismissed: readonly string[];
     records: MapItemRecord[];
     kinds: Kind[];
     locale: string;
+}
+
+/**
+ * What Esc closes a card for (entry 10, R10): the batch and its refusal, its code and the other editor's time, so a newer
+ * conflict for the same batch (after Try again) shows a fresh card. The component also forgets a batch's closed card on Try again.
+ */
+export function dismissKey(entry: UnsavedEntry): string {
+    const c = (entry.conflict || [])[0];
+    return entry.batchId + '|' + (entry.reason ? entry.reason.code : '') + '|' + (c && c.changedAt ? c.changedAt : '');
 }
 
 /** Whether an entry waits refused for a conflict (the conflict card's). */
@@ -907,38 +935,39 @@ function otherEditor(entry: UnsavedEntry): string {
  * two or more wait), then busy; null with none. A conflict or busy card closed with Esc is not shown again for its entry.
  */
 export function saveCardFor(facts: SaveCardFacts): SaveCardData | null {
-    const n = facts.unsaved.length;
+    // The edits that wait to save when the store is back (a refused one waits for Try again or Discard, not for the store).
+    const n = facts.unsaved.filter((e) => e.state === 'unsent').length;
     if (facts.paused) {
         const yours = n === 1 ? 'Your edit is' : n === 0 ? 'Your edits are' : 'Your ' + n + ' edits are';
         return {
             kind: 'unreachable', batchId: '', title: 'Store unreachable',
             text: 'Map Studio cannot reach the map store. ' + yours + ' kept on this computer, not saved yet, and save when the store '
                 + 'is back. Drawing and editing are paused; live values still update.',
-            kept: '', position: '', who: '', onTop: false, blocked: '', count: n
+            kept: '', position: '', who: '', onTop: false, blocked: '', count: n, closeKey: ''
         };
     }
     const conflicts = facts.unsaved.filter(isConflict);
-    const open = conflicts.filter((e) => facts.dismissed.indexOf(e.batchId) < 0);
+    const open = conflicts.filter((e) => facts.dismissed.indexOf(dismissKey(e)) < 0);
     if (open.length > 0) {
         const entry = open[0];
         const who = otherEditor(entry);
         const blocked = onTopBlockedText(entry);
-        const their = theirChangeText(entry, facts.kinds, facts.locale);
+        const their = theirChangeText(entry, facts.kinds, facts.locale, facts.records);
         return {
             kind: 'conflict', batchId: entry.batchId,
             title: 'Not saved - conflict with ' + (who !== '' ? who + "'s" : "another editor's") + ' change',
             text: their + (blocked === '' ? ', while you were editing it.' : '. ' + blocked),
             kept: 'Your change, kept here and not saved: ' + yourChangeText(entry, facts.records, facts.kinds, facts.locale) + '.',
             position: conflicts.length >= 2 ? (conflicts.indexOf(entry) + 1) + ' of ' + conflicts.length : '',
-            who, onTop: blocked === '' && onTopBatch(entry, 'check') !== null, blocked, count: n
+            who, onTop: blocked === '' && onTopBatch(entry, 'check') !== null, blocked, count: n, closeKey: dismissKey(entry)
         };
     }
-    const busy = facts.unsaved.find((e) => isBusy(e.reason) && facts.dismissed.indexOf(e.batchId) < 0);
+    const busy = facts.unsaved.find((e) => isBusy(e.reason) && facts.dismissed.indexOf(dismissKey(e)) < 0);
     if (busy && busy.reason) {
         return {
             kind: 'busy', batchId: busy.batchId, title: 'Not saved - Map Studio is busy', text: busy.reason.message,
             kept: 'Your change, kept here: ' + yourChangeText(busy, facts.records, facts.kinds, facts.locale, true) + '.',
-            position: '', who: '', onTop: false, blocked: '', count: n
+            position: '', who: '', onTop: false, blocked: '', count: n, closeKey: dismissKey(busy)
         };
     }
     return null;

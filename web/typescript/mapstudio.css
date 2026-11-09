@@ -3716,6 +3716,10 @@
     top: calc(var(--mapstudio-map-inset) + 40px + 8px + 36px + 10px);
 }
 
+.mapstudio-stage[data-toolbar-row="under"] .mapstudio-save-card--below-chip {
+    top: calc(var(--mapstudio-map-inset) + 40px + 8px + 36px + 10px + 36px + 8px);
+}
+
 .mapstudio-save-card-head {
     display: flex;
     align-items: center;

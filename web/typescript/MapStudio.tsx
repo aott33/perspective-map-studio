@@ -172,7 +172,10 @@ export interface MapStudioState {
     listCollapsed: boolean;
     /** The collapsed list open over the map (entry 7c): the rail's Items toggles it; a row choice, Esc and a map click close it. */
     listOpen: boolean;
-    /** The conflict and busy cards closed with Esc (entry 10, R10), by batchId: their entries stay on the save status row. */
+    /**
+     * The conflict and busy cards closed with Esc (entry 10, R10), by the batch and its refusal (unsaved.ts `dismissKey`): their
+     * entries stay on the save status row; Try again forgets a batch's, so a newer answer shows a fresh card.
+     */
     cardsClosed: string[];
     /** Bumped by the unreachable card's "Show my 2 edits" (entry 10, R5) to open the row's list; 0 once a row took it. */
     showEdits: number;
@@ -1637,6 +1640,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /** The queued edit's Try again and Discard, on the waiting edits under the save status row (entry 24). */
     private onRetryUnsaved = (batchId: string): void => {
         const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        // Try again forgets the batch's closed card (entry 10): its next answer shows a fresh card.
+        if (this.state.cardsClosed.some((key) => key.indexOf(batchId + '|') === 0)) {
+            this.setState((prev) => ({ cardsClosed: prev.cardsClosed.filter((key) => key.indexOf(batchId + '|') !== 0) }));
+        }
         if (delegate) {
             delegate.retryUnsaved(batchId);
         }
@@ -1681,8 +1688,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             delegate.retryStore();
         }
     };
-    private onCardClose = (batchId: string): void => {
-        this.setState((prev) => ({ cardsClosed: prev.cardsClosed.indexOf(batchId) >= 0 ? prev.cardsClosed : prev.cardsClosed.concat([batchId]) }));
+    private onCardClose = (closeKey: string): void => {
+        this.setState((prev) => ({ cardsClosed: prev.cardsClosed.indexOf(closeKey) >= 0 ? prev.cardsClosed : prev.cardsClosed.concat([closeKey]) }));
     };
     /** "Show my 2 edits" (R5): the row's list of them opens in the dock; below 1280 px the Items list opens over the map first. */
     private onCardShowEdits = (): void => {

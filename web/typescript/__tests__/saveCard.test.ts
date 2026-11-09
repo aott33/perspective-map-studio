@@ -7,7 +7,7 @@ import { Kind } from '../adapters';
 import { Conflict, EditBatch, MapItemRecord } from '../contract';
 import { updateBatch } from '../save';
 import {
-    KeyValueStore, SaveCardData, UnsavedEntry, UnsavedQueue, clockText, compassWord, moveWords, onTopBatch, onTopBlockedText, readEntries,
+    KeyValueStore, SaveCardData, UnsavedEntry, UnsavedQueue, clockText, compassWord, dismissKey, moveWords, onTopBatch, onTopBlockedText, readEntries,
     saveCardFor, storageKey, theirChangeText, yourChangeText
 } from '../unsaved';
 import { SaveCard, showEditsText, useTheirsText } from '../studio/SaveCard';
@@ -144,22 +144,54 @@ describe('which card shows', () => {
         const a = mine(pad({ version: 4, geometry: { type: 'Point', coordinates: P14_NORTH } }), { batchId: 'a', batch: { ...mine(null).batch, batchId: 'a' } });
         const b = mine(pad({ version: 5 }), { batchId: 'b', batch: { ...mine(null).batch, batchId: 'b' } });
         const all = [busy(1), a, b];
-        const unreachable = card({ unsaved: all, paused: true }) as SaveCardData;
-        expect(unreachable).toMatchObject({ kind: 'unreachable', batchId: '', title: 'Store unreachable', count: 3 });
-        expect(unreachable.text).toBe('Map Studio cannot reach the map store. Your 3 edits are kept on this computer, not saved yet, and save when '
+        // The two conflicts are refused, waiting for a choice, not for the store: one edit saves when it is back.
+        const unreachable = card({ unsaved: all.concat([busy(2)]), paused: true }) as SaveCardData;
+        expect(unreachable).toMatchObject({ kind: 'unreachable', batchId: '', title: 'Store unreachable', count: 2, closeKey: '' });
+        expect(unreachable.text).toBe('Map Studio cannot reach the map store. Your 2 edits are kept on this computer, not saved yet, and save when '
             + 'the store is back. Drawing and editing are paused; live values still update.');
         const first = card({ unsaved: all }) as SaveCardData;
         expect(first).toMatchObject({ kind: 'conflict', batchId: 'a', position: '1 of 2', who: 'Sam', onTop: true,
             title: "Not saved - conflict with Sam's change" });
         expect(first.text).toBe('Sam moved P14 about 40 m north at 10:42, while you were editing it.');
         expect(first.kept).toBe('Your change, kept here and not saved: label position Right, Gas rate switched on.');
-        expect(card({ unsaved: all, dismissed: ['a'] })).toMatchObject({ kind: 'conflict', batchId: 'b', position: '2 of 2' });
-        const third = card({ unsaved: all, dismissed: ['a', 'b'] }) as SaveCardData;
+        expect(first.closeKey).toBe(dismissKey(a));
+        expect(card({ unsaved: all, dismissed: [dismissKey(a)] })).toMatchObject({ kind: 'conflict', batchId: 'b', position: '2 of 2' });
+        const third = card({ unsaved: all, dismissed: [dismissKey(a), dismissKey(b)] }) as SaveCardData;
         expect(third).toMatchObject({ kind: 'busy', batchId: 'batch-busy-1', title: 'Not saved - Map Studio is busy', text: BUSY,
             kept: 'Your change, kept here: P14 label position Right.' });
-        expect(card({ unsaved: all, dismissed: ['a', 'b', 'batch-busy-1'] })).toBeNull();
+        expect(card({ unsaved: all, dismissed: [dismissKey(a), dismissKey(b), dismissKey(busy(1))] })).toBeNull();
         expect(card({ unsaved: [] })).toBeNull();
         expect((card({ unsaved: [busy(1)], paused: true }) as SaveCardData).text).toContain('Your edit is kept');
+    });
+
+    test('a card closed with Esc comes back for a newer refusal of the same batch (R3: a fresh card for the newer change)', () => {
+        const older = mine(pad({ version: 4 }));
+        const closed = [dismissKey(older)];
+        expect(card({ unsaved: [older], dismissed: closed })).toBeNull();
+        const later = new Date(2026, 10, 9, 11, 5, 0).toISOString();
+        const newer = mine(pad({ version: 5 }), { conflict: [conflictOf(pad({ version: 5 }), { changedAt: later })] });
+        expect(dismissKey(newer)).not.toBe(dismissKey(older));
+        expect(card({ unsaved: [newer], dismissed: closed })).toMatchObject({ kind: 'conflict', batchId: newer.batchId });
+        // Busy after a conflict: a new code, a new card.
+        const busyNow: UnsavedEntry = { ...older, state: 'unsent', reason: { code: 'store-unreachable', message: BUSY }, conflict: undefined };
+        expect(card({ unsaved: [busyNow], dismissed: closed })).toMatchObject({ kind: 'busy', batchId: older.batchId });
+    });
+
+    test('a conflict queued before entry 10 (no conflict kept): who and the item, and Apply mine on top withheld with the reason', () => {
+        const old = mine(null, { conflict: undefined });
+        const c = card({ unsaved: [old] }) as SaveCardData;
+        expect(c).toMatchObject({ kind: 'conflict', onTop: false });
+        expect(c.text).toBe('Sam changed P14 since you loaded it. The stored version was not kept with this edit, so it cannot go on top.');
+        expect(onTopBlockedText(old)).not.toBe('');
+    });
+
+    test('my delete meeting their delete: "deleted", and Apply mine on top withheld', () => {
+        const del: EditBatch = { batchId: 'b-del', ops: [{ op: 'delete', entity: 'item', id: 'p14', baseVersion: 3 }] };
+        const entry = mine(pad({ version: 4, deleted: true }), {}, del);
+        expect(onTopBatch(entry, 'x')).toBeNull();
+        const c = card({ unsaved: [entry] }) as SaveCardData;
+        expect(c.onTop).toBe(false);
+        expect(c.text).toBe('Sam deleted P14 at 10:42. It was deleted, so your change cannot go on top of it.');
     });
 
     test('a deleted item offers only Use theirs, the reason in the sentence', () => {
@@ -209,7 +241,7 @@ describe('the card', () => {
         expect(html).toContain('Sam moved P14 about 40 m north at 10:42, while you were editing it.');
         expect(html).toContain('>Use Sam&#x27;s version</button>');
         expect(html).toContain('>Apply mine on top</button>');
-        expect(html).not.toContain('—');
+        expect(html).not.toContain('\u2014');
         const blocked = render(card({ unsaved: [mine(pad({ version: 4, deleted: true }))] }) as SaveCardData);
         expect(blocked).not.toContain('Apply mine on top');
     });

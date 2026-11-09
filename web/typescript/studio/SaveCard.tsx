@@ -32,8 +32,8 @@ export interface SaveCardProps {
     onRetryStore: () => void;
     onDiscard: (batchId: string) => void;
     onShowEdits: () => void;
-    /** Esc on a conflict or busy card. */
-    onClose: (batchId: string) => void;
+    /** Esc on a conflict or busy card, with its `closeKey` (the batch and its refusal). */
+    onClose: (closeKey: string) => void;
 }
 
 /** "Use Sam's version", or "Use their version" when the Gateway named nobody. */
@@ -79,7 +79,7 @@ export class SaveCard extends React.Component<SaveCardProps> {
             ev.preventDefault();
             ev.stopPropagation();
             this.giveFocusBack();
-            this.props.onClose(card.batchId);
+            this.props.onClose(card.closeKey);
         }
     };
 

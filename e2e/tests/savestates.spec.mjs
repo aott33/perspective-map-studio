@@ -167,6 +167,20 @@ editorTest.describe('save states at 1366 px', () => {
                 await setOperator(page, id, 'Acme');
                 await expect(card).toHaveAttribute('data-card', 'conflict', { timeout: REPLY_MS });
                 const refused = (await storedQueue(page))[0].batchId;
+                // Every batch id the page writes to its queue from here, to tell the batch Apply mine on top sends.
+                await page.evaluate((key) => {
+                    const w = window;
+                    w.__queuedIds = [];
+                    const setItem = Storage.prototype.setItem;
+                    Storage.prototype.setItem = function (k, v) {
+                        if (k === key) {
+                            try {
+                                for (const e of JSON.parse(v)) w.__queuedIds.push(e.batchId);
+                            } catch (err) { /* not a queue */ }
+                        }
+                        return setItem.call(this, k, v);
+                    };
+                }, KEY);
                 await card.locator('.mapstudio-save-card-ontop').click();
                 await expect(card).toHaveCount(0, { timeout: REPLY_MS });
                 await expect(map).toHaveAttribute('data-unsaved-count', '0', { timeout: REPLY_MS });
@@ -174,10 +188,11 @@ editorTest.describe('save states at 1366 px', () => {
                 now = await stored(page, id);
                 expect(now.properties.operator).toBe('Acme');
                 const theirs = now.geometry.coordinates;
-                // Not the refused batch resent: that one was never written.
-                const resend = await send(page, 'edits.apply', { batchId: refused, ops: [{ op: 'update', entity: 'item', id, baseVersion: 1,
-                    data: { name: 'never' } }] });
-                expect(resend.type).toBe('error');
+                // A new batch, not the refused one resent, saved once: one new batch id queued, and the version rose by exactly one.
+                const queued = [...new Set(await page.evaluate(() => window.__queuedIds))].filter((b) => b !== refused);
+                expect(queued).toHaveLength(1);
+                expect(queued[0]).not.toBe(refused);
+                expect(now.version).toBe(version + 1);
                 // One undo step puts theirs back.
                 const undo = page.locator('.mapstudio-toolbar .mapstudio-undo');
                 await expect(undo).toHaveAttribute('data-step', 'Undo: edit ' + name, { timeout: REPLY_MS });
@@ -352,7 +367,8 @@ editorTest.describe('save states at 1366 px', () => {
         await setOperator(page, c, 'Down');
         await expect(card).toHaveAttribute('data-card', 'unreachable', { timeout: REPLY_MS });
         await expect(page.locator('.mapstudio-save-card')).toHaveCount(1);
-        await expect(card.locator('.mapstudio-save-card-show')).toHaveText('Show my 3 edits');
+        // The two conflicts wait for a choice, not for the store: one edit saves when it is back.
+        await expect(card.locator('.mapstudio-save-card-show')).toHaveText('Show my edit');
 
         // Clean up: the store back, the conflicts discarded.
         gate.failSave = null;

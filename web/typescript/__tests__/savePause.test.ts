@@ -186,3 +186,54 @@ describe('a conflict', () => {
         expect(state().unsaved.length).toBe(1);
     });
 });
+
+describe('the pause ends', () => {
+    test('when another tab saved this tab\'s entries: the storage event leaves nothing unsent, so map.load checks the store', () => {
+        const data = new Map<string, string>();
+        const storage = { getItem: (k: string) => (data.has(k) ? data.get(k) as string : null), setItem: (k: string, v: string) => { data.set(k, v); },
+            removeItem: (k: string) => { data.delete(k); } };
+        (global as unknown as { window: unknown }).window = { localStorage: storage };
+        try {
+            delegate.stopReplay();
+            delegate = new MapStudioStoreDelegate({ view: { page: { parent: { projectName: 'p' } } } } as unknown as AbstractUIElementStore);
+            delegate.sendMapLoad();
+            reply(MessageTypes.MAP_LOAD_REPLY, lastOf(MessageTypes.MAP_LOAD).id, { level: 'full', seq: 0, items: [P14], user: 'jordan' });
+            delegate.renameItem('p14', 'P14 north');
+            refused(lastOf(MessageTypes.EDITS_APPLY), 'store-unreachable', DOWN);
+            expect(state().savePaused).toBe(true);
+            const key = Array.from(data.keys())[0];
+            const loads = fired().filter((m) => m.type === MessageTypes.MAP_LOAD).length;
+            data.delete(key);
+            delegate.onStorage(key);
+            expect(state().unsaved).toEqual([]);
+            expect(fired().filter((m) => m.type === MessageTypes.MAP_LOAD).length).toBe(loads + 1);
+            reply(MessageTypes.MAP_LOAD_REPLY, lastOf(MessageTypes.MAP_LOAD).id, { level: 'full', seq: 0, items: [P14], user: 'jordan' });
+            expect(state()).toMatchObject({ savePaused: false, editing: 'on' });
+        } finally {
+            delete (global as unknown as { window?: unknown }).window;
+        }
+    });
+
+    test('when a save is answered anything but the store out of reach: a conflict shows, not hidden under the pause', () => {
+        delegate.renameItem('p14', 'P14 north');
+        const first = lastOf(MessageTypes.EDITS_APPLY);
+        refused(first, 'store-unreachable', DOWN);
+        expect(state().savePaused).toBe(true);
+        jest.advanceTimersByTime(REPLAY_INTERVAL_MS);
+        refused(lastOf(MessageTypes.EDITS_APPLY), 'conflict', 'P14 was changed by sam since you loaded it. Nothing in this save was written.',
+            [{ index: 0, entity: 'item', id: 'p14', baseVersion: 3, current: { ...P14, version: 4 }, changedBy: 'sam', changedAt: null }]);
+        expect(state()).toMatchObject({ savePaused: false, editing: 'on' });
+    });
+});
+
+test('Apply mine on top waits while another save of the entry\'s item is in flight; the entry and the card stay', () => {
+    delegate.setKind('p14', 'tank');
+    const message = lastOf(MessageTypes.EDITS_APPLY);
+    refused(message, 'conflict', 'P14 was changed by sam since you loaded it. Nothing in this save was written.',
+        [{ index: 0, entity: 'item', id: 'p14', baseVersion: 3, current: { ...P14, version: 4 }, changedBy: 'sam', changedAt: null }]);
+    delegate.renameItem('p14', 'P14 again');
+    const sent = fired().length;
+    delegate.applyOnTop(message.body.batchId);
+    expect(fired().length).toBe(sent);
+    expect(state().unsaved.map((e) => e.batchId)).toContain(message.body.batchId);
+});

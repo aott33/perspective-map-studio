@@ -3,7 +3,7 @@ title: "Save states and the unsaved list: the conflict card, the store unreachab
 type: 'feature'
 ticket: '10'
 created: '2026-11-09'
-status: 'in-review'
+status: 'built'
 baseline_revision: '972e9effb4be73bd7079c926ac784a068b825a41'
 route: 'full'
 route_source: 'auto'
@@ -95,6 +95,25 @@ Decisions (owner, 2026-11-09, "Approve and continue" on the planner's seven pick
 ## Plan Change Log
 
 ## Review Triage Log
+
+### Pass 1 (quick lens, 2026-11-09): 12 findings - 0 high, 6 medium, 3 low, 3 false; 9 patches, 3 rejected
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---|---|---|---|
+| 1 | `savePaused` stays on in a tab whose entries another tab saved | medium | patch | Confirmed: cleared only in `onSave` saved and `onMapLoad`; `storage()` with nothing unsent sends nothing. Fix: a storage event that leaves a paused tab nothing unsent sends `map.load`. |
+| 2 | A non-transient store answer during a pause never ends it; the unreachable card then hides the conflict card | medium | patch | Confirmed in `onSave` (only `saved` clears it). Fix: any save answer other than store-unreachable (busy included) ends the pause. |
+| 3 | A conflict entry refused before entry 10 (no `conflict`) reads the Gateway sentence plus ", while you were editing it." and withholds Apply mine on top with no reason | medium | patch | Confirmed in `theirChangeText`/`saveCardFor`. Fix: "<name> changed <item> since you loaded it" and the reason in words when Apply mine on top is withheld (decisions 1, 3). |
+| 4 | The card covers the connection chip when the toolbar sits under the switch | medium | patch | The under-row rule sets the chip's own `top` and outranks `--below-chip`. Fix: below the chip in that layout too. |
+| 5 | Apply mine on top while another batch of the item is in flight: the new batch is held, then dropped if that batch is refused; the original entry is gone | medium | patch | `dispatch` holds by item and `releaseFlight(..., null)` drops held batches. Fix: Apply mine on top waits (does nothing, says so) while a batch of the same item is in flight, as Discard does. |
+| 6 | A card closed with Esc never comes back for a newer refusal of the same batch | medium | patch | Dismissal keyed by `batchId` only; R3 says a fresh card for the newer change. Fix: key it by batch and refusal (code and changedAt). |
+| 7 | The unreachable card counts refused entries in "save when the store is back" | low | patch | `n = facts.unsaved.length`; refused entries are not replayed. Fix: count unsent entries, the spec's R7 number with it. |
+| 8 | My delete meeting their delete offers Apply mine on top and reads "changed" | low | patch | `blockedWhy` returns '' when `current.deleted` and my op is a delete. Fix: "deleted" in the words, only Use their version. |
+| 9 | Without `before` an update lists every property of the item | low | reject | Only entries queued before entry 10; rare and the words stay true (the form sends the properties whole). |
+| 10 | AC 2's "an editor makes two edits" is not possible in one tab | false | reject | R4 (frozen) pauses editing after the first refusal; the second edit from a second tab is the only way two wait, recorded in the notes and told to the owner. |
+| 11 | AC 3's "no skipped test" fails on a default run | false | reject | Decision 7 (frozen) puts the real stop behind `MAPSTUDIO_STORE_STOP=1`; the suite already gates the Gateway stop the same way (`unsaved.spec.mjs`). |
+| 12 | R3's "not the refused batch resent" check proves nothing | medium | patch | It sends a different, stale body under the refused id. Fix: assert the saved batch's id differs from the refused one and the stored version rose by one. |
+
+Outcome (2026-11-09): the nine patches applied by the implementer; the orchestrator's Verification: tsc clean, Jest 745 passed, Gradle clean build offline passed, contract check OK, `ops/up.sh --fresh` and the whole e2e suite 282 passed, 0 failed, 8 skipped (the env-gated stop tests); `MAPSTUDIO_STORE_STOP=1` on the real PostgreSQL stop passed in 29 s. No Ignition file changed (no ignition-lint). Contact sheet: `docs/screenshots/mapstudio-savestates-contact-sheet.png`. Status built.
 
 ## Design Notes
 
