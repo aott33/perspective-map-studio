@@ -3,7 +3,7 @@ title: "Save states and the unsaved list: the conflict card, the store unreachab
 type: 'feature'
 ticket: '10'
 created: '2026-11-09'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '972e9effb4be73bd7079c926ac784a068b825a41'
 route: 'full'
 route_source: 'auto'
@@ -22,6 +22,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 **Problem:** Edit mode says a save failed only on the save status row: a conflict names the other editor but not what they changed and offers only Discard, a save answered store-unreachable leaves the tools on, busy looks like any other refusal, and a second tab that learns another tab's unsent batch from a `storage` event does not replay it until a reload (deferred from 0.2.0).
 
 **Approach:** Build the approved key-screen-9 mocks (EXPERIENCE.md "Save and store states", R26): one card on the map under the toolbar for a conflict (who changed what and when, my change kept, "Use <name>'s version" and "Apply mine on top"), for store unreachable (edits kept on this computer, the toolbar faded and inert, live values still updating, Try again, Show my N edits) and for busy (nothing saved, the change kept here, Try again, Discard my change); the save status row keeps its words and its unsaved list; the `storage` event arms the 15 s replay. No toasts in Edit mode.
+
+Decisions (owner, 2026-11-09, "Approve and continue" on the planner's seven picks): (1) Apply mine on top is a new batch at the stored version, undone like any edit; when they deleted the item or my add meets one that already exists, only "Use <name>'s version" is offered with the reason in words. (2) One card at a time on the map under the toolbar, unreachable then conflict then busy, "1 of 2" when two conflicts wait. (3) Each queued entry keeps the records my ops started from (`before`), so the card names the fields they changed and a moved point reads "about 40 m north"; an older entry without it reads "changed P14 at 10:42". (4) A lost connection is unchanged; only store unreachable pauses the tools. (5) Busy is read from its sentence, no new code. (6) The undo-in-flight race stays with entry 17. (7) The suite fakes the replies through the socket gate; a real PostgreSQL stop runs behind `MAPSTUDIO_STORE_STOP=1`, run once by the orchestrator.
 
 ## Boundaries & Constraints
 
