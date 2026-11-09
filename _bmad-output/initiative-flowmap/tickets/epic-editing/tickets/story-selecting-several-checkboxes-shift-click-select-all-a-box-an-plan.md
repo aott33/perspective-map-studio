@@ -3,7 +3,7 @@ title: "Selecting several: checkboxes, Shift-click, Select all, a box and a lass
 type: 'feature'
 ticket: '8'
 created: '2026-11-08'
-status: 'in-review'
+status: 'built'
 baseline_revision: '62b8146b667506415703c83f12b46b140e8a3280'
 route: 'full'
 route_source: 'auto'
@@ -103,6 +103,8 @@ Quick lens, 2026-11-09: 10 findings; high 0, medium 4, low 4, false 2. One more 
 | `mapItems` can be shorter than `selectedItems` | low | `itemFor` drops unresolved ids | patch: both from one resolved list |
 | The whole suite was not rerun and ignition-lint not run | false | The orchestrator's whole-suite run follows the review; lint run by the orchestrator: `MapStudioEvents/view.json` 0 errors, 0 warnings, naming hints | rejected |
 | The commit trailers name a model, against "no model identifier" | false | The trailers are the session's required attribution lines, used on every commit of this branch; the plan's rule covers file content | rejected |
+
+Outcome, 2026-11-09: the nine patches applied (9191186) and verified by the orchestrator: `tsc` clean, Jest 696 passed, `./gradlew clean build --offline --rerun-tasks` green, the contract check OK at 0.4.0, ignition-lint on `MapStudioEvents/view.json` 0 errors and 0 warnings, and `ops/up.sh --fresh` with the whole e2e suite: 272 passed, 7 skipped, 0 failed in 48.2 min. The Designer's lists (five events, `selectedItems`) are the owner's check, carried to entry 18.
 
 ## Verification
 
