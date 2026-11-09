@@ -195,3 +195,11 @@
 - source_plan: none
   summary: Entry 11b, the rail's History surface (Recent changes in the left dock, the next undo step with Undo, rows that expand to before and after, Revert as one step for a bulk change or import, new changes from map.changed, the save status opening it), built on 11a's edits.history.
   evidence: Entry 11 split by the owner on 2026-11-09 ("Go with recommendations"): the plan whole ran about 3,500 to 4,000 tokens; 11a (the Gateway record and edits.history) first, 11b as `...-plan-11b.md` with `part_of: '11'`.
+
+- source_plan: none
+  summary: Entry 12b, the Kinds screen's Style rule section (States, Bands, Expression on a key value or a tag, a line's instruments, area tints, preset tiles, the preview on the map), after 12a.
+  evidence: Entry 12 split by the owner on 2026-11-09 ("go with recommended"): 12a the Kinds list and the non-rule sections first, then 12b and 12c in either order; icon, size and label editable is backlog 38.
+
+- source_plan: none
+  summary: Entry 12c, per-item overrides: the Style tab (icon, size and label read-only, the style rule override with "Edit the kind's rule"), Details' Live now block with full-path overrides, Override with Reset and From kind, the kind header's override count, after 12a.
+  evidence: Entry 12 split by the owner on 2026-11-09 ("go with recommended").
