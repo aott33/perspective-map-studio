@@ -57,6 +57,12 @@
             "geometry": "point"
         },
         {
+            "id": "meter",
+            "label": "Flow meter on a line",
+            "group": "kind",
+            "geometry": "point"
+        },
+        {
             "id": "rtu",
             "label": "RTU or comms tower",
             "group": "kind",

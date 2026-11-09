@@ -12,6 +12,7 @@
         { "id": "pig-trap", "label": "Pig launcher or receiver", "group": "kind", "geometry": "point", "origin": "drawn", "licence": "Apache-2.0" },
         { "id": "line-valve", "label": "Line valve", "group": "kind", "geometry": "point", "origin": "drawn", "licence": "Apache-2.0" },
         { "id": "tap", "label": "Tap", "group": "kind", "geometry": "point", "origin": "drawn", "licence": "Apache-2.0" },
+        { "id": "meter", "label": "Flow meter on a line", "group": "kind", "geometry": "point", "origin": "drawn", "licence": "Apache-2.0" },
         { "id": "rtu", "label": "RTU or comms tower", "group": "kind", "geometry": "point", "origin": "tabler:building-broadcast-tower@3.49.0", "licence": "MIT", "modified": "attributes normalised, Tabler's empty bounding path removed" },
         { "id": "swd", "label": "Salt water disposal", "group": "kind", "geometry": "point", "origin": "drawn", "licence": "Apache-2.0" },
         { "id": "separator", "label": "Separator", "group": "kind", "geometry": "point", "origin": "drawn", "licence": "Apache-2.0" },

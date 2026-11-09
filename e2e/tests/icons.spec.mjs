@@ -10,7 +10,7 @@ import { screenshotDir } from '../lib/env.mjs';
 import { EDITOR_USER, editorTest, expect, mapLoaded, openMap, test } from './fixtures.mjs';
 
 const BASE = '/res/mapstudio/icons/';
-const ICON_COUNT = 30;
+const ICON_COUNT = 31;
 
 /** File, and a content type the browser accepts for its use. */
 const SERVED = [
@@ -91,13 +91,13 @@ test.describe('kind icon check', () => {
             // The dev kinds name real icons: ok with no icon note.
             await press(page, 'ok', 'ok');
             let k = await kindsAfterReload(page);
-            expect(k).toEqual({ status: 'ok', message: `5 kinds from ${KINDS_FN}.`, rows: '5' });
+            expect(k).toEqual({ status: 'ok', message: `6 kinds from ${KINDS_FN}.`, rows: '6' });
 
             const r = await press(page, 'unknown-icon', 'unknown-icon');
             expect(r.kinds.status).toBe('ok');
-            expect(r.kinds.message).toBe(`5 kinds from ${KINDS_FN}. ${UNKNOWN}`);
+            expect(r.kinds.message).toBe(`6 kinds from ${KINDS_FN}. ${UNKNOWN}`);
             k = await kindsAfterReload(page);
-            expect(k).toEqual({ status: 'ok', message: `5 kinds from ${KINDS_FN}. ${UNKNOWN}`, rows: '5' });
+            expect(k).toEqual({ status: 'ok', message: `6 kinds from ${KINDS_FN}. ${UNKNOWN}`, rows: '6' });
 
             // A session that cannot edit gets the count only, no kind id or icon name.
             // An anonymous context: newContext would otherwise inherit the editor's sign-in.
@@ -111,7 +111,7 @@ test.describe('kind icon check', () => {
                 await expect(viewerMap).toHaveAttribute('data-edit-level', 'none');
                 const el = viewer.locator('.mapstudio-adapter-status');
                 await expect(el).toHaveAttribute('data-kinds-status', 'ok');
-                await expect(el).toHaveAttribute('data-kinds-message', `5 kinds from ${KINDS_FN}. ${VIEWER_NOTE}`);
+                await expect(el).toHaveAttribute('data-kinds-message', `6 kinds from ${KINDS_FN}. ${VIEWER_NOTE}`);
             } finally {
                 await viewerContext.close();
             }
@@ -119,6 +119,6 @@ test.describe('kind icon check', () => {
             await press(page, 'ok', 'ok');
         }
         const k = await kindsAfterReload(page);
-        expect(k.message).toBe(`5 kinds from ${KINDS_FN}.`);
+        expect(k.message).toBe(`6 kinds from ${KINDS_FN}.`);
     });
 });

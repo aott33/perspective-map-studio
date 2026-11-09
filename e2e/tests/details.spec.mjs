@@ -385,7 +385,7 @@ test.describe('1366 px', () => {
             await expect(map).toHaveAttribute('data-tool', '');
         });
 
-    editorTest('a tap with Tag set changed to a line valve keeps Tag; a pad changed to a tap drops its values in the same update, and Undo puts them back',
+    editorTest('a tap with Tag set changed to a line valve keeps Tag; changed to a meter it drops Tag in the same update, and Undo puts it back; a pad lists no instrument kind',
         async ({ page }) => {
             const map = await openEditor(page);
             const tap = randomUUID();
@@ -395,7 +395,11 @@ test.describe('1366 px', () => {
             const kind = page.locator('.mapstudio-panel .mapstudio-field-kind');
             const undo = page.locator('.mapstudio-toolbar .mapstudio-undo');
 
+            // Entry 9: an instrument's Kind select lists instrument kinds only; a pad's lists no instrument kind.
+            await selectRow(page, pad);
+            await expect(kind.locator('option')).toHaveText(['Well pad']);
             await selectRow(page, tap);
+            await expect(kind.locator('option')).toHaveText(['Tap', 'Line valve', 'Meter']);
             await expect(field(page, 'tag').input).toHaveValue('PT-9');
             let seq = await seqOf(map);
             await kind.selectOption('valve');
@@ -404,27 +408,24 @@ test.describe('1366 px', () => {
             await expect(page.locator('.mapstudio-panel-subline')).toContainText('Line valve');
             await expect(field(page, 'tag').input).toHaveValue('PT-9');
 
-            await selectRow(page, pad);
             seq = await seqOf(map);
-            await kind.selectOption('tap');
-            await expectOneBatch(page, map, seq, 'edit Form pad 2');
-            const dropped = await stored(page, pad);
-            expect(dropped.kind).toBe('tap');
+            await kind.selectOption('meter');
+            await expectOneBatch(page, map, seq, 'edit Form tap');
+            const dropped = await stored(page, tap);
+            expect(dropped.kind).toBe('meter');
             expect(dropped.properties).toEqual({});
             await expect(page.locator('.mapstudio-panel .mapstudio-field--prop')).toHaveCount(1);
-            await expect(field(page, 'tag').input).toHaveValue('');
-            // Undo: the kind and every value back, one batch.
+            await expect(field(page, 'size').input).toHaveValue('');
+            // Undo: the kind and the value back, one batch.
             seq = await seqOf(map);
             await undo.click();
             await expect(map).toHaveAttribute('data-store-seq', String(seq + 1), { timeout: REPLY_MS });
             await expect.poll(async () => {
-                const back = await stored(page, pad);
+                const back = await stored(page, tap);
                 return [back.kind, back.properties];
-            }, { timeout: REPLY_MS }).toEqual(['pad', { operator: 'Acme', wells: 2, status: 'producing' }]);
-            await expect(kind).toHaveValue('pad');
-            await expect(field(page, 'operator').input).toHaveValue('Acme');
-            await expect(field(page, 'wells').input).toHaveValue('2');
-            await expect(field(page, 'status').input).toHaveValue('producing');
+            }, { timeout: REPLY_MS }).toEqual(['valve', { tag: 'PT-9' }]);
+            await expect(kind).toHaveValue('valve');
+            await expect(field(page, 'tag').input).toHaveValue('PT-9');
         });
 
     editorTest('a second item named P14 on another asset: Name underlined with a tooltip and description naming the other; the save goes through',

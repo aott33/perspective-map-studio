@@ -45,6 +45,10 @@ KINDS = [
     # its setup, bounds no line segment.
     {'id': 'valve', 'name': 'Line valve', 'geometry': 'point', 'icon': 'line-valve', 'labelRank': 1, 'instrument': True,
      'fields': [{'key': 'tag', 'label': 'Tag', 'type': 'text', 'required': False}]},
+    # A third instrument kind (epic 4 entry 9): a flow meter, added from a line's Details, with no kind setup; its one field is
+    # not a tap's, so a tap changed to a meter drops its values.
+    {'id': 'meter', 'name': 'Meter', 'geometry': 'point', 'icon': 'meter', 'labelRank': 2, 'instrument': True,
+     'fields': [{'key': 'size', 'label': 'Size (in)', 'type': 'number', 'required': False}]},
 ]
 
 # Mode tank's extra kind (epic 4 entry 6): a point kind with one number field, gone again in mode ok.

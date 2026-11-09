@@ -14,7 +14,7 @@ const noticeFile = path.join(repoRoot, 'NOTICE');
 const catalogueFile = path.join(repoRoot, 'common', 'src', 'main', 'resources', 'com', 'aoindustrial',
     'perspective', 'mapstudio', 'common', 'icons.json');
 
-const ICON_COUNT = 30;
+const ICON_COUNT = 31;
 const FR9_AND_OWNER = ['well-pad', 'wellhead', 'tank-battery', 'compressor-station', 'booster-station',
     'meter-station', 'pig-trap', 'line-valve', 'tap', 'rtu', 'pipeline', 'lateral', 'lease-road', 'geofence',
     'region', 'site-footprint', 'swd', 'separator'];

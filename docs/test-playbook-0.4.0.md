@@ -2,7 +2,7 @@
 
 A walk through what epic 4 has built so far, grouped by what you do, on the local development stack. Tick each box and note anything that looks or feels off in the Notes line under each section (a screenshot helps). Each note goes into `_bmad-output/initiative-flowmap/tickets/epic-editing/epic-editing.md` Notes or a new entry. The playbook grows as entries land; entry 18 (the 0.4.0 release) finishes it for the release test and the 30-minute test.
 
-Built so far (2026-11-08): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed) and 7c (the layout). Still to come: 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems), 11 (Recent changes and History), 12 and 13 (the Kinds screen, the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
+Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several) and 9 (instruments). Still to come: 10 (save problems), 11 (Recent changes and History), 12 and 13 (the Kinds screen, the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
 
 ## Results so far
 
@@ -22,6 +22,7 @@ Built so far (2026-11-08): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item li
 | 8c. The item list | | |
 | 8d. The layout | | |
 | 8e. First run | | |
+| 8g. Instruments | | |
 | 9. View mode, unchanged | | |
 | 10. Phone (390 px) | | |
 | 11. Designer | | |
@@ -230,6 +231,23 @@ On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor
 - [ ] With three selected, switch the rail to Kinds and back: still three. A click on the empty map, **Clear**, or Esc empties the set and closes the panel.
 - [ ] On `/events`, turn Edit mode on and select three: the **selectedItems** label lists their ids in the order they joined and **onSelectionChanged** counts one more per change; Clear: `selectedItems:` empty, one more event.
 - [ ] Turn Edit mode off and Shift-drag on the map: MapLibre zooms into the box, as before; nothing is selected.
+
+Notes:
+
+## 8g. Instruments
+
+On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor. An instrument is only added from its line (no toolbar tool) and only moves along it.
+
+- [ ] Select L-SWD: its Details show **Instruments** after Location: PT-1 1.1 km, LV-1 2 km, PT-2 2.8 km, in that order. Click PT-1 in the row: PT-1 is selected with its Details.
+- [ ] Back on L-SWD, press **Add an instrument**: a short list offers Tap, Line valve and Meter (the Meter glyph is new: a flow meter on the line). Pick Tap: the bar at the bottom reads "New tap on L-SWD - click the line or type its distance", with a distance field, "of 2,922 m", Place and Cancel; the map shows a crosshair.
+- [ ] Click the empty map, then another item: the bar says "Click on L-SWD: an instrument sits on its line" and nothing saves. Click L-SWD near PT-1: a tap appears there, its Details open with the cursor in Name ("Tap"); Location reads "On L-SWD at ...". The Undo button reads "Undo: add Tap".
+- [ ] Add a Meter and type 99999, Enter: "Type a distance from 0 to 2,922 m", nothing saved. Type 2841 and press Place: the meter sits at 2.8 km, listed in L-SWD's Instruments row and in its line popup (View mode, click the line).
+- [ ] Add an instrument and press Esc (or Cancel): the bar goes, nothing saves, L-SWD's Details stay.
+- [ ] Select PT-1: Location reads "On L-SWD at 1.1 km" with **Distance along the line (m)**; latitude and longitude are read only and there is no Move; the Kind select lists Tap, Line valve and Meter only.
+- [ ] Drag PT-1 along the line: a disc follows the pointer on the line; pull the pointer off to the side: the disc stays on the line. Release: PT-1 lands where the disc was, one change ("Undo: move PT-1"); the map did not pan.
+- [ ] Type 1143 in PT-1's distance and press Enter: PT-1 goes back to 1.1 km, one change. Undo twice: the drag's place, then 1.1 km again.
+- [ ] Reshape L-SWD (drag its bend), delete it (Delete key), then Undo: the instruments, a tap you added among them, stay on the reshaped line, go with the delete, and come back with the one Undo.
+- [ ] The toolbar's kind buttons are Well pad, Gathering line and Geofence; the Point tool adds a well pad, and a pad's Kind select offers no Tap, Line valve or Meter.
 
 Notes:
 

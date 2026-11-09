@@ -34,6 +34,7 @@ Kind icons. Points are drawn on the map; lines and areas are drawn as styled lin
 | `pig-trap` | Pig launcher or receiver | point | drawn | Apache-2.0 |
 | `line-valve` | Line valve | point | drawn | Apache-2.0 |
 | `tap` | Tap | point | drawn | Apache-2.0 |
+| `meter` | Flow meter on a line (epic 4 entry 9: the pipe through the meter body, a flow arrow inside; distinct from `meter-station`, a box on a stem over the pipe) | point | drawn | Apache-2.0 |
 | `rtu` | RTU or comms tower | point | Tabler `building-broadcast-tower` 3.49.0, modified | MIT |
 | `swd` | Salt water disposal | point | drawn | Apache-2.0 |
 | `separator` | Separator | point | drawn | Apache-2.0 |

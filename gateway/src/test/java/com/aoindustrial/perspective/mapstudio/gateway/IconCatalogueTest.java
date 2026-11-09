@@ -30,8 +30,8 @@ class IconCatalogueTest {
             assertEquals("kind", c.get(id).group, id);
         }
         assertTrue(c.contains(IconCatalogue.FALLBACK));
-        assertEquals(30, c.ids().size());
-        assertEquals(19, c.kindIcons().size());
+        assertEquals(31, c.ids().size());
+        assertEquals(20, c.kindIcons().size());
         assertEquals("0.3.0", c.version());
     }
 
