@@ -3,8 +3,8 @@ title: "11a: The edit record keeps what each change did, read by edits.history"
 type: 'feature'
 ticket: '11'
 created: '2026-11-09'
-status: 'draft'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: '11c3fd424cc2ec4b71a8897969dd3070ebd2b2dd'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
@@ -23,7 +23,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/architecture-map-studi
 
 **Approach:** Entry 11 split by the owner (2026-11-09, "Go with recommendations"): 11a, this plan, is the Gateway half; 11b (`...-plan-11b.md`, `part_of: '11'`) builds the rail's History surface and Revert on it. Migration 0003 adds each op's values before and after, and the item's name and kind, to its edit row, written by the write service in the same transaction from the records it already holds; a new `edits.history` request and reply in contract 0.4.0 reads the record newest first in pages, for the phone and full levels only.
 
-Decisions (owner, 2026-11-09, "yes, I am good with those changes" after the round table): the planner's six picks stand (changed fields only on an update; one entry per batch; pages of 50 entries or fewer once a page reaches 1,000 ops, a batch never split; rows from before the migration listed with no values; `map.changed` unchanged, 11b asking for the first page again; a schema-2-with-edit-rows upgrade in `ops/store-checks.sh`), with the room's changes: each edit row keeps the item's `name` and `kind` as written (the stored record's for a delete), so an old change reads the name it had then (Sally); the page rule is stated against `EditBatch.MAX_OPS` 1,000 (Amelia); the store's size after repeated imports is measured in entry 18's performance run and the record's retention is backlog 37 (Mary, Sofia).
+Decisions (owner, 2026-11-09, "yes, I am good with those changes" after the round table): the planner's six picks stand (changed fields only on an update; one entry per batch; pages of 50 entries or fewer once a page reaches 1,000 ops, a batch never split; rows from before the migration listed with no values; `map.changed` unchanged, 11b asking for the first page again; a schema-2-with-edit-rows upgrade in `ops/store-checks.sh`), with the room's changes (owner, "approve and continue" on the plan, 2026-11-09): each edit row keeps the item's `name` and `kind` as written (the stored record's for a delete), so an old change reads the name it had then (Sally); the page rule is stated against `EditBatch.MAX_OPS` 1,000 (Amelia); the store's size after repeated imports is measured in entry 18's performance run and the record's retention is backlog 37 (Mary, Sofia).
 
 ## Boundaries & Constraints
 
