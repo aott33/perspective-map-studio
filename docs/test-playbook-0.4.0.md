@@ -74,7 +74,7 @@ Notes:
 - [ ] Select CTB1 and press Delete (or the delete icon in Details' footer): CTB1 goes, no "Are you sure?"; Ctrl+Z brings it back with its link and the line ends that named it.
 - [ ] Delete L-SWD: its instruments (PT-1, LV-1, PT-2) go with it in one step; one Undo restores all four; Ctrl+Shift+Z deletes them again.
 - [ ] With a drawing tool in hand, the delete icon is off and says why ("Off while a tool is in hand - Esc puts it down").
-- [ ] Hover the controls: each names its key (Undo (Ctrl+Z), Redo (Ctrl+Shift+Z), Delete (Del), Select (Esc), Close (Esc), Clear the search (Esc)).
+- [ ] Hover the controls: each names its key (Undo (Ctrl+Z), Redo (Ctrl+Shift+Z), Delete (Del), Select (Shift-drag for a box, Shift+Alt-drag for a lasso), Close (Esc), Clear the search (Esc)).
 
 Notes:
 
@@ -215,6 +215,24 @@ On the empty project `mapstudio-empty` (the dev project mounted a second time, w
 
 Notes:
 
+## 8f. Selecting several
+
+On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor.
+
+- [ ] Each list row starts with a checkbox. Tick Point 1, Point 2 and CTB1: the panel beside the list reads **3 selected** with **Clear** and the delete icon in its footer, no fields; the three rows are tinted and the three markers ringed on the map. A plain row click selects that one item alone with Details, as before.
+- [ ] Click Point 1's row, then Shift-click SWD1's row: every row between them, in the order shown, is selected.
+- [ ] Under the MESA FIELD header, **Select all in MESA FIELD** selects that field's rows; other group headers carry **Select all in group**. Filter on Well pad (or type in Search items): **Select all in filter** appears above the list and selects every row shown.
+- [ ] With Select in hand (no tool), Shift-drag a box over CTB1 and SWD1: a dashed box over a light tint follows the pointer; on release both join, and L-SWD joins as it crosses the box. The map does not zoom. Esc during the drag cancels it with nothing selected.
+- [ ] Shift+Alt-drag a lasso round the Mesa pads (Point 1 to 3): every pad inside joins, and every line crossing it.
+- [ ] Shift-click CTB1 on the map while it is selected: it leaves the set; Shift-click again brings it back.
+- [ ] With three pads selected press Delete (or the footer's delete icon): all three go as one change; the Undo button reads "Undo: delete 3 items"; one Undo restores them all.
+- [ ] Select L-SWD and PT-1 and delete them: the line goes with all its instruments in one change ("Undo: delete 2 items"); Undo restores the line and its instruments.
+- [ ] With three selected, switch the rail to Kinds and back: still three. A click on the empty map, **Clear**, or Esc empties the set and closes the panel.
+- [ ] On `/events`, turn Edit mode on and select three: the **selectedItems** label lists their ids in the order they joined and **onSelectionChanged** counts one more per change; Clear: `selectedItems:` empty, one more event.
+- [ ] Turn Edit mode off and Shift-drag on the map: MapLibre zooms into the box, as before; nothing is selected.
+
+Notes:
+
 ## 9. View mode, unchanged
 
 On `/` (View mode), a quick pass over 0.3.0's behaviour.
@@ -234,7 +252,7 @@ Notes:
 
 ## 11. Designer
 
-- [ ] In the Designer, the Map Studio component's event list shows four events: `onItemSelected`, `onViewportChanged`, `onPopupOpen` and `onPopupClose`, each with its payload (entry 14; no Designer runs in the build container, so this is the owner's check).
+- [ ] In the Designer, the Map Studio component's event list shows five events: `onItemSelected`, `onViewportChanged`, `onPopupOpen`, `onPopupClose` and `onSelectionChanged` (entry 8), each with its payload, and the props list `selectedItems` read-only after `selectedItem` (entries 14 and 8; no Designer runs in the build container, so this is the owner's check).
 - [ ] The Map Studio Setup tab still reads and saves as in 0.3.0.
 
 Notes:
