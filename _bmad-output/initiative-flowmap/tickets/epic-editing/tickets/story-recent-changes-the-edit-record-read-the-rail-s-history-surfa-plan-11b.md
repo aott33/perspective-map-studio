@@ -4,8 +4,8 @@ type: 'feature'
 ticket: ''
 part_of: '11'
 created: '2026-11-09'
-status: 'draft'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: '6234a757c8645c2778af851710852fd9afaf7e42'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
@@ -23,6 +23,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 **Problem:** 11a keeps what every saved change did and serves it as `edits.history`, but nothing in Edit mode shows it: an editor cannot see who changed what, nor undo another editor's change (R18).
 
 **Approach:** Build Recent changes as DESIGN.md's Recent changes panel and EXPERIENCE.md's History surface (owner, 2026-11-05): a History item on the rail under Layers with a clock glyph opens it in the left dock, as does a click on "Saved"; at the top a note box names the next undo step with an Undo button; then one row per saved batch, newest first, of who (an initial avatar), what in a sentence and when, with Revert; a row expands to the values before and after; a footer says what Revert does. Revert sends the row's reverse as an ordinary edit.
+
+Decisions (owner, 2026-11-09, "approve and continue" on the planner's seven picks): older changes from a Show older button, not on scroll; live updates only while History is open, each `map.changed` asking for the first page again; a kind setup row listed with its kind and no Revert, the reason in words; a row from before 11a with who, what and when and no Revert; the time "10:42" today, else "Nov 7, 10:42"; who as one neutral avatar with the initial; a revert can itself be reverted. Built to DESIGN.md's prose, the surface's screenshots sent to the owner after the build.
 
 ## Boundaries & Constraints
 
