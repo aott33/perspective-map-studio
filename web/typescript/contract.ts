@@ -305,6 +305,91 @@ export function readEditsApplyReply(body: Record<string, unknown>): EditsApplyRe
     return { batchId: body.batchId, seq: body.seq, results };
 }
 
+/**
+ * One saved op in the edit record (epic-editing entry 11a, 0.4.0): `name` and `kind` as written (a kind setup's kind
+ * id and no name); `before` and `after` what it changed (a create `after` only, a delete `before` only, an update the
+ * top-level fields whose values differ), both null on a change saved before map store schema 3.
+ */
+export interface HistoryOp {
+    op: 'create' | 'update' | 'delete';
+    entity: 'item' | 'kindSetup';
+    id: string;
+    name: string | null;
+    kind: string | null;
+    version: number;
+    before: Record<string, unknown> | null;
+    after: Record<string, unknown> | null;
+}
+
+/** One committed batch in the edit record: who saved it, when (ISO 8601 UTC), from where, and its ops in order. */
+export interface HistoryEntry {
+    seq: number;
+    batchId: string;
+    actor: string;
+    at: string;
+    source: 'session' | 'script';
+    ops: HistoryOp[];
+}
+
+/** `edits.history.reply`: one page of the edit record, newest first; `more` when older batches remain. */
+export interface EditsHistoryReplyBody {
+    entries: HistoryEntry[];
+    more: boolean;
+}
+
+/** The `edits.history` request: entries with a seq below `before`, at most `limit` (1 to 50, default 50). */
+export interface EditsHistoryRequest {
+    before?: number;
+    limit?: number;
+}
+
+function readHistoryOp(value: unknown): HistoryOp | null {
+    if (!isRecord(value)) {
+        return null;
+    }
+    const { op, entity, id, name, kind, version, before, after } = value;
+    if ((op !== 'create' && op !== 'update' && op !== 'delete') || (entity !== 'item' && entity !== 'kindSetup')
+        || typeof id !== 'string' || typeof version !== 'number') {
+        return null;
+    }
+    return {
+        op, entity, id, version,
+        name: typeof name === 'string' ? name : null,
+        kind: typeof kind === 'string' ? kind : null,
+        before: isRecord(before) ? before : null,
+        after: isRecord(after) ? after : null
+    };
+}
+
+function readHistoryEntry(value: unknown): HistoryEntry | null {
+    if (!isRecord(value) || typeof value.seq !== 'number' || typeof value.batchId !== 'string'
+        || typeof value.actor !== 'string' || typeof value.at !== 'string'
+        || (value.source !== 'session' && value.source !== 'script') || !Array.isArray(value.ops)) {
+        return null;
+    }
+    const ops: HistoryOp[] = [];
+    for (const o of value.ops) {
+        const read = readHistoryOp(o);
+        if (!read) {
+            return null;
+        }
+        ops.push(read);
+    }
+    return { seq: value.seq, batchId: value.batchId, actor: value.actor, at: value.at, source: value.source, ops };
+}
+
+/**
+ * Read an `edits.history.reply` body; null when it is not `{entries, more}`. An entry that cannot be read is left
+ * out whole (never half a batch: Revert reverses a batch as one step).
+ */
+export function readEditsHistoryReply(body: Record<string, unknown>): EditsHistoryReplyBody | null {
+    if (!Array.isArray(body.entries) || typeof body.more !== 'boolean') {
+        return null;
+    }
+    const entries = body.entries.map(readHistoryEntry).filter((e): e is HistoryEntry => e !== null);
+    return { entries, more: body.more };
+}
+
 /** The conflicts of a `conflict` error body; entries that are not conflicts are left out. */
 export function readConflicts(value: unknown): Conflict[] {
     if (!Array.isArray(value)) {

@@ -1,6 +1,7 @@
 import {
     MESSAGE_VERSION,
     MessageTypes,
+    editsHistory,
     envelope,
     newMessageId,
     pointClick,
@@ -81,5 +82,50 @@ describe('reply handling', () => {
         const reply = readReply({ v: 1, type: 'error', id: 'x' });
         expect(reply.kind).toBe('error');
         expect(replyText(reply)).toBe('Error (unknown): Unknown error.');
+    });
+});
+
+describe('edits.history (epic-editing entry 11a)', () => {
+    test('the request carries only what is given', () => {
+        expect(editsHistory({}, 'h')).toEqual({ v: 1, type: 'edits.history', id: 'h', body: {} });
+        expect(editsHistory({ before: 42, limit: 10 }, 'h2').body).toEqual({ before: 42, limit: 10 });
+        expect(editsHistory(undefined, 'h3').body).toEqual({});
+    });
+
+    const page = {
+        entries: [
+            {
+                seq: 9, batchId: 'b2', actor: 'sam', at: '2026-11-09T10:00:05Z', source: 'session',
+                ops: [{ op: 'update', entity: 'item', id: 'p31', name: 'P31', kind: 'pad', version: 2,
+                    before: { geometry: { type: 'Point', coordinates: [1, 2] } },
+                    after: { geometry: { type: 'Point', coordinates: [1, 3] } } }]
+            },
+            {
+                seq: 4, batchId: 'b1', actor: 'alex', at: '2026-11-09T09:00:00Z', source: 'script',
+                ops: [{ op: 'delete', entity: 'item', id: 'l1', name: null, kind: null, version: 2, before: null, after: null }]
+            },
+            { seq: 3, batchId: 'b0', actor: 'alex', at: 'x', source: 'session', ops: [{ op: 'move', entity: 'item', id: 'q', version: 1 }] }
+        ],
+        more: true
+    };
+
+    test('a reply is read newest first, old rows with null values, an unreadable entry left out whole', () => {
+        const reply = readReply({ v: 1, type: 'edits.history.reply', id: 'h', body: page });
+        expect(reply.kind).toBe('edits.history.reply');
+        if (reply.kind !== 'edits.history.reply') {
+            return;
+        }
+        expect(reply.body.more).toBe(true);
+        expect(reply.body.entries.map((e) => e.seq)).toEqual([9, 4]);
+        expect(reply.body.entries[0].ops[0].after).toEqual({ geometry: { type: 'Point', coordinates: [1, 3] } });
+        expect(reply.body.entries[1].source).toBe('script');
+        expect(reply.body.entries[1].ops[0]).toEqual({ op: 'delete', entity: 'item', id: 'l1', name: null, kind: null,
+            version: 2, before: null, after: null });
+        expect(replyText(reply)).toBe('Recent changes: 2 change(s), more');
+    });
+
+    test('a reply without entries or more is invalid', () => {
+        expect(readReply({ v: 1, type: 'edits.history.reply', id: 'h', body: { entries: [] } }).kind).toBe('invalid');
+        expect(readReply({ v: 1, type: 'edits.history.reply', id: 'h', body: { more: false } }).kind).toBe('invalid');
     });
 });

@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.function.Function;
 
 import com.inductiveautomation.ignition.common.gson.JsonElement;
+import com.inductiveautomation.ignition.common.gson.JsonNull;
 import com.inductiveautomation.ignition.common.gson.JsonObject;
 import com.inductiveautomation.ignition.common.util.LoggerEx;
 
@@ -157,8 +158,7 @@ public final class WriteService {
                     if (isItem(op)) {
                         items.add(new AttachmentRules.Written(op, (MapItemRecord) current, (MapItemRecord) written));
                     }
-                    tx.insertEdit(new MapStore.EditRow(project, batch.batchId(), seq, op.entity(), op.id(),
-                        op.op(), written.version(), actor.name(), actor.source()));
+                    tx.insertEdit(editRow(project, batch.batchId(), seq, op, current, written, actor));
                     results.add(new EditResult.OpResult(op.entity(), op.id(), written.version()));
                     committed.add(new ChangeHook.CommittedOp(op.op(), op.entity(), op.id(), written));
                 }
@@ -194,6 +194,51 @@ public final class WriteService {
                 + " was saved: " + ex.getClass().getSimpleName(), ex);
         }
         return result;
+    }
+
+    /**
+     * The op's edit record row with what it did (epic-editing entry 11a, schema 3), from the records the write
+     * already holds: a create keeps {@code after} (the written record), a delete {@code before} (the stored
+     * record), an update {@code before} and {@code after} with only the top-level fields whose values differ, each
+     * field's whole value ({@code version} left out: the row has its own). A map item's name and kind are the
+     * written record's, the stored record's for a delete; a kind setup's kind is its id and it has no name.
+     */
+    static MapStore.EditRow editRow(String project, String batchId, long seq, EditOp op, StoredRecord current,
+                                    StoredRecord written, Actor actor) {
+        JsonObject before = null;
+        JsonObject after = null;
+        switch (op.op()) {
+            case EditOp.CREATE -> after = written.toJson();
+            case EditOp.DELETE -> before = current.toJson();
+            default -> {
+                JsonObject was = current.toJson();
+                JsonObject now = written.toJson();
+                before = new JsonObject();
+                after = new JsonObject();
+                for (String key : now.keySet()) {
+                    if ("version".equals(key)) {
+                        continue;
+                    }
+                    JsonElement a = was.get(key);
+                    JsonElement b = now.get(key);
+                    if (a == null || !a.equals(b)) {
+                        before.add(key, a == null ? JsonNull.INSTANCE : a.deepCopy());
+                        after.add(key, b.deepCopy());
+                    }
+                }
+            }
+        }
+        String name = null;
+        String kind;
+        if (isItem(op)) {
+            MapItemRecord named = (MapItemRecord) (EditOp.DELETE.equals(op.op()) ? current : written);
+            name = named.name();
+            kind = named.kind();
+        } else {
+            kind = op.id();
+        }
+        return new MapStore.EditRow(project, batchId, seq, op.entity(), op.id(), op.op(), written.version(),
+            actor.name(), actor.source(), before, after, name, kind);
     }
 
     /** The stored reply of a committed batch for the same actor; another actor's reuse is {@code invalid}. */

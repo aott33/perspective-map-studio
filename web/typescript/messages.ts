@@ -8,7 +8,8 @@
 import { isRecord } from './json';
 import { MapChangedBody, readMapChanged } from './changes';
 import {
-    Conflict, EditBatch, EditsApplyReplyBody, MapLoadReplyBody, readConflicts, readEditsApplyReply, readMapLoadReply
+    Conflict, EditBatch, EditsApplyReplyBody, EditsHistoryReplyBody, EditsHistoryRequest, MapLoadReplyBody,
+    readConflicts, readEditsApplyReply, readEditsHistoryReply, readMapLoadReply
 } from './contract';
 import { ValuesBatchBody, readValuesBatch } from './live';
 import { BasemapId, BasemapSourceReplyBody, readBasemapSource } from './basemaps';
@@ -40,7 +41,10 @@ export const MessageTypes = {
     POPUP_CLOSE: 'popup.close',
     /** A basemap's tile source (epic 3 entry 6, AD-12): the satellite source with its token, read on the Gateway. */
     BASEMAP_SOURCE: 'basemap.source',
-    BASEMAP_SOURCE_REPLY: 'basemap.source.reply'
+    BASEMAP_SOURCE_REPLY: 'basemap.source.reply',
+    /** The edit record, newest first, in pages (epic-editing entry 11a): levels phone and full only. */
+    EDITS_HISTORY: 'edits.history',
+    EDITS_HISTORY_REPLY: 'edits.history.reply'
 } as const;
 
 export interface Envelope<B = Record<string, unknown>> {
@@ -81,6 +85,7 @@ export type Reply =
     | { kind: 'values.batch'; id: string; body: ValuesBatchBody | null }
     /** `body` is null when the basemap.source.reply could not be read: the basemap stays as it was. */
     | { kind: 'basemap.source.reply'; id: string; body: BasemapSourceReplyBody | null }
+    | { kind: 'edits.history.reply'; id: string; body: EditsHistoryReplyBody }
     | { kind: 'error'; id: string; body: ErrorBody }
     | { kind: 'invalid'; reason: string };
 
@@ -114,6 +119,18 @@ export function basemapSource(basemap: BasemapId, id?: string): Envelope<{ basem
 /** The `edits.apply` message for one batch. */
 export function editsApply(batch: EditBatch, id?: string): Envelope<EditBatch> {
     return envelope(MessageTypes.EDITS_APPLY, batch, id);
+}
+
+/** The `edits.history` message: one page of the edit record, before a seq when paging back. */
+export function editsHistory(request: EditsHistoryRequest = {}, id?: string): Envelope<EditsHistoryRequest> {
+    const body: EditsHistoryRequest = {};
+    if (request.before !== undefined) {
+        body.before = request.before;
+    }
+    if (request.limit !== undefined) {
+        body.limit = request.limit;
+    }
+    return envelope(MessageTypes.EDITS_HISTORY, body, id);
 }
 
 /** A UUID v4 string: `crypto.randomUUID` where the browser has it, else a Math.random fallback. */
@@ -171,6 +188,11 @@ export function readReply(raw: unknown): Reply {
             return saved ? { kind: 'edits.apply.reply', id: raw.id, body: saved }
                 : { kind: 'invalid', reason: 'edits.apply.reply needs batchId, seq and results.' };
         }
+        case MessageTypes.EDITS_HISTORY_REPLY: {
+            const page = readEditsHistoryReply(body);
+            return page ? { kind: 'edits.history.reply', id: raw.id, body: page }
+                : { kind: 'invalid', reason: 'edits.history.reply needs entries and more.' };
+        }
         case MessageTypes.MAP_CHANGED:
             return { kind: 'map.changed', id: raw.id, body: readMapChanged(raw.body) };
         case MessageTypes.VALUES_BATCH:
@@ -218,6 +240,8 @@ export function replyText(reply: Reply): string {
             // Never the tile URL: it carries the token.
             return reply.body ? 'Basemap source: ' + reply.body.basemap + ' from ' + reply.body.provider
                 : 'Basemap source: unreadable reply';
+        case 'edits.history.reply':
+            return 'Recent changes: ' + reply.body.entries.length + ' change(s)' + (reply.body.more ? ', more' : '');
         case 'error':
             return 'Error (' + reply.body.code + '): ' + reply.body.message;
         default:

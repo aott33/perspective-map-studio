@@ -19,6 +19,7 @@ import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 import com.aoindustrial.perspective.mapstudio.gateway.adapter.AdapterSnapshot;
+import com.aoindustrial.perspective.mapstudio.gateway.store.HistoryPage;
 import com.aoindustrial.perspective.mapstudio.gateway.store.MapStore;
 import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
 import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
@@ -98,6 +99,52 @@ public final class MapLoader {
             throw new MapStudioException(Messages.CODE_STORE_UNREACHABLE,
                 "The map store could not be read (SQLState " + ex.getSQLState() + ").");
         }
+    }
+
+    /** Why a viewer may not read the edit record ({@code role}): it names the editors and their items. */
+    static final String HISTORY_ROLE_MESSAGE = "Recent changes need an editing role. Ask for a Map Studio editing role.";
+
+    /**
+     * The {@code edits.history.reply} body (epic-editing entry 11a): one page of the edit record, newest first,
+     * for levels {@code phone} and {@code full}; {@code none} is refused {@code role} before anything is read, so
+     * a viewer never learns names. {@code before} (a change sequence number) and {@code limit} (1 to 50, default
+     * 50) are checked, else {@code invalid}. A read-only store is read as usual.
+     *
+     * @throws MapStudioException {@code role}, {@code invalid} or {@code store-unreachable}
+     */
+    public JsonObject historyReply(String project, Function<Setup, String> levelOf, JsonObject body) {
+        StoreGate.Readable readable = gate.requireReadable(project);
+        Setup setup = readable.setup();
+        if (!RoleMatrix.isEditor(levelOf.apply(setup))) {
+            throw new MapStudioException(Messages.CODE_ROLE, HISTORY_ROLE_MESSAGE);
+        }
+        Long before = historyNumber(body, "before", 1, Long.MAX_VALUE);
+        Long limit = historyNumber(body, "limit", 1, HistoryPage.MAX_ENTRIES);
+        int pageSize = limit == null ? HistoryPage.MAX_ENTRIES : limit.intValue();
+        try {
+            return store.inTransaction(setup.connection(), tx -> tx.history(project, before, pageSize)).toJson();
+        } catch (SQLException ex) {
+            log.errorf("Map Studio could not read the edit record of project %s on database connection %s (SQLState %s):"
+                + " %s", project, setup.connection(), ex.getSQLState(), ex.getClass().getSimpleName());
+            throw new MapStudioException(Messages.CODE_STORE_UNREACHABLE,
+                "The map store could not be read (SQLState " + ex.getSQLState() + ").");
+        }
+    }
+
+    /** An optional whole number of the history request between {@code min} and {@code max}; null when absent. */
+    static Long historyNumber(JsonObject body, String key, long min, long max) {
+        JsonElement e = body == null ? null : body.get(key);
+        if (e == null || e.isJsonNull()) {
+            return null;
+        }
+        if (e.isJsonPrimitive() && e.getAsJsonPrimitive().isNumber()) {
+            double d = e.getAsDouble();
+            if (d == Math.rint(d) && d >= min && d <= max) {
+                return e.getAsLong();
+            }
+        }
+        String range = max == Long.MAX_VALUE ? "a whole number from " + min : "a whole number from " + min + " to " + max;
+        throw new MapStudioException(Messages.CODE_INVALID, "edits.history: " + key + " must be " + range + ".");
     }
 
     /** The {@code map.load.reply} body for a session at a fixed {@code level}. */

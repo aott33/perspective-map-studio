@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Map store checks on the dev stack (epic 2 story 5): rights, a failed migration, the
-# lazy retry, a schema newer than the module, and (epic 2 story 14) an upgrade from schema 1
-# with data. Development only; run by hand (owner decision, 2026-10-26), results recorded in
+# lazy retry, a schema newer than the module, (epic 2 story 14) an upgrade from schema 1
+# with data and (epic-editing entry 11a) an upgrade from schema 2 with edit rows. Development only; run by hand (owner decision, 2026-10-26), results recorded in
 # docs/platform-checks.md.
 #
 # Usage: ops/store-checks.sh [scenario ...]    (default: rights partial healed newer upgrade)
@@ -199,8 +199,8 @@ for scenario in "${SCENARIOS[@]}"; do
       check_sql -c "INSERT INTO mapstudio_schema_version (version, module_version) VALUES (999, 'store-checks')"
       edits_before="$(check_sql -c "SELECT count(*) FROM mapstudio_edit")"
       restart_gateway
-      if wait_for_log "is at schema version 999, newer than this module knows (2)" 150; then
-        expect_one_line "is at schema version 999, newer than this module knows (2)" || true
+      if wait_for_log "is at schema version 999, newer than this module knows (3)" 150; then
+        expect_one_line "is at schema version 999, newer than this module knows (3)" || true
       else
         fail "no newer-schema warning within 150 s"
       fi
@@ -215,7 +215,9 @@ for scenario in "${SCENARIOS[@]}"; do
       # Epic 2 story 14: a store left at schema 1 with a map item, its tables owned by another role
       # (the owner role mapstudio) and the connection's role given the runtime rights only. Migration 2
       # (ALTER TABLE) fails with 42501 and changes nothing; once the tables are the connection role's,
-      # the next map.load after the retry interval upgrades it to 2 with no restart, the item kept.
+      # the next map.load after the retry interval upgrades it to 2 and 3 with no restart, the item kept.
+      # Then (epic-editing entry 11a, H7) a store at schema 2 with edit rows is upgraded to 3 alone: the
+      # rows are untouched, read back with before, after, name and kind null, and the name comes from the item.
       reset_check_db
       check_sql < "${PROJECT_ROOT}/gateway/src/main/resources/com/aoindustrial/perspective/mapstudio/gateway/store/migrations/0001_first_schema.sql"
       check_sql -c "CREATE TABLE mapstudio_schema_version (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now(), module_version text NOT NULL)" \
@@ -243,15 +245,49 @@ for scenario in "${SCENARIOS[@]}"; do
       info "Waiting 65 s, past the retry interval ..."
       sleep 65
       run_spec upgraded
-      if wait_for_log "Map Studio upgraded its map store schema on database connection MapStudioCheck: applied version(s) [2], now at schema version 2." 30; then
+      if wait_for_log "Map Studio upgraded its map store schema on database connection MapStudioCheck: applied version(s) [2, 3], now at schema version 3." 30; then
         ok "$(log_lines "upgraded its map store schema on database connection MapStudioCheck" | sed 's/^.*\]: //')"
       else
-        fail "no 'upgraded its map store schema ... [2]' line for MapStudioCheck"
+        fail "no 'upgraded its map store schema ... [2, 3]' line for MapStudioCheck"
       fi
-      [[ "$(check_sql -c "SELECT max(version) FROM mapstudio_schema_version")" == "2" ]] || fail "the schema is not at version 2"
+      [[ "$(check_sql -c "SELECT max(version) FROM mapstudio_schema_version")" == "3" ]] || fail "the schema is not at version 3"
       [[ "$(check_sql -c "SELECT count(*) FROM mapstudio_item WHERE attachment IS NULL AND name = 'Schema 1 pad'")" == "1" ]] \
         || fail "the schema 1 item did not read back with attachment null"
-      ok "schema 1 to 2 with data: $(check_sql -c "SELECT string_agg(indexname, ', ' ORDER BY indexname) FROM pg_indexes WHERE indexname IN ('mapstudio_item_attached_line', 'mapstudio_edit_project_entity')")"
+      ok "schema 1 to 3 with data: $(check_sql -c "SELECT string_agg(indexname, ', ' ORDER BY indexname) FROM pg_indexes WHERE indexname IN ('mapstudio_item_attached_line', 'mapstudio_edit_project_entity')")"
+
+      # H7: schema 2 with an item and three edit rows (a create, a move, a rename), tables owned by the
+      # connection's role and CREATE on the schema (an upgrade's rights, docs/operations.md), so migration 3
+      # runs at the start and is applied once.
+      reset_check_db
+      migrations="${PROJECT_ROOT}/gateway/src/main/resources/com/aoindustrial/perspective/mapstudio/gateway/store/migrations"
+      check_sql < "${migrations}/0001_first_schema.sql"
+      check_sql < "${migrations}/0002_instrument_attachment.sql"
+      check_sql -c "CREATE TABLE mapstudio_schema_version (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now(), module_version text NOT NULL)" \
+        -c "INSERT INTO mapstudio_schema_version (version, module_version) VALUES (1, 'store-checks'), (2, 'store-checks')" \
+        -c "INSERT INTO mapstudio_project (project, seq) VALUES ('mapstudio-check', 3)" \
+        -c "INSERT INTO mapstudio_item (project, id, kind, name, geometry, version) VALUES ('mapstudio-check', 'c0ffee00-0000-4000-8000-000000000002', 'pad', 'Schema 2 pad renamed', '{\"type\":\"Point\",\"coordinates\":[-104.96,39.74]}', 3)" \
+        -c "INSERT INTO mapstudio_edit (project, batch_id, seq, entity, entity_id, op, version, actor, source) VALUES ('mapstudio-check', 'c0ffee00-0000-4000-8000-0000000000b1', 1, 'item', 'c0ffee00-0000-4000-8000-000000000002', 'create', 1, 'mapeditor', 'session'), ('mapstudio-check', 'c0ffee00-0000-4000-8000-0000000000b2', 2, 'item', 'c0ffee00-0000-4000-8000-000000000002', 'update', 2, 'mapoperator', 'session'), ('mapstudio-check', 'c0ffee00-0000-4000-8000-0000000000b3', 3, 'item', 'c0ffee00-0000-4000-8000-000000000002', 'update', 3, 'cutover', 'script')" \
+        -c "GRANT CREATE ON SCHEMA public TO mapstudio_check" \
+        -c "DO \$\$ DECLARE t text; BEGIN FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'mapstudio_%' LOOP EXECUTE format('ALTER TABLE %I OWNER TO mapstudio_check', t); END LOOP; END \$\$"
+      edits_before="$(check_sql -c "SELECT string_agg(edit_id || ':' || seq || ':' || op || ':' || actor || ':' || at, ',' ORDER BY edit_id) FROM mapstudio_edit")"
+      restart_gateway
+      if wait_for_log "Map Studio upgraded its map store schema on database connection MapStudioCheck: applied version(s) [3], now at schema version 3." 150; then
+        expect_one_line "upgraded its map store schema on database connection MapStudioCheck" || true
+        ok "$(log_lines "upgraded its map store schema on database connection MapStudioCheck" | sed 's/^.*\]: //')"
+      else
+        fail "no 'upgraded its map store schema ... [3]' line for MapStudioCheck: $(log_lines "${LINE_PREFIX}" | sed 's/^.*\]: //')"
+      fi
+      [[ "$(check_sql -c "SELECT string_agg(version::text, ',' ORDER BY version) FROM mapstudio_schema_version")" == "1,2,3" ]] \
+        || fail "the schema versions are not 1, 2 and 3, each once"
+      [[ "$(check_sql -c "SELECT string_agg(edit_id || ':' || seq || ':' || op || ':' || actor || ':' || at, ',' ORDER BY edit_id) FROM mapstudio_edit")" == "${edits_before}" ]] \
+        || fail "the schema 2 edit rows changed in the upgrade"
+      [[ "$(check_sql -c "SELECT count(*) FROM mapstudio_edit WHERE before IS NULL AND after IS NULL AND name IS NULL AND kind IS NULL")" == "3" ]] \
+        || fail "the schema 2 edit rows do not read back with before, after, name and kind null"
+      # The name and kind of an old row come from the item's stored record (JdbcMapStore.HISTORY_ROWS_SQL's join).
+      old_rows="$(check_sql -c "SELECT string_agg(e.seq || ' ' || e.actor || ' ' || COALESCE(e.name, i.name) || ' ' || COALESCE(e.kind, i.kind), ', ' ORDER BY e.seq DESC) FROM mapstudio_edit e LEFT JOIN mapstudio_item i ON e.entity = 'item' AND i.project = e.project AND i.id = CASE WHEN e.entity = 'item' THEN e.entity_id::uuid END WHERE e.project = 'mapstudio-check'")"
+      [[ "${old_rows}" == "3 cutover Schema 2 pad renamed pad, 2 mapoperator Schema 2 pad renamed pad, 1 mapeditor Schema 2 pad renamed pad" ]] \
+        || fail "the old rows read back as '${old_rows}'"
+      ok "schema 2 to 3 with edit rows: ${old_rows}"
       ;;
     *)
       fail "unknown scenario ${scenario}"

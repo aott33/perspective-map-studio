@@ -24,6 +24,8 @@ Every message, both ways, is one JSON object `{v, type, id, body}` carried under
 | `popup.open`, `popup.close` | browser to Gateway | 0.3.0 | `{itemId}`: the map item whose popup is open; its values are pushed on change meanwhile (below) **[live 8.3.10]** |
 | `basemap.source` | browser to Gateway | 0.3.0 | `{basemap}`: the browser asks for a basemap's raster tile source; only `satellite` is asked for (epic 3 entry 6, below) **[live 8.3.10]** |
 | `basemap.source.reply` | Gateway to browser | 0.3.0 | `{basemap, provider, tiles, tileSize, maxzoom, attribution}`: the raster source, its token (read on the Gateway from the setup's secret) inside the tile URL template only (below) **[live 8.3.10]** |
+| `edits.history` | browser to Gateway | 0.4.0 | `{before?, limit?}`: one page of the edit record, newest first; levels `phone` and `full` only (epic-editing entry 11a, below) |
+| `edits.history.reply` | Gateway to browser | 0.4.0 | `{entries: [{seq, batchId, actor, at, source, ops}], more}`: one entry per committed batch (below) |
 | `point.click`, `point.click.reply` | both | 0.1.0 | the spike's round trip, unchanged |
 
 The `id` of a reply is the `id` of the message it answers.
@@ -49,6 +51,29 @@ After every committed batch, from a browser or from `system.mapstudio.applyEdits
 - A `map.load` answered with an error (the busy `store-unreachable` reply among them) leaves the map not loaded and holding changes; the next `map.changed` sends one new `map.load`, and so does a 15 s timer while no `map.load` is pending (a quiet project sends no `map.changed`; epic 2 story 8), so a refused reload never leaves the map stale until the page is reloaded.
 - A browser that was disconnected catches up at its next gap or its next page open; reloading on a Perspective reconnect is epic-viewing's (AD-6).
 - The dev component shows the state for tests as `data-store-seq` (the last `seq` applied) and `data-map-reloads` (gap reloads) on `.mapstudio-map`.
+
+## edits.history: the edit record, newest first (epic-editing entry 11a)
+
+Added in 0.4.0 for Recent changes (R18, R45): the browser reads what each saved batch did, a page at a time, and Revert (entry 11b) sends the reverse as an ordinary `edits.apply` batch. It reads and writes nothing else; `map.changed` is unchanged (a browser showing Recent changes asks for the first page again).
+
+```json
+{"type": "edits.history", "body": {"before": 61, "limit": 50}}
+{"type": "edits.history.reply",
+ "body": {"entries": [{"seq": 60, "batchId": "<UUID>", "actor": "mapoperator", "at": "2026-11-09T10:00:05Z",
+                       "source": "session",
+                       "ops": [{"op": "update", "entity": "item", "id": "<UUID>", "name": "P31", "kind": "pad",
+                                "version": 2,
+                                "before": {"geometry": {"type": "Point", "coordinates": [-104.9688, 39.7442]}},
+                                "after": {"geometry": {"type": "Point", "coordinates": [-104.9689, 39.7443]}}}]}],
+          "more": true}}
+```
+
+- **Who may read it.** Levels `phone` and `full`; a session at level `none` is refused `role` ("Recent changes need an editing role. Ask for a Map Studio editing role.") before anything is read, so a viewer never learns the editors' names or the items' (as `tags.*`). Checks, in order: the project's setup (`store-unreachable`), the level (`role`), the body (`invalid`), then the read (`store-unreachable`). A read-only store is read as usual. It runs on the module's work pool like `map.load`.
+- **The request.** `before` (optional) is a change sequence number: only batches with a lower `seq` are listed, so the next page asks `before` the last entry's `seq`. `limit` (optional, default 50) is a whole number from 1 to 50. Anything else in either is refused `invalid`.
+- **One entry per batch**, newest first: its `seq`, `batchId`, `actor` (the session's user name, or the actor a script named), `at` (ISO 8601 UTC to the second) and `source` (`session` or `script`), and its `ops` in the order they were saved. A refused batch wrote nothing, so it has no entry.
+- **Each op**: `op`, `entity` (`item` or `kindSetup`), `id`, `version` (after the op), `name` and `kind` as the op wrote them (the stored record's for a delete), so an old change reads the name the item had then; a kind setup's `kind` is its kind id and its `name` null. `before` and `after` are what it did: a create carries `after`, the written record, with `before` null; a delete carries `before`, the stored record, with `after` null; an update carries in both only the top-level fields whose values differ (for example `geometry`, `name`, `properties`, `overrides`, `attachment`, or a kind setup's `setup`), each field's whole value, never `version`. A change saved before map store schema 3 has `before` and `after` null, and its `name` and `kind` from the item's stored record.
+- **Pages.** A page closes at `limit` entries, or once adding the next batch would take it past 1,000 ops (one batch's cap, `edits.apply`), always with at least one whole entry: a batch is never split. `more` is true when older batches remain.
+- Unit tested (`EditHistoryTest`, `HistoryJdbcTest`, `MigratorTest`) and run on the dev stack (`history.spec.mjs`).
 
 ## tags.browse and tags.resolve: the tag browser's lookups
 
@@ -390,9 +415,9 @@ except Exception as ex:
 
 The project resource `com.aoindustrial.perspective.mapstudio/setup/` (`setup.json`). Every field, its default and rule, the messages a wrong setup gives, and how to change it on a running Gateway: `docs/setup.md`. In short: only `schemaVersion` (1) and `connection` are required; unknown fields are refused; a wrong or missing setup makes the project's map store answer `store-unreachable` with the reason; a changed setup applies at the next call after a project scan, with no restart **[live 8.3.10]**. The map is keyed by the project's own name, even when a child project inherits the setup. The kind and asset functions (`kindsFunction`, `assetsFunction`) and how often they are called (`refreshIntervalSeconds`): [kinds-and-assets.md](kinds-and-assets.md).
 
-## The map store, schema version 2 (AD-3, AD-21)
+## The map store, schema version 3 (AD-3, AD-21)
 
-PostgreSQL only. On start, for each connection a setup names, Map Studio waits for the connection to be usable (every 5 s, up to 2 minutes), then reads the recorded schema version with no lock and no DDL (`to_regclass`, then `max(version)`); only when a migration is pending does it apply its versioned migrations (`gateway/src/main/resources/.../store/migrations/`), each in one transaction under `pg_advisory_xact_lock(hashtext('mapstudio_migrations'))`, and records the version **[live 8.3.10]**. When the connection never becomes usable it logs one error naming the connection; when a statement fails it logs one error naming the connection, the migration, the statement (its number in the migration's transaction and its first words), the SQLState ("none" for a failure that is not a database error), the missing right for 42501, and PostgreSQL's message (entry 5, `docs/operations.md`). Either way the map store is unavailable (`store-unreachable`), with no half-created schema, and Map Studio tries again at most once a minute on the next `map.load` or `applyEdits` **[live 8.3.10]**, logging the line again only when it changes (unit tested, `StoreRegistryStateTest`; **[unverified]** live: no live run has retried with the same failure). A recorded version newer than the module makes the map store read only: one warning naming the connection and both versions, nothing migrated or changed, `map.load` as usual with `readOnly`, saves refused `read-only` **[live 8.3.10]**. Of a redundant pair only the active node migrates and saves; a standby reads the version only and refuses saves `read-only` **[unverified]**. Rights: the first start needs a role that may CREATE in the schema, and the upgrade to schema 2 (epic 2 story 14: `ALTER TABLE`) the role that owns the tables ([operations.md](operations.md)) **[live 8.3.10]**; after that a least-privilege runtime role with CONNECT, USAGE on the schema, SELECT, INSERT and UPDATE on the tables and USAGE and SELECT on the sequences is enough **[live 8.3.10]** (docs/platform-checks.md). Map Studio has no backup of its own: the site's PostgreSQL backups cover these tables.
+PostgreSQL only. On start, for each connection a setup names, Map Studio waits for the connection to be usable (every 5 s, up to 2 minutes), then reads the recorded schema version with no lock and no DDL (`to_regclass`, then `max(version)`); only when a migration is pending does it apply its versioned migrations (`gateway/src/main/resources/.../store/migrations/`), each in one transaction under `pg_advisory_xact_lock(hashtext('mapstudio_migrations'))`, and records the version **[live 8.3.10]**. When the connection never becomes usable it logs one error naming the connection; when a statement fails it logs one error naming the connection, the migration, the statement (its number in the migration's transaction and its first words), the SQLState ("none" for a failure that is not a database error), the missing right for 42501, and PostgreSQL's message (entry 5, `docs/operations.md`). Either way the map store is unavailable (`store-unreachable`), with no half-created schema, and Map Studio tries again at most once a minute on the next `map.load` or `applyEdits` **[live 8.3.10]**, logging the line again only when it changes (unit tested, `StoreRegistryStateTest`; **[unverified]** live: no live run has retried with the same failure). A recorded version newer than the module makes the map store read only: one warning naming the connection and both versions, nothing migrated or changed, `map.load` as usual with `readOnly`, saves refused `read-only` **[live 8.3.10]**. Of a redundant pair only the active node migrates and saves; a standby reads the version only and refuses saves `read-only` **[unverified]**. Rights: the first start needs a role that may CREATE in the schema, and the upgrades to schema 2 (epic 2 story 14: `ALTER TABLE`) and schema 3 (epic-editing entry 11a: `ALTER TABLE mapstudio_edit`) the role that owns the tables ([operations.md](operations.md)) **[live 8.3.10]**; after that a least-privilege runtime role with CONNECT, USAGE on the schema, SELECT, INSERT and UPDATE on the tables and USAGE and SELECT on the sequences is enough **[live 8.3.10]** (docs/platform-checks.md). Map Studio has no backup of its own: the site's PostgreSQL backups cover these tables.
 
 | Table | Key | Columns |
 | --- | --- | --- |
@@ -400,10 +425,10 @@ PostgreSQL only. On start, for each connection a setup names, Map Studio waits f
 | `mapstudio_project` | `project` | `seq bigint`: the project's change sequence |
 | `mapstudio_item` | `(project, id uuid)` | `kind`, `name`, `geometry text` (GeoJSON), `properties jsonb`, `asset_id`, `overrides jsonb`, `ends jsonb`, `version`, `deleted`, `updated_at`, `attachment jsonb` (schema 2, null but on an attached instrument); partial index `(project, (attachment->>'lineId'))` on live attached rows (schema 2) |
 | `mapstudio_kind_setup` | `(project, kind_id)` | `setup jsonb`, `version`, `deleted`, `updated_at` (written from entry 9) |
-| `mapstudio_edit` | `edit_id bigserial` | `project`, `batch_id uuid`, `seq`, `entity`, `entity_id`, `op`, `version` (after the op), `actor`, `source` (`session` or `script`), `at timestamptz` (UTC); indexes `(project, seq)` and (schema 2) `(project, entity, entity_id)` |
+| `mapstudio_edit` | `edit_id bigserial` | `project`, `batch_id uuid`, `seq`, `entity`, `entity_id`, `op`, `version` (after the op), `actor`, `source` (`session` or `script`), `at timestamptz` (UTC); (schema 3) `before jsonb` and `after jsonb` (what the op changed, `edits.history` above), `name` and `kind` (the item's, as written), all four null on rows from before schema 3; indexes `(project, seq)` and (schema 2) `(project, entity, entity_id)` |
 | `mapstudio_batch` | `(project, batch_id)` | `seq`, `actor`, `result jsonb`, `committed_at` (the reply a retried `batchId` gets, from entry 2) |
 
-The edit record answers "who changed what, when": the Ignition user name of the session, or the actor a script names.
+The edit record answers "who changed what, when": the Ignition user name of the session, or the actor a script names, and since schema 3 what each op changed, read by `edits.history`.
 
 ## The scripting API (AD-18)
 

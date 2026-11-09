@@ -83,15 +83,27 @@ public final class Messages {
     public static final String BASEMAP_SOURCE = "basemap.source";
     /** Body {basemap, provider, tiles: [url template], tileSize, maxzoom, attribution}: a raster tile source. */
     public static final String BASEMAP_SOURCE_REPLY = "basemap.source.reply";
+    /**
+     * The browser reads the edit record, newest first (epic-editing entry 11a, 0.4.0): body {before?: seq,
+     * limit?: 1-50, default 50}; levels {@code phone} and {@code full} only, {@code none} is refused {@code role}.
+     */
+    public static final String EDITS_HISTORY = "edits.history";
+    /**
+     * Body {entries: [{seq, batchId, actor, at, source, ops: [{op, entity, id, name, kind, version, before,
+     * after}]}], more}: one entry per batch, newest first; a page closes at {@code limit} entries or before the
+     * batch that would take it past 1,000 ops, never splitting a batch.
+     */
+    public static final String EDITS_HISTORY_REPLY = "edits.history.reply";
 
     /** Every type the Gateway accepts from the browser. */
     public static final Set<String> INBOUND_TYPES =
-        Set.of(POINT_CLICK, MAP_LOAD, EDITS_APPLY, TAGS_BROWSE, TAGS_RESOLVE, POPUP_OPEN, POPUP_CLOSE, BASEMAP_SOURCE);
+        Set.of(POINT_CLICK, MAP_LOAD, EDITS_APPLY, TAGS_BROWSE, TAGS_RESOLVE, POPUP_OPEN, POPUP_CLOSE, BASEMAP_SOURCE,
+            EDITS_HISTORY);
 
     /** Every type the Gateway sends to the browser. */
     public static final Set<String> OUTBOUND_TYPES =
         Set.of(POINT_CLICK_REPLY, MAP_LOAD_REPLY, EDITS_APPLY_REPLY, MAP_CHANGED, ERROR, TAGS_BROWSE_REPLY,
-            TAGS_RESOLVE_REPLY, VALUES_BATCH, BASEMAP_SOURCE_REPLY);
+            TAGS_RESOLVE_REPLY, VALUES_BATCH, BASEMAP_SOURCE_REPLY, EDITS_HISTORY_REPLY);
 
     // Error codes: stable kebab-case words.
     /** A batch's baseVersion is not the stored version. */

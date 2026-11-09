@@ -5,7 +5,7 @@
 //   ready        after the grant is fixed, the map heals without a Gateway restart
 //   read-only    the schema is newer than the module: the map is read, a save is refused
 //                read-only, nothing is written, getMap's list says readOnly
-//   upgraded     (epic 2 story 14) a schema 1 store with an item, upgraded to 2: the item reads back
+//   upgraded     (epic 2 story 14) a schema 1 store with an item, upgraded to 3: the item reads back
 //                through getMap and map.load with attachment null and nothing else changed
 // Skipped in the plain suite (no scenario set). Screenshots at 1440 and 390 px (AD-15).
 
@@ -81,7 +81,7 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
             await expect(map).toHaveAttribute('data-load-state', 'loaded');
             await expect(map).toHaveAttribute('data-store-state', 'read-only');
             const before = Number(await map.getAttribute('data-items-loaded'));
-            const reason = 'The map store was upgraded by a newer Map Studio (schema 999, this module knows 2); '
+            const reason = 'The map store was upgraded by a newer Map Studio (schema 999, this module knows 3); '
                 + 'saving is off until the module is upgraded.';
             // The reason on the map (epic 4 entry 24); this viewer sees no chip for it: a read-only store is an editor's problem
             // (the save status row in Edit mode, the chip in View mode for an editor; e2e/tests/problems.spec.mjs).

@@ -2,7 +2,7 @@
 
 A walk through what epic 4 has built so far, grouped by what you do, on the local development stack. Tick each box and note anything that looks or feels off in the Notes line under each section (a screenshot helps). Each note goes into `_bmad-output/initiative-flowmap/tickets/epic-editing/epic-editing.md` Notes or a new entry. The playbook grows as entries land; entry 18 (the 0.4.0 release) finishes it for the release test and the 30-minute test.
 
-Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments) and 10 (save problems). Still to come: 11 (Recent changes and History), 12 and 13 (the Kinds screen, the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
+Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems) and 11a (the edit record, Gateway only). Still to come: 11b (Recent changes and History), 12 and 13 (the Kinds screen, the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
 
 ## Results so far
 
@@ -24,6 +24,7 @@ Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item li
 | 8e. First run | | |
 | 8g. Instruments | | |
 | 8h. Save problems | | |
+| 8i. The edit record | | |
 | 9. View mode, unchanged | | |
 | 10. Phone (390 px) | | |
 | 11. Designer | | |
@@ -267,6 +268,19 @@ On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor
 - [ ] **A lost connection is unchanged**: stop the Gateway container instead (`docker stop <MAPSTUDIO_CONTAINER>`) and draw a line: the chip says no connection, the toolbar stays on, and the line waits on the row; no card. Start it again.
 - [ ] **Busy** is hard to make by hand (the Gateway's work pool full); the suite fakes it (`savestates.spec.mjs`). Check its screenshot `docs/screenshots/mapstudio-savestates-busy-1366.png` against [key-screen-9 busy](../_bmad-output/initiative-flowmap/ux-map-studio/mockups/key-screen-9-save-states-busy.png): "Not saved - Map Studio is busy", the sentence, "Your change, kept here: ...", **Try again** and **Discard my change**.
 - [ ] **Second tab.** A tab that cannot send a batch leaves it in the browser's queue, and another open tab of the same browser now replays it within 15 s with no reload. The suite makes it (`savestates.spec.mjs`, R8: tab A's saves dropped by the test, tab B saves the line, both lists empty after). By hand: open `/edit` in two tabs, draw a line in one; both tabs' rows stay empty and the line shows in both.
+
+Notes:
+
+## 8i. The edit record (Gateway only)
+
+Entry 11a keeps what each change did and reads it with `edits.history`; nothing shows in the studio until entry 11b (History in the rail, Revert). A short check in the browser's developer console on `/edit`, signed in as the map editor, after **Seed the dev map**. The test hook (`window.__mapStudioTest`) sends through the component's own session, so the Gateway decides with your roles.
+
+- [ ] Move P14 (Edit mode, Select, drag it), then in the console run `(await window.__mapStudioTest.send('edits.history', {limit: 3})).body.entries[0]`: the newest entry is your move, `actor` your user name, `at` the time in UTC, and one op with `name` "P14", `kind`, and `before` and `after` holding only `geometry` (the old and the new coordinates).
+- [ ] Rename P14 in Details, then run the same line: the newest op's `before` and `after` hold only `name`, and the entry below it (your move) still reads `name` "P14", the name it had then.
+- [ ] Delete a line with an instrument on it, then run the same line: one entry, its ops one delete per item, each with `before` (the record as it was) and `after` null.
+- [ ] Page back: `(await window.__mapStudioTest.send('edits.history', {before: <the last entry's seq>, limit: 3})).body` lists the three older batches and `more`.
+- [ ] Open `/` in a private window (no sign-in) and run `(await window.__mapStudioTest.send('edits.history', {})).body`: `{code: "role", ...}` and no names.
+- [ ] A store from before this build (schema 2) is upgraded once on the Gateway's start: the log says "applied version(s) [3], now at schema version 3", and the older changes are listed with `before` and `after` null.
 
 Notes:
 

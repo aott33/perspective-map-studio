@@ -41,6 +41,26 @@ public final class JdbcMapStore implements MapStore {
     static final String LAST_EDITS_SQL = "SELECT DISTINCT ON (entity_id) entity_id, actor, at FROM mapstudio_edit"
         + " WHERE project = ? AND entity = 'item' ORDER BY entity_id, edit_id DESC";
 
+    /**
+     * {@code edits.history}'s page heads (epic-editing entry 11a): the newest batches below a seq with their op counts,
+     * one row per batch (its seq), served backwards by mapstudio_edit_project_seq.
+     */
+    static final String HISTORY_HEADS_SQL = "SELECT seq, count(*) FROM mapstudio_edit WHERE project = ? AND seq < ?"
+        + " GROUP BY seq ORDER BY seq DESC LIMIT ?";
+
+    /**
+     * The rows of the batches a page takes, newest batch first, each batch's ops in the order they were saved. A row
+     * from before schema 3 has no name or kind of its own: the map item's stored record gives them (a kind setup's
+     * kind is its id).
+     */
+    static final String HISTORY_ROWS_SQL = "SELECT e.seq, e.batch_id::text, e.actor, e.at, e.source, e.op, e.entity,"
+        + " e.entity_id, e.version, COALESCE(e.name, i.name),"
+        + " COALESCE(e.kind, i.kind, CASE WHEN e.entity = 'kindSetup' THEN e.entity_id END),"
+        + " e.before::text, e.after::text"
+        + " FROM mapstudio_edit e LEFT JOIN mapstudio_item i ON e.entity = 'item' AND i.project = e.project"
+        + " AND i.id = CASE WHEN e.entity = 'item' THEN e.entity_id::uuid END"
+        + " WHERE e.project = ? AND e.seq <= ? AND e.seq >= ? ORDER BY e.seq DESC, e.edit_id";
+
     /** A database time as ISO 8601 UTC to the second ({@code LastEdit}'s form), null for null. */
     static String isoSecond(OffsetDateTime at) {
         return at == null ? null : DateTimeFormatter.ISO_INSTANT.format(at.withOffsetSameInstant(ZoneOffset.UTC)
@@ -184,7 +204,8 @@ public final class JdbcMapStore implements MapStore {
         @Override
         public void insertEdit(EditRow row) throws SQLException {
             try (PreparedStatement ps = c.prepareStatement("INSERT INTO mapstudio_edit (project, batch_id, seq, entity, "
-                    + "entity_id, op, version, actor, source, at) VALUES (?, ?::uuid, ?, ?, ?, ?, ?, ?, ?, now())")) {
+                    + "entity_id, op, version, actor, source, before, after, name, kind, at) "
+                    + "VALUES (?, ?::uuid, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, now())")) {
                 ps.setString(1, row.project());
                 ps.setString(2, row.batchId());
                 ps.setLong(3, row.seq());
@@ -194,6 +215,10 @@ public final class JdbcMapStore implements MapStore {
                 ps.setInt(7, row.version());
                 ps.setString(8, row.actor());
                 ps.setString(9, row.source());
+                setNullable(ps, 10, row.before() == null ? null : row.before().toString());
+                setNullable(ps, 11, row.after() == null ? null : row.after().toString());
+                setNullable(ps, 12, row.name());
+                setNullable(ps, 13, row.kind());
                 ps.executeUpdate();
             }
         }
@@ -256,6 +281,66 @@ public final class JdbcMapStore implements MapStore {
                 }
             }
             return out;
+        }
+
+        @Override
+        public HistoryPage history(String project, Long before, int limit) throws SQLException {
+            List<Long> seqs = new ArrayList<>();
+            List<Integer> counts = new ArrayList<>();
+            // One more head than the page can take, so more is known without another query.
+            try (PreparedStatement ps = c.prepareStatement(HISTORY_HEADS_SQL)) {
+                ps.setString(1, project);
+                ps.setLong(2, before == null ? Long.MAX_VALUE : before);
+                ps.setInt(3, limit + 1);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        seqs.add(rs.getLong(1));
+                        counts.add(rs.getInt(2));
+                    }
+                }
+            }
+            int n = HistoryPage.take(counts, limit);
+            if (n == 0) {
+                return new HistoryPage(List.of(), false);
+            }
+            List<HistoryPage.Entry> entries = new ArrayList<>();
+            try (PreparedStatement ps = c.prepareStatement(HISTORY_ROWS_SQL)) {
+                ps.setString(1, project);
+                ps.setLong(2, seqs.get(0));
+                ps.setLong(3, seqs.get(n - 1));
+                try (ResultSet rs = ps.executeQuery()) {
+                    long seq = -1;
+                    List<HistoryPage.Op> ops = null;
+                    while (rs.next()) {
+                        long rowSeq = rs.getLong(1);
+                        if (ops == null || rowSeq != seq) {
+                            seq = rowSeq;
+                            ops = new ArrayList<>();
+                            entries.add(new HistoryPage.Entry(seq, rs.getString(2), rs.getString(3),
+                                isoSecond(rs.getObject(4, OffsetDateTime.class)), rs.getString(5), ops));
+                        }
+                        ops.add(new HistoryPage.Op(rs.getString(6), rs.getString(7), rs.getString(8), rs.getString(10),
+                            rs.getString(11), rs.getInt(9), jsonOrNull(rs.getString(12)), jsonOrNull(rs.getString(13))));
+                    }
+                }
+            }
+            List<HistoryPage.Entry> frozen = new ArrayList<>();
+            for (HistoryPage.Entry e : entries) {
+                frozen.add(new HistoryPage.Entry(e.seq(), e.batchId(), e.actor(), e.at(), e.source(), List.copyOf(e.ops())));
+            }
+            return new HistoryPage(List.copyOf(frozen), n < seqs.size());
+        }
+
+        private static JsonObject jsonOrNull(String text) {
+            return text == null ? null : JsonParser.parseString(text).getAsJsonObject();
+        }
+
+        private static void setNullable(PreparedStatement ps, int index, String value) throws SQLException {
+            if (value == null) {
+                ps.setNull(index, Types.VARCHAR);
+            } else {
+                ps.setString(index, value);
+            }
         }
 
         @Override

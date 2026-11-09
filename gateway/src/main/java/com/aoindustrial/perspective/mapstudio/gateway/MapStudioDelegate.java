@@ -405,7 +405,7 @@ public class MapStudioDelegate extends ComponentModelDelegate {
     }
 
     /**
-     * The reply to {@code map.load} or {@code edits.apply} for this session. Every
+     * The reply to {@code map.load}, {@code edits.apply} or {@code edits.history} for this session. Every
      * refusal becomes an {@code error} envelope; nothing escapes. The session's level is
      * worked out from the one setup the loader or the write service reads for this call, so
      * the level and the reply always come from the same setup.
@@ -418,6 +418,10 @@ public class MapStudioDelegate extends ComponentModelDelegate {
             if (Messages.MAP_LOAD.equals(type)) {
                 return envelope(Messages.MAP_LOAD_REPLY, id,
                     withUser(loader.mapLoadReply(view.project(), level), view.userName()));
+            }
+            if (Messages.EDITS_HISTORY.equals(type)) {
+                // Levels phone and full only (epic-editing entry 11a); the loader refuses none with role.
+                return envelope(Messages.EDITS_HISTORY_REPLY, id, loader.historyReply(view.project(), level, body));
             }
             JsonElement b = body.get("batchId");
             batchId = b != null && b.isJsonPrimitive() ? b.getAsString() : null;
@@ -484,7 +488,7 @@ public class MapStudioDelegate extends ComponentModelDelegate {
 
     private static boolean isStoreType(String type) {
         return Messages.MAP_LOAD.equals(type) || Messages.EDITS_APPLY.equals(type) || isTagType(type)
-            || Messages.BASEMAP_SOURCE.equals(type);
+            || Messages.BASEMAP_SOURCE.equals(type) || Messages.EDITS_HISTORY.equals(type);
     }
 
     static boolean isTagType(String type) {

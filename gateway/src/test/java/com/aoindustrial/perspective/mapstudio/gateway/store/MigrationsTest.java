@@ -15,8 +15,8 @@ class MigrationsTest {
     @Test
     void migrationOneCreatesTheWholeFirstSchema() {
         List<Migrations.Migration> all = Migrations.all();
-        assertEquals(2, all.size());
-        assertEquals(2, Migrations.latest());
+        assertEquals(3, all.size());
+        assertEquals(3, Migrations.latest());
         Migrations.Migration first = all.get(0);
         assertEquals(1, first.version());
         String joined = String.join("\n", first.statements());
@@ -43,6 +43,20 @@ class MigrationsTest {
                 + "    WHERE attachment IS NOT NULL AND NOT deleted",
             "CREATE INDEX mapstudio_edit_project_entity ON mapstudio_edit (project, entity, entity_id)"),
             second.statements());
+    }
+
+    @Test
+    void migrationThreeAddsTheEditValuesNameAndKindColumns() {
+        // Epic-editing entry 11a: additive, existing rows untouched; (project, seq) of migration 1 serves the page query.
+        Migrations.Migration third = Migrations.all().get(2);
+        assertEquals(3, third.version());
+        assertEquals("0003_edit_values.sql", third.name());
+        assertEquals(List.of(
+            "ALTER TABLE mapstudio_edit ADD COLUMN before jsonb",
+            "ALTER TABLE mapstudio_edit ADD COLUMN after jsonb",
+            "ALTER TABLE mapstudio_edit ADD COLUMN name text",
+            "ALTER TABLE mapstudio_edit ADD COLUMN kind text"),
+            third.statements());
     }
 
     @Test

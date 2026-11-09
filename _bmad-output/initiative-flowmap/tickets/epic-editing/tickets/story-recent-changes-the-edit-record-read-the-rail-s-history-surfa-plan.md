@@ -3,14 +3,14 @@ title: "11a: The edit record keeps what each change did, read by edits.history"
 type: 'feature'
 ticket: '11'
 created: '2026-11-09'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '11c3fd424cc2ec4b71a8897969dd3070ebd2b2dd'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/architecture-map-studio/architecture-map-studio.md']
 ---
@@ -63,14 +63,14 @@ G = `gateway/src/main/java/com/aoindustrial/perspective/mapstudio/gateway`, GT i
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `0003_edit_values.sql`, `Migrations.java` -- `before jsonb`, `after jsonb`, `name text`, `kind text` on `mapstudio_edit`; an index for `(project, seq DESC)` if the page query needs it -- H7.
-- [ ] `MapStore.java`, `JdbcMapStore.java`, `FakeMapStore.java` -- write the values; read a page grouped by batch with the 50-entry / 1,000-op rule and `more` -- H4, H5.
-- [ ] `WriteService.java` -- compute the values, name and kind per op from `current` and `written` -- H1, H2, H7, H8.
-- [ ] `Messages.java`, `MapStudioDelegate.java` -- the types, routing, validation, role refusal, `name`/`kind` -- H3, H6.
-- [ ] Gateway and common tests -- every matrix row; the migration and the page cursor.
-- [ ] `messages.ts`, `contract.ts`, `testHook.ts`, Jest -- the request builder and the reply reader.
-- [ ] `e2e/tests/history.spec.mjs` -- H1 to H6 and H8 on the dev stack through the test hook (two editors, the operator user for H6).
-- [ ] `ops/store-checks.sh`, docs -- H7 run once by the orchestrator; contract, CHANGELOG, platform checks, playbook 8i.
+- [x] `0003_edit_values.sql`, `Migrations.java` -- `before jsonb`, `after jsonb`, `name text`, `kind text` on `mapstudio_edit`; an index for `(project, seq DESC)` if the page query needs it -- H7.
+- [x] `MapStore.java`, `JdbcMapStore.java`, `FakeMapStore.java` -- write the values; read a page grouped by batch with the 50-entry / 1,000-op rule and `more` -- H4, H5.
+- [x] `WriteService.java` -- compute the values, name and kind per op from `current` and `written` -- H1, H2, H7, H8.
+- [x] `Messages.java`, `MapStudioDelegate.java` -- the types, routing, validation, role refusal, `name`/`kind` -- H3, H6.
+- [x] Gateway and common tests -- every matrix row; the migration and the page cursor.
+- [x] `messages.ts`, `contract.ts`, `testHook.ts`, Jest -- the request builder and the reply reader.
+- [x] `e2e/tests/history.spec.mjs` -- H1 to H6 and H8 on the dev stack through the test hook (two editors, the operator user for H6).
+- [x] `ops/store-checks.sh`, docs -- H7 run once by the orchestrator; contract, CHANGELOG, platform checks, playbook 8i.
 
 **Acceptance Criteria:**
 - Given the dev stack, when two editors move P14 and P31, then `edits.history` lists P31's move first with its actor, time and old and new coordinates, then P14's.

@@ -13,6 +13,7 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
 
 import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
+import com.aoindustrial.perspective.mapstudio.gateway.store.HistoryPage;
 import com.aoindustrial.perspective.mapstudio.gateway.store.MapStore;
 
 /**
@@ -54,6 +55,8 @@ public class FakeMapStore implements MapStore {
     public String now = "2026-10-26T14:02:00Z";
     /** How many times {@code lastEdits} was called (entry 7a: one query per load, never one per item). */
     public int lastEditsQueries;
+    /** How many times {@code history} was called. */
+    public int historyQueries;
     /**
      * When set, the next insertBatch finds this row already committed by another transaction
      * (a concurrent send of the same batchId): it is added to the committed state and the
@@ -207,6 +210,51 @@ public class FakeMapStore implements MapStore {
                 }
             }
             return out;
+        }
+
+        @Override
+        public HistoryPage history(String project, Long before, int limit) {
+            historyQueries++;
+            // Batches newest first, by seq; each batch's rows in the order they were saved.
+            TreeMap<Long, List<Integer>> bySeq = new TreeMap<>(java.util.Comparator.reverseOrder());
+            for (int i = 0; i < s.edits.size(); i++) {
+                EditRow row = s.edits.get(i);
+                if (row.project().equals(project) && (before == null || row.seq() < before)) {
+                    bySeq.computeIfAbsent(row.seq(), q -> new ArrayList<>()).add(i);
+                }
+            }
+            List<Integer> counts = new ArrayList<>();
+            bySeq.values().forEach(rows -> counts.add(rows.size()));
+            int n = HistoryPage.take(counts, limit);
+            List<HistoryPage.Entry> entries = new ArrayList<>();
+            for (Map.Entry<Long, List<Integer>> batch : bySeq.entrySet()) {
+                if (entries.size() == n) {
+                    break;
+                }
+                List<HistoryPage.Op> ops = new ArrayList<>();
+                EditRow first = s.edits.get(batch.getValue().get(0));
+                for (int i : batch.getValue()) {
+                    EditRow row = s.edits.get(i);
+                    String name = row.name();
+                    String kind = row.kind();
+                    if ("item".equals(row.entity())) {
+                        MapItemRecord stored = s.items.getOrDefault(project, new TreeMap<>()).get(row.entityId());
+                        if (name == null && stored != null) {
+                            name = stored.name();
+                        }
+                        if (kind == null && stored != null) {
+                            kind = stored.kind();
+                        }
+                    } else if (kind == null) {
+                        kind = row.entityId();
+                    }
+                    ops.add(new HistoryPage.Op(row.op(), row.entity(), row.entityId(), name, kind, row.version(),
+                        row.before(), row.after()));
+                }
+                entries.add(new HistoryPage.Entry(batch.getKey(), first.batchId(), first.actor(),
+                    s.editTimes.get(batch.getValue().get(0)), first.source(), List.copyOf(ops)));
+            }
+            return new HistoryPage(List.copyOf(entries), n < counts.size());
         }
 
         @Override
