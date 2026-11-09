@@ -62,12 +62,12 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] Geometry create and move batches, delegate methods, undo labels, Jest.
-- [ ] `studio.ts` and the armed placement, the drawing bar, refusals.
-- [ ] Line and instrument Details, the Kind select.
-- [ ] Dragging along the line.
-- [ ] Dev Meter kind and glyph, ignition-lint; e2e `addinstrument.spec.mjs` and the changed specs.
-- [ ] Docs, CHANGELOG, playbook.
+- [x] Geometry create and move batches, delegate methods, undo labels, Jest.
+- [x] `studio.ts` and the armed placement, the drawing bar, refusals.
+- [x] Line and instrument Details, the Kind select.
+- [x] Dragging along the line.
+- [x] Dev Meter kind and glyph, ignition-lint; e2e `addinstrument.spec.mjs` and the changed specs.
+- [x] Docs, CHANGELOG, playbook.
 
 **Acceptance Criteria:**
 - Given the seeded dev map as `mapeditor` at 1366 px, when the matrix runs, then each row holds.
@@ -78,6 +78,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 - Planner, 2026-11-09: the environment, commit and identity rules are entry 8's plan's (Docker by hand after a restart, JDK 17 by apt if gone, `ops/up.sh --fresh` before a whole-suite run, the session's trailers, `git commit --only`, no em dashes, never a bare `git stash`, never a push). Commit at each working milestone. Render the new `meter` glyph beside `tap`, `line-valve` and `meter-station` at 18 px into the plan's notes for the owner.
 
 - Approval (owner, 2026-11-09): "Approved and continue" with the four picks, written into the Approach.
+
+- Build, 2026-11-09: `geometry.ts` `placeAlong`, `instrumentCreateBatch`, `instrumentMoveBatch`; the delegate's `createInstrument` and `moveInstrument` go through `sendShapeChange`, built from the line's record when they go and waiting while a save of the line is in flight; `sendShape` and `deleteItem` wait in turn while a save in flight or held attaches an instrument to that line (`attachInFlightTo`), so the line's batch carries the new instrument; `moveItem` refuses an attached instrument. `studio.ts`: `armed` ({lineId, kindId, problem}) in the studio state, `armInstrument`, `disarm`, `armedProblem`, `keepArmed` (applied in `selectionState` and `selectionSetState`), `instrumentKinds`; `kindsFor`, `toolKind` and `kindButtons` leave instrument kinds out. `editing.ts`: `onArmedClick` (before every other click), `placeTyped`, Esc on the map and on the root, handles off while armed, the drag as own handling on MapLibre's `mousedown` (preventDefault stops the pan; document listeners; a 3 px tolerance; a `mapstudio-instrument-drag` circle layer in the selection token shows the place until the save settles), `data-instrument-handle`, `data-instrument-drag`, `data-armed-line`, `data-armed-kind` on the map. `DrawingBar.tsx` `InstrumentBar` (field focused on arm, Enter places, Esc in it cancels). `PropertiesPanel.tsx`: the Instruments row with the short kind list, the instrument's Location, distance field, read-only latitude and longitude. The Meter kind's field is `size` (number), so `details.spec.mjs`' kind-change test now changes a tap to a meter (a pad no longer lists instrument kinds). The meter glyph at 18 px beside tap, line-valve and meter-station, light and dark, for the owner: `_bmad-output/backlog/renders/entry-9/meter-glyph-18px.png`.
 
 ## Plan Change Log
 
