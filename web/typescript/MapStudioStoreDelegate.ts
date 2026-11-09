@@ -105,6 +105,8 @@ export interface MapStudioDelegateState {
     store: StoreState;
     /** Every queued batch of this project and user, oldest first (epic 2 story 8, unsaved.ts). */
     unsaved: UnsavedEntry[];
+    /** The items a create held behind another save would store (entry 9), version 0: selectable with Details meanwhile. */
+    heldCreates: MapItemRecord[];
     /** Bumped whenever the queue changes, so the component knows to redraw the unsaved items. */
     unsavedRevision: number;
     /** The queued batches this tab waits on a reply for: their Discard is off meanwhile. */
@@ -256,7 +258,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * records, so each waits as a builder while a save of any item it touches is in flight or waiting, and is built again from
      * the records once those saves settle (`releaseShapes`): saved in order, never dropped and never built on a stale record.
      */
-    private heldShapes: Array<{ itemId: string; label: string; build: () => EditBatch | null; ids: string[]; waits: (batch: EditBatch) => boolean }> = [];
+    private heldShapes: Array<{ itemId: string; label: string; build: () => EditBatch | null; ids: string[]; waits: (batch: EditBatch) => boolean;
+        /** The items a held create would store (entry 9: an instrument added while its line is saved), drawn in Details meanwhile. */
+        creates: MapItemRecord[] }> = [];
     /**
      * The batches this page sent and awaits a reply for (replaying after a transient refusal included), by id: what a delete
      * waits on when one of them names an item it deletes in its `ends` (entry 25), until it saves or is given up.
@@ -334,6 +338,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             lists: this.lists,
             store: this.store,
             unsaved: this.unsaved.list(),
+            heldCreates: this.heldShapes.reduce((all, h) => all.concat(h.creates), [] as MapItemRecord[]),
             unsavedRevision: this.unsavedRevision,
             sending: this.sender.sending(),
             editing: this.store.status === 'unavailable' ? 'off' : 'on',
@@ -626,7 +631,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * Point tool's create in flight, version 0): its update is held and rebased when the create's reply comes.
      */
     private knownRecord(id: string): MapItemRecord | undefined {
-        return this.storedRecord(id) || unsavedItems(this.unsaved.list()).find((i) => i.id === id);
+        return this.storedRecord(id) || unsavedItems(this.unsaved.list()).find((i) => i.id === id) || this.heldCreate(id);
     }
 
     /**
@@ -697,6 +702,29 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private itemBusy(id: string): boolean {
         return this.inFlightByItem.has(id)
             || Array.from(this.heldByItem.values()).some((list) => list.some((h) => h.batch.ops.some((op) => op.id === id)));
+    }
+
+    /**
+     * Whether the batch changes or deletes a stored line while a save attaching an instrument to it is in flight or waiting
+     * (`attachInFlightTo`): the one wait every geometry change and delete takes through `sendShapeChange` (entry 9). A save still
+     * held in `heldShapes` is covered by their order: a change made after it waits behind it and is built once it has gone.
+     */
+    private attachWaits(batch: EditBatch): boolean {
+        return batch.ops.some((op) => {
+            const record = op.entity === 'item' ? this.storedRecord(op.id) : undefined;
+            return !!record && record.geometry.type === 'LineString' && this.attachInFlightTo(op.id);
+        });
+    }
+
+    /** The record of a create held behind another save (entry 9), version 0, or undefined. */
+    private heldCreate(id: string): MapItemRecord | undefined {
+        for (const h of this.heldShapes) {
+            const found = h.creates.find((r) => r.id === id);
+            if (found) {
+                return found;
+            }
+        }
+        return undefined;
     }
 
     /**
@@ -845,7 +873,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * geometry change waits; else it waits as a builder (one console line) and goes when those saves settle (`releaseShapes`).
      */
     private sendShapeChange(itemId: string, label: string, build: () => EditBatch | null,
-        waits: (batch: EditBatch) => boolean = () => false): void {
+        own: (batch: EditBatch) => boolean = () => false): void {
+        // Every change that re-places or deletes a line's instruments (a reshape, a split, a pad's move with the lines its ends
+        // name, a delete of one or several) waits for a save that attaches an instrument to such a line (entry 9).
+        const waits = (b: EditBatch): boolean => own(b) || this.attachWaits(b);
         const batch = build();
         if (batch === null) {
             return;
@@ -855,7 +886,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             return;
         }
         // The items it touches as built now: a refusal of a save of any of them drops it (it was made on top of that save).
-        this.heldShapes.push({ itemId, label, build, ids: [itemId].concat(batch.ops.map((op) => op.id)), waits });
+        this.heldShapes.push({ itemId, label, build, ids: [itemId].concat(batch.ops.map((op) => op.id)), waits,
+            creates: unsavedItems([{ batch } as UnsavedEntry]) });
         console.info('[MapStudio] ' + label + ' waits its turn: a save of an item it changes is still in flight.');
         this.notify();
     }
@@ -961,7 +993,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
                 console.info('[MapStudio] The ' + action + ' of ' + line.name + ' was not sent: ' + (err instanceof Error ? err.message : String(err)));
                 return null;
             }
-        }, () => this.attachInFlightTo(id));
+        });
         return true;
     }
 
@@ -1023,7 +1055,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
                 return null;
             }
             return itemDeleteBatch(newId(), now, this.changes.state.items);
-        }, (batch) => this.endsInFlightName(batch.ops.filter((op) => op.op === 'delete').map((op) => op.id)) || this.attachInFlightTo(id));
+        }, (batch) => this.endsInFlightName(batch.ops.filter((op) => op.op === 'delete').map((op) => op.id)));
         return true;
     }
 
@@ -1078,6 +1110,14 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         const item = this.knownRecord(id);
         if (!item) {
             console.info('[MapStudio] The change to ' + id + ' was dropped: the item is not on the map.');
+            return;
+        }
+        if (item.version === 0 && this.heldCreate(id)) {
+            // Its create waits its turn (entry 9): the field goes after it, at the version its reply gives.
+            this.sendShapeChange(id, label, () => {
+                const now = this.knownRecord(id);
+                return now ? updateBatch(id, newId(), now.version, data) : null;
+            });
             return;
         }
         this.sendBatch(updateBatch(id, newId(), item.version, data), id, label);

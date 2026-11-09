@@ -9,7 +9,7 @@
 // deleted, and one Undo restores all; no tap, meter or valve among the toolbar's kind buttons or the Point tool's kinds. The spec
 // leaves the seed as it found it (each change undone, then the seed run again and the strays removed), since later specs read L-SWD.
 
-import { pagePixel } from '../lib/geo.mjs';
+import { pagePixel, project, unproject } from '../lib/geo.mjs';
 import {
     EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot as shotNow, signedInContext, test, view
 } from './fixtures.mjs';
@@ -109,6 +109,41 @@ async function undoOnce(page, map, check) {
     await expect.poll(async () => check(await storedAll(page)), { timeout: REPLY_MS }).toBe(true);
 }
 
+/**
+ * The place under a page pixel on a map set to `view` by the test hook (Web Mercator, as MapLibre): the view's exact centre, not
+ * the map's `data-center`, which is rounded to 5 decimals (about half a metre).
+ */
+async function placeAt(map, [x, y], { center, zoom }) {
+    const box = await map.boundingBox();
+    const [cx, cy] = project(center, zoom);
+    return unproject([cx + (x - box.x - box.width / 2), cy + (y - box.y - box.height / 2)], zoom);
+}
+
+/**
+ * The nearest place on a line to `p` and its distance along the line from the first point (metres, haversine segments as Turf
+ * measures them): each segment's foot found in a local plane, which over a few kilometres is well under a metre from Turf's.
+ */
+function projectOnLine(coords, p) {
+    const k = Math.cos((p[1] * Math.PI) / 180);
+    const xy = (c) => [c[0] * k, c[1]];
+    let best = null;
+    let before = 0;
+    for (let i = 0; i < coords.length - 1; i++) {
+        const [ax, ay] = xy(coords[i]);
+        const [bx, by] = xy(coords[i + 1]);
+        const [px, py] = xy(p);
+        const len2 = (bx - ax) ** 2 + (by - ay) ** 2;
+        const t = Math.max(0, Math.min(1, ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / len2));
+        const foot = [coords[i][0] + t * (coords[i + 1][0] - coords[i][0]), coords[i][1] + t * (coords[i + 1][1] - coords[i][1])];
+        const off = metres(foot, p);
+        if (best === null || off < best.off) {
+            best = { off, point: foot, distanceM: before + metres(coords[i], foot) };
+        }
+        before += metres(coords[i], coords[i + 1]);
+    }
+    return best;
+}
+
 /** Haversine metres between two places. */
 function metres(a, b) {
     const r = (d) => (d * Math.PI) / 180;
@@ -183,7 +218,10 @@ test.describe('1366 px', () => {
 
             // A click on the line near PT-1 places a tap there: within 1 m of the click's place on the line (a pixel is under 2 m).
             await view(page, map, NEAR_VIEW.center, NEAR_VIEW.zoom);
-            const on = await pixelNow(map, AT_1300);
+            // A whole pixel, so the place MapLibre reads from the click is the place computed here.
+            const box = await map.boundingBox();
+            const on = pagePixel(box, AT_1300, NEAR_VIEW.center, NEAR_VIEW.zoom).map(Math.round);
+            const clicked = projectOnLine([CTB1, BEND, SWD1], await placeAt(map, on, NEAR_VIEW));
             await page.mouse.click(on[0], on[1]);
             await expectOneBatch(page, map, seqBefore, 'add Tap');
             const panel = page.locator('.mapstudio-panel');
@@ -196,8 +234,9 @@ test.describe('1366 px', () => {
             const items = await storedAll(page);
             expect(items[tap].kind).toBe('tap');
             expect(items[tap].attachment.lineId).toBe(ids.line);
-            expect(Math.abs(items[tap].attachment.distanceM - 1300)).toBeLessThan(4);
-            expect(metres(items[tap].geometry.coordinates, AT_1300)).toBeLessThan(4);
+            // Stored within 1 m of the click's projection onto the line.
+            expect(Math.abs(items[tap].attachment.distanceM - clicked.distanceM)).toBeLessThan(1);
+            expect(metres(items[tap].geometry.coordinates, clicked.point)).toBeLessThan(1);
             // Its Details: on its line at its distance, the distance field, latitude and longitude read only, no Move.
             await expect(panel.locator('.mapstudio-field-on-line')).toHaveText('On L-SWD at 1.3 km');
             await expect(panel.locator('.mapstudio-field-distance')).toHaveValue(String(items[tap].attachment.distanceM));

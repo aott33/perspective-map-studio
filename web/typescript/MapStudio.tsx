@@ -1214,7 +1214,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
             return live;
         }
         const delegate = this.props.delegate;
-        return delegate ? unsavedItems(delegate.unsaved).find((i) => i.id === id) : undefined;
+        if (!delegate) {
+            return undefined;
+        }
+        // A create held behind another save (entry 9: an instrument added while its line is saved) is an item too, version 0.
+        return unsavedItems(delegate.unsaved).find((i) => i.id === id) || (delegate.heldCreates || []).find((i) => i.id === id);
     }
 
     /**

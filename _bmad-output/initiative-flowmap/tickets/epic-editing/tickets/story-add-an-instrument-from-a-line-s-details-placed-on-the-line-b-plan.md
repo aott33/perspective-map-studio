@@ -3,14 +3,14 @@ title: "Add an instrument from a line's Details: placed by click or typed distan
 type: 'feature'
 ticket: '9'
 created: '2026-11-09'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '70f6fa9bd27895019fffe0bb713b816afb81e3c9'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md', '{project-root}/docs/instruments.md']
 ---
@@ -83,7 +83,22 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 ## Plan Change Log
 
+- 2026-11-09, review fixes: every geometry change and delete through `sendShapeChange` waits for an instrument's save on a line it re-places or deletes (`attachWaits`: a pad's move with its lines, a delete of several, a reshape, a split, a delete); a create held behind its line's save is an item meanwhile (`heldCreates`, `itemFor`, `knownRecord`), so its Details stay open with Name focused and a field finished goes after the create; an attached instrument's latitude and longitude read only whether or not its line is on the map; the icon catalogue at 0.4.0 (`meter` added); the click-place e2e assertion within 1 m of the click's projection.
+
 ## Review Triage Log
+
+Quick lens, 2026-11-09: 8 findings; high 0, medium 3, low 3, false 2.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| Moving a pad named by a line's ends does not wait for an instrument create in flight on that line | medium | `moveItem` passes no `waits`; `pointMoveBatch` re-places the line's instruments from `state.items` | patch (grouped with the next): one wait for every batch that re-places or deletes a line's instruments |
+| Deleting several does not wait for an instrument create in flight on a selected line | medium | `deleteItems` waits only on `endsInFlightName` | patch (same root cause) |
+| An instrument create held behind a busy line: its Details closes at once | medium | The create waits in `heldShapes`; `dropDeadSelection` uses `itemFor`, which sees only live and unsaved items | patch: held creates seen, Details opens |
+| An instrument whose line is not on the map gets editable lat and lng that save nothing | low | `readOnly` and the guard key on `onLine` | patch: keyed on the attachment |
+| `docs/icons.md` says 0.3.0 adds no id while `meter` is added, the catalogue versioned with the contract | low | `icons.json` `catalogueVersion` 0.3.0, 31 icons | patch: the catalogue to 0.4.0, the words to match |
+| The click-place spec asserts 4 m from a fixed 1,300 m, not 1 m of the click's projection | low | `addinstrument.spec.mjs` | patch: the projection computed, 1 m |
+| The whole suite did not pass and was not rerun | false | The orchestrator's whole-suite run on a fresh stack follows the review | rejected |
+| ignition-lint not run on the dev script | false | Run by the orchestrator: `mapstudio_dev/code.py` "No issues found" | rejected |
 
 ## Verification
 

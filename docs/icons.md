@@ -1,6 +1,6 @@
 # Map Studio icons
 
-Map Studio ships one icon set in one minimalist style (epic 2 R9, PRD FR-9, NFR-10, NFR-11): a glyph for each oil and gas kind a project's kind list may name, and the state glyphs the map uses for comms lost, stale values and alarms. A kind names an icon by its id in the kind list's `icon` field. Catalogue version **0.3.0** (versioned with the public contract, NFR-8; 0.3.0 redraws five glyphs, below, and adds no id).
+Map Studio ships one icon set in one minimalist style (epic 2 R9, PRD FR-9, NFR-10, NFR-11): a glyph for each oil and gas kind a project's kind list may name, and the state glyphs the map uses for comms lost, stale values and alarms. A kind names an icon by its id in the kind list's `icon` field. Catalogue version **0.4.0** (versioned with the public contract, NFR-8; 0.3.0 redraws five glyphs, below, and adds no id; 0.4.0 adds `meter`, a flow meter on a line, epic 4 entry 9).
 
 Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway (`inductiveautomation/ignition:8.3.10`); **[unverified]** written but not seen working.
 

@@ -1065,6 +1065,23 @@ describe('an instrument added from its line\'s Details (entry 9)', () => {
         expect(h.ms.focusNameId).toBe('new-tap');
     });
 
+    test('an instrument whose create waits behind its line\'s save keeps the selection and its Details with Name focused', () => {
+        const h = armed();
+        const delegate = h.ms.props.delegate as unknown as { heldCreates: MapItemRecord[] };
+        delegate.heldCreates = [{ id: 'new-tap', kind: 'tap', name: 'Pressure tap', geometry: { type: 'Point', coordinates: BEND }, properties: {},
+            assetId: null, overrides: {}, ends: null, attachment: { lineId: 'lswd', distanceM: 659.4 }, version: 0, deleted: false }];
+        h.ms.onPlaceInstrument('659.4');
+        (h.ms as unknown as { dropDeadSelection: () => void }).dropDeadSelection();
+        expect(h.state().selected).toEqual({ id: 'new-tap', kind: 'point' });
+        expect(h.state().panel).toBe('new-tap');
+        expect(h.ms.itemFor('new-tap')!.version).toBe(0);
+        expect(h.ms.focusNameId).toBe('new-tap');
+        // Without it the item is not on the map, and the selection goes.
+        delegate.heldCreates = [];
+        (h.ms as unknown as { dropDeadSelection: () => void }).dropDeadSelection();
+        expect(h.state().selected).toBeNull();
+    });
+
     test('a typed distance places it; one outside the line is refused in words; Esc and another selection put it down', () => {
         const h = armed();
         h.ms.onPlaceInstrument('99999');

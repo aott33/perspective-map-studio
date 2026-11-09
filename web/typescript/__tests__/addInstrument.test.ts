@@ -177,3 +177,57 @@ describe('an instrument moved along its line (entry 9)', () => {
         expect(delegate.moveInstrument('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 5)).toBe(false);
     });
 });
+
+describe('a change that re-places or deletes a line\'s instruments waits for an instrument\'s save on it (entry 9 review)', () => {
+    const PAD: Kind = { id: 'pad', name: 'Well pad', geometry: 'point', icon: 'well-pad', labelRank: 10, fields: [] };
+
+    function padAndLine(): { pad: string; line: string } {
+        const pad = delegate.createPoint(CTB, PAD);
+        save(last());
+        const line = delegate.createLine([CTB, BEND, SWD], LINE, { start: { itemId: pad } });
+        save(last());
+        return { pad, line };
+    }
+
+    test('a pad the line\'s ends name, moved while a new instrument on the line is saved, waits and carries it', () => {
+        const { pad, line } = padAndLine();
+        const id = delegate.createInstrument(line, METER, 1000)!;
+        const create = last();
+        const before = sent().length;
+        expect(delegate.moveItem(pad, [-105.013, 39.7265])).toBe(true);
+        expect(sent()).toHaveLength(before);
+        save(create);
+        expect(sent()).toHaveLength(before + 1);
+        expect(last().body.ops.map((o) => o.id)).toEqual([pad, line, id]);
+    });
+
+    test('several deleted, the line among them, while a new instrument on it is saved: waits, then deletes it too', () => {
+        const { pad, line } = padAndLine();
+        const id = delegate.createInstrument(line, METER, 1000)!;
+        const create = last();
+        const before = sent().length;
+        expect(delegate.deleteItems([line, pad])).toBe(true);
+        expect(sent()).toHaveLength(before);
+        save(create);
+        expect(sent()).toHaveLength(before + 1);
+        expect(last().body.ops.filter((o) => o.op === 'delete').map((o) => o.id).sort()).toEqual([line, id, pad].sort());
+    });
+
+    test('a create held behind the line\'s save is an item meanwhile; a rename of it goes right after the create, at its version', () => {
+        const line = savedLine();
+        expect(delegate.moveVertex(line, 1, [-105.0, 39.72], null)).toBe(true);
+        const reshape = last();
+        const id = delegate.createInstrument(line, METER, 1000)!;
+        expect(delegate.mapStateToProps().heldCreates.map((r) => [r.id, r.version, r.attachment && r.attachment.lineId])).toEqual([[id, 0, line]]);
+        const before = sent().length;
+        delegate.renameItem(id, 'FT-1');
+        expect(sent()).toHaveLength(before);
+        save(reshape);
+        expect(sent()).toHaveLength(before + 1);
+        expect(last().body.ops[0]).toMatchObject({ op: 'create', id });
+        expect(delegate.mapStateToProps().heldCreates).toEqual([]);
+        save(last());
+        expect(sent()).toHaveLength(before + 2);
+        expect(last().body.ops[0]).toMatchObject({ op: 'update', id, baseVersion: 1, data: { name: 'FT-1' } });
+    });
+});

@@ -358,7 +358,7 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
             return;
         }
         const item = this.props.item;
-        if (item.geometry.type !== 'Point' || (item.attachment !== null && this.props.onLine)) {
+        if (item.geometry.type !== 'Point' || item.attachment !== null) {
             // An instrument on a line moves along it only (entry 9): its latitude and longitude are read only.
             return;
         }
@@ -791,14 +791,14 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                                 <label className="mapstudio-field-half">
                                     <span className="mapstudio-field-sublabel">Latitude</span>
                                     <input className="mapstudio-input mapstudio-field-lat" type="number" step="any" inputMode="decimal" value={this.state.lat}
-                                           disabled={frozen} readOnly={!!onLine} aria-invalid={latProblem} aria-describedby={place && place.text !== '' ? placeId : undefined}
+                                           disabled={frozen} readOnly={item.attachment !== null} aria-invalid={latProblem} aria-describedby={place && place.text !== '' ? placeId : undefined}
                                            onChange={(ev) => this.setState({ lat: ev.target.value })}
                                            onBlur={this.commitLocation('lat')} onKeyDown={this.onKey('lat')} />
                                 </label>
                                 <label className="mapstudio-field-half">
                                     <span className="mapstudio-field-sublabel">Longitude</span>
                                     <input className="mapstudio-input mapstudio-field-lng" type="number" step="any" inputMode="decimal" value={this.state.lng}
-                                           disabled={frozen} readOnly={!!onLine} aria-invalid={lngProblem} aria-describedby={place && place.text !== '' ? placeId : undefined}
+                                           disabled={frozen} readOnly={item.attachment !== null} aria-invalid={lngProblem} aria-describedby={place && place.text !== '' ? placeId : undefined}
                                            onChange={(ev) => this.setState({ lng: ev.target.value })}
                                            onBlur={this.commitLocation('lng')} onKeyDown={this.onKey('lng')} />
                                 </label>
@@ -810,6 +810,7 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                             {(latProblem || lngProblem) && !swapped
                                 ? 'Latitude is -90 to 90 and longitude -180 to 180.'
                                 : onLine ? 'Drag it along the line, or type its distance.'
+                                    : point && item.attachment !== null ? 'It moves along its line, which is not on the map.'
                                     : point ? 'Drag the pin to fine-tune, or type latitude and longitude.' : ''}
                         </span>
                         {place && place.text !== '' ? (

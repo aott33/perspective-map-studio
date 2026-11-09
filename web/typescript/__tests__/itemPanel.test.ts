@@ -400,4 +400,13 @@ describe('instruments in Details (entry 9)', () => {
         expect(option(html, 'mapstudio-kind-pt1', 'meter')).toContain('>Meter<');
         expect(html).not.toContain('value="pad"');
     });
+
+    test('an instrument whose line is not on the map: latitude and longitude still read only, no distance field', () => {
+        const pt1 = record({ id: 'pt1', kind: 'tap', name: 'PT-1', assetId: null, attachment: { lineId: 'gone', distanceM: 1143 } });
+        const html = panel({ item: pt1, kind: TAP, kinds: [TAP, METER], canMoveByClick: false });
+        expect(tag(html, 'mapstudio-field-lat')).toContain('readonly=""');
+        expect(tag(html, 'mapstudio-field-lng')).toContain('readonly=""');
+        expect(html).not.toContain('mapstudio-field-distance');
+        expect(html).toContain('It moves along its line, which is not on the map.');
+    });
 });
