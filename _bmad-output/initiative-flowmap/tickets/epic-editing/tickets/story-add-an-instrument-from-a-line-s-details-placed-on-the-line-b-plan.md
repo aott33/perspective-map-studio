@@ -3,7 +3,7 @@ title: "Add an instrument from a line's Details: placed by click or typed distan
 type: 'feature'
 ticket: '9'
 created: '2026-11-09'
-status: 'in-review'
+status: 'built'
 baseline_revision: '70f6fa9bd27895019fffe0bb713b816afb81e3c9'
 route: 'full'
 route_source: 'auto'
@@ -99,6 +99,8 @@ Quick lens, 2026-11-09: 8 findings; high 0, medium 3, low 3, false 2.
 | The click-place spec asserts 4 m from a fixed 1,300 m, not 1 m of the click's projection | low | `addinstrument.spec.mjs` | patch: the projection computed, 1 m |
 | The whole suite did not pass and was not rerun | false | The orchestrator's whole-suite run on a fresh stack follows the review | rejected |
 | ignition-lint not run on the dev script | false | Run by the orchestrator: `mapstudio_dev/code.py` "No issues found" | rejected |
+
+Outcome, 2026-11-09: the patches applied (994cbbf) and verified by the orchestrator: `tsc` clean, Jest 720 passed, `./gradlew clean build --offline --rerun-tasks` green, the contract check OK at 0.4.0, ignition-lint on the dev script no issues, and `ops/up.sh --fresh` with the whole e2e suite: 277 passed, 7 skipped, 0 failed in 48.3 min (the implementer's three View-mode failures did not repeat). The meter glyph was shown to the owner (`_bmad-output/backlog/renders/entry-9/meter-glyph-18px.png`).
 
 ## Verification
 

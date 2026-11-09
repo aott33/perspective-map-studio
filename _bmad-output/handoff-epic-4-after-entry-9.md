@@ -5,13 +5,13 @@ Written 2026-11-09 by the session that built epic 4 entries 15, 16, 7 (as 7a, 7c
 ## State
 
 - **Branch:** `claude/festive-gates-ji0y4s` (aott33/perspective-map-studio), pushed. The owner pulls it and tests with `ops/up.sh`. Last release v0.3.0; working version `0.3.0-SNAPSHOT`; contract 0.4.0, unreleased (entry 18 releases it).
-- **Epic 4 built:** 1 to 8 (7 as three plans: 7a the list `...-layout-plan.md` holds ticket 7, 7c and 7b are `...-plan-7c.md` and `...-plan-7b.md` with `part_of: '7'`), 14, 15, 16, 21 to 27; 3 done. Entry 9 (instruments) was being built when this note was written: check its plan's `status` and `## Review Triage Log`; if `in-progress` with commits after `70f6fa9`, resume at the review (step 4), else at implementation.
-- **The flaky-test fix** (`_bmad-output/plan-fix-three-flaky-tests.md`, built): the e2e `view()` helper waits for the map to go idle, the Gateway setup lookups' thread race fixed, R4 (a) diagnostics in place. Three whole-suite runs in a row since were clean (260, 260, 272 passed, 0 failed). A failure now is real until shown otherwise.
+- **Epic 4 built:** 1 to 9 (7 as three plans: 7a the list `...-layout-plan.md` holds ticket 7, 7c and 7b are `...-plan-7c.md` and `...-plan-7b.md` with `part_of: '7'`), 14, 15, 16, 21 to 27; 3 done. Entry 9 (instruments) is built (2026-11-09, 277 passed on a fresh stack, 0 failed): the meter glyph went to the owner for a look; a reply about it is the first thing to act on. Next is entry 10.
+- **The flaky-test fix** (`_bmad-output/plan-fix-three-flaky-tests.md`, built): the e2e `view()` helper waits for the map to go idle, the Gateway setup lookups' thread race fixed, R4 (a) diagnostics in place. Four whole-suite runs since were clean on the orchestrator's side (260, 260, 272, 277 passed, 0 failed); an implementer's run once had 3 View-mode failures that did not repeat. A failure now is real until shown otherwise.
 - **Playbook:** `docs/test-playbook-0.4.0.md`, sections 8a to 8f added this session (Locate me, Directions, the item list, the layout, first run, selecting several); add one per entry.
 
 ## Next
 
-1. **Epic 4 in order:** finish 9, then 10 (save problems), 11 (Recent changes, high, may split), 12 (the Kinds screen, high, will likely split), 13 (tag browser), 19 and 20 (units; backlog 36's neutral words can ride with 19's schema 2), 17 (sweep), 18 (release 0.4.0).
+1. **Epic 4 in order:** 10 (save problems), 11 (Recent changes, high, may split), 12 (the Kinds screen, high, will likely split), 13 (tag browser), 19 and 20 (units; backlog 36's neutral words can ride with 19's schema 2), 17 (sweep), 18 (release 0.4.0).
 2. **Then (owner, 2026-11-08, `initiative-flowmap/.memlog.md`):** the owner tests and validates, fixes, then **epic 7, the template cutover** (Mesa moved into the map store by a one-off migration), then epic 5 (import and export), then epic 8.
 3. **Backlog:** next id 37. Added this session: 36, industry-neutral words in the module's own text (owner: the oil and gas and the solar demos are the two demos).
 
