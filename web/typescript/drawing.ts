@@ -236,10 +236,17 @@ export function deleteOffText(vertexCount: number, area: boolean): string {
  * the container such as one in a custom popup view's content, so Backspace there removes a letter, not a vertex.
  */
 export function inField(target: EventTarget | null): boolean {
-    const el = target as { tagName?: unknown; isContentEditable?: unknown } | null;
+    const el = target as { tagName?: unknown; isContentEditable?: unknown; type?: unknown } | null;
     if (!el || typeof el.tagName !== 'string') {
         return false;
     }
     const tag = el.tagName.toUpperCase();
+    if (tag === 'INPUT' && typeof el.type === 'string' && NOT_TYPED.indexOf(el.type.toLowerCase()) >= 0) {
+        // A checkbox (a list row's, epic 4 entry 8) or a button takes no typed text: Delete, Esc and Ctrl+Z act on the map.
+        return false;
+    }
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable === true;
 }
+
+/** The input types that take no typed text (`inField`). */
+const NOT_TYPED = ['checkbox', 'radio', 'button', 'submit', 'reset'];

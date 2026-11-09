@@ -227,6 +227,25 @@ export class BoxSelect {
         window.addEventListener('pointermove', this.onMove, true);
         window.addEventListener('pointerup', this.onUp, true);
         window.addEventListener('keydown', this.onKey, true);
+        // A cancelled pointer, the window losing focus or the pointer's capture lost ends the drag with nothing selected, so
+        // MapLibre's drag pan never stays off.
+        window.addEventListener('pointercancel', this.onLost, true);
+        window.addEventListener('lostpointercapture', this.onLost, true);
+        window.addEventListener('blur', this.onBlur);
+    };
+
+    private onLost = (ev: PointerEvent): void => {
+        if (this.start !== null && ev.pointerId === this.pointerId) {
+            console.info('[MapStudio] The ' + this.shape + ' was dropped (' + ev.type + '): nothing was selected.');
+            this.end();
+        }
+    };
+
+    private onBlur = (): void => {
+        if (this.start !== null) {
+            console.info('[MapStudio] The ' + this.shape + ' was dropped (the window lost focus): nothing was selected.');
+            this.end();
+        }
     };
 
     /** While a gesture is under way the map's element keeps its moves and its release from Terra Draw. */
@@ -311,6 +330,9 @@ export class BoxSelect {
         window.removeEventListener('pointermove', this.onMove, true);
         window.removeEventListener('pointerup', this.onUp, true);
         window.removeEventListener('keydown', this.onKey, true);
+        window.removeEventListener('pointercancel', this.onLost, true);
+        window.removeEventListener('lostpointercapture', this.onLost, true);
+        window.removeEventListener('blur', this.onBlur);
         const map = this.host.map;
         if (map && this.panWasOn && !map.dragPan.isEnabled()) {
             map.dragPan.enable();

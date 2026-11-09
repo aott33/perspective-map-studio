@@ -755,11 +755,18 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * View mode, as before. `data-box-zoom` on the map says which, for the suite.
      */
     private applyBoxZoom(): void {
+        const on = !this.studioOn();
+        const current = this.state.selected;
+        if (on && current && isMultiple(this.state.studio)) {
+            // The studio stopped showing with Edit mode still on (below 768 px, the level dropped): no selection of several there,
+            // so the set is cut to its current item, as leaving Edit mode does.
+            console.info('[MapStudio] The studio is not shown: the selection keeps ' + current.id + ' alone.');
+            this.setState((prev) => (prev.selected && isMultiple(prev.studio) ? { studio: select(prev.studio, prev.selected.id) } : null));
+        }
         const map = this.map;
         if (!map || !map.boxZoom) {
             return;
         }
-        const on = !this.studioOn();
         if (map.boxZoom.isEnabled() !== on) {
             if (on) {
                 map.boxZoom.enable();
@@ -1008,10 +1015,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /**
      * The selection as a set (entry 8; studio.ts): `change` makes the new set from the studio model, and the rest follows it from
      * `prev`: the current item is the last to join (its kind read from its geometry, a line's open segment kept only while it stays
-     * current), and Details and a chosen point or Move stay only while the set is that one item still. A set change opens no Details:
-     * two or more show the count's panel (`renderPanel`), and a set of one shows its ring alone, as a ticked row does.
+     * current), and a chosen point or Move stay only while the set is that one item still. Two or more show the count's panel
+     * (`renderPanel`); a set of one shows that item's Details, as one item selected does today (no camera move), except right after
+     * a checkbox ticked into an empty set (`tick`), which opens no Details (the plan's checkbox rule).
      */
-    selectionSetState(prev: Readonly<MapStudioState>, change: (studio: StudioState) => StudioState):
+    selectionSetState(prev: Readonly<MapStudioState>, change: (studio: StudioState) => StudioState, tick = false):
         Pick<MapStudioState, 'selected' | 'studio' | 'panel' | 'geometry' | 'pick'> {
         const studio = change(prev.studio);
         const ids = studio.selected;
@@ -1027,7 +1035,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
             selected,
             studio,
             pick: null,
-            panel: single && prev.panel === id ? prev.panel : null,
+            panel: single && (prev.panel === id || !(tick && prev.studio.selected.length === 0)) ? id : null,
             geometry: single && prev.geometry !== null && prev.geometry.itemId === id ? prev.geometry : null
         };
     }
@@ -1036,9 +1044,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * A change of the set (entry 8): a box, a lasso, Shift-click, a checkbox, a range, Select all, Clear. The count's panel may dock or
      * leave, so it is a dock change: the ground keeps its place on the page (selection.tsx `dockChange`).
      */
-    changeSelection(change: (studio: StudioState) => StudioState): void {
+    changeSelection(change: (studio: StudioState) => StudioState, tick = false): void {
         selection.closePopup(this);
-        this.dockChange((prev) => this.selectionSetState(prev, change));
+        this.dockChange((prev) => this.selectionSetState(prev, change, tick));
     }
 
     /** Shift-click on the map (entry 8): each id in or out of the set (a shared marker's members together: out if all are in). */
@@ -1094,12 +1102,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
         return out;
     }
 
-    /** A row's checkbox (entry 8): the row in or out of the set, no Details opened, the map not moved. */
+    /** A row's checkbox (entry 8): the row in or out of the set, the map not moved; ticked into an empty set it opens no Details. */
     onRowToggle = (id: string): void => {
         if (!this.itemFor(id)) {
             return;
         }
-        this.changeSelection((s) => toggleSelect(s, id));
+        this.changeSelection((s) => toggleSelect(s, id), true);
     };
 
     /** A Shift-click range or a Select all in the list (entry 8): the set replaced by those rows, in the order shown. */
@@ -1129,9 +1137,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             return;
         }
         if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && (ev.key === 'z' || ev.key === 'Z' || ev.key === 'y' || ev.key === 'Y')) {
-            const target = ev.target as HTMLElement | null;
-            const tag = target && target.tagName ? target.tagName.toUpperCase() : '';
-            if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' && this.studioOn()) {
+            // A field keeps its own undo; a checkbox (a ticked list row, entry 8) is not one (drawing.ts `inField`).
+            if (!inField(ev.target) && this.studioOn()) {
                 ev.preventDefault();
                 if (ev.shiftKey || ev.key === 'y' || ev.key === 'Y') {
                     this.onRedo();

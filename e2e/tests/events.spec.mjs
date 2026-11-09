@@ -424,6 +424,8 @@ test.describe('1366 px', () => {
             let back = await backFromEdit(page);
             await expect(page.locator('.maplibregl-popup .mapstudio-popup--default')).toHaveAttribute('data-point-id', ids.p14, { timeout: POPUP_MS });
             await expect(back).toHaveAttribute('data-selected', ids.p14);
+            // The camera's move to P14 settled first (the viewport published after its last move end), then the zoom read.
+            await moveSettled(back);
             expect(Number(await back.getAttribute('data-zoom')), 'chosen at zoom 15 or more').toBeGreaterThanOrEqual(15);
             const box = await back.boundingBox();
             const [x, y] = await pixelNow(back, P14);
@@ -445,6 +447,22 @@ test.describe('1366 px', () => {
 });
 
 /** Away to /edit and back with the browser's back: the /events view starts again (the page's choice before the items load). */
+/**
+ * Wait until the map's moves have settled: the viewport the component published once its moves settled (`data-viewport`, 200 ms
+ * after the last move end) carries the zoom the map shows now, and neither changes between two reads.
+ */
+async function moveSettled(map) {
+    let last = '';
+    await expect.poll(async () => {
+        const viewport = await map.getAttribute('data-viewport');
+        const zoom = await map.getAttribute('data-zoom');
+        const now = viewport + '|' + zoom;
+        const same = now === last && viewport !== null && Number(JSON.parse(viewport).zoom).toFixed(2) === Number(zoom).toFixed(2);
+        last = now;
+        return same;
+    }, { timeout: REPLY_MS, intervals: [500] }).toBe(true);
+}
+
 async function backFromEdit(page) {
     const url = page.url();
     await page.locator('#mapstudio-events-open-edit').click();

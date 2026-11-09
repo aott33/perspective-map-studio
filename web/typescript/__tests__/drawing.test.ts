@@ -126,6 +126,14 @@ describe('a key typed in a field stays the field\'s (inField)', () => {
         expect(inField(target('DIV', true))).toBe(true);
     });
 
+    test('a checkbox or a button input is not a field (a ticked list row, entry 8); a text input is', () => {
+        const input = (type: string): EventTarget => ({ tagName: 'INPUT', type }) as unknown as EventTarget;
+        expect(inField(input('checkbox'))).toBe(false);
+        expect(inField(input('button'))).toBe(false);
+        expect(inField(input('text'))).toBe(true);
+        expect(inField(input('number'))).toBe(true);
+    });
+
     test('the canvas, a div and no target are not', () => {
         expect(inField(target('CANVAS'))).toBe(false);
         expect(inField(target('DIV'))).toBe(false);

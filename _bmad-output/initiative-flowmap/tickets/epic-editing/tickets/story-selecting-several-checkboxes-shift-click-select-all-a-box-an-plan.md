@@ -3,14 +3,14 @@ title: "Selecting several: checkboxes, Shift-click, Select all, a box and a lass
 type: 'feature'
 ticket: '8'
 created: '2026-11-08'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '62b8146b667506415703c83f12b46b140e8a3280'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
@@ -85,7 +85,24 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 ## Plan Change Log
 
+- 2026-11-09, review fixes: a checkbox or button input is not a field for Delete, Esc and Ctrl+Z; a set of one shows its Details (except right after a checkbox ticked into an empty set); Shift-click on a shared marker opens its pick list and toggles the member chosen; Shift-click on a context row does nothing; Esc in a field leaves the set; the set is cut to its current item when the studio stops showing; the box and lasso end on pointercancel, lost capture and window blur; `selectedItems` and `mapItems` written from one resolved list; `events.spec.mjs` R4 waits for the move to settle before reading the zoom.
+
 ## Review Triage Log
+
+Quick lens, 2026-11-09: 10 findings; high 0, medium 4, low 4, false 2. One more patch from the implementer's run: `events.spec.mjs:412` read the zoom mid-ease.
+
+| Finding | Verdict | Evidence | Route |
+| --- | --- | --- | --- |
+| Delete and Ctrl+Z do nothing after ticking rows (focus on the checkbox) | medium | `inField` and the undo branch count any INPUT; the spec focused the canvas first | patch: checkboxes and buttons are not fields for these keys; the spec presses with focus on the checkbox |
+| A set dropping to one keeps Details closed | medium | `selectionSetState` keeps `panel` only for the same id | patch: a set of one shows Details, except right after a first checkbox tick |
+| Shift-click on a shared marker toggles every member | medium | `itemsAt` returns all `memberIds` | patch: the pick list, then one member toggled |
+| A set of several survives the studio going away (below 768 px, a level drop) | medium | Only the Edit switch cuts the set; `drawItems` and the page still see several | patch: cut to the current item whenever the studio stops showing |
+| Shift-click on a context row selects it | low | `onRowClick` falls back to `[id]` | patch: context rows ignored |
+| Esc in an empty search field clears the set | low | The new branch lacks `inField` | patch: the guard |
+| A cancelled pointer leaves the box drag active and pan off | low | `BoxSelect` listens only for move, up and keydown | patch: cancel on pointercancel, blur, lost capture |
+| `mapItems` can be shorter than `selectedItems` | low | `itemFor` drops unresolved ids | patch: both from one resolved list |
+| The whole suite was not rerun and ignition-lint not run | false | The orchestrator's whole-suite run follows the review; lint run by the orchestrator: `MapStudioEvents/view.json` 0 errors, 0 warnings, naming hints | rejected |
+| The commit trailers name a model, against "no model identifier" | false | The trailers are the session's required attribution lines, used on every commit of this branch; the plan's rule covers file content | rejected |
 
 ## Verification
 

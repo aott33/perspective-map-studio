@@ -31,6 +31,7 @@ import { MapStudioStoreDelegate } from './MapStudioStoreDelegate';
 import { RESTORE_WAIT_MS } from './camera';
 import { MapItemRecord } from './contract';
 import { DefaultPopup } from './DefaultPopup';
+import { inField } from './drawing';
 import { currentAgent, directionsLink, openDirections, readDirections } from './directions';
 import { SegmentRef, Selection } from './features';
 import { lengthM } from './geometry';
@@ -77,6 +78,8 @@ export interface OpenPopup {
 export interface OpenPick {
     rows: PickRow[];
     lngLat: [number, number];
+    /** Opened by a Shift-click (epic 4 entry 8): the row chosen is toggled in or out of the set, nothing else. */
+    toggle?: boolean;
 }
 
 /** A value the page wrote to `selectedItem` (epic 4 entry 14) waiting to be applied: the id, or null, and when it was read. */
@@ -176,7 +179,7 @@ export function onRootKeyDown(host: SelectionHost, ev: React.KeyboardEvent<HTMLD
         return;
     }
     if (host.state.popup === null && host.state.pick === null) {
-        if (host.state.panel !== null || (host.studioOn() && host.state.studio.selected.length > 0)) {
+        if (host.state.panel !== null || (host.studioOn() && host.state.studio.selected.length > 0 && !inField(ev.target))) {
             // The Details panel closes with close or Esc (EXPERIENCE.md Properties panel, epic 4 entry 2): the selection goes. In Edit
             // mode Esc outside a field empties the set too, Details or none (entry 8: ticked rows, a box, the count's panel).
             ev.preventDefault();
@@ -258,9 +261,12 @@ export function onMapClick(host: SelectionHost, ev: MapMouseEvent): void {
     const map = host.map;
     if (host.studioOn() && ev.originalEvent && (ev.originalEvent as MouseEvent).shiftKey) {
         // Shift-click with the Select tool (entry 8): the clicked item in or out of the set, no Details; the ground changes nothing.
-        const ids = itemsAt(map, ev);
-        if (ids.length > 0) {
-            host.toggleInSelection(ids);
+        const hit = itemsAt(map, ev);
+        if (hit.shared) {
+            // A shared marker: its pick list, whose row chosen is the one member toggled.
+            openPick(host, hit.shared.memberIds, hit.shared.lngLat, true);
+        } else if (hit.ids.length > 0) {
+            host.toggleInSelection(hit.ids);
         }
         return;
     }
@@ -320,10 +326,10 @@ export function onMapClick(host: SelectionHost, ev: MapMouseEvent): void {
 }
 
 /**
- * The item under a click (entry 8, Shift-click): the nearest marker's item (a shared marker's members, all of them), else a line,
- * else an area, as a plain click finds them; empty on the ground.
+ * The item under a click (entry 8, Shift-click): the nearest marker's item (a shared marker as itself, for its pick list), else a
+ * line, else an area, as a plain click finds them; empty on the ground.
  */
-function itemsAt(map: MapLibreMap, ev: MapMouseEvent): string[] {
+function itemsAt(map: MapLibreMap, ev: MapMouseEvent): { ids: string[]; shared?: { memberIds: string; lngLat: [number, number] } } {
     const onPoint = map.queryRenderedFeatures(ev.point, { layers: [LAYER_ITEM_MARKERS] });
     if (onPoint.length > 0) {
         let nearest = onPoint[0];
@@ -341,21 +347,21 @@ function itemsAt(map: MapLibreMap, ev: MapMouseEvent): string[] {
             }
         }
         const props = (nearest.properties || {}) as Record<string, unknown>;
-        if (Number(props.members) > 1) {
-            return String(props.memberIds || '').split(',').filter((id) => id !== '');
+        if (Number(props.members) > 1 && nearest.geometry.type === 'Point') {
+            return { ids: [], shared: { memberIds: String(props.memberIds || ''), lngLat: [nearest.geometry.coordinates[0], nearest.geometry.coordinates[1]] } };
         }
-        return typeof props.id === 'string' ? [props.id] : [];
+        return { ids: typeof props.id === 'string' ? [props.id] : [] };
     }
     const pad = 4;
     const box: [[number, number], [number, number]] = [[ev.point.x - pad, ev.point.y - pad], [ev.point.x + pad, ev.point.y + pad]];
     const onLine = map.queryRenderedFeatures(box, { layers: [LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED] });
     const lineId = onLine.length > 0 && onLine[0].properties ? onLine[0].properties.id : undefined;
     if (typeof lineId === 'string') {
-        return [lineId];
+        return { ids: [lineId] };
     }
     const onArea = map.queryRenderedFeatures(box, { layers: [LAYER_AREA_FILL, LAYER_AREA_LINE, LAYER_AREA_LINE_DASHED] });
     const areaId = onArea.length > 0 && onArea[0].properties ? onArea[0].properties.id : undefined;
-    return typeof areaId === 'string' ? [areaId] : [];
+    return { ids: typeof areaId === 'string' ? [areaId] : [] };
 }
 
 /** A line clicked: selected (casing, flow arrow, Return), the popup closed. */
@@ -593,7 +599,7 @@ export function navigate(host: SelectionHost, path: string): void {
  * A shared marker clicked (epic 3 entry 7): the pick list of its members opens in the popup. In View mode the selection goes
  * while it is open; in Edit mode (entry 26) it stays, with Details if it is open, so the stage keeps its width.
  */
-export function openPick(host: SelectionHost, memberIds: string, lngLat: [number, number]): void {
+export function openPick(host: SelectionHost, memberIds: string, lngLat: [number, number], toggle = false): void {
     const delegate = host.props.delegate;
     if (!delegate) {
         return;
@@ -619,7 +625,7 @@ export function openPick(host: SelectionHost, memberIds: string, lngLat: [number
     stopPopupClock(host);
     if (host.studioOn()) {
         // In Edit mode (entry 26) the selection and an open Details stay while the list is open, so nothing docks or moves.
-        host.setState({ popup: null, pick: { rows, lngLat } }, () => showPopupAt(host, lngLat));
+        host.setState({ popup: null, pick: { rows, lngLat, toggle } }, () => showPopupAt(host, lngLat));
         return;
     }
     host.setState((prev) => ({ popup: null, pick: { rows, lngLat }, ...host.selectionState(prev, null) }), () => showPopupAt(host, lngLat));
@@ -629,6 +635,13 @@ export function openPick(host: SelectionHost, memberIds: string, lngLat: [number
 export function onPick(host: SelectionHost, id: string): void {
     const item = host.liveItem(id);
     if (!item || item.geometry.type !== 'Point') {
+        return;
+    }
+    const pick = host.state.pick;
+    if (pick && pick.toggle) {
+        // A pick list a Shift-click opened (entry 8): the member chosen in or out of the set, no Details, no point click.
+        closePopup(host);
+        host.toggleInSelection([item.id]);
         return;
     }
     // The popup anchors to the shared marker drawn, not the member's own place (item 20).
@@ -1087,7 +1100,8 @@ export function publishSelection(host: SelectionHost): void {
 function publishSetToPage(host: SelectionHost, ids: readonly string[]): void {
     const store = host.props.store;
     const items = ids.map((id) => itemFor(host, id)).filter((i): i is MapItemRecord => !!i);
-    writePageProp(store.props, 'selectedItems', ids.slice());
+    // Both from the same resolved list, so the prop and the event never fall out of step (an id with no record is left out of both).
+    writePageProp(store.props, 'selectedItems', items.map((item) => item.id));
     firePageEvent(store.componentEvents, SELECTION_CHANGED_EVENT, { mapItems: items.map((item) => selectedItemObject(host, item)) });
     console.debug('[MapStudio] Selected set published to the page: ' + (ids.length === 0 ? 'none' : ids.join(', ')));
 }

@@ -33,7 +33,7 @@ test.beforeAll(async ({ browser }) => {
     ids = {
         p1: seed.ids['tracer/p1'], p2: seed.ids['tracer/p2'], p3: seed.ids['tracer/p3'], ctb1: seed.ids['swd/ctb1'], swd1: seed.ids['swd/swd1'],
         line: seed.ids['swd/line'], pt1: seed.ids['swd/pt1'], pt2: seed.ids['swd/pt2'], lv1: seed.ids['swd/lv1'],
-        pad1: seed.ids['scale/pad-1'], pad2: seed.ids['scale/pad-2'], pad3: seed.ids['scale/pad-3']
+        pad1: seed.ids['scale/pad-1'], pad2: seed.ids['scale/pad-2'], pad3: seed.ids['scale/pad-3'], pad4: seed.ids['scale/pad-4']
     };
     await restoreSeed(browser);
 });
@@ -307,13 +307,17 @@ test.describe('selecting several (entry 8)', () => {
         const before = Number(await map.getAttribute('data-items-loaded'));
         for (const id of [ids.pad1, ids.pad2, ids.pad3]) await check(page, id).check();
         await expect(countPanel(page).locator('.mapstudio-several-count')).toHaveText('3 selected');
-        await page.locator('.mapstudio-map canvas').focus();
+        // The focus stays on the last ticked checkbox: Delete and Ctrl+Z act on the map from there.
+        await expect(check(page, ids.pad3)).toBeFocused();
         await page.keyboard.press('Delete');
         await expectSet(map, []);
         const undo = page.locator('.mapstudio-toolbar .mapstudio-undo');
         await expect(undo).toHaveAttribute('title', 'Undo: delete 3 items (Ctrl+Z)', { timeout: REPLY_MS });
         await expect(map).toHaveAttribute('data-items-loaded', String(before - 3), { timeout: REPLY_MS });
-        await undo.click();
+        // Ctrl+Z with the focus on a ticked checkbox again (Pad 4's): the undo is the map's, not the checkbox's.
+        await check(page, ids.pad4).check();
+        await expect(check(page, ids.pad4)).toBeFocused();
+        await page.keyboard.press('Control+z');
         await expect(map).toHaveAttribute('data-items-loaded', String(before), { timeout: REPLY_MS });
         const load = await send(page, 'map.load', {});
         for (const id of [ids.pad1, ids.pad2, ids.pad3]) {

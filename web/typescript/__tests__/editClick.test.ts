@@ -964,4 +964,65 @@ describe('selecting several (entry 8)', () => {
         expect(h.state().studio.mode).toBe('view');
         expect(h.state().studio.selected).toEqual(['p14']);
     });
+
+    test('a set of one shows that item\'s Details, except right after a checkbox ticked into an empty set', () => {
+        const h = harness(true);
+        h.ms.onRowToggle('a');
+        expect(h.state().studio.selected).toEqual(['a']);
+        expect(h.state().panel).toBeNull();
+        h.ms.onRowToggle('b');
+        expect(h.state().panel).toBeNull();
+        // Unticked from two to one: Details for the one left.
+        h.ms.onRowToggle('b');
+        expect(h.state().studio.selected).toEqual(['a']);
+        expect(h.state().panel).toBe('a');
+        // A Shift-click out of two, and a box taking one into an empty set, leave one with its Details too.
+        h.ms.onSelectRows(['ctb1', 'p14']);
+        h.click({ markers: [marker('p14', 'P14', P14)] }, P14, true);
+        expect(h.state().studio.selected).toEqual(['ctb1']);
+        expect(h.state().panel).toBe('ctb1');
+        h.ms.onClearSelection();
+        h.ms.addToSelection(['lswd'], 'box');
+        expect(h.state().selected).toEqual({ id: 'lswd', kind: 'line', segment: null });
+        expect(h.state().panel).toBe('lswd');
+    });
+
+    test('Shift-click on a shared marker opens its pick list; the row chosen toggles that member alone, no Details, no point click', () => {
+        const h = harness(true);
+        h.ms.onRowToggle('ctb1');
+        h.click({ markers: [marker('a', 'Pad A', SWD1, ['a', 'b'])] }, SWD1, true);
+        expect(h.state().pick!.rows.map((r) => r.id)).toEqual(['a', 'b']);
+        expect(h.state().studio.selected).toEqual(['ctb1']);
+        h.ms.onPick('b');
+        expect(h.state().pick).toBeNull();
+        expect(h.state().studio.selected).toEqual(['ctb1', 'b']);
+        expect(h.sent.pointClick).toEqual([]);
+    });
+
+    test('Esc in a field leaves the set; Delete and Ctrl+Z with the focus on a ticked row\'s checkbox act on the map', () => {
+        const h = harness(true);
+        h.ms.onSelectRows(['ctb1', 'p14']);
+        const key = (k: string, target: unknown, ctrl = false): void => {
+            const ev = { key: k, target, defaultPrevented: false, ctrlKey: ctrl, metaKey: false, altKey: false, shiftKey: false,
+                preventDefault: (): void => undefined } as unknown as React.KeyboardEvent<HTMLDivElement>;
+            (h.ms as unknown as { onRootKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => void }).onRootKeyDown(ev);
+        };
+        key('Escape', { tagName: 'INPUT', type: 'text' });
+        expect(h.state().studio.selected).toEqual(['ctb1', 'p14']);
+        const undone: string[] = [];
+        (h.ms as unknown as { onUndo: () => void }).onUndo = (): void => { undone.push('undo'); };
+        key('Delete', { tagName: 'INPUT', type: 'checkbox' });
+        expect(h.sent.deletes).toEqual([['ctb1', 'p14']]);
+        key('z', { tagName: 'INPUT', type: 'checkbox' }, true);
+        expect(undone).toEqual(['undo']);
+    });
+
+    test('the studio no longer shown with Edit mode on (the level dropped): the set is cut to its current item', () => {
+        const h = harness(true);
+        h.ms.onSelectRows(['ctb1', 'p14', 'a']);
+        (h.ms.props.delegate as unknown as { level: string }).level = 'phone';
+        expect(h.ms.studioOn()).toBe(false);
+        (h.ms as unknown as { applyBoxZoom: () => void }).applyBoxZoom();
+        expect(h.state().studio.selected).toEqual(['a']);
+    });
 });

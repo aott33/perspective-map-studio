@@ -206,11 +206,15 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
     private onRowClick(ev: React.MouseEvent<HTMLButtonElement>, id: string): void {
         const props = this.props;
         if (ev.shiftKey && props.onSelectRows) {
+            // A context row (shown only so a matching child reads under it) is never taken by a range, as by a Select all: a
+            // Shift-click on one does nothing. A plain click on it selects it alone, as before.
             const order = this.shownIds();
+            if (order.indexOf(id) < 0) {
+                return;
+            }
             const from = this.anchor !== null && order.indexOf(this.anchor) >= 0 ? this.anchor : props.selectedId;
-            const ids = rangeIds(order, from, id);
             this.anchor = id;
-            props.onSelectRows(ids.length > 0 ? ids : [id]);
+            props.onSelectRows(rangeIds(order, from, id));
             return;
         }
         this.anchor = id;
