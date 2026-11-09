@@ -20,8 +20,8 @@ export type StudioMode = 'view' | 'edit';
 /** The tools the studio knows (entry 4): a point placed by a click, a line or an area drawn vertex by vertex. */
 export type StudioTool = 'point' | 'line' | 'area';
 
-/** The rail's surfaces (EXPERIENCE.md rail order: View, Items, Kinds, Layers; Import is epic 5's). */
-export type StudioSurface = 'items' | 'kinds' | 'layers';
+/** The rail's surfaces (EXPERIENCE.md rail order: View, Items, Kinds, Layers, History; Import is epic 5's). History is entry 11b's. */
+export type StudioSurface = 'items' | 'kinds' | 'layers' | 'history';
 
 /**
  * An instrument being placed (epic 4 entry 9; EXPERIENCE.md Instruments): Add an instrument pressed in a line's Details with the

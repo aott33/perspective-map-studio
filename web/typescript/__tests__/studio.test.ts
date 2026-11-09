@@ -1,4 +1,8 @@
+import * as React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { Kind } from '../adapters';
+import { GLYPH_PATHS } from '../controls';
+import { Rail } from '../studio/Rail';
 import {
     KIND_BUTTONS, armInstrument, armedProblem, disarm, instrumentKinds, keepArmed, StudioState, clearSelection, enterEdit, fromProps, isDrawing, isEditing, isPlacing, kindButtons, kindsFor, leaveEdit, pickTool,
     pointKind, select, selectedId, showSurface, toggleSelect, toolKind, toolOf, selectMany, addMany, isMultiple, rangeIds, sameIds
@@ -207,6 +211,17 @@ describe('the point tool and the surfaces (entry 2)', () => {
         expect(enterEdit(leaveEdit(kinds)).surface).toBe('items');
         const view = fromProps(false);
         expect(showSurface(view, 'layers')).toBe(view);
+        // History (entry 11b): a surface of the rail as the others, never in View mode.
+        expect(showSurface(kinds, 'history').surface).toBe('history');
+        expect(showSurface(view, 'history')).toBe(view);
+    });
+
+    it('the rail lists View, Items, Kinds, Layers and History, History with the clock glyph (entry 11b)', () => {
+        const html = renderToStaticMarkup(React.createElement(Rail, { surface: 'history', onView: () => undefined, onSurface: () => undefined }));
+        const surfaces = Array.from(html.matchAll(/data-surface="([a-z]+)"/g)).map((m) => m[1]);
+        expect(surfaces).toEqual(['view', 'items', 'kinds', 'layers', 'history']);
+        expect(html).toContain(GLYPH_PATHS.clock);
+        expect(html).toMatch(/mapstudio-rail-item--active" data-surface="history" aria-pressed="true"/);
     });
 
     it('the Point tool adds the kind list\'s first point kind', () => {

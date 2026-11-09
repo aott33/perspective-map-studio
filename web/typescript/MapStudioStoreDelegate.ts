@@ -23,6 +23,9 @@
  * From entry 10 the save problems' card: a save answered store-unreachable (not busy) pauses the tools and Undo (`savePaused`)
  * until a save or a load succeeds, with the items and live values kept; the conflict card's `useTheirs` and `applyOnTop` (a new
  * batch at the stored versions, one undo step), and the unreachable card's `retryStore`.
+ * From entry 11b Recent changes (history.ts): `setHistoryOpen` asks `edits.history` for the first page when the History surface
+ * opens and again on each `map.changed` while it is open (merged by `seq`, older pages kept), `historyOlder` asks the next page,
+ * `historyRetry` asks again after a failed read, and `revert` sends a row's reverse through `sendBatch` as one undo step.
  */
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
@@ -33,7 +36,11 @@ import {
     vertexMoveBatch
 } from './geometry';
 import { HostLists, NO_HOST_LISTS } from './adapters';
-import { MESSAGE_EVENT, Reply, basemapSource, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText } from './messages';
+import { MESSAGE_EVENT, Reply, basemapSource, editsHistory, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText } from './messages';
+import {
+    HISTORY_EMPTY, HISTORY_PAGE, HistoryState, batchSentence, failRead, mergeFirstPage, mergeOlderPage, readFailedText, revertBatch, revertLabel
+} from './history';
+import { browserLocale } from './linePopup';
 import {
     BasemapId, OSM_SOURCE, RasterSource, fallbackBasemap, initialBasemap, offeredBasemaps, refusedText, rememberBasemap,
     rememberedBasemap
@@ -169,7 +176,15 @@ export interface MapStudioDelegateState {
     kindSetups: KindSetupRecord[];
     /** The session user map.load named, '' when none (a viewer, an anonymous session): the first-run checklist's kept flags are per project and user. */
     user: string;
+    /**
+     * Recent changes (entry 11b, history.ts): the edit record's pages read while the History surface is open, newest first, with
+     * the state of the reads; kept (not cleared) when the surface closes, and read again when it opens.
+     */
+    history: HistoryState;
 }
+
+/** How long a read of the edit record may take before the surface says it did not answer. */
+export const HISTORY_TIMEOUT_MS = 15_000;
 
 /** `localStorage`, or null when the browser refuses it (a private window, blocked site data). */
 export function browserStorage(): KeyValueStore | null {
@@ -280,6 +295,14 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     /** The geometry batches sent and not yet saved, with the items they touch and the item's name: a refusal drops what waits on them. */
     private shapesSent = new Map<string, { ids: string[]; name: string }>();
     private shapeRefused: ShapeRefusal = NO_SHAPE_REFUSAL;
+    /** Recent changes (entry 11b): the pages read, whether the surface is open, and the reads in flight by message id. */
+    private history: HistoryState = HISTORY_EMPTY;
+    private historyOpen = false;
+    private historyFirstId: string | null = null;
+    private historyOlderId: string | null = null;
+    /** A map.changed came while the first page was being read: it is asked again once that read answers. */
+    private historyAgain = false;
+    private historyTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(componentStore: AbstractUIElementStore) {
         super(componentStore);
@@ -365,7 +388,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             changed: this.changed,
             justAdded: this.justAdded,
             kindSetups: this.changes.state.kindSetups,
-            user: this.user
+            user: this.user,
+            history: this.history
         };
     }
 
@@ -1384,6 +1408,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     stopReplay(): void {
         this.sender.stop();
         this.connectionWatch.stop();
+        if (this.historyTimer !== null) {
+            clearTimeout(this.historyTimer);
+            this.historyTimer = null;
+        }
         if (this.loadRetryTimer !== null) {
             clearTimeout(this.loadRetryTimer);
             this.loadRetryTimer = null;
@@ -1425,6 +1453,137 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         }, REPLAY_INTERVAL_MS);
     }
 
+    /**
+     * The History surface opened or closed (entry 11b): on open the first page of the edit record is asked (`edits.history`, a page
+     * of 50); while it is open each `map.changed` asks the first page again. Closed, nothing is asked; the rows read stay.
+     */
+    setHistoryOpen(open: boolean): void {
+        if (open === this.historyOpen) {
+            return;
+        }
+        this.historyOpen = open;
+        if (open) {
+            this.askHistoryFirst();
+        }
+    }
+
+    /** Try again after a failed read: the read that failed is asked again. */
+    historyRetry(): void {
+        if (this.history.errorOn === 'older') {
+            this.historyOlder();
+        } else {
+            this.askHistoryFirst();
+        }
+    }
+
+    /** Show older: the next page, before the reader's `nextBefore`; nothing while one is read or none remains. */
+    historyOlder(): void {
+        const before = this.history.nextBefore;
+        if (!this.history.more || before === null || this.historyOlderId !== null) {
+            return;
+        }
+        const message = editsHistory({ before, limit: HISTORY_PAGE });
+        this.historyOlderId = message.id;
+        this.history = { ...this.history, loading: 'older' };
+        this.armHistoryTimer();
+        this.notify();
+        this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject);
+    }
+
+    private askHistoryFirst(): void {
+        if (this.historyFirstId !== null) {
+            // A read is in flight: one more once it answers, so a burst of changes asks twice at most.
+            this.historyAgain = true;
+            return;
+        }
+        const message = editsHistory({ limit: HISTORY_PAGE });
+        this.historyFirstId = message.id;
+        this.historyAgain = false;
+        this.history = { ...this.history, loading: this.history.loading === 'older' ? 'older' : 'first' };
+        this.armHistoryTimer();
+        this.notify();
+        this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject);
+    }
+
+    /** No answer within 15 s: the read in flight is said to have failed, with Try again. */
+    private armHistoryTimer(): void {
+        if (this.historyTimer !== null) {
+            clearTimeout(this.historyTimer);
+        }
+        this.historyTimer = setTimeout(() => {
+            this.historyTimer = null;
+            const which = this.historyFirstId !== null ? 'first' : this.historyOlderId !== null ? 'older' : null;
+            if (which === null) {
+                return;
+            }
+            this.historyFirstId = null;
+            this.historyOlderId = null;
+            this.historyAgain = false;
+            this.history = failRead(this.history, which, readFailedText(which, 'the Gateway did not answer in time'));
+            this.history = { ...this.history, loading: null };
+            console.info('[MapStudio] Recent changes: the read of the edit record did not answer.');
+            this.notify();
+        }, HISTORY_TIMEOUT_MS);
+    }
+
+    private settleHistoryTimer(): void {
+        if (this.historyTimer !== null && this.historyFirstId === null && this.historyOlderId === null) {
+            clearTimeout(this.historyTimer);
+            this.historyTimer = null;
+        }
+    }
+
+    /** A reply to one of the surface's reads: its page merged, or its refusal said in words. */
+    private onHistoryReply(reply: Reply): void {
+        const first = reply.kind !== 'invalid' && reply.id === this.historyFirstId;
+        if (first) {
+            this.historyFirstId = null;
+        } else {
+            this.historyOlderId = null;
+        }
+        this.settleHistoryTimer();
+        if (reply.kind === 'edits.history.reply') {
+            this.history = first ? mergeFirstPage(this.history, reply.body) : mergeOlderPage(this.history, reply.body);
+            console.debug('[MapStudio] ' + replyText(reply));
+        } else if (reply.kind === 'error') {
+            const which = first ? 'first' : 'older';
+            this.history = failRead(this.history, which, readFailedText(which, reply.body.message));
+            console.info('[MapStudio] Recent changes: the read was refused (' + reply.body.code + ').');
+        }
+        this.history = { ...this.history, loading: this.historyOlderId !== null ? 'older' : this.historyFirstId !== null ? 'first' : null };
+        if (first && this.historyAgain && this.historyOpen) {
+            this.historyAgain = false;
+            this.askHistoryFirst();
+            return;
+        }
+        this.notify();
+    }
+
+    /**
+     * Revert a row of Recent changes (entry 11b): its batch's reverse, each op at the row's own version (history.ts `revertBatch`),
+     * sent through `sendBatch` as an ordinary edit and one undo step "revert "<sentence>"", so it is refused as any edit is (a change
+     * saved since is a `conflict` naming who made it, on the conflict card). Nothing for a row Revert is not offered for, or while
+     * editing is paused.
+     */
+    revert(seq: number): boolean {
+        const entry = this.history.entries.find((e) => e.seq === seq);
+        if (!entry) {
+            console.info('[MapStudio] Revert: change ' + seq + ' is not among the rows read.');
+            return false;
+        }
+        if (this.pausedFor('Revert')) {
+            return false;
+        }
+        const batch = revertBatch(entry, newId());
+        if (!batch || batch.ops.length === 0) {
+            console.info('[MapStudio] Revert is not offered for change ' + seq + '.');
+            return false;
+        }
+        const sentence = batchSentence(entry, this.lists.kinds, browserLocale());
+        this.sendBatch(batch, batch.ops[0].id, revertLabel(sentence));
+        return true;
+    }
+
     handleEvent(eventName: string, eventObject: JsObject): void {
         if (eventName !== MESSAGE_EVENT) {
             console.warn('[MapStudio] Ignoring unknown model event ' + eventName);
@@ -1448,6 +1607,15 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         }
         if (reply.kind === 'error' && this.basemapPendingId !== null && reply.id === this.basemapPendingId) {
             this.refuseBasemap('satellite', reply.body.message);
+            return;
+        }
+        if (reply.kind === 'edits.history.reply' || (reply.kind === 'error'
+            && (reply.id === this.historyFirstId || reply.id === this.historyOlderId))) {
+            if (reply.id === this.historyFirstId || reply.id === this.historyOlderId) {
+                this.onHistoryReply(reply);
+            } else {
+                console.info('[MapStudio] An edits.history.reply that nothing waits for was ignored.');
+            }
             return;
         }
         if (reply.kind === 'map.load.reply' || (reply.kind === 'error' && reply.id === this.mapLoadId)) {
@@ -1515,6 +1683,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
     /** A map.changed from the Gateway; `body` is null when it could not be read (a gap). */
     private onMapChanged(body: MapChangedBody | null): void {
+        if (this.historyOpen) {
+            // Recent changes live while History is open (entry 11b): the first page again, merged by seq.
+            this.askHistoryFirst();
+        }
         if (this.changes.changed(body)) {
             this.itemsRevision++;
             console.debug('[MapStudio] Map changed: seq ' + this.changes.seq);

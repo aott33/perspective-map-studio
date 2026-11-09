@@ -711,6 +711,19 @@ describe('every dock change keeps the ground in place (entry 7c, "keep place")',
         expect(h.state().panel).toBe('p14');
     });
 
+    test('History docks in the list\'s place as Layers does, and Saved opens it (entry 11b)', () => {
+        const h = harness(true);
+        (h.ms as unknown as { onCollapseChange: (ev: { matches: boolean }) => void }).onCollapseChange({ matches: true });
+        h.pans.length = 0;
+        h.ms.onShowHistory();
+        expect(h.state().studio.surface).toBe('history');
+        expect(h.size()).toEqual([PAGE_W - DOCK, MAP_H]);
+        expect(h.pans).toEqual([{ offset: [128, 0], animate: false }]);
+        h.ms.onRailSurface('items');
+        expect(h.state().studio.surface).toBe('items');
+        expect(h.state().listOpen).toBe(true);
+    });
+
     test('below 1280 px another surface docks in the list\'s place, a dock change too: the ground keeps its place', () => {
         const h = harness(true);
         (h.ms as unknown as { onCollapseChange: (ev: { matches: boolean }) => void }).onCollapseChange({ matches: true });

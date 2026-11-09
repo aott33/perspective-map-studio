@@ -77,6 +77,10 @@ import { GeometryBar } from './studio/GeometryBar';
 import { ChromeGlyph } from './studio/ChromeGlyph';
 import { ProblemStatus } from './studio/SaveStatus';
 import { SaveCard } from './studio/SaveCard';
+import { HistoryPanel } from './studio/HistoryPanel';
+import { expandOps, historyRows } from './history';
+import { HistoryEntry } from './contract';
+import { busyText, undoLabel } from './undoStack';
 import { FirstRunChecklist, ViewerNote } from './studio/FirstRunChecklist';
 import { FIRST_RUN_NONE, FirstRunKept, VIEWER_NOTE, checklistShows, firstRunKey, keepFlag, readKept, stepsDone, viewerNoteShows } from './firstRun';
 
@@ -625,6 +629,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         selection.readPageSelection(this, prevProps.props.selectedItem);
         this.applyUserLocation();
         this.applyStudioControls();
+        this.applyHistory();
         this.applyTopBar();
         this.applyBoxZoom();
         this.dropDeadSelection();
@@ -1253,6 +1258,43 @@ export class MapStudio extends Component<Props, MapStudioState> {
         return typeof window !== 'undefined' && window.innerWidth > 0 ? isSheetWidth(window.innerWidth) : false;
     }
 
+    /**
+     * Recent changes (entry 11b): the delegate reads the edit record while the History surface shows (Edit mode's studio on, the
+     * rail's History), asking the first page as it opens and again on each map.changed meanwhile; nothing is read otherwise.
+     */
+    private applyHistory(): void {
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        if (delegate && typeof delegate.setHistoryOpen === 'function') {
+            delegate.setHistoryOpen(this.studioOn() && this.state.studio.surface === 'history');
+        }
+    }
+
+    /** The save status's "Saved" pressed (EXPERIENCE.md Save status: a click opens Recent changes): the rail's History. */
+    onShowHistory = (): void => this.onRailSurface('history');
+
+    private onHistoryOlder = (): void => {
+        const delegate = this.storeDelegate();
+        if (delegate) {
+            delegate.historyOlder();
+        }
+    };
+
+    private onHistoryRetry = (): void => {
+        const delegate = this.storeDelegate();
+        if (delegate) {
+            delegate.historyRetry();
+        }
+    };
+
+    /** A row's Revert (entry 11b): its reverse sent as an ordinary edit, one undo step; a placed pin would be stale, so it goes. */
+    onRevert = (seq: number): void => {
+        const delegate = this.storeDelegate();
+        if (delegate) {
+            editing.clearPlacedPoints(this);
+            delegate.revert(seq);
+        }
+    };
+
     /** The Edit switch (entry 2) and the rail's View: the mode, written back to the editMode prop. */
     onEditSwitch = (on: boolean): void => this.setEditMode(on, true);
     onRailView = (): void => this.setEditMode(false, true);
@@ -1809,6 +1851,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                 </section>
             );
         }
+        if (surface === 'history') {
+            return this.renderHistory(delegate, facts);
+        }
         if (surface === 'kinds') {
             return (
                 <section key="kinds" className="mapstudio-dock mapstudio-dock--empty" aria-label="Kinds" data-surface="kinds">
@@ -1825,6 +1870,47 @@ export class MapStudio extends Component<Props, MapStudioState> {
             return null;
         }
         return this.renderItemList(delegate, facts, false);
+    }
+
+    /**
+     * Recent changes, the rail's History surface (entry 11b; DESIGN.md Recent changes panel): the dock's header as the other surfaces
+     * have it, then the note box with the toolbar's Undo, the rows, Show older and the footer (studio/HistoryPanel.tsx).
+     */
+    private renderHistory(delegate: MapStudioDelegateState, facts: ProblemFacts): React.ReactNode {
+        const kinds = delegate.lists.kinds;
+        const locale = browserLocale();
+        const stack = delegate.undo;
+        const busy = busyText(stack, delegate.editInFlight);
+        const names = new Map(delegate.lists.assetNames.map((a) => [a.id, a.name]));
+        const expand = (entry: HistoryEntry) => expandOps(entry, {
+            kinds,
+            locale,
+            assetName: (id) => names.get(id) || id,
+            itemName: (id) => {
+                const item = delegate.items.find((i) => i.id === id);
+                return item ? item.name : '';
+            }
+        });
+        return (
+            <HistoryPanel key="history"
+                          header={(
+                              <header className="mapstudio-dock-header">
+                                  <div className="mapstudio-dock-title-row"><h2 className="mapstudio-dock-title">Recent changes</h2></div>
+                                  {this.renderProblemStatus(delegate, facts)}
+                              </header>
+                          )}
+                          history={delegate.history}
+                          rows={historyRows(delegate.history.entries, kinds, locale)}
+                          expand={expand}
+                          lastStep={stack.done > 0 ? stack.steps[stack.done - 1].label : ''}
+                          undoLabel={busy !== '' ? '' : undoLabel(stack)}
+                          busy={busy}
+                          paused={delegate.editing === 'off'}
+                          onUndo={this.onUndo}
+                          onRevert={this.onRevert}
+                          onOlder={this.onHistoryOlder}
+                          onRetry={this.onHistoryRetry} />
+        );
     }
 
     /**
@@ -1871,7 +1957,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                       onRetry={this.onRetryUnsaved}
                       onDiscard={this.onDiscardUnsaved}
                       openWaiting={this.state.showEdits}
-                      onOpenHandled={this.onShowEditsHandled} />
+                      onOpenHandled={this.onShowEditsHandled}
+                      onHistory={this.onShowHistory} />
         );
     }
 

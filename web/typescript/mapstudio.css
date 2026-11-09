@@ -2539,6 +2539,230 @@
     color: var(--label--disabled);
 }
 
+/* The save status's words are a button (entry 11b; EXPERIENCE.md Save status: a click opens Recent changes): the words as they were,
+   no chrome until hovered or focused. */
+.mapstudio-panel-save-button {
+    margin: 0;
+    padding: 2px 4px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.mapstudio-panel-save-button:hover {
+    background: var(--mapstudio-hover);
+}
+
+.mapstudio-panel-save-button:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: 0;
+}
+
+/* Recent changes, the rail's History surface in the left dock (entry 11b; DESIGN.md Recent changes panel): the dock's header, a
+   note box naming the next undo step with Undo, the rows (an initial avatar, the sentence, who and when in tiny text, a ghost
+   Revert), each expanding to the values before and after in small text, Show older, and the footer line under them. Docked: no
+   shadow. Tokens only. */
+.mapstudio-history-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 8px 8px 12px;
+    overflow-y: auto;
+}
+
+.mapstudio-history-next {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 6px;
+    background: var(--mapstudio-hover);
+    font-size: 12px;
+}
+
+.mapstudio-history-next-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-history-status {
+    padding: 12px 4px;
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
+}
+
+.mapstudio-history-error {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 8px 0 0;
+    padding: 6px 8px;
+    border-left: 3px solid var(--mapstudio-warning);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--mapstudio-warning) 10%, var(--mapstudio-surface));
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-history-list {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.mapstudio-history-row {
+    margin: 0;
+    padding: 2px 0;
+    border-bottom: 1px solid var(--mapstudio-divider);
+}
+
+.mapstudio-history-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.mapstudio-history-summary {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+    margin: 0;
+    padding: 6px 4px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--label);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.mapstudio-history-summary:hover {
+    background: var(--mapstudio-hover);
+}
+
+.mapstudio-history-summary:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -2px;
+}
+
+.mapstudio-history-avatar {
+    display: flex;
+    flex: 0 0 24px;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 9999px;
+    background: var(--mapstudio-hover);
+    color: var(--label);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.mapstudio-history-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.mapstudio-history-sentence {
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-history-meta {
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+    line-height: 1.3;
+}
+
+.mapstudio-history-revert {
+    margin-top: 4px;
+    height: 28px;
+    padding: 0 8px;
+}
+
+.mapstudio-history-revert:hover:not(:disabled) {
+    color: var(--label);
+}
+
+.mapstudio-history-norevert {
+    padding: 0 4px 6px 36px;
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+    line-height: 1.3;
+}
+
+.mapstudio-history-detail {
+    padding: 0 4px 8px 32px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.mapstudio-history-op + .mapstudio-history-op {
+    margin-top: 6px;
+}
+
+.mapstudio-history-op-title {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-history-fields {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.mapstudio-history-fields th,
+.mapstudio-history-fields td {
+    padding: 2px 4px 2px 0;
+    vertical-align: top;
+    text-align: left;
+    overflow-wrap: break-word;
+}
+
+/* The label column as wide as its words, so a latitude and longitude break at their comma, not inside a number. */
+.mapstudio-history-fields tbody th {
+    white-space: nowrap;
+}
+
+.mapstudio-history-fields thead th {
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.mapstudio-history-fields tbody th {
+    font-weight: 500;
+}
+
+.mapstudio-history-op-note {
+    color: var(--mapstudio-secondary);
+}
+
+.mapstudio-history-older {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+}
+
+.mapstudio-history-footer {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    border-top: 1px solid var(--mapstudio-divider);
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+    line-height: 1.3;
+}
+
 .mapstudio-panel-save--row {
     display: flex;
     flex-direction: column;

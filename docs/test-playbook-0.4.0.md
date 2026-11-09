@@ -25,6 +25,7 @@ Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item li
 | 8g. Instruments | | |
 | 8h. Save problems | | |
 | 8i. The edit record | | |
+| 8j. Recent changes | | |
 | 9. View mode, unchanged | | |
 | 10. Phone (390 px) | | |
 | 11. Designer | | |
@@ -273,7 +274,7 @@ Notes:
 
 ## 8i. The edit record (Gateway only)
 
-Entry 11a keeps what each change did and reads it with `edits.history`; nothing shows in the studio until entry 11b (History in the rail, Revert). A short check in the browser's developer console on `/edit`, signed in as the map editor, after **Seed the dev map**. The test hook (`window.__mapStudioTest`) sends through the component's own session, so the Gateway decides with your roles.
+Entry 11a keeps what each change did and reads it with `edits.history`; entry 11b shows it in the studio (History in the rail, Revert, section 8j). A short check in the browser's developer console on `/edit`, signed in as the map editor, after **Seed the dev map**. The test hook (`window.__mapStudioTest`) sends through the component's own session, so the Gateway decides with your roles.
 
 - [ ] Move P14 (Edit mode, Select, drag it), then in the console run `(await window.__mapStudioTest.send('edits.history', {limit: 3})).body.entries[0]`: the newest entry is your move, `actor` your user name, `at` the time in UTC, and one op with `name` "P14", `kind`, and `before` and `after` holding only `geometry` (the old and the new coordinates).
 - [ ] Rename P14 in Details, then run the same line: the newest op's `before` and `after` hold only `name`, and the entry below it (your move) still reads `name` "P14", the name it had then.
@@ -281,6 +282,23 @@ Entry 11a keeps what each change did and reads it with `edits.history`; nothing 
 - [ ] Page back: `(await window.__mapStudioTest.send('edits.history', {before: <the last entry's seq>, limit: 3})).body` lists the three older batches and `more`.
 - [ ] Open `/` in a private window (no sign-in) and run `(await window.__mapStudioTest.send('edits.history', {})).body`: `{code: "role", ...}` and no names.
 - [ ] A store from before this build (schema 2) is upgraded once on the Gateway's start: the log says "applied version(s) [3], now at schema version 3", and the older changes are listed with `before` and `after` null.
+
+Notes:
+
+## 8j. Recent changes (History)
+
+On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor, with a second browser (a private window) signed in as the phone editor `mapoperator` on `/edit`, and a third (another private window) signed in as the map editor on `/edit` at 1366 px. Compare the surface with DESIGN.md's Recent changes panel: a note box at the top, rows of an initial avatar, a sentence, who and when in tiny text and a ghost Revert, and a footer line.
+
+- [ ] The rail lists View, Items, Kinds, Layers, **History** (a clock) and Import is not there yet. Press **History**: the rail item reads active and the dock shows "Recent changes", the save status row under its title, a note box "Nothing to undo yet" with a disabled **Undo**, then the changes newest first, and the footer "Revert undoes that one change, including someone else's, and saves like any edit." In the third browser press **Saved** beside the map's name in the Items list: History opens there too.
+- [ ] Move P14 (Select, drag it); in the second browser move P31 (its sheet's Edit, Move). Within seconds both the first and the third browser list "Moved P31 about ... north" by mapoperator (the avatar "M", "mapoperator - 10:42") above "Moved P14 ..." by mapeditor, with no reload. A change from an earlier day reads its date, "Nov 7, 10:42".
+- [ ] Tab to P31's row and press Enter: it expands to "Location" with the latitude and longitude before and after; Space closes it.
+- [ ] Press **Revert** on P31's row: P31 moves back in every browser, and a new row "Reverted "Moved P31 about ... north"" shows on top in the first and the third. The note box reads "Next undo is one step: Undo: revert "Moved P31 ..."", as the toolbar's Undo names it on hover; press the note box's **Undo**: P31 goes where the phone editor put it.
+- [ ] In the second browser move P31 again, then in the first press **Revert** on the phone editor's first move of P31: refused, the conflict card reads "Not saved - conflict with mapoperator's change", and nothing moves. Press **Use mapoperator's version**.
+- [ ] Rename a pad, then delete a line with its instruments: the rows read "Renamed P12 to ..." and "Deleted ... and its 2 instruments in one change"; the delete's **Revert** brings the line and its instruments back in one change and one undo step.
+- [ ] Select twenty pads and set one field on all of them: one row "Changed 20 well pads in one change". A kind setup saved by **Seed the dev map** reads "Changed the well pad kind setup" with no Revert and "Kind setups change from the Kinds screen, so this change has no Revert." under it.
+- [ ] Scroll to the end of the rows: **Show older** adds the next 50 below; at the end of the record it goes.
+- [ ] Stop the store (`docker stop <MAPSTUDIO_CONTAINER>-pg`) and make an edit: the note box's Undo and every Revert are off, saying "Paused - the map store is unreachable" on hover. Start it again.
+- [ ] Turn the Edit switch off: View mode shows no History.
 
 Notes:
 

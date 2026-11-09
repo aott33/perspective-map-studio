@@ -3,8 +3,8 @@ import { StudioSurface } from '../studio';
 import { ChromeGlyph } from './ChromeGlyph';
 
 /**
- * The mode rail (epic 4 entry 2; DESIGN.md mode-rail, EXPERIENCE.md Mode rail): View, Items, Kinds
- * and Layers stacked, each a glyph over a tiny label; the active surface takes the hover surface and
+ * The mode rail (epic 4 entry 2; DESIGN.md mode-rail, EXPERIENCE.md Mode rail): View, Items, Kinds,
+ * Layers and History (entry 11b: Recent changes in the dock, a clock glyph) stacked, each a glyph over a tiny label; the active surface takes the hover surface and
  * bold text. View leaves Edit mode; the others switch the surface and keep the map and the selection.
  * Import is epic 5's. Rendered by MapStudio beside the map in Edit mode at level `full`.
  *
@@ -22,7 +22,7 @@ export interface RailProps {
 }
 
 export function Rail(props: RailProps): React.ReactElement {
-    const item = (key: StudioSurface, label: string, glyph: 'list' | 'kinds' | 'layers'): React.ReactElement => {
+    const item = (key: StudioSurface, label: string, glyph: 'list' | 'kinds' | 'layers' | 'clock'): React.ReactElement => {
         const opens = key === 'items' && !!props.collapsed;
         const active = props.surface === key && (!opens || !!props.listOpen);
         return (
@@ -43,6 +43,7 @@ export function Rail(props: RailProps): React.ReactElement {
             {item('items', 'Items', 'list')}
             {item('kinds', 'Kinds', 'kinds')}
             {item('layers', 'Layers', 'layers')}
+            {item('history', 'History', 'clock')}
         </nav>
     );
 }

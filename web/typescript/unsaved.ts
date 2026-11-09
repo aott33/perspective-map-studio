@@ -588,7 +588,7 @@ function same(a: unknown, b: unknown): boolean {
 }
 
 /** A kind's field label for a property key, the key itself when the kind does not name it. */
-function fieldLabel(kinds: Kind[], kindId: string, key: string): string {
+export function fieldLabel(kinds: Kind[], kindId: string, key: string): string {
     const kind = kinds.find((k) => k.id === kindId);
     const field = kind ? kind.fields.find((f) => f.key === key) : undefined;
     return field && field.label !== '' ? field.label : key;
@@ -602,7 +602,7 @@ function changedKeys(a: Record<string, unknown> | undefined, b: Record<string, u
     return keys.filter((k) => !same(x[k], y[k]));
 }
 
-function joinWords(words: string[]): string {
+export function joinWords(words: string[]): string {
     if (words.length <= 1) {
         return words.join('');
     }

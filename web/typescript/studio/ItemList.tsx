@@ -48,7 +48,8 @@ import { ProblemStatus } from './SaveStatus';
  * The save status beside the title always says the save state (Saving..., Not saved while edits wait, else Saved); a
  * problem shows on its own row under the title (entry 24, owner 2026-11-05: the status box retired, its problems said
  * here in Edit mode; studio/SaveStatus.tsx `ProblemStatus`), and the edits waiting on that row open the list of them
- * under it, closed until asked for and closed again with Hide, Esc or the edits' going.
+ * under it, closed until asked for and closed again with Hide, Esc or the edits' going. From entry 11b the status's words are a
+ * button (`onHistory`) that opens Recent changes, the rail's History (EXPERIENCE.md Save status); the wrapper keeps its status role.
  */
 export interface ItemListProps {
     title: string;
@@ -92,6 +93,8 @@ export interface ItemListProps {
     /** Bumped to open the waiting edits under the save status row (entry 10, "Show my 2 edits"; SaveStatus.tsx `openRequest`). */
     openWaiting?: number;
     onOpenHandled?: () => void;
+    /** The save status's words pressed (entry 11b; EXPERIENCE.md Save status): Recent changes opens, the rail's History. */
+    onHistory?: () => void;
 }
 
 function Badge(props: { row: ListRow }): React.ReactElement | null {
@@ -352,7 +355,12 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
                     <div className="mapstudio-dock-title-row">
                         <h2 className="mapstudio-dock-title">{props.title}</h2>
                         <span className={'mapstudio-panel-save mapstudio-panel-save--' + save.state} role="status" data-save-state={save.state}>
-                            {props.saveWords}
+                            {props.onHistory ? (
+                                <button type="button" className="mapstudio-panel-save-button" title={props.saveWords + ' - open Recent changes'}
+                                        onClick={props.onHistory}>
+                                    {props.saveWords}
+                                </button>
+                            ) : props.saveWords}
                         </span>
                     </div>
                     <ProblemStatus save={save} problems={props.problems} unsaved={props.unsaved} records={props.records} level={props.level}

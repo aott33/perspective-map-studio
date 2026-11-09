@@ -68,13 +68,13 @@ Decisions (owner, 2026-11-09, "approve and continue" on the planner's seven pick
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `web/typescript/history.ts` -- rows from entries, sentences, expand lines, the reverse batch, who can Revert -- B2, B3, B6 to B8.
-- [ ] `MapStudioStoreDelegate.ts` -- history state (pages, loading, error), ask on open, on `map.changed` while open, Show older; `revert(seq)` through `sendBatch` -- B1, B2, B4, B5, B9.
-- [ ] `controls.ts`, `Rail.tsx`, `studio.ts` -- the clock glyph and History item -- B1.
-- [ ] `studio/HistoryPanel.tsx`, `MapStudio.tsx`, `ItemList.tsx`, `mapstudio.css` -- the surface, the note box, rows, expand, footer, Saved opens it; test hooks (`.mapstudio-history`, `.mapstudio-history-row` with `data-seq`, `.mapstudio-history-revert`, `.mapstudio-history-older`) -- B1, B3, B10.
-- [ ] Jest -- every matrix row's logic.
-- [ ] `e2e/tests/recentchanges.spec.mjs` -- B1 to B10 at 1366 px, two editor contexts, screenshots of the surface, a row expanded and a refused Revert.
-- [ ] Docs and playbook 8j.
+- [x] `web/typescript/history.ts` -- rows from entries, sentences, expand lines, the reverse batch, who can Revert -- B2, B3, B6 to B8.
+- [x] `MapStudioStoreDelegate.ts` -- history state (pages, loading, error), ask on open, on `map.changed` while open, Show older; `revert(seq)` through `sendBatch` -- B1, B2, B4, B5, B9.
+- [x] `controls.ts`, `Rail.tsx`, `studio.ts` -- the clock glyph and History item -- B1.
+- [x] `studio/HistoryPanel.tsx`, `MapStudio.tsx`, `ItemList.tsx`, `mapstudio.css` -- the surface, the note box, rows, expand, footer, Saved opens it; test hooks (`.mapstudio-history`, `.mapstudio-history-row` with `data-seq`, `.mapstudio-history-revert`, `.mapstudio-history-older`) -- B1, B3, B10.
+- [x] Jest -- every matrix row's logic.
+- [x] `e2e/tests/recentchanges.spec.mjs` -- B1 to B10 at 1366 px, two editor contexts, screenshots of the surface, a row expanded and a refused Revert.
+- [x] Docs and playbook 8j.
 
 **Acceptance Criteria:**
 - Given the dev stack and two browsers, when both move items and one reverts the other's move, then both see the item back and the revert listed first, and a Revert after a later change is refused naming who.
