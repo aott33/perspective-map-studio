@@ -259,12 +259,49 @@ class EditHistoryTest {
     @Test
     void h4ALimitOutsideOneToFiftyOrABeforeThatIsNotANumberIsInvalid() {
         for (String body : List.of("{\"limit\":0}", "{\"limit\":51}", "{\"limit\":2.5}", "{\"limit\":\"10\"}",
-                "{\"before\":\"x\"}", "{\"before\":0}", "{\"before\":1.5}", "{\"before\":{}}")) {
+                "{\"before\":\"x\"}", "{\"before\":0}", "{\"before\":1.5}", "{\"before\":{}}",
+                "{\"before\":9223372036854775808}", "{\"before\":9223372036854775807.5}", "{\"limit\":50.000001}")) {
             JsonObject reply = history(EDITOR, body);
             assertEquals(Messages.ERROR, reply.get("type").getAsString(), body);
             assertEquals(Messages.CODE_INVALID, reply.getAsJsonObject("body").get("code").getAsString(), body);
         }
         assertEquals(0, store.historyQueries, "nothing is read for a malformed request");
+    }
+
+    @Test
+    void h4TheLargestSeqAndAWholeNumberWrittenWithAFractionAreRead() {
+        save("alex", createPad(uuid(), "P14", -103.5, 31.9));
+        assertEquals(1, entries(page("{\"before\":9223372036854775807}")).size(), "Long.MAX_VALUE is a seq");
+        assertEquals(1, entries(page("{\"limit\":2.0}")).size(), "2.0 is the whole number 2");
+    }
+
+    @Test
+    void anUnexpectedFailureReadingTheRecordIsWordedAsARead() {
+        MapStore failing = new MapStore() {
+            @Override
+            public <T> T inTransaction(String connection, Work<T> work) {
+                throw new IllegalStateException("boom");
+            }
+        };
+        SetupRegistry setups = new SetupRegistry(s -> { });
+        try {
+            setups.put(P, Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\","
+                + "\"roles\":{\"full\":[\"MapEditor\"],\"phone\":[\"MapOperator\"]}}"));
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
+        StoreGate gate = new StoreGate(setups, c -> StoreState.ready());
+        MapLoader brokenLoader = new MapLoader(gate, failing, TestKinds::snapshot);
+        WriteService brokenWrites = new WriteService(gate, failing, new NoChangeHook(), TestKinds::snapshot);
+        MapStudioDelegate.SessionView view = new MapStudioDelegate.SessionView(P, "mapeditor", EDITOR);
+        JsonObject read = MapStudioDelegate.storeReply(brokenLoader, brokenWrites, view, Messages.EDITS_HISTORY, "h",
+            new JsonObject());
+        assertEquals(Messages.CODE_STORE_UNREACHABLE, read.getAsJsonObject("body").get("code").getAsString());
+        assertEquals("The map store failed to read the edit record.",
+            read.getAsJsonObject("body").get("message").getAsString());
+        JsonObject saved = MapStudioDelegate.storeReply(brokenLoader, brokenWrites, view, Messages.EDITS_APPLY, "a",
+            batch(createPad(uuid(), "P1", -103.5, 31.9)));
+        assertEquals("The map store failed; nothing was saved.", saved.getAsJsonObject("body").get("message").getAsString());
     }
 
     @Test

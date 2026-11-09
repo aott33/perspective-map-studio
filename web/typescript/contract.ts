@@ -331,10 +331,16 @@ export interface HistoryEntry {
     ops: HistoryOp[];
 }
 
-/** `edits.history.reply`: one page of the edit record, newest first; `more` when older batches remain. */
+/**
+ * `edits.history.reply`: one page of the edit record, newest first; `more` when older batches remain. `nextBefore` is
+ * the cursor for the next page, the lowest `seq` among the reply's entries, read or not (null when none carries one), and
+ * `unread` counts the entries that could not be read (an op or entity a newer Gateway adds), so none vanishes unsaid.
+ */
 export interface EditsHistoryReplyBody {
     entries: HistoryEntry[];
     more: boolean;
+    nextBefore: number | null;
+    unread: number;
 }
 
 /** The `edits.history` request: entries with a seq below `before`, at most `limit` (1 to 50, default 50). */
@@ -387,7 +393,13 @@ export function readEditsHistoryReply(body: Record<string, unknown>): EditsHisto
         return null;
     }
     const entries = body.entries.map(readHistoryEntry).filter((e): e is HistoryEntry => e !== null);
-    return { entries, more: body.more };
+    let nextBefore: number | null = null;
+    for (const raw of body.entries) {
+        if (isRecord(raw) && typeof raw.seq === 'number' && isFinite(raw.seq) && (nextBefore === null || raw.seq < nextBefore)) {
+            nextBefore = raw.seq;
+        }
+    }
+    return { entries, more: body.more, nextBefore, unread: body.entries.length - entries.length };
 }
 
 /** The conflicts of a `conflict` error body; entries that are not conflicts are left out. */

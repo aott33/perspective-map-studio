@@ -3,7 +3,11 @@
 // the phone editor each move a pad (two editors, two actors); a viewer is refused. Every item a test makes is deleted
 // at its end, so the map other specs count is unchanged (their edit rows stay: the record keeps every change).
 
+import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { e2eProject } from '../lib/env.mjs';
 import {
     EDITOR_USER, OPERATOR_USER, editorTest, expect, mapLoaded, openMap, send, signedInContext, test
 } from './fixtures.mjs';
@@ -13,6 +17,17 @@ const SWD = [[-103.52, 31.92], [-103.505, 31.9205], [-103.490423, 31.926]];
 const PT1_AT = [-103.507899, 31.920404];
 const PT2_AT = [-103.491211, 31.925703];
 const ISO_SECOND = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/;
+
+const PSQL = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'ops', 'psql.sh');
+
+/** One statement on the dev map store as its owner role (ops/psql.sh); returns the first line of its unaligned output (a RETURNING value; psql adds the command tag after it). */
+function sql(statement) {
+    const run = spawnSync('bash', [PSQL, '-v', 'ON_ERROR_STOP=1', '-At', '-c', statement], { encoding: 'utf8', timeout: 60_000 });
+    if (run.status !== 0) {
+        throw new Error('psql failed: ' + (run.stderr || '').trim());
+    }
+    return run.stdout.trim().split('\n')[0];
+}
 
 const batch = (...ops) => ({ batchId: randomUUID(), ops });
 const point = (c) => ({ type: 'Point', coordinates: c });
@@ -154,6 +169,36 @@ editorTest.describe('recent changes: the edit record', () => {
             expect((await history(page, { limit: 1 })).entries[0]).toEqual(top);
 
             saved(await send(page, 'edits.apply', batch(del(pad, version))));
+        });
+
+    editorTest('a row from before schema 3 reads null values and the stored record\'s name and kind (H7, the SQL path)',
+        async ({ page }) => {
+            await openEditor(page);
+            const pad = randomUUID();
+            const oldBatch = randomUUID();
+            const made = saved(await send(page, 'edits.apply', batch(
+                create(pad, { kind: 'pad', name: 'History old row', geometry: point([-104.9703, 39.7427]) }))));
+            saved(await send(page, 'edits.apply', batch(update(pad, 1, { name: 'History old row, renamed' }))));
+            // A row as schema 2 wrote it (no before, after, name or kind), at the project's next seq, so no batch shares it.
+            const project = e2eProject();
+            const seq = Number(sql("WITH s AS (UPDATE mapstudio_project SET seq = seq + 1 WHERE project = '" + project
+                + "' RETURNING seq) INSERT INTO mapstudio_edit (project, batch_id, seq, entity, entity_id, op, version, actor,"
+                + " source) SELECT '" + project + "', '" + oldBatch + "', s.seq, 'item', '" + pad + "', 'update', 2,"
+                + " 'schema2-actor', 'script' FROM s RETURNING seq"));
+            try {
+                expect(seq).toBe(made.seq + 2);
+                const { entries } = await history(page, { limit: 3 });
+                expect(entries[0]).toMatchObject({ seq, batchId: oldBatch, actor: 'schema2-actor', source: 'script' });
+                expect(entries[0].at).toMatch(ISO_SECOND);
+                expect(entries[0].ops).toEqual([{ op: 'update', entity: 'item', id: pad, name: 'History old row, renamed',
+                    kind: 'pad', version: 2, before: null, after: null }]);
+                // The rows written by this build keep the name as written, beside the old one.
+                expect(entries[1].ops[0]).toMatchObject({ id: pad, name: 'History old row, renamed',
+                    before: { name: 'History old row' }, after: { name: 'History old row, renamed' } });
+            } finally {
+                sql("DELETE FROM mapstudio_edit WHERE batch_id = '" + oldBatch + "'");
+                saved(await send(page, 'edits.apply', batch(del(pad, 2))));
+            }
         });
 
     editorTest('a page stops before the batch that would take it past 1,000 ops, and holds it whole and alone next (H5)',

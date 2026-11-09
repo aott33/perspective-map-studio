@@ -3,7 +3,7 @@ title: "11a: The edit record keeps what each change did, read by edits.history"
 type: 'feature'
 ticket: '11'
 created: '2026-11-09'
-status: 'in-review'
+status: 'built'
 baseline_revision: '11c3fd424cc2ec4b71a8897969dd3070ebd2b2dd'
 route: 'full'
 route_source: 'auto'
@@ -83,6 +83,17 @@ G = `gateway/src/main/java/com/aoindustrial/perspective/mapstudio/gateway`, GT i
 ## Plan Change Log
 
 ## Review Triage Log
+
+### Pass 1 (quick lens, 2026-11-09): 4 findings - 0 high, 2 medium, 2 low; 4 patches
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---|---|---|---|
+| 1 | `contract.ts` `readEditsHistoryReply` drops an unreadable entry, so a page holding only that entry returns no `seq` to page on and the batch disappears unsaid | medium | patch | Confirmed: `.filter` drops it, `more` kept; an op or entity a newer Gateway adds is enough. Fix: the reader returns the cursor for the next page from the raw reply and counts the entries it could not read. |
+| 2 | `MapLoader.historyNumber`: `before` 2^63 passes the double range check and wraps to `Long.MIN_VALUE`, an empty page instead of `invalid` | low | patch | Confirmed by Gson's `LazilyParsedNumber` fallback. A direct correction of the range check. |
+| 3 | A failed history read is answered "The map store failed; nothing was saved." | low | patch | `storeReply`'s catch is shared; the words are wrong for a read. Fix: words per request type. |
+| 4 | No test runs `HISTORY_ROWS_SQL`'s old-row path (null name and values) against PostgreSQL: `store-checks.sh` runs a copy, `HistoryJdbcTest` a proxied driver | medium | patch | `history.spec.mjs` covers new rows on PostgreSQL only. Fix: an e2e row writes a schema-2-style edit row (null values, name, kind) with psql and reads it through `edits.history`. |
+
+Outcome (2026-11-09): the four patches applied; the orchestrator's Verification: tsc clean, Jest 749 passed, Gradle clean build offline passed, contract check OK (map store schema 3), `ops/up.sh --fresh` and the whole e2e suite 288 passed, 0 failed, 8 skipped (the env-gated scenarios), `ops/store-checks.sh upgrade` passed (1 to 3, and 2 with edit rows to 3). No Ignition file changed. Not for 11a: an upgrade needs CREATE on the schema as well as table ownership (`docs/operations.md`), for the 0.4.0 release notes; kind setup ops carry `name` null, for 11b. Status built.
 
 ## Design Notes
 

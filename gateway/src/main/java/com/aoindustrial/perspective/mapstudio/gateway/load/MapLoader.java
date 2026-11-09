@@ -138,9 +138,15 @@ public final class MapLoader {
             return null;
         }
         if (e.isJsonPrimitive() && e.getAsJsonPrimitive().isNumber()) {
-            double d = e.getAsDouble();
-            if (d == Math.rint(d) && d >= min && d <= max) {
-                return e.getAsLong();
+            // Exact: a double check passes 2^63, which getAsLong would wrap to Long.MIN_VALUE.
+            try {
+                java.math.BigDecimal d = e.getAsBigDecimal();
+                if (d.stripTrailingZeros().scale() <= 0 && d.compareTo(java.math.BigDecimal.valueOf(min)) >= 0
+                        && d.compareTo(java.math.BigDecimal.valueOf(max)) <= 0) {
+                    return d.longValueExact();
+                }
+            } catch (NumberFormatException | ArithmeticException ex) {
+                // Not a number we can read exactly: refused below.
             }
         }
         String range = max == Long.MAX_VALUE ? "a whole number from " + min : "a whole number from " + min + " to " + max;

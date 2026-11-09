@@ -122,6 +122,19 @@ describe('edits.history (epic-editing entry 11a)', () => {
         expect(reply.body.entries[1].ops[0]).toEqual({ op: 'delete', entity: 'item', id: 'l1', name: null, kind: null,
             version: 2, before: null, after: null });
         expect(replyText(reply)).toBe('Recent changes: 2 change(s), more');
+        expect(reply.body.nextBefore).toBe(3);
+        expect(reply.body.unread).toBe(1);
+    });
+
+    test('a page whose only entry cannot be read still gives the next cursor and counts it', () => {
+        const reply = readReply({ v: 1, type: 'edits.history.reply', id: 'h', body: { entries: [
+            { seq: 12, batchId: 'b', actor: 'a', at: '2026-11-09T09:00:00Z', source: 'session',
+                ops: [{ op: 'merge', entity: 'layer', id: 'x', version: 1 }] }], more: true } });
+        expect(reply.kind).toBe('edits.history.reply');
+        if (reply.kind !== 'edits.history.reply') {
+            return;
+        }
+        expect(reply.body).toEqual({ entries: [], more: true, nextBefore: 12, unread: 1 });
     });
 
     test('a reply without entries or more is invalid', () => {

@@ -71,6 +71,9 @@ public class MapStudioDelegate extends ComponentModelDelegate {
 
     private static final LoggerEx log = LoggerEx.newBuilder().build("MapStudio.delegate");
 
+    /** The answer to an unexpected failure reading edits.history: a read, so nothing about saving. */
+    static final String HISTORY_FAILED = "The map store failed to read the edit record.";
+
     private static final DateTimeFormatter ISO_UTC = DateTimeFormatter.ISO_INSTANT;
 
     private final MapStudioServices services;
@@ -438,7 +441,8 @@ public class MapStudioDelegate extends ComponentModelDelegate {
         } catch (RuntimeException ex) {
             log.error("Map Studio failed on " + type + " for project " + view.project() + ": "
                 + ex.getClass().getSimpleName(), ex);
-            return error(id, Messages.CODE_STORE_UNREACHABLE, "The map store failed; nothing was saved.");
+            return error(id, Messages.CODE_STORE_UNREACHABLE, Messages.EDITS_HISTORY.equals(type)
+                ? HISTORY_FAILED : "The map store failed; nothing was saved.");
         }
     }
 
