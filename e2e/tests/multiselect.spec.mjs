@@ -371,13 +371,20 @@ test.describe('selecting several (entry 8)', () => {
         await expect(map).toHaveAttribute('data-studio', 'on');
         const changed = page.locator('#mapstudio-events-selection-changed');
         const countOf = async () => Number((await changed.textContent()).split('|')[0]);
-        await check(page, ids.p1).check();
-        await check(page, ids.p2).check();
-        // The two ticks' events in first (each goes through the Gateway), so the count starts after them.
-        await expect(changed).toHaveText(/\|/, { timeout: REPLY_MS });
-        await expect.poll(async () => (await changed.textContent()).split('|')[1], { timeout: REPLY_MS }).toBe(ids.p1 + ',' + ids.p2);
+        // A selection the page's session kept from an earlier visit is cleared first (the page writes null), and the events it
+        // brings settle, so the count starts from a quiet page.
+        await page.locator('#mapstudio-events-write-null').click();
+        await expectSet(map, []);
+        await expect(page.locator('#mapstudio-events-selected')).toHaveText(/^selectedItem:\s*$/, { timeout: REPLY_MS });
+        let settled = -1;
+        await expect.poll(async () => {
+            const now = await countOf();
+            const same = now === settled;
+            settled = now;
+            return same;
+        }, { timeout: REPLY_MS, intervals: [1500] }).toBe(true);
         const start = await countOf();
-        // Two at once: a Select all of the three (one change of the set), then Clear (another).
+        // Three at once with one Select all in filter (one change of the set), then Clear (another).
         await page.locator('.mapstudio-list-sort-select').selectOption('name');
         await page.locator('.mapstudio-list-search-input').fill('Point');
         await page.locator('.mapstudio-list-select-filter').click();
