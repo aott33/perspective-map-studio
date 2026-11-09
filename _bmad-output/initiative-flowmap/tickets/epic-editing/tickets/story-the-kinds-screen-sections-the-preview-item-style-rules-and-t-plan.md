@@ -3,8 +3,8 @@ title: "12a: the Kinds surface and a kind's setup (Icon, Key values, Comms, Alar
 type: 'feature'
 ticket: '12'
 created: '2026-11-09'
-status: 'ready-for-dev'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: 'dec0579510c87604ac6c12c65726f7f920a9ee19'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
@@ -78,6 +78,8 @@ Decisions (owner, 2026-11-09, "take all of a to e, pick 6 C, approve and continu
 - Given a refused value, when the Gateway answers, then its words stand beside that field and nowhere says Saved.
 
 ## Implementation Notes
+
+- Planner, 2026-11-09: the environment, commit and identity rules are entry 8's plan's (Docker by hand after a restart, JDK 17 by apt if gone, `ops/up.sh --fresh` before a whole-suite run, the session's trailers, `git commit --only`, no em dashes, never a bare `git stash`, never a push). A Gradle download refused 429 passes on a retry with backoff. The orchestrator is bringing Docker, the JDK and the Gradle cache up while the code is written; run the new and changed e2e specs once the stack answers.
 
 ## Plan Change Log
 
