@@ -97,7 +97,8 @@ export function drawItems(host: ItemsHost): void {
             && selectionKey === host.drawnSelection && host.withinM === host.drawnWithinM)) {
         return;
     }
-    const items = delegate.editing === 'off' ? [] : delegate.items;
+    // No store item is drawn as current while map.load says the store is unavailable; a save's pause (entry 10) keeps them.
+    const items = delegate.editing === 'off' && !delegate.savePaused ? [] : delegate.items;
     const data = buildFeatures(items, delegate.lists.kinds, delegate.live, selected, host.markerColors, host.withinM, several ? set : []);
     host.anchors = data.anchors;
     host.drawnWithinM = host.withinM;

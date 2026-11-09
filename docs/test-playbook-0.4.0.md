@@ -2,7 +2,7 @@
 
 A walk through what epic 4 has built so far, grouped by what you do, on the local development stack. Tick each box and note anything that looks or feels off in the Notes line under each section (a screenshot helps). Each note goes into `_bmad-output/initiative-flowmap/tickets/epic-editing/epic-editing.md` Notes or a new entry. The playbook grows as entries land; entry 18 (the 0.4.0 release) finishes it for the release test and the 30-minute test.
 
-Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several) and 9 (instruments). Still to come: 10 (save problems), 11 (Recent changes and History), 12 and 13 (the Kinds screen, the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
+Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments) and 10 (save problems). Still to come: 11 (Recent changes and History), 12 and 13 (the Kinds screen, the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
 
 ## Results so far
 
@@ -23,6 +23,7 @@ Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item li
 | 8d. The layout | | |
 | 8e. First run | | |
 | 8g. Instruments | | |
+| 8h. Save problems | | |
 | 9. View mode, unchanged | | |
 | 10. Phone (390 px) | | |
 | 11. Designer | | |
@@ -248,6 +249,24 @@ On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor
 - [ ] Type 1143 in PT-1's distance and press Enter: PT-1 goes back to 1.1 km, one change. Undo twice: the drag's place, then 1.1 km again.
 - [ ] Reshape L-SWD (drag its bend), delete it (Delete key), then Undo: the instruments, a tap you added among them, stay on the reshaped line, go with the delete, and come back with the one Undo.
 - [ ] The toolbar's kind buttons are Well pad, Gathering line and Geofence; the Point tool adds a well pad, and a pad's Kind select offers no Tap, Line valve or Meter.
+
+Notes:
+
+## 8h. Save problems
+
+On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor, with a second browser (a private window) signed in as the phone editor `mapoperator` on `/edit`. One card at a time shows on the map under the toolbar; the save status row in the list's header keeps its words and its list. No toasts.
+
+- [ ] **Conflict.** In the first browser select P14 and leave Details open. In the second, move P14 (its sheet's Edit, Move). Before the first browser shows it moved, type an Operator in P14's Details and press Enter (if it already moved, unplug the network for a moment while the second saves, or use the store-checks conflict). The row reads "Not saved - conflict with mapoperator's change" and a card under the toolbar reads "Not saved - conflict with mapoperator's change", "mapoperator moved P14 about ... north at <time>, while you were editing it." and "Your change, kept here and not saved: Operator ...", with **Use mapoperator's version** and **Apply mine on top**. Compare it with [key-screen-9 conflict](../_bmad-output/initiative-flowmap/ux-map-studio/mockups/key-screen-9-save-states-conflict.png).
+- [ ] The card took no focus: Tab from the toolbar reaches its buttons. Esc in it closes it and the edit stays on the row (open the row: Try again and Discard).
+- [ ] Make another conflict and press **Use mapoperator's version**: the card and the row go, the header says Saved, P14 stays where the phone editor put it, with no Operator.
+- [ ] Make another and press **Apply mine on top**: it saves (Saved), P14 keeps the phone editor's place and shows your Operator. The Undo button reads "Undo: edit P14"; Undo puts the phone editor's version back.
+- [ ] In the second browser delete an item the first has a pending edit on (the same way): the card offers only **Use mapoperator's version**, saying "It was deleted, so your change cannot go on top of it."
+- [ ] **Store unreachable.** Open `/edit` in a second tab too. Stop the store: `docker stop <MAPSTUDIO_CONTAINER>-pg` (the name in `.env`). Change one pad's Operator in the first tab and another pad's in the second (the first answer pauses that tab's editing within a second, so the second edit is made in the other tab). Within seconds a card reads "Store unreachable" and "Your 2 edits are kept on this computer, not saved yet, and save when the store is back. Drawing and editing are paused; live values still update."; the toolbar fades, its buttons and Details' fields do nothing and say "Paused - the map store is unreachable" on hover; the items stay on the map and live values keep moving; Esc does not close the card. Compare it with [key-screen-9 unreachable](../_bmad-output/initiative-flowmap/ux-map-studio/mockups/key-screen-9-save-states-unreachable.png).
+- [ ] Press **Show my 2 edits**: the row's list opens in the dock with both edits, the focus in it.
+- [ ] Start the store (`docker start <MAPSTUDIO_CONTAINER>-pg`) and press **Try again** (or wait 15 s): both save, the card goes, the toolbar comes back.
+- [ ] **A lost connection is unchanged**: stop the Gateway container instead (`docker stop <MAPSTUDIO_CONTAINER>`) and draw a line: the chip says no connection, the toolbar stays on, and the line waits on the row; no card. Start it again.
+- [ ] **Busy** is hard to make by hand (the Gateway's work pool full); the suite fakes it (`savestates.spec.mjs`). Check its screenshot `docs/screenshots/mapstudio-savestates-busy-1366.png` against [key-screen-9 busy](../_bmad-output/initiative-flowmap/ux-map-studio/mockups/key-screen-9-save-states-busy.png): "Not saved - Map Studio is busy", the sentence, "Your change, kept here: ...", **Try again** and **Discard my change**.
+- [ ] **Second tab.** A tab that cannot send a batch leaves it in the browser's queue, and another open tab of the same browser now replays it within 15 s with no reload. The suite makes it (`savestates.spec.mjs`, R8: tab A's saves dropped by the test, tab B saves the line, both lists empty after). By hand: open `/edit` in two tabs, draw a line in one; both tabs' rows stay empty and the line shows in both.
 
 Notes:
 

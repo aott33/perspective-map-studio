@@ -274,6 +274,41 @@ describe('sending the unsaved queue (UnsavedSender)', () => {
         expect(store.data.has(KEY)).toBe(false);
     });
 
+    test('a storage event arms the 15 s replay: another tab\'s unsent batch is replayed here without a reload (entry 10, R8)', () => {
+        const store = new FakeStore();
+        const b = rig({ store });
+        // Tab A queues a batch it cannot send (another queue on the same storage stands in for it).
+        const a = new UnsavedQueue(store, () => undefined);
+        a.setKey(KEY);
+        a.enqueue(line(1), T0);
+        b.sender.storage(KEY);
+        expect(b.host.fired).toEqual([]);
+        jest.advanceTimersByTime(REPLAY_INTERVAL_MS);
+        expect(b.host.fired.length).toBe(1);
+        expect(b.last().body.batchId).toBe('batch-1');
+        b.sender.onSaved(b.last().id, 'batch-1');
+        expect(store.data.has(KEY)).toBe(false);
+        jest.advanceTimersByTime(REPLAY_INTERVAL_MS * 2);
+        expect(b.host.fired.length).toBe(1);
+    });
+
+    test('a storage event arms nothing before map.load answered, nor below level phone, nor with nothing unsent', () => {
+        const store = new FakeStore();
+        const seed = new UnsavedQueue(store, () => undefined);
+        seed.setKey(KEY);
+        seed.enqueue(line(1), T0);
+        for (const level of [null, 'none'] as Array<EditLevel | null>) {
+            const r = rig({ store, level });
+            r.sender.storage(KEY);
+            jest.advanceTimersByTime(REPLAY_INTERVAL_MS * 2);
+            expect(r.host.fired).toEqual([]);
+        }
+        seed.discard('batch-1');
+        const r = rig({ store });
+        r.sender.storage(KEY);
+        expect(jest.getTimerCount()).toBe(0);
+    });
+
     test('stop clears every timer', () => {
         const { host, sender } = rig();
         sender.enqueueAndSend(line(1), T0);

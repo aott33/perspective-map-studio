@@ -35,7 +35,8 @@ import { CHOSEN_POINT_ZOOM, SearchResult } from './search';
 import { PLACES } from './placeCheck';
 import { STORE_UNKNOWN, storeStateAttribute } from './storeState';
 import { SAVE_IDLE } from './save';
-import { unsavedItems } from './unsaved';
+import { saveCardFor, unsavedItems } from './unsaved';
+import { browserLocale } from './linePopup';
 import { ProblemFacts, chipProblem, editProblems, headerSaveWords } from './problems';
 import { PopupPoint, isSheetWidth, sheetBasisWidth } from './popupParams';
 import { CameraPadding, PopupAnchor, Rect } from './popupPlacement';
@@ -75,6 +76,7 @@ import { DrawingBar, InstrumentBar } from './studio/DrawingBar';
 import { GeometryBar } from './studio/GeometryBar';
 import { ChromeGlyph } from './studio/ChromeGlyph';
 import { ProblemStatus } from './studio/SaveStatus';
+import { SaveCard } from './studio/SaveCard';
 import { FirstRunChecklist, ViewerNote } from './studio/FirstRunChecklist';
 import { FIRST_RUN_NONE, FirstRunKept, VIEWER_NOTE, checklistShows, firstRunKey, keepFlag, readKept, stepsDone, viewerNoteShows } from './firstRun';
 
@@ -170,6 +172,10 @@ export interface MapStudioState {
     listCollapsed: boolean;
     /** The collapsed list open over the map (entry 7c): the rail's Items toggles it; a row choice, Esc and a map click close it. */
     listOpen: boolean;
+    /** The conflict and busy cards closed with Esc (entry 10, R10), by batchId: their entries stay on the save status row. */
+    cardsClosed: string[];
+    /** Bumped by the unreachable card's "Show my 2 edits" (entry 10, R5) to open the row's list; 0 once a row took it. */
+    showEdits: number;
 }
 
 /** The map inset the toolbar keeps from the map's left edge and the Editing switch on the top row (DESIGN.md spacing map-inset). */
@@ -206,7 +212,8 @@ export type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
 export class MapStudio extends Component<Props, MapStudioState> {
     state: MapStudioState = {
         drawing: null, snap: false, snapHint: '', popup: null, clock: Date.now(), pick: null, selected: null, panel: null,
-        studio: fromProps(this.props.props.editMode), layersTab: 'layers', geometry: null, listCollapsed: listCollapsedNow(), listOpen: false
+        studio: fromProps(this.props.props.editMode), layersTab: 'layers', geometry: null, listCollapsed: listCollapsedNow(), listOpen: false,
+        cardsClosed: [], showEdits: 0
     };
 
     mapContainer: HTMLDivElement | null = null;
@@ -1082,7 +1089,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     shapeItems(): ShapeItem[] {
         const map = this.map;
         const delegate = this.props.delegate;
-        if (!map || !delegate || delegate.editing === 'off') {
+        if (!map || !delegate || (delegate.editing === 'off' && !delegate.savePaused)) {
             return [];
         }
         const px = (c: [number, number]): [number, number] => {
@@ -1645,7 +1652,70 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private renderProblemStatus(delegate: MapStudioDelegateState, facts: ProblemFacts): React.ReactNode {
         return (
             <ProblemStatus save={delegate.save} problems={editProblems(facts)} unsaved={delegate.unsaved} records={delegate.items}
-                           level={facts.level} sending={delegate.sending} onRetry={this.onRetryUnsaved} onDiscard={this.onDiscardUnsaved} />
+                           level={facts.level} sending={delegate.sending} onRetry={this.onRetryUnsaved} onDiscard={this.onDiscardUnsaved}
+                           openRequest={this.state.showEdits} onOpenHandled={this.onShowEditsHandled} />
+        );
+    }
+
+    /** The store delegate, for the save card's actions. */
+    private storeDelegate(): MapStudioStoreDelegate | undefined {
+        return this.props.store.delegate as MapStudioStoreDelegate | undefined;
+    }
+
+    /** The save card's actions (entry 10): the conflict's two choices, Try again, Discard my change, Show my 2 edits and Esc. */
+    private onCardUseTheirs = (batchId: string): void => {
+        const delegate = this.storeDelegate();
+        if (delegate) {
+            delegate.useTheirs(batchId);
+        }
+    };
+    private onCardApplyOnTop = (batchId: string): void => {
+        const delegate = this.storeDelegate();
+        if (delegate) {
+            delegate.applyOnTop(batchId);
+        }
+    };
+    private onCardRetryStore = (): void => {
+        const delegate = this.storeDelegate();
+        if (delegate) {
+            delegate.retryStore();
+        }
+    };
+    private onCardClose = (batchId: string): void => {
+        this.setState((prev) => ({ cardsClosed: prev.cardsClosed.indexOf(batchId) >= 0 ? prev.cardsClosed : prev.cardsClosed.concat([batchId]) }));
+    };
+    /** "Show my 2 edits" (R5): the row's list of them opens in the dock; below 1280 px the Items list opens over the map first. */
+    private onCardShowEdits = (): void => {
+        const surface = this.state.studio.surface;
+        this.setState((prev) => ({
+            showEdits: prev.showEdits + 1,
+            listOpen: prev.listCollapsed && surface === 'items' ? true : prev.listOpen
+        }));
+    };
+    private onShowEditsHandled = (): void => {
+        if (this.state.showEdits !== 0) {
+            this.setState({ showEdits: 0 });
+        }
+    };
+
+    /**
+     * The save problems' card on the map under the toolbar (epic 4 entry 10, R26; studio/SaveCard.tsx): Edit mode only (View mode
+     * keeps entry 24's chip), one at a time, unreachable then conflict then busy (unsaved.ts `saveCardFor`). Keyed by the card and
+     * its entry, so a new card arrives as a new alert.
+     */
+    private renderSaveCard(delegate: MapStudioDelegateState, belowChip: boolean): React.ReactNode {
+        const card = saveCardFor({
+            unsaved: delegate.unsaved, paused: !!delegate.savePaused, dismissed: this.state.cardsClosed, records: delegate.items,
+            kinds: delegate.lists.kinds, locale: browserLocale()
+        });
+        if (!card) {
+            return null;
+        }
+        return (
+            <SaveCard key={card.kind + ':' + card.batchId} card={card} sending={delegate.sending.indexOf(card.batchId) >= 0} belowChip={belowChip}
+                      onUseTheirs={this.onCardUseTheirs} onApplyOnTop={this.onCardApplyOnTop} onRetry={this.onRetryUnsaved}
+                      onRetryStore={this.onCardRetryStore} onDiscard={this.onDiscardUnsaved} onShowEdits={this.onCardShowEdits}
+                      onClose={this.onCardClose} />
         );
     }
 
@@ -1792,7 +1862,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                       sending={delegate.sending}
                       onSelect={this.onRowSelect}
                       onRetry={this.onRetryUnsaved}
-                      onDiscard={this.onDiscardUnsaved} />
+                      onDiscard={this.onDiscardUnsaved}
+                      openWaiting={this.state.showEdits}
+                      onOpenHandled={this.onShowEditsHandled} />
         );
     }
 
@@ -2032,6 +2104,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              ? String(delegate.refreshIntervalSeconds) : ''}
                          data-unsaved-count={String(unsaved.length)}
                          data-editing={editing}
+                         data-save-paused={delegate && delegate.savePaused ? 'true' : 'false'}
                          data-live-seq={delegate ? String(delegate.live.seq) : ''}
                          data-live-full={delegate ? String(delegate.live.fulls) : ''}
                          data-last-reply={delegate ? delegate.lastReply : ''}
@@ -2075,6 +2148,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                                      onRedo={this.onRedo}
                                      onUndoTo={this.onUndoTo} />
                     ) : null}
+                    {studioOn && delegate ? this.renderSaveCard(delegate, !!chip) : null}
                     {studioOn && delegate && studio.tool !== null ? (
                         // The one place Edit mode talks, while any tool is in hand (entry 23); with no tool nothing talks.
                         <DrawingBar tool={studio.tool}

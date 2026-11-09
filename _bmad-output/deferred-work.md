@@ -105,6 +105,7 @@
   summary: A tab that learns another tab's unsent batch from a `storage` event arms no replay timer (`UnsavedSender.storage()` refreshes the list only), so it replays the batch only on its next `map.load`, `map.changed` or Try again.
   evidence: Story 13 rehearsal on the template stack, 2026-10-27 (`docs/platform-checks.md`, "Epic 2 story 13"): the second tab showed the batch at once but saved it only after a reload. The contract promises only the refresh; a module change is out of scope for the version pull request.
   goes_to: epic-editing (the save banner and the unsaved list), or a 0.2.x fix if the owner wants it sooner.
+  resolved: 2026-11-09 epic 4 entry 10 (`story-save-states-and-the-unsaved-list-the-conflict-card-the-store-plan.md`): `UnsavedSender.storage()` arms the 15 s replay while unsent entries remain and the tab may replay (level `phone` or `full`), so the second tab replays the batch within 15 s with no reload (unit tested in `unsavedSender.test.ts`; `e2e/tests/savestates.spec.mjs` R8, two pages of one context).
 
 - source_plan: `_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-release-0-2-0-on-the-template-s-test-stack-plan.md`
   summary: `mapstudio_schema_version.module_version` is `dev` for every build, a signed release too: `MapStudioServices.moduleVersion()` reads the jar's `Implementation-Version`, which no module jar's manifest carries.

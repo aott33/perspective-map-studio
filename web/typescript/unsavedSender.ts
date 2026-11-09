@@ -6,7 +6,7 @@
  * connection, and the delegate keeps the save status, the store state and the items.
  */
 
-import { EditBatch, EditLevel } from './contract';
+import { Conflict, EditBatch, EditLevel, MapItemRecord } from './contract';
 import { Envelope, editsApply } from './messages';
 import {
     LocalReasons, REPLAY_INTERVAL_MS, REPLY_TIMEOUT_MS, UnsavedEntry, UnsavedQueue, UnsavedReason, isTransient
@@ -44,9 +44,12 @@ export class UnsavedSender {
     constructor(readonly queue: UnsavedQueue, private readonly host: SenderHost) {
     }
 
-    /** Queue a new batch and send it at once, at any level (the Gateway decides the role). */
-    enqueueAndSend(batch: EditBatch, now: Date): void {
-        this.queue.enqueue(batch, now);
+    /**
+     * Queue a new batch and send it at once, at any level (the Gateway decides the role), with the records its ops started
+     * from (entry 10: the conflict card's words).
+     */
+    enqueueAndSend(batch: EditBatch, now: Date, before: MapItemRecord[] = []): void {
+        this.queue.enqueue(batch, now, before);
         this.host.changed();
         this.send(batch.batchId);
     }
@@ -90,7 +93,11 @@ export class UnsavedSender {
         return true;
     }
 
-    /** A `storage` event for `key` (null: storage cleared): another tab may have changed the queue. */
+    /**
+     * A `storage` event for `key` (null: storage cleared): another tab may have changed the queue. From epic 4 entry 10 it also
+     * arms the 15 s replay while unsent entries remain and this tab may replay, so a batch another tab queued and could not send
+     * is replayed here without a reload (a resend of a committed batch gets the first reply, so both tabs sending it is safe).
+     */
     storage(key: string | null): void {
         if (key !== null && key !== this.queue.storageKey) {
             return;
@@ -103,6 +110,9 @@ export class UnsavedSender {
                 }
             }
             this.host.changed();
+        }
+        if (this.canReplay()) {
+            this.scheduleReplay();
         }
     }
 
@@ -137,8 +147,8 @@ export class UnsavedSender {
         return { kind: 'saved', batchId, entry };
     }
 
-    /** An error reply to one of this tab's sends. */
-    onError(messageId: string, reason: UnsavedReason): ReplyOutcome {
+    /** An error reply to one of this tab's sends; a conflict's stale ops are kept on the entry (entry 10). */
+    onError(messageId: string, reason: UnsavedReason, conflict: Conflict[] = []): ReplyOutcome {
         const batchId = this.sentMessages.get(messageId);
         if (batchId === undefined) {
             return { kind: 'ignored' };
@@ -156,7 +166,7 @@ export class UnsavedSender {
             this.host.changed();
             return { kind: 'ignored' };
         }
-        this.queue.failed(batchId, reason);
+        this.queue.failed(batchId, reason, conflict);
         this.host.changed();
         if (isTransient(reason.code)) {
             this.scheduleReplay();

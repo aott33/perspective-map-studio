@@ -20,11 +20,14 @@
  * with; `setKind` carries the values the new kind defines and drops the rest in the same update.
  * From entry 14 `sendPopupOpen` and `sendPopupClose` also fire the page's `onPopupOpen` and `onPopupClose` (pageEvents.ts), so every
  * popup the Gateway is told of the page is told of too.
+ * From entry 10 the save problems' card: a save answered store-unreachable (not busy) pauses the tools and Undo (`savePaused`)
+ * until a save or a load succeeds, with the items and live values kept; the conflict card's `useTheirs` and `applyOnTop` (a new
+ * batch at the stored versions, one undo step), and the unreachable card's `retryStore`.
  */
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
 import { MapChanges, MapChangedBody } from './changes';
-import { EditBatch, EditLevel, KindSetupRecord, LastChange, MapItemData, MapItemRecord } from './contract';
+import { EditBatch, EditLevel, ErrorCodes, KindSetupRecord, LastChange, MapItemData, MapItemRecord } from './contract';
 import {
     Position, instrumentCreateBatch, instrumentMoveBatch, itemDeleteBatch, itemsDeleteBatch, lineGeometryBatch, pointMoveBatch, splitAtBatch, vertexDeleteBatch,
     vertexMoveBatch
@@ -45,8 +48,8 @@ import {
     UNDO_EMPTY, UndoRun, UndoStack, failPending, finishPending, pushStep, runAfterSave, startRedo, startRun, severalLabel, startUndo, stepLabel
 } from './undoStack';
 import {
-    KeyValueStore, REPLAY_INTERVAL_MS, STORAGE_WARNING, UnsavedEntry, UnsavedQueue, UnsavedReason, isBusy, isTransient, reasonFromError,
-    savedRecords, storageKey, unsavedItems
+    KeyValueStore, REPLAY_INTERVAL_MS, STORAGE_WARNING, UnsavedEntry, UnsavedQueue, UnsavedReason, editLabel, isBusy, isTransient, onTopBatch,
+    reasonFromError, savedRecords, storageKey, unsavedItems
 } from './unsaved';
 import { UnsavedSender } from './unsavedSender';
 import { registerTestHook, takeTestReply } from './testHook';
@@ -114,8 +117,14 @@ export interface MapStudioDelegateState {
     /**
      * 'off' while map.load says the map store is unreachable (not the busy answer): the draw
      * tool is disabled and no store item is drawn; map.load is re-sent every 15 s meanwhile.
+     * From epic 4 entry 10 also while `savePaused`: the tools and Undo are off, the items stay drawn.
      */
     editing: 'on' | 'off';
+    /**
+     * A save was answered store-unreachable, not the busy answer (entry 10, R4): the tools and Undo pause, the items and the
+     * live values stay, the queue replays every 15 s, and a save or a map.load that succeeds ends it. The unreachable card's.
+     */
+    savePaused: boolean;
     /** The one warning when this browser cannot keep unsaved edits, or ''. */
     storageWarning: string;
     /** The live values and kind display of the last batches (epic 3 entry 5, live.ts). */
@@ -216,6 +225,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private sender: UnsavedSender;
     private unsavedRevision = 0;
     private storageWarning = '';
+    /** A save answered store-unreachable (not busy) paused the tools until a save or a load succeeds (entry 10). */
+    private savePaused = false;
     /** Re-sends map.load every 15 s while the last one failed (store unreachable, busy). */
     private loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
     /** The batch whose save the save status shows (the last line drawn here), or null. */
@@ -341,7 +352,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             heldCreates: this.heldShapes.reduce((all, h) => all.concat(h.creates), [] as MapItemRecord[]),
             unsavedRevision: this.unsavedRevision,
             sending: this.sender.sending(),
-            editing: this.store.status === 'unavailable' ? 'off' : 'on',
+            editing: this.store.status === 'unavailable' || this.savePaused ? 'off' : 'on',
+            savePaused: this.savePaused,
             storageWarning: this.storageWarning,
             live: this.live,
             liveRevision: this.liveRevision,
@@ -570,7 +582,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.batchesInFlight.set(batch.batchId, batch);
         this.save = { state: 'saving', itemId };
         this.saveBatchId = batch.batchId;
-        this.sender.enqueueAndSend(batch, now);
+        // With the records its ops start from (entry 10): a conflict card names what the other editor changed since.
+        this.sender.enqueueAndSend(batch, now, this.recordsFor(batch));
         this.notify();
     }
 
@@ -1133,6 +1146,15 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             || Array.from(this.heldByItem.values()).some((held) => held.some((h) => h.label !== null));
     }
 
+    /** True, with one console line, while editing is paused (the store unreachable): Undo, Redo and the history are off too (entry 10). */
+    private pausedFor(what: string): boolean {
+        if (this.store.status !== 'unavailable' && !this.savePaused) {
+            return false;
+        }
+        console.info('[MapStudio] ' + what + ' is off: the map store is unreachable.');
+        return true;
+    }
+
     /** True, with one console line, when an edit being saved makes Undo, Redo or the history wait. */
     private waitForEdit(what: string): boolean {
         if (!this.editInFlight()) {
@@ -1144,7 +1166,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
     /** Undo the last saved edit of this session (entry 2): its reverse batch, at this session's own version of the record, through the queue. */
     undo(): void {
-        if (this.waitForEdit('Undo')) {
+        if (this.pausedFor('Undo') || this.waitForEdit('Undo')) {
             return;
         }
         if (!this.undoNext()) {
@@ -1159,7 +1181,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * the save status row, as for any undo), at a step whose reverse cannot be built, or when another edit is made.
      */
     undoTo(count: number): void {
-        if (this.waitForEdit('Undo to here')) {
+        if (this.pausedFor('Undo to here') || this.waitForEdit('Undo to here')) {
             return;
         }
         const run = startRun(this.undoStack, count);
@@ -1210,7 +1232,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
     /** Redo the last undone edit: the reverse of its undo, through the queue. */
     redo(): void {
-        if (this.waitForEdit('Redo')) {
+        if (this.pausedFor('Redo') || this.waitForEdit('Redo')) {
             return;
         }
         const started = startRedo(this.undoStack, newId(), this.changes.state.items);
@@ -1252,7 +1274,79 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             return;
         }
         this.giveUp(batchId);
+        this.checkStoreAfterDiscard();
         this.notify();
+    }
+
+    /**
+     * The conflict card's "Use <name>'s version" (epic 4 entry 10, R2): my entry is discarded (never sent again) and the items
+     * it was refused for are drawn as stored, from the conflict's records. Nothing while the batch is being sent.
+     */
+    useTheirs(batchId: string): void {
+        const entry = this.unsaved.get(batchId);
+        if (!entry) {
+            return;
+        }
+        if (!this.sender.discard(batchId)) {
+            console.info('[MapStudio] Batch ' + batchId + ' is being sent; Use their version waits for its answer.');
+            return;
+        }
+        this.takeStored(entry);
+        this.giveUp(batchId);
+        this.checkStoreAfterDiscard();
+        this.notify();
+    }
+
+    /**
+     * The conflict card's "Apply mine on top" (entry 10, R3, decision 1): a new batch with a new batchId, my ops at the
+     * conflict's stored versions (unsaved.ts `onTopBatch`), saved and undone as an ordinary edit, one undo step named as the
+     * edit was ("Undo: edit P14" restores theirs: the step's records are the stored ones, taken from the conflict first). The
+     * refused entry is discarded, so a replay still sends a stored batch unchanged. Nothing when it is not offered (they
+     * deleted the item, or my add met one that exists) or while the batch is being sent.
+     */
+    applyOnTop(batchId: string): void {
+        const entry = this.unsaved.get(batchId);
+        const batch = entry ? onTopBatch(entry, newId()) : null;
+        if (!entry || !batch) {
+            console.info('[MapStudio] Apply mine on top is not offered for batch ' + batchId + '.');
+            return;
+        }
+        if (!this.sender.discard(batchId)) {
+            console.info('[MapStudio] Batch ' + batchId + ' is being sent; Apply mine on top waits for its answer.');
+            return;
+        }
+        this.takeStored(entry);
+        this.giveUp(batchId);
+        const first = batch.ops.find((op) => op.entity === 'item') || batch.ops[0];
+        this.sendBatch(batch, first.id, editLabel(entry.batch, this.changes.state.items));
+    }
+
+    /**
+     * The unreachable card's Try again (entry 10, R4): the queue replays now; with nothing to replay, map.load is sent, whose
+     * success ends the pause (a store-unreachable answer makes the store unavailable and retries every 15 s).
+     */
+    retryStore(): void {
+        if (this.unsaved.hasUnsent()) {
+            this.sender.replay();
+        } else {
+            this.changes.load();
+        }
+    }
+
+    /** A discard while saves are paused leaving nothing to replay: map.load checks the store, so the pause cannot outlive the edits. */
+    private checkStoreAfterDiscard(): void {
+        if (this.savePaused && !this.unsaved.hasUnsent()) {
+            this.changes.load();
+        }
+    }
+
+    /** The conflict's stored map item records drawn (entry 10): the item shows the other editor's version, a later one kept. */
+    private takeStored(entry: UnsavedEntry): void {
+        for (const c of entry.conflict || []) {
+            if (c.entity === 'item' && c.current && this.changes.saved(c.current as MapItemRecord)) {
+                this.itemsRevision++;
+            }
+        }
     }
 
     /**
@@ -1377,6 +1471,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.refreshIntervalSeconds = reply.body.setup ? reply.body.setup.refreshIntervalSeconds : null;
             this.alarmPage = reply.body.setup ? reply.body.setup.alarmPage : '';
             this.load = { state: 'loaded', message: '' };
+            // The store answered: a pause from a save answered store-unreachable ends (entry 10).
+            this.savePaused = false;
             this.itemsRevision++;
             this.store = storeStateFromLoad(reply.body);
             // May send one more map.load (a gap among the changes held during the load).
@@ -1425,7 +1521,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         }
         const outcome = reply.kind === 'edits.apply.reply'
             ? this.sender.onSaved(reply.id, reply.body.batchId)
-            : this.sender.onError(reply.id, reasonFromError(reply.body));
+            : this.sender.onError(reply.id, reasonFromError(reply.body), reply.body.conflicts || []);
         console.info('[MapStudio] ' + replyText(reply));
         if (outcome.kind === 'ignored') {
             console.info('[MapStudio] The save reply ' + reply.id + ' changes nothing (an earlier send, or discarded).');
@@ -1433,6 +1529,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         }
         const shown = outcome.batchId === this.saveBatchId && this.save.state !== 'idle';
         if (reply.kind === 'edits.apply.reply' && outcome.kind === 'saved') {
+            // A save reached the store: a pause from a save answered store-unreachable ends (entry 10).
+            this.savePaused = false;
             // The undo a run waits on (entry 23): read before the stack settles it.
             const runStep = this.undoRun !== null && this.isPendingUndo(reply.body.batchId);
             if (outcome.entry) {
@@ -1485,6 +1583,14 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
                 this.giveUp(outcome.batchId);
             }
             this.store = storeStateFromSaveError(this.store, reply.body);
+            if (outcome.kind === 'failed' && reply.body.code === ErrorCodes.STORE_UNREACHABLE && !isBusy(reply.body)) {
+                // The store is out of reach for saves (entry 10, R4, decision 4: a lost connection is not this): the tools and
+                // Undo pause, the items and the live values stay, the queue replays every 15 s until a save or a load succeeds.
+                if (!this.savePaused) {
+                    console.info('[MapStudio] A save was answered store-unreachable: editing is paused until the store answers.');
+                }
+                this.savePaused = true;
+            }
         }
         this.notify();
     }

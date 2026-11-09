@@ -89,6 +89,9 @@ export interface ItemListProps {
     view?: ListView;
     onRetry: (batchId: string) => void;
     onDiscard: (batchId: string) => void;
+    /** Bumped to open the waiting edits under the save status row (entry 10, "Show my 2 edits"; SaveStatus.tsx `openRequest`). */
+    openWaiting?: number;
+    onOpenHandled?: () => void;
 }
 
 function Badge(props: { row: ListRow }): React.ReactElement | null {
@@ -353,7 +356,8 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
                         </span>
                     </div>
                     <ProblemStatus save={save} problems={props.problems} unsaved={props.unsaved} records={props.records} level={props.level}
-                                   sending={props.sending} onRetry={props.onRetry} onDiscard={props.onDiscard} />
+                                   sending={props.sending} onRetry={props.onRetry} onDiscard={props.onDiscard} openRequest={props.openWaiting}
+                                   onOpenHandled={props.onOpenHandled} />
                     <div className="mapstudio-list-search" role="search" aria-label="Items list">
                         <ChromeGlyph name="search" className="mapstudio-list-search-glyph" size={16} />
                         <input ref={this.input} type="text" className="mapstudio-input mapstudio-list-search-input"

@@ -121,6 +121,13 @@ export interface ProblemStatusProps {
     sending: string[];
     onRetry: (batchId: string) => void;
     onDiscard: (batchId: string) => void;
+    /**
+     * Bumped to open the list from outside (epic 4 entry 10: the unreachable card's "Show my 2 edits"): the list opens with the
+     * focus on its first button, and `onOpenHandled` is called so the request is not taken again by a later mount. 0 (or
+     * absent) asks nothing.
+     */
+    openRequest?: number;
+    onOpenHandled?: () => void;
 }
 
 interface ProblemStatusState {
@@ -141,7 +148,16 @@ export class ProblemStatus extends React.Component<ProblemStatusProps, ProblemSt
     /** The batch a Discard was pressed for and its row's place, until the update that removes it moves the focus. */
     private discarded: { batchId: string; index: number } | null = null;
 
-    componentDidUpdate(): void {
+    componentDidMount(): void {
+        if (this.props.openRequest) {
+            this.openFromOutside();
+        }
+    }
+
+    componentDidUpdate(prev: ProblemStatusProps): void {
+        if ((this.props.openRequest || 0) !== (prev.openRequest || 0) && this.props.openRequest) {
+            this.openFromOutside();
+        }
         const discarded = this.discarded;
         if (discarded) {
             this.discarded = null;
@@ -164,6 +180,22 @@ export class ProblemStatus extends React.Component<ProblemStatusProps, ProblemSt
         } else if (this.toggle.current) {
             this.toggle.current.focus();
         }
+    }
+
+    /** "Show my 2 edits" (entry 10): the list opens, the focus on its first button so the keyboard is in it. */
+    private openFromOutside(): void {
+        if (this.props.onOpenHandled) {
+            this.props.onOpenHandled();
+        }
+        if (!hasWaiting(this.props.problems)) {
+            return;
+        }
+        this.setState({ open: true }, () => {
+            const first = this.list.current ? this.list.current.querySelector<HTMLButtonElement>('button:not(:disabled)') : null;
+            if (first) {
+                first.focus();
+            }
+        });
     }
 
     private onToggle = (): void => {

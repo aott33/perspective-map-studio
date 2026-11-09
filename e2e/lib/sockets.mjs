@@ -11,6 +11,8 @@ const SYNC = 'sync:';
 export const BUSY_MESSAGE = 'Map Studio is busy with other map requests; nothing was saved. Try again in a moment.';
 /** The words a routed map.load.reply carries for `failLoad: 'down'`. */
 export const DOWN_MESSAGE = 'The map store is unavailable (test).';
+/** The words a routed edits.apply is answered with for `failSave: 'down'` (epic 4 entry 10). */
+export const SAVE_DOWN_MESSAGE = 'The map store could not be reached to save this batch (test).';
 
 /**
  * The Gateway's reply as Perspective delivers it ([observed in the 8.3.10 client]: a text
@@ -27,12 +29,13 @@ function firedEvent(message) {
 }
 
 /**
- * A browser frame without the edits.apply events the gate drops. Perspective sends component
+ * A browser frame without the edits.apply events the gate drops or answers itself. Perspective sends component
  * events inside numbered `sync:` frames and waits for each one to be answered
  * ([observed in the 8.3.10 client]: a dropped frame stalls every later one), so the frame is
- * passed on with those events taken out rather than dropped.
+ * passed on with those events taken out rather than dropped. `answered` collects the edits.apply envelopes the gate
+ * answers with an error itself (`failSave`, epic 4 entry 10).
  */
-function withoutDroppedSaves(message, gate) {
+function withoutDroppedSaves(message, gate, answered) {
     if (typeof message !== 'string' || !message.startsWith(SYNC) || !message.includes('edits.apply')) return message;
     let frame;
     try {
@@ -46,16 +49,33 @@ function withoutDroppedSaves(message, gate) {
         const save = ev && ev.type === 'edits.apply';
         const drop = save && (gate.drop || (gate.dropBatch && ev.body && ev.body.batchId === gate.dropBatch));
         if (drop) gate.dropped++;
-        return !drop;
+        const fail = save && !drop && !!gate.failSave && !!gate.template;
+        if (fail) answered.push(ev);
+        return !drop && !fail;
     });
     if (kept.length === frame.events.length) return message;
     frame.events = kept;
     return SYNC + JSON.stringify(frame);
 }
 
+/**
+ * The gate's own answer to an edits.apply (`failSave`): a store-unreachable error, the busy answer for 'busy' (the Gateway's
+ * MapStudioDelegate.busyReply, which names no batch) or SAVE_DOWN_MESSAGE for 'down', in a frame shaped as the last one the
+ * Gateway fired to this page (`gate.template`), so the client delivers it as the Gateway's own.
+ */
+function failedSaveFrame(gate, envelope) {
+    const body = gate.failSave === 'busy'
+        ? { code: 'store-unreachable', message: BUSY_MESSAGE }
+        : { code: 'store-unreachable', message: SAVE_DOWN_MESSAGE, batchId: envelope.body ? envelope.body.batchId : undefined };
+    return EVENT_FIRED + JSON.stringify({ ...gate.template, event: { v: envelope.v, type: 'error', id: envelope.id, body } });
+}
+
 /** A gate with nothing in force; a spec sets its fields as it goes. */
 export function openGate() {
-    return { drop: false, dropBatch: null, dropped: 0, dropChanged: 0, failLoad: null, failedLoads: 0, readOnly: null, loads: 0 };
+    return {
+        drop: false, dropBatch: null, dropped: 0, dropChanged: 0, failLoad: null, failedLoads: 0, readOnly: null, loads: 0,
+        failSave: null, failedSaves: 0, template: null
+    };
 }
 
 /**
@@ -66,16 +86,29 @@ export function openGate() {
  * becomes a store-unreachable error: 'busy' the busy answer, 'down' DOWN_MESSAGE, any other string
  * those words (`gate.failedLoads` counts them); else while `gate.readOnly` is a string, a
  * map.load.reply says the store is read only with that reason. `gate.loads` counts every
- * map.load.reply that came.
+ * map.load.reply that came. While `gate.failSave` is 'busy' or 'down' (epic 4 entry 10), every edits.apply the browser
+ * sends is answered by the gate, never reaching the Gateway: store-unreachable with the busy sentence, or with
+ * SAVE_DOWN_MESSAGE (`gate.failedSaves` counts them); the answer copies the frame of the last event the Gateway fired, so
+ * it needs one first (map.load's reply at the page's open is one). `target` is a browser context, or one page of it
+ * (Playwright's routeWebSocket on either), so two pages of one context can be routed apart.
  */
-export async function routeSockets(context, gate) {
-    await context.routeWebSocket(/.*/, (ws) => {
+export async function routeSockets(target, gate) {
+    await target.routeWebSocket(/.*/, (ws) => {
         const server = ws.connectToServer();
         ws.onMessage((message) => {
-            server.send(withoutDroppedSaves(message, gate));
+            const answered = [];
+            server.send(withoutDroppedSaves(message, gate, answered));
+            for (const envelope of answered) {
+                gate.failedSaves = (gate.failedSaves || 0) + 1;
+                ws.send(failedSaveFrame(gate, envelope));
+            }
         });
         server.onMessage((message) => {
             const frame = firedEvent(message);
+            if (frame) {
+                const { event, ...rest } = frame;
+                gate.template = rest;
+            }
             if (frame && frame.event.type === 'map.changed' && gate.dropChanged > 0) {
                 gate.dropChanged--;
                 return;

@@ -3,14 +3,14 @@ title: "Save states and the unsaved list: the conflict card, the store unreachab
 type: 'feature'
 ticket: '10'
 created: '2026-11-09'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '972e9effb4be73bd7079c926ac784a068b825a41'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
@@ -66,13 +66,13 @@ Decisions (owner, 2026-11-09, "Approve and continue" on the planner's seven pick
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `web/typescript/unsaved.ts` -- keep the conflict and the `before` records on the entry; words for "their change" (fields that differ between `before` and `current`, a point's move as distance and compass word, else "changed P14 at 10:42") and "your change"; the rebased batch builder -- the card's data and Apply mine on top.
-- [ ] `web/typescript/unsavedSender.ts` -- `storage()` schedules the replay -- R8.
-- [ ] `web/typescript/MapStudioStoreDelegate.ts` -- editing off on a save answered store-unreachable (not busy) until a save or load succeeds; the card state (unreachable, conflicts oldest first, busy); `useTheirs`, `applyOnTop` -- R2 to R4, R6, R7.
-- [ ] `web/typescript/studio/SaveCard.tsx` (new) and `MapStudio.tsx`, `mapstudio.css` -- the card per the mocks, buttons, "1 of 2", Esc, focus, test hooks (`.mapstudio-save-card`, `data-card` `conflict|unreachable|busy`, `data-batch-id`) -- R1 to R7, R10.
-- [ ] `web/typescript/__tests__/` -- unit tests of the words, the rebased batch, the card's order, the pause, storage arming the timer.
-- [ ] `e2e/lib/sockets.mjs` -- a gate field answering `edits.apply` busy or unreachable; `e2e/tests/savestates.spec.mjs` (new) -- R1 to R10 at 1366 px, two contexts for R1 to R3, two pages of one context for R8, screenshots of each card; a store-stop row behind `MAPSTUDIO_STORE_STOP=1` that `docker stop`s and starts the PostgreSQL container.
-- [ ] `docs/contract.md`, `CHANGELOG.md`, `docs/test-playbook-0.4.0.md` (8h Save problems) -- the cards, Apply mine on top as a new batch, the second tab's replay; the deferred entry resolved in `_bmad-output/deferred-work.md`.
+- [x] `web/typescript/unsaved.ts` -- keep the conflict and the `before` records on the entry; words for "their change" (fields that differ between `before` and `current`, a point's move as distance and compass word, else "changed P14 at 10:42") and "your change"; the rebased batch builder -- the card's data and Apply mine on top.
+- [x] `web/typescript/unsavedSender.ts` -- `storage()` schedules the replay -- R8.
+- [x] `web/typescript/MapStudioStoreDelegate.ts` -- editing off on a save answered store-unreachable (not busy) until a save or load succeeds; the card state (unreachable, conflicts oldest first, busy); `useTheirs`, `applyOnTop` -- R2 to R4, R6, R7.
+- [x] `web/typescript/studio/SaveCard.tsx` (new) and `MapStudio.tsx`, `mapstudio.css` -- the card per the mocks, buttons, "1 of 2", Esc, focus, test hooks (`.mapstudio-save-card`, `data-card` `conflict|unreachable|busy`, `data-batch-id`) -- R1 to R7, R10.
+- [x] `web/typescript/__tests__/` -- unit tests of the words, the rebased batch, the card's order, the pause, storage arming the timer.
+- [x] `e2e/lib/sockets.mjs` -- a gate field answering `edits.apply` busy or unreachable; `e2e/tests/savestates.spec.mjs` (new) -- R1 to R10 at 1366 px, two contexts for R1 to R3, two pages of one context for R8, screenshots of each card; a store-stop row behind `MAPSTUDIO_STORE_STOP=1` that `docker stop`s and starts the PostgreSQL container.
+- [x] `docs/contract.md`, `CHANGELOG.md`, `docs/test-playbook-0.4.0.md` (8h Save problems) -- the cards, Apply mine on top as a new batch, the second tab's replay; the deferred entry resolved in `_bmad-output/deferred-work.md`.
 
 **Acceptance Criteria:**
 - Given the dev stack and two browsers, when both edit P14, then the second shows the card naming the first, Use theirs drops the change and Apply mine on top saves it at the new version.
@@ -80,6 +80,17 @@ Decisions (owner, 2026-11-09, "Approve and continue" on the planner's seven pick
 - Given the whole suite, then it passes on a fresh stack with no skipped or retried test.
 
 ## Implementation Notes
+
+- `unsaved.ts`: the entry keeps optional `conflict` (written by `failed` on a conflict, dropped on any other reason) and `before` (written at enqueue from the delegate's `recordsFor`); `readEntry` reads both, an older entry stays valid. The words (`theirChangeText`, `yourChangeText`, `moveWords` with `shared.ts` `distanceM` and `linePopup.ts` `distanceWords` in the browser's locale, `compassWord`, `clockText`), the rebased batch (`onTopBatch`, `onTopBlockedText`) and the card's choice (`saveCardFor`) are pure.
+- Apply mine on top: each stale op at `current.version` with my op's data, except that an update's `properties` and `overrides` (sent whole by the form) take only the keys I changed from `before` onto the stored ones, so a field the other editor changed and I did not is not reverted. Without `before` (an older entry) my data goes as it is. Noted for review: the plan says "my op's data"; the merge is the field-level reading of it.
+- `MapStudioStoreDelegate.ts`: `savePaused` (a save answered store-unreachable, not busy) makes `editing` off; `itemsLayer.ts` and the box/lasso's `shapeItems` hide the items only for a load-unavailable store (`editing` off and not `savePaused`), so the items stay drawn while a save pauses. Undo, Redo and Undo to here refuse while paused (Ctrl+Z too). A discard that leaves nothing unsent while paused, and the card's Try again with nothing to replay, send `map.load`, so the pause cannot outlive the edits.
+- `SaveCard.tsx`: the conflict and busy cards closed with Esc are kept in the component's state by batchId (`cardsClosed`); reopening a closed card from the row is not built. "Show my N edits" bumps an open request that `ProblemStatus` takes once (`openRequest`, `onOpenHandled`).
+- `e2e/lib/sockets.mjs`: `failSave` ('busy', 'down') answers the edits.apply itself with a frame copied from the last frame the Gateway fired to that page (`gate.template`) **[unverified live: the copied frame's shape]**; `routeSockets` takes a page as well as a context (R8 routes tab A alone).
+
+- Live run findings (2026-11-09, dev stack ms-2a5e1993):
+  - R4 flake (`tabIntoCard` false on a second run): the helper started from the toolbar's Select, which is disabled while editing is paused, so `focus()` left the focus on the page's body and Tab had to walk the rail and the whole item list (which grows each run) before the card, past the 40-press limit. The card itself does not remount (its key is stable). Fixed in the helper: it starts on the map's canvas, always focusable and before the toolbar and the card in the page's order. R4 ran 5 times in a row green (`--repeat-each 5`), the whole spec green after.
+  - The PostgreSQL stop test hung: a probe with atomic snapshots measured the first save answered `store-unreachable` about 250 ms after the edit, so the page pauses (R4) before a second edit can be made there; the test's second `setOperator` then waited on a disabled field until the test's own 600 s timeout. Recovery was not the problem: after `docker start` the paused page's 15 s replay saved the entry (about 15 s) and the Gateway's pool reconnected. Fixed in the test, not the component (the matrix pauses editing on the first answer): the second edit is made in a second tab of the same browser, not yet paused, both edits wait in the one queue, and the first tab's card reads "Show my 2 edits". Every action in the spec is bounded (`actionTimeout` 20 s) so a disabled field fails the step with its reason, the stop test's timeout is 300 s, and PostgreSQL is started in `finally` (and before the test when found stopped). Ran once green (28 s).
+  - "Card unreachable with no entry and no pause": not reproducible with atomic reads (one `page.evaluate` per sample): the card and `data-save-paused`/`data-unsaved-count` come from the same render, and `saveCardFor` shows the unreachable card only while `savePaused`. The probe's sample likely read the attributes and the card in separate calls around the moment the edit was queued and answered (250 ms). The load state does not make the card: a `map.load` answered `store-unreachable` shows on the row only.
 
 ## Plan Change Log
 
