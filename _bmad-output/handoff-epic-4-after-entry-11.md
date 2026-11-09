@@ -35,7 +35,7 @@ Written 2026-11-09 by the session that built epic 4 entries 10 and 11 (as 11a an
 - **A fresh container has nothing:** no Docker images, no JDK 17, no Gradle distribution or dependency cache. Fixes that worked: start `dockerd` by hand (`rm -f /var/run/docker.pid /var/run/docker/containerd/containerd.pid; nohup dockerd > <scratch>/dockerd.log 2>&1 &`), `docker pull postgres:16-alpine` and `inductiveautomation/ignition:8.3.10`; `apt-get install -y openjdk-17-jdk-headless`; the Gradle wrapper's zip with `curl` into `~/.gradle/wrapper/dists/gradle-9.8.0-bin/<hash>/` (delete the `.part` file); then one online `./gradlew clean build --rerun-tasks` to fill the cache (Maven Central answers 429 at times: retry with backoff), after which `--offline` works. Container restarts stop Docker again; images survive.
 - **A shallow clone** may make the remote branch look unrelated: `git fetch --unshallow origin <branch>` before comparing.
 - **Implementers cannot always run e2e:** a report that the suite did not run is unfinished work; get the stack up and send the failures back. Flaky tests were each a test bug (a disabled button as the Tab start; a second edit typed into a paused form); fix the cause, never skip.
-- **No em dashes** includes tests that assert their absence: write `'—'`.
+- **No em dashes** includes tests that assert their absence: write `'\u2014'` (the escape, never the character).
 - **The owner:** short answers, tables, a recommendation; "How's it going?" means the run's numbers; prefers party mode before approving bigger plans; wants subagents run on the model the owner names (ask at the start of a session if unsure).
 
 ## For entry 18 (already carried in its description)
