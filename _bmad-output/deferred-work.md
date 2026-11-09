@@ -191,3 +191,7 @@
   summary: Unconfirmed: the e2e test `retest.spec.mjs` R4 (a) failed once with P14's card open after a reload just after its close, where it should stay closed.
   evidence: Entry 7b's whole-suite run on a fresh stack (2026-11-08), 259 passed and this one failed; it passed rerun alone 3 of 3 and did not reproduce in 30 runs in the flaky-test investigation, so its cause is unproven (the suspect: the page's kept `selectedItem` racing the close's write). The flaky-test fix added diagnostics, no product change and no change to the expectations: on a failure the test attaches the reloaded page's `session-init` `selectedItem` values and every `[MapStudio]` console line about a page selection.
   goes_to: the next failure's attachments name the cause; fix it then (the speculative mount-selection product change is not made without them).
+
+- source_plan: none
+  summary: Entry 11b, the rail's History surface (Recent changes in the left dock, the next undo step with Undo, rows that expand to before and after, Revert as one step for a bulk change or import, new changes from map.changed, the save status opening it), built on 11a's edits.history.
+  evidence: Entry 11 split by the owner on 2026-11-09 ("Go with recommendations"): the plan whole ran about 3,500 to 4,000 tokens; 11a (the Gateway record and edits.history) first, 11b as `...-plan-11b.md` with `part_of: '11'`.
