@@ -486,7 +486,7 @@ test.describe('1366 px', () => {
             await mapLoaded(await openMap(page, ADAPTERS));
             try {
                 const r = await press(page, 'tank', 'tank');
-                expect(r.kinds.count).toBe(6);
+                expect(r.kinds.count).toBe(7);
                 await apply(page, [pointOp(tank, 'tank', 'Form tank', 6, { properties: { capacity: 400 } }),
                     pointOp(ghost, 'pad', 'Form P99', 7, { assetId: 'P99', properties: { status: 'producing' } })]);
                 expect(await stored(page, tank)).toMatchObject({ kind: 'tank', properties: { capacity: 400 } });
