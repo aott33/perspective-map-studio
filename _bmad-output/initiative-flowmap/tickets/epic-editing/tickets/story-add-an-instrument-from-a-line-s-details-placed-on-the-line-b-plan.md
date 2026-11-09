@@ -3,7 +3,7 @@ title: "Add an instrument from a line's Details: placed by click or typed distan
 type: 'feature'
 ticket: '9'
 created: '2026-11-09'
-status: 'draft'
+status: 'in-progress'
 baseline_revision: '70f6fa9bd27895019fffe0bb713b816afb81e3c9'
 route: 'full'
 route_source: 'auto'
@@ -21,7 +21,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 **Problem:** The store and the Gateway know instruments on lines (attachment `{lineId, distanceM}`, AD-19), but an editor cannot add one, and an existing one cannot be moved: its lat and lng fields send a move the Gateway refuses, and a tap can be placed loose with the Point tool.
 
-**Approach:** Decisions (owner, 2026-11-06, entry 3: no toolbar tool; a selected line's Details holds an Instruments row and Add an instrument; placed by a click on the line or a typed distance; moved only along the line, never off it, WCAG 2.5.7). Instruments are made and moved from their line, in one op each, with the shared geometry module's projection.
+**Approach:** Decisions (owner, 2026-11-06, entry 3: no toolbar tool; a selected line's Details holds an Instruments row and Add an instrument; placed by a click on the line or a typed distance; moved only along the line, never off it, WCAG 2.5.7; 2026-11-09, "Approved and continue" on the planner's four picks: a dev Meter kind with a new meter glyph shown to the owner after the build, 12 px for a click on the line, metres until entries 19 and 20, instrument kinds out of the Point tool). Instruments are made and moved from their line, in one op each, with the shared geometry module's projection.
 
 ## Boundaries & Constraints
 
@@ -76,6 +76,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 ## Implementation Notes
 
 - Planner, 2026-11-09: the environment, commit and identity rules are entry 8's plan's (Docker by hand after a restart, JDK 17 by apt if gone, `ops/up.sh --fresh` before a whole-suite run, the session's trailers, `git commit --only`, no em dashes, never a bare `git stash`, never a push). Commit at each working milestone. Render the new `meter` glyph beside `tap`, `line-valve` and `meter-station` at 18 px into the plan's notes for the owner.
+
+- Approval (owner, 2026-11-09): "Approved and continue" with the four picks, written into the Approach.
 
 ## Plan Change Log
 
