@@ -358,8 +358,8 @@ test.describe('1366 px', () => {
         async ({ page }) => {
             const map = await openEditor(page);
             const select = page.locator('.mapstudio-tool--select');
-            await expect(select).toHaveAttribute('title', 'Select (Esc)');
-            await expect(select).toHaveAccessibleDescription('Select (Esc)');
+            await expect(select).toHaveAttribute('title', 'Select (Shift-drag for a box, Shift+Alt-drag for a lasso)');
+            await expect(select).toHaveAccessibleDescription('Select (Shift-drag for a box, Shift+Alt-drag for a lasso)');
             await expect(select).toHaveAttribute('aria-keyshortcuts', 'Escape');
             // The Items list's Clear, shown while the search holds text: Esc in the field empties it too.
             await page.locator('.mapstudio-list-search-input').fill('L-SWD');

@@ -198,7 +198,9 @@ function pointFeature<P>(coordinates: Position, properties: P): Feature<Point, P
  * marker apart on screen.
  */
 export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveState, selected: Selection | null,
-                              colors: MarkerColors, withinM: number = SHARED_M): MapFeatures {
+                              colors: MarkerColors, withinM: number = SHARED_M, set: readonly string[] = []): MapFeatures {
+    // A selection of several (epic 4 entry 8): every item in the set takes today's ring or casing; an area in it its casing.
+    const inSet = new Set(set);
     const kindById = new Map<string, Kind>();
     kinds.forEach((k) => kindById.set(k.id, k));
     const points: Array<Feature<Point, MarkerProperties>> = [];
@@ -239,7 +241,7 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
         const first = members[0];
         const kind = kindById.get(first.kind);
         const isSelected = (selected !== null && selected.kind === 'point' && members.some((m) => m.id === selected.id))
-            || members.some((m) => highlighted.has(m.id));
+            || members.some((m) => highlighted.has(m.id) || inSet.has(m.id));
         members.forEach((m) => extend((m.geometry as Point).coordinates as Position));
         if (members.length === 1) {
             points.push(pointFeature((first.geometry as Point).coordinates as Position,
@@ -269,7 +271,9 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
         coords.forEach(extend);
         const kind = kindById.get(item.kind);
         const state = stateOf(item);
-        const isSelected = selected !== null && selected.kind === 'line' && selected.id === item.id;
+        // The current line (its arrow, floating ends and open segment) or a line in a set of several (its casing alone).
+        const isCurrent = selected !== null && selected.kind === 'line' && selected.id === item.id;
+        const isSelected = isCurrent || inSet.has(item.id);
         if (kind && kind.area) {
             // An area: a closed fill in its category tint (areas only, AD-11) and its outline; no pipeline look.
             if (coords.length >= 3) {
@@ -281,7 +285,8 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
                 }
                 areas.push({
                     type: 'Feature',
-                    properties: areaProperties(item.id, item.name, item.kind, areaTint(live.display[item.kind], item.properties), colors, isSelected),
+                    properties: areaProperties(item.id, item.name, item.kind, areaTint(live.display[item.kind], item.properties), colors, isSelected,
+                        inSet.has(item.id)),
                     geometry: { type: 'Polygon', coordinates: [ring] }
                 });
             }
@@ -293,7 +298,7 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
         const look = lineLook(state, diameter);
         const nodes = lineNodes(item, instruments, live, coords.length >= 2 ? lengthM(coords) : 0);
         const bounding = segmentNodes(nodes);
-        const openSegment = isSelected && selected ? selected.segment || null : null;
+        const openSegment = isCurrent && selected ? selected.segment || null : null;
         const segmentOf = (from: LineNode, to: LineNode): { from: string; to: string; segmentSelected: boolean } => ({
             from: from.id, to: to.id,
             segmentSelected: openSegment !== null && openSegment.fromId === from.id && openSegment.toId === to.id
@@ -334,7 +339,7 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
                 rank: labelRank(state, kind ? kind.labelRank : 0, isSelected),
                 selected: isSelected
             }));
-            if (isSelected) {
+            if (isCurrent) {
                 // The selected line's geometry: the arrow layer repeats the flow arrow along it in the line's
                 // drawn direction, first vertex to last (item 22), under the midpoint chip and badge.
                 arrow.push({ type: 'Feature', properties: { id: item.id }, geometry: { type: 'LineString', coordinates: coords } });

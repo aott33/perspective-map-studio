@@ -106,8 +106,17 @@
         "string",
         "null"
       ],
-      "description": "The selected map item's id, both ways (epic 4 entries 2 and 14, docs/contract.md): the component writes it on every selection change (a marker click, a list row, a search or Needs you choice; a tap on the ground clears it to null), and an id the page writes selects that item as a click on it does (in View mode centred or fitted with its popup, in Edit mode with Details open); null clears the selection, and an id not on the map clears it with one console warning. The component's own write coming back is ignored. Read it from a binding or the onItemSelected event.",
+      "description": "The selected map item's id, both ways (epic 4 entries 2 and 14, docs/contract.md): the component writes it on every selection change (a marker click, a list row, a search or Needs you choice; a tap on the ground clears it to null), and an id the page writes selects that item as a click on it does (in View mode centred or fitted with its popup, in Edit mode with Details open); null clears the selection, and an id not on the map clears it with one console warning. The component's own write coming back is ignored. Read it from a binding or the onItemSelected event. With several selected in Edit mode (epic 4 entry 8) it is the current item, the last to join, and selectedItems lists them all; an id the page writes selects that one item alone.",
       "default": null
+    },
+    "selectedItems": {
+      "type": "array",
+      "description": "Read-only (output). The selected set (epic 4 entry 8, docs/contract.md): the selected map items' ids in the order each joined, the last the current item (the one selectedItem carries), [] when nothing is selected. Written by the component on every change of the set (a click, a Shift-click, a checkbox, a Shift-click range, Select all, a box or a lasso, Clear, Esc, a delete), at every level; in View mode it holds the one selected item. The onSelectionChanged event carries the same items as AD-7 map item objects. A value the page writes is not read: write selectedItem to choose an item.",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "readOnly": true
     },
     "viewport": {
       "type": [

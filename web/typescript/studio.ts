@@ -32,7 +32,7 @@ export interface StudioState {
     toolKind: string | null;
     /** The rail's surface; Items when Edit mode is entered (EXPERIENCE.md Editing switch: on opens Items). */
     surface: StudioSurface;
-    /** The selected map items' ids, in the order selected; one at most today. */
+    /** The selected map items' ids, in the order each joined (entry 8: a set in Edit mode); the last to join is the current item. */
     selected: string[];
 }
 
@@ -91,6 +91,68 @@ export function toggleSelect(state: StudioState, id: string): StudioState {
         ? state.selected.filter((s) => s !== id)
         : state.selected.concat([id]);
     return { ...state, selected };
+}
+
+/**
+ * The selection replaced by a set (epic 4 entry 8: a range, Select all in a field, a group or the filter): the ids in the order
+ * given, each once; the last is the current item. The same state when the set is already that, in that order.
+ */
+export function selectMany(state: StudioState, ids: readonly string[]): StudioState {
+    const selected = uniqueIds(ids);
+    if (sameIds(selected, state.selected)) {
+        return state;
+    }
+    return { ...state, selected };
+}
+
+/**
+ * Items added to the selection (entry 8: a box or a lasso drawn on the map with the Select tool): each id not in it yet joins at
+ * the end, in the order given, so the last to join is the current item; ids already in it keep their place.
+ */
+export function addMany(state: StudioState, ids: readonly string[]): StudioState {
+    const add = uniqueIds(ids).filter((id) => state.selected.indexOf(id) < 0);
+    if (add.length === 0) {
+        return state;
+    }
+    return { ...state, selected: state.selected.concat(add) };
+}
+
+/** Whether two or more items are selected (entry 8): the properties panel shows the count, Clear and Delete, no fields. */
+export function isMultiple(state: StudioState): boolean {
+    return state.selected.length >= 2;
+}
+
+/**
+ * The rows of a Shift-click range (entry 8; EXPERIENCE.md List row): every id from `anchor` (the last row clicked or ticked) to
+ * `target` in the order shown, both ends included, from the anchor's side to the target's, so the target is the current item.
+ * Only `target` when the anchor is not shown (null, filtered out, gone); empty when the target is not shown.
+ */
+export function rangeIds(order: readonly string[], anchor: string | null, target: string): string[] {
+    const to = order.indexOf(target);
+    if (to < 0) {
+        return [];
+    }
+    const from = anchor === null ? -1 : order.indexOf(anchor);
+    if (from < 0) {
+        return [target];
+    }
+    return from <= to ? order.slice(from, to + 1) : order.slice(to, from + 1).reverse();
+}
+
+/** The ids each once, in their first order. */
+function uniqueIds(ids: readonly string[]): string[] {
+    const out: string[] = [];
+    for (const id of ids) {
+        if (out.indexOf(id) < 0) {
+            out.push(id);
+        }
+    }
+    return out;
+}
+
+/** Whether two id lists are the same, in the same order. */
+export function sameIds(a: readonly string[], b: readonly string[]): boolean {
+    return a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
 /** Nothing selected (a tap on the ground). */

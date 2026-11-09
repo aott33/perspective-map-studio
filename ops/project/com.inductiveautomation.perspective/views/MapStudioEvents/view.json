@@ -421,6 +421,64 @@
          }
         },
         "meta": {
+         "name": "selectedItems",
+         "domId": "mapstudio-events-selected-items"
+        },
+        "position": {
+         "basis": "24px",
+         "shrink": 0
+        },
+        "custom": {},
+        "propConfig": {
+         "props.text": {
+          "binding": {
+           "type": "property",
+           "config": {
+            "path": "../../map.props.selectedItems"
+           },
+           "transforms": [
+            {
+             "code": "\t# Dev only (epic 4 entry 8): the read-only selectedItems prop, the selected set's ids in joining order.\n\tif value is None:\n\t\treturn 'selectedItems: '\n\treturn 'selectedItems: ' + ','.join([str(v) for v in value])",
+             "type": "script"
+            }
+           ]
+          }
+         }
+        }
+       },
+       {
+        "type": "ia.display.label",
+        "version": 0,
+        "props": {
+         "text": "0|",
+         "style": {
+          "padding": "2px 12px",
+          "fontSize": "12px"
+         }
+        },
+        "meta": {
+         "name": "selectionChanged",
+         "domId": "mapstudio-events-selection-changed"
+        },
+        "position": {
+         "basis": "24px",
+         "shrink": 0
+        },
+        "custom": {
+         "count": 0
+        }
+       },
+       {
+        "type": "ia.display.label",
+        "version": 0,
+        "props": {
+         "text": "",
+         "style": {
+          "padding": "2px 12px",
+          "fontSize": "12px"
+         }
+        },
+        "meta": {
          "name": "viewport",
          "domId": "mapstudio-events-viewport"
         },
@@ -574,6 +632,15 @@
          {
           "config": {
            "script": "\t# Dev only (epic 4 entry 14): onPopupClose for the page. The label shows how many came and the\n\t# last one's item id.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devevents')\n\ttry:\n\t\tout = self.getSibling('side').getChild('popupClose')\n\t\tcount = out.custom.count + 1\n\t\tout.custom.count = count\n\t\tout.props.text = '%d|%s' % (count, event.itemId)\n\texcept java.lang.Throwable as ex:\n\t\tlogger.warn('onPopupClose failed: %s' % ex.getMessage())\n\texcept Exception as ex:\n\t\tlogger.warn('onPopupClose failed: %s' % ex)"
+          },
+          "scope": "G",
+          "type": "script"
+         }
+        ],
+        "onSelectionChanged": [
+         {
+          "config": {
+           "script": "\t# Dev only (epic 4 entry 8): onSelectionChanged for the page, once per change of the selected set. The\n\t# label shows how many came and the last one's ids in joining order (event.mapItems), or nothing when it emptied.\n\timport java.lang\n\n\tlogger = system.util.getLogger('MapStudio.devevents')\n\ttry:\n\t\tout = self.getSibling('side').getChild('selectionChanged')\n\t\tcount = out.custom.count + 1\n\t\tout.custom.count = count\n\t\tids = [item['id'] for item in event.mapItems]\n\t\tout.props.text = '%d|%s' % (count, ','.join(ids))\n\t\tlogger.info('onSelectionChanged: %s' % out.props.text)\n\texcept java.lang.Throwable as ex:\n\t\tlogger.warn('onSelectionChanged failed: %s' % ex.getMessage())\n\texcept Exception as ex:\n\t\tlogger.warn('onSelectionChanged failed: %s' % ex)"
           },
           "scope": "G",
           "type": "script"

@@ -96,6 +96,10 @@ interface Sent {
     popupClose: string[];
     /** The props the component wrote (editMode, selectedItem) in order. */
     props: Array<[string, unknown]>;
+    /** The component events fired (entry 8: onItemSelected, onSelectionChanged), in order. */
+    events: Array<[string, Record<string, unknown>]>;
+    /** The deletes asked of the delegate (entry 8): one id, or several ids as one step. */
+    deletes: string[][];
 }
 
 /** What a MapLibre click on the map hits: the marker, line or area features `queryRenderedFeatures` returns, by layer. */
@@ -115,8 +119,8 @@ interface Harness {
     sent: Sent;
     /** The component's state after every update so far (setState applies at once here, as outside React's batching). */
     state(): MapStudioState;
-    /** A click on the map at a place (a page pixel there), the map's stub reporting `hit` under it. */
-    click(hit: Hit, at?: [number, number]): void;
+    /** A click on the map at a place (a page pixel there), the map's stub reporting `hit` under it; Shift held with `shift` (entry 8). */
+    click(hit: Hit, at?: [number, number], shift?: boolean): void;
     /** Where a place is on the page now: the map's box on the page plus the place's pixel in the map. */
     page(lngLat: [number, number]): [number, number];
     /** The pans asked of the map, in order. */
@@ -130,7 +134,7 @@ interface Harness {
 }
 
 function harness(editMode: boolean): Harness {
-    const sent: Sent = { pointClick: [], popupOpen: [], popupClose: [], props: [] };
+    const sent: Sent = { pointClick: [], popupOpen: [], popupClose: [], props: [], events: [], deletes: [] };
     const store = {
         delegate: {
             sendPointClick: (id: string): void => { sent.pointClick.push(id); },
@@ -138,10 +142,13 @@ function harness(editMode: boolean): Harness {
             sendPopupClose: (id: string): void => { sent.popupClose.push(id); },
             // The Point and Line tools' saves (entry 7c's placement cases): the new item's id.
             createPoint: (): string => 'new-pad',
-            createLine: (): string => 'new-line'
+            createLine: (): string => 'new-line',
+            // Delete (entries 25 and 8): one item, or several as one step.
+            deleteItem: (id: string): boolean => { sent.deletes.push([id]); return true; },
+            deleteItems: (ids: string[]): boolean => { sent.deletes.push(ids.slice()); return true; }
         },
         props: { write: (key: string, value: unknown): void => { sent.props.push([key, value]); } },
-        componentEvents: { fireComponentEvent: (): void => undefined }
+        componentEvents: { fireComponentEvent: (name: string, payload: Record<string, unknown>): void => { sent.events.push([name, payload]); } }
     };
     const delegate = {
         level: 'full', items: ITEMS, editing: 'on', load: { state: 'loaded', message: '' }, unsaved: [], itemsRevision: 1,
@@ -230,10 +237,11 @@ function harness(editMode: boolean): Harness {
         state: () => ms.state,
         page,
         size: () => size,
-        click: (h: Hit, at: [number, number] = CTB1): void => {
+        click: (h: Hit, at: [number, number] = CTB1, shift = false): void => {
             hit = h;
             const p = project(at);
-            (ms as unknown as { onMapClick: (ev: unknown) => void }).onMapClick({ point: { x: p.x, y: p.y }, lngLat: { lng: at[0], lat: at[1] } });
+            (ms as unknown as { onMapClick: (ev: unknown) => void }).onMapClick({ point: { x: p.x, y: p.y }, lngLat: { lng: at[0], lat: at[1] },
+                originalEvent: { shiftKey: shift } });
         }
     };
 }
@@ -736,7 +744,7 @@ describe('the Edit switch turned on closes an open popup or pick list and keeps 
         expect(h.state().selected).toEqual({ id: 'p14', kind: 'point' });
         expect(h.state().panel).toBeNull();
         expect(h.state().studio.selected).toEqual(['p14']);
-        expect(h.sent.props).toEqual([['selectedItem', 'p14'], ['editMode', true]]);
+        expect(h.sent.props).toEqual([['selectedItem', 'p14'], ['selectedItems', ['p14']], ['editMode', true]]);
     });
 
     test('L-SWD\'s line popup open at a segment: the switch on keeps the line selected, without the popup\'s segment', () => {
@@ -861,5 +869,99 @@ describe('View mode is unchanged', () => {
         expect(h.state().popup).toBeNull();
         expect(h.state().selected).toBeNull();
         expect(h.sent.popupClose).toEqual(['ctb1']);
+    });
+});
+
+describe('selecting several (entry 8)', () => {
+    /** The `selectedItems` values the component wrote to the page, in order. */
+    function pageSets(sent: Sent): unknown[] {
+        return sent.props.filter(([key]) => key === 'selectedItems').map(([, value]) => value);
+    }
+
+    /** The ids of every onSelectionChanged fired, in order. */
+    function setEvents(sent: Sent): string[][] {
+        return sent.events.filter(([name]) => name === 'onSelectionChanged')
+            .map(([, payload]) => (payload.mapItems as Array<{ id: string }>).map((m) => m.id));
+    }
+
+    test('Shift-click on the map toggles an item in or out, with no Details; the ground under Shift changes nothing', () => {
+        const h = harness(true);
+        h.click({ markers: [marker('ctb1', 'CTB1', CTB1)] }, CTB1);
+        expect(h.state().panel).toBe('ctb1');
+        h.click({ markers: [marker('p14', 'P14', P14)] }, P14, true);
+        expect(h.state().studio.selected).toEqual(['ctb1', 'p14']);
+        expect(h.state().selected).toEqual({ id: 'p14', kind: 'point', segment: null });
+        expect(h.state().panel).toBeNull();
+        expect(h.sent.pointClick).toEqual(['ctb1']);
+        h.click(LINE_HIT, BEND, true);
+        expect(h.state().studio.selected).toEqual(['ctb1', 'p14', 'lswd']);
+        h.click({}, FENCE_AT, true);
+        expect(h.state().studio.selected).toEqual(['ctb1', 'p14', 'lswd']);
+        h.click({ markers: [marker('ctb1', 'CTB1', CTB1)] }, CTB1, true);
+        expect(h.state().studio.selected).toEqual(['p14', 'lswd']);
+        expect(h.state().selected!.id).toBe('lswd');
+    });
+
+    test('the page sees the set: selectedItems the ids in joining order and onSelectionChanged once per change; then [] once cleared', () => {
+        const h = harness(true);
+        h.ms.onRowToggle('a');
+        h.ms.onRowToggle('b');
+        h.ms.onRowToggle('ctb1');
+        expect(h.state().studio.selected).toEqual(['a', 'b', 'ctb1']);
+        expect(h.state().panel).toBeNull();
+        h.ms.publishSelection();
+        h.click({}, FENCE_AT);
+        expect(h.state().studio.selected).toEqual([]);
+        expect(pageSets(h.sent)).toEqual([['a'], ['a', 'b'], ['a', 'b', 'ctb1'], []]);
+        expect(setEvents(h.sent)).toEqual([['a'], ['a', 'b'], ['a', 'b', 'ctb1'], []]);
+        // selectedItem carries the current item, the last to join, and null once the set empties.
+        expect(pageSelections(h.sent)).toEqual(['a', 'b', 'ctb1', null]);
+    });
+
+    test('a range or a Select all replaces the set; a box or a lasso adds to it; Clear and Esc empty it', () => {
+        const h = harness(true);
+        h.ms.onRowToggle('w1');
+        h.ms.onSelectRows(['ctb1', 'p14', 'gone']);
+        expect(h.state().studio.selected).toEqual(['ctb1', 'p14']);
+        h.ms.addToSelection(['p14', 'lswd', 'pt1'], 'box');
+        expect(h.state().studio.selected).toEqual(['ctb1', 'p14', 'lswd', 'pt1']);
+        h.ms.onClearSelection();
+        expect(h.state().studio.selected).toEqual([]);
+        expect(h.state().selected).toBeNull();
+        h.ms.addToSelection(['a', 'b'], 'lasso');
+        expect(h.state().studio.selected).toEqual(['a', 'b']);
+        escape(h.ms);
+        expect(h.state().studio.selected).toEqual([]);
+    });
+
+    test('the rail switching surface keeps the set; a tool picked up keeps it', () => {
+        const h = harness(true);
+        h.ms.onSelectRows(['ctb1', 'p14', 'a']);
+        h.ms.onRailSurface('kinds');
+        h.ms.onRailSurface('items');
+        expect(h.state().studio.selected).toEqual(['ctb1', 'p14', 'a']);
+        h.ms.setState((prev) => ({ studio: pickTool(prev.studio, 'line') }));
+        expect(h.state().studio.selected).toEqual(['ctb1', 'p14', 'a']);
+    });
+
+    test('Delete of several is one call for the set (the delegate builds one batch, one step); the set empties', () => {
+        const h = harness(true);
+        h.ms.onSelectRows(['lswd', 'pt1', 'ctb1']);
+        h.ms.onDeleteItem();
+        expect(h.sent.deletes).toEqual([['lswd', 'pt1', 'ctb1']]);
+        expect(h.state().studio.selected).toEqual([]);
+        expect(h.state().selected).toBeNull();
+    });
+
+    test('a page write to selectedItem selects that one item alone; leaving Edit mode keeps the current item alone', () => {
+        const h = harness(true);
+        h.ms.onSelectRows(['ctb1', 'p14']);
+        h.ms.onRowSelect('a');
+        expect(h.state().studio.selected).toEqual(['a']);
+        expect(h.state().panel).toBe('a');
+        h.ms.onSelectRows(['ctb1', 'p14']);
+        h.ms.onEditSwitch(false);
+        expect(h.state().studio.mode).toBe('view');
+        expect(h.state().studio.selected).toEqual(['p14']);
     });
 });

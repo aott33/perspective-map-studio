@@ -56,7 +56,7 @@ import { MapStudio, MapStudioState } from '../MapStudio';
 import { MapStudioStoreDelegate } from '../MapStudioStoreDelegate';
 import { MESSAGE_EVENT, MessageTypes } from '../messages';
 import {
-    ECHO_EXPIRY_MS, ECHO_LIMIT, EchoGuard, ITEM_SELECTED_EVENT, POPUP_CLOSE_EVENT, POPUP_OPEN_EVENT, VIEWPORT_CHANGED_EVENT, echoGuard,
+    ECHO_EXPIRY_MS, ECHO_LIMIT, EchoGuard, ITEM_SELECTED_EVENT, POPUP_CLOSE_EVENT, POPUP_OPEN_EVENT, SELECTION_CHANGED_EVENT, VIEWPORT_CHANGED_EVENT, echoGuard,
     firePageEvent, noteWrite, pageId, takeEcho, viewportKey, viewportOf, writePageProp
 } from '../pageEvents';
 import { Place } from '../place';
@@ -797,5 +797,11 @@ describe('onPopupOpen and onPopupClose beside popup.open and popup.close (the de
         } finally {
             delegate.stopReplay();
         }
+    });
+});
+
+describe('onSelectionChanged (entry 8)', () => {
+    test('the event name matches MapStudioComponent.EVENT_SELECTION_CHANGED', () => {
+        expect(SELECTION_CHANGED_EVENT).toBe('onSelectionChanged');
     });
 });

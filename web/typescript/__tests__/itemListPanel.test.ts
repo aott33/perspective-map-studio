@@ -5,7 +5,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Asset, Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
-import { ListRow, listRows } from '../itemList';
+import { ListRow, groupIds, groupRows, listRows } from '../itemList';
 import { LIVE_INITIAL } from '../live';
 import { ItemList, ItemListProps, newListView } from '../studio/ItemList';
 
@@ -128,5 +128,49 @@ describe('the list\'s view held by the component (entry 7c\'s review)', () => {
         // Without a held view a mount starts fresh, as before.
         expect(new ItemList({ ...again.props, view: undefined }).state).toEqual(newListView());
         jest.restoreAllMocks();
+    });
+});
+
+describe('selecting several in the list (entry 8)', () => {
+    const several = { selectedIds: ['p14', 's1'], selectedId: 's1', onToggle: noop, onSelectRows: noop };
+
+    test('each row starts with a checkbox, ticked and in the selected look while in the set; the current item is aria-current', () => {
+        const html = render({}, several);
+        expect(html.match(/<input type="checkbox"/g)).toHaveLength(5);
+        expect(html).toMatch(/<input type="checkbox" class="mapstudio-list-check" checked=""[^>]*data-item-id="p14"[^>]*aria-label="Select P14"/);
+        expect(html).toMatch(/<input type="checkbox" class="mapstudio-list-check" data-item-id="w"/);
+        expect(html).toMatch(/class="mapstudio-list-row mapstudio-list-row--selected" data-item-id="p14"/);
+        expect(html).toMatch(/class="mapstudio-list-row mapstudio-list-row--selected" data-item-id="s1"[^>]*aria-current="true"/);
+        expect(html).not.toMatch(/data-item-id="p14"[^>]*aria-current/);
+        // Without the set's callbacks (the list as before) there are no checkboxes and no Select all.
+        expect(render()).not.toContain('type="checkbox"');
+        expect(render()).not.toContain('Select all');
+    });
+
+    test('"Select all in MESA FIELD" under the field header, "Select all in group" on the other group headers', () => {
+        const html = render({}, several);
+        expect(html).toContain('<li class="mapstudio-list-select-all-row" role="presentation" data-group="h:field:Mesa">'
+            + '<button type="button" class="mapstudio-list-select-all" data-group="h:field:Mesa">Select all in MESA FIELD</button></li>');
+        expect(html).toContain('data-group="h:not-linked">Select all in group</button>');
+        expect(html).toContain('data-group="h:wide:Mesa">Select all in group</button>');
+        expect(html).not.toContain('Select all in filter');
+    });
+
+    test('"Select all in filter" above the list while a kind filter, the unlinked filter or a search is on', () => {
+        expect(render({ kind: 'line' }, several)).toContain('>Select all in filter</button>');
+        expect(render({ unlinkedOnly: true }, several)).toContain('>Select all in filter</button>');
+        expect(render({ query: 'Scale' }, several)).toContain('>Select all in filter</button>');
+        expect(render({ query: 'nothing like it' }, several)).not.toContain('Select all in filter');
+    });
+
+    test('a group\'s rows as shown: a field\'s down to the next field or group, Field-wide included; another group\'s to the next header', () => {
+        const items = groupRows(ROWS, { sort: 'attention', kind: null, query: '', justAdded: [], unlinkedOnly: false, now: new Date() });
+        expect(groupIds(items, 'h:field:Mesa')).toEqual(['p14', 'w', 'l']);
+        expect(groupIds(items, 'h:wide:Mesa')).toEqual(['l']);
+        expect(groupIds(items, 'h:not-linked')).toEqual(['s1', 's2']);
+        expect(groupIds(items, 'h:nope')).toEqual([]);
+        // A search for the well shows P14 only as its context: never taken.
+        const searched = groupRows(ROWS, { sort: 'attention', kind: null, query: '2H', justAdded: [], unlinkedOnly: false, now: new Date() });
+        expect(groupIds(searched, 'h:field:Mesa')).toEqual(['w']);
     });
 });

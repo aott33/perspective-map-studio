@@ -151,8 +151,9 @@ describe('the properties panel\'s footer: the delete icon (entry 25; DESIGN.md P
 });
 
 describe('the other controls with a key name it (entry 25\'s review)', () => {
-    test('Select (Esc) on the toolbar', () => {
-        expect(toolbar(UNDO_EMPTY)).toContain('aria-pressed="true" title="Select (Esc)" aria-label="Select" aria-keyshortcuts="Escape"');
+    test('Select on the toolbar names its ways to select several (entry 8), Esc kept as its key', () => {
+        expect(toolbar(UNDO_EMPTY)).toContain('aria-pressed="true" title="Select (Shift-drag for a box, Shift+Alt-drag for a lasso)" aria-label="Select" '
+            + 'aria-keyshortcuts="Escape"');
         expect(toolbar(UNDO_EMPTY, true)).toContain('title="' + PAUSED_TEXT + '" aria-label="Select" disabled="" aria-keyshortcuts="Escape"');
     });
 

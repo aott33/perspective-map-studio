@@ -418,9 +418,31 @@ export function lineDeleteBatch(batchId: string, line: MapItemRecord, items: Map
  * the items before it puts the `ends` back; one undo step restores them all with their links, properties, kinds and shapes.
  */
 export function itemDeleteBatch(batchId: string, item: MapItemRecord, items: MapItemRecord[]): EditBatch {
-    const ops: EditOp[] = item.geometry.type === 'LineString'
-        ? lineDeleteBatch(batchId, item, items).ops
-        : [{ op: 'delete', entity: 'item', id: item.id, baseVersion: item.version }];
+    return itemsDeleteBatch(batchId, [item], items);
+}
+
+/**
+ * A delete of several map items as one batch (epic 4 entry 8; EXPERIENCE.md Delete, the properties panel's count view and the
+ * Delete key): each item's delete as `itemDeleteBatch` builds it (a line with every instrument on it), every item once, so an
+ * instrument also selected with its line is deleted once (at most one op per id in a batch, docs/contract.md); then the `ends`
+ * of every live line left that name a deleted item cleared, once per line. The deletes come first, so the one undo step restores
+ * them all before it puts the `ends` back.
+ */
+export function itemsDeleteBatch(batchId: string, chosen: MapItemRecord[], items: MapItemRecord[]): EditBatch {
+    const ops: EditOp[] = [];
+    const add = (record: MapItemRecord): void => {
+        if (!ops.some((op) => op.id === record.id)) {
+            ops.push({ op: 'delete', entity: 'item', id: record.id, baseVersion: record.version });
+        }
+    };
+    for (const item of chosen) {
+        if (item.geometry.type === 'LineString') {
+            add(item);
+            instrumentsOn(items, item.id).forEach(add);
+        } else {
+            add(item);
+        }
+    }
     const gone = new Set(ops.map((op) => op.id));
     for (const line of items) {
         if (line.deleted || gone.has(line.id) || line.geometry.type !== 'LineString' || !line.ends) {

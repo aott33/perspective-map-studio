@@ -165,7 +165,7 @@ test.describe('1366 px', () => {
         // status box (entry 24: gone; the header says Saved and no problem row shows).
         await expect(page.locator('.mapstudio-tool--select')).toHaveAttribute('aria-pressed', 'true');
         // Its key on hover too (entry 25's review: Esc returns to Select).
-        await expect(page.locator('.mapstudio-tool--select')).toHaveAttribute('title', 'Select (Esc)');
+        await expect(page.locator('.mapstudio-tool--select')).toHaveAttribute('title', 'Select (Shift-drag for a box, Shift+Alt-drag for a lasso)');
         await expect(page.locator('.mapstudio-pill')).toHaveCount(0);
         await expect(page.locator('.mapstudio-drawing-bar')).toHaveCount(0);
         await expect(page.locator('.mapstudio-reply')).toHaveCount(0);

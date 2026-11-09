@@ -25,7 +25,7 @@
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
 import { MapChanges, MapChangedBody } from './changes';
 import { EditBatch, EditLevel, KindSetupRecord, LastChange, MapItemData, MapItemRecord } from './contract';
-import { Position, itemDeleteBatch, lineGeometryBatch, pointMoveBatch, splitAtBatch, vertexDeleteBatch, vertexMoveBatch } from './geometry';
+import { Position, itemDeleteBatch, itemsDeleteBatch, lineGeometryBatch, pointMoveBatch, splitAtBatch, vertexDeleteBatch, vertexMoveBatch } from './geometry';
 import { HostLists, NO_HOST_LISTS } from './adapters';
 import { MESSAGE_EVENT, Reply, basemapSource, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText } from './messages';
 import {
@@ -39,7 +39,7 @@ import { STORE_UNKNOWN, StoreState, storeStateFromError, storeStateFromLoad, sto
 import { SAVE_IDLE, SaveState, lineCreateBatch, newId, pointCreateBatch, refusedSave, updateBatch } from './save';
 import { Kind } from './adapters';
 import {
-    UNDO_EMPTY, UndoRun, UndoStack, failPending, finishPending, pushStep, runAfterSave, startRedo, startRun, startUndo, stepLabel
+    UNDO_EMPTY, UndoRun, UndoStack, failPending, finishPending, pushStep, runAfterSave, startRedo, startRun, severalLabel, startUndo, stepLabel
 } from './undoStack';
 import {
     KeyValueStore, REPLAY_INTERVAL_MS, STORAGE_WARNING, UnsavedEntry, UnsavedQueue, UnsavedReason, isBusy, isTransient, reasonFromError,
@@ -947,6 +947,32 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
                 return null;
             }
             return itemDeleteBatch(newId(), now, this.changes.state.items);
+        }, (batch) => this.endsInFlightName(batch.ops.filter((op) => op.op === 'delete').map((op) => op.id)));
+        return true;
+    }
+
+    /**
+     * Delete of several (epic 4 entry 8; EXPERIENCE.md Delete): one batch with every stored item of `ids` (a line with every
+     * instrument on it, an instrument also chosen counted once, the `ends` naming a deleted item cleared once per line; geometry.ts
+     * `itemsDeleteBatch`) and one undo step, "delete N items", N the stored items chosen. Held and built from the records as a single
+     * delete is (`deleteItem`). One id is `deleteItem`'s "delete <name>". False when none of them is stored on the map.
+     */
+    deleteItems(ids: readonly string[]): boolean {
+        const stored = ids.filter((id, i) => ids.indexOf(id) === i && !!this.storedRecord(id));
+        if (stored.length === 0) {
+            console.info('[MapStudio] The delete of ' + ids.length + ' items was dropped: none of them is saved on the map.');
+            return false;
+        }
+        if (stored.length === 1) {
+            return this.deleteItem(stored[0]);
+        }
+        this.sendShapeChange(stored[0], severalLabel(stored.length), () => {
+            const now = stored.map((id) => this.storedRecord(id)).filter((r): r is MapItemRecord => !!r);
+            if (now.length === 0) {
+                console.info('[MapStudio] The delete of ' + stored.length + ' items was let go: they left the map before its turn.');
+                return null;
+            }
+            return itemsDeleteBatch(newId(), now, this.changes.state.items);
         }, (batch) => this.endsInFlightName(batch.ops.filter((op) => op.op === 'delete').map((op) => op.id)));
         return true;
     }

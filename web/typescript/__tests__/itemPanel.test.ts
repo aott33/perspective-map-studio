@@ -10,6 +10,9 @@ import { AdapterStatus, Asset, AssetName, FormField, Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import { createPlaceSource } from '../placeCheck';
 import { PropertiesPanel, PropertiesPanelProps } from '../studio/PropertiesPanel';
+import { SelectionCount } from '../studio/SelectionCount';
+
+const noopCount = (): void => undefined;
 
 const FIELDS: FormField[] = [
     { key: 'operator', label: 'Operator', type: 'text', required: false, choices: [] },
@@ -336,5 +339,23 @@ describe('a kind field\'s save settling (entry 6\'s review)', () => {
         p.finish(OPERATOR);
         expect(p.sent).toHaveLength(4);
         expect(p.shown(0)).toBe('X');
+    });
+});
+
+describe('the count with several selected (entry 8)', () => {
+    test('"3 selected", Clear and the footer\'s Delete; no fields; Delete off with its reason while paused, a tool in hand or none saved', () => {
+        const html = renderToStaticMarkup(React.createElement(SelectionCount,
+            { count: 3, deletable: 3, paused: false, toolInHand: false, onClear: noopCount, onDelete: noopCount }));
+        expect(html).toContain('<h2 class="mapstudio-several-count" role="status">3 selected</h2>');
+        expect(html).toContain('>Clear</button>');
+        expect(html).toContain('title="Delete (Del)" aria-label="Delete 3 items" aria-keyshortcuts="Delete" data-off=""');
+        expect(html).not.toContain('mapstudio-field');
+        expect(html).not.toContain('mapstudio-panel-tab');
+        const tool = renderToStaticMarkup(React.createElement(SelectionCount,
+            { count: 2, deletable: 2, paused: false, toolInHand: true, onClear: noopCount, onDelete: noopCount }));
+        expect(tool).toContain('data-off="Off while a tool is in hand - Esc puts it down"');
+        const none = renderToStaticMarkup(React.createElement(SelectionCount,
+            { count: 2, deletable: 0, paused: false, toolInHand: false, onClear: noopCount, onDelete: noopCount }));
+        expect(none).toContain('data-off="Not saved yet"');
     });
 });

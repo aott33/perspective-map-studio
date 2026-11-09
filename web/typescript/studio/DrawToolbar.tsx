@@ -18,6 +18,9 @@ import { PAUSED_TEXT, UndoGroup } from './UndoGroup';
  * 2026-11-05): while a tool is in hand the drawing bar says it. While the map store is unreachable the toolbar fades and
  * takes no input (`paused`), every button saying so on hover. Box select, the lasso and the instrument tool are entries 8 and 9.
  */
+/** Select's hover text (epic 4 entry 8; DESIGN.md Floating draw toolbar): its ways to select several. */
+export const SELECT_TITLE = 'Select (Shift-drag for a box, Shift+Alt-drag for a lasso)';
+
 export interface DrawToolbarProps {
     tool: StudioTool | null;
     /** The kind a kind button fixed (its id), or null for a generic tool. */
@@ -71,7 +74,7 @@ export function DrawToolbar(props: DrawToolbarProps): React.ReactElement {
             <div className="mapstudio-toolbar" role="toolbar" aria-label={props.paused ? 'Drawing tools - ' + PAUSED_TEXT : 'Drawing tools'}
                  data-paused={props.paused ? 'true' : 'false'}>
                 <button type="button" className={'mapstudio-tool mapstudio-tool--select' + (props.tool === null ? ' mapstudio-tool--active' : '')}
-                        aria-pressed={props.tool === null} title={props.paused ? PAUSED_TEXT : 'Select (Esc)'} aria-label="Select" disabled={props.paused}
+                        aria-pressed={props.tool === null} title={props.paused ? PAUSED_TEXT : SELECT_TITLE} aria-label="Select" disabled={props.paused}
                         aria-keyshortcuts="Escape" onClick={props.onSelect}>
                     <ChromeGlyph name="pointer" />
                 </button>

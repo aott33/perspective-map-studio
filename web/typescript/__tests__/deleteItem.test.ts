@@ -282,3 +282,68 @@ describe('a delete is one batch and one undo step (entry 25)', () => {
         expect(state.unsaved.map((e) => e.batchId)).toEqual([del.body.batchId]);
     });
 });
+
+describe('a delete of several is one batch and one undo step (entry 8)', () => {
+    test('three items: one batch, "delete 3 items"; Undo restores all three in one batch; Redo deletes them again', () => {
+        const { pad, line } = padAndLine();
+        const other = delegate.createPoint(SWD, PAD);
+        save(last());
+        const before = sent().length;
+        expect(delegate.deleteItems([pad, line, other])).toBe(true);
+        expect(sent()).toHaveLength(before + 1);
+        expect(last().body.ops.map((op) => [op.op, op.id])).toEqual([['delete', pad], ['delete', line], ['delete', other]]);
+        save(last());
+        expect(record(pad)).toBeUndefined();
+        expect(record(line)).toBeUndefined();
+        expect(record(other)).toBeUndefined();
+        expect(undoLabel(delegate.mapStateToProps().undo)).toBe('Undo: delete 3 items');
+
+        delegate.undo();
+        expect(sent()).toHaveLength(before + 2);
+        expect(last().body.ops.map((op) => [op.op, op.id])).toEqual([['create', pad], ['create', line], ['create', other]]);
+        save(last());
+        expect(record(pad)).toMatchObject({ assetId: 'CTB1' });
+        expect(record(line)!.ends).toEqual({ start: { itemId: pad } });
+        expect(record(other)).toBeDefined();
+        expect(redoLabel(delegate.mapStateToProps().undo)).toBe('Redo: delete 3 items');
+    });
+
+    test('a line and its instrument both selected: one batch, the instrument deleted once; the pad\'s line end left alone', () => {
+        const { pad, line } = padAndLine();
+        const tap = tapOn(line);
+        expect(delegate.deleteItems([line, tap])).toBe(true);
+        expect(last().body.ops).toEqual([
+            { op: 'delete', entity: 'item', id: line, baseVersion: 1 },
+            { op: 'delete', entity: 'item', id: tap, baseVersion: 1 }]);
+        save(last());
+        expect(record(pad)).toBeDefined();
+        expect(undoLabel(delegate.mapStateToProps().undo)).toBe('Undo: delete 2 items');
+    });
+
+    test('both pads a line\'s ends name: the surviving line\'s ends cleared once, in the same batch', () => {
+        const pad = delegate.createPoint(CTB, PAD);
+        save(last());
+        const end = delegate.createPoint(SWD, PAD);
+        save(last());
+        const line = delegate.createLine([CTB, BEND, SWD], LINE, { start: { itemId: pad }, end: { itemId: end } });
+        save(last());
+        expect(delegate.deleteItems([pad, end])).toBe(true);
+        expect(last().body.ops).toEqual([
+            { op: 'delete', entity: 'item', id: pad, baseVersion: 1 },
+            { op: 'delete', entity: 'item', id: end, baseVersion: 1 },
+            { op: 'update', entity: 'item', id: line, baseVersion: 1, data: { ends: null } }]);
+    });
+
+    test('one id is a single delete; ids never saved are left out; none saved sends nothing', () => {
+        const { pad } = padAndLine();
+        const unsavedPad = delegate.createPoint(SWD, PAD);
+        const create = last();
+        const before = sent().length;
+        expect(delegate.deleteItems([unsavedPad])).toBe(false);
+        expect(sent()).toHaveLength(before);
+        save(create);
+        expect(delegate.deleteItems([pad])).toBe(true);
+        save(last());
+        expect(undoLabel(delegate.mapStateToProps().undo)).toBe('Undo: delete Well pad');
+    });
+});

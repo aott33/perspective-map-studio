@@ -35,6 +35,8 @@ export const SOURCE_ITEM_AREAS = 'mapstudio-items-area';
 export const LAYER_AREA_FILL = 'mapstudio-items-area-fill';
 export const LAYER_AREA_LINE = 'mapstudio-items-area-line';
 export const LAYER_AREA_LINE_DASHED = 'mapstudio-items-area-line-dashed';
+/** The selection casing of an area in a selection of several (epic 4 entry 8), under its outline. */
+export const LAYER_AREA_CASING = 'mapstudio-items-area-casing';
 /** The `dotted` preset's lines (entry 1): round dots, a layer of their own since the dash pattern is not data-driven. */
 export const LAYER_ITEM_LINES_DOTTED = 'mapstudio-items-line-dotted';
 /** Each line's midpoint mark (its name chip and alarm badge) and the selected line's flow arrow (features.ts). */
@@ -238,6 +240,16 @@ export function addItemLayers(map: MapLibreMap, mc: MarkerColors): void {
         type: 'fill',
         source: SOURCE_ITEM_AREAS,
         paint: { 'fill-color': ['get', 'color'], 'fill-opacity': ['case', tinted, AREA_FILL_OPACITY, 0] }
+    });
+    // An area in a selection of several (epic 4 entry 8) takes the lines' selection casing under its outline; one area selected
+    // alone shows its handles instead, as before.
+    map.addLayer({
+        id: LAYER_AREA_CASING,
+        type: 'line',
+        source: SOURCE_ITEM_AREAS,
+        filter: ['==', ['get', 'inSet'], true],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': mc.selection, 'line-width': AREA_LINE_WIDTH + 4, 'line-opacity': 0.5 }
     });
     map.addLayer({
         id: LAYER_AREA_LINE,
@@ -679,6 +691,7 @@ export function applyThemePaint(map: MapLibreMap, root: HTMLElement | undefined,
         setPaint(layer, 'line-color', mc.halo);
     }
     setPaint(LAYER_LINE_CASING, 'line-color', mc.selection);
+    setPaint(LAYER_AREA_CASING, 'line-color', mc.selection);
     setPaint(LAYER_LINE_ENDS, 'circle-color', mc.halo);
     setPaint(LAYER_LINE_ENDS, 'circle-stroke-color', mc.selection);
     setPaint(LAYER_UNSAVED_LINES, 'line-color', themeColor(root, '--label'));

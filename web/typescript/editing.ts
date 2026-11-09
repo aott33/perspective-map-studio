@@ -478,6 +478,10 @@ function wantedHandles(host: EditingHost): Omit<Handles, 'featureId' | 'awaiting
     if (!delegate || delegate.editing === 'off' || !selected || host.state.studio.tool !== null || !host.studioOn()) {
         return null;
     }
+    if (host.state.studio.selected.length >= 2) {
+        // Several selected (entry 8): no geometry handles, no geometry edits of several.
+        return null;
+    }
     const item = host.liveItem(selected.id);
     if (!item || item.version < 1) {
         return null;
@@ -833,6 +837,10 @@ export function deleteSelected(host: EditingHost): boolean {
     if (!selected || !delegate || !canDelete(host) || toolInHand(host)) {
         return false;
     }
+    const set = host.state.studio.selected;
+    if (set.length >= 2) {
+        return deleteSeveral(host, delegate, set);
+    }
     // Never an item only the waiting edits know (version 0: its create being saved, or refused for good): "Not saved yet".
     const item = host.liveItem(selected.id);
     if (!item || item.version < 1 || !delegate.deleteItem(selected.id)) {
@@ -846,6 +854,30 @@ export function deleteSelected(host: EditingHost): boolean {
         host.map.getCanvas().focus({ preventScroll: true });
     }
     console.info('[MapStudio] ' + selected.id + ' deleted, with no question asked: Undo restores it.');
+    return true;
+}
+
+/**
+ * Delete of several (epic 4 entry 8; the count's footer Delete or the Delete key): one batch and one undo step, "delete N items"
+ * (the delegate's `deleteItems`: each line with its instruments, an instrument also selected counted once, the ends on surviving
+ * lines cleared once), the stored items of the set only; the set empties at once, the count's panel undocking with the ground kept
+ * in place, and the focus goes to the map, where Ctrl+Z restores them all.
+ */
+function deleteSeveral(host: EditingHost, delegate: MapStudioStoreDelegate, set: readonly string[]): boolean {
+    const stored = set.filter((id) => {
+        const item = host.liveItem(id);
+        return !!item && item.version >= 1;
+    });
+    if (stored.length === 0 || !delegate.deleteItems(stored)) {
+        return false;
+    }
+    clearPlacedPoints(host);
+    host.closePopup();
+    host.dockChange((prev) => ({ ...host.selectionState(prev, null), pick: null }));
+    if (host.map) {
+        host.map.getCanvas().focus({ preventScroll: true });
+    }
+    console.info('[MapStudio] ' + stored.length + ' items deleted as one step, with no question asked: Undo restores them all.');
     return true;
 }
 

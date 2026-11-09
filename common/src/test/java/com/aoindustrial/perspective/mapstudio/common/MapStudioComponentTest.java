@@ -19,7 +19,8 @@ import com.inductiveautomation.perspective.common.api.ComponentEventDescriptor;
 
 /**
  * The component's contract with the page (epic 4 entries 2 and 14, contract 0.4.0): the descriptor declares the
- * four events {@code onItemSelected}, {@code onViewportChanged}, {@code onPopupOpen} and {@code onPopupClose}, each
+ * five events {@code onItemSelected}, {@code onViewportChanged}, {@code onPopupOpen}, {@code onPopupClose} and (entry 8)
+ * {@code onSelectionChanged}, each
  * with its schema (the Designer lists them), and the props schema is the closed list with {@code editMode}
  * (bidirectional), {@code selectedItem} (a string or null, both ways) and the read-only {@code viewport}.
  */
@@ -35,18 +36,20 @@ class MapStudioComponentTest {
     @Test
     void theDescriptorDeclaresTheItemSelectedEventWithItsSchema() {
         List<ComponentEventDescriptor> events = List.copyOf(MapStudioComponent.DESCRIPTOR.events());
-        assertEquals(4, events.size());
-        assertEquals(List.of("onItemSelected", "onViewportChanged", "onPopupOpen", "onPopupClose"),
+        assertEquals(5, events.size());
+        assertEquals(List.of("onItemSelected", "onViewportChanged", "onPopupOpen", "onPopupClose", "onSelectionChanged"),
             events.stream().map(ComponentEventDescriptor::getName).toList());
         assertEquals(MapStudioComponent.EVENT_ITEM_SELECTED, events.get(0).getName());
         assertEquals(MapStudioComponent.EVENT_VIEWPORT_CHANGED, events.get(1).getName());
         assertEquals(MapStudioComponent.EVENT_POPUP_OPEN, events.get(2).getName());
         assertEquals(MapStudioComponent.EVENT_POPUP_CLOSE, events.get(3).getName());
+        assertEquals(MapStudioComponent.EVENT_SELECTION_CHANGED, events.get(4).getName());
         ComponentEventDescriptor event = events.get(0);
         assertTrue(event.getDescription().contains("event.mapItem"), event.getDescription());
         assertTrue(events.get(1).getDescription().contains("event.bounds"), events.get(1).getDescription());
         assertTrue(events.get(2).getDescription().contains("event.segment"), events.get(2).getDescription());
         assertTrue(events.get(3).getDescription().contains("event.itemId"), events.get(3).getDescription());
+        assertTrue(events.get(4).getDescription().contains("event.mapItems"), events.get(4).getDescription());
         for (ComponentEventDescriptor e : events) {
             assertFalse(e.getDescription().contains("\u2014"), "no em dash");
             assertNotNull(e.getSchema(), e.getName());
@@ -83,7 +86,11 @@ class MapStudioComponentTest {
         assertEquals("null", segment.get(1).getAsString());
         JsonObject close = resource("/mapstudio.events.popup-close.json");
         assertEquals(List.of("itemId"), List.copyOf(close.getAsJsonObject("properties").keySet()));
-        for (JsonObject schema : List.of(viewport, open, close)) {
+        // Entry 8: the selected set as a list of AD-7 map item objects, in joining order.
+        JsonObject changed = resource("/mapstudio.events.selection-changed.json");
+        assertEquals(List.of("mapItems"), List.copyOf(changed.getAsJsonObject("properties").keySet()));
+        assertEquals("array", changed.getAsJsonObject("properties").getAsJsonObject("mapItems").get("type").getAsString());
+        for (JsonObject schema : List.of(viewport, open, close, changed)) {
             assertFalse(schema.get("additionalProperties").getAsBoolean(), "a closed event object");
             assertFalse(schema.toString().contains("\u2014"), "no em dash");
         }
@@ -94,8 +101,8 @@ class MapStudioComponentTest {
         JsonObject schema = resource("/mapstudio.props.json");
         assertFalse(schema.get("additionalProperties").getAsBoolean(), "the list is closed");
         JsonObject props = schema.getAsJsonObject("properties");
-        assertEquals(List.of("startingArea", "previewStyles", "editMode", "selectedItem", "viewport", "userLocation", "directions",
-            "style"),
+        assertEquals(List.of("startingArea", "previewStyles", "editMode", "selectedItem", "selectedItems", "viewport", "userLocation",
+            "directions", "style"),
             List.copyOf(props.keySet()));
         JsonObject editMode = props.getAsJsonObject("editMode");
         assertEquals("boolean", editMode.get("type").getAsString());
@@ -107,6 +114,11 @@ class MapStudioComponentTest {
         assertEquals("null", types.get(1).getAsString());
         assertTrue(selected.get("default").isJsonNull());
         assertTrue(selected.get("description").getAsString().contains("an id the page writes selects"));
+        JsonObject selectedItems = props.getAsJsonObject("selectedItems");
+        assertEquals("array", selectedItems.get("type").getAsString());
+        assertTrue(selectedItems.get("readOnly").getAsBoolean(), "the component writes it; the page does not");
+        assertEquals(0, selectedItems.getAsJsonArray("default").size());
+        assertEquals("string", selectedItems.getAsJsonObject("items").get("type").getAsString());
         JsonObject viewport = props.getAsJsonObject("viewport");
         assertTrue(viewport.get("readOnly").getAsBoolean(), "the component writes it; the page does not");
         assertTrue(viewport.get("default").isJsonNull());

@@ -86,15 +86,19 @@ export interface ItemsHost {
 export function drawItems(host: ItemsHost): void {
     drawUnsaved(host);
     const delegate = host.props.delegate;
-    const selected = host.state.selected;
-    const selectionKey = selected ? selected.kind + ':' + selected.id : '';
+    // One item: today's selection (its ring or casing, a line's arrow, floating ends and open segment). Several (epic 4 entry 8):
+    // every item in the set takes its ring or casing alone, an area its casing, and no line its arrow or ends.
+    const set = host.state.studio.selected;
+    const several = set.length >= 2;
+    const selected = several ? null : host.state.selected;
+    const selectionKey = several ? 'set:' + set.join(',') : selected ? selected.kind + ':' + selected.id : '';
     if (!host.map || !host.itemsReady || !delegate || !host.markerColors
         || (delegate.itemsRevision === host.drawnRevision && delegate.liveRevision === host.drawnLive
             && selectionKey === host.drawnSelection && host.withinM === host.drawnWithinM)) {
         return;
     }
     const items = delegate.editing === 'off' ? [] : delegate.items;
-    const data = buildFeatures(items, delegate.lists.kinds, delegate.live, selected, host.markerColors, host.withinM);
+    const data = buildFeatures(items, delegate.lists.kinds, delegate.live, selected, host.markerColors, host.withinM, several ? set : []);
     host.anchors = data.anchors;
     host.drawnWithinM = host.withinM;
     const source = (id: string): GeoJSONSource | undefined => host.map!.getSource(id) as GeoJSONSource | undefined;

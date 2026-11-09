@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "description": "The event object of onSelectionChanged (epic 4 entry 8, docs/contract.md): fired once per change of the selected set, with the selected map items in the order each joined.",
+  "properties": {
+    "mapItems": {
+      "type": "array",
+      "description": "The selected map items as AD-7 map item objects (id, name, kind, assetId, properties, basePath, alarmsPath, values; a line adds its instruments and segment), in the order each joined, the last the current item; empty when nothing is selected. The selectedItems prop carries their ids.",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

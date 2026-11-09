@@ -492,10 +492,13 @@ export interface AreaProperties {
     /** The resolved fill and outline colour: the tint's token value, or the lateral tone for an outline alone (DESIGN.md: the geofence outline). */
     color: string;
     selected: boolean;
+    /** In a selection of several (epic 4 entry 8): its outline takes the selection casing (one area alone shows its handles instead). */
+    inSet: boolean;
 }
 
-export function areaProperties(id: string, name: string, kind: string, tint: Tint | null, colors: MarkerColors, selected: boolean): AreaProperties {
-    return { id, name, kind, tint: tint || '', color: tint ? tintColor(tint, colors) || colors.line : colors.chipEdge, selected };
+export function areaProperties(id: string, name: string, kind: string, tint: Tint | null, colors: MarkerColors, selected: boolean,
+                               inSet = false): AreaProperties {
+    return { id, name, kind, tint: tint || '', color: tint ? tintColor(tint, colors) || colors.line : colors.chipEdge, selected, inSet };
 }
 
 /** What an image id names. */

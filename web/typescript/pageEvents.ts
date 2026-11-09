@@ -1,6 +1,6 @@
 /**
- * The page's window on the map (epic 4 entries 2 and 14, contract 0.4.0; MapStudioComponent.java declares the events): the
- * four component events' names, the `viewport` object the component writes and fires, the try-guarded prop write and event
+ * The page's window on the map (epic 4 entries 2, 14 and 8, contract 0.4.0; MapStudioComponent.java declares the events): the
+ * five component events' names, the `viewport` object the component writes and fires, the try-guarded prop write and event
  * fire every path shares, and the echo guard that tells the component's own `selectedItem` write coming back from a value the
  * page wrote. Pure: unit tested in node (pageEvents.test.ts).
  */
@@ -9,6 +9,11 @@ import { round6 } from './geometry';
 
 /** Fired on every selection change with `{mapItem}` (MapStudioComponent.EVENT_ITEM_SELECTED). */
 export const ITEM_SELECTED_EVENT = 'onItemSelected';
+/**
+ * Fired once per change of the selected set with `{mapItems}`, the AD-7 objects in joining order (epic 4 entry 8,
+ * MapStudioComponent.EVENT_SELECTION_CHANGED); beside the read-only `selectedItems` prop, the ids in the same order.
+ */
+export const SELECTION_CHANGED_EVENT = 'onSelectionChanged';
 /** Fired when the map first settles and at every move end with the viewport object (EVENT_VIEWPORT_CHANGED). */
 export const VIEWPORT_CHANGED_EVENT = 'onViewportChanged';
 /** Fired wherever the Gateway is told popup.open, with `{itemId, segment}` (EVENT_POPUP_OPEN). */

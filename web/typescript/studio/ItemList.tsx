@@ -1,9 +1,10 @@
 import * as React from 'react';
 import { EditLevel, MapItemRecord } from '../contract';
 import {
-    LIST_SEARCH_LABEL, LIST_SEARCH_PLACEHOLDER, LIST_SORTS, ListEntry, ListItem, ListRow, ListSort, entriesOf, groupRows, kindChips,
-    unlinkedCount, unlinkedLabel
+    LIST_SEARCH_LABEL, LIST_SEARCH_PLACEHOLDER, LIST_SORTS, ListEntry, ListHeader, ListItem, ListRow, ListSort, SELECT_ALL_IN_FILTER, entriesOf,
+    groupIds, groupRows, kindChips, selectAllText, unlinkedCount, unlinkedLabel
 } from '../itemList';
+import { rangeIds } from '../studio';
 import { alarmGlyphId } from '../live';
 import { Glyph } from '../popupParts';
 import { Problem } from '../problems';
@@ -34,8 +35,15 @@ import { ProblemStatus } from './SaveStatus';
  * group headers (`MESA FIELD` with "4 NEED ATTENTION", "Field-wide", "Not linked", "Just added", a kind), the "All normal"
  * divider, children indented 26 px with "on P14", Last changed's "Sam - Today 10:42". The footer: **Add item** (the toolbar's
  * generic Point tool) and "N unlinked" while N > 0, which keeps the Not linked rows alone until its clear. Sort, Filter and
- * the unlinked filter are the list's own, as the search text is. Checkboxes and Select all are entry 8's. Below 1280 px (entry 7c) the same list
- * opens over the map from the rail's Items (`overlay`).
+ * the unlinked filter are the list's own, as the search text is. Below 1280 px (entry 7c) the same list opens over the map from the
+ * rail's Items (`overlay`).
+ *
+ * Entry 8 (EXPERIENCE.md List row, Multi-select; DESIGN.md list-row): each row starts with a checkbox, which toggles the row in or
+ * out of the selection without opening Details (`onToggle`); every row in the set takes the selected look. A plain row click selects
+ * that one item alone as before; Shift-click selects the range from the last row clicked or ticked to it, in the order shown,
+ * replacing the set (`onSelectRows`); "Select all in MESA FIELD" under each field header, "Select all in group" on each other group
+ * header and, while a kind filter, the unlinked filter or a search is on, "Select all in filter" above the list replace the set with
+ * those rows as shown. Context rows are never taken by a range or a Select all.
  *
  * The save status beside the title always says the save state (Saving..., Not saved while edits wait, else Saved); a
  * problem shows on its own row under the title (entry 24, owner 2026-11-05: the status box retired, its problems said
@@ -46,6 +54,12 @@ export interface ItemListProps {
     title: string;
     rows: ListRow[];
     selectedId: string | null;
+    /** The selected set in joining order (entry 8): each row in it is ticked and takes the selected look. */
+    selectedIds?: readonly string[];
+    /** A row's checkbox (entry 8): the row toggled in or out of the set, no Details. */
+    onToggle?: (id: string) => void;
+    /** A Shift-click range or a Select all (entry 8): the set replaced by these rows, in the order shown. */
+    onSelectRows?: (ids: string[]) => void;
     save: SaveState;
     /** The words beside the title (problems.ts headerSaveWords). */
     saveWords: string;
@@ -132,17 +146,37 @@ interface ItemListState {
     unlinkedOnly: boolean;
 }
 
-/** A group header or the All normal divider, as a list item with no button (presentation for the list's row count). */
-function Heading(props: { item: Exclude<ListItem, ListEntry> }): React.ReactElement {
+/**
+ * A group header or the All normal divider, as a list item (presentation for the list's row count). With `onSelectAll` (entry 8) a
+ * field's header is followed by its "Select all in MESA FIELD" line and any other group header carries "Select all in group".
+ */
+function Heading(props: { item: Exclude<ListItem, ListEntry>; onSelectAll?: (header: ListHeader) => void }): React.ReactElement {
     const item = props.item;
     if (item.type === 'divider') {
         return <li className="mapstudio-list-divider" role="presentation" data-divider="all-normal">{item.label}</li>;
     }
-    return (
-        <li className={'mapstudio-list-group mapstudio-list-group--' + item.level} role="presentation" data-group={item.key}>
+    const onSelectAll = props.onSelectAll;
+    const field = item.key.indexOf('h:field:') === 0;
+    const button = onSelectAll ? (
+        <button type="button" className="mapstudio-list-select-all" data-group={item.key} onClick={() => onSelectAll(item)}>
+            {selectAllText(item)}
+        </button>
+    ) : null;
+    const header = (
+        <li key={item.key} className={'mapstudio-list-group mapstudio-list-group--' + item.level} role="presentation" data-group={item.key}>
             <span className="mapstudio-list-group-label">{item.label}</span>
             {item.right !== '' ? <span className="mapstudio-list-group-right" data-attention={item.right}>{item.right}</span> : null}
+            {!field ? button : null}
         </li>
+    );
+    if (!field || !button) {
+        return header;
+    }
+    return (
+        <React.Fragment>
+            {header}
+            <li className="mapstudio-list-select-all-row" role="presentation" data-group={item.key}>{button}</li>
+        </React.Fragment>
     );
 }
 
@@ -158,6 +192,56 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
     }
 
     private readonly input = React.createRef<HTMLInputElement>();
+    /** The last row clicked or ticked (entry 8), where a Shift-click range starts. */
+    private anchor: string | null = null;
+    /** The layout last drawn, which a range and a Select all read in the order shown. */
+    private shownItems: ListItem[] = [];
+
+    /** The rows shown, in order, without the context rows (a range and a Select all never take one). */
+    private shownIds(): string[] {
+        return entriesOf(this.shownItems).filter((e) => !e.context).map((e) => e.row.id);
+    }
+
+    /** A row clicked: Shift-click selects the range from the anchor (entry 8); a plain click selects the one item, as before. */
+    private onRowClick(ev: React.MouseEvent<HTMLButtonElement>, id: string): void {
+        const props = this.props;
+        if (ev.shiftKey && props.onSelectRows) {
+            const order = this.shownIds();
+            const from = this.anchor !== null && order.indexOf(this.anchor) >= 0 ? this.anchor : props.selectedId;
+            const ids = rangeIds(order, from, id);
+            this.anchor = id;
+            props.onSelectRows(ids.length > 0 ? ids : [id]);
+            return;
+        }
+        this.anchor = id;
+        props.onSelect(id);
+    }
+
+    /** A row's checkbox (entry 8): toggled in or out of the set, and the anchor of a later Shift-click. */
+    private onCheck(id: string): void {
+        this.anchor = id;
+        if (this.props.onToggle) {
+            this.props.onToggle(id);
+        }
+    }
+
+    /** A header's Select all (entry 8): the group's rows as shown replace the set. */
+    private onSelectAll = (header: ListHeader): void => {
+        if (this.props.onSelectRows) {
+            const ids = groupIds(this.shownItems, header.key);
+            this.anchor = ids.length > 0 ? ids[ids.length - 1] : this.anchor;
+            this.props.onSelectRows(ids);
+        }
+    };
+
+    /** Select all in filter (entry 8): every row shown replaces the set. */
+    private onSelectFilter = (): void => {
+        if (this.props.onSelectRows) {
+            const ids = this.shownIds();
+            this.anchor = ids.length > 0 ? ids[ids.length - 1] : this.anchor;
+            this.props.onSelectRows(ids);
+        }
+    };
     private readonly listId = 'mapstudio-item-list-' + Math.random().toString(36).slice(2, 8);
 
     private onQuery = (ev: React.ChangeEvent<HTMLInputElement>): void => {
@@ -207,17 +291,25 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
         const props = this.props;
         const row = item.row;
         const selected = props.selectedId === row.id;
+        // In the set (entry 8): ticked and in the selected look; the current item (the last to join) is also aria-current.
+        const inSet = selected || (!!props.selectedIds && props.selectedIds.indexOf(row.id) >= 0);
         return (
-            // A list item holding the button, so assistive technology hears both the list and a button (R14).
-            <li key={item.key} className={'mapstudio-list-item' + (item.depth > 0 ? ' mapstudio-list-item--child' : '')}
+            // A list item holding the checkbox and the button, so assistive technology hears both the list and a button (R14).
+            <li key={item.key} className={'mapstudio-list-item' + (item.depth > 0 ? ' mapstudio-list-item--child' : '')
+                    + (props.onToggle ? ' mapstudio-list-item--check' : '') + (inSet ? ' mapstudio-list-item--selected' : '')}
                 style={item.depth > 1 ? { paddingLeft: (item.depth * 26) + 'px' } : undefined}>
+                {props.onToggle ? (
+                    <input type="checkbox" className="mapstudio-list-check" checked={inSet} data-item-id={row.id}
+                           aria-label={'Select ' + row.name} title={'Select ' + row.name + ' with others'}
+                           onChange={() => this.onCheck(row.id)} />
+                ) : null}
                 <button type="button"
-                        className={'mapstudio-list-row' + (selected ? ' mapstudio-list-row--selected' : '')
+                        className={'mapstudio-list-row' + (inSet ? ' mapstudio-list-row--selected' : '')
                             + (item.context ? ' mapstudio-list-row--context' : '')}
                         data-item-id={row.id} data-kind={row.kindId} data-state={row.badge} data-depth={String(item.depth)}
                         aria-current={selected ? 'true' : undefined}
                         title={row.name + ' - ' + row.kindName + (row.words ? ' - ' + row.words : '') + (item.note ? ' - ' + item.note : '')}
-                        onClick={() => props.onSelect(row.id)}>
+                        onClick={(ev) => this.onRowClick(ev, row.id)}>
                     {row.icon !== '' ? <Glyph id={row.icon} className="mapstudio-list-kind-glyph" size={18} /> : <span className="mapstudio-list-kind-glyph" />}
                     <span className="mapstudio-list-text">
                         <span className="mapstudio-list-name">{row.name}</span>
@@ -240,6 +332,10 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
         const unlinkedOnly = this.state.unlinkedOnly && unlinked > 0;
         const items = groupRows(props.rows, { sort, kind: chosen, query, justAdded: props.justAdded, unlinkedOnly, now: new Date() });
         const shown = entriesOf(items);
+        this.shownItems = items;
+        // Select all in filter (entry 8): while a kind filter, the unlinked filter or a search narrows the rows shown.
+        const filtered = chosen !== null || unlinkedOnly || query.trim() !== '';
+        const selectAll = props.onSelectRows ? this.onSelectAll : undefined;
         const noMatches = props.rows.length > 0 && shown.length === 0;
         const chosenChip = chips.find((c) => c.id === chosen);
         const filterWords = chosen !== null && chosenChip ? chosenChip.label : 'Filter';
@@ -300,8 +396,15 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
                 {noMatches ? <div className="mapstudio-list-empty mapstudio-list-empty--search" data-empty="search">{NO_MATCHES}</div> : null}
                 {/* One polite live region, always mounted and visually hidden, so a screen reader hears "No matches" when it comes. */}
                 <div className="mapstudio-visually-hidden mapstudio-list-status" role="status" aria-live="polite">{noMatches ? NO_MATCHES : ''}</div>
+                {filtered && props.onSelectRows && shown.some((e) => !e.context) ? (
+                    <div className="mapstudio-list-filter-all">
+                        <button type="button" className="mapstudio-list-select-all mapstudio-list-select-filter" onClick={this.onSelectFilter}>
+                            {SELECT_ALL_IN_FILTER}
+                        </button>
+                    </div>
+                ) : null}
                 <ul id={this.listId} className="mapstudio-list" data-rows={String(shown.length)} data-sort={sort}>
-                    {items.map((item) => item.type === 'row' ? this.renderRow(item) : <Heading key={item.key} item={item} />)}
+                    {items.map((item) => item.type === 'row' ? this.renderRow(item) : <Heading key={item.key} item={item} onSelectAll={selectAll} />)}
                 </ul>
                 <footer className="mapstudio-list-footer">
                     <button type="button" className="mapstudio-button mapstudio-list-add" disabled={props.addDisabled}

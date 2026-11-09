@@ -27,7 +27,7 @@ public final class MapStudioComponent {
     public static final String COMPONENT_ID = "ao.mapstudio";
 
     /**
-     * The component's events (epic 4 entries 2 and 14, contract 0.4.0, docs/contract.md "The component's
+     * The component's events (epic 4 entries 2, 14 and 8, contract 0.4.0, docs/contract.md "The component's
      * events"), fired by the browser through {@code componentEvents.fireComponentEvent}, each with its payload
      * schema: {@code onItemSelected} on every selection change with the selected map item as the AD-7 map item
      * object under {@code mapItem}, or null when the selection was cleared ({@code mapstudio.events.json}).
@@ -52,6 +52,13 @@ public final class MapStudioComponent {
      */
     public static final String EVENT_POPUP_CLOSE = "onPopupClose";
 
+    /**
+     * Fired once per change of the selected set (epic 4 entry 8), with the selected map items as AD-7 map item objects in
+     * the order each joined under {@code mapItems}; the read-only {@code selectedItems} prop carries their ids
+     * ({@code mapstudio.events.selection-changed.json}).
+     */
+    public static final String EVENT_SELECTION_CHANGED = "onSelectionChanged";
+
     /** The events' descriptions, as the Designer's event editor shows them. */
     static final String EVENT_ITEM_SELECTED_DESCRIPTION = "Fired on every selection change: event.mapItem is the "
         + "selected map item (id, name, kind, assetId, properties, basePath, alarmsPath, values), or null when the "
@@ -67,6 +74,10 @@ public final class MapStudioComponent {
 
     static final String EVENT_POPUP_CLOSE_DESCRIPTION = "Fired when a popup closes: event.itemId is the map item "
         + "whose popup closed.";
+
+    static final String EVENT_SELECTION_CHANGED_DESCRIPTION = "Fired once per change of the selected set: event.mapItems "
+        + "is the list of selected map items (each as onItemSelected's event.mapItem) in the order each joined, the last "
+        + "the current item, and empty when nothing is selected. The selectedItems prop carries their ids.";
 
     /** The descriptor registered with Perspective's component registries. */
     public static final ComponentDescriptor DESCRIPTOR;
@@ -86,7 +97,9 @@ public final class MapStudioComponent {
                 new ComponentEventDescriptor(EVENT_POPUP_OPEN, EVENT_POPUP_OPEN_DESCRIPTION,
                     MapStudioModule.schema("/mapstudio.events.popup-open.json")),
                 new ComponentEventDescriptor(EVENT_POPUP_CLOSE, EVENT_POPUP_CLOSE_DESCRIPTION,
-                    MapStudioModule.schema("/mapstudio.events.popup-close.json"))))
+                    MapStudioModule.schema("/mapstudio.events.popup-close.json")),
+                new ComponentEventDescriptor(EVENT_SELECTION_CHANGED, EVENT_SELECTION_CHANGED_DESCRIPTION,
+                    MapStudioModule.schema("/mapstudio.events.selection-changed.json"))))
             .setName("Map Studio")
             .setIcon(new ImageIcon(icon))
             .addPaletteEntry("", "Map Studio",

@@ -53,7 +53,8 @@ async function press(page, button) {
  * or a row {type: 'row', id, name, kind, state, depth, note}.
  */
 async function layout(page) {
-    return page.locator('.mapstudio-list > li').evaluateAll((els) => els.map((el) => {
+    // Entry 8's "Select all in MESA FIELD" line under a field header is not a list entry of its own here.
+    return page.locator('.mapstudio-list > li:not(.mapstudio-list-select-all-row)').evaluateAll((els) => els.map((el) => {
         if (el.classList.contains('mapstudio-list-divider')) return { type: 'divider', label: el.textContent };
         if (el.classList.contains('mapstudio-list-group')) {
             const right = el.querySelector('.mapstudio-list-group-right');

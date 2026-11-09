@@ -513,6 +513,39 @@ export function groupRows(all: readonly ListRow[], view: ListView): ListItem[] {
     return out;
 }
 
+/**
+ * The rows under a group header (epic 4 entry 8: "Select all in MESA FIELD", "Select all in group"), in the order shown: a field's
+ * rows down to the next field or top group, its Field-wide rows included; a Field-wide or any other group's rows down to the next
+ * header. Context rows (a site shown only so a matching child reads under it) are never taken. Empty for a key not in the layout.
+ */
+export function groupIds(items: readonly ListItem[], key: string): string[] {
+    const at = items.findIndex((i) => i.type === 'header' && i.key === key);
+    if (at < 0) {
+        return [];
+    }
+    const head = items[at] as ListHeader;
+    const field = head.key.indexOf('h:field:') === 0;
+    const out: string[] = [];
+    for (let j = at + 1; j < items.length; j++) {
+        const item = items[j];
+        if (item.type === 'header' && (!field || item.level === 'group')) {
+            break;
+        }
+        if (item.type === 'row' && !item.context && out.indexOf(item.row.id) < 0) {
+            out.push(item.row.id);
+        }
+    }
+    return out;
+}
+
+/** The words of a header's Select all (entry 8): "Select all in MESA FIELD" under a field, "Select all in group" on any other. */
+export function selectAllText(header: ListHeader): string {
+    return header.key.indexOf('h:field:') === 0 ? 'Select all in ' + header.label : 'Select all in group';
+}
+
+/** "Select all in filter" (entry 8), above the list while a kind filter, the unlinked filter or a search is on. */
+export const SELECT_ALL_IN_FILTER = 'Select all in filter';
+
 /** The rows of a layout, in order (what the list's keyboard and counts read). */
 export function entriesOf(items: readonly ListItem[]): ListEntry[] {
     return items.filter((i): i is ListEntry => i.type === 'row');

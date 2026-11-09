@@ -189,6 +189,11 @@ export function stepLabel(action: 'add' | 'move' | 'rename' | 'link' | 'unlink' 
     return action + ' ' + name;
 }
 
+/** The words of a delete of several items as one step (epic 4 entry 8): "delete 3 items", the items selected counted once each. */
+export function severalLabel(count: number): string {
+    return 'delete ' + count + ' item' + (count === 1 ? '' : 's');
+}
+
 /** How many steps the history lists (owner, 2026-11-05: "the last 10 actions"). */
 export const HISTORY_SIZE = 10;
 

@@ -44,7 +44,7 @@ import {
     LAYER_AREA_FILL, LAYER_AREA_LINE, LAYER_AREA_LINE_DASHED, LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED, LAYER_ITEM_MARKERS
 } from './mapLayers';
 import { NeedsYouControl } from './NeedsYouControl';
-import { EchoGuard, ITEM_SELECTED_EVENT, firePageEvent, noteWrite, pageId, takeEcho, writePageProp } from './pageEvents';
+import { EchoGuard, ITEM_SELECTED_EVENT, SELECTION_CHANGED_EVENT, firePageEvent, noteWrite, pageId, takeEcho, writePageProp } from './pageEvents';
 import { PickList, PickRow } from './PickList';
 import { Place } from './place';
 import { PointPopup } from './PointPopup';
@@ -118,6 +118,10 @@ export interface SelectionHost {
     openedBy: 'search' | 'needsyou' | null;
     /** The selection last written to the page (the item's id, '' for none), so a redraw with the same selection writes nothing. */
     publishedSelection: string;
+    /** The set last written to the page (`selectedItems`, epic 4 entry 8): the ids joined by commas, '' for none. */
+    publishedSet: string;
+    /** Shift-click on the map with the Select tool (entry 8): the items toggled in or out of the set, without Details. */
+    toggleInSelection(ids: string[]): void;
     /** The echo guard of `selectedItem` (pageEvents.ts): the component's own writes still to come back, and the value last written. */
     selectedEcho: EchoGuard;
     /** The page's choice waiting to be applied (entry 14): until the items have come, or while a tool is in hand; else null. */
@@ -172,8 +176,9 @@ export function onRootKeyDown(host: SelectionHost, ev: React.KeyboardEvent<HTMLD
         return;
     }
     if (host.state.popup === null && host.state.pick === null) {
-        if (host.state.panel !== null) {
-            // The Details panel closes with close or Esc (EXPERIENCE.md Properties panel, epic 4 entry 2): the selection goes.
+        if (host.state.panel !== null || (host.studioOn() && host.state.studio.selected.length > 0)) {
+            // The Details panel closes with close or Esc (EXPERIENCE.md Properties panel, epic 4 entry 2): the selection goes. In Edit
+            // mode Esc outside a field empties the set too, Details or none (entry 8: ticked rows, a box, the count's panel).
             ev.preventDefault();
             clearSelection(host);
             if (host.map) {
@@ -251,6 +256,14 @@ export function onMapClick(host: SelectionHost, ev: MapMouseEvent): void {
         host.needsYouControl.close(false);
     }
     const map = host.map;
+    if (host.studioOn() && ev.originalEvent && (ev.originalEvent as MouseEvent).shiftKey) {
+        // Shift-click with the Select tool (entry 8): the clicked item in or out of the set, no Details; the ground changes nothing.
+        const ids = itemsAt(map, ev);
+        if (ids.length > 0) {
+            host.toggleInSelection(ids);
+        }
+        return;
+    }
     const onPoint = map.queryRenderedFeatures(ev.point, { layers: [LAYER_ITEM_MARKERS] });
     if (onPoint.length > 0) {
         // A click on a marker: the point click round trip and the popup, once. A marker image is
@@ -304,6 +317,45 @@ export function onMapClick(host: SelectionHost, ev: MapMouseEvent): void {
         }
     }
     clearSelection(host);
+}
+
+/**
+ * The item under a click (entry 8, Shift-click): the nearest marker's item (a shared marker's members, all of them), else a line,
+ * else an area, as a plain click finds them; empty on the ground.
+ */
+function itemsAt(map: MapLibreMap, ev: MapMouseEvent): string[] {
+    const onPoint = map.queryRenderedFeatures(ev.point, { layers: [LAYER_ITEM_MARKERS] });
+    if (onPoint.length > 0) {
+        let nearest = onPoint[0];
+        let best = Number.POSITIVE_INFINITY;
+        for (const f of onPoint) {
+            const g = f.geometry;
+            if (!g || g.type !== 'Point') {
+                continue;
+            }
+            const p = map.project([g.coordinates[0], g.coordinates[1]]);
+            const d = (p.x - ev.point.x) * (p.x - ev.point.x) + (p.y - ev.point.y) * (p.y - ev.point.y);
+            if (d < best) {
+                best = d;
+                nearest = f;
+            }
+        }
+        const props = (nearest.properties || {}) as Record<string, unknown>;
+        if (Number(props.members) > 1) {
+            return String(props.memberIds || '').split(',').filter((id) => id !== '');
+        }
+        return typeof props.id === 'string' ? [props.id] : [];
+    }
+    const pad = 4;
+    const box: [[number, number], [number, number]] = [[ev.point.x - pad, ev.point.y - pad], [ev.point.x + pad, ev.point.y + pad]];
+    const onLine = map.queryRenderedFeatures(box, { layers: [LAYER_ITEM_LINES, LAYER_ITEM_LINES_DASHED, LAYER_ITEM_LINES_DOTTED] });
+    const lineId = onLine.length > 0 && onLine[0].properties ? onLine[0].properties.id : undefined;
+    if (typeof lineId === 'string') {
+        return [lineId];
+    }
+    const onArea = map.queryRenderedFeatures(box, { layers: [LAYER_AREA_FILL, LAYER_AREA_LINE, LAYER_AREA_LINE_DASHED] });
+    const areaId = onArea.length > 0 && onArea[0].properties ? onArea[0].properties.id : undefined;
+    return typeof areaId === 'string' ? [areaId] : [];
 }
 
 /** A line clicked: selected (casing, flow arrow, Return), the popup closed. */
@@ -1009,11 +1061,35 @@ export function publishSelection(host: SelectionHost): void {
         host.mapContainer.setAttribute('data-segment', segment ? segment.fromId + '|' + segment.toId : '');
         host.mapContainer.setAttribute('data-highlighted', segment ? segment.fromId + ',' + segment.toId : '');
     }
+    const set = host.state.studio.selected;
+    if (host.mapContainer) {
+        // The selected set in joining order (entry 8), the last the current item (`data-selected`).
+        host.mapContainer.setAttribute('data-selected-ids', set.join(','));
+    }
     const key = selected ? selected.id : '';
     if (host.publishedSelection !== key) {
         host.publishedSelection = key;
         publishToPage(host, selected ? selected.id : null);
     }
+    const setKey = set.join(',');
+    if (host.publishedSet !== setKey) {
+        host.publishedSet = setKey;
+        publishSetToPage(host, set);
+    }
+}
+
+/**
+ * The page's window on a selection of several (epic 4 entry 8, contract 0.4.0; the owner's pick of 2026-11-08, both): the read-only
+ * `selectedItems` prop written with the ids in joining order (`[]` when none), then `onSelectionChanged` fired once with
+ * `{mapItems}`, the AD-7 objects in the same order, each guarded as the other writes and fires are (pageEvents.ts). The prop is
+ * never read back, so it needs no echo guard. `selectedItem` and `onItemSelected` carry the current item, the last to join.
+ */
+function publishSetToPage(host: SelectionHost, ids: readonly string[]): void {
+    const store = host.props.store;
+    const items = ids.map((id) => itemFor(host, id)).filter((i): i is MapItemRecord => !!i);
+    writePageProp(store.props, 'selectedItems', ids.slice());
+    firePageEvent(store.componentEvents, SELECTION_CHANGED_EVENT, { mapItems: items.map((item) => selectedItemObject(host, item)) });
+    console.debug('[MapStudio] Selected set published to the page: ' + (ids.length === 0 ? 'none' : ids.join(', ')));
 }
 
 /**

@@ -207,7 +207,7 @@ describe('line looks (DESIGN.md map-line)', () => {
         expect(stateWord({ ...STALE, preset: 'fault' })).toBe('Stale');
         expect(labelRank({ ...NORMAL, preset: 'fault' }, 0, false)).toBe(RANK_STYLE);
         expect(labelRank({ ...NORMAL, preset: 'dimmed' }, 0, false)).toBe(104);
-        expect(areaProperties('g', 'G', 'geofence', 'tint-3', COLORS, false)).toEqual({ id: 'g', name: 'G', kind: 'geofence', tint: 'tint-3', color: COLORS.tints[2], selected: false });
+        expect(areaProperties('g', 'G', 'geofence', 'tint-3', COLORS, false)).toEqual({ id: 'g', name: 'G', kind: 'geofence', tint: 'tint-3', color: COLORS.tints[2], selected: false, inSet: false });
         expect(areaProperties('g', 'G', 'geofence', null, COLORS, true)).toMatchObject({ tint: '', color: COLORS.chipEdge });
     });
 

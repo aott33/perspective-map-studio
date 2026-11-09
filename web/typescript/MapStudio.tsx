@@ -60,8 +60,11 @@ import * as editing from './editing';
 import * as basemap from './basemapLayer';
 import { TilesState } from './basemapLayer';
 import {
-    StudioState, StudioSurface, StudioTool, clearSelection, enterEdit, fromProps, isEditing, leaveEdit, pickTool, select, showSurface, toolKind
+    StudioState, StudioSurface, StudioTool, addMany, clearSelection, enterEdit, fromProps, isEditing, isMultiple, leaveEdit, pickTool, select,
+    selectMany, showSurface, toggleSelect, toolKind
 } from './studio';
+import { BoxSelect, DragShape, ShapeItem } from './multiSelect';
+import { SelectionCount } from './studio/SelectionCount';
 import { listRows } from './itemList';
 import { FieldValue, assetListKnown } from './itemForm';
 import { Rail } from './studio/Rail';
@@ -253,6 +256,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
     focusNameId: string | null = null;
     /** The selection last written to the page (selection.tsx publishSelection): the item's id, '' for none. */
     publishedSelection = '';
+    /** The set last written to the page's `selectedItems` (entry 8, selection.tsx publishSelection): the ids joined, '' for none. */
+    publishedSet = '';
+    /** The Shift-drag box and Shift+Alt-drag lasso with the Select tool in Edit mode (entry 8, multiSelect.ts). */
+    boxSelect: BoxSelect = new BoxSelect(this);
     /** The echo guard of selectedItem (entry 14, pageEvents.ts): the component's own writes still to come back, the value last written. */
     selectedEcho: EchoGuard = echoGuard(pageId(this.props.props.selectedItem));
     /** The page's choice of an item waiting to be applied (entry 14, selection.tsx applyPageSelection), or null. */
@@ -416,6 +423,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
             }
             map.on('click', this.onMapClick);
             addPointerCursor(map);
+            this.applyBoxZoom();
             editing.startTerraDraw(this, map, root);
             // A selection made before the map loaded (a restored place, a list row) takes its handles now (entry 5).
             editing.applyHandles(this);
@@ -428,6 +436,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             });
         });
         this.map = map;
+        // The box and the lasso listen on the map's element, before Terra Draw and MapLibre (entry 8).
+        this.boxSelect.attach(this.mapContainer);
         // The Edit switch and the studio wait for map.load's level (applyStudioControls, componentDidUpdate).
         this.themeWatch = new ThemeWatch(root, THEME_TOKENS, () => this.applyTheme());
         this.themeWatch.start();
@@ -604,6 +614,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.applyUserLocation();
         this.applyStudioControls();
         this.applyTopBar();
+        this.applyBoxZoom();
         this.dropDeadSelection();
         basemap.applyBasemap(this);
         this.drawItems();
@@ -660,8 +671,13 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.listView = newListView();
         } else {
             editing.putToolDown(this);
+            this.boxSelect.cancel();
         }
-        this.setState((prev) => ({ studio: on ? enterEdit(prev.studio) : leaveEdit(prev.studio), layersTab: on ? 'layers' : prev.layersTab, listOpen: false }));
+        // View mode has no selection of several (entry 8): leaving Edit mode keeps the current item alone, the last to join.
+        this.setState((prev) => ({
+            studio: on ? enterEdit(prev.studio) : leaveEdit(prev.selected && isMultiple(prev.studio) ? select(prev.studio, prev.selected.id) : prev.studio),
+            layersTab: on ? 'layers' : prev.layersTab, listOpen: false
+        }));
         if (writeProp) {
             try {
                 this.props.store.props.write('editMode', on);
@@ -734,11 +750,49 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.studioWasOn = on;
     }
 
-    /** A selected item that left the map (an undo of its add, another editor's delete) leaves the selection too. */
+    /**
+     * MapLibre's Shift-drag box zoom (entry 8): off while the studio shows, where Shift-drag draws the selection's box, and on again in
+     * View mode, as before. `data-box-zoom` on the map says which, for the suite.
+     */
+    private applyBoxZoom(): void {
+        const map = this.map;
+        if (!map || !map.boxZoom) {
+            return;
+        }
+        const on = !this.studioOn();
+        if (map.boxZoom.isEnabled() !== on) {
+            if (on) {
+                map.boxZoom.enable();
+            } else {
+                map.boxZoom.disable();
+                this.boxSelect.cancel();
+            }
+        }
+        if (this.mapContainer && this.mapContainer.getAttribute('data-box-zoom') !== (on ? 'on' : 'off')) {
+            this.mapContainer.setAttribute('data-box-zoom', on ? 'on' : 'off');
+        }
+    }
+
+    /**
+     * A selected item that left the map (an undo of its add, another editor's delete) leaves the selection too; in a set of several
+     * (entry 8) each item gone leaves it, the others staying.
+     */
     private dropDeadSelection(): void {
         const selected = this.state.selected;
         const delegate = this.props.delegate;
-        if (selected && delegate && delegate.load.state === 'loaded' && !this.itemFor(selected.id)) {
+        if (!delegate || delegate.load.state !== 'loaded') {
+            return;
+        }
+        const set = this.state.studio.selected;
+        if (set.length >= 2) {
+            const kept = set.filter((id) => !!this.itemFor(id));
+            if (kept.length < set.length) {
+                console.info('[MapStudio] ' + (set.length - kept.length) + ' selected item(s) are no longer on the map.');
+                this.changeSelection((s) => selectMany(s, kept));
+            }
+            return;
+        }
+        if (selected && !this.itemFor(selected.id)) {
             console.info('[MapStudio] The selected item ' + selected.id + ' is no longer on the map.');
             selection.clearSelection(this);
         }
@@ -883,6 +937,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (this.mapContainer) {
             this.mapContainer.removeEventListener('keydown', this.onKeyDown, true);
         }
+        this.boxSelect.detach();
         // The handle layers leave before Terra Draw's own source does (entry 5).
         editing.stopTerraDraw(this);
         this.lineMode = null;
@@ -949,6 +1004,115 @@ export class MapStudio extends Component<Props, MapStudioState> {
             geometry: selected !== null && prev.geometry !== null && prev.geometry.itemId === selected.id ? prev.geometry : null
         };
     }
+
+    /**
+     * The selection as a set (entry 8; studio.ts): `change` makes the new set from the studio model, and the rest follows it from
+     * `prev`: the current item is the last to join (its kind read from its geometry, a line's open segment kept only while it stays
+     * current), and Details and a chosen point or Move stay only while the set is that one item still. A set change opens no Details:
+     * two or more show the count's panel (`renderPanel`), and a set of one shows its ring alone, as a ticked row does.
+     */
+    selectionSetState(prev: Readonly<MapStudioState>, change: (studio: StudioState) => StudioState):
+        Pick<MapStudioState, 'selected' | 'studio' | 'panel' | 'geometry' | 'pick'> {
+        const studio = change(prev.studio);
+        const ids = studio.selected;
+        const id = ids.length > 0 ? ids[ids.length - 1] : null;
+        let selected: Selection | null = null;
+        if (id !== null) {
+            const item = this.itemFor(id);
+            selected = prev.selected && prev.selected.id === id ? prev.selected
+                : { id, kind: item && item.geometry.type === 'Point' ? 'point' : 'line', segment: null };
+        }
+        const single = ids.length === 1;
+        return {
+            selected,
+            studio,
+            pick: null,
+            panel: single && prev.panel === id ? prev.panel : null,
+            geometry: single && prev.geometry !== null && prev.geometry.itemId === id ? prev.geometry : null
+        };
+    }
+
+    /**
+     * A change of the set (entry 8): a box, a lasso, Shift-click, a checkbox, a range, Select all, Clear. The count's panel may dock or
+     * leave, so it is a dock change: the ground keeps its place on the page (selection.tsx `dockChange`).
+     */
+    changeSelection(change: (studio: StudioState) => StudioState): void {
+        selection.closePopup(this);
+        this.dockChange((prev) => this.selectionSetState(prev, change));
+    }
+
+    /** Shift-click on the map (entry 8): each id in or out of the set (a shared marker's members together: out if all are in). */
+    toggleInSelection = (ids: string[]): void => {
+        this.changeSelection((s) => {
+            const allIn = ids.every((id) => s.selected.indexOf(id) >= 0);
+            return allIn ? selectMany(s, s.selected.filter((id) => ids.indexOf(id) < 0)) : addMany(s, ids);
+        });
+        console.info('[MapStudio] Shift-click: ' + ids.join(', ') + ' toggled in the selection.');
+    };
+
+    /** A released box or lasso (entry 8, multiSelect.ts): what it took joins the set, in the items' order. */
+    addToSelection = (ids: string[], shape: DragShape): void => {
+        console.info('[MapStudio] The ' + shape + ' took ' + ids.length + ' item(s)' + (ids.length > 0 ? ': ' + ids.join(', ') : '') + '.');
+        if (ids.length > 0) {
+            this.changeSelection((s) => addMany(s, ids));
+        }
+    };
+
+    /** Whether a Shift-drag draws the box or the lasso now: the studio shows and no tool is in hand (the Select tool). */
+    boxSelectOn(): boolean {
+        return this.studioOn() && this.state.studio.tool === null && this.state.drawing === null;
+    }
+
+    /**
+     * The live items as the box and the lasso test them (entry 8), in the map's container pixels now: a point where its marker is
+     * drawn (a shared marker's members at the group's place), a line's vertices, an area's ring. Items not drawn (the store paused)
+     * are left out.
+     */
+    shapeItems(): ShapeItem[] {
+        const map = this.map;
+        const delegate = this.props.delegate;
+        if (!map || !delegate || delegate.editing === 'off') {
+            return [];
+        }
+        const px = (c: [number, number]): [number, number] => {
+            const p = map.project(c);
+            return [p.x, p.y];
+        };
+        const out: ShapeItem[] = [];
+        for (const item of delegate.items) {
+            if (item.deleted) {
+                continue;
+            }
+            if (item.geometry.type === 'Point') {
+                out.push({ id: item.id, type: 'point', at: px(this.anchorFor(item.id, [item.geometry.coordinates[0], item.geometry.coordinates[1]])) });
+                continue;
+            }
+            const kind = delegate.lists.kinds.find((k) => k.id === item.kind);
+            const path = item.geometry.coordinates.map((c) => px([c[0], c[1]]));
+            out.push(kind && kind.area ? { id: item.id, type: 'area', ring: path } : { id: item.id, type: 'line', path });
+        }
+        return out;
+    }
+
+    /** A row's checkbox (entry 8): the row in or out of the set, no Details opened, the map not moved. */
+    onRowToggle = (id: string): void => {
+        if (!this.itemFor(id)) {
+            return;
+        }
+        this.changeSelection((s) => toggleSelect(s, id));
+    };
+
+    /** A Shift-click range or a Select all in the list (entry 8): the set replaced by those rows, in the order shown. */
+    onSelectRows = (ids: string[]): void => {
+        const live = ids.filter((id) => !!this.itemFor(id));
+        this.changeSelection((s) => selectMany(s, live));
+        console.info('[MapStudio] ' + live.length + ' row(s) selected in the list.');
+    };
+
+    /** The count's Clear (entry 8): the set emptied, the panel closed. */
+    onClearSelection = (): void => {
+        this.changeSelection((s) => clearSelection(s));
+    };
 
     /**
      * Keys on the component: Ctrl+Z and Ctrl+Shift+Z (or Ctrl+Y) undo and redo in Edit mode outside a field (a
@@ -1372,10 +1536,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
                     const state = itemState(values, item ? live.display[item.kind] : undefined);
                     // The row's marker is the map's own look: the selection ring (the selected point, or the two
                     // instruments at an open segment's ends, entry 2) and the instrument disc included.
-                    const selected = this.state.selected;
-                    const ringed = selected !== null && ((selected.kind === 'point' && selected.id === id)
+                    // With several selected (entry 8) every item in the set is ringed, as the map draws it.
+                    const set = this.state.studio.selected;
+                    const selected = set.length >= 2 ? null : this.state.selected;
+                    const ringed = (set.length >= 2 && set.indexOf(id) >= 0) || (selected !== null && ((selected.kind === 'point' && selected.id === id)
                         || (selected.segment !== undefined && selected.segment !== null
-                            && (selected.segment.fromId === id || selected.segment.toId === id)));
+                            && (selected.segment.fromId === id || selected.segment.toId === id))));
                     const spec = markerProperties(id, item ? item.name : '', item ? item.kind : '', kind ? kind.icon : '', state,
                         { labelRank: kind ? kind.labelRank : 0, selected: ringed, instrument: !!(kind && kind.instrument) });
                     return (
@@ -1388,6 +1554,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              data-kpi={state.iconKpi ? state.iconKpi.text : ''}
                              data-kpi-stale={state.iconKpi && state.iconKpi.stale ? 'true' : 'false'}
                              data-marker={spec.marker}
+                             data-ringed={ringed ? 'true' : 'false'}
                              data-word={stateWord(state)}
                              data-rank={String(spec.rank)}
                              data-segments={values.segments ? JSON.stringify(values.segments.map((g) => ({
@@ -1572,6 +1739,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                       onAddItem={this.onAddItem}
                       addDisabled={delegate.editing === 'off'}
                       selectedId={selected ? selected.id : null}
+                      selectedIds={this.state.studio.selected}
+                      onToggle={this.onRowToggle}
+                      onSelectRows={this.onSelectRows}
                       save={delegate.save}
                       saveWords={headerSaveWords(facts)}
                       problems={editProblems(facts)}
@@ -1591,6 +1761,19 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * an asset that left the list is told from one of another kind, the asset list's status and the items for the name check.
      */
     private renderPanel(delegate: MapStudioDelegateState): React.ReactNode {
+        const set = this.state.studio.selected;
+        if (set.length >= 2) {
+            // Several selected (entry 8): the count, Clear and the footer's Delete; no fields and no geometry handles.
+            const deletable = set.filter((id) => {
+                const item = this.liveItem(id);
+                return !!item && item.version >= 1;
+            });
+            return (
+                <SelectionCount key="several" count={set.length} deletable={deletable.length} paused={delegate.editing === 'off'}
+                                toolInHand={this.state.studio.tool !== null || this.state.drawing !== null}
+                                onClear={this.onClearSelection} onDelete={this.onDeleteItem} />
+            );
+        }
         const selected = this.state.selected;
         const item = selected && this.state.panel === selected.id ? this.itemFor(selected.id) : undefined;
         if (!item) {

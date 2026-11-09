@@ -139,7 +139,7 @@ describe('the map features (epic 3 entry 7)', () => {
         expect(out.lines.features).toHaveLength(1);
         expect(out.areas.features).toHaveLength(1);
         const g = out.areas.features[0];
-        expect(g.properties).toEqual({ id: 'g', name: 'North fence', kind: 'geofence', tint: 'tint-1', color: 't1', selected: false });
+        expect(g.properties).toEqual({ id: 'g', name: 'North fence', kind: 'geofence', tint: 'tint-1', color: 't1', selected: false, inSet: false });
         expect(g.geometry.coordinates[0]).toHaveLength(4);
         expect(g.geometry.coordinates[0][3]).toEqual([-104.99, 39.74]);
         expect(a.marker).not.toContain('t1');
@@ -176,5 +176,28 @@ describe('the floating ends of the selected line (epic 4 entry 4)', () => {
         expect(one.ends.features.map((f) => f.properties)).toEqual([{ id: 'half', role: 'end' }]);
         // A point's selection marks no line end.
         expect(buildFeatures([A, FAR, L], KINDS, LIVE_INITIAL, { id: 'a', kind: 'point' }, COLORS).ends.features).toEqual([]);
+    });
+});
+
+describe('a selection of several (entry 8)', () => {
+    const FENCE_KIND: Kind = { id: 'fence', name: 'Geofence', geometry: 'line', icon: 'geofence', labelRank: 1, fields: [], area: true };
+    const FENCE = item('f', 'fence', 'Fence', { type: 'LineString', coordinates: [[-104.9, 39.7], [-104.8, 39.7], [-104.8, 39.6]] });
+
+    test('every item in the set takes its ring or casing; no line its arrow or floating ends; an area in it its casing', () => {
+        const out = buildFeatures([FAR, L, FENCE], KINDS.concat([FENCE_KIND]), LIVE_INITIAL, null, COLORS, undefined, ['far', 'l', 'f']);
+        expect(out.points.features[0].properties).toMatchObject({ id: 'far', selected: true });
+        expect(out.lines.features[0].properties).toMatchObject({ id: 'l', selected: true, segmentSelected: false });
+        expect(out.arrow.features).toHaveLength(0);
+        expect(out.ends.features).toHaveLength(0);
+        expect(out.areas.features[0].properties).toMatchObject({ id: 'f', selected: true, inSet: true });
+    });
+
+    test('a shared marker is ringed when one of its members is in the set; one item selected alone is drawn as before', () => {
+        const shared = buildFeatures([A, B], KINDS, LIVE_INITIAL, null, COLORS, undefined, ['b', 'far']);
+        expect(shared.points.features[0].properties).toMatchObject({ memberIds: 'a,b', selected: true });
+        const one = buildFeatures([FAR, L, FENCE], KINDS.concat([FENCE_KIND]), LIVE_INITIAL, { id: 'l', kind: 'line' }, COLORS);
+        expect(one.arrow.features).toHaveLength(1);
+        expect(one.points.features[0].properties.selected).toBe(false);
+        expect(one.areas.features[0].properties).toMatchObject({ selected: false, inSet: false });
     });
 });

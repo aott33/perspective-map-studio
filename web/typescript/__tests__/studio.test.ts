@@ -1,7 +1,7 @@
 import { Kind } from '../adapters';
 import {
     KIND_BUTTONS, StudioState, clearSelection, enterEdit, fromProps, isDrawing, isEditing, isPlacing, kindButtons, kindsFor, leaveEdit, pickTool,
-    pointKind, select, selectedId, showSurface, toggleSelect, toolKind, toolOf
+    pointKind, select, selectedId, showSurface, toggleSelect, toolKind, toolOf, selectMany, addMany, isMultiple, rangeIds, sameIds
 } from '../studio';
 
 describe('fromProps', () => {
@@ -132,6 +132,50 @@ describe('select, toggleSelect and clearSelection', () => {
         pickTool(before, 'line');
         leaveEdit(before);
         expect(before).toEqual(copy);
+    });
+});
+
+describe('selecting several (entry 8): selectMany, addMany, isMultiple, rangeIds', () => {
+    it('selectMany replaces the set, each id once in the order given, the last the current item', () => {
+        const state = selectMany(select(fromProps(true), 'x'), ['a', 'b', 'a', 'c']);
+        expect(state.selected).toEqual(['a', 'b', 'c']);
+        expect(selectedId(state)).toBe('c');
+        expect(isMultiple(state)).toBe(true);
+        expect(selectMany(state, ['a', 'b', 'c'])).toBe(state);
+        expect(selectMany(state, []).selected).toEqual([]);
+    });
+
+    it('addMany adds the ids not in the set at its end, keeping the others in place (a box, a lasso)', () => {
+        const state = addMany(selectMany(fromProps(true), ['a', 'b']), ['c', 'a', 'd', 'c']);
+        expect(state.selected).toEqual(['a', 'b', 'c', 'd']);
+        expect(selectedId(state)).toBe('d');
+        expect(addMany(state, ['a', 'b'])).toBe(state);
+        expect(addMany(state, [])).toBe(state);
+    });
+
+    it('a set of one is not several, and Shift-click toggling one out of two leaves one', () => {
+        const two = selectMany(fromProps(true), ['a', 'b']);
+        expect(isMultiple(two)).toBe(true);
+        const one = toggleSelect(two, 'b');
+        expect(one.selected).toEqual(['a']);
+        expect(isMultiple(one)).toBe(false);
+        expect(isMultiple(fromProps(true))).toBe(false);
+    });
+
+    it('rangeIds: every row from the anchor to the target in the order shown, the target last', () => {
+        const order = ['p1', 'p2', 'ctb1', 'swd1', 'l1'];
+        expect(rangeIds(order, 'p1', 'swd1')).toEqual(['p1', 'p2', 'ctb1', 'swd1']);
+        expect(rangeIds(order, 'swd1', 'p2')).toEqual(['swd1', 'ctb1', 'p2']);
+        expect(rangeIds(order, 'ctb1', 'ctb1')).toEqual(['ctb1']);
+        expect(rangeIds(order, null, 'ctb1')).toEqual(['ctb1']);
+        expect(rangeIds(order, 'gone', 'ctb1')).toEqual(['ctb1']);
+        expect(rangeIds(order, 'p1', 'gone')).toEqual([]);
+    });
+
+    it('sameIds compares in order', () => {
+        expect(sameIds(['a', 'b'], ['a', 'b'])).toBe(true);
+        expect(sameIds(['a', 'b'], ['b', 'a'])).toBe(false);
+        expect(sameIds([], [])).toBe(true);
     });
 });
 
