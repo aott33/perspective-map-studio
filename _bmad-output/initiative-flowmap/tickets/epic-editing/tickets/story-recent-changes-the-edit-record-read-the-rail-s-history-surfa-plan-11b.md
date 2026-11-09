@@ -4,7 +4,7 @@ type: 'feature'
 ticket: ''
 part_of: '11'
 created: '2026-11-09'
-status: 'in-review'
+status: 'built'
 baseline_revision: '6234a757c8645c2778af851710852fd9afaf7e42'
 route: 'full'
 route_source: 'auto'
@@ -102,6 +102,8 @@ Decisions (owner, 2026-11-09, "approve and continue" on the planner's seven pick
 | 6 | An empty batch reads "Changed 0 kind setups"; a batch mixing items and kind setups is worded from the items alone | low | patch | `batchSentence` fall-through. Fix: an empty batch "Saved an empty change"; a mixed batch names the kind setup too (B8). |
 | 7 | The e2e never checks the reverted editor's own browser (the AC, B4): the other editor saves by raw sends at 390 px, the "second browser" is the same user | medium | patch | Confirmed in `recentchanges.spec.mjs`. Fix: the second editor at 1366 px with History open sees the item back and the revert listed first; B5's editor at 1366 px. |
 | 8 | Every save state is a button opening History, nested in the `role="status"` region | medium | patch | `ItemList.tsx` wraps `saveWords` whatever it says. Fix: only "Saved" is the button, outside the live region's text, the status words kept readable. |
+
+Outcome (2026-11-09): the eight patches applied, with the owner's option A (the History dock 340 px, DESIGN.md's token) and a second dev map editor `mapeditor2` for the two-editor spec; the orchestrator's Verification: tsc clean, Jest 790 passed, Gradle clean build offline passed, contract check OK, `ops/tests` 6 passed, `ops/up.sh --fresh` and the whole e2e suite 293 passed, 0 failed, 8 skipped (the env-gated scenarios). No Ignition file changed. Entry 11 (11a and 11b) built. Status built.
 
 ## Design Notes
 
