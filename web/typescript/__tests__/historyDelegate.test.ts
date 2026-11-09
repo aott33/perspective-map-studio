@@ -141,6 +141,44 @@ describe('the reads (B1, B2, B9)', () => {
         expect(history().error).toBe('');
     });
 
+    test('a first page and an older page out together: each read has its own timeout, the older one reported with Try again', () => {
+        delegate.setHistoryOpen(true);
+        reply(MessageTypes.EDITS_HISTORY_REPLY, lastOf(MessageTypes.EDITS_HISTORY).id,
+            page(Array.from({ length: 50 }, (_, i) => moveOf(60 - i, 2, AT, NORTH, 'mapeditor')), true));
+        delegate.historyOlder();
+        const older = lastOf(MessageTypes.EDITS_HISTORY);
+        jest.advanceTimersByTime(5_000);
+        reply(MessageTypes.MAP_CHANGED, 'c61', { seq: 61, ops: [] });
+        const first = lastOf(MessageTypes.EDITS_HISTORY);
+        expect(first.body).toEqual({ limit: 50 });
+        // The first page answers; the older read is still out and times out on its own clock.
+        reply(MessageTypes.EDITS_HISTORY_REPLY, first.id, page([moveOf(61, 2, AT, NORTH, 'mapeditor')], true));
+        expect(history().loading).toBe('older');
+        jest.advanceTimersByTime(HISTORY_TIMEOUT_MS - 5_000);
+        expect(history().errorOn).toBe('older');
+        expect(history().error).toBe('Older changes could not be read: the Gateway did not answer in time.');
+        expect(history().loading).toBeNull();
+        // Its late answer changes nothing; Try again asks the older page again.
+        reply(MessageTypes.EDITS_HISTORY_REPLY, older.id, page([], false));
+        expect(history().more).toBe(true);
+        delegate.historyRetry();
+        expect(lastOf(MessageTypes.EDITS_HISTORY).body).toEqual({ before: 11, limit: 50 });
+    });
+
+    test('closed (the surface left, or the component unmounted) the reads are let go: no more asks; reopened it asks afresh', () => {
+        delegate.setHistoryOpen(true);
+        expect(ofType(MessageTypes.EDITS_HISTORY)).toHaveLength(1);
+        delegate.setHistoryOpen(false);
+        expect(history().loading).toBeNull();
+        reply(MessageTypes.MAP_CHANGED, 'c8', { seq: 8, ops: [] });
+        jest.advanceTimersByTime(HISTORY_TIMEOUT_MS);
+        expect(ofType(MessageTypes.EDITS_HISTORY)).toHaveLength(1);
+        expect(history().error).toBe('');
+        delegate.setHistoryOpen(true);
+        expect(ofType(MessageTypes.EDITS_HISTORY)).toHaveLength(2);
+        expect(history().loading).toBe('first');
+    });
+
     test('a refused first read says so; one with no answer in 15 s too', () => {
         delegate.setHistoryOpen(true);
         reply(MessageTypes.ERROR, lastOf(MessageTypes.EDITS_HISTORY).id,
@@ -187,6 +225,36 @@ describe('Revert (B4, B5)', () => {
         expect(state.unsaved[0].state).toBe('refused');
         expect(state.unsaved[0].conflict![0].changedBy).toBe('mapoperator');
         expect(state.undo.done).toBe(0);
+    });
+
+    test('Revert waits as Undo does: a second press while the first is saved sends nothing; never held behind another save of the item', () => {
+        const before = ofType(MessageTypes.EDITS_APPLY).length;
+        expect(delegate.revert(7)).toBe(true);
+        expect(delegate.revert(7)).toBe(false);
+        expect(ofType(MessageTypes.EDITS_APPLY)).toHaveLength(before + 1);
+        const sent = lastOf(MessageTypes.EDITS_APPLY);
+        reply(MessageTypes.EDITS_APPLY_REPLY, sent.id, { batchId: sent.body.batchId, seq: 8, results: [{ entity: 'item', id: 'p31', version: 3 }] });
+
+        // Another edit of P31 in flight: Revert sends nothing, so it is never rebased past it.
+        delegate.renameItem('p31', 'P31 renamed');
+        const rename = lastOf(MessageTypes.EDITS_APPLY);
+        expect(delegate.revert(7)).toBe(false);
+        expect(ofType(MessageTypes.EDITS_APPLY)).toHaveLength(before + 2);
+        reply(MessageTypes.EDITS_APPLY_REPLY, rename.id, { batchId: rename.body.batchId, seq: 9, results: [{ entity: 'item', id: 'p31', version: 4 }] });
+        expect(ofType(MessageTypes.EDITS_APPLY)).toHaveLength(before + 2);
+        // Pressed again once it saved: sent at the row's version, so the Gateway refuses it as changed since.
+        expect(delegate.revert(7)).toBe(true);
+        expect(lastOf(MessageTypes.EDITS_APPLY).body.ops[0].baseVersion).toBe(2);
+    });
+
+    test('the undo step names the row as it reads: reverting a "Reverted ..." row', () => {
+        reply(MessageTypes.MAP_CHANGED, 'c8', { seq: 8, ops: [] });
+        reply(MessageTypes.EDITS_HISTORY_REPLY, lastOf(MessageTypes.EDITS_HISTORY).id,
+            page([moveOf(8, 3, NORTH, AT, 'mapeditor'), moveOf(7, 2, AT, NORTH, 'mapoperator')]));
+        delegate.revert(8);
+        const sent = lastOf(MessageTypes.EDITS_APPLY);
+        reply(MessageTypes.EDITS_APPLY_REPLY, sent.id, { batchId: sent.body.batchId, seq: 9, results: [{ entity: 'item', id: 'p31', version: 4 }] });
+        expect(undoLabel(delegate.mapStateToProps().undo)).toMatch(/^Undo: revert "Reverted "Moved P31 about (40 m|130 ft) north""$/);
     });
 
     test('no Revert for an old row or a row not read; nothing while editing is paused', () => {

@@ -262,7 +262,7 @@ api_get() {
 # Every secret this run can know must not be in any file under e2e/out (as ops/perf.sh).
 secret_grep() {
   local secrets=() hits
-  for v in MAPSTUDIO_EDITOR_PASSWORD MAPSTUDIO_OPERATOR_PASSWORD GATEWAY_ADMIN_PASSWORD; do
+  for v in MAPSTUDIO_EDITOR_PASSWORD MAPSTUDIO_EDITOR2_PASSWORD MAPSTUDIO_OPERATOR_PASSWORD GATEWAY_ADMIN_PASSWORD; do
     [[ -n "${!v:-}" ]] && secrets+=("${!v}")
   done
   [[ -f "${TOKEN_FILE}" ]] && secrets+=("$(cat "${TOKEN_FILE}")")

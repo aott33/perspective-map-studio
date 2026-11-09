@@ -5,11 +5,11 @@
 
 import { rmSync } from 'node:fs';
 import { outDir } from './lib/env.mjs';
-import { EDITOR_USER, EMPTY_PROJECT, OPERATOR_USER, allPasswords, stateFile } from './lib/editorAuth.mjs';
+import { EDITOR2_USER, EDITOR_USER, EMPTY_PROJECT, OPERATOR_USER, allPasswords, stateFile } from './lib/editorAuth.mjs';
 import { filesHolding } from './lib/secretScan.mjs';
 
 export default async function globalTeardown() {
-    for (const user of [EDITOR_USER, OPERATOR_USER]) {
+    for (const user of [EDITOR_USER, EDITOR2_USER, OPERATOR_USER]) {
         rmSync(stateFile(user), { force: true });
         // The empty project's sign-in (epic 4 entry 7b, firstrun.spec.mjs).
         rmSync(stateFile(user, EMPTY_PROJECT), { force: true });

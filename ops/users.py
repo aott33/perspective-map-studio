@@ -7,7 +7,8 @@ Gateway-written ops/project/ignition/global-props), exists: a fresh volume has o
 Gateway's system identity provider is an internal one, it is copied under the name `default` (same user
 source, same settings; the template's scripts/gw/ensure_identity.py). Then it makes the user `mapeditor` in
 the internal user source behind `default`, gives it the role `MapEditor` (full editing in the dev project's Map Studio setup) and sets its password
-from MAPSTUDIO_EDITOR_PASSWORD (generated into the git-ignored .env by ops/lib.sh), and the user `mapoperator`
+from MAPSTUDIO_EDITOR_PASSWORD (generated into the git-ignored .env by ops/lib.sh), a second map editor `mapeditor2`
+in `MapEditor` with MAPSTUDIO_EDITOR2_PASSWORD (epic-editing entry 11b), and the user `mapoperator`
 in the role `MapOperator` (phone editing, epic 2 story 2) with MAPSTUDIO_OPERATOR_PASSWORD. Passwords are
 never printed.
 
@@ -35,11 +36,14 @@ GW = os.environ.get('GW_URL', '').rstrip('/')
 USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User'
 GROUP_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Group'
 EDITOR = 'mapeditor'
+# A second map editor (epic-editing entry 11b): Recent changes names another full editor's change and reverts it.
+EDITOR2 = 'mapeditor2'
 EDITOR_ROLE = 'MapEditor'
 OPERATOR = 'mapoperator'
 OPERATOR_ROLE = 'MapOperator'
 # Each dev user: (user name, role, the .env key of its password).
 DEV_USERS = ((EDITOR, EDITOR_ROLE, 'MAPSTUDIO_EDITOR_PASSWORD'),
+             (EDITOR2, EDITOR_ROLE, 'MAPSTUDIO_EDITOR2_PASSWORD'),
              (OPERATOR, OPERATOR_ROLE, 'MAPSTUDIO_OPERATOR_PASSWORD'))
 
 
@@ -157,8 +161,13 @@ def run():
         else:
             users[user] = api('POST', scim + '/Users', body)['id']
     groups = {g['displayName']: g for g in listing(scim + '/Groups')}
-    for user, role, _key in DEV_USERS:
-        ensure_group(scim, groups, role, [users[user]])
+    # One call per role with all its users, so a group made for the first is not made again for the second.
+    roles = []
+    for _user, role, _key in DEV_USERS:
+        if role not in roles:
+            roles.append(role)
+    for role in roles:
+        ensure_group(scim, groups, role, [users[u] for u, r, _k in DEV_USERS if r == role])
     print('ok   %s (passwords from .env, not printed; user source %s)'
           % (', '.join('%s in %s' % (u, r) for u, r, _k in DEV_USERS), source))
     return 0

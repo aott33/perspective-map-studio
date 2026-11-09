@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EDITOR_USER, OPERATOR_USER, editorStateFile, stateFile } from '../lib/editorAuth.mjs';
+import { EDITOR2_USER, EDITOR_USER, OPERATOR_USER, editorStateFile, stateFile } from '../lib/editorAuth.mjs';
 
 const signInCli = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'lib', 'signInCli.mjs');
 
@@ -201,7 +201,7 @@ export async function removeStrays(page, seedIds) {
     return strays.length;
 }
 
-export { EDITOR_USER, OPERATOR_USER };
+export { EDITOR2_USER, EDITOR_USER, OPERATOR_USER };
 
 /** Sign a dev user in, in its own node process (lib/signInCli.mjs), on the suite's project or `project`; returns the state file. */
 function signInFresh(user, project = undefined) {

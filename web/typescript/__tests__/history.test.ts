@@ -77,12 +77,34 @@ describe('the sentence of a batch (B2, B6, B8)', () => {
 
     test('a pad moved with the line ends it carries reads as the pad moved; a split reads as a split', () => {
         const pad = op({ op: 'update', id: 'p14', name: 'P14', version: 2, before: { geometry: point(P14_AT) }, after: { geometry: point(P14_NORTH) } });
-        const line = op({ op: 'update', id: 'l', name: 'L-SWD', kind: 'pipe', before: { geometry: { type: 'LineString', coordinates: [[0, 0], [1, 1]] } },
-            after: { geometry: { type: 'LineString', coordinates: [[0, 0], [1, 2]] } } });
+        const line = op({ op: 'update', id: 'l', name: 'L-SWD', kind: 'pipe', before: { geometry: { type: 'LineString', coordinates: [[0, 0], P14_AT] } },
+            after: { geometry: { type: 'LineString', coordinates: [[0, 0], P14_NORTH] } } });
         expect(batchSentence(entry(12, [pad, line]), KINDS)).toBe('Moved P14 about 40 m north');
-        const created = op({ op: 'create', id: 'l2', name: 'L-SWD 2', kind: 'pipe', after: record('L-SWD 2', 'pipe', { type: 'LineString', coordinates: [[1, 1], [2, 2]] }) });
-        expect(batchSentence(entry(13, [{ ...line }, created]), KINDS)).toBe('Split L-SWD');
-        expect(batchSentence(entry(14, [line]), KINDS)).toBe('Reshaped L-SWD');
+        // A line not ending on the pad is a change of its own.
+        const other = op({ op: 'update', id: 'l2', name: 'L-2', kind: 'pipe', before: { geometry: { type: 'LineString', coordinates: [[0, 0], [1, 1]] } },
+            after: { geometry: { type: 'LineString', coordinates: [[0, 0], [1, 2]] } } });
+        expect(batchSentence(entry(12, [pad, other]), KINDS)).toBe('Changed 2 items in one change');
+        const created = op({ op: 'create', id: 'l3', name: 'L-2 2', kind: 'pipe', after: record('L-2 2', 'pipe', { type: 'LineString', coordinates: [[1, 1], [2, 2]] }) });
+        const tap = op({ op: 'update', id: 't', name: 'PT-1', kind: 'tap', before: { geometry: point([1, 1]), attachment: { lineId: 'l2', distanceM: 5 } },
+            after: { geometry: point([1.5, 1.5]), attachment: { lineId: 'l3', distanceM: 2 } } });
+        expect(batchSentence(entry(13, [other, created, tap]), KINDS)).toBe('Split L-2');
+        expect(batchSentence(entry(14, [other, tap]), KINDS)).toBe('Reshaped L-2');
+        expect(batchSentence(entry(14, [other, { ...tap, before: { ...tap.before, attachment: { lineId: 'x', distanceM: 5 } },
+            after: { ...tap.after, attachment: { lineId: 'x', distanceM: 2 } } }]), KINDS)).toBe('Changed 2 items in one change');
+    });
+
+    test('20 pads moved in one batch read as one change, not as the first pad\'s move (B6)', () => {
+        const ops = Array.from({ length: 20 }, (_, i) => op({ op: 'update', id: 'p' + i, name: 'P' + i,
+            before: { geometry: point([-103.8 + i * 0.01, 32.2]) }, after: { geometry: point([-103.8 + i * 0.01, 32.21]) } }));
+        expect(batchSentence(entry(18, ops), KINDS)).toBe('Changed 20 well pads in one change');
+    });
+
+    test('an empty batch has a plain sentence; a batch with items and a kind setup names both (B8)', () => {
+        expect(batchSentence(entry(19, []), KINDS)).toBe('Saved a change with nothing in it');
+        const setup: HistoryOp = { op: 'update', entity: 'kindSetup', id: 'pad', name: null, kind: 'pad', version: 3, before: {}, after: {} };
+        expect(batchSentence(entry(20, [setup, { ...setup, id: 'pipe', kind: 'pipe' }]), KINDS)).toBe('Changed 2 kind setups in one change');
+        expect(batchSentence(entry(21, [op({ op: 'create', id: 'p40', name: 'P40', after: record('P40', 'pad', point(P14_AT)) }), setup]), KINDS))
+            .toBe('Added well pad P40, and changed the well pad kind setup');
     });
 
     test('a kind setup is worded with its kind (B8); an old row with no values still says what (B7)', () => {
@@ -271,7 +293,7 @@ describe('the panel (B1, B3, B7, B10)', () => {
         expect(html).toContain('No changes saved yet.');
         expect(html).toContain(REVERT_FOOTER.replace("'", '&#x27;'));
         expect(html).not.toMatch(/mapstudio-history-undo"[^>]*disabled/);
-        expect(html).not.toContain('—');
+        expect(html).not.toContain('\u2014');
     });
 
     test('Undo is disabled with the toolbar\'s reason while paused or busy', () => {

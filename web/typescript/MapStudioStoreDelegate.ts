@@ -38,7 +38,7 @@ import {
 import { HostLists, NO_HOST_LISTS } from './adapters';
 import { MESSAGE_EVENT, Reply, basemapSource, editsHistory, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText } from './messages';
 import {
-    HISTORY_EMPTY, HISTORY_PAGE, HistoryState, batchSentence, failRead, mergeFirstPage, mergeOlderPage, readFailedText, revertBatch, revertLabel
+    HISTORY_EMPTY, HISTORY_PAGE, HistoryState, failRead, mergeFirstPage, mergeOlderPage, readFailedText, revertBatch, revertLabel, rowSentence
 } from './history';
 import { browserLocale } from './linePopup';
 import {
@@ -302,7 +302,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private historyOlderId: string | null = null;
     /** A map.changed came while the first page was being read: it is asked again once that read answers. */
     private historyAgain = false;
-    private historyTimer: ReturnType<typeof setTimeout> | null = null;
+    /** One timer per read in flight: a read with no answer in 15 s is said to have failed, with Try again. */
+    private historyTimers: { first: ReturnType<typeof setTimeout> | null; older: ReturnType<typeof setTimeout> | null } = { first: null, older: null };
 
     constructor(componentStore: AbstractUIElementStore) {
         super(componentStore);
@@ -1408,10 +1409,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     stopReplay(): void {
         this.sender.stop();
         this.connectionWatch.stop();
-        if (this.historyTimer !== null) {
-            clearTimeout(this.historyTimer);
-            this.historyTimer = null;
-        }
+        this.clearHistoryTimer('first');
+        this.clearHistoryTimer('older');
         if (this.loadRetryTimer !== null) {
             clearTimeout(this.loadRetryTimer);
             this.loadRetryTimer = null;
@@ -1464,6 +1463,17 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.historyOpen = open;
         if (open) {
             this.askHistoryFirst();
+            return;
+        }
+        // Closed (the surface left, or the component unmounted): the reads in flight are let go, so a reopen asks afresh.
+        this.historyFirstId = null;
+        this.historyOlderId = null;
+        this.historyAgain = false;
+        this.clearHistoryTimer('first');
+        this.clearHistoryTimer('older');
+        if (this.history.loading !== null) {
+            this.history = { ...this.history, loading: null };
+            this.notify();
         }
     }
 
@@ -1485,7 +1495,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         const message = editsHistory({ before, limit: HISTORY_PAGE });
         this.historyOlderId = message.id;
         this.history = { ...this.history, loading: 'older' };
-        this.armHistoryTimer();
+        this.armHistoryTimer('older');
         this.notify();
         this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject);
     }
@@ -1500,37 +1510,39 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.historyFirstId = message.id;
         this.historyAgain = false;
         this.history = { ...this.history, loading: this.history.loading === 'older' ? 'older' : 'first' };
-        this.armHistoryTimer();
+        this.armHistoryTimer('first');
         this.notify();
         this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject);
     }
 
-    /** No answer within 15 s: the read in flight is said to have failed, with Try again. */
-    private armHistoryTimer(): void {
-        if (this.historyTimer !== null) {
-            clearTimeout(this.historyTimer);
-        }
-        this.historyTimer = setTimeout(() => {
-            this.historyTimer = null;
-            const which = this.historyFirstId !== null ? 'first' : this.historyOlderId !== null ? 'older' : null;
-            if (which === null) {
-                return;
+    /** No answer within 15 s: that read is said to have failed, with Try again; a read of the other page is left as it is. */
+    private armHistoryTimer(which: 'first' | 'older'): void {
+        this.clearHistoryTimer(which);
+        this.historyTimers[which] = setTimeout(() => {
+            this.historyTimers[which] = null;
+            if (which === 'first') {
+                this.historyFirstId = null;
+                this.historyAgain = false;
+            } else {
+                this.historyOlderId = null;
             }
-            this.historyFirstId = null;
-            this.historyOlderId = null;
-            this.historyAgain = false;
             this.history = failRead(this.history, which, readFailedText(which, 'the Gateway did not answer in time'));
-            this.history = { ...this.history, loading: null };
-            console.info('[MapStudio] Recent changes: the read of the edit record did not answer.');
+            this.history = { ...this.history, loading: this.historyLoading() };
+            console.info('[MapStudio] Recent changes: a read of the edit record did not answer.');
             this.notify();
         }, HISTORY_TIMEOUT_MS);
     }
 
-    private settleHistoryTimer(): void {
-        if (this.historyTimer !== null && this.historyFirstId === null && this.historyOlderId === null) {
-            clearTimeout(this.historyTimer);
-            this.historyTimer = null;
+    private clearHistoryTimer(which: 'first' | 'older'): void {
+        const timer = this.historyTimers[which];
+        if (timer !== null) {
+            clearTimeout(timer);
+            this.historyTimers[which] = null;
         }
+    }
+
+    private historyLoading(): 'first' | 'older' | null {
+        return this.historyOlderId !== null ? 'older' : this.historyFirstId !== null ? 'first' : null;
     }
 
     /** A reply to one of the surface's reads: its page merged, or its refusal said in words. */
@@ -1541,7 +1553,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         } else {
             this.historyOlderId = null;
         }
-        this.settleHistoryTimer();
+        this.clearHistoryTimer(first ? 'first' : 'older');
         if (reply.kind === 'edits.history.reply') {
             this.history = first ? mergeFirstPage(this.history, reply.body) : mergeOlderPage(this.history, reply.body);
             console.debug('[MapStudio] ' + replyText(reply));
@@ -1550,7 +1562,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.history = failRead(this.history, which, readFailedText(which, reply.body.message));
             console.info('[MapStudio] Recent changes: the read was refused (' + reply.body.code + ').');
         }
-        this.history = { ...this.history, loading: this.historyOlderId !== null ? 'older' : this.historyFirstId !== null ? 'first' : null };
+        this.history = { ...this.history, loading: this.historyLoading() };
         if (first && this.historyAgain && this.historyOpen) {
             this.historyAgain = false;
             this.askHistoryFirst();
@@ -1571,7 +1583,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             console.info('[MapStudio] Revert: change ' + seq + ' is not among the rows read.');
             return false;
         }
-        if (this.pausedFor('Revert')) {
+        // It waits as Undo does: never held behind another save of its items, whose reply would rebase it past the change made
+        // since and save over it with no conflict; a second press while the first is saved sends nothing.
+        if (this.pausedFor('Revert') || this.waitForEdit('Revert')) {
             return false;
         }
         const batch = revertBatch(entry, newId());
@@ -1579,7 +1593,12 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             console.info('[MapStudio] Revert is not offered for change ' + seq + '.');
             return false;
         }
-        const sentence = batchSentence(entry, this.lists.kinds, browserLocale());
+        if (this.undoStack.pending !== null || this.touchesBusy(batch)) {
+            console.info('[MapStudio] Revert waits: a save of its items is in flight.');
+            return false;
+        }
+        // The undo step names the row as it reads ("Reverted ..." included).
+        const sentence = rowSentence(entry, this.history.entries, this.lists.kinds, browserLocale());
         this.sendBatch(batch, batch.ops[0].id, revertLabel(sentence));
         return true;
     }

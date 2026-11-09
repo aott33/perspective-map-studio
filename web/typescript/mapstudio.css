@@ -2561,6 +2561,12 @@
     outline-offset: 0;
 }
 
+/* The History surface docks at 340 px (the owner's option A, 2026-11-09: DESIGN.md recent-changes-panel width), wider than the list. */
+.mapstudio-dock--history {
+    flex-basis: 340px;
+    width: 340px;
+}
+
 /* Recent changes, the rail's History surface in the left dock (entry 11b; DESIGN.md Recent changes panel): the dock's header, a
    note box naming the next undo step with Undo, the rows (an initial avatar, the sentence, who and when in tiny text, a ghost
    Revert), each expanding to the values before and after in small text, Show older, and the footer line under them. Docked: no

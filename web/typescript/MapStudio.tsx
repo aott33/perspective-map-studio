@@ -942,6 +942,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
         if (delegate) {
+            // Recent changes stop reading (entry 11b): a remount with History open asks afresh.
+            if (typeof delegate.setHistoryOpen === 'function') {
+                delegate.setHistoryOpen(false);
+            }
             delegate.stopReplay();
         }
         if (this.resizeObserver) {

@@ -31,7 +31,7 @@ export interface HistoryPanelProps {
     lastStep: string;
     /** The toolbar's Undo label ("Undo: edit 3 pads"), '' when it cannot undo now. */
     undoLabel: string;
-    /** What is in flight ("Undoing...", "Saving..."), '' for nothing (undoStack.ts `busyText`). */
+    /** What is in flight ("Undoing...", "Saving..."), '' for nothing (undoStack.ts `busyText`): Undo and every Revert wait, saying it. */
     busy: string;
     paused: boolean;
     onUndo: () => void;
@@ -138,7 +138,8 @@ export class HistoryPanel extends React.Component<HistoryPanelProps, HistoryPane
                                             </button>
                                             {row.blocked === '' ? (
                                                 <button type="button" className="mapstudio-button mapstudio-button--ghost mapstudio-history-revert"
-                                                        disabled={p.paused} title={p.paused ? PAUSED_TEXT : 'Revert: ' + row.sentence}
+                                                        disabled={p.paused || p.busy !== ''}
+                                                        title={p.paused ? PAUSED_TEXT : p.busy || 'Revert: ' + row.sentence}
                                                         aria-label={'Revert: ' + row.sentence} onClick={() => p.onRevert(row.seq)}>Revert</button>
                                             ) : null}
                                         </div>

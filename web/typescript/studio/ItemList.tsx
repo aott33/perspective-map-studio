@@ -49,7 +49,8 @@ import { ProblemStatus } from './SaveStatus';
  * problem shows on its own row under the title (entry 24, owner 2026-11-05: the status box retired, its problems said
  * here in Edit mode; studio/SaveStatus.tsx `ProblemStatus`), and the edits waiting on that row open the list of them
  * under it, closed until asked for and closed again with Hide, Esc or the edits' going. From entry 11b the status's words are a
- * button (`onHistory`) that opens Recent changes, the rail's History (EXPERIENCE.md Save status); the wrapper keeps its status role.
+ * button (`onHistory`) while they read "Saved", opening Recent changes, the rail's History (EXPERIENCE.md Save status); the words are
+ * announced by a status region beside it that holds no button (`.mapstudio-panel-save-status`).
  */
 export interface ItemListProps {
     title: string;
@@ -354,14 +355,16 @@ export class ItemList extends React.Component<ItemListProps, ItemListState> {
                 <header className="mapstudio-dock-header">
                     <div className="mapstudio-dock-title-row">
                         <h2 className="mapstudio-dock-title">{props.title}</h2>
-                        <span className={'mapstudio-panel-save mapstudio-panel-save--' + save.state} role="status" data-save-state={save.state}>
-                            {props.onHistory ? (
-                                <button type="button" className="mapstudio-panel-save-button" title={props.saveWords + ' - open Recent changes'}
+                        <span className={'mapstudio-panel-save mapstudio-panel-save--' + save.state} data-save-state={save.state}>
+                            {props.onHistory && props.saveWords === 'Saved' ? (
+                                <button type="button" className="mapstudio-panel-save-button" title="Saved - open Recent changes"
                                         onClick={props.onHistory}>
                                     {props.saveWords}
                                 </button>
-                            ) : props.saveWords}
+                            ) : <span aria-hidden="true">{props.saveWords}</span>}
                         </span>
+                        {/* The words announced, apart from the button (entry 11b): the visible ones are the button or hidden from it. */}
+                        <span className="mapstudio-visually-hidden mapstudio-panel-save-status" role="status">{props.saveWords}</span>
                     </div>
                     <ProblemStatus save={save} problems={props.problems} unsaved={props.unsaved} records={props.records} level={props.level}
                                    sending={props.sending} onRetry={props.onRetry} onDiscard={props.onDiscard} openRequest={props.openWaiting}

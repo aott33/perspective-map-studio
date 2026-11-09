@@ -82,6 +82,7 @@ while True:
   export "${name?}"
 }
 ensure_dev_password MAPSTUDIO_EDITOR_PASSWORD
+ensure_dev_password MAPSTUDIO_EDITOR2_PASSWORD
 ensure_dev_password MAPSTUDIO_OPERATOR_PASSWORD
 SECRETS_DIR="${OPS_DIR}/secrets"
 GATEWAY_HTTP_PORT="${GATEWAY_HTTP_PORT:-9088}"
@@ -160,10 +161,10 @@ ensure_dev_security() {
 }
 
 # --- dev users ------------------------------------------------------------
-# Create or update the dev map editor (mapeditor, role MapEditor) and the dev phone
+# Create or update the dev map editors (mapeditor and mapeditor2, role MapEditor) and the dev phone
 # editor (mapoperator, role MapOperator) through the Gateway's SCIM routes (ops/users.py).
 ensure_dev_users() {
-  info "Creating the dev users (mapeditor in MapEditor, mapoperator in MapOperator) ..."
+  info "Creating the dev users (mapeditor and mapeditor2 in MapEditor, mapoperator in MapOperator) ..."
   GW_URL="${GATEWAY_URL}" python3 -I "${OPS_DIR}/users.py"
 }
 

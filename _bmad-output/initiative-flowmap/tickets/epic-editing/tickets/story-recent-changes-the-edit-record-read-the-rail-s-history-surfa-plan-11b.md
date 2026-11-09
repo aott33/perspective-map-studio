@@ -4,14 +4,14 @@ type: 'feature'
 ticket: ''
 part_of: '11'
 created: '2026-11-09'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '6234a757c8645c2778af851710852fd9afaf7e42'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
@@ -83,9 +83,25 @@ Decisions (owner, 2026-11-09, "approve and continue" on the planner's seven pick
 
 - Planner, 2026-11-09: the environment, commit and identity rules are entry 8's plan's (Docker by hand after a restart, JDK 17 by apt if gone, `ops/up.sh --fresh` before a whole-suite run, the session's trailers, `git commit --only`, no em dashes, never a bare `git stash`, never a push). A Gradle download refused 429 passes on a retry with backoff.
 
+- Owner, 2026-11-09 (option A): the History surface docks at 340 px, DESIGN.md's `recent-changes-panel` width, not the list's 256/280 px; the map keeps its ground still as it docks and undocks (entry 7c's rule, `dockChange`).
+- Build, 2026-11-09: the other editor in the e2e spec is a second dev map editor, `mapeditor2` in `MapEditor` (`ops/users.py`, `MAPSTUDIO_EDITOR2_PASSWORD` in `.env`), in its own 1366 px browser with History open, so the reverted editor's browser is checked.
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+### Pass 1 (quick lens, 2026-11-09): 8 findings - 1 high, 5 medium, 2 low; 8 patches
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---|---|---|---|
+| 1 | A Revert held behind an in-flight edit of the item is rebased by `releaseFlight` and overwrites the change made since with no conflict; a double click sends two | high | patch | Confirmed: `revert` checks `pausedFor` only, `releaseFlight` rewrites `baseVersion` (`MapStudioStoreDelegate.ts:639-643`); Undo has `waitForEdit`. Fix: Revert waits as Undo does (the button disabled with the busy reason) and is never rebased. |
+| 2 | A batch moving several items reads as one move ("Moved P0 ...") | medium | patch | `followsLead` accepts any geometry-only update. Fix: only lines whose ends sit on the lead item and instruments on the lead line follow it; a Jest case of 20 pads moved. |
+| 3 | Unmounting with History open leaves `historyOpen` and in-flight ids set; reads keep going on `map.changed`, and a remount never asks again | medium | patch | `componentWillUnmount` never closes History; `stopReplay` clears only the timer. Fix: close History on unmount, clearing its ids. |
+| 4 | A first-page and an older-page read out together share one timer; a timeout drops the older one unreported | medium | patch | `armHistoryTimer` re-arms one timer and clears both ids. Fix: one timer per read, each failure said with Try again. |
+| 5 | Reverting a "Reverted ..." row names the undo step from `batchSentence`, not the row's sentence | low | patch | Confirmed in `revert`. Fix: the row's sentence. |
+| 6 | An empty batch reads "Changed 0 kind setups"; a batch mixing items and kind setups is worded from the items alone | low | patch | `batchSentence` fall-through. Fix: an empty batch "Saved an empty change"; a mixed batch names the kind setup too (B8). |
+| 7 | The e2e never checks the reverted editor's own browser (the AC, B4): the other editor saves by raw sends at 390 px, the "second browser" is the same user | medium | patch | Confirmed in `recentchanges.spec.mjs`. Fix: the second editor at 1366 px with History open sees the item back and the revert listed first; B5's editor at 1366 px. |
+| 8 | Every save state is a button opening History, nested in the `role="status"` region | medium | patch | `ItemList.tsx` wraps `saveWords` whatever it says. Fix: only "Saved" is the button, outside the live region's text, the status words kept readable. |
 
 ## Design Notes
 

@@ -238,13 +238,42 @@ function updateSentence(op: HistoryOp, kinds: Kind[], locale: string, split: boo
     return words.length > 0 ? 'Changed ' + name + "'s " + joinWords(words) : 'Changed ' + name;
 }
 
-/** An update that only follows another op of its batch: a line's ends moved with a pad, an instrument kept on its line. */
-function followsLead(op: HistoryOp, lead: HistoryOp): boolean {
+function coordsOf(g: unknown): Array<[number, number]> | null {
+    const geometry = g as ItemGeometry | null;
+    return geometry && geometry.type === 'LineString' && Array.isArray(geometry.coordinates)
+        ? geometry.coordinates as Array<[number, number]> : null;
+}
+
+function samePoint(a: [number, number] | undefined, b: [number, number] | null): boolean {
+    return !!a && !!b && a[0] === b[0] && a[1] === b[1];
+}
+
+/**
+ * An update that only follows the lead op of its batch: a line whose end sits on the moved lead item and moved with it, or an
+ * instrument attached to the lead line (or to a line the batch split off it), kept on it. Any other update is a change of its own.
+ */
+function followsLead(op: HistoryOp, lead: HistoryOp, lineIds: Set<string>): boolean {
     if (op === lead || op.op !== 'update' || notKept(op)) {
         return false;
     }
-    const keys = changedKeys(op);
-    return keys.every((k) => k === 'geometry' || k === 'ends' || k === 'attachment');
+    const before = op.before || {};
+    const after = op.after || {};
+    const from = pointOf((lead.before || {}).geometry);
+    const to = pointOf((lead.after || {}).geometry);
+    const was = coordsOf(before.geometry);
+    const now = coordsOf(after.geometry);
+    if (from && to && was && now && changedKeys(op).every((k) => k === 'geometry' || k === 'ends')) {
+        const first = samePoint(was[0], from) && samePoint(now[0], to);
+        const last = samePoint(was[was.length - 1], from) && samePoint(now[now.length - 1], to);
+        return first || last;
+    }
+    const on = [attachedTo(after), attachedTo(before)].some((line) => line !== null && lineIds.has(line));
+    return on && changedKeys(op).every((k) => k === 'geometry' || k === 'attachment');
+}
+
+/** The kind setups of a batch in words, for a sentence: "the well pad kind setup", "2 kind setups". */
+function setupWords(setups: HistoryOp[], kinds: Kind[]): string {
+    return setups.length === 1 ? 'the ' + kindWords(kinds, setups[0].kind || setups[0].id) + ' kind setup' : setups.length + ' kind setups';
 }
 
 /**
@@ -255,13 +284,19 @@ function followsLead(op: HistoryOp, lead: HistoryOp): boolean {
  */
 export function batchSentence(entry: HistoryEntry, kinds: Kind[] = [], locale: string = ''): string {
     const items = entry.ops.filter((o) => o.entity === 'item');
+    const setups = entry.ops.filter((o) => o.entity === 'kindSetup');
     if (items.length === 0) {
-        const setups = entry.ops.filter((o) => o.entity === 'kindSetup');
-        if (setups.length === 1) {
-            return 'Changed the ' + kindWords(kinds, setups[0].kind || setups[0].id) + ' kind setup';
+        if (setups.length === 0) {
+            return 'Saved a change with nothing in it';
         }
-        return 'Changed ' + setups.length + ' kind setups in one change';
+        return 'Changed ' + setupWords(setups, kinds) + (setups.length > 1 ? ' in one change' : '');
     }
+    const sentence = itemSentence(entry, items, kinds, locale);
+    // A batch with kind setups too names them, so a row never hides one.
+    return setups.length === 0 ? sentence : sentence + ', and changed ' + setupWords(setups, kinds);
+}
+
+function itemSentence(entry: HistoryEntry, items: HistoryOp[], kinds: Kind[], locale: string): string {
     const lead = items[0];
     const sameKind = (ops: HistoryOp[]): string =>
         ops.every((o) => o.kind === ops[0].kind) ? kindWords(kinds, ops[0].kind) : 'item';
@@ -284,7 +319,7 @@ export function batchSentence(entry: HistoryEntry, kinds: Kind[] = [], locale: s
     const others = items.filter((o) => o.op !== 'delete');
     if (deletes.length > 0 && others.every((o) => o.op === 'update' && changedKeys(o).every((k) => k === 'ends'))) {
         // A delete that cleared the ends of lines that named the item (entry 25): the delete is the change.
-        return batchSentence({ ...entry, ops: entry.ops.filter((o) => o.op === 'delete' || o.entity !== 'item') }, kinds, locale);
+        return itemSentence(entry, deletes, kinds, locale);
     }
     if (items.every((o) => o.op === 'create')) {
         if (items.length === 1) {
@@ -297,7 +332,8 @@ export function batchSentence(entry: HistoryEntry, kinds: Kind[] = [], locale: s
     }
     if (lead.op === 'update') {
         const split = items.some((o) => o.op === 'create' && isLine((o.after || {}).geometry)) && isLine((lead.after || {}).geometry);
-        const rest = items.filter((o) => o !== lead && !followsLead(o, lead) && !(split && o.op === 'create'));
+        const lineIds = new Set([lead.id].concat(split ? items.filter((o) => o.op === 'create').map((o) => o.id) : []));
+        const rest = items.filter((o) => o !== lead && !followsLead(o, lead, lineIds) && !(split && o.op === 'create'));
         if (rest.length === 0) {
             return updateSentence(lead, kinds, locale, split);
         }

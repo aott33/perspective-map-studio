@@ -85,6 +85,8 @@ function display(kindId: string): KindDisplay {
 const PAGE_W = 1366;
 const RAIL = 72;
 const DOCK = RAIL + 256;
+/** The rail's History surface docks at 340 px (entry 11b, the owner's option A: DESIGN.md recent-changes-panel). */
+const HISTORY = RAIL + 340;
 const PANEL = 320;
 const MAP_TOP = 60;
 const MAP_H = 700;
@@ -171,7 +173,8 @@ function harness(editMode: boolean): Harness {
     const box = (): { left: number; top: number; width: number; height: number } => {
         const docked = ms.studioOn();
         const details = docked && ms.state.panel !== null && ms.state.selected !== null && ms.state.selected.id === ms.state.panel;
-        const list = ms.state.listCollapsed && ms.state.studio.surface === 'items' ? RAIL : DOCK;
+        const surface = ms.state.studio.surface;
+        const list = ms.state.listCollapsed && surface === 'items' ? RAIL : surface === 'history' ? HISTORY : DOCK;
         const left = docked ? list + (details ? PANEL : 0) : 0;
         return { left, top: MAP_TOP, width: PAGE_W - left, height: MAP_H };
     };
@@ -711,17 +714,49 @@ describe('every dock change keeps the ground in place (entry 7c, "keep place")',
         expect(h.state().panel).toBe('p14');
     });
 
-    test('History docks in the list\'s place as Layers does, and Saved opens it (entry 11b)', () => {
+    test('History docks at 340 px, the ground kept still as it docks and undocks; Saved opens it (entry 11b)', () => {
         const h = harness(true);
-        (h.ms as unknown as { onCollapseChange: (ev: { matches: boolean }) => void }).onCollapseChange({ matches: true });
+        const spots = [CTB1, P14, SWD1].map((p) => h.page(p));
         h.pans.length = 0;
         h.ms.onShowHistory();
         expect(h.state().studio.surface).toBe('history');
+        expect(h.size()).toEqual([PAGE_W - HISTORY, MAP_H]);
+        expect(h.pans).toEqual([{ offset: [42, 0], animate: false }]);
+        [CTB1, P14, SWD1].forEach((p, i) => samePixel(h.page(p), spots[i]));
+        h.ms.onRailSurface('layers');
         expect(h.size()).toEqual([PAGE_W - DOCK, MAP_H]);
-        expect(h.pans).toEqual([{ offset: [128, 0], animate: false }]);
+        [CTB1, P14, SWD1].forEach((p, i) => samePixel(h.page(p), spots[i]));
+        // Below 1280 px it docks in the list's place, the ground kept too.
+        (h.ms as unknown as { onCollapseChange: (ev: { matches: boolean }) => void }).onCollapseChange({ matches: true });
         h.ms.onRailSurface('items');
-        expect(h.state().studio.surface).toBe('items');
+        h.ms.onRailSurface('history');
+        expect(h.size()).toEqual([PAGE_W - HISTORY, MAP_H]);
+        [CTB1, P14, SWD1].forEach((p, i) => samePixel(h.page(p), spots[i]));
+        h.ms.onRailSurface('items');
         expect(h.state().listOpen).toBe(true);
+        expect(h.size()).toEqual([PAGE_W - RAIL, MAP_H]);
+        [CTB1, P14, SWD1].forEach((p, i) => samePixel(h.page(p), spots[i]));
+    });
+
+    test('unmounted with History open, the delegate stops reading the edit record (entry 11b)', () => {
+        const h = harness(true);
+        const calls: boolean[] = [];
+        const store = (h.ms.props as unknown as { store: { delegate: Record<string, unknown> } }).store;
+        store.delegate.setHistoryOpen = (open: boolean): void => { calls.push(open); };
+        store.delegate.stopReplay = (): void => undefined;
+        h.ms.onShowHistory();
+        const win = window as unknown as { removeEventListener?: unknown };
+        const had = win.removeEventListener;
+        win.removeEventListener = (): void => undefined;
+        // The stand-ins' own teardown is not what this checks: the map and its box leave first.
+        h.ms.mapContainer = null;
+        (h.ms as unknown as { map: unknown }).map = null;
+        try {
+            h.ms.componentWillUnmount();
+        } finally {
+            win.removeEventListener = had;
+        }
+        expect(calls[calls.length - 1]).toBe(false);
     });
 
     test('below 1280 px another surface docks in the list\'s place, a dock change too: the ground keeps its place', () => {

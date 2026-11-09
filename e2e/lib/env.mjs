@@ -15,7 +15,7 @@ export function envFileValue(key) {
     const file = path.join(repoRoot, '.env');
     if (!existsSync(file)) return undefined;
     for (const line of readFileSync(file, 'utf8').split('\n')) {
-        const m = line.match(/^\s*([A-Z_]+)=(.*)$/);
+        const m = line.match(/^\s*([A-Z0-9_]+)=(.*)$/);
         if (m && m[1] === key) return m[2].trim().replace(/^["']|["']$/g, '');
     }
     return undefined;

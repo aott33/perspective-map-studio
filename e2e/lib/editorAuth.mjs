@@ -15,13 +15,17 @@ import { e2eProject, envFileValue, repoRoot, sessionUrl } from './env.mjs';
 
 /** The dev map editor (ops/users.py): user mapeditor, role MapEditor. */
 export const EDITOR_USER = 'mapeditor';
+/** The second dev map editor (ops/users.py, epic-editing entry 11b): user mapeditor2, role MapEditor. */
+export const EDITOR2_USER = 'mapeditor2';
 /** The dev phone editor (ops/users.py, epic 2 story 2): user mapoperator, role MapOperator. */
 export const OPERATOR_USER = 'mapoperator';
 /** The dev Gateway's empty project (epic 4 entry 7b): ops/project mounted a second time, its map kept empty by firstrun.spec.mjs. */
 export const EMPTY_PROJECT = 'mapstudio-empty';
 
 /** Each dev user's .env key for its password. */
-const PASSWORD_KEYS = { [EDITOR_USER]: 'MAPSTUDIO_EDITOR_PASSWORD', [OPERATOR_USER]: 'MAPSTUDIO_OPERATOR_PASSWORD' };
+const PASSWORD_KEYS = {
+    [EDITOR_USER]: 'MAPSTUDIO_EDITOR_PASSWORD', [EDITOR2_USER]: 'MAPSTUDIO_EDITOR2_PASSWORD', [OPERATOR_USER]: 'MAPSTUDIO_OPERATOR_PASSWORD'
+};
 
 const stateDir = path.join(os.tmpdir(),
     'mapstudio-e2e-' + createHash('sha256').update(repoRoot).digest('hex').slice(0, 8));

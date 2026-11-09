@@ -1,7 +1,7 @@
 // Recent changes, the rail's History surface (epic-editing entry 11b, R18; DESIGN.md Recent changes panel, EXPERIENCE.md Recent
-// changes): the plan's matrix B1 to B10 at 1366 px on the dev stack. The map editor's page shows History; the phone editor
-// (mapoperator) is the other editor, saving through its own session (window.__mapStudioTest), and a second map editor's page shows
-// the same rows live. Every item a test makes is gone at its end (its edit rows stay: the record keeps every change).
+// changes): the plan's matrix B1 to B10 at 1366 px on the dev stack. The map editor's page shows History; the other editor is the
+// second dev map editor (mapeditor2) in its own 1366 px browser with History open too, saving through its own session
+// (window.__mapStudioTest), so each sees the other's change, its own put back, and the revert listed first. Every item a test makes is gone at its end (its edit rows stay: the record keeps every change).
 
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { e2eProject } from '../lib/env.mjs';
 import {
-    EDITOR_USER, OPERATOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, send, shot, signedInContext
+    EDITOR2_USER, EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, send, shot, signedInContext
 } from './fixtures.mjs';
 
 const REPLY_MS = 20_000;
@@ -90,8 +90,7 @@ editorTest.describe('recent changes at 1366 px', () => {
         async ({ page, browser }) => {
             editorTest.setTimeout(300_000);
             const map = await openEditor(page);
-            const operator = await signedInContext(browser, OPERATOR_USER, { viewport: { width: 390, height: 844 } });
-            const second = await openSecond(browser, EDITOR_USER);
+            const other = await openSecond(browser, EDITOR2_USER);
             const p14 = randomUUID();
             const p31 = randomUUID();
             const tag = p14.slice(0, 4);
@@ -102,32 +101,34 @@ editorTest.describe('recent changes at 1366 px', () => {
             const moved14 = [-104.9712, 39.7435];
             const moved31 = [-104.9688, 39.7446];
             try {
-                const opPage = await operator.newPage();
-                await mapLoaded(await openMap(opPage, '/edit'));
+                await expect(other.page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR2_USER);
+                await expect(other.map).toHaveAttribute('data-edit-level', 'full');
                 saved(await send(page, 'edits.apply', batch(
                     create(p14, { kind: 'pad', name: n14, geometry: point(at14) }),
                     create(p31, { kind: 'pad', name: n31, geometry: point(at31) }))));
 
-                // B1: the rail's History, and on the second page a click on Saved, open the surface.
+                // B1: the rail's History opens the surface, docked at 340 px (the owner's option A); in the other browser a click on Saved.
                 const panel = await openHistory(page);
+                expect(Math.round((await panel.boundingBox()).width)).toBe(340);
+                await expect.poll(async () => Math.round((await map.boundingBox()).width), { timeout: 10_000 }).toBe(1366 - 72 - 340);
                 await expect(page.locator('.mapstudio-history-next')).toHaveText(/Nothing to undo yet/);
                 await expect(page.locator('.mapstudio-history-undo')).toBeDisabled();
                 await expect(page.locator('.mapstudio-history-footer'))
                     .toHaveText("Revert undoes that one change, including someone else's, and saves like any edit.");
-                await second.page.locator('.mapstudio-panel-save-button').click();
-                await expect(second.page.locator('.mapstudio-history')).toBeVisible();
+                await other.page.locator('.mapstudio-panel-save-button').click();
+                await expect(other.page.locator('.mapstudio-history')).toBeVisible();
 
                 // B2: A moves P14, B moves P31: B's row first, then A's, each with who and when, live in both browsers.
                 const a = saved(await send(page, 'edits.apply', batch(update(p14, 1, { geometry: point(moved14) }))));
-                const b = saved(await send(opPage, 'edits.apply', batch(update(p31, 1, { geometry: point(moved31) }))));
-                for (const p of [page, second.page]) {
+                const b = saved(await send(other.page, 'edits.apply', batch(update(p31, 1, { geometry: point(moved31) }))));
+                for (const p of [page, other.page]) {
                     await expect(row(p, b.seq)).toHaveCount(1, { timeout: REPLY_MS });
                     await expect(row(p, a.seq)).toHaveCount(1);
-                    await expect(row(p, b.seq)).toHaveAttribute('data-actor', OPERATOR_USER);
+                    await expect(row(p, b.seq)).toHaveAttribute('data-actor', EDITOR2_USER);
                     await expect(row(p, a.seq)).toHaveAttribute('data-actor', EDITOR_USER);
                     await expect(row(p, b.seq).locator('.mapstudio-history-sentence')).toHaveText(MOVED(n31, 'north'));
                     await expect(row(p, b.seq).locator('.mapstudio-history-avatar')).toHaveText('M');
-                    await expect(row(p, b.seq).locator('.mapstudio-history-meta')).toHaveText(new RegExp('^' + OPERATOR_USER + ' - \\d\\d:\\d\\d$'));
+                    await expect(row(p, b.seq).locator('.mapstudio-history-meta')).toHaveText(new RegExp('^' + EDITOR2_USER + ' - \\d\\d:\\d\\d$'));
                     const order = await p.locator('.mapstudio-history-row').evaluateAll((rows) => rows.slice(0, 2).map((r) => Number(r.dataset.seq)));
                     expect(order).toEqual([b.seq, a.seq]);
                 }
@@ -145,10 +146,13 @@ editorTest.describe('recent changes at 1366 px', () => {
                 await page.keyboard.press('Space');
                 await expect(summary).toHaveAttribute('aria-expanded', 'false');
 
-                // B4: A reverts B's move: P31 moves back, a row "Reverted ..." on top in both browsers.
+                // B4: A reverts B's move: in B's own browser P31 is put back and the revert is listed first, by A; in A's too.
                 await row(page, b.seq).locator('.mapstudio-history-revert').click();
-                await expect.poll(async () => (await stored(page, p31)).geometry.coordinates, { timeout: REPLY_MS }).toEqual(at31);
-                for (const p of [page, second.page]) {
+                await expect.poll(async () => {
+                    const item = (await other.page.evaluate(() => window.__mapStudioTest.send('map.load', {}))).body.items.find((i) => i.id === p31);
+                    return item.geometry.coordinates;
+                }, { timeout: REPLY_MS }).toEqual(at31);
+                for (const p of [other.page, page]) {
                     const top = p.locator('.mapstudio-history-row').first();
                     await expect(top.locator('.mapstudio-history-sentence')).toHaveText(/^Reverted "Moved Recent P31 /, { timeout: REPLY_MS });
                     await expect(top).toHaveAttribute('data-actor', EDITOR_USER);
@@ -158,42 +162,43 @@ editorTest.describe('recent changes at 1366 px', () => {
                     { timeout: REPLY_MS });
                 await expect(page.locator('.mapstudio-history-next-text')).toHaveText(/^Next undo is one step: Undo: revert "Moved Recent P31 /);
                 await page.locator('.mapstudio-history-undo').click();
-                await expect.poll(async () => (await stored(page, p31)).geometry.coordinates, { timeout: REPLY_MS }).toEqual(moved31);
+                await expect.poll(async () => (await stored(other.page, p31)).geometry.coordinates, { timeout: REPLY_MS }).toEqual(moved31);
                 await expect(map).toHaveAttribute('data-save-state', 'saved', { timeout: REPLY_MS });
                 await expect(panel).toBeVisible();
             } finally {
                 await cleanUp(page, [p14, p31]);
-                await operator.close();
-                await second.context.close();
+                await other.context.close();
             }
         });
 
     editorTest('B5: a Revert after a later change is refused, the conflict card naming who; nothing saved', async ({ page, browser }) => {
         editorTest.setTimeout(240_000);
         const map = await openEditor(page);
-        const operator = await signedInContext(browser, OPERATOR_USER, { viewport: { width: 390, height: 844 } });
+        const other = await openSecond(browser, EDITOR2_USER);
         const p31 = randomUUID();
         const name = 'Recent stale ' + p31.slice(0, 4);
         try {
-            const opPage = await operator.newPage();
-            await mapLoaded(await openMap(opPage, '/edit'));
             saved(await send(page, 'edits.apply', batch(create(p31, { kind: 'pad', name, geometry: point([-104.9690, 39.7440]) }))));
-            const first = saved(await send(opPage, 'edits.apply', batch(update(p31, 1, { geometry: point([-104.9690, 39.7444]) }))));
-            saved(await send(opPage, 'edits.apply', batch(update(p31, 2, { geometry: point([-104.9690, 39.7448]) }))));
+            await openHistory(other.page);
+            const first = saved(await send(other.page, 'edits.apply', batch(update(p31, 1, { geometry: point([-104.9690, 39.7444]) }))));
+            saved(await send(other.page, 'edits.apply', batch(update(p31, 2, { geometry: point([-104.9690, 39.7448]) }))));
             await openHistory(page);
             await expect(row(page, first.seq)).toHaveCount(1, { timeout: REPLY_MS });
             await row(page, first.seq).locator('.mapstudio-history-revert').click();
             const card = page.locator('.mapstudio-save-card');
             await expect(card).toHaveAttribute('data-card', 'conflict', { timeout: REPLY_MS });
-            await expect(card.locator('.mapstudio-save-card-title')).toHaveText(`Not saved - conflict with ${OPERATOR_USER}'s change`);
+            await expect(card.locator('.mapstudio-save-card-title')).toHaveText(`Not saved - conflict with ${EDITOR2_USER}'s change`);
             await expect(map).toHaveAttribute('data-save-code', 'conflict');
             await shot(page, 'mapstudio-recent-changes-refused-1366.png');
-            expect((await stored(page, p31)).geometry.coordinates).toEqual([-104.9690, 39.7448]);
+            // Nothing saved: the other editor's browser keeps its own last move, and no new row comes.
+            expect((await stored(other.page, p31)).geometry.coordinates).toEqual([-104.9690, 39.7448]);
+            await expect(other.page.locator('.mapstudio-history-row').first().locator('.mapstudio-history-sentence'))
+                .toHaveText(new RegExp('^Moved ' + name + ' '));
             await card.locator('.mapstudio-save-card-theirs').click();
             await expect(card).toHaveCount(0, { timeout: REPLY_MS });
         } finally {
             await cleanUp(page, [p31]);
-            await operator.close();
+            await other.context.close();
         }
     });
 
