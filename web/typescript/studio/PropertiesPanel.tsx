@@ -6,6 +6,9 @@ import {
     missingText, nameTwins, readField, twinText, unknownKindText, vanishedText
 } from '../itemForm';
 import { PLACE_CREDIT, PlaceSource, placeLine } from '../placeCheck';
+import { instrumentLocationText, metresText, readDistance } from '../drawing';
+import { round1 } from '../geometry';
+import { distanceText } from '../linePopup';
 import { Glyph } from '../popupParts';
 import { roundCoordinate } from '../save';
 import { ChromeGlyph } from './ChromeGlyph';
@@ -146,19 +149,44 @@ export interface PropertiesPanelProps {
     places: PlaceSource;
     /** Zoom to location (entry 27): the map moves to the saved point at zoom 15 or more; the selection and Details stay. */
     onZoomTo: () => void;
+    /**
+     * Entry 9, a line that is not an area: its instruments in order along it (the line popup's order, `instrumentsOn`), each with its
+     * distance; undefined for a point or an area (no Instruments row).
+     */
+    instruments?: Array<{ id: string; name: string; distanceM: number }>;
+    /** The instrument kinds Add an instrument offers (entry 9): one arms it at once, several open a short list to pick from. */
+    instrumentKinds?: Kind[];
+    /** The kind being placed on this line (the drawing bar says it), or null. */
+    armedKind?: string | null;
+    onAddInstrument?: (kindId: string) => void;
+    /** A row of the Instruments list clicked: that instrument selected with its Details, as a list row does. */
+    onSelectInstrument?: (id: string) => void;
+    /**
+     * Entry 9, an instrument on a line: the line's name and length, for "On L-SWD at 1.1 km" and the distance field; undefined
+     * otherwise (a free point keeps its latitude and longitude).
+     */
+    onLine?: { name: string; lengthM: number };
+    /** The distance along the line typed (Enter or blur): the instrument moves there along it, one change. */
+    onMoveAlong?: (distanceM: number) => void;
 }
 
 interface Drafts {
     name: string;
     lat: string;
     lng: string;
+    /** Entry 9: an instrument's distance along its line, in metres, as typed; '' for an item not on a line. */
+    distance: string;
+    /** Why the typed distance was not saved ("Type a distance from 0 to 2,936 m"), '' when none. */
+    distanceProblem: string;
+    /** The short list of instrument kinds under Add an instrument is open (entry 9: several kinds to pick from). */
+    kindMenu: boolean;
     /** The kind's fields being typed or just chosen, by key (entry 6); a key left out shows the record's value. */
     fields: Record<string, string>;
     /** A typed field's problem in words, by key ("Wells takes a whole number"); nothing of it was saved. */
     problems: Record<string, string>;
 }
 
-type FixedField = 'name' | 'lat' | 'lng';
+type FixedField = 'name' | 'lat' | 'lng' | 'distance';
 
 /** The record's values as the fields show them. */
 function draftsOf(item: MapItemRecord): Drafts {
@@ -167,6 +195,9 @@ function draftsOf(item: MapItemRecord): Drafts {
         name: item.name,
         lat: point ? String(item.geometry.coordinates[1]) : '',
         lng: point ? String(item.geometry.coordinates[0]) : '',
+        distance: item.attachment ? String(item.attachment.distanceM) : '',
+        distanceProblem: '',
+        kindMenu: false,
         fields: {},
         problems: {}
     };
@@ -240,10 +271,13 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
             const before = draftsOf(prev.item);
             const after = draftsOf(this.props.item);
             const next: Partial<Drafts> = {};
-            for (const field of ['name', 'lat', 'lng'] as const) {
+            for (const field of ['name', 'lat', 'lng', 'distance'] as const) {
                 if (this.state[field] === before[field]) {
                     next[field] = after[field];
                 }
+            }
+            if (next.distance !== undefined) {
+                next.distanceProblem = '';
             }
             // A kind field's draft goes once the record holds it (saved) or still holds what it had (not touched since).
             const fields: Record<string, string> = {};
@@ -324,7 +358,8 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
             return;
         }
         const item = this.props.item;
-        if (item.geometry.type !== 'Point') {
+        if (item.geometry.type !== 'Point' || (item.attachment !== null && this.props.onLine)) {
+            // An instrument on a line moves along it only (entry 9): its latitude and longitude are read only.
             return;
         }
         const lat = readCoordinate(this.state.lat, 90);
@@ -339,6 +374,120 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         this.props.onMove([lng, lat]);
     };
 
+    /**
+     * An instrument's distance along its line finished (entry 9, Enter or blur; the non-drag way to move it, WCAG 2.5.7): read in
+     * metres from 0 to the line's length, else the words beside the field and nothing saved; the stored distance saves nothing;
+     * else one move along the line.
+     */
+    private commitDistance = (): void => {
+        if (this.wasEscaped('distance')) {
+            return;
+        }
+        const { item, onLine, paused } = this.props;
+        if (!onLine || !item.attachment || paused || !this.props.onMoveAlong) {
+            return;
+        }
+        const read = readDistance(this.state.distance, onLine.lengthM);
+        if ('problem' in read) {
+            this.setState({ distanceProblem: read.problem });
+            return;
+        }
+        const d = round1(read.distanceM);
+        this.setState({ distance: String(d), distanceProblem: '' });
+        if (d !== item.attachment.distanceM) {
+            this.props.onMoveAlong(d);
+        }
+    };
+
+    /** Add an instrument (entry 9): one instrument kind arms it at once; several open the short list (pressed again, it closes). */
+    private onAddInstrument = (): void => {
+        const kinds = this.props.instrumentKinds || [];
+        if (kinds.length === 1 && this.props.onAddInstrument) {
+            this.setState({ kindMenu: false });
+            this.props.onAddInstrument(kinds[0].id);
+        } else if (kinds.length > 1) {
+            this.setState((prev) => ({ kindMenu: !prev.kindMenu }));
+        }
+    };
+
+    /** A kind picked in the short list (entry 9): it closes and the kind is armed. */
+    private pickInstrumentKind(kindId: string): void {
+        this.setState({ kindMenu: false });
+        if (this.props.onAddInstrument) {
+            this.props.onAddInstrument(kindId);
+        }
+    }
+
+    /** Esc in the short list closes it, the focus back on Add an instrument, and goes no further (Details stays open). */
+    private onKindMenuKey = (ev: React.KeyboardEvent<HTMLDivElement>): void => {
+        if (ev.key !== 'Escape') {
+            return;
+        }
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.setState({ kindMenu: false });
+        const root = ev.currentTarget.closest('.mapstudio-field--instruments');
+        const button = root ? root.querySelector('.mapstudio-field-add-instrument') as HTMLButtonElement | null : null;
+        if (button) {
+            button.focus();
+        }
+    };
+
+    /**
+     * The Instruments row of a line's Details (entry 9; EXPERIENCE.md Properties panel), after Location: Add an instrument, then the
+     * instruments on the line by name in order along it, each with its distance and a click selecting it; "None yet" when empty.
+     */
+    private renderInstruments(frozen: boolean): React.ReactNode {
+        const instruments = this.props.instruments;
+        if (!instruments) {
+            return null;
+        }
+        const kinds = this.props.instrumentKinds || [];
+        const armed = this.props.armedKind || null;
+        const off = frozen ? (this.props.paused ? PAUSED_TEXT : 'Off while the kind is not in the kind list')
+            : this.props.pending ? NOT_SAVED_TEXT : kinds.length === 0 ? 'The kind list has no instrument kind' : '';
+        const title = off !== '' ? off : kinds.length === 1 ? 'Add a ' + kinds[0].name.toLowerCase() + ': click the line or type its distance'
+            : 'Add an instrument: pick its kind, then click the line or type its distance';
+        return (
+            <div className="mapstudio-field mapstudio-field--instruments" data-count={String(instruments.length)} data-armed={armed || ''}>
+                <div className="mapstudio-field-label-row">
+                    <span className="mapstudio-field-label" id={'mapstudio-instruments-' + this.props.item.id}>Instruments</span>
+                    <span className="mapstudio-field-actions">
+                        <button type="button" className="mapstudio-button mapstudio-field-add-instrument" disabled={off !== ''} title={title}
+                                aria-pressed={armed !== null} aria-haspopup={kinds.length > 1 ? 'menu' : undefined}
+                                aria-expanded={kinds.length > 1 ? this.state.kindMenu : undefined} onClick={this.onAddInstrument}>Add an instrument</button>
+                    </span>
+                </div>
+                {this.state.kindMenu && off === '' && kinds.length > 1 ? (
+                    <div className="mapstudio-instrument-kinds" role="menu" aria-label="Instrument kinds" onKeyDown={this.onKindMenuKey}>
+                        {kinds.map((k, i) => (
+                            <button type="button" role="menuitem" key={k.id} className="mapstudio-instrument-kind" data-kind={k.id}
+                                    autoFocus={i === 0} onClick={() => this.pickInstrumentKind(k.id)}>
+                                {k.icon !== '' ? <Glyph id={k.icon} className="mapstudio-instrument-kind-glyph" size={16} /> : null}
+                                <span>{k.name}</span>
+                            </button>
+                        ))}
+                    </div>
+                ) : null}
+                {instruments.length === 0 ? (
+                    <span className="mapstudio-field-text mapstudio-instruments-none">None yet</span>
+                ) : (
+                    <ul className="mapstudio-instrument-list" aria-labelledby={'mapstudio-instruments-' + this.props.item.id}>
+                        {instruments.map((i) => (
+                            <li key={i.id}>
+                                <button type="button" className="mapstudio-instrument-row" data-item-id={i.id} title={'Select ' + i.name}
+                                        onClick={() => this.props.onSelectInstrument && this.props.onSelectInstrument(i.id)}>
+                                    <span className="mapstudio-instrument-name">{i.name}</span>
+                                    <span className="mapstudio-instrument-at">{distanceText(i.distanceM)}</span>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        );
+    }
+
     /** Enter finishes a field (its blur saves it); Esc puts the record's value back. */
     private onKey = (field: FixedField) => (ev: React.KeyboardEvent<HTMLInputElement>): void => {
         if (ev.key === 'Enter') {
@@ -349,6 +498,9 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
             ev.stopPropagation();
             this.escaped = field;
             this.setState({ [field]: draftsOf(this.props.item)[field] } as Pick<Drafts, FixedField>);
+            if (field === 'distance') {
+                this.setState({ distanceProblem: '' });
+            }
             ev.currentTarget.blur();
             this.escaped = null;
         }
@@ -550,6 +702,9 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         const twinId = 'mapstudio-twin-' + item.id;
         const assetNote = assetListNote(assetStatus);
         const kindWords = kind ? kind.name.toLowerCase() : item.kind;
+        // Entry 9: an instrument on a line moves along it only (its distance typed, or dragged); its latitude and longitude read only.
+        const onLine = point && item.attachment !== null ? this.props.onLine : undefined;
+        const distanceId = 'mapstudio-distance-' + item.id;
         return (
             <section className="mapstudio-panel" aria-label={item.name} data-item-id={item.id} data-pending={pending ? 'true' : 'false'}
                      data-paused={paused ? 'true' : 'false'} data-kind-known={known ? 'true' : 'false'}
@@ -611,19 +766,39 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                                 </span>
                             ) : null}
                         </div>
+                        {onLine && item.attachment ? (
+                            <>
+                                <span className="mapstudio-field-text mapstudio-field-on-line">{instrumentLocationText(onLine.name, item.attachment.distanceM)}</span>
+                                <label className="mapstudio-field-distance-row" htmlFor={distanceId}>
+                                    <span className="mapstudio-field-sublabel">Distance along the line (m)</span>
+                                </label>
+                                <div className="mapstudio-field-pair mapstudio-field-pair--distance">
+                                    <input id={distanceId} className="mapstudio-input mapstudio-field-distance" type="text" inputMode="decimal"
+                                           value={this.state.distance} disabled={frozen} aria-invalid={this.state.distanceProblem !== ''}
+                                           aria-describedby={this.state.distanceProblem !== '' ? distanceId + '-problem' : undefined}
+                                           onChange={(ev) => this.setState({ distance: ev.target.value })}
+                                           onBlur={this.commitDistance} onKeyDown={this.onKey('distance')} />
+                                    <span className="mapstudio-field-text mapstudio-field-length">of {metresText(onLine.lengthM)}</span>
+                                </div>
+                                {this.state.distanceProblem !== '' ? (
+                                    <span id={distanceId + '-problem'} className="mapstudio-field-hint mapstudio-field-problem mapstudio-field-distance-problem"
+                                          aria-live="polite">{this.state.distanceProblem}</span>
+                                ) : null}
+                            </>
+                        ) : null}
                         {point ? (
                             <div className="mapstudio-field-pair">
                                 <label className="mapstudio-field-half">
                                     <span className="mapstudio-field-sublabel">Latitude</span>
                                     <input className="mapstudio-input mapstudio-field-lat" type="number" step="any" inputMode="decimal" value={this.state.lat}
-                                           disabled={frozen} aria-invalid={latProblem} aria-describedby={place && place.text !== '' ? placeId : undefined}
+                                           disabled={frozen} readOnly={!!onLine} aria-invalid={latProblem} aria-describedby={place && place.text !== '' ? placeId : undefined}
                                            onChange={(ev) => this.setState({ lat: ev.target.value })}
                                            onBlur={this.commitLocation('lat')} onKeyDown={this.onKey('lat')} />
                                 </label>
                                 <label className="mapstudio-field-half">
                                     <span className="mapstudio-field-sublabel">Longitude</span>
                                     <input className="mapstudio-input mapstudio-field-lng" type="number" step="any" inputMode="decimal" value={this.state.lng}
-                                           disabled={frozen} aria-invalid={lngProblem} aria-describedby={place && place.text !== '' ? placeId : undefined}
+                                           disabled={frozen} readOnly={!!onLine} aria-invalid={lngProblem} aria-describedby={place && place.text !== '' ? placeId : undefined}
                                            onChange={(ev) => this.setState({ lng: ev.target.value })}
                                            onBlur={this.commitLocation('lng')} onKeyDown={this.onKey('lng')} />
                                 </label>
@@ -634,12 +809,14 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                         <span className="mapstudio-field-hint">
                             {(latProblem || lngProblem) && !swapped
                                 ? 'Latitude is -90 to 90 and longitude -180 to 180.'
-                                : point ? 'Drag the pin to fine-tune, or type latitude and longitude.' : ''}
+                                : onLine ? 'Drag it along the line, or type its distance.'
+                                    : point ? 'Drag the pin to fine-tune, or type latitude and longitude.' : ''}
                         </span>
                         {place && place.text !== '' ? (
                             <span id={placeId} className="mapstudio-field-place" data-place={place.state} title={PLACE_CREDIT}>{place.text}</span>
                         ) : null}
                     </div>
+                    {this.renderInstruments(frozen)}
                     {kind ? kind.fields.map((field, i) => this.renderField(field, i)) : this.renderStored()}
                     <div className="mapstudio-field mapstudio-field--asset" data-vanished={vanished ? 'true' : 'false'}>
                         <label className="mapstudio-field-label" htmlFor={'mapstudio-asset-' + item.id}>Asset</label>

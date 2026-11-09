@@ -359,3 +359,45 @@ describe('the count with several selected (entry 8)', () => {
         expect(none).toContain('data-off="Not saved yet"');
     });
 });
+
+describe('instruments in Details (entry 9)', () => {
+    const TAP: Kind = { id: 'tap', name: 'Tap', geometry: 'point', icon: 'tap', labelRank: 2, fields: [], instrument: true };
+    const METER: Kind = { id: 'meter', name: 'Meter', geometry: 'point', icon: 'meter', labelRank: 2, fields: [], instrument: true };
+    const line = record({ id: 'lswd', kind: 'line', name: 'L-SWD', geometry: { type: 'LineString', coordinates: [[-105.012, 39.7262], [-104.983671, 39.715476]] },
+        assetId: null });
+
+    test('a line: Instruments after Location, by name in order with each distance; Add an instrument; None yet when empty', () => {
+        const html = panel({ item: line, kind: LINE, kinds: [LINE], instrumentKinds: [TAP, METER], armedKind: null,
+            instruments: [{ id: 'pt1', name: 'PT-1', distanceM: 1143 }, { id: 'lv1', name: 'LV-1', distanceM: 2000 }, { id: 'pt2', name: 'PT-2', distanceM: 2841 }] });
+        const at = (s: string): number => html.indexOf(s);
+        expect(at('mapstudio-field--location')).toBeLessThan(at('mapstudio-field--instruments'));
+        expect(at('mapstudio-field--instruments')).toBeLessThan(at('data-field="diameter"'));
+        expect(html).toContain('>Instruments<');
+        expect(html).toContain('>Add an instrument<');
+        expect(tag(html, 'mapstudio-field-add-instrument')).toContain('aria-haspopup="menu"');
+        const rows = html.match(/<span class="mapstudio-instrument-name">([^<]*)<\/span><span class="mapstudio-instrument-at">([^<]*)(?=<)/g) || [];
+        expect(rows.map((r) => r.replace(/<[^>]+>/g, ' ').trim().replace(/\s+/g, ' '))).toEqual(['PT-1 1.1 km', 'LV-1 2 km', 'PT-2 2.8 km']);
+        const empty = panel({ item: line, kind: LINE, kinds: [LINE], instrumentKinds: [TAP], instruments: [] });
+        expect(empty).toContain('>None yet<');
+        expect(tag(empty, 'mapstudio-field-add-instrument')).not.toContain('aria-haspopup');
+        expect(tag(panel({ item: line, kind: LINE, kinds: [LINE], instrumentKinds: [], instruments: [] }), 'mapstudio-field-add-instrument'))
+            .toContain('title="The kind list has no instrument kind"');
+        // A point or an area has no Instruments row.
+        expect(panel()).not.toContain('mapstudio-field--instruments');
+    });
+
+    test('an instrument on a line: "On L-SWD at 1.1 km", the distance field, latitude and longitude read only, no Move', () => {
+        const pt1 = record({ id: 'pt1', kind: 'tap', name: 'PT-1', assetId: null, attachment: { lineId: 'lswd', distanceM: 1143 } });
+        const html = panel({ item: pt1, kind: TAP, kinds: [TAP, METER], canMoveByClick: false, onLine: { name: 'L-SWD', lengthM: 2936.4 } });
+        expect(html).toContain('On L-SWD at 1.1 km');
+        expect(html).toContain('Distance along the line (m)');
+        expect(tag(html, 'mapstudio-input mapstudio-field-distance')).toContain('value="1143"');
+        expect(html).toContain('of 2,936 m');
+        expect(tag(html, 'mapstudio-field-lat')).toContain('readonly=""');
+        expect(tag(html, 'mapstudio-field-lng')).toContain('readonly=""');
+        expect(html).not.toContain('mapstudio-field-move');
+        expect(html).toContain('Drag it along the line, or type its distance.');
+        expect(option(html, 'mapstudio-kind-pt1', 'meter')).toContain('>Meter<');
+        expect(html).not.toContain('value="pad"');
+    });
+});

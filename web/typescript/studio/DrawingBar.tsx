@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { Kind } from '../adapters';
 import {
-    Drawing, PLACE_HINT, barTitle, canFinish, endSnap, finishHint, isDrawingTool, noKindText, problemText, progressText, snapIndicatorText, startSnap
+    Drawing, INSTRUMENT_HINT, PLACE_HINT, barTitle, canFinish, endSnap, finishHint, instrumentTitle, isDrawingTool, metresText, noKindText, problemText,
+    progressText, snapIndicatorText, startSnap
 } from '../drawing';
 import { Glyph } from '../popupParts';
 import { StudioTool } from '../studio';
@@ -94,6 +95,73 @@ export function DrawingBar(props: DrawingBarProps): React.ReactElement {
             <button type="button" className="mapstudio-button mapstudio-button--primary mapstudio-drawing-finish" disabled={!valid}
                     title={valid ? 'Finish (Enter)' : problem || 'Click the map to add points'} aria-keyshortcuts="Enter"
                     onClick={props.onFinish}>Finish</button>
+        </div>
+    );
+}
+
+/**
+ * The drawing bar while an instrument is placed (epic 4 entry 9; EXPERIENCE.md Instruments and Drawing bar): Add an instrument in a
+ * line's Details armed its kind, and the bar is the one place that talks. "New tap on L-SWD - click the line or type its distance",
+ * a distance field in metres with the line's length beside it ("of 2,936 m"), Place (Enter in the field too) and Cancel (Esc). A
+ * click off the line or a distance outside it is refused here in words (`problem`), nothing saved. The field takes the focus when
+ * the bar opens, so the placement works from the keyboard alone; Esc in it puts the placement down. Its attributes are what the e2e
+ * suite reads.
+ */
+export interface InstrumentBarProps {
+    kind: Kind;
+    lineId: string;
+    lineName: string;
+    lengthM: number;
+    /** Why the last click or typed distance was refused, in words; '' when none. */
+    problem: string;
+    onPlace: (text: string) => void;
+    onCancel: () => void;
+}
+
+export function InstrumentBar(props: InstrumentBarProps): React.ReactElement {
+    const { kind, lineName, problem } = props;
+    const [text, setText] = React.useState('');
+    const field = React.useRef<HTMLInputElement>(null);
+    React.useEffect(() => {
+        if (field.current) {
+            field.current.focus();
+        }
+    }, [props.lineId, kind.id]);
+    const title = instrumentTitle(kind.name, lineName);
+    const fieldId = 'mapstudio-instrument-distance';
+    const problemId = fieldId + '-problem';
+    const onKey = (ev: React.KeyboardEvent<HTMLInputElement>): void => {
+        if (ev.key === 'Enter') {
+            ev.preventDefault();
+            props.onPlace(text);
+        } else if (ev.key === 'Escape') {
+            // The field's Esc puts the placement down here: the map's and the component's Esc never see it (one press, one step).
+            ev.preventDefault();
+            ev.stopPropagation();
+            props.onCancel();
+        }
+    };
+    return (
+        <div className="mapstudio-drawing-bar mapstudio-drawing-bar--instrument" role="group" aria-label={title} data-tool="instrument"
+             data-kind={kind.id} data-line-id={props.lineId} data-reason={problem}>
+            <span className="mapstudio-drawing-glyph">
+                {kind.icon !== '' ? <Glyph id={kind.icon} className="mapstudio-drawing-kind-glyph" size={18} /> : <ChromeGlyph name="pin" size={18} />}
+            </span>
+            <span className="mapstudio-drawing-words" aria-live="polite">
+                <span className="mapstudio-drawing-title">{title + ' - ' + INSTRUMENT_HINT}</span>
+                {problem !== '' ? <span id={problemId} className="mapstudio-drawing-hint mapstudio-drawing-hint--problem">{problem}</span> : null}
+            </span>
+            <span className="mapstudio-instrument-place">
+                <label className="mapstudio-visually-hidden" htmlFor={fieldId}>Distance along {lineName} (m)</label>
+                <input id={fieldId} ref={field} className="mapstudio-input mapstudio-instrument-distance" type="text" inputMode="decimal" value={text}
+                       placeholder="Metres" aria-invalid={problem !== ''} aria-describedby={problem !== '' ? problemId : undefined}
+                       onChange={(ev) => setText(ev.target.value)} onKeyDown={onKey} />
+                <span className="mapstudio-instrument-length">of {metresText(props.lengthM)}</span>
+            </span>
+            <button type="button" className="mapstudio-button mapstudio-drawing-cancel" title="Cancel (Esc)" aria-keyshortcuts="Escape"
+                    onClick={props.onCancel}>Cancel</button>
+            <button type="button" className="mapstudio-button mapstudio-button--primary mapstudio-instrument-place-button" title="Place (Enter)"
+                    aria-keyshortcuts="Enter" onClick={() => props.onPlace(text)}>Place</button>
         </div>
     );
 }

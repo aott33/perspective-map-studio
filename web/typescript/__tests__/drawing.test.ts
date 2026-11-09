@@ -2,7 +2,8 @@ import { Kind } from '../adapters';
 import {
     CHOSEN_HINT, Drawing, MOVE_HINT, PLACE_HINT, REASON_SELF_INTERSECTS, barTitle, canFinish, deleteOffText, drawingEnds, drawnLengthM, endSnap,
     finishHint, geometryHint, geometryTitle, inField, isDrawingTool, minVertices, newItemText, noKindText, problemText, progressText, reasonText,
-    snapIndicatorText, snapTitle, splitOffText, startDrawing, startSnap, withVertices
+    snapIndicatorText, snapTitle, splitOffText, startDrawing, startSnap, withVertices, INSTRUMENT_CLICK_PX, INSTRUMENT_HINT, distanceRangeText,
+    instrumentLocationText, instrumentTitle, metresText, offLineText, readDistance
 } from '../drawing';
 import { SnapTarget } from '../geometry';
 
@@ -167,5 +168,32 @@ describe('the chosen point\'s bar and Move\'s bar (epic 4 entry 5, the owner\'s 
         expect(deleteOffText(2, false)).toBe('A line keeps at least two points');
         expect(deleteOffText(3, true)).toBe('An area keeps at least three points');
         expect(deleteOffText(4, true)).toBe('');
+    });
+});
+
+describe('placing an instrument from its line (entry 9): the bar\'s words and the typed distance', () => {
+    it('names the kind and the line, the click and the field; refuses in words', () => {
+        expect(INSTRUMENT_CLICK_PX).toBe(12);
+        expect(instrumentTitle('Tap', 'L-SWD') + ' - ' + INSTRUMENT_HINT).toBe('New tap on L-SWD - click the line or type its distance');
+        expect(offLineText('L-SWD')).toBe('Click on L-SWD: an instrument sits on its line');
+        expect(metresText(2936.4)).toBe('2,936 m');
+        expect(metresText(12)).toBe('12 m');
+        expect(metresText(1234567)).toBe('1,234,567 m');
+        expect(metresText(-3)).toBe('0 m');
+        expect(distanceRangeText(2936.4)).toBe('Type a distance from 0 to 2,936 m');
+        expect(instrumentLocationText('L-SWD', 1143)).toBe('On L-SWD at 1.1 km');
+        expect(instrumentLocationText('L-SWD', 2000)).toBe('On L-SWD at 2 km');
+    });
+
+    it('reads a distance from 0 to the line\'s length, refusing anything else', () => {
+        expect(readDistance('2841', 2936.4)).toEqual({ distanceM: 2841 });
+        expect(readDistance(' 2,841 ', 2936.4)).toEqual({ distanceM: 2841 });
+        expect(readDistance('1143.5 m', 2936.4)).toEqual({ distanceM: 1143.5 });
+        expect(readDistance('0', 2936.4)).toEqual({ distanceM: 0 });
+        // The length as the bar shows it places it at the end.
+        expect(readDistance('2936', 2935.7)).toEqual({ distanceM: 2935.7 });
+        for (const bad of ['99999', '-1', '', 'abc', '2937']) {
+            expect(readDistance(bad, 2936.4)).toEqual({ problem: 'Type a distance from 0 to 2,936 m' });
+        }
     });
 });

@@ -250,3 +250,54 @@ export function inField(target: EventTarget | null): boolean {
 
 /** The input types that take no typed text (`inField`). */
 const NOT_TYPED = ['checkbox', 'radio', 'button', 'submit', 'reset'];
+
+/**
+ * Placing an instrument (epic 4 entry 9; EXPERIENCE.md Instruments, the drawing bar): Add an instrument in a line's Details arms
+ * the kind, then a click within INSTRUMENT_CLICK_PX of the line places it at the click's projection, or a distance typed in
+ * metres places it there; a click elsewhere or a distance outside the line is refused in words in the bar, nothing saved.
+ */
+
+/** How near the line a click must be, in screen pixels, to place an instrument at its projection (the planner's pick, 2026-11-09). */
+export const INSTRUMENT_CLICK_PX = 12;
+
+/** Whole metres with thousands separators: "2,936 m" (metres until the units entries, 19 and 20). */
+export function metresText(metres: number): string {
+    const m = Math.round(metres > 0 && isFinite(metres) ? metres : 0);
+    return String(m).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' m';
+}
+
+/** The placement bar's title: "New tap on L-SWD". */
+export function instrumentTitle(kindName: string, lineName: string): string {
+    return newItemText(kindName) + ' on ' + lineName;
+}
+
+/** The placement bar's hint after the title. */
+export const INSTRUMENT_HINT = 'click the line or type its distance';
+
+/** A click that is not on the line, refused in the bar: "Click on L-SWD: an instrument sits on its line". */
+export function offLineText(lineName: string): string {
+    return 'Click on ' + lineName + ': an instrument sits on its line';
+}
+
+/** A typed distance that is not a number from 0 to the line's length, refused in words: "Type a distance from 0 to 2,936 m". */
+export function distanceRangeText(lengthM: number): string {
+    return 'Type a distance from 0 to ' + metresText(lengthM);
+}
+
+/**
+ * A distance along a line typed in metres ("2841", "2,841", "1143.5"): the number when it is from 0 to the line's length (to the
+ * metre the bar shows it, the place kept at the end), else the problem in words; nothing typed is a problem too.
+ */
+export function readDistance(text: string, lengthM: number): { distanceM: number } | { problem: string } {
+    const t = text.replace(/[,\s]/g, '').replace(/m$/i, '');
+    const n = Number(t);
+    if (t === '' || !Number.isFinite(n) || n < 0 || n > lengthM + 0.5) {
+        return { problem: distanceRangeText(lengthM) };
+    }
+    return { distanceM: Math.min(n, lengthM) };
+}
+
+/** An instrument's Location in Details (entry 9): "On L-SWD at 1.1 km", the distance as the line popup writes it. */
+export function instrumentLocationText(lineName: string, distanceM: number): string {
+    return 'On ' + lineName + ' at ' + distanceText(distanceM);
+}

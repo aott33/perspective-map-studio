@@ -39,7 +39,7 @@ const LINE: Kind = { id: 'line', name: 'Gathering line', geometry: 'line', icon:
 const CTB: [number, number] = [-105.012, 39.7262];
 const BEND: [number, number] = [-105.009441, 39.720791];
 const SWD: [number, number] = [-104.983671, 39.715476];
-const TAP_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const TAP: Kind = { id: 'tap', name: 'Tap', geometry: 'point', icon: 'tap', labelRank: 2, fields: [], instrument: true };
 
 interface Sent {
     id: string;
@@ -86,13 +86,12 @@ function padAndLine(): { pad: string; line: string } {
     return { pad, line };
 }
 
-/** A tap on the line at its bend, saved (the instrument tool is entry 9's: sent as a batch here). */
+/** A tap on the line at its bend, saved: added from the line's Details as entry 9 does (one create with its attachment). */
 function tapOn(line: string): string {
-    delegate.sendBatch({ batchId: 'tap-create', ops: [{ op: 'create', entity: 'item', id: TAP_ID, baseVersion: 0, data: {
-        kind: 'tap', name: 'PT-1', geometry: { type: 'Point', coordinates: BEND }, attachment: { lineId: line, distanceM: 659.4 } } }] },
-    TAP_ID, 'add Tap');
+    const tap = delegate.createInstrument(line, TAP, 659.4);
+    expect(tap).not.toBeNull();
     save(last());
-    return TAP_ID;
+    return tap!;
 }
 
 beforeEach(() => {

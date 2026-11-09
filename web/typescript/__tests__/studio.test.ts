@@ -1,13 +1,13 @@
 import { Kind } from '../adapters';
 import {
-    KIND_BUTTONS, StudioState, clearSelection, enterEdit, fromProps, isDrawing, isEditing, isPlacing, kindButtons, kindsFor, leaveEdit, pickTool,
+    KIND_BUTTONS, armInstrument, armedProblem, disarm, instrumentKinds, keepArmed, StudioState, clearSelection, enterEdit, fromProps, isDrawing, isEditing, isPlacing, kindButtons, kindsFor, leaveEdit, pickTool,
     pointKind, select, selectedId, showSurface, toggleSelect, toolKind, toolOf, selectMany, addMany, isMultiple, rangeIds, sameIds
 } from '../studio';
 
 describe('fromProps', () => {
     it('reads the editMode prop once into the mode, with no tool and nothing selected', () => {
-        expect(fromProps(false)).toEqual({ mode: 'view', tool: null, toolKind: null, surface: 'items', selected: [] });
-        expect(fromProps(true)).toEqual({ mode: 'edit', tool: null, toolKind: null, surface: 'items', selected: [] });
+        expect(fromProps(false)).toEqual({ mode: 'view', tool: null, toolKind: null, surface: 'items', selected: [], armed: null });
+        expect(fromProps(true)).toEqual({ mode: 'edit', tool: null, toolKind: null, surface: 'items', selected: [], armed: null });
     });
 
     it('derives today\'s editing, drawing and selection from the model at mount', () => {
@@ -22,14 +22,14 @@ describe('enterEdit and leaveEdit', () => {
     it('enters Edit mode keeping the selection and no tool', () => {
         const view = select(fromProps(false), 'a');
         const edit = enterEdit(view);
-        expect(edit).toEqual({ mode: 'edit', tool: null, toolKind: null, surface: 'items', selected: ['a'] });
+        expect(edit).toEqual({ mode: 'edit', tool: null, toolKind: null, surface: 'items', selected: ['a'], armed: null });
         expect(isEditing(edit)).toBe(true);
     });
 
     it('leaves Edit mode putting the tool down and keeping the selection', () => {
         const drawing = pickTool(select(fromProps(true), 'a'), 'line');
         const view = leaveEdit(drawing);
-        expect(view).toEqual({ mode: 'view', tool: null, toolKind: null, surface: 'items', selected: ['a'] });
+        expect(view).toEqual({ mode: 'view', tool: null, toolKind: null, surface: 'items', selected: ['a'], armed: null });
         expect(isDrawing(view)).toBe(false);
     });
 
@@ -55,14 +55,14 @@ describe('pickTool', () => {
 
     it('a kind button fixes the kind for the tool; a generic tool fixes none; putting the tool down clears it', () => {
         const fixed = pickTool(fromProps(true), 'line', 'pipeline');
-        expect(fixed).toEqual({ mode: 'edit', tool: 'line', toolKind: 'pipeline', surface: 'items', selected: [] });
+        expect(fixed).toEqual({ mode: 'edit', tool: 'line', toolKind: 'pipeline', surface: 'items', selected: [], armed: null });
         expect(isDrawing(fixed)).toBe(true);
         const generic = pickTool(fixed, 'line', null);
         expect(generic.toolKind).toBeNull();
         expect(pickTool(generic, 'line', 'pipeline')).not.toBe(generic);
         expect(pickTool(fixed, 'line', 'pipeline')).toBe(fixed);
         expect(pickTool(fixed, null, 'pipeline').toolKind).toBeNull();
-        expect(pickTool(fixed, 'area', 'geofence')).toEqual({ mode: 'edit', tool: 'area', toolKind: 'geofence', surface: 'items', selected: [] });
+        expect(pickTool(fixed, 'area', 'geofence')).toEqual({ mode: 'edit', tool: 'area', toolKind: 'geofence', surface: 'items', selected: [], armed: null });
         expect(isDrawing(pickTool(fixed, 'area'))).toBe(true);
         expect(leaveEdit(fixed).toolKind).toBeNull();
     });
@@ -114,14 +114,14 @@ describe('select, toggleSelect and clearSelection', () => {
 
     it('clearSelection empties the selection, as a tap on the ground does, and keeps the mode and tool', () => {
         const state = clearSelection(pickTool(select(fromProps(true), 'a'), 'line'));
-        expect(state).toEqual({ mode: 'edit', tool: 'line', toolKind: null, surface: 'items', selected: [] });
+        expect(state).toEqual({ mode: 'edit', tool: 'line', toolKind: null, surface: 'items', selected: [], armed: null });
         const empty = fromProps(false);
         expect(clearSelection(empty)).toBe(empty);
     });
 
     it('works the same in View mode (the selection is not a tool)', () => {
         const state = toggleSelect(select(fromProps(false), 'a'), 'b');
-        expect(state).toEqual({ mode: 'view', tool: null, toolKind: null, surface: 'items', selected: ['a', 'b'] });
+        expect(state).toEqual({ mode: 'view', tool: null, toolKind: null, surface: 'items', selected: ['a', 'b'], armed: null });
     });
 
     it('never mutates the state it is given', () => {
@@ -202,7 +202,7 @@ describe('the point tool and the surfaces (entry 2)', () => {
 
     it('entering Edit mode opens Items; the rail switches the surface and keeps the selection and the tool', () => {
         const kinds = showSurface(pickTool(select(fromProps(true), 'a'), 'point'), 'kinds');
-        expect(kinds).toEqual({ mode: 'edit', tool: 'point', toolKind: null, surface: 'kinds', selected: ['a'] });
+        expect(kinds).toEqual({ mode: 'edit', tool: 'point', toolKind: null, surface: 'kinds', selected: ['a'], armed: null });
         expect(showSurface(kinds, 'kinds')).toBe(kinds);
         expect(enterEdit(leaveEdit(kinds)).surface).toBe('items');
         const view = fromProps(false);
@@ -250,5 +250,39 @@ describe('the tools, the kinds per geometry and the kind buttons (entry 4)', () 
         expect(kindButtons(KINDS)).toEqual([PAD, LINE, FENCE]);
         expect(kindButtons([LINE, PAD])).toEqual([LINE, PAD]);
         expect(kindButtons([])).toEqual([]);
+    });
+});
+
+describe('instruments are added from their line (entry 9)', () => {
+    const TAP: Kind = { id: 'tap', name: 'Tap', geometry: 'point', icon: 'tap', labelRank: 2, fields: [], instrument: true };
+    const METER: Kind = { id: 'meter', name: 'Meter', geometry: 'point', icon: 'meter', labelRank: 2, fields: [], instrument: true };
+
+    it('instrument kinds leave the Point tool\'s kinds and the kind buttons; Add an instrument offers them', () => {
+        expect(kindsFor([TAP, PAD, METER], 'point')).toEqual([PAD]);
+        expect(toolKind([TAP, PAD], 'point', 'tap')).toBe(PAD);
+        expect(toolKind([TAP], 'point', null)).toBeNull();
+        expect(pointKind([TAP, METER])).toBeNull();
+        expect(kindButtons([TAP, PAD, METER, LINE, FENCE])).toEqual([PAD, LINE, FENCE]);
+        expect(instrumentKinds([PAD, TAP, LINE, METER])).toEqual([TAP, METER]);
+        expect(instrumentKinds([PAD, LINE])).toEqual([]);
+    });
+
+    it('armed on the one selected line in Edit mode; a tool, View mode or another selection puts it down', () => {
+        const line = select(fromProps(true), 'L');
+        const armed = armInstrument(pickTool(line, 'point'), 'L', 'tap');
+        expect(armed.armed).toEqual({ lineId: 'L', kindId: 'tap', problem: '' });
+        expect(armed.tool).toBeNull();
+        expect(armInstrument(fromProps(true), 'L', 'tap').armed).toBeNull();
+        expect(armInstrument(select(fromProps(false), 'L'), 'L', 'tap').armed).toBeNull();
+        expect(armedProblem(armed, 'Click on L-SWD').armed!.problem).toBe('Click on L-SWD');
+        expect(armedProblem(line, 'x')).toBe(line);
+        expect(pickTool(armed, 'line').armed).toBeNull();
+        expect(pickTool(armed, null).armed).toBeNull();
+        expect(leaveEdit(armed).armed).toBeNull();
+        expect(disarm(armed).armed).toBeNull();
+        expect(disarm(line)).toBe(line);
+        expect(keepArmed(armed)).toBe(armed);
+        expect(keepArmed(select(armed, 'P')).armed).toBeNull();
+        expect(keepArmed(clearSelection(armed)).armed).toBeNull();
     });
 });

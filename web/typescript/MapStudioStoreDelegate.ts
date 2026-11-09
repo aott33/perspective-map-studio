@@ -25,7 +25,10 @@
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
 import { MapChanges, MapChangedBody } from './changes';
 import { EditBatch, EditLevel, KindSetupRecord, LastChange, MapItemData, MapItemRecord } from './contract';
-import { Position, itemDeleteBatch, itemsDeleteBatch, lineGeometryBatch, pointMoveBatch, splitAtBatch, vertexDeleteBatch, vertexMoveBatch } from './geometry';
+import {
+    Position, instrumentCreateBatch, instrumentMoveBatch, itemDeleteBatch, itemsDeleteBatch, lineGeometryBatch, pointMoveBatch, splitAtBatch, vertexDeleteBatch,
+    vertexMoveBatch
+} from './geometry';
 import { HostLists, NO_HOST_LISTS } from './adapters';
 import { MESSAGE_EVENT, Reply, basemapSource, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText } from './messages';
 import {
@@ -639,6 +642,74 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         return itemId;
     }
 
+    /**
+     * Add an instrument from a line's Details (epic 4 entry 9; EXPERIENCE.md Instruments): one create of `kind` on the stored line
+     * `lineId` at `distanceM` metres along it (a click's projection or a typed distance), its point and attachment in the one op
+     * (geometry.ts `instrumentCreateBatch`), named after the kind with its prefill, one undo step "add <kind>". Built when it goes,
+     * from the line's record then: it waits while a save of the line is in flight or waiting, so its place is measured on the shape
+     * the Gateway checks it against. Returns the new item's id, or null (one console line) when the line is not stored on the map.
+     */
+    createInstrument(lineId: string, kind: Kind, distanceM: number): string | null {
+        const line = this.storedRecord(lineId);
+        if (!line || line.geometry.type !== 'LineString') {
+            console.info('[MapStudio] The new ' + kind.name + ' was dropped: line ' + lineId + ' is not on the map.');
+            return null;
+        }
+        const itemId = newId();
+        const prefill = this.prefillOf(kind);
+        this.sendShapeChange(itemId, stepLabel('add', kind.name), () => {
+            const now = this.storedRecord(lineId);
+            if (!now || now.geometry.type !== 'LineString') {
+                console.info('[MapStudio] The new ' + kind.name + ' was let go: line ' + line.name + ' left the map before its turn.');
+                return null;
+            }
+            return instrumentCreateBatch(newId(), itemId, kind.id, kind.name, now, distanceM, prefill);
+        }, () => this.itemBusy(lineId));
+        this.noteAdded(itemId);
+        return itemId;
+    }
+
+    /**
+     * An instrument moved along its line (epic 4 entry 9: its drag released, or its distance typed in Details; never off the line,
+     * WCAG 2.5.7): one update with its point and attachment at `distanceM` on the line it is attached to (geometry.ts
+     * `instrumentMoveBatch`), one undo step "move <name>". Built when it goes, from the records then; it waits for a save of the
+     * instrument or of its line. False, with one console line, when the item is not an instrument on a stored line.
+     */
+    moveInstrument(id: string, distanceM: number): boolean {
+        const item = this.knownRecord(id);
+        if (!item || item.geometry.type !== 'Point' || item.attachment === null || !this.storedRecord(item.attachment.lineId)) {
+            console.info('[MapStudio] The move of ' + id + ' was dropped: it is not an instrument on a line on the map.');
+            return false;
+        }
+        this.sendShapeChange(id, stepLabel('move', item.name), () => {
+            const now = this.knownRecord(id);
+            const line = now && now.attachment ? this.storedRecord(now.attachment.lineId) : undefined;
+            if (!now || !line || line.geometry.type !== 'LineString') {
+                console.info('[MapStudio] The move of ' + item.name + ' was let go: it or its line left the map before its turn.');
+                return null;
+            }
+            return instrumentMoveBatch(newId(), now, line, distanceM);
+        }, () => this.itemBusy(item.attachment!.lineId));
+        return true;
+    }
+
+    /** Whether a save of the map item is in flight, or waiting its turn behind one (entry 9: an instrument's line). */
+    private itemBusy(id: string): boolean {
+        return this.inFlightByItem.has(id)
+            || Array.from(this.heldByItem.values()).some((list) => list.some((h) => h.batch.ops.some((op) => op.id === id)));
+    }
+
+    /**
+     * Whether a save this page sent and awaits, or one waiting its turn, writes an attachment to the line `lineId` (entry 9: an
+     * instrument just added or moved): a change of the line's shape, or its delete, waits for it, since the batch must carry that
+     * instrument, which the records it is built from hold only once that save's reply comes.
+     */
+    private attachInFlightTo(lineId: string): boolean {
+        const held = Array.from(this.heldByItem.values()).reduce((all, list) => all.concat(list.map((h) => h.batch)), [] as EditBatch[]);
+        return Array.from(this.batchesInFlight.values()).concat(held).some((b) => b.ops.some((op) => op.entity === 'item' && op.op !== 'delete'
+            && !!op.data && !!op.data.attachment && (op.data.attachment as { lineId?: string }).lineId === lineId));
+    }
+
     /** A tool's add (entry 7a): the item heads the list's Just added, newest first, until the add is undone or the page reloads. */
     private noteAdded(itemId: string): void {
         this.justAdded = [itemId].concat(this.justAdded.filter((id) => id !== itemId));
@@ -750,6 +821,11 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         const item = this.knownRecord(id);
         if (!item || item.geometry.type !== 'Point') {
             console.info('[MapStudio] The move of ' + id + ' was dropped: the item is not a point on the map.');
+            return false;
+        }
+        if (item.attachment !== null) {
+            // An instrument on a line moves along it only (entry 9, `moveInstrument`): a free place would leave its line.
+            console.info('[MapStudio] The move of ' + item.name + ' was dropped: an instrument moves along its line.');
             return false;
         }
         // Built when it goes, from the records then: a pin dragged while its create is saved waits for the create's reply.
@@ -885,7 +961,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
                 console.info('[MapStudio] The ' + action + ' of ' + line.name + ' was not sent: ' + (err instanceof Error ? err.message : String(err)));
                 return null;
             }
-        });
+        }, () => this.attachInFlightTo(id));
         return true;
     }
 
@@ -947,7 +1023,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
                 return null;
             }
             return itemDeleteBatch(newId(), now, this.changes.state.items);
-        }, (batch) => this.endsInFlightName(batch.ops.filter((op) => op.op === 'delete').map((op) => op.id)));
+        }, (batch) => this.endsInFlightName(batch.ops.filter((op) => op.op === 'delete').map((op) => op.id)) || this.attachInFlightTo(id));
         return true;
     }
 

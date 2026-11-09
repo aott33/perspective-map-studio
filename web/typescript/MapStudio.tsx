@@ -12,7 +12,7 @@ import {
 import { ErrorEvent, Map as MapLibreMap, MapMouseEvent, Popup, setWorkerUrl } from 'maplibre-gl';
 import { TerraDraw, TerraDrawLineStringMode, TerraDrawPolygonMode, TerraDrawSelectMode } from 'terra-draw';
 import { Drawing, GeometryPick, inField } from './drawing';
-import { SnapTarget } from './geometry';
+import { SnapTarget, instrumentsOn, lengthM } from './geometry';
 import { EditLevel, MapItemRecord } from './contract';
 import { AdapterStatus, HostLists, NO_HOST_LISTS } from './adapters';
 import { BasemapId, RasterSource } from './basemaps';
@@ -60,8 +60,8 @@ import * as editing from './editing';
 import * as basemap from './basemapLayer';
 import { TilesState } from './basemapLayer';
 import {
-    StudioState, StudioSurface, StudioTool, addMany, clearSelection, enterEdit, fromProps, isEditing, isMultiple, leaveEdit, pickTool, select,
-    selectMany, showSurface, toggleSelect, toolKind
+    StudioState, StudioSurface, StudioTool, addMany, clearSelection, enterEdit, fromProps, instrumentKinds, isEditing, isMultiple, keepArmed, kindsFor,
+    leaveEdit, pickTool, select, selectMany, showSurface, toggleSelect, toolKind
 } from './studio';
 import { BoxSelect, DragShape, ShapeItem } from './multiSelect';
 import { SelectionCount } from './studio/SelectionCount';
@@ -71,7 +71,7 @@ import { Rail } from './studio/Rail';
 import { ItemList, ListView, newListView } from './studio/ItemList';
 import { PropertiesPanel } from './studio/PropertiesPanel';
 import { DrawToolbar } from './studio/DrawToolbar';
-import { DrawingBar } from './studio/DrawingBar';
+import { DrawingBar, InstrumentBar } from './studio/DrawingBar';
 import { GeometryBar } from './studio/GeometryBar';
 import { ChromeGlyph } from './studio/ChromeGlyph';
 import { ProblemStatus } from './studio/SaveStatus';
@@ -224,6 +224,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     snapCache: { revision: number; targets: SnapTarget[] } | null = null;
     lastSnap: SnapTarget | null = null;
     drawingReason = '';
+    /** Entry 9 (editing.ts): the selected instrument dragged along its line, or null. */
+    instrumentDrag: editing.InstrumentDrag | null = null;
     /** Entry 5 (editing.ts): Terra Draw's select mode, the selected item's copy in it, a dragged end's snap, the chosen point drawn. */
     selectMode: TerraDrawSelectMode | null = null;
     handles: editing.Handles | null = null;
@@ -1005,7 +1007,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     selectionState(prev: Readonly<MapStudioState>, selected: Selection | null): Pick<MapStudioState, 'selected' | 'studio' | 'panel' | 'geometry'> {
         return {
             selected,
-            studio: selected ? select(prev.studio, selected.id) : clearSelection(prev.studio),
+            // An instrument being placed stays only while its line is the item selected (entry 9).
+            studio: keepArmed(selected ? select(prev.studio, selected.id) : clearSelection(prev.studio)),
             panel: selected !== null && prev.panel === selected.id ? prev.panel : null,
             // A chosen point and Move stay with their item only (entry 5).
             geometry: selected !== null && prev.geometry !== null && prev.geometry.itemId === selected.id ? prev.geometry : null
@@ -1021,7 +1024,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
      */
     selectionSetState(prev: Readonly<MapStudioState>, change: (studio: StudioState) => StudioState, tick = false):
         Pick<MapStudioState, 'selected' | 'studio' | 'panel' | 'geometry' | 'pick'> {
-        const studio = change(prev.studio);
+        const studio = keepArmed(change(prev.studio));
         const ids = studio.selected;
         const id = ids.length > 0 ? ids[ids.length - 1] : null;
         let selected: Selection | null = null;
@@ -1156,6 +1159,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
             this.closeListOverlay(true);
             return;
         }
+        if (ev.key === 'Escape' && !ev.defaultPrevented && !inField(ev.target) && editing.disarmInstrument(this)) {
+            // Esc puts down the instrument being placed (entry 9) before it closes Details: one press, one step.
+            ev.preventDefault();
+            return;
+        }
         if (ev.key === 'Escape' && !ev.defaultPrevented && !inField(ev.target) && editing.escapeGeometry(this)) {
             // Esc puts down Move, then the chosen point (entry 5), before it closes a popup or Details.
             ev.preventDefault();
@@ -1174,7 +1182,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             // A click on the map closes the collapsed list open over it (entry 7c), as it closes the legend, and goes on as a click.
             this.closeListOverlay(false);
         }
-        if (editing.onGeometryClick(this, ev)) {
+        if (editing.onArmedClick(this, ev) || editing.onGeometryClick(this, ev)) {
+            // An instrument being placed takes the click first (entry 9), then Move or a handle (entry 5).
             return;
         }
         selection.onMapClick(this, ev);
@@ -1437,6 +1446,27 @@ export class MapStudio extends Component<Props, MapStudioState> {
             editing.putToolDown(this);
         }
         this.setState((prev) => (prev.selected && prev.selected.id === selected.id ? { geometry: { itemId: selected.id, index: null, moving: true } } : null));
+    };
+
+    /** Add an instrument in a line's Details (entry 9), its kind picked: armed on the line; the drawing bar says how to place it. */
+    onAddInstrument = (kindId: string): void => {
+        const selected = this.state.selected;
+        if (selected) {
+            editing.armInstrument(this, selected.id, kindId);
+        }
+    };
+    /** The placement bar (entry 9): Place with the typed distance, Cancel as Esc. */
+    onPlaceInstrument = (text: string): void => editing.placeTyped(this, text);
+    onCancelInstrument = (): void => {
+        editing.disarmInstrument(this);
+    };
+    /** An instrument's distance typed in its Details (entry 9): it moves there along its line, one change. */
+    onMoveAlong = (distanceM: number): void => {
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        const selected = this.state.selected;
+        if (delegate && selected) {
+            delegate.moveInstrument(selected.id, distanceM);
+        }
     };
 
     /** The geometry bar (entry 5): Move for the chosen point, Cancel (as Esc), Split here and Delete point, each one batch. */
@@ -1792,11 +1822,21 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const geometry = item.geometry.type === 'Point' ? 'point' : 'line';
         const kind = delegate.lists.kinds.find((k) => k.id === item.kind);
         const pick = this.state.geometry;
+        // Entry 9: an instrument's Kind select lists instrument kinds only, a point's the others; a line (not an area) lists its
+        // instruments in order with Add an instrument; an instrument on a line reads its line's name and length.
+        const instrument = geometry === 'point' && (item.attachment !== null || !!(kind && kind.instrument));
+        const kindOptions = geometry === 'line' ? delegate.lists.kinds.filter((k) => k.geometry === 'line')
+            : instrument ? instrumentKinds(delegate.lists.kinds) : kindsFor(delegate.lists.kinds, 'point');
+        const isLine = geometry === 'line' && !(kind && kind.area);
+        const attachedTo = item.attachment !== null ? this.liveItem(item.attachment.lineId) : undefined;
+        const onLine = attachedTo && attachedTo.geometry.type === 'LineString'
+            ? { name: attachedTo.name, lengthM: lengthM(attachedTo.geometry.coordinates) } : undefined;
+        const armed = this.state.studio.armed;
         return (
             <PropertiesPanel key={item.id}
                              item={item}
                              kind={kind}
-                             kinds={delegate.lists.kinds.filter((k) => k.geometry === geometry)}
+                             kinds={kindOptions}
                              assets={assets.filter((a) => a.kind === item.kind)}
                              assetNames={delegate.lists.assetNames}
                              assetStatus={delegate.lists.adapters ? delegate.lists.adapters.assets : null}
@@ -1819,10 +1859,31 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              onKind={this.onKind}
                              onProperty={this.onProperty}
                              onDelete={this.onDeleteItem}
-                             toolInHand={this.state.studio.tool !== null || this.state.drawing !== null}
+                             toolInHand={this.state.studio.tool !== null || this.state.drawing !== null || armed !== null}
                              delKey={!(pick && pick.itemId === item.id)}
                              places={PLACES}
-                             onZoomTo={this.onZoomToLocation} />
+                             onZoomTo={this.onZoomToLocation}
+                             instruments={isLine ? instrumentsOn(delegate.items, item.id)
+                                 .map((i) => ({ id: i.id, name: i.name, distanceM: i.attachment ? i.attachment.distanceM : 0 })) : undefined}
+                             instrumentKinds={instrumentKinds(delegate.lists.kinds)}
+                             armedKind={armed && armed.lineId === item.id ? armed.kindId : null}
+                             onAddInstrument={this.onAddInstrument}
+                             onSelectInstrument={this.onRowSelect}
+                             onLine={onLine}
+                             onMoveAlong={this.onMoveAlong} />
+        );
+    }
+
+    /** The drawing bar while an instrument is placed (entry 9): its kind and line, the line's length, the last refusal's words. */
+    private renderInstrumentBar(delegate: MapStudioDelegateState, lineId: string, kindId: string, problem: string): React.ReactNode {
+        const line = this.liveItem(lineId);
+        const kind = delegate.lists.kinds.find((k) => k.id === kindId);
+        if (!line || line.geometry.type !== 'LineString' || !kind) {
+            return null;
+        }
+        return (
+            <InstrumentBar kind={kind} lineId={line.id} lineName={line.name} lengthM={lengthM(line.geometry.coordinates)} problem={problem}
+                           onPlace={this.onPlaceInstrument} onCancel={this.onCancelInstrument} />
         );
     }
 
@@ -2021,6 +2082,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                                     onFinish={this.onFinishDrawing}
                                     onDone={this.onSelectTool} />
                     ) : null}
+                    {studioOn && delegate && studio.armed ? this.renderInstrumentBar(delegate, studio.armed.lineId, studio.armed.kindId, studio.armed.problem) : null}
                     {delegate && pick && picked ? (
                         // With Select in hand, the chosen point's or Move's bar is the one place that talks (entry 5).
                         <GeometryBar pick={pick}

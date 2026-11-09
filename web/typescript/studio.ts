@@ -23,6 +23,17 @@ export type StudioTool = 'point' | 'line' | 'area';
 /** The rail's surfaces (EXPERIENCE.md rail order: View, Items, Kinds, Layers; Import is epic 5's). */
 export type StudioSurface = 'items' | 'kinds' | 'layers';
 
+/**
+ * An instrument being placed (epic 4 entry 9; EXPERIENCE.md Instruments): Add an instrument pressed in a line's Details with the
+ * kind picked; the next click on that line, or a typed distance along it, places it. Esc or Cancel puts it down. `problem` is why
+ * the last click or typed distance was refused, in words, nothing saved ('' when none).
+ */
+export interface ArmedInstrument {
+    lineId: string;
+    kindId: string;
+    problem: string;
+}
+
 export interface StudioState {
     /** View mode shows the map and its controls; Edit mode adds the studio's surfaces and tools. */
     mode: StudioMode;
@@ -34,11 +45,13 @@ export interface StudioState {
     surface: StudioSurface;
     /** The selected map items' ids, in the order each joined (entry 8: a set in Edit mode); the last to join is the current item. */
     selected: string[];
+    /** An instrument being placed on the selected line (entry 9), or null; never with a tool in hand, never in View mode. */
+    armed: ArmedInstrument | null;
 }
 
 /** The model at mount: the mode the `editMode` prop names, no tool, Items, nothing selected. */
 export function fromProps(editMode: boolean): StudioState {
-    return { mode: editMode ? 'edit' : 'view', tool: null, toolKind: null, surface: 'items', selected: [] };
+    return { mode: editMode ? 'edit' : 'view', tool: null, toolKind: null, surface: 'items', selected: [], armed: null };
 }
 
 /** Edit mode entered: the selection stays, no tool is in hand yet, Items opens. */
@@ -51,22 +64,55 @@ export function enterEdit(state: StudioState): StudioState {
 
 /** View mode: the tool is put down (View mode has none), the selection stays. */
 export function leaveEdit(state: StudioState): StudioState {
-    if (state.mode === 'view' && state.tool === null) {
+    if (state.mode === 'view' && state.tool === null && state.armed === null) {
         return state;
     }
-    return { ...state, mode: 'view', tool: null, toolKind: null };
+    return { ...state, mode: 'view', tool: null, toolKind: null, armed: null };
 }
 
 /**
- * A tool picked up with the kind a kind button fixed (null for a generic tool), or put down with null;
- * nothing changes in View mode, which has no tool.
+ * A tool picked up with the kind a kind button fixed (null for a generic tool), or put down with null; an instrument being placed
+ * is put down either way (entry 9); nothing changes in View mode, which has no tool.
  */
 export function pickTool(state: StudioState, tool: StudioTool | null, kindId: string | null = null): StudioState {
     const toolKind = tool === null ? null : kindId;
-    if (state.mode !== 'edit' || (state.tool === tool && state.toolKind === toolKind)) {
+    if (state.mode !== 'edit' || (state.tool === tool && state.toolKind === toolKind && state.armed === null)) {
         return state;
     }
-    return { ...state, tool, toolKind };
+    return { ...state, tool, toolKind, armed: null };
+}
+
+/**
+ * Add an instrument pressed in a line's Details with its kind (entry 9): the instrument is placed by the next click on the line or a
+ * typed distance; the tool in hand is put down (Select's). Only in Edit mode, with the line the one item selected.
+ */
+export function armInstrument(state: StudioState, lineId: string, kindId: string): StudioState {
+    if (state.mode !== 'edit' || state.selected.length !== 1 || state.selected[0] !== lineId) {
+        return state;
+    }
+    return { ...state, tool: null, toolKind: null, armed: { lineId, kindId, problem: '' } };
+}
+
+/** The instrument being placed put down (Esc, Cancel, placed): nothing changes when none is. */
+export function disarm(state: StudioState): StudioState {
+    return state.armed === null ? state : { ...state, armed: null };
+}
+
+/** Why the last click or typed distance was refused (entry 9), said in the drawing bar; nothing changes when none is armed. */
+export function armedProblem(state: StudioState, problem: string): StudioState {
+    if (state.armed === null || state.armed.problem === problem) {
+        return state;
+    }
+    return { ...state, armed: { ...state.armed, problem } };
+}
+
+/** An instrument being placed stays only while its line is the one item selected (entry 9): a new selection puts it down. */
+export function keepArmed(state: StudioState): StudioState {
+    const armed = state.armed;
+    if (armed === null || (state.selected.length === 1 && state.selected[0] === armed.lineId)) {
+        return state;
+    }
+    return { ...state, armed: null };
 }
 
 /** The rail's surface switched (the map and the selection stay); nothing changes in View mode. */
@@ -188,9 +234,17 @@ export function toolOf(kind: Kind): StudioTool {
     return kind.geometry === 'point' ? 'point' : kind.area ? 'area' : 'line';
 }
 
-/** The kinds a tool may save as, in the kind list's order: point kinds, line kinds without `area`, or area kinds. */
+/**
+ * The kinds a tool may save as, in the kind list's order: point kinds, line kinds without `area`, or area kinds. Instrument kinds
+ * are never a tool's (entry 9): an instrument is only added from its line's Details.
+ */
 export function kindsFor(kinds: Kind[], tool: StudioTool): Kind[] {
-    return kinds.filter((k) => toolOf(k) === tool);
+    return kinds.filter((k) => toolOf(k) === tool && !k.instrument);
+}
+
+/** The instrument kinds (entry 9), in the kind list's order: what Add an instrument offers, and an instrument's Kind select. */
+export function instrumentKinds(kinds: Kind[]): Kind[] {
+    return kinds.filter((k) => k.geometry === 'point' && k.instrument === true);
 }
 
 /**
@@ -207,14 +261,18 @@ export function pointKind(kinds: Kind[]): Kind | null {
  * when the list has none.
  */
 export function toolKind(kinds: Kind[], tool: StudioTool, kindId: string | null): Kind | null {
-    const fixed = kindId === null ? undefined : kinds.find((k) => k.id === kindId && toolOf(k) === tool);
-    return fixed || kindsFor(kinds, tool)[0] || null;
+    const usable = kindsFor(kinds, tool);
+    const fixed = kindId === null ? undefined : usable.find((k) => k.id === kindId);
+    return fixed || usable[0] || null;
 }
 
 /** How many kind buttons the toolbar holds (DESIGN.md Floating draw toolbar: Well pad, Tank battery, Pipeline). */
 export const KIND_BUTTONS = 3;
 
-/** The toolbar's kind buttons (entry 4): the kind list's first kinds, up to three, in the list's order and nothing else. */
+/**
+ * The toolbar's kind buttons (entry 4): the kind list's first kinds, up to three, in the list's order and nothing else; never an
+ * instrument kind (entry 9: an instrument is only added from its line's Details).
+ */
 export function kindButtons(kinds: Kind[]): Kind[] {
-    return kinds.slice(0, KIND_BUTTONS);
+    return kinds.filter((k) => !k.instrument).slice(0, KIND_BUTTONS);
 }

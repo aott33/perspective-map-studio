@@ -44,6 +44,7 @@ import { LAYER_AREA_FILL, LAYER_ITEM_LINES, LAYER_ITEM_MARKERS } from '../mapLay
 import { MapStudio, MapStudioState } from '../MapStudio';
 import { applyRestore } from '../camera';
 import { fromProps, pickTool } from '../studio';
+import { project } from '../geometry';
 
 const PAD: Kind = { id: 'pad', name: 'Well pad', geometry: 'point', icon: 'well-pad', labelRank: 10, fields: [] };
 const LINE: Kind = { id: 'line', name: 'Gathering line', geometry: 'line', icon: 'pipeline', labelRank: 5, fields: [] };
@@ -100,6 +101,8 @@ interface Sent {
     events: Array<[string, Record<string, unknown>]>;
     /** The deletes asked of the delegate (entry 8): one id, or several ids as one step. */
     deletes: string[][];
+    /** The instruments added from a line's Details (entry 9): the line, the kind and the distance along it. */
+    instruments: Array<[string, string, number]>;
 }
 
 /** What a MapLibre click on the map hits: the marker, line or area features `queryRenderedFeatures` returns, by layer. */
@@ -134,7 +137,7 @@ interface Harness {
 }
 
 function harness(editMode: boolean): Harness {
-    const sent: Sent = { pointClick: [], popupOpen: [], popupClose: [], props: [], events: [], deletes: [] };
+    const sent: Sent = { pointClick: [], popupOpen: [], popupClose: [], props: [], events: [], deletes: [], instruments: [] };
     const store = {
         delegate: {
             sendPointClick: (id: string): void => { sent.pointClick.push(id); },
@@ -143,6 +146,11 @@ function harness(editMode: boolean): Harness {
             // The Point and Line tools' saves (entry 7c's placement cases): the new item's id.
             createPoint: (): string => 'new-pad',
             createLine: (): string => 'new-line',
+            // Entry 9: an instrument added from its line's Details.
+            createInstrument: (lineId: string, kind: Kind, distanceM: number): string => {
+                sent.instruments.push([lineId, kind.id, distanceM]);
+                return 'new-tap';
+            },
             // Delete (entries 25 and 8): one item, or several as one step.
             deleteItem: (id: string): boolean => { sent.deletes.push([id]); return true; },
             deleteItems: (ids: string[]): boolean => { sent.deletes.push(ids.slice()); return true; }
@@ -1024,5 +1032,56 @@ describe('selecting several (entry 8)', () => {
         expect(h.ms.studioOn()).toBe(false);
         (h.ms as unknown as { applyBoxZoom: () => void }).applyBoxZoom();
         expect(h.state().studio.selected).toEqual(['a']);
+    });
+});
+
+describe('an instrument added from its line\'s Details (entry 9)', () => {
+    function armed(): Harness {
+        const h = harness(true);
+        h.click(LINE_HIT, BEND);
+        expect(h.state().selected).toMatchObject({ id: 'lswd' });
+        h.ms.onAddInstrument('tap');
+        expect(h.state().studio.armed).toEqual({ lineId: 'lswd', kindId: 'tap', problem: '' });
+        return h;
+    }
+
+    test('a click on the empty map or off the line is refused in words, nothing saved; a click on the line places it there', () => {
+        const h = armed();
+        h.click({}, [BEND[0], BEND[1] + 0.01]);
+        expect(h.state().studio.armed!.problem).toBe('Click on L-SWD: an instrument sits on its line');
+        h.click({ markers: [marker('p14', 'P14', P14)] }, P14);
+        expect(h.state().studio.armed!.problem).toBe('Click on L-SWD: an instrument sits on its line');
+        expect(h.state().selected).toMatchObject({ id: 'lswd' });
+        expect(h.sent.instruments).toEqual([]);
+        // 0.0005 degrees off the line is 5 px on this map: within the 12 px.
+        h.click(LINE_HIT, [BEND[0], BEND[1] + 0.0005]);
+        expect(h.sent.instruments.length).toBe(1);
+        expect(h.sent.instruments[0][0]).toBe('lswd');
+        expect(h.sent.instruments[0][1]).toBe('tap');
+        expect(h.sent.instruments[0][2]).toBe(project([CTB1, BEND, SWD1], [BEND[0], BEND[1] + 0.0005]).distanceM);
+        expect(h.state().studio.armed).toBeNull();
+        expect(h.state().selected).toEqual({ id: 'new-tap', kind: 'point' });
+        expect(h.state().panel).toBe('new-tap');
+        expect(h.ms.focusNameId).toBe('new-tap');
+    });
+
+    test('a typed distance places it; one outside the line is refused in words; Esc and another selection put it down', () => {
+        const h = armed();
+        h.ms.onPlaceInstrument('99999');
+        expect(h.state().studio.armed!.problem).toMatch(/^Type a distance from 0 to [0-9,]+ m$/);
+        expect(h.sent.instruments).toEqual([]);
+        h.ms.onPlaceInstrument('300');
+        expect(h.sent.instruments).toEqual([['lswd', 'tap', 300]]);
+        expect(h.state().selected).toEqual({ id: 'new-tap', kind: 'point' });
+
+        const again = armed();
+        again.ms.onCancelInstrument();
+        expect(again.state().studio.armed).toBeNull();
+        expect(again.state().selected).toMatchObject({ id: 'lswd' });
+        again.ms.onAddInstrument('tap');
+        again.click({ markers: [marker('ctb1', 'CTB1', CTB1)] }, [CTB1[0], CTB1[1] + 0.01]);
+        expect(again.state().studio.armed).not.toBeNull();
+        again.ms.onRowSelect('p14');
+        expect(again.state().studio.armed).toBeNull();
     });
 });

@@ -5,7 +5,8 @@ import { join } from 'path';
 
 import { MapItemRecord } from '../contract';
 import {
-    EDGES_CROSS, Position, SNAP_PX, canDeleteVertex, canSplitAt, endSideOf, endsFrom, endsWith, instrumentsOn, itemDeleteBatch, lengthM, lineDeleteBatch,
+    EDGES_CROSS, Position, SNAP_PX, canDeleteVertex, canSplitAt, endSideOf, endsFrom, endsWith, instrumentCreateBatch, instrumentMoveBatch,
+    instrumentsOn, itemDeleteBatch, placeAlong, lengthM, lineDeleteBatch,
     lineGeometryBatch, lineMoveBatch, lineSplitBatch, linesSnappedTo, minVertexCount, nearestSnap, pointAt, pointMoveBatch, project, ringCrosses,
     round1, round6, snapDistanceM, snapTargets, snapTargetsForLine, splitAtBatch, splitName, vertexDeleteBatch, vertexMoveBatch
 } from '../geometry';
@@ -190,6 +191,51 @@ describe('one batch for a line and its instruments', () => {
 
     test('a point is not a line', () => {
         expect(() => lineMoveBatch('b6', ITEMS[0], [0, 0], ITEMS)).toThrow('is not a line');
+    });
+});
+
+describe('an instrument made and moved from its line (epic 4 entry 9): one op with its point and attachment', () => {
+    const NEW = '66666666-6666-4666-8666-666666666666';
+
+    test('a create at a typed distance: the point at that distance and the attachment, the kind\'s prefill', () => {
+        const batch = instrumentCreateBatch('c1', NEW, 'meter', 'Meter', LINE, 2841, { tag: 'FT-1' });
+        expect(batch.batchId).toBe('c1');
+        expect(batch.ops).toHaveLength(1);
+        const op = batch.ops[0];
+        expect([op.op, op.entity, op.id, op.baseVersion]).toEqual(['create', 'item', NEW, 0]);
+        expect(op.data!.kind).toBe('meter');
+        expect(op.data!.name).toBe('Meter');
+        expect(op.data!.properties).toEqual({ tag: 'FT-1' });
+        expect(op.data!.attachment).toEqual({ lineId: LINE_ID, distanceM: 2841 });
+        expectOnLine(op.data as Record<string, unknown>, SWD);
+        expect(Object.keys(instrumentCreateBatch('c2', NEW, 'tap', 'Tap', LINE, 10).ops[0].data!).sort())
+            .toEqual(['attachment', 'geometry', 'kind', 'name']);
+    });
+
+    test('a create at a click\'s projection is stored within 1 m of it', () => {
+        const near = pointAt(SWD, 1500);
+        const click: Position = [near[0] + 0.0002, near[1] + 0.0003];
+        const p = project(SWD, click);
+        const op = instrumentCreateBatch('c3', NEW, 'tap', 'Tap', LINE, p.distanceM).ops[0];
+        const stored = (op.data!.geometry as { coordinates: Position }).coordinates;
+        expect(metres(stored, p.point)).toBeLessThan(1);
+        expectOnLine(op.data as Record<string, unknown>, SWD);
+    });
+
+    test('a move along the line: one update at the instrument\'s version, never past either end', () => {
+        const batch = instrumentMoveBatch('m1', ITEMS[2], LINE, 1200.04);
+        expect(batch.ops.map((o) => [o.op, o.id, o.baseVersion])).toEqual([['update', PT1, 2]]);
+        expect(Object.keys(batch.ops[0].data!).sort()).toEqual(['attachment', 'geometry']);
+        expect(batch.ops[0].data!.attachment).toEqual({ lineId: LINE_ID, distanceM: 1200 });
+        expectOnLine(batch.ops[0].data as Record<string, unknown>, SWD);
+        expect(placeAlong(SWD, -5).distanceM).toBe(0);
+        expect(placeAlong(SWD, 99999).distanceM).toBe(round1(lengthM(SWD)));
+        expect(placeAlong(SWD, 0).point).toEqual(SWD[0]);
+    });
+
+    test('a point is not a line', () => {
+        expect(() => instrumentCreateBatch('c4', NEW, 'tap', 'Tap', ITEMS[0], 5)).toThrow('is not a line');
+        expect(() => instrumentMoveBatch('m2', ITEMS[2], ITEMS[0], 5)).toThrow('is not a line');
     });
 });
 

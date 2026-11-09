@@ -45,13 +45,15 @@ import type { MapStudioState, Props } from './MapStudio';
 import { MapStudioStoreDelegate } from './MapStudioStoreDelegate';
 import { MapItemRecord } from './contract';
 import {
-    Drawing, DrawingTool, GeometryPick, REASON_SELF_INTERSECTS, drawingEnds, inField, isDrawingTool, minVertices, startDrawing, withVertices
+    Drawing, DrawingTool, GeometryPick, INSTRUMENT_CLICK_PX, REASON_SELF_INTERSECTS, drawingEnds, inField, isDrawingTool, minVertices, offLineText,
+    readDistance, startDrawing, withVertices
 } from './drawing';
 import { Selection } from './features';
 import {
-    EDGES_CROSS, SnapTarget, canDeleteVertex, endSideOf, nearestSnap, ringCrosses, snapDistanceM, snapTargets, snapTargetsForLine
+    EDGES_CROSS, Position as LinePosition, SnapTarget, canDeleteVertex, endSideOf, lengthM, nearestSnap, placeAlong, project, ringCrosses, snapDistanceM,
+    snapTargets, snapTargetsForLine
 } from './geometry';
-import { StudioTool, isDrawing, isPlacing, toolKind } from './studio';
+import { StudioTool, armInstrument as armStudio, armedProblem, disarm, isDrawing, isPlacing, toolKind } from './studio';
 import { drawColor } from './theme';
 
 /** Terra Draw's mode names: idle, and the three tools'. */
@@ -72,6 +74,11 @@ export const HANDLE_PX = 12;
 export const LAYER_HANDLE_MIDPOINTS = 'mapstudio-handle-midpoints';
 export const LAYER_HANDLE_CHOSEN = 'mapstudio-handle-chosen';
 const MIDPOINT_IMAGE = 'mapstudio-handle-midpoint';
+/** Entry 9: the map's own source and layer for an instrument dragged along its line (where it lands, on the line). */
+export const LAYER_INSTRUMENT_DRAG = 'mapstudio-instrument-drag';
+const INSTRUMENT_DRAG_SOURCE = 'mapstudio-instrument-drag';
+/** Screen pixels the pointer moves before a press on the selected instrument is a drag, as MapLibre's click tolerance. */
+const DRAG_TOLERANCE_PX = 3;
 /** Terra Draw's point source on the MapLibre adapter (its `td` prefix): the handles' features with their properties. */
 const TERRA_DRAW_POINTS = 'td-point';
 
@@ -93,6 +100,26 @@ export interface Handles {
     awaiting: boolean;
     /** The delegate's geometry refusal last read: a newer one of this item makes the copy again from the stored shape. */
     refusalSeen: number;
+}
+
+/**
+ * An instrument dragged along its line (epic 4 entry 9; WCAG 2.5.7's typed distance is its non-drag way): the pointer is projected
+ * onto the line throughout, so the place shown never leaves it, and the release writes one change. `released` keeps the place
+ * shown after the release until the save settles, since the map draws the stored record.
+ */
+export interface InstrumentDrag {
+    itemId: string;
+    lineId: string;
+    coords: LinePosition[];
+    /** The press's screen point: a drag starts once the pointer moves past DRAG_TOLERANCE_PX. */
+    start: { x: number; y: number };
+    moved: boolean;
+    /** Where it would land: its distance along the line and the point there. */
+    distanceM: number;
+    point: LinePosition;
+    released: boolean;
+    /** The document listeners of the drag, removed when it ends. */
+    stop: () => void;
 }
 
 /** What the tools read and write on the component. */
@@ -126,6 +153,8 @@ export interface EditingHost {
     lastSnap: SnapTarget | null;
     /** The validation hook's latest reason on a committed vertex ('' when valid), which the change handler puts in the state. */
     drawingReason: string;
+    /** Entry 9: the selected instrument being dragged along its line (own handling, not Terra Draw), or null. */
+    instrumentDrag: InstrumentDrag | null;
     /** The component's stable callbacks Terra Draw's finish and change events and the container's keydown take. */
     onDrawFinish: (id: string | number, context: { mode: string; action: string }) => void;
     onDrawChange: (ids: Array<string | number>, type: string) => void;
@@ -233,6 +262,8 @@ export function startTerraDraw(host: EditingHost, map: MapLibreMap, root: HTMLEl
     draw.start();
     host.draw = draw;
     addHandleLayers(map, midpoint, fill, selection);
+    addInstrumentDragLayer(map, fill, selection);
+    map.on('mousedown', (ev: MapMouseEvent) => onInstrumentDown(host, ev));
     if (host.mapContainer) {
         // Capture phase, so Escape and Backspace reach the tool before Terra Draw's own key handling on the canvas.
         host.mapContainer.addEventListener('keydown', host.onKeyDown, true);
@@ -393,11 +424,15 @@ function addHandleLayers(map: MapLibreMap, midpoint: ImageData | null, fill: Hex
  */
 export function stopTerraDraw(host: EditingHost): void {
     const map = host.map;
+    endInstrumentDrag(host);
     if (map) {
-        for (const id of [LAYER_HANDLE_CHOSEN, LAYER_HANDLE_MIDPOINTS]) {
+        for (const id of [LAYER_HANDLE_CHOSEN, LAYER_HANDLE_MIDPOINTS, LAYER_INSTRUMENT_DRAG]) {
             if (map.getLayer(id)) {
                 map.removeLayer(id);
             }
+        }
+        if (map.getSource(INSTRUMENT_DRAG_SOURCE)) {
+            map.removeSource(INSTRUMENT_DRAG_SOURCE);
         }
         if (map.hasImage(MIDPOINT_IMAGE)) {
             map.removeImage(MIDPOINT_IMAGE);
@@ -451,6 +486,7 @@ export function applyHandles(host: EditingHost): void {
         }
     }
     keepPick(host);
+    settleInstrumentDrag(host);
     publishHandles(host);
 }
 
@@ -476,6 +512,10 @@ function wantedHandles(host: EditingHost): Omit<Handles, 'featureId' | 'awaiting
     const delegate = host.props.delegate;
     const selected = host.state.selected;
     if (!delegate || delegate.editing === 'off' || !selected || host.state.studio.tool !== null || !host.studioOn()) {
+        return null;
+    }
+    if (host.state.studio.armed !== null) {
+        // An instrument being placed on the line (entry 9): the next click is its place, so no handle takes it.
         return null;
     }
     if (host.state.studio.selected.length >= 2) {
@@ -590,6 +630,14 @@ function publishHandles(host: EditingHost): void {
         el.setAttribute('data-handle-midpoints', handles ? String(midpoints) : '');
         // Whether the handles show a change not yet drawn from the record (being saved, or waiting its turn).
         el.setAttribute('data-handles-changed', handles && copy ? String(copyChanged(host, copy)) : '');
+        // Entry 9: the selected instrument that drags along its line, and where a drag under way would land (metres along it).
+        const draggable = draggableInstrument(host);
+        el.setAttribute('data-instrument-handle', draggable ? draggable.item.id : '');
+        const drag = host.instrumentDrag;
+        el.setAttribute('data-instrument-drag', drag && drag.moved && !drag.released ? String(drag.distanceM) : '');
+        const armed = host.state.studio.armed;
+        el.setAttribute('data-armed-line', armed ? armed.lineId : '');
+        el.setAttribute('data-armed-kind', armed ? armed.kindId : '');
     }
     const pick = host.state.geometry;
     const chosen = pick && pick.index !== null && handles && handles.itemId === pick.itemId ? pick.index : -1;
@@ -821,7 +869,8 @@ export function canDelete(host: EditingHost): boolean {
 
 /** The Point, Line or Area tool is in hand, or a drawing is in progress: no delete then, by the footer or the key (entry 25's review). */
 export function toolInHand(host: EditingHost): boolean {
-    return host.state.studio.tool !== null || host.state.drawing !== null;
+    // An instrument being placed (entry 9) counts too: the Delete key does not delete its line meanwhile.
+    return host.state.studio.tool !== null || host.state.drawing !== null || host.state.studio.armed !== null;
 }
 
 /**
@@ -901,11 +950,18 @@ export function onDeleteKey(host: EditingHost): boolean {
     return deleteSelected(host);
 }
 
-/** Every tool is off while map.load says the store is unreachable: a drawing in progress is cancelled, a placed pin dropped. */
+/**
+ * Every tool is off while map.load says the store is unreachable: a drawing in progress is cancelled, a placed pin dropped; an
+ * instrument being placed is put down then too, and when its line has left the map or the studio (entry 9).
+ */
 export function applyEditing(host: EditingHost): void {
     const off = !!host.props.delegate && host.props.delegate.editing === 'off';
     if (off && host.state.studio.tool !== null) {
         putToolDown(host);
+    }
+    const armed = host.state.studio.armed;
+    if (armed !== null && (off || !host.studioOn() || !armedLine(host))) {
+        disarmInstrument(host);
     }
 }
 
@@ -1256,6 +1312,15 @@ export function onKeyDown(host: EditingHost, ev: KeyboardEvent): void {
         if (isDrawing(host.state.studio) || isPlacing(host.state.studio)) {
             ev.preventDefault();
             putToolDown(host);
+        } else if (host.instrumentDrag && !host.instrumentDrag.released) {
+            // A drag along the line let go with Esc: nothing is sent (entry 9).
+            ev.preventDefault();
+            endInstrumentDrag(host);
+            publishHandles(host);
+        } else if (host.state.studio.armed !== null) {
+            // The instrument being placed is put down (entry 9); Details stays open for a second Esc to close.
+            ev.preventDefault();
+            disarmInstrument(host);
         }
         return;
     }
@@ -1267,5 +1332,298 @@ export function onKeyDown(host: EditingHost, ev: KeyboardEvent): void {
             host.lastSnap = null;
             mode.undo();
         }
+    }
+}
+
+/*
+ * Instruments (epic 4 entry 9; EXPERIENCE.md Instruments, owner 2026-11-06 and 2026-11-09): no toolbar tool. Add an instrument in a
+ * selected line's Details arms its kind (`armInstrument`); the next click within INSTRUMENT_CLICK_PX of that line places it at the
+ * click's projection (`onArmedClick`), or a distance typed in the drawing bar places it there (`placeTyped`); a click elsewhere or a
+ * distance outside the line is refused in words in the bar, nothing saved; Esc or Cancel puts it down. One create with its point
+ * and attachment, one undo step, then the new instrument's Details with Name focused. A selected instrument drags along its line
+ * with the Select tool (own handling, not Terra Draw): the pointer is projected onto the line throughout and the release writes one
+ * change; snapping never applies. Its non-drag way is the distance typed in its Details (WCAG 2.5.7).
+ */
+
+/** The line an instrument is being placed on, with its coordinates and the armed kind, or null (no line on the map, none armed). */
+function armedLine(host: EditingHost): { line: MapItemRecord; coords: LinePosition[] } | null {
+    const armed = host.state.studio.armed;
+    const line = armed ? host.liveItem(armed.lineId) : undefined;
+    if (!line || line.geometry.type !== 'LineString' || line.version < 1) {
+        return null;
+    }
+    return { line, coords: line.geometry.coordinates as LinePosition[] };
+}
+
+/**
+ * Add an instrument (entry 9), its kind picked: armed on the selected line, the tool in hand put down (its drawing and pins go),
+ * the chosen point or Move dropped; nothing while the store is unreachable or the line is not stored on the map.
+ */
+export function armInstrument(host: EditingHost, lineId: string, kindId: string): void {
+    const delegate = host.props.delegate;
+    const line = host.liveItem(lineId);
+    if (!delegate || delegate.editing === 'off' || !host.studioOn() || !line || line.geometry.type !== 'LineString' || line.version < 1) {
+        return;
+    }
+    if (host.draw && host.state.studio.tool !== null) {
+        host.draw.setMode(DRAW_MODE_OFF);
+    }
+    clearPlacedPoints(host);
+    host.lastSnap = null;
+    host.drawingReason = '';
+    host.setState((prev) => ({ drawing: null, snapHint: '', geometry: null, studio: armStudio(prev.studio, lineId, kindId) }));
+    console.info('[MapStudio] Add an instrument: ' + kindId + ' on ' + line.name + ', placed by a click on the line or a typed distance.');
+}
+
+/** The instrument being placed put down (Esc, Cancel): nothing is sent. True when one was armed. */
+export function disarmInstrument(host: EditingHost): boolean {
+    if (host.state.studio.armed === null) {
+        return false;
+    }
+    host.setState((prev) => (prev.studio.armed !== null ? { studio: disarm(prev.studio) } : null));
+    return true;
+}
+
+/** A click or a typed distance refused (entry 9): the words in the bar, nothing sent. */
+function refuseArmed(host: EditingHost, problem: string): void {
+    host.setState((prev) => {
+        const studio = armedProblem(prev.studio, problem);
+        return studio === prev.studio ? null : { studio };
+    });
+    console.info('[MapStudio] ' + problem + '; nothing was saved.');
+}
+
+/**
+ * A click on the map while an instrument is armed (entry 9), before every other click: within INSTRUMENT_CLICK_PX of the line it
+ * places the instrument at the click's projection; anywhere else (the empty map, another line, a marker) it is refused in the bar.
+ * True when the click was taken.
+ */
+export function onArmedClick(host: EditingHost, ev: MapMouseEvent): boolean {
+    const armed = host.state.studio.armed;
+    const map = host.map;
+    if (armed === null || !map) {
+        return false;
+    }
+    const target = armedLine(host);
+    if (!target) {
+        disarmInstrument(host);
+        return true;
+    }
+    const at = project(target.coords, [ev.lngLat.lng, ev.lngLat.lat]);
+    const p = map.project(at.point as [number, number]);
+    if (Math.hypot(p.x - ev.point.x, p.y - ev.point.y) > INSTRUMENT_CLICK_PX) {
+        refuseArmed(host, offLineText(target.line.name));
+        return true;
+    }
+    placeInstrument(host, target, at.distanceM);
+    return true;
+}
+
+/** The drawing bar's Place (or Enter in its field, entry 9): the typed distance in metres places the instrument, else the words why not. */
+export function placeTyped(host: EditingHost, text: string): void {
+    const target = armedLine(host);
+    if (!target) {
+        disarmInstrument(host);
+        return;
+    }
+    const read = readDistance(text, lengthM(target.coords));
+    if ('problem' in read) {
+        refuseArmed(host, read.problem);
+        return;
+    }
+    placeInstrument(host, target, read.distanceM);
+}
+
+/**
+ * The instrument placed (entry 9): one create through the delegate (its point and attachment in one op, "add <kind>"), then it
+ * takes the selection and its Details open with Name focused, as a placed pad's do (the armed placement goes with the line's
+ * selection, studio.ts `keepArmed`).
+ */
+function placeInstrument(host: EditingHost, target: { line: MapItemRecord; coords: LinePosition[] }, distanceM: number): void {
+    const armed = host.state.studio.armed;
+    const delegate = host.props.store.delegate as MapStudioStoreDelegate | undefined;
+    const kinds = host.props.delegate ? host.props.delegate.lists.kinds : [];
+    if (armed === null || !delegate) {
+        return;
+    }
+    const kind = kinds.find((k) => k.id === armed.kindId && k.instrument === true);
+    if (!kind) {
+        refuseArmed(host, 'The kind list has no instrument kind ' + armed.kindId);
+        return;
+    }
+    const itemId = delegate.createInstrument(target.line.id, kind, distanceM);
+    if (itemId === null) {
+        disarmInstrument(host);
+        return;
+    }
+    const place = placeAlong(target.coords, distanceM);
+    host.focusNameId = itemId;
+    host.closePopup();
+    host.dockChange((prev) => ({ ...host.selectionState(prev, { id: itemId, kind: 'point' }), pick: null, panel: itemId }),
+        [place.point[0], place.point[1]]);
+    console.info('[MapStudio] ' + kind.name + ' added on ' + target.line.name + ' at ' + place.distanceM + ' m: ' + itemId);
+}
+
+/**
+ * The selected instrument that drags along its line (entry 9), with its line's coordinates: Select in hand in the studio, the store
+ * reachable, one stored instrument selected whose attachment names a line on the map; else null.
+ */
+function draggableInstrument(host: EditingHost): { item: MapItemRecord; coords: LinePosition[] } | null {
+    const delegate = host.props.delegate;
+    const selected = host.state.selected;
+    if (!delegate || delegate.editing === 'off' || !selected || host.state.studio.tool !== null || host.state.studio.armed !== null
+        || host.state.studio.selected.length !== 1 || !host.studioOn()) {
+        return null;
+    }
+    const item = host.liveItem(selected.id);
+    if (!item || item.version < 1 || item.geometry.type !== 'Point' || item.attachment === null) {
+        return null;
+    }
+    const line = host.liveItem(item.attachment.lineId);
+    if (!line || line.geometry.type !== 'LineString') {
+        return null;
+    }
+    return { item, coords: line.geometry.coordinates as LinePosition[] };
+}
+
+/**
+ * The map's own source and layer for an instrument dragged along its line (entry 9): where it would land, a disc in the selection
+ * token ringed in the surface token, as the chosen point is drawn. Without the tokens the drag still works, the layer is left out.
+ */
+function addInstrumentDragLayer(map: MapLibreMap, fill: HexColor | null, selection: HexColor | null): void {
+    if (map.getSource(INSTRUMENT_DRAG_SOURCE)) {
+        return;
+    }
+    map.addSource(INSTRUMENT_DRAG_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    if (!fill || !selection) {
+        return;
+    }
+    map.addLayer({
+        id: LAYER_INSTRUMENT_DRAG, type: 'circle', source: INSTRUMENT_DRAG_SOURCE,
+        paint: { 'circle-radius': 9, 'circle-color': selection, 'circle-opacity': 0.85, 'circle-stroke-width': 2.5, 'circle-stroke-color': fill }
+    });
+}
+
+/** The drag layer shows `point` (or nothing for null). */
+function showDragPoint(host: EditingHost, point: LinePosition | null): void {
+    const map = host.map;
+    const source = map ? map.getSource(INSTRUMENT_DRAG_SOURCE) as { setData?: (data: unknown) => void } | undefined : undefined;
+    if (!source || typeof source.setData !== 'function') {
+        return;
+    }
+    source.setData({ type: 'FeatureCollection', features: point === null ? []
+        : [{ type: 'Feature', geometry: { type: 'Point', coordinates: point }, properties: {} }] });
+}
+
+/**
+ * A press on the map (entry 9): on the selected instrument (within HANDLE_PX of its marker), with Select in hand and no Shift (the
+ * box and the lasso), it starts a drag along its line: the map does not pan, and the document follows the pointer until release.
+ */
+function onInstrumentDown(host: EditingHost, ev: MapMouseEvent): void {
+    const map = host.map;
+    const original = ev.originalEvent as MouseEvent | undefined;
+    if (!map || host.instrumentDrag || (original && (original.button !== 0 || original.shiftKey || original.altKey || original.ctrlKey || original.metaKey))) {
+        return;
+    }
+    const target = draggableInstrument(host);
+    if (!target || target.item.geometry.type !== 'Point') {
+        return;
+    }
+    const c = target.item.geometry.coordinates;
+    const at = map.project([c[0], c[1]]);
+    if (Math.hypot(at.x - ev.point.x, at.y - ev.point.y) > HANDLE_PX) {
+        return;
+    }
+    // The map does not pan from this press (MapLibre's drag pan reads it).
+    ev.preventDefault();
+    const canvas = map.getCanvas();
+    const move = (e: MouseEvent): void => onInstrumentMove(host, e);
+    const up = (e: MouseEvent): void => onInstrumentUp(host, e);
+    document.addEventListener('mousemove', move, true);
+    document.addEventListener('mouseup', up, true);
+    host.instrumentDrag = {
+        itemId: target.item.id, lineId: target.item.attachment!.lineId, coords: target.coords, start: { x: ev.point.x, y: ev.point.y }, moved: false,
+        distanceM: target.item.attachment!.distanceM, point: [c[0], c[1]], released: false,
+        stop: () => {
+            document.removeEventListener('mousemove', move, true);
+            document.removeEventListener('mouseup', up, true);
+            canvas.style.cursor = '';
+        }
+    };
+}
+
+/** The pointer's screen point on the map's canvas. */
+function canvasPoint(host: EditingHost, e: MouseEvent): { x: number; y: number } | null {
+    const map = host.map;
+    if (!map) {
+        return null;
+    }
+    const rect = map.getCanvas().getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+/** The drag follows the pointer (entry 9): projected onto the line, so where it would land never leaves it; no snapping. */
+function onInstrumentMove(host: EditingHost, e: MouseEvent): void {
+    const drag = host.instrumentDrag;
+    const map = host.map;
+    const p = canvasPoint(host, e);
+    if (!drag || drag.released || !map || !p) {
+        return;
+    }
+    if (!drag.moved && Math.hypot(p.x - drag.start.x, p.y - drag.start.y) <= DRAG_TOLERANCE_PX) {
+        return;
+    }
+    drag.moved = true;
+    const lngLat = map.unproject([p.x, p.y]);
+    const at = project(drag.coords, [lngLat.lng, lngLat.lat]);
+    drag.distanceM = at.distanceM;
+    drag.point = at.point;
+    map.getCanvas().style.cursor = 'grabbing';
+    showDragPoint(host, at.point);
+    publishHandles(host);
+}
+
+/**
+ * The drag released (entry 9): one change through the delegate at its place on the line, "move <name>", released off the line at
+ * the pointer's projection; a press that did not move is a click (the selection's) and sends nothing. The place stays shown until
+ * the save settles.
+ */
+function onInstrumentUp(host: EditingHost, e: MouseEvent): void {
+    const drag = host.instrumentDrag;
+    if (!drag || drag.released) {
+        return;
+    }
+    onInstrumentMove(host, e);
+    drag.stop();
+    const delegate = host.props.store.delegate as MapStudioStoreDelegate | undefined;
+    const item = host.liveItem(drag.itemId);
+    const changed = !!item && !!item.attachment && item.attachment.distanceM !== drag.distanceM;
+    if (!drag.moved || !delegate || !changed || !delegate.moveInstrument(drag.itemId, drag.distanceM)) {
+        endInstrumentDrag(host);
+        publishHandles(host);
+        return;
+    }
+    drag.released = true;
+    console.info('[MapStudio] Instrument ' + drag.itemId + ' dragged along its line to ' + drag.distanceM + ' m: one change.');
+    publishHandles(host);
+}
+
+/** The drag over (Esc, released and settled, Terra Draw stopped): its listeners and its shown place go. */
+function endInstrumentDrag(host: EditingHost): void {
+    const drag = host.instrumentDrag;
+    if (!drag) {
+        return;
+    }
+    host.instrumentDrag = null;
+    drag.stop();
+    showDragPoint(host, null);
+}
+
+/** After every update: a released drag's place goes once nothing is in flight (its save drew the instrument there, or was refused). */
+function settleInstrumentDrag(host: EditingHost): void {
+    const drag = host.instrumentDrag;
+    const delegate = host.props.delegate;
+    if (drag && drag.released && !(delegate && delegate.editInFlight)) {
+        endInstrumentDrag(host);
     }
 }

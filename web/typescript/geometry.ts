@@ -110,6 +110,58 @@ function placeOp(instrument: MapItemRecord, lineId: string, coords: Position[], 
 }
 
 /**
+ * An instrument's place `distanceM` metres along a line (epic 4 entry 9): the distance to 0.1 m, kept within 0 and the line's
+ * length, and the point at that distance to 6 decimals, as the Gateway stores and checks them (within 1 m of the place).
+ */
+export function placeAlong(coords: Position[], distanceM: number): { point: Position; distanceM: number } {
+    const total = lengthM(coords);
+    const d = Math.min(Math.max(0, round1(distanceM)), round1(total));
+    const at = pointAt(coords, d);
+    return { point: [round6(at[0]), round6(at[1])], distanceM: d };
+}
+
+/**
+ * A new instrument on a line (epic 4 entry 9; EXPERIENCE.md Instruments: added from its line's Details, placed by a click on the
+ * line or a typed distance): one create op with its point and its attachment `{lineId, distanceM}`, as `placeOp` writes them,
+ * named after the kind (the placeholder the editor renames), with the kind's prefill.
+ */
+export function instrumentCreateBatch(batchId: string, itemId: string, kind: string, name: string, line: MapItemRecord,
+    distanceM: number, properties: Record<string, unknown> = {}): EditBatch {
+    const place = placeAlong(lineCoords(line), distanceM);
+    return {
+        batchId,
+        ops: [{
+            op: 'create', entity: 'item', id: itemId, baseVersion: 0,
+            data: {
+                kind,
+                name,
+                geometry: { type: 'Point', coordinates: place.point },
+                attachment: { lineId: line.id, distanceM: place.distanceM },
+                ...(Object.keys(properties).length === 0 ? {} : { properties })
+            }
+        }]
+    };
+}
+
+/**
+ * An instrument moved along its line (epic 4 entry 9: dragged, or its distance typed; never off the line, WCAG 2.5.7): one update
+ * op with its new point and attachment at `distanceM` on `line`, at the instrument's version.
+ */
+export function instrumentMoveBatch(batchId: string, instrument: MapItemRecord, line: MapItemRecord, distanceM: number): EditBatch {
+    const place = placeAlong(lineCoords(line), distanceM);
+    return {
+        batchId,
+        ops: [{
+            op: 'update', entity: 'item', id: instrument.id, baseVersion: instrument.version,
+            data: {
+                geometry: { type: 'Point', coordinates: place.point },
+                attachment: { lineId: line.id, distanceM: place.distanceM }
+            }
+        }]
+    };
+}
+
+/**
  * A reshape or vertex change (insert, move or delete a vertex) of a line: one batch with the
  * line's new geometry and, for each instrument on it, its nearest place on the new geometry.
  */

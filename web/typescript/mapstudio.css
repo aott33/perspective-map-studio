@@ -3198,6 +3198,101 @@
     padding: 0 10px;
 }
 
+/* Entry 9: an instrument's Location ("On L-SWD at 1.1 km", the distance along the line typed, the line's length beside it) and a
+   line's Instruments row (Add an instrument, the short list of instrument kinds, the instruments in order with their distances). */
+.mapstudio-field-pair--distance {
+    align-items: center;
+}
+
+.mapstudio .mapstudio-field-distance {
+    flex: 0 0 110px;
+    width: 110px;
+}
+
+.mapstudio-field-length {
+    min-height: 0;
+    color: var(--mapstudio-secondary);
+    white-space: nowrap;
+}
+
+.mapstudio-input[readonly] {
+    color: var(--mapstudio-secondary);
+    background: transparent;
+}
+
+.mapstudio-field-add-instrument {
+    height: 24px;
+    padding: 0 10px;
+}
+
+.mapstudio-field-add-instrument[aria-pressed="true"] {
+    border-color: var(--callToAction);
+    color: var(--callToAction);
+}
+
+.mapstudio-instrument-kinds {
+    display: flex;
+    flex-direction: column;
+    padding: 4px;
+    border: 1px solid var(--mapstudio-divider);
+    border-radius: 8px;
+    background: var(--mapstudio-surface);
+    box-shadow: var(--mapstudio-float-shadow);
+}
+
+.mapstudio-instrument-kind,
+.mapstudio-instrument-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 28px;
+    padding: 2px 6px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--label);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.mapstudio-instrument-kind:hover,
+.mapstudio-instrument-kind:focus-visible,
+.mapstudio-instrument-row:hover,
+.mapstudio-instrument-row:focus-visible {
+    background: var(--mapstudio-blank);
+}
+
+.mapstudio-instrument-kind-glyph {
+    flex: 0 0 auto;
+    color: var(--neutral-80, var(--label));
+}
+
+.mapstudio-instrument-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.mapstudio-instrument-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mapstudio-instrument-at {
+    flex: 0 0 auto;
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+}
+
+.mapstudio-instruments-none {
+    color: var(--mapstudio-secondary);
+}
+
 /* The place line under the hint (entry 27): where the point lands, in the secondary text colour, its tooltip naming the sources;
    a swap flag reads in the text colour, as a field's problem does. Words only, no hue. */
 .mapstudio-field-place {
@@ -3864,6 +3959,47 @@
 /* While Move waits for its click (entry 5) the map takes a crosshair over MapLibre's grab and the markers' pointer. */
 .mapstudio-map[data-moving="point"] .maplibregl-canvas,
 .mapstudio-map[data-moving="item"] .maplibregl-canvas {
+    cursor: crosshair !important;
+}
+
+/* Entry 9: the drawing bar while an instrument is placed from its line's Details: the title wraps with Details docked (the map is
+   about 718 px at 1366), the distance field and the line's length kept on one line beside Cancel and Place. */
+.mapstudio-drawing-bar--instrument {
+    width: max-content;
+}
+
+.mapstudio-drawing-bar--instrument .mapstudio-drawing-words {
+    flex: 0 1 auto;
+    min-width: 160px;
+}
+
+.mapstudio-drawing-bar--instrument .mapstudio-drawing-title,
+.mapstudio-drawing-bar--instrument .mapstudio-drawing-hint {
+    white-space: normal;
+}
+
+.mapstudio-instrument-place {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+}
+
+.mapstudio .mapstudio-instrument-distance {
+    width: 76px;
+}
+
+.mapstudio-instrument-length {
+    color: var(--neutral-70, var(--label--disabled));
+    white-space: nowrap;
+}
+
+.mapstudio-instrument-place-button {
+    flex: 0 0 auto;
+}
+
+/* While an instrument waits for its click on the line (entry 9) the map takes a crosshair, as Move does. */
+.mapstudio-map[data-armed-line]:not([data-armed-line=""]) .maplibregl-canvas {
     cursor: crosshair !important;
 }
 
