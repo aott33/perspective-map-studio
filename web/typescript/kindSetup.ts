@@ -11,13 +11,19 @@
  * Also here: the setup read with its defaults (`readSetup`: `on`, `count` and `summary` true, `icon` false), a key value's `key`
  * made from its label when the row is first saved (`keyFromLabel`), a refusal's Gateway words placed beside the field they name
  * (`refusalPlace`, by the order the rows were sent in), the header's override count and words, the resolve note's words, the
- * Style rule section's one read-only line, and the preview item (the kind's first linked item by name, remembered per kind for
+ * stored style rule in one line, and the preview item (the kind's first linked item by name, remembered per kind for
  * the browser session, never stored).
+ *
+ * From entry 12b1, section 6's editor: the style rule and an area kind's tints as they are typed (`RuleDraft`, `TintsDraft`),
+ * read from the stored parts (`ruleDraft`, `tintsDraft`) and checked in shape before anything is sent (`checkRule`, `checkTints`:
+ * the part as it is saved, or what is missing in words, "Not saved yet"). A rule and the tints are each one part, sent whole
+ * (`SetupEdit` `styleRule`, `areaTints`).
  */
 
 import { Asset, Kind } from './adapters';
 import { EditBatch, EditOp, ErrorCodes, KindSetupRecord, MapItemRecord } from './contract';
 import { isRecord } from './json';
+import { PRESETS, TINTS } from './live';
 import { ASSET_ID, ASSET_PATH, ITEM_ID, ITEM_NAME, PROPERTY_PREFIX } from './placeholders';
 import { plural } from './history';
 import { UnsavedEntry, isBusy, isTransient } from './unsaved';
@@ -61,8 +67,16 @@ export interface SetupView {
     /** The popup link, '' for none. */
     link: string;
     popupView: { path: string; params: Param[] } | null;
-    /** The stored style rule as it is (read only until entry 12b), or null. */
+    /** The stored style rule as it is, or null (`ruleDraft` reads it for the editor). */
     styleRule: Record<string, unknown> | null;
+    /** An area kind's stored category tints, or null. */
+    areaTints: { property: string; tints: TintRow[] } | null;
+}
+
+/** One category's tint as it is typed: '' while none is picked. */
+export interface TintRow {
+    category: string;
+    tint: string;
 }
 
 function text(value: unknown): string {
@@ -98,7 +112,12 @@ export function readSetup(setup: Record<string, unknown> | null | undefined): Se
         }
         popupView = { path: text(s.popupView.path), params };
     }
-    return { comms, kpis, alarms, link: text(s.link), popupView, styleRule: isRecord(s.styleRule) ? s.styleRule : null };
+    let areaTints: SetupView['areaTints'] = null;
+    if (isRecord(s.areaTints)) {
+        const rows = Array.isArray(s.areaTints.tints) ? s.areaTints.tints.filter(isRecord) : [];
+        areaTints = { property: text(s.areaTints.property), tints: rows.map((t) => ({ category: text(t.category), tint: text(t.tint) })) };
+    }
+    return { comms, kpis, alarms, link: text(s.link), popupView, styleRule: isRecord(s.styleRule) ? s.styleRule : null, areaTints };
 }
 
 /**
@@ -122,7 +141,11 @@ export type SetupEdit =
     | { part: 'param.add'; name: string; value: string }
     | { part: 'param.value'; name: string; value: string }
     | { part: 'param.name'; name: string; to: string }
-    | { part: 'param.remove'; name: string };
+    | { part: 'param.remove'; name: string }
+    /** The whole style rule (entry 12b1): replaced, or removed with null (None). */
+    | { part: 'styleRule'; rule: Record<string, unknown> | null }
+    /** An area kind's whole tints part: replaced, or removed with null (the property emptied). */
+    | { part: 'areaTints'; tints: Record<string, unknown> | null };
 
 function without(setup: Record<string, unknown>, key: string): Record<string, unknown> {
     if (!(key in setup)) {
@@ -264,6 +287,10 @@ export function applyEdit(stored: Record<string, unknown> | null | undefined, ed
             delete out[edit.name];
             return withParams(setup, out);
         }
+        case 'styleRule':
+            return edit.rule === null ? without(setup, 'styleRule') : { ...setup, styleRule: edit.rule };
+        case 'areaTints':
+            return edit.tints === null ? without(setup, 'areaTints') : { ...setup, areaTints: edit.tints };
         default:
             return setup;
     }
@@ -363,6 +390,14 @@ export const Fields = {
     link: 'link',
     popupPath: 'popupView.path',
     styleRule: 'styleRule',
+    /** The value a rule reads, its expression, and one of its cases by its place as sent. */
+    ruleSource: 'styleRule.source',
+    ruleExpression: 'styleRule.expression',
+    ruleCase: (index: number): string => 'styleRule.cases.' + index,
+    /** An area kind's tints, their property, and one category's row. */
+    areaTints: 'areaTints',
+    tintsProperty: 'areaTints.property',
+    tint: (category: string): string => 'areaTints.tints.' + category,
     /** A key value row, and one value of it. */
     kpi: (key: string, value?: 'label' | 'path' | 'unit' | 'on' | 'icon'): string => 'kpis.' + key + (value ? '.' + value : ''),
     /** A popup view param's row. */
@@ -417,8 +452,31 @@ export function refusalPlace(message: string, sent: Record<string, unknown> | nu
     if (rest.indexOf('link: ') === 0 || rest.indexOf('link ') === 0) {
         return { at: Fields.link, words: after('link') };
     }
+    // A case is the row at that place as sent (entry 12b1): a rule is sent whole, one case per row, in the rows' order.
+    const ruleCase = /^styleRule\.cases\[(\d+)\](?:\.(?:value|min|max|preset))?/.exec(rest);
+    if (ruleCase) {
+        return { at: Fields.ruleCase(Number(ruleCase[1])), words: after(ruleCase[0]) };
+    }
+    for (const where of [Fields.ruleExpression, 'styleRule.source.path', 'styleRule.source.kpi', Fields.ruleSource]) {
+        if (rest.indexOf(where + ': ') === 0 || rest.indexOf(where + ' ') === 0) {
+            return { at: where === Fields.ruleExpression ? where : Fields.ruleSource, words: after(where) };
+        }
+    }
     if (rest.indexOf('styleRule') === 0) {
-        return { at: Fields.styleRule, words: rest };
+        return { at: Fields.styleRule, words: after(/^styleRule(?:\.[A-Za-z]+)*/.exec(rest)![0]) };
+    }
+    // A tint is named by its category as sent: only the rows with a tint are sent, so the place alone would not find the row.
+    const tint = /^areaTints\.tints\[(\d+)\](?:\.(?:category|tint))?/.exec(rest);
+    if (tint) {
+        const held = sent && isRecord(sent.areaTints) && Array.isArray(sent.areaTints.tints) ? sent.areaTints.tints[Number(tint[1])] : null;
+        return isRecord(held) && typeof held.category === 'string' ? { at: Fields.tint(held.category), words: after(tint[0]) }
+            : { at: Fields.areaTints, words: rest };
+    }
+    if (rest.indexOf(Fields.tintsProperty + ': ') === 0) {
+        return { at: Fields.tintsProperty, words: after(Fields.tintsProperty) };
+    }
+    if (rest.indexOf('areaTints') === 0) {
+        return { at: Fields.areaTints, words: after(/^areaTints(?:\.[A-Za-z]+)*/.exec(rest)![0]) };
     }
     return { at: '', words: rest };
 }
@@ -610,13 +668,17 @@ export function resolveNote(path: string, kind: Kind, state: ResolveState | unde
     return { text: 'Resolves for ' + state.n + ' of ' + state.m + ' ' + plural(lowerKind(kind)), warning: state.n < state.m, state: 'resolved' };
 }
 
-/** The setup's tag paths that are asked of `tags.resolve`: those below the asset, each once (a full path is said without asking). */
+/**
+ * The setup's tag paths that are asked of `tags.resolve`: those below the asset, each once (a full path is said without asking);
+ * the tag path a style rule reads last (entry 12b1).
+ */
 export function pathsToResolve(view: SetupView): string[] {
-    const paths = [view.comms ? view.comms.path : '', view.alarms ? view.alarms.path : ''].concat(view.kpis.map((k) => k.path));
+    const source = view.styleRule && isRecord(view.styleRule.source) ? text(view.styleRule.source.path) : '';
+    const paths = [view.comms ? view.comms.path : '', view.alarms ? view.alarms.path : ''].concat(view.kpis.map((k) => k.path)).concat([source]);
     return paths.filter((p, i) => p !== '' && !isFullPath(p) && paths.indexOf(p) === i);
 }
 
-// ---- Section 6, read only until entry 12b ----
+// ---- Section 6: what is stored, in words ----
 
 /** The key value a style rule is built on, or null (a path, the instruments, or none). */
 export function ruleKpi(setup: SetupView): string | null {
@@ -630,7 +692,7 @@ export function removeBlocked(setup: SetupView, key: string): string {
 }
 
 /**
- * The Style rule section's one read-only line: "No style rule", "States on Status: 4 states", "Bands on Flow: 3 bands",
+ * The stored style rule in one line: "No style rule", "States on Status: 4 states", "Bands on Flow: 3 bands",
  * "Expression on Pressure", "From the instruments on the line: the worst of them".
  */
 export function styleRuleLine(setup: SetupView): string {
@@ -748,4 +810,389 @@ export function pausedText(storePaused: boolean, waiting: UnsavedEntry | null): 
         return 'Not saved - the map store is read only';
     }
     return isTransient(reason.code) ? 'Not saved - store unreachable' : 'Not saved - ' + reason.message;
+}
+
+// ---- Section 6: the Style rule editor (entry 12b1) ----
+
+/** A rule's type as the editor's segmented choice has it; None is no rule. */
+export type RuleType = 'none' | 'states' | 'bands' | 'expression' | 'instruments';
+
+/** The value a rule reads: a key value by its key, a typed tag path, or none picked yet. */
+export type RuleSource = { from: '' } | { from: 'kpi'; key: string } | { from: 'path'; path: string };
+
+/** One States case as typed: the value's text and the preset, '' while none is picked. */
+export interface StateRow {
+    value: string;
+    preset: string;
+}
+
+/** One band as typed: from and to as text, empty for an open end, and the preset. */
+export interface BandRow {
+    from: string;
+    to: string;
+    preset: string;
+}
+
+/**
+ * A rule as the editor holds it (owner decision 3): the type chosen, the value read, and each type's own cases side by side, so
+ * a type switched away from and back has its cases again. Only the chosen type's part is saved.
+ */
+export interface RuleDraft {
+    type: RuleType;
+    source: RuleSource;
+    states: StateRow[];
+    bands: BandRow[];
+    expression: string;
+}
+
+export const NO_RULE: RuleDraft = { type: 'none', source: { from: '' }, states: [], bands: [], expression: '' };
+
+/** The types a kind's rule may have: From its instruments only for a line kind that is not an area. */
+export function ruleTypes(kind: Kind): RuleType[] {
+    const types: RuleType[] = ['none', 'states', 'bands', 'expression'];
+    return kind.geometry === 'line' && !kind.area ? types.concat(['instruments']) : types;
+}
+
+export const RULE_TYPE_WORDS: Record<RuleType, string> = {
+    none: 'None', states: 'States', bands: 'Bands', expression: 'Expression', instruments: 'From its instruments'
+};
+
+/** The closed preset list of a kind, by name (`StylePresets.presetsFor`): the line presets too for a line kind. */
+export function presetsFor(kind: Kind): string[] {
+    return kind.geometry === 'line' ? PRESETS.slice() : PRESETS.slice(0, 5);
+}
+
+const NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
+
+/** A typed number, or NaN: digits with an optional sign, point and exponent, nothing else. */
+export function typedNumber(typed: string): number {
+    const t = typed.trim();
+    const n = NUMBER.test(t) ? Number(t) : NaN;
+    return isFinite(n) ? n : NaN;
+}
+
+/**
+ * A States value as typed (docs/kind-setup.md: text, a number, or true or false; 1 and "1" are distinct cases): a number as a
+ * number, `true` and `false` as themselves, text in double quotes as that text ("1" is the text 1), anything else as text.
+ * Undefined for nothing typed.
+ */
+export function typedValue(typed: string): string | number | boolean | undefined {
+    const t = typed.trim();
+    if (t === '') {
+        return undefined;
+    }
+    if (t.length >= 2 && t.charAt(0) === '"' && t.charAt(t.length - 1) === '"') {
+        return t.slice(1, -1);
+    }
+    if (t === 'true' || t === 'false') {
+        return t === 'true';
+    }
+    const n = typedNumber(t);
+    return isNaN(n) ? t : n;
+}
+
+/** A stored States value as it is typed: a text that would read as something else (a number, true, nothing) in double quotes. */
+export function valueText(value: unknown): string {
+    if (typeof value === 'number' || typeof value === 'boolean') {
+        return String(value);
+    }
+    if (typeof value !== 'string') {
+        return '';
+    }
+    return typedValue(value) === value ? value : '"' + value + '"';
+}
+
+function numberText(value: unknown): string {
+    return typeof value === 'number' ? String(value) : '';
+}
+
+/** A stored style rule read for the editor; a rule of no known shape reads as None. */
+export function ruleDraft(rule: Record<string, unknown> | null | undefined): RuleDraft {
+    if (!rule) {
+        return NO_RULE;
+    }
+    const src = isRecord(rule.source) ? rule.source : {};
+    if ('instruments' in src) {
+        return { ...NO_RULE, type: 'instruments' };
+    }
+    const source: RuleSource = typeof src.kpi === 'string' ? { from: 'kpi', key: src.kpi }
+        : typeof src.path === 'string' ? { from: 'path', path: src.path } : { from: '' };
+    const cases = Array.isArray(rule.cases) ? rule.cases.filter(isRecord) : [];
+    if (rule.type === 'states') {
+        return { ...NO_RULE, type: 'states', source, states: cases.map((c) => ({ value: valueText(c.value), preset: text(c.preset) })) };
+    }
+    if (rule.type === 'bands') {
+        return { ...NO_RULE, type: 'bands', source,
+            bands: cases.map((c) => ({ from: numberText(c.min), to: numberText(c.max), preset: text(c.preset) })) };
+    }
+    if (rule.type === 'expression') {
+        return { ...NO_RULE, type: 'expression', source, expression: text(rule.expression) };
+    }
+    return NO_RULE;
+}
+
+/**
+ * The stored rule taken into a draft (another editor saved it, or a save of this one was given up): the stored type, value and
+ * that type's cases, the other types' cases kept as they were typed (owner decision 3).
+ */
+export function foldRule(draft: RuleDraft, stored: RuleDraft): RuleDraft {
+    return {
+        type: stored.type,
+        source: stored.type === 'none' || stored.type === 'instruments' ? draft.source : stored.source,
+        states: stored.type === 'states' ? stored.states : draft.states,
+        bands: stored.type === 'bands' ? stored.bands : draft.bands,
+        expression: stored.type === 'expression' ? stored.expression : draft.expression
+    };
+}
+
+/** A draft checked in shape (owner decision 2). */
+export interface RuleCheck {
+    /** The rule as it is saved, null for None (the rule removed); undefined while it is not whole. */
+    rule?: Record<string, unknown> | null;
+    /** What is missing, a sentence each; empty when the rule is whole. */
+    missing: string[];
+    /** The rows a sentence names, by their place: their inputs are marked. */
+    rows: number[];
+}
+
+function sourceOf(source: RuleSource, missing: string[], needed: boolean): Record<string, unknown> | undefined {
+    if (source.from === 'kpi') {
+        return { kpi: source.key };
+    }
+    if (source.from === 'path') {
+        if (source.path.trim() === '') {
+            missing.push('Type the tag path the rule reads.');
+            return undefined;
+        }
+        return { path: source.path.trim() };
+    }
+    if (needed) {
+        missing.push('Pick the value the rule reads.');
+    }
+    return undefined;
+}
+
+/**
+ * A draft checked as the Gateway will check it (`KindSetup.java`), in the browser first, so a half-built rule is never sent
+ * (matrix S2, S3): a States or Bands rule needs its value, at least one case, a preset in every row; a States value is typed and
+ * has one case; a band's from is below its to, bands are in order and do not overlap, only the first is open below and only the
+ * last open above; an expression needs its text. What the Gateway alone can tell (a tag path's form, an expression that cannot
+ * be read) it still refuses, with its words beside the field.
+ */
+export function checkRule(draft: RuleDraft, kind: Kind): RuleCheck {
+    const missing: string[] = [];
+    const rows: number[] = [];
+    const mark = (i: number, words: string): void => {
+        missing.push(words);
+        if (rows.indexOf(i) < 0) {
+            rows.push(i);
+        }
+    };
+    if (draft.type === 'none') {
+        return { rule: null, missing, rows };
+    }
+    if (draft.type === 'instruments') {
+        return ruleTypes(kind).indexOf('instruments') >= 0 ? { rule: { source: { instruments: 'worst' } }, missing, rows }
+            : { missing: ['Only a line kind that is not an area takes its look from its instruments.'], rows };
+    }
+    const presets = presetsFor(kind);
+    const preset = (i: number, name: string, noun: string): void => {
+        if (name === '') {
+            mark(i, noun + ' ' + (i + 1) + ' has no preset.');
+        } else if (presets.indexOf(name) < 0) {
+            mark(i, noun + ' ' + (i + 1) + ': ' + name + ' is not a preset of this kind.');
+        }
+    };
+    const source = sourceOf(draft.source, missing, draft.type !== 'expression');
+    if (draft.type === 'expression') {
+        const expression = draft.expression.trim();
+        if (expression === '') {
+            missing.push('Type the expression.');
+        }
+        return missing.length > 0 ? { missing, rows } : { rule: { ...(source ? { source } : {}), type: 'expression', expression }, missing, rows };
+    }
+    const cases: Array<Record<string, unknown>> = [];
+    if (draft.type === 'states') {
+        if (draft.states.length === 0) {
+            missing.push('Add a case.');
+        }
+        const values: Array<string | number | boolean | undefined> = [];
+        draft.states.forEach((row, i) => {
+            const value = typedValue(row.value);
+            if (value === undefined) {
+                mark(i, 'Case ' + (i + 1) + ' has no value.');
+            } else {
+                const twin = values.indexOf(value);
+                if (twin >= 0) {
+                    mark(i, 'Case ' + (i + 1) + ' has the same value as case ' + (twin + 1) + ' (' + valueText(value) + '): each value has one case.');
+                }
+            }
+            values.push(value);
+            preset(i, row.preset, 'Case');
+            cases.push({ value, preset: row.preset });
+        });
+    } else {
+        if (draft.bands.length === 0) {
+            missing.push('Add a band.');
+        }
+        let previous: number | null = null;
+        const last = draft.bands.length - 1;
+        draft.bands.forEach((row, i) => {
+            const read = (typed: string, end: string): number | null => {
+                if (typed.trim() === '') {
+                    return null;
+                }
+                const n = typedNumber(typed);
+                if (isNaN(n)) {
+                    mark(i, 'Band ' + (i + 1) + ': its ' + end + ' "' + typed.trim() + '" is not a number.');
+                }
+                return n;
+            };
+            const min = read(row.from, 'from');
+            const max = read(row.to, 'to');
+            if (min === null && i > 0) {
+                mark(i, 'Band ' + (i + 1) + ' needs a from: only the first band is open below.');
+            }
+            if (max === null && i < last) {
+                mark(i, 'Band ' + (i + 1) + ' needs a to: only the last band is open above.');
+            }
+            if (min !== null && max !== null && min >= max) {
+                mark(i, 'Band ' + (i + 1) + ': its from (' + min + ') is not below its to (' + max + ').');
+            }
+            if (i > 0 && min !== null && previous !== null && min < previous) {
+                mark(i, 'Band ' + (i + 1) + ' starts at ' + min + ', below the end of the band before (' + previous + '): bands are in order and do not overlap.');
+            }
+            previous = max === null || isNaN(max) ? previous : max;
+            preset(i, row.preset, 'Band');
+            cases.push({ min, max, preset: row.preset });
+        });
+    }
+    return missing.length > 0 ? { missing, rows } : { rule: { source, type: draft.type, cases }, missing, rows };
+}
+
+/** "Not saved yet. Band 2 has no preset." under the rows, or '' when nothing is missing (owner decision 2). */
+export function unsavedText(missing: readonly string[]): string {
+    return missing.length === 0 ? '' : 'Not saved yet. ' + missing.join(' ');
+}
+
+/** Whether a draft is what is stored: both whole and the same rule, whatever order the stored rule's keys are in. */
+export function sameRule(draft: RuleDraft, stored: Record<string, unknown> | null | undefined, kind: Kind): boolean {
+    const mine = checkRule(draft, kind).rule;
+    const theirs = checkRule(ruleDraft(stored), kind).rule;
+    return mine !== undefined && theirs !== undefined && JSON.stringify(mine) === JSON.stringify(theirs);
+}
+
+/** The name of the value a rule reads, for "When Pressure is": the key value's label, else "the value". */
+export function sourceName(source: RuleSource, kpis: readonly KeyValue[]): string {
+    if (source.from !== 'kpi') {
+        return 'the value';
+    }
+    const kpi = kpis.find((k) => k.key === source.key);
+    return kpi && kpi.label !== '' ? kpi.label : source.key;
+}
+
+/** The presets an expression's text names, in order, each once: its preview tiles (EXPERIENCE.md, Open Question 4). */
+export function expressionPresets(expression: string, kind: Kind): string[] {
+    const presets = presetsFor(kind);
+    const out: string[] = [];
+    const quoted = /'([^']*)'|"([^"]*)"/g;
+    let m = quoted.exec(expression);
+    while (m) {
+        const name = m[1] !== undefined ? m[1] : m[2];
+        if (presets.indexOf(name) >= 0 && out.indexOf(name) < 0) {
+            out.push(name);
+        }
+        m = quoted.exec(expression);
+    }
+    return out;
+}
+
+// ---- Section 6: an area kind's tints (entry 12b1) ----
+
+/** An area kind's tints as the editor holds them: the property read ('' for none) and a row per category. */
+export interface TintsDraft {
+    property: string;
+    rows: TintRow[];
+}
+
+/** The tint names, the closed palette. */
+export const TINT_NAMES: readonly string[] = TINTS;
+
+/** Whether a property's categories are a choice field's choices (owner decision 4): then the rows are fixed, else typed. */
+export function fixedCategories(kind: Kind, property: string): boolean {
+    const field = kind.fields.find((f) => f.key === property);
+    return !!field && field.type === 'choice';
+}
+
+/**
+ * The rows of a property: for a choice field one per choice, with its stored tint, then any stored category that is no choice
+ * (kept, so nothing stored is dropped unseen); for any other field the stored rows, typed.
+ */
+export function tintRows(kind: Kind, property: string, stored: readonly TintRow[]): TintRow[] {
+    const field = kind.fields.find((f) => f.key === property);
+    if (!field || field.type !== 'choice') {
+        return stored.map((r) => ({ ...r }));
+    }
+    const rows = field.choices.map((c) => ({ category: c, tint: (stored.find((r) => r.category === c) || { tint: '' }).tint }));
+    return rows.concat(stored.filter((r) => field.choices.indexOf(r.category) < 0).map((r) => ({ ...r })));
+}
+
+/** The stored tints read for the editor. */
+export function tintsDraft(stored: SetupView['areaTints'], kind: Kind): TintsDraft {
+    return stored ? { property: stored.property, rows: tintRows(kind, stored.property, stored.tints) } : { property: '', rows: [] };
+}
+
+/** The tints checked in shape. */
+export interface TintsCheck {
+    /** The part as it is saved, null for no property (the part removed); undefined while it is not whole. */
+    tints?: Record<string, unknown> | null;
+    missing: string[];
+    rows: number[];
+}
+
+/**
+ * The tints checked as the Gateway will (`KindSetup.java` `areaTints`): no property removes the part; a choice field's rows
+ * without a tint are left out and one at least has a tint; a typed row has a category of its own and a tint.
+ */
+export function checkTints(draft: TintsDraft, kind: Kind): TintsCheck {
+    const missing: string[] = [];
+    const rows: number[] = [];
+    if (draft.property === '') {
+        return { tints: null, missing, rows };
+    }
+    const fixed = fixedCategories(kind, draft.property);
+    const tints: TintRow[] = [];
+    draft.rows.forEach((row, i) => {
+        const category = row.category.trim();
+        let ok = true;
+        if (!fixed && category === '') {
+            missing.push('Category ' + (i + 1) + ' has no name.');
+            ok = false;
+        } else if (tints.some((t) => t.category === category)) {
+            missing.push('Category ' + (i + 1) + ' repeats ' + category + ': each category has one tint.');
+            ok = false;
+        }
+        if (row.tint === '') {
+            if (!fixed) {
+                missing.push((category === '' ? 'Category ' + (i + 1) : category) + ' has no tint.');
+                ok = false;
+            }
+        } else if (ok) {
+            tints.push({ category, tint: row.tint });
+        }
+        if (!ok) {
+            rows.push(i);
+        }
+    });
+    if (missing.length === 0 && tints.length === 0) {
+        missing.push(fixed ? 'Pick a tint for a category.' : 'Add a category.');
+    }
+    return missing.length > 0 ? { missing, rows } : { tints: { property: draft.property, tints }, missing, rows };
+}
+
+/** Whether the tints typed are what is stored. */
+export function sameTints(draft: TintsDraft, stored: SetupView['areaTints'], kind: Kind): boolean {
+    const mine = checkTints(draft, kind).tints;
+    const theirs = checkTints(tintsDraft(stored, kind), kind).tints;
+    return mine !== undefined && theirs !== undefined && JSON.stringify(mine) === JSON.stringify(theirs);
 }

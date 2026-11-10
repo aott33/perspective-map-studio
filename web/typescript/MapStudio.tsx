@@ -1968,8 +1968,14 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         const id = kind.id;
         const chosen = this.state.studio.previews[id];
+        if (this.symbols === null) {
+            // The preset tiles draw the kind's glyph from the sprite (entry 12b1), as the style preview does.
+            items.loadSprite(this).then(() => this.forceUpdate());
+        }
         return (
             <KindSetupPanel key={'kind:' + id}
+                            symbols={this.symbols || {}}
+                            colors={this.markerColors}
                             kind={kind}
                             record={delegate.kindSetups.find((k) => k.kindId === id)}
                             items={delegate.items}

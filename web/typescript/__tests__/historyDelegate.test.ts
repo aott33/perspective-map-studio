@@ -27,6 +27,7 @@ import { EditBatch, HistoryEntry, MapItemRecord } from '../contract';
 import { MESSAGE_EVENT, MessageTypes } from '../messages';
 import { HISTORY_TIMEOUT_MS, MapStudioStoreDelegate } from '../MapStudioStoreDelegate';
 import { undoLabel } from '../undoStack';
+import { saveCardFor } from '../unsaved';
 
 const AT: [number, number] = [-103.8689, 32.2297];
 const NORTH: [number, number] = [-103.8689, 32.23006];
@@ -225,6 +226,28 @@ describe('Revert (B4, B5)', () => {
         expect(state.unsaved[0].state).toBe('refused');
         expect(state.unsaved[0].conflict![0].changedBy).toBe('mapoperator');
         expect(state.undo.done).toBe(0);
+        // S11 (entry 12b1): the entry is marked as a Revert, so its card offers only "Use mapoperator's version".
+        expect(state.unsaved[0].revert).toBe(true);
+        const card = saveCardFor({ unsaved: state.unsaved, paused: false, dismissed: [], records: state.items, kinds: [], locale: '' });
+        expect(card).toMatchObject({ kind: 'conflict', who: 'mapoperator', onTop: false, blocked: '' });
+        const before = ofType(MessageTypes.EDITS_APPLY).length;
+        delegate.applyOnTop(sent.body.batchId);
+        expect(ofType(MessageTypes.EDITS_APPLY)).toHaveLength(before);
+        expect(delegate.mapStateToProps().unsaved).toHaveLength(1);
+    });
+
+    test('an ordinary edit refused the same way is no Revert: Apply mine on top is offered', () => {
+        delegate.renameItem('p31', 'P31 renamed');
+        const sent = lastOf(MessageTypes.EDITS_APPLY);
+        reply(MessageTypes.ERROR, sent.id, {
+            code: 'conflict', message: 'P31 was changed by mapoperator.', batchId: sent.body.batchId,
+            conflicts: [{ index: 0, entity: 'item', id: 'p31', baseVersion: 2, current: { ...P31, version: 3 }, changedBy: 'mapoperator',
+                changedAt: '2026-11-09T10:44:00Z' }]
+        });
+        const state = delegate.mapStateToProps();
+        expect(state.unsaved[0].revert).toBeUndefined();
+        expect(saveCardFor({ unsaved: state.unsaved, paused: false, dismissed: [], records: state.items, kinds: [], locale: '' }))
+            .toMatchObject({ kind: 'conflict', onTop: true });
     });
 
     test('Revert waits as Undo does: a second press while the first is saved sends nothing; never held behind another save of the item', () => {

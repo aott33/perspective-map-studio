@@ -10,7 +10,7 @@ import { ChromeGlyph } from './ChromeGlyph';
  * - **conflict**: the warning glyph, "Not saved - conflict with Sam's change", the other editor's change ("Sam moved P14 about
  *   40 m north at 10:42, while you were editing it."), "Your change, kept here and not saved: ...", then "Use Sam's version" and
  *   a primary "Apply mine on top" (only the first, with the reason in words, when they deleted it or my add met one that
- *   exists); "1 of 2" while two conflicts wait.
+ *   exists; only the first too for a kind setup's save and for a refused Revert, entry 12b1); "1 of 2" while two conflicts wait.
  * - **unreachable**: the cloud glyph, "Store unreachable", what is kept and that editing is paused, a primary "Try again" and
  *   "Show my 2 edits", which opens the row's list of them.
  * - **busy**: the warning glyph, "Not saved - Map Studio is busy", the Gateway's sentence, "Your change, kept here: ...", a

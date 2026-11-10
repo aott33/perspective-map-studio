@@ -46,10 +46,10 @@ export class UnsavedSender {
 
     /**
      * Queue a new batch and send it at once, at any level (the Gateway decides the role), with the records its ops started
-     * from (entry 10: the conflict card's words).
+     * from (entry 10: the conflict card's words) and whether it is a Revert (entry 12b1: its conflict card has one choice).
      */
-    enqueueAndSend(batch: EditBatch, now: Date, before: MapItemRecord[] = []): void {
-        this.queue.enqueue(batch, now, before);
+    enqueueAndSend(batch: EditBatch, now: Date, before: MapItemRecord[] = [], revert = false): void {
+        this.queue.enqueue(batch, now, before, revert);
         this.host.changed();
         this.send(batch.batchId);
     }

@@ -245,6 +245,61 @@ describe('a refused value (K5, K6)', () => {
     });
 });
 
+// Entry 12b1: the rule and the tints are each one part, sent whole on the stored setup; a refused case stands beside its row.
+describe('the style rule and the area tints saved as parts (12b1: S1, S6, S8, S10)', () => {
+    const bands = { source: { kpi: 'pressure' }, type: 'bands', cases: [{ min: null, max: 900, preset: 'normal' }, { min: 900, max: null, preset: 'warning' }] };
+
+    test('S1, S10: a whole rule replaces the stored one and every other part is sent as stored; None removes it', () => {
+        expect(delegate.saveKindSetup('pad', 'styleRule', { part: 'styleRule', rule: bands }, 3)).toBe(true);
+        const op = lastOf(MessageTypes.EDITS_APPLY).body.ops[0];
+        expect(op).toMatchObject({ op: 'update', entity: 'kindSetup', id: 'pad', baseVersion: 3 });
+        expect(op.data.setup).toEqual({ ...PAD_SETUP, styleRule: bands });
+        for (const key of ['comms', 'kpis', 'alarms', 'link'] as const) {
+            expect(op.data.setup[key]).toBe(PAD_SETUP[key]);
+        }
+        saved(4);
+        expect(stored('pad')!.setup.styleRule).toEqual(bands);
+        expect(state().undo.done).toBe(0);
+        delegate.saveKindSetup('pad', 'styleRule', { part: 'styleRule', rule: null }, 4);
+        const removed = lastOf(MessageTypes.EDITS_APPLY).body.ops[0];
+        expect(removed.baseVersion).toBe(4);
+        expect('styleRule' in removed.data.setup).toBe(false);
+        expect(removed.data.setup.kpis).toBe(PAD_SETUP.kpis);
+    });
+
+    test('the stored rule sent again changes nothing and sends nothing', () => {
+        const before = applies().length;
+        delegate.saveKindSetup('pad', 'styleRule', { part: 'styleRule', rule: JSON.parse(JSON.stringify(PAD_SETUP.styleRule)) }, 3);
+        expect(applies()).toHaveLength(before);
+        expect(saves('pad')).toEqual({ saving: [], refusals: [], done: 1 });
+    });
+
+    test('S8: a refused case stands beside the row at that place as sent, the stored rule stands; the expression\'s reason beside its field', () => {
+        const rule = { ...bands, cases: [bands.cases[0], { min: 900, max: 600, preset: 'warning' }] };
+        delegate.saveKindSetup('pad', 'styleRule', { part: 'styleRule', rule }, 3);
+        refused('invalid', 'Op 0 (pad): styleRule.cases[1]: min must be below max.');
+        expect(saves('pad').refusals).toEqual([expect.objectContaining({ field: 'styleRule', at: 'styleRule.cases.1', words: 'min must be below max.', code: 'invalid' })]);
+        expect(stored('pad')).toEqual(PAD);
+        expect(state().unsaved).toEqual([]);
+        delegate.saveKindSetup('pad', 'styleRule', { part: 'styleRule', rule: { type: 'expression', expression: 'if(' } }, 3);
+        // Saved again: the last refusal's words go.
+        expect(saves('pad').refusals).toEqual([]);
+        refused('invalid', 'Op 0 (pad): styleRule.expression: the expression could not be read: unexpected end of the expression.');
+        expect(saves('pad').refusals[0]).toMatchObject({ field: 'styleRule', at: 'styleRule.expression',
+            words: 'the expression could not be read: unexpected end of the expression.' });
+    });
+
+    test('S9: the tints are one part; a refused tint is named by its category as sent', () => {
+        const tints = { property: 'operator', tints: [{ category: 'North', tint: 'tint-1' }, { category: 'South', tint: 'tint-9' }] };
+        delegate.saveKindSetup('pad', 'areaTints', { part: 'areaTints', tints }, 3);
+        const op = lastOf(MessageTypes.EDITS_APPLY).body.ops[0];
+        expect(op.data.setup).toEqual({ ...PAD_SETUP, areaTints: tints });
+        expect(op.data.setup.styleRule).toBe(PAD_SETUP.styleRule);
+        refused('invalid', 'Op 0 (pad): areaTints.tints[1].tint: "tint-9" is not a tint. Pick a tint: tint-1, tint-2, tint-3, tint-4, tint-5, tint-6; colour codes are not accepted.');
+        expect(saves('pad').refusals[0]).toMatchObject({ field: 'areaTints', at: 'areaTints.tints.South' });
+    });
+});
+
 describe('two editors (K11)', () => {
     test('another editor\'s save shows at once; the field typed before it is saved at the version it was typed on, and is a conflict', () => {
         // A began typing in Link at version 3; B saved the comms path.

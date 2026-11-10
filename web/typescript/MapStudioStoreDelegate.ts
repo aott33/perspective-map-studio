@@ -304,6 +304,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private undoRun: UndoRun | null = null;
     /** The label and the records before each batch sent by a tool or a field, until its reply makes it a step. */
     private pendingSteps = new Map<string, { label: string; before: MapItemRecord[] }>();
+    /** The batches that are a Revert of a row of Recent changes, until each is queued with its marker (entry 12b1). */
+    private revertBatches = new Set<string>();
     /**
      * One send at a time per map item (entry 2): the batch in flight for an item (its create included), and behind it
      * the batches waiting their turn, each sent right after the reply with its baseVersion set from the reply's
@@ -865,7 +867,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.save = { state: 'saving', itemId };
         this.saveBatchId = batch.batchId;
         // With the records its ops start from (entry 10): a conflict card names what the other editor changed since.
-        this.sender.enqueueAndSend(batch, now, this.recordsFor(batch));
+        // And whether it is a Revert (entry 12b1): the marker is kept with the entry, so the card has one choice after a reload too.
+        this.sender.enqueueAndSend(batch, now, this.recordsFor(batch), this.revertBatches.delete(batch.batchId));
         this.notify();
     }
 
@@ -1838,8 +1841,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     /**
      * Revert a row of Recent changes (entry 11b): its batch's reverse, each op at the row's own version (history.ts `revertBatch`),
      * sent through `sendBatch` as an ordinary edit and one undo step "revert "<sentence>"", so it is refused as any edit is (a change
-     * saved since is a `conflict` naming who made it, on the conflict card). Nothing for a row Revert is not offered for, or while
-     * editing is paused.
+     * saved since is a `conflict` naming who made it, on the conflict card, which offers only "Use <name>'s version": the batch is
+     * queued marked as a Revert, entry 12b1). Nothing for a row Revert is not offered for, or while editing is paused.
      */
     revert(seq: number): boolean {
         const entry = this.history.entries.find((e) => e.seq === seq);
@@ -1863,6 +1866,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         }
         // The undo step names the row as it reads ("Reverted ..." included).
         const sentence = rowSentence(entry, this.history.entries, this.lists.kinds, browserLocale());
+        this.revertBatches.add(batch.batchId);
         this.sendBatch(batch, batch.ops[0].id, revertLabel(sentence));
         return true;
     }

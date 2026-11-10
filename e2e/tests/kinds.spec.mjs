@@ -170,7 +170,9 @@ editorTest.describe('the Kinds surface at 1366 px', () => {
             expect(await panel.locator('.mapstudio-kindsetup-heading').evaluateAll((els) => els.map((e) => e.textContent.trim().replace(/\s+/g, ' '))))
                 .toEqual(['1 Icon', '2 Key values', '3 Comms', '4 Alarms', '5 Popup', '6 Style ruleBuilds on key values']);
             await expect(section(page, 'icon')).toContainText('well-pad');
-            await expect(section(page, 'styleRule')).toContainText('States on {asset.path}/Status: 4 states');
+            // Section 6 is the Style rule editor since entry 12b1 (kindstyle.spec.mjs): the stored States rule's four cases.
+            await expect(section(page, 'styleRule')).toHaveAttribute('data-rule', 'states');
+            await expect(section(page, 'styleRule').locator('.mapstudio-rule-case')).toHaveCount(4);
             await expect(section(page, 'popup')).toContainText('Order is fixed: comms, values, alarms');
             await expect(field(page, 'alarmPage')).toContainText('set in the Designer');
             await expect(input(page, 'kpis.pressure.path')).toHaveValue('{asset.path}/Pressure');
@@ -211,7 +213,8 @@ editorTest.describe('the Kinds surface at 1366 px', () => {
             await expect(remove).toBeDisabled();
             await expect(remove).toHaveAttribute('title', 'Used by the style rule');
             await expect(page.locator('.mapstudio-kv-row[data-key="flow"] .mapstudio-kv-used')).toHaveText('Used by style rule');
-            await expect(section(page, 'styleRule')).toContainText('Bands on Flow: 3 bands');
+            await expect(section(page, 'styleRule')).toHaveAttribute('data-rule', 'bands');
+            await expect(section(page, 'styleRule').locator('.mapstudio-rule-case')).toHaveCount(3);
 
             // Items again: the selected item's Details is back; Kinds again: the kind last chosen.
             await page.locator('.mapstudio-rail-item[data-surface="items"]').click();

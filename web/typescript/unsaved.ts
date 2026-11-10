@@ -71,6 +71,12 @@ export interface UnsavedEntry {
      * editor changed since (a point's move as a distance and a compass word). An entry queued before entry 10 has none.
      */
     before?: MapItemRecord[];
+    /**
+     * The batch is a Revert of a row of Recent changes (entry 12b1's rider, owner 2026-11-10), kept with the entry so it holds
+     * after a reload: a refused Revert's conflict card offers only "Use <name>'s version", since the reverse put on top of the
+     * change made since would take that change back unseen. Absent otherwise.
+     */
+    revert?: boolean;
 }
 
 export const STORAGE_WARNING =
@@ -150,6 +156,9 @@ export function readEntry(value: unknown): UnsavedEntry | null {
         if (before.length > 0) {
             entry.before = before;
         }
+    }
+    if (value.revert === true) {
+        entry.revert = true;
     }
     return entry;
 }
@@ -275,11 +284,17 @@ export class UnsavedQueue {
         return this.entries.find((e) => e.batchId === batchId);
     }
 
-    /** Write a new batch at the end of the queue, before it is sent, with the records its ops started from (entry 10). */
-    enqueue(batch: EditBatch, now: Date, before: MapItemRecord[] = []): UnsavedEntry {
+    /**
+     * Write a new batch at the end of the queue, before it is sent, with the records its ops started from (entry 10) and
+     * whether it is a Revert of a row of Recent changes (entry 12b1).
+     */
+    enqueue(batch: EditBatch, now: Date, before: MapItemRecord[] = [], revert = false): UnsavedEntry {
         const entry: UnsavedEntry = { batchId: batch.batchId, batch, queuedAt: now.toISOString(), state: 'unsent' };
         if (before.length > 0) {
             entry.before = before;
+        }
+        if (revert) {
+            entry.revert = true;
         }
         this.change((list) => {
             if (!list.some((e) => e.batchId === batch.batchId)) {
@@ -842,12 +857,12 @@ function mergeOnto(stored: Record<string, unknown>, mine: Record<string, unknown
  * `current.version` with my op's data; `properties` and `overrides`, which an update carries whole, take only the keys I
  * changed from where I started (`before`) onto the stored ones, so a field the other editor changed and I did not stays
  * theirs. The other ops are as stored. Null when it is not offered: no conflict kept, they deleted the item or my add met
- * one that already exists (`onTopBlockedText`), or the batch saves a kind setup (`isSetupSave`, entry 12a). The stored entry is not
- * changed: the caller discards it.
+ * one that already exists (`onTopBlockedText`), the batch saves a kind setup (`isSetupSave`, entry 12a), or it is a Revert
+ * (`revert`, entry 12b1). The stored entry is not changed: the caller discards it.
  */
 export function onTopBatch(entry: UnsavedEntry, batchId: string): EditBatch | null {
     const conflicts = entry.conflict || [];
-    if (conflicts.length === 0 || onTopBlockedText(entry) !== '' || isSetupSave(entry)) {
+    if (conflicts.length === 0 || onTopBlockedText(entry) !== '' || isSetupSave(entry) || entry.revert === true) {
         return null;
     }
     const ops: EditOp[] = [];
@@ -878,7 +893,7 @@ export function onTopBatch(entry: UnsavedEntry, batchId: string): EditBatch | nu
 /**
  * Whether an entry saves a kind setup (epic 4 entry 12a). A setup is stored whole, so mine cannot go on top of another editor's
  * without taking their other parts back: its conflict card offers only "Use <name>'s version" (owner decision 6, 2026-11-09; to be
- * weighed again in entry 12b).
+ * weighed again in entry 12b; kept in 12b1, owner decision 5 of 2026-11-10).
  */
 export function isSetupSave(entry: UnsavedEntry): boolean {
     return entry.batch.ops.some((op) => op.entity === 'kindSetup');

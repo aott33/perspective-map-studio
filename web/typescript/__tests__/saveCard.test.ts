@@ -137,6 +137,20 @@ describe('Apply mine on top', () => {
         expect(theirChangeText(exists, KINDS)).toBe('Sam already added P14 at 10:42');
         expect(onTopBatch(mine(pad(), { conflict: [] }), 'x')).toBeNull();
     });
+
+    test('not offered for a refused Revert (entry 12b1): the card has only "Use Sam\'s version", with no reason to give', () => {
+        const revert = mine(pad({ version: 4 }), { revert: true });
+        expect(onTopBatch(revert, 'x')).toBeNull();
+        expect(onTopBlockedText(revert)).toBe('');
+        const c = card({ unsaved: [revert] }) as SaveCardData;
+        expect(c).toMatchObject({ kind: 'conflict', who: 'Sam', onTop: false, blocked: '' });
+        const html = renderToStaticMarkup(React.createElement(SaveCard, { card: c, sending: false, belowChip: false, onUseTheirs: () => undefined,
+            onApplyOnTop: () => undefined, onRetry: () => undefined, onRetryStore: () => undefined, onDiscard: () => undefined,
+            onShowEdits: () => undefined, onClose: () => undefined }));
+        expect(html).toContain('data-on-top="false"');
+        expect(html).toContain('Use Sam&#x27;s version');
+        expect(html).not.toContain('Apply mine on top');
+    });
 });
 
 describe('which card shows', () => {

@@ -65,7 +65,7 @@ export function presetSampleSvg(kind: StylePreviewKind, preset: Preset, symbols:
     return markerSvg({ ...markerSpec(kind.icon, state), preset: pointPreset(preset) }, symbols, colors);
 }
 
-function Sample(props: { svg: string; className: string }): React.ReactElement {
+export function Sample(props: { svg: string; className: string }): React.ReactElement {
     // The SVG text comes from markers.ts (the module's own drawing, token values only), never from data.
     return <span className={props.className} aria-hidden="true" dangerouslySetInnerHTML={{ __html: props.svg }} />;
 }

@@ -8,6 +8,7 @@ import { AdapterStatus, Asset, Kind } from '../adapters';
 import { KindSetupRecord, MapItemRecord } from '../contract';
 import { KindSaveState, NO_KIND_SAVES, resolveKey } from '../kindSetup';
 import { KINDS_NOTE, KindList } from '../studio/KindList';
+import { MarkerColors } from '../markers';
 import { KindSetupPanel, KindSetupPanelProps } from '../studio/KindSetupPanel';
 
 const PAD: Kind = { id: 'pad', name: 'Well pad', geometry: 'point', icon: 'well-pad', labelRank: 10, fields: [
@@ -34,6 +35,15 @@ function item(id: string, name: string, over: Partial<MapItemRecord> = {}): MapI
 const ITEMS = [item('a', 'P2', { assetId: 'P14', overrides: { styleRule: { source: { path: '[default]x' } } } }), item('b', 'P3')];
 
 const noop = (): void => undefined;
+
+// Token values as the map reads them from the theme (any text: the tiles only hand them to the marker drawing).
+const COLORS: MarkerColors = {
+    disc: 'rgb(255, 255, 255)', glyph: 'rgb(30, 30, 30)', halo: 'rgb(250, 250, 250)', textSecondary: 'rgb(120, 120, 120)',
+    line: 'rgb(90, 90, 90)', chipEdge: 'rgb(150, 150, 150)', selection: 'rgb(20, 80, 200)',
+    commsLost: 'rgb(125, 60, 189)', alarm: ['rgb(200, 0, 0)', 'rgb(173, 95, 0)', 'rgb(50, 114, 217)'], font: 'Inter, sans-serif',
+    attention: 'rgb(50, 50, 50)', warning: 'rgb(173, 95, 1)', fault: 'rgb(200, 0, 1)',
+    tints: ['rgb(8, 105, 98)', 'rgb(3, 133, 55)', 'rgb(34, 154, 214)', 'rgb(237, 83, 147)', 'rgb(207, 121, 17)', 'rgb(17, 69, 153)']
+};
 
 function panel(over: Partial<KindSetupPanelProps> = {}): string {
     const props: KindSetupPanelProps = {
@@ -116,7 +126,7 @@ describe('a kind\'s setup', () => {
             expect(html).toContain('<span class="mapstudio-kindsetup-number">' + n + '</span> ' + title);
         }
         expect(section(html, 'icon')).toContain('comes from the project&#x27;s kind list');
-        expect(section(html, 'styleRule')).toContain('Bands on Pressure: 2 bands');
+        expect(section(html, 'styleRule')).toContain('data-rule="bands"');
         expect(section(html, 'styleRule')).toContain('Builds on key values');
         expect(section(html, 'alarms')).toContain('/alarms/{item.name}</span> - set in the Designer');
         expect(section(html, 'popup')).toContain('Order is fixed: comms, values, alarms');
@@ -167,6 +177,7 @@ describe('a kind\'s setup', () => {
         expect(html).toContain('Line - applies to 0 items - no overrides');
         expect(section(html, 'keyValues')).toContain('No key values yet');
         expect(section(html, 'styleRule')).toContain('No style rule');
+        expect(section(html, 'styleRule')).toContain('data-rule="none"');
         const popup = section(html, 'popup');
         expect(slice(popup, 'data-field="popup.comms"', '</div>')).toContain('title="Set the heartbeat path first"');
         expect(slice(popup, 'data-field="popup.comms"', '</div>')).toContain('disabled=""');
@@ -218,6 +229,134 @@ describe('a kind\'s setup', () => {
         // A conflict has no words here: its card says them.
         expect(panel({ saves: { saving: ['link'], done: 0, refusals: [{ field: 'link', at: '', words: '', code: 'conflict', batchId: 'b' }] } }))
             .not.toContain('mapstudio-field-refusal');
+    });
+
+    // Entry 12b1: section 6 as it is drawn from the stored rule (the typing and the saves are e2e/tests/kindstyle.spec.mjs).
+    describe('section 6, the Style rule editor (12b1)', () => {
+        const rule = (html: string): string => section(html, 'styleRule');
+        const withRule = (styleRule: unknown, kind: Kind = PAD): string =>
+            panel({ kind, record: { kindId: kind.id, setup: { kpis: SETUP.kpis, styleRule } as Record<string, unknown>, version: 2, deleted: false }, colors: COLORS });
+
+        test('the type is a segmented choice in the panel tabs\' look; From its instruments only for a line kind that is not an area', () => {
+            const html = rule(panel());
+            expect(html.match(/data-type="[a-z]+"/g)).toEqual(['data-type="none"', 'data-type="states"', 'data-type="bands"', 'data-type="expression"']);
+            expect(html).toContain('<button type="button" data-type="bands" aria-pressed="true" class="mapstudio-panel-tab mapstudio-rule-type mapstudio-panel-tab--active">Bands</button>');
+            expect(rule(panel({ kind: LINE, record: undefined, items: [] }))).toContain('data-type="instruments"');
+            expect(rule(panel({ kind: LINE, record: undefined, items: [] }))).toContain('>From its instruments</button>');
+            expect(rule(panel({ kind: FENCE, record: undefined, items: [] }))).not.toContain('data-type="instruments"');
+        });
+
+        test('S1: Bands on a key value: the value select lists every key value, switched-off ones too; a row per band with its preset and tile', () => {
+            const html = rule(panel({ colors: COLORS }));
+            const source = slice(html, 'data-field="styleRule.source"', 'mapstudio-rule-case');
+            expect(source).toContain('<option selected="" value="kpi:pressure">Pressure</option>');
+            expect(source).toContain('<option value="kpi:gas">Gas price (off in the popup)</option>');
+            expect(source).toContain('<option value="path">A tag path</option>');
+            expect(html.match(/class="mapstudio-rule-case"/g)).toHaveLength(2);
+            const second = slice(html, 'data-index="1"', 'Add a band');
+            expect(second).toContain('class="mapstudio-input mapstudio-kindsetup-input mapstudio-rule-from" value="900"');
+            expect(second).toContain('placeholder="Open above"');
+            expect(second).toContain('<option selected="" value="warning">warning</option>');
+            // The closed list by name, never a colour: a point kind has no line presets.
+            expect(second).not.toContain('value="dashed"');
+            expect(second).not.toMatch(/#[0-9a-fA-F]{3,6}"?>/);
+            const tile = slice(second, 'mapstudio-rule-tile', 'mapstudio-rule-remove');
+            expect(tile).toContain('data-preset="warning"');
+            expect(tile).toContain('<svg');
+            expect(tile).toContain('mapstudio-rule-word">Warning</span>');
+            // A stored rule is whole: nothing says Not saved yet.
+            expect(html).toContain('data-unsaved="false"');
+            expect(html).not.toContain('mapstudio-rule-unsaved');
+        });
+
+        test('S2: States on a tag path: "When the value is", the typed path with its resolve note, a tile per case', () => {
+            const styleRule = { source: { path: '{asset.path}/Status' }, type: 'states', cases: [{ value: 1, preset: 'attention' }, { value: '1', preset: 'fault' }] };
+            const key = resolveKey('pad', 'P14', '{asset.path}/Status');
+            const html = rule(panel({ record: { ...RECORD, setup: { ...SETUP, styleRule } }, colors: COLORS, resolves: { [key]: { state: 'resolved', n: 1, m: 1 } } }));
+            expect(html).toContain('data-source="path"');
+            expect(html).toContain('mapstudio-rule-path" value="{asset.path}/Status"');
+            expect(html).toContain('Resolves for 1 of 1 well pads');
+            expect(html.match(/When the value is/g)).toHaveLength(2);
+            expect(html).toContain('mapstudio-rule-value" value="1"');
+            expect(html).toContain('mapstudio-rule-value" value="&quot;1&quot;"');
+            expect(html.match(/class="mapstudio-rule-tile" data-preset="(attention|fault)"/g)).toHaveLength(2);
+            expect(rule(withRule({ source: { kpi: 'pressure' }, type: 'states', cases: [{ value: 1, preset: 'fault' }] }))).toContain('When Pressure is');
+        });
+
+        test('S4: Expression: a multi-line field, the hint, and the Gateway\'s reason beside it when refused', () => {
+            const styleRule = { type: 'expression', expression: "if({value} > 600, 'warning', 'normal')" };
+            const saves: KindSaveState = { saving: [], done: 1, refusals: [
+                { field: 'styleRule', at: 'styleRule.expression', words: 'the expression could not be read: unexpected end.', code: 'invalid', batchId: 'b1' }] };
+            const html = rule(panel({ record: { ...RECORD, setup: { ...SETUP, styleRule } }, colors: COLORS, saves }));
+            const field = slice(html, 'data-field="styleRule.expression"', 'mapstudio-rule-named');
+            expect(field).toContain('<textarea');
+            expect(field).toContain('if({value} &gt; 600, &#x27;warning&#x27;, &#x27;normal&#x27;)</textarea>');
+            expect(field).toContain('{value}</span> is the one reference');
+            expect(field).toContain('The result is a preset name, as text: normal, attention, warning, fault, dimmed.');
+            expect(field).toContain('the expression could not be read: unexpected end.');
+            expect(field).toContain('aria-invalid="true"');
+            // Its value is optional, and its tiles are the presets its text names.
+            expect(html).toContain('<option selected="" value="">No value</option>');
+            expect(html.match(/class="mapstudio-rule-tile" data-preset="(warning|normal)"/g)).toHaveLength(2);
+        });
+
+        test('S5, S6: From its instruments has no value or cases, one line; None says No style rule', () => {
+            const html = rule(withRule({ source: { instruments: 'worst' } }, LINE));
+            expect(html).toContain('data-rule="instruments"');
+            expect(html).toContain('Each segment takes the worst of the instruments at its ends.');
+            expect(html).not.toContain('data-field="styleRule.source"');
+            expect(html).not.toContain('mapstudio-rule-case');
+            const none = rule(panel({ record: { ...RECORD, setup: { ...SETUP, styleRule: undefined } } }));
+            expect(none).toContain('data-rule="none"');
+            expect(none).toContain('No style rule');
+            // "Used by style rule" stands on the key value a saved rule reads, and goes with the rule.
+            expect(section(panel(), 'keyValues')).toContain('Used by style rule');
+            expect(section(panel({ record: { ...RECORD, setup: { ...SETUP, styleRule: undefined } } }), 'keyValues')).not.toContain('Used by style rule');
+        });
+
+        test('S8: a refused case\'s words stand beside that row; a line kind\'s preset list has the line presets', () => {
+            const saves: KindSaveState = { saving: [], done: 1, refusals: [
+                { field: 'styleRule', at: 'styleRule.cases.1', words: 'min must be below max.', code: 'invalid', batchId: 'b1' }] };
+            const html = rule(panel({ saves }));
+            expect(slice(html, 'data-index="0"', 'data-index="1"')).not.toContain('mapstudio-field-refusal');
+            const second = slice(html, 'data-index="1"', 'Add a band');
+            expect(second).toContain('min must be below max.');
+            expect(second).toContain('aria-invalid="true"');
+            expect(html.match(/mapstudio-field-refusal-text/g)).toHaveLength(1);
+            const line = rule(withRule({ source: { kpi: 'pressure' }, type: 'bands', cases: [{ min: 0, max: 1, preset: 'dashed' }] }, LINE));
+            expect(line).toContain('<option selected="" value="dashed">dashed</option>');
+            expect(line).toContain('<option value="dotted">dotted</option>');
+        });
+
+        test('S9: an area kind\'s tints under the rule: the property, a choice field\'s choices as rows, each with its tint and swatch', () => {
+            const fence: Kind = { ...FENCE, fields: [
+                { key: 'operator', label: 'Operator', type: 'choice', required: false, choices: ['North', 'South', 'West'] }] };
+            const record: KindSetupRecord = { kindId: 'geofence', version: 1, deleted: false,
+                setup: { areaTints: { property: 'operator', tints: [{ category: 'North', tint: 'tint-1' }, { category: 'South', tint: 'tint-4' }] } } };
+            const html = rule(panel({ kind: fence, record, items: [], colors: COLORS }));
+            const tints = html.slice(html.indexOf('data-field="areaTints"'));
+            expect(tints).toContain('<option selected="" value="operator">Operator</option>');
+            expect(tints).toContain('<option value="">No tints</option>');
+            expect(tints.match(/class="mapstudio-tint-row"[^>]*data-category="[A-Za-z]+" data-tint="[a-z0-9-]*"/g))
+                .toEqual(['North', 'South', 'West'].map((c, i) => 'class="mapstudio-tint-row" role="group" aria-label="Tint of ' + c + '" data-category="' + c
+                    + '" data-tint="' + ['tint-1', 'tint-4', ''][i] + '"'));
+            expect(slice(tints, 'data-category="South"', 'data-category="West"')).toContain('<option selected="" value="tint-4">tint-4</option>');
+            expect(slice(tints, 'data-category="South"', 'data-category="West"')).toContain('<svg');
+            expect(tints).not.toContain('mapstudio-tints-unsaved');
+            // A text field's categories are typed; a kind that is not an area has no tints.
+            const typed = rule(panel({ kind: { ...FENCE, fields: PAD.fields }, record, items: [] }));
+            expect(typed).toContain('class="mapstudio-input mapstudio-kindsetup-input mapstudio-tint-category" value="North"');
+            expect(typed).toContain('Add a category');
+            expect(rule(panel())).not.toContain('data-field="areaTints"');
+            expect(rule(panel({ kind: LINE, record: undefined, items: [] }))).not.toContain('data-field="areaTints"');
+        });
+
+        test('paused: no control of the rule or the tints takes input', () => {
+            const html = rule(panel({ paused: 'Paused - the map store is unreachable' }));
+            const controls = html.match(/<(?:input|select|button|textarea) [^>]*>/g) || [];
+            expect(controls.length).toBeGreaterThan(8);
+            expect(controls.every((c) => c.indexOf('disabled=""') >= 0)).toBe(true);
+        });
     });
 
     test('paused: the words at the top and no field takes input', () => {

@@ -2738,6 +2738,187 @@
     overflow-wrap: anywhere;
 }
 
+/* Section 6, the Style rule editor (entry 12b1; DESIGN.md Kind setup, key screen 6 kinds-style): the type as a segmented choice in
+   the panel tabs' look, the value, then one bordered row per case with its preset select and a 64 px preview tile
+   (kind-setup-row.preview-tile-width) on the blank map's surface; what is missing in the note box's look. Tokens only: a tile's
+   look is the marker's own drawing from the theme's token values, and a preset is picked by name. */
+.mapstudio-rule,
+.mapstudio-kindsetup-tints {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.mapstudio-kindsetup-tints {
+    padding-top: 12px;
+    border-top: 1px solid var(--mapstudio-divider);
+}
+
+.mapstudio-rule-types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 14px;
+    border-bottom: 1px solid var(--mapstudio-divider);
+}
+
+.mapstudio-panel-tab.mapstudio-rule-type {
+    min-width: 24px;
+    min-height: 24px;
+    white-space: nowrap;
+}
+
+.mapstudio-panel-tab.mapstudio-rule-type:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -2px;
+}
+
+.mapstudio-panel-tab.mapstudio-rule-type:disabled {
+    cursor: not-allowed;
+}
+
+.mapstudio-rule-case,
+.mapstudio-tint-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid var(--mapstudio-divider);
+    border-radius: 6px;
+}
+
+.mapstudio-rule-when,
+.mapstudio-rule-end {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.mapstudio-rule-ends,
+.mapstudio-rule-look,
+.mapstudio-tint-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.mapstudio-rule-ends {
+    align-items: flex-end;
+}
+
+.mapstudio-rule-look > .mapstudio-rule-preset,
+.mapstudio-tint-line > .mapstudio-tint-select {
+    flex: 1 1 auto;
+}
+
+.mapstudio-tint-line > .mapstudio-tint-category {
+    flex: 1 1 96px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-tint-line > .mapstudio-tint-select {
+    flex: 0 1 96px;
+}
+
+.mapstudio-rule-tile {
+    display: inline-flex;
+    flex: 0 0 64px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    box-sizing: border-box;
+    width: 64px;
+    min-height: 48px;
+    padding: 2px;
+    border: 1px solid var(--mapstudio-divider);
+    border-radius: 6px;
+    background: var(--mapstudio-blank);
+    overflow: hidden;
+}
+
+.mapstudio-rule-sample {
+    display: inline-flex;
+    line-height: 0;
+}
+
+.mapstudio-rule-sample--point svg {
+    width: 40px;
+    height: 33px;
+}
+
+.mapstudio-rule-sample--line svg {
+    width: 56px;
+    height: auto;
+}
+
+.mapstudio-rule-word {
+    max-width: 100%;
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: nowrap;
+    background: var(--mapstudio-surface);
+    color: var(--label);
+}
+
+.mapstudio-tint-swatch {
+    display: inline-flex;
+    flex: 0 0 48px;
+    line-height: 0;
+}
+
+.mapstudio-tint-swatch svg {
+    width: 48px;
+    height: 24px;
+}
+
+.mapstudio-dock-button.mapstudio-rule-remove {
+    flex: 0 0 auto;
+}
+
+.mapstudio-button.mapstudio-rule-add {
+    align-self: flex-start;
+}
+
+textarea.mapstudio-input.mapstudio-rule-expression {
+    height: auto;
+    min-height: 76px;
+    padding: 6px 8px;
+    line-height: 1.4;
+    resize: vertical;
+}
+
+.mapstudio-rule-named {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.mapstudio-rule-named-tile {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.mapstudio-rule-unsaved {
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--mapstudio-hover);
+    color: var(--label);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-kindsetup select.mapstudio-input:disabled,
+.mapstudio-kindsetup textarea.mapstudio-input:disabled {
+    cursor: not-allowed;
+}
+
 .mapstudio-kindsetup-with-picker,
 .mapstudio-param-line,
 .mapstudio-kv-line {
