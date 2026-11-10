@@ -2,7 +2,7 @@
 
 A walk through what epic 4 has built so far, grouped by what you do, on the local development stack. Tick each box and note anything that looks or feels off in the Notes line under each section (a screenshot helps). Each note goes into `_bmad-output/initiative-flowmap/tickets/epic-editing/epic-editing.md` Notes or a new entry. The playbook grows as entries land; entry 18 (the 0.4.0 release) finishes it for the release test and the 30-minute test.
 
-Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems) and 11a (the edit record, Gateway only). Still to come: 11b (Recent changes and History), 12 and 13 (the Kinds screen, the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
+Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems) and 11a (the edit record, Gateway only). Also built: 11b (Recent changes and History) and 12a (the Kinds surface and a kind's setup). Still to come: 12b (the style rule editor and area tints), 12c (per-item overrides), 13 (the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
 
 ## Results so far
 
@@ -26,6 +26,7 @@ Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item li
 | 8h. Save problems | | |
 | 8i. The edit record | | |
 | 8j. Recent changes | | |
+| 8k. Kinds and a kind's setup | | |
 | 9. View mode, unchanged | | |
 | 10. Phone (390 px) | | |
 | 11. Designer | | |
@@ -299,6 +300,26 @@ On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor
 - [ ] Scroll to the end of the rows: **Show older** adds the next 50 below; at the end of the record it goes.
 - [ ] Stop the store (`docker stop <MAPSTUDIO_CONTAINER>-pg`) and make an edit: the note box's Undo and every Revert are off, saying "Paused - the map store is unreachable" on hover. Start it again.
 - [ ] Turn the Edit switch off: View mode shows no History.
+
+Notes:
+
+## 8k. Kinds and a kind's setup
+
+On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor, with a second browser (a private window) signed in as the second map editor `mapeditor2` on `/edit`, and a third in View mode on `/live`. Compare the surface with DESIGN.md's Kind setup and key screen 6 ([key-screen-6-kinds-style.png](../_bmad-output/initiative-flowmap/ux-map-studio/mockups/key-screen-6-kinds-style.png)): the list of kinds in the dock, the kind's setup beside it with its header, the Preview item and the numbered sections. The style rule editor, the tag button and the tag browser are later entries (12b, 13).
+
+- [ ] Select a pad, then press **Kinds** on the rail: the dock lists the note "Setup applies to every item of a kind. Items can override." and six kinds (Well pad, Gathering line, Geofence, Tap, Line valve, Meter), each with its glyph, "Point", "Line" or "Area" and its item count. Well pad is chosen and its setup shows where the pad's Details was. Press **Items**: the pad's Details is back.
+- [ ] The setup's header reads "Well pad", "Point - applies to 37 items - 1 override (Point 2 style rule)" and **Preview item** "CTB1 - [default]Mesa/CTB1", the folder again in monospace under it. The sections read 1 ICON, 2 KEY VALUES, 3 COMMS, 4 ALARMS, 5 POPUP, 6 STYLE RULE ("Builds on key values"), in that order.
+- [ ] Under Pressure's path: "Resolves for 4 of 5 well pads" in the warning colour with its glyph (Pad 15 has no Pressure tag); under Flow's: "Resolves for 5 of 5 well pads" in grey. Choose Point 2 as the preview item: the notes are asked again. Reload the page and open Kinds: the preview item is still Point 2.
+- [ ] Change Pressure's path to `{asset.path}/Flow` and press Enter: the header says "Saving..." then "Saved", and within ten seconds every linked pad's icon value on the map (and in the third browser) is its flow, with no reload. 6 Style rule still reads "States on {asset.path}/Status: 4 states". Hover the toolbar's Undo: it names the same step as before. Open **History**: the top row reads "Changed the well pad kind setup" with no Revert. Put the path back.
+- [ ] **Add a key value**, type the label "Gas price" and press Enter: "Type a tag path. This row is not saved yet." and nothing is saved. Type `[default]Shared/GasPrice` and press Enter: saved, and under it "Same tag for every well pad" in the warning colour. Add a fourth row: **Add a key value** is gone. Press its **Icon value** star: Pressure's star goes. Switch Flow's **In popup** off: in the third browser a pad's popup no longer lists Flow.
+- [ ] In 5 Popup untick **Comms**: the Comms section's switch goes off too, and the third browser's popup has no Comms row. The line "Order is fixed: comms, values, alarms" stands under the three checkboxes.
+- [ ] Type the link `//x` and press Enter: under Link, on the warning tint with its glyph, "link is a Perspective page path starting with one / (/pad/{item.name}), not //x."; the field still reads `//x`, the header says "Not saved" and nothing says Saved. Press Esc in the field: the stored link is back and the words go.
+- [ ] Type the popup view `Popups/PadDetails`, press **Add a param**, name it `mapItem` with any value and press Enter: the Gateway's words under that row ("... no param may be named mapItem."). Name it `padName` with the value `a {item.name}`: "... mixes text and placeholders ..." under the row. Press the row's **{ }**, choose `{item.name}` and press Enter: saved. Now empty the popup view's path and press Enter: "Remove its params first. The popup view is kept." under it and nothing is saved; press Esc. (With its params removed first, an emptied path removes the popup view; an emptied heartbeat or alarm source path removes its part at once.)
+- [ ] Choose **Gathering line**: Flow's Remove is off and says "Used by the style rule" on hover. Choose **Meter** (no item, no setup): under Preview item "No meter is linked to an asset yet, so its tag paths cannot be checked."; type a heartbeat path: saved, with no note under it.
+- [ ] Two editors: in the first browser click in Well pad's Link and type `/mine` without leaving the field. In the second browser open Kinds and change the heartbeat path. In the first, the heartbeat path changes at once and Link still reads `/mine`; press Enter: the conflict card reads "Not saved - conflict with mapeditor2's change" with one button, **Use mapeditor2's version**; the fields are paused with the same words. Press it: Link shows the stored link.
+- [ ] Tab through the whole panel: every field, switch, star, picker and Remove is reached and worked by the keyboard (Enter saves a field, Esc puts it back, Esc closes the picker).
+- [ ] On `/adapters` press **incomplete**, reload `/edit` and open Kinds: the kind list's message stands above the rows. Press **ok** again.
+- [ ] Press **Seed the dev map** to put the seed's kind setups back.
 
 Notes:
 

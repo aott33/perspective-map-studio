@@ -70,6 +70,11 @@ export interface ProblemFacts {
     storageWarning: string;
     /** The last geometry save refused for good and the later changes it took with it (entry 5); absent before any. */
     shapeRefused?: ShapeRefusal;
+    /**
+     * A kind setup save was refused and its words stand beside its field in the Kinds panel (entry 12a): it left the queue, so
+     * nothing waits, but the header must not say Saved.
+     */
+    kindRefused?: boolean;
 }
 
 function problem(code: ProblemCode, text: string, glyph: ProblemGlyph, detail: string = text): Problem {
@@ -162,13 +167,13 @@ export function connectionProblem(connection: ConnectionState): Problem | null {
 
 /**
  * The save status beside the list header's title, always shown (the problems on the row under it): "Saving..." while a
- * batch is out, "Not saved" while edits wait, else "Saved".
+ * batch is out, "Not saved" while edits wait or a kind setup's refusal stands (entry 12a), else "Saved".
  */
 export function headerSaveWords(facts: ProblemFacts): string {
     if (facts.save.state === 'saving') {
         return 'Saving...';
     }
-    return editsWait(facts.unsaved, facts.sending) ? 'Not saved' : 'Saved';
+    return editsWait(facts.unsaved, facts.sending) || facts.kindRefused === true ? 'Not saved' : 'Saved';
 }
 
 function present(list: Array<Problem | null>): Problem[] {

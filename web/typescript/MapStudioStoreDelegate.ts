@@ -26,17 +26,24 @@
  * From entry 11b Recent changes (history.ts): `setHistoryOpen` asks `edits.history` for the first page when the History surface
  * opens and again on each `map.changed` while it is open (merged by `seq`, older pages kept), `historyOlder` asks the next page,
  * `historyRetry` asks again after a failed read, and `revert` sends a row's reverse through `sendBatch` as one undo step.
+ * From entry 12a the Kinds screen's saves (kindSetup.ts): `saveKindSetup` saves one edited part of a kind's setup as the whole setup,
+ * built from the newest stored one when it is sent, one save per kind in flight and the later edits after it at the version its
+ * reply gave, never an undo step; an `invalid` reply's words are kept per kind for the field they name (`kindSaves`), a conflict,
+ * the store unreachable and busy stay in the queue as entry 10's; and `askResolve` sends `tags.resolve` for the resolve notes.
  */
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
 import { MapChanges, MapChangedBody } from './changes';
 import { EditBatch, EditLevel, ErrorCodes, KindSetupRecord, LastChange, MapItemData, MapItemRecord } from './contract';
+import { KindRefusal, KindSaveState, ResolveState, SetupEdit, applyEdit, refusalPlace, resolveKey, sameSetup, setupBatch } from './kindSetup';
 import {
     Position, instrumentCreateBatch, instrumentMoveBatch, itemDeleteBatch, itemsDeleteBatch, lineGeometryBatch, pointMoveBatch, splitAtBatch, vertexDeleteBatch,
     vertexMoveBatch
 } from './geometry';
 import { HostLists, NO_HOST_LISTS } from './adapters';
-import { MESSAGE_EVENT, Reply, basemapSource, editsHistory, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText } from './messages';
+import {
+    ErrorBody, MESSAGE_EVENT, Reply, basemapSource, editsHistory, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText, tagsResolve
+} from './messages';
 import {
     HISTORY_EMPTY, HISTORY_PAGE, HistoryState, failRead, mergeFirstPage, mergeOlderPage, readFailedText, revertBatch, revertLabel, rowSentence
 } from './history';
@@ -181,10 +188,35 @@ export interface MapStudioDelegateState {
      * the state of the reads; kept (not cleared) when the surface closes, and read again when it opens.
      */
     history: HistoryState;
+    /**
+     * The Kinds screen's saves (entry 12a), by kind id: the fields being saved or waiting their turn, the refusals that stand, and
+     * a count of the saves settled. A kind with nothing to say is left out.
+     */
+    kindSaves: Record<string, KindSaveState>;
+    /** What `tags.resolve` said of each tag path asked (entry 12a), by kindSetup.ts `resolveKey` (kind, asset, path). */
+    resolves: Record<string, ResolveState>;
+}
+
+/** One edit of a kind's setup on its way: the field it was typed in, the edit, and the setup version it was typed on. */
+interface KindEdit {
+    field: string;
+    edit: SetupEdit;
+    seen: number;
+}
+
+/** A kind's saves (entry 12a): the one in flight with the setup it carries, the edits waiting their turn, the refusals that stand. */
+interface KindWork {
+    flight: (KindEdit & { batchId: string; setup: Record<string, unknown>; restored: boolean }) | null;
+    waiting: KindEdit[];
+    refusals: KindRefusal[];
+    done: number;
 }
 
 /** How long a read of the edit record may take before the surface says it did not answer. */
 export const HISTORY_TIMEOUT_MS = 15_000;
+
+/** How long a `tags.resolve` may take before its note says the check did not answer (the Gateway gives the tag system 5 s). */
+export const RESOLVE_TIMEOUT_MS = 15_000;
 
 /** `localStorage`, or null when the browser refuses it (a private window, blocked site data). */
 export function browserStorage(): KeyValueStore | null {
@@ -304,6 +336,17 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private historyAgain = false;
     /** One timer per read in flight: a read with no answer in 15 s is said to have failed, with Try again. */
     private historyTimers: { first: ReturnType<typeof setTimeout> | null; older: ReturnType<typeof setTimeout> | null } = { first: null, older: null };
+    /** The Kinds screen's saves by kind (entry 12a): one in flight per kind, the later edits behind it. */
+    private kindWork = new Map<string, KindWork>();
+    /** The kind setup batches this page sent, by id: their map.changed is this page's own, not another editor's. */
+    private kindBatches = new Map<string, string>();
+    /** The newest version of each kind's setup that another editor's change gave: a field typed on an older one meets the conflict. */
+    private kindForeign = new Map<string, number>();
+    /** A deleted setup's version, from the conflict a create at 0 met: the create is sent again there, which restores it. */
+    private kindTombstones = new Map<string, number>();
+    /** The resolve notes (entry 12a): what `tags.resolve` said per kind, asset and path, and the asks in flight by message id. */
+    private resolves: Record<string, ResolveState> = {};
+    private resolveAsks = new Map<string, { key: string; timer: ReturnType<typeof setTimeout> }>();
 
     constructor(componentStore: AbstractUIElementStore) {
         super(componentStore);
@@ -390,8 +433,222 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             justAdded: this.justAdded,
             kindSetups: this.changes.state.kindSetups,
             user: this.user,
-            history: this.history
+            history: this.history,
+            kindSaves: this.kindSaveStates(),
+            resolves: this.resolves
         };
+    }
+
+    /** The state's `kindSaves`: every kind with a save on its way, a refusal standing or a save settled. */
+    private kindSaveStates(): Record<string, KindSaveState> {
+        const out: Record<string, KindSaveState> = {};
+        this.kindWork.forEach((work, kindId) => {
+            out[kindId] = {
+                saving: (work.flight ? [work.flight.field] : []).concat(work.waiting.map((w) => w.field)),
+                refusals: work.refusals,
+                done: work.done
+            };
+        });
+        return out;
+    }
+
+    private kindWorkOf(kindId: string): KindWork {
+        let work = this.kindWork.get(kindId);
+        if (!work) {
+            work = { flight: null, waiting: [], refusals: [], done: 0 };
+            this.kindWork.set(kindId, work);
+        }
+        return work;
+    }
+
+    /**
+     * One finished field of a kind's setup (epic 4 entry 12a; kindSetup.ts): the edit of that one part, saved as the kind's whole
+     * setup through `edits.apply`. The setup is built when the save is sent, from the newest stored one (after the reply of the
+     * save in flight), never from the panel's copy, so the parts nobody touched pass through as stored. One save per kind is in
+     * flight; a later edit waits and goes at the version that reply gave. It is no undo step. `seen` is the setup version the
+     * field was typed on: when another editor has saved the kind since, the save goes at `seen` and the Gateway answers the
+     * conflict. False, with one console line, when it is not taken (editing paused, a kind not in the kind list).
+     */
+    saveKindSetup(kindId: string, field: string, edit: SetupEdit, seen: number): boolean {
+        if (this.pausedFor('A kind setup save')) {
+            return false;
+        }
+        if (!this.lists.kinds.some((k) => k.id === kindId)) {
+            console.info('[MapStudio] The kind setup change was dropped: ' + kindId + ' is not in the kind list.');
+            return false;
+        }
+        const work = this.kindWorkOf(kindId);
+        // The field is saved again: what its last save was refused for no longer stands.
+        work.refusals = work.refusals.filter((r) => r.field !== field);
+        work.waiting.push({ field, edit, seen });
+        this.pumpKind(kindId);
+        this.notify();
+        return true;
+    }
+
+    /** A refusal's words cleared (the field put back, or the panel left): every one of the kind that left the queue, or one field's. */
+    clearKindRefusals(kindId: string, field?: string): void {
+        const work = this.kindWork.get(kindId);
+        if (!work) {
+            return;
+        }
+        const kept = work.refusals.filter((r) => r.code === ErrorCodes.CONFLICT || (field !== undefined && r.field !== field));
+        if (kept.length !== work.refusals.length) {
+            work.refusals = kept;
+            this.notify();
+        }
+    }
+
+    /**
+     * The kind's next waiting edit sent, when none is in flight: applied to the stored setup as it is now. An edit that changes
+     * nothing sends nothing and is settled at once.
+     */
+    private pumpKind(kindId: string): void {
+        const work = this.kindWorkOf(kindId);
+        while (work.flight === null && work.waiting.length > 0) {
+            const next = work.waiting.shift() as KindEdit;
+            const stored = this.changes.state.kindSetups.find((k) => k.kindId === kindId);
+            const base = stored ? stored.setup : {};
+            const setup = applyEdit(base, next.edit);
+            if (sameSetup(setup, base)) {
+                work.done++;
+                continue;
+            }
+            // Another editor saved this kind after the field was typed on `seen`: the save goes at `seen`, and is a conflict.
+            const foreign = this.kindForeign.get(kindId) || 0;
+            const tombstone = stored ? undefined : this.kindTombstones.get(kindId);
+            this.kindTombstones.delete(kindId);
+            const batch = setupBatch(kindId, newId(), stored, setup, stored && foreign > next.seen ? next.seen : undefined, tombstone);
+            work.flight = { ...next, batchId: batch.batchId, setup, restored: tombstone !== undefined };
+            this.kindBatches.set(batch.batchId, kindId);
+            // No label: a kind setup save is not an Undo step (owner, 2026-11-09).
+            this.dispatch(batch, kindId, null, new Date());
+        }
+    }
+
+    /** The kind and its work whose save in flight is `batchId`, or null. */
+    private kindFlight(batchId: string): { kindId: string; work: KindWork; flight: NonNullable<KindWork['flight']> } | null {
+        const kindId = this.kindBatches.get(batchId);
+        const work = kindId !== undefined ? this.kindWork.get(kindId) : undefined;
+        return kindId !== undefined && work && work.flight && work.flight.batchId === batchId ? { kindId, work, flight: work.flight } : null;
+    }
+
+    /** A kind setup save saved: the stored setup is the one sent at the reply's version, and the next edit goes on top of it. */
+    private kindSaved(batchId: string, results: Array<{ entity: string; id: string; version: number }>): void {
+        const found = this.kindFlight(batchId);
+        if (!found) {
+            return;
+        }
+        const result = results.find((r) => r.entity === 'kindSetup' && r.id === found.kindId);
+        if (result) {
+            this.changes.savedKindSetup({ kindId: found.kindId, setup: found.flight.setup, version: result.version, deleted: false });
+        }
+        this.settleKind(found.kindId, found.work, batchId);
+    }
+
+    /** A kind's save in flight is done (saved, refused for good, discarded): its turn moves on to the next waiting edit. */
+    private settleKind(kindId: string, work: KindWork, batchId: string): void {
+        work.flight = null;
+        work.refusals = work.refusals.filter((r) => r.batchId !== batchId);
+        work.done++;
+        this.pumpKind(kindId);
+    }
+
+    /**
+     * A kind setup save answered with an error. A transient one (the store unreachable, busy, read only, no answer) stays queued
+     * and replays, as entry 10's. A conflict stays in the queue with its card, the kind's later edits waiting behind it; one
+     * exception: a create at version 0 that met a setup deleted before anyone here typed is sent again at the tombstone's version,
+     * which restores it. Anything else (`invalid`, `role`) leaves the queue: its words stand beside the field they name, by the
+     * order the rows were sent in, the field keeps what was typed and the stored setup stands.
+     */
+    private kindRefused(batchId: string, error: ErrorBody, transient: boolean): void {
+        const found = this.kindFlight(batchId);
+        if (!found || transient) {
+            return;
+        }
+        const { kindId, work, flight } = found;
+        if (error.code === ErrorCodes.CONFLICT) {
+            const conflict = (error.conflicts || []).find((c) => c.entity === 'kindSetup' && c.id === kindId);
+            const stored = this.changes.state.kindSetups.some((k) => k.kindId === kindId);
+            if (conflict && conflict.current && conflict.current.deleted && !stored && !flight.restored
+                && (this.kindForeign.get(kindId) || 0) <= flight.seen && this.sender.discard(batchId)) {
+                this.kindTombstones.set(kindId, conflict.current.version);
+                work.flight = null;
+                work.waiting.unshift({ field: flight.field, edit: flight.edit, seen: flight.seen });
+                console.info('[MapStudio] The ' + kindId + ' kind setup was deleted before: saving it again restores it.');
+                this.pumpKind(kindId);
+                return;
+            }
+            work.refusals = work.refusals.filter((r) => r.batchId !== batchId)
+                .concat([{ field: flight.field, at: '', words: '', code: error.code, batchId }]);
+            return;
+        }
+        const place = refusalPlace(error.message, flight.setup);
+        this.sender.discard(batchId);
+        work.flight = null;
+        work.refusals = work.refusals.filter((r) => r.field !== flight.field && r.batchId !== batchId)
+            .concat([{ field: flight.field, at: place.at, words: place.words, code: error.code, batchId }]);
+        work.done++;
+        this.pumpKind(kindId);
+    }
+
+    /** A queued kind setup save left the queue by a choice (Discard, Use their version): nothing of it stands, the next edit goes. */
+    private kindDropped(batchId: string): void {
+        const found = this.kindFlight(batchId);
+        if (found) {
+            this.settleKind(found.kindId, found.work, batchId);
+        }
+    }
+
+    /**
+     * The resolve notes (entry 12a; EXPERIENCE.md Kind setup: "Each path reports how many items it resolves for"): `tags.resolve`
+     * for each path with the preview item's asset, asked when a path is saved or the preview item changes. A path already being
+     * asked is not asked twice; an earlier answer shows until the new one comes.
+     */
+    askResolve(kindId: string, assetId: string, paths: readonly string[]): void {
+        let asked = false;
+        for (const path of paths) {
+            const key = resolveKey(kindId, assetId, path);
+            if (path === '' || Array.from(this.resolveAsks.values()).some((a) => a.key === key)) {
+                continue;
+            }
+            const message = tagsResolve({ kindId, assetId, path });
+            const timer = setTimeout(() => {
+                this.resolveAsks.delete(message.id);
+                this.resolves = { ...this.resolves, [key]: { state: 'failed', message: 'the Gateway did not answer in time.' } };
+                console.info('[MapStudio] A tags.resolve did not answer.');
+                this.notify();
+            }, RESOLVE_TIMEOUT_MS);
+            this.resolveAsks.set(message.id, { key, timer });
+            if (!this.resolves[key]) {
+                this.resolves = { ...this.resolves, [key]: { state: 'asking' } };
+            }
+            asked = true;
+            this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject);
+        }
+        if (asked) {
+            this.notify();
+        }
+    }
+
+    /** A reply to one of the resolve asks: the count, a full path, or the Gateway's refusal in words. */
+    private onResolveReply(reply: Reply): void {
+        if (reply.kind !== 'tags.resolve.reply' && reply.kind !== 'error') {
+            return;
+        }
+        const ask = this.resolveAsks.get(reply.id);
+        if (!ask) {
+            console.info('[MapStudio] A tags.resolve.reply that nothing waits for was ignored.');
+            return;
+        }
+        clearTimeout(ask.timer);
+        this.resolveAsks.delete(reply.id);
+        const state: ResolveState = reply.kind === 'error' ? { state: 'failed', message: reply.body.message }
+            : reply.body.relative && reply.body.n !== undefined && reply.body.m !== undefined
+                ? { state: 'resolved', n: reply.body.n, m: reply.body.m } : { state: 'shared' };
+        this.resolves = { ...this.resolves, [ask.key]: state };
+        console.debug('[MapStudio] ' + replyText(reply));
+        this.notify();
     }
 
     /**
@@ -1299,6 +1556,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             return;
         }
         this.giveUp(batchId);
+        this.kindDropped(batchId);
         this.checkStoreAfterDiscard();
         this.notify();
     }
@@ -1318,6 +1576,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         }
         this.takeStored(entry);
         this.giveUp(batchId);
+        this.kindDropped(batchId);
         this.checkStoreAfterDiscard();
         this.notify();
     }
@@ -1376,6 +1635,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         for (const c of entry.conflict || []) {
             if (c.entity === 'item' && c.current && this.changes.saved(c.current as MapItemRecord)) {
                 this.itemsRevision++;
+            } else if (c.entity === 'kindSetup' && c.current) {
+                // A kind setup's stored record (entry 12a): the Kinds panel shows the other editor's version, a later one kept.
+                this.changes.savedKindSetup(c.current as KindSetupRecord);
             }
         }
     }
@@ -1411,6 +1673,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.connectionWatch.stop();
         this.clearHistoryTimer('first');
         this.clearHistoryTimer('older');
+        this.resolveAsks.forEach((ask) => clearTimeout(ask.timer));
+        this.resolveAsks.clear();
         if (this.loadRetryTimer !== null) {
             clearTimeout(this.loadRetryTimer);
             this.loadRetryTimer = null;
@@ -1637,6 +1901,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             }
             return;
         }
+        if (reply.kind === 'tags.resolve.reply' || (reply.kind === 'error' && this.resolveAsks.has(reply.id))) {
+            this.onResolveReply(reply);
+            return;
+        }
         if (reply.kind === 'map.load.reply' || (reply.kind === 'error' && reply.id === this.mapLoadId)) {
             this.onMapLoad(reply);
             return;
@@ -1670,8 +1938,18 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.savePaused = false;
             this.itemsRevision++;
             this.store = storeStateFromLoad(reply.body);
+            // A kind setup that moved on across a reload (a gap) is another editor's as far as this page can tell (entry 12a).
+            const heldSetups = this.changes.loadedOnce ? this.changes.state.kindSetups : null;
             // May send one more map.load (a gap among the changes held during the load).
             this.changes.loaded(reply.body);
+            if (heldSetups !== null) {
+                for (const now of this.changes.state.kindSetups) {
+                    const held = heldSetups.find((k) => k.kindId === now.kindId);
+                    if (now.version > (held ? held.version : 0)) {
+                        this.kindForeign.set(now.kindId, Math.max(this.kindForeign.get(now.kindId) || 0, now.version));
+                    }
+                }
+            }
             // The queue of this project and user (owner decision, 2026-10-27); '' when map.load names none.
             const project = this.projectName();
             if (project !== null) {
@@ -1705,6 +1983,22 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         if (this.historyOpen) {
             // Recent changes live while History is open (entry 11b): the first page again, merged by seq.
             this.askHistoryFirst();
+        }
+        if (body && !this.kindBatches.has(body.batchId)) {
+            // A kind setup another editor (or a script, or another tab) saved (entry 12a): a field typed before it meets the conflict.
+            for (const op of body.ops) {
+                if (op.entity !== 'kindSetup') {
+                    continue;
+                }
+                if (op.op === 'delete' || (op.record as { deleted?: unknown }).deleted === true) {
+                    // A setup deleted while the page is open: its version is the tombstone the next save from the screen restores
+                    // at (a create there), not a version that blocks it.
+                    this.kindTombstones.set(op.id, Math.max(this.kindTombstones.get(op.id) || 0, op.version));
+                } else {
+                    this.kindTombstones.delete(op.id);
+                    this.kindForeign.set(op.id, Math.max(this.kindForeign.get(op.id) || 0, op.version));
+                }
+            }
         }
         if (this.changes.changed(body)) {
             this.itemsRevision++;
@@ -1763,6 +2057,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
                 this.save = { state: 'saved', itemId, version: result ? result.version : 1 };
             }
             this.releaseFlight(reply.body.batchId, reply.body.results);
+            // A kind setup save (entry 12a): the stored setup takes the reply's version, and the kind's next edit goes on top of it.
+            this.kindSaved(reply.body.batchId, reply.body.results);
             if (runStep) {
                 // After the save status and the item's turn moved on, so the next reverse starts its own Saving...
                 this.continueRun();
@@ -1780,6 +2076,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             if (outcome.kind === 'failed' && !isTransient(outcome.reason.code)) {
                 // After the refusal is on the save status: a geometry change waiting on it goes now (entry 5) and says Saving...
                 this.giveUp(outcome.batchId);
+            }
+            if (outcome.kind === 'failed') {
+                // A kind setup save (entry 12a): an invalid one leaves the queue, its words beside the field; the rest is entry 10's.
+                this.kindRefused(outcome.batchId, reply.body, isTransient(outcome.reason.code));
             }
             this.store = storeStateFromSaveError(this.store, reply.body);
             if (outcome.kind === 'failed' && !(reply.body.code === ErrorCodes.STORE_UNREACHABLE && !isBusy(reply.body)) && this.savePaused) {

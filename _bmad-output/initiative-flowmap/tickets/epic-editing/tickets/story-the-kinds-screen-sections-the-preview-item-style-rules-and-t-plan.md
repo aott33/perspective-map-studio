@@ -3,14 +3,14 @@ title: "12a: the Kinds surface and a kind's setup (Icon, Key values, Comms, Alar
 type: 'feature'
 ticket: '12'
 created: '2026-11-09'
-status: 'in-progress'
+status: 'built'
 baseline_revision: 'dec0579510c87604ac6c12c65726f7f920a9ee19'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md', '{project-root}/docs/kind-setup.md']
 ---
@@ -24,6 +24,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 **Approach:** Build Kinds as DESIGN.md's Kind setup and key screen 6: the dock lists the project's kinds, and the chosen kind's setup opens in the properties panel's place with the header (preview item, override count) and the sections 1 Icon, 2 Key values, 3 Comms, 4 Alarms, 5 Popup. Each field saves when it is finished, as a `kindSetup` op through `edits.apply`. Entry 12 is split (owner, 2026-11-09): the Style rule section and tints are 12b, per-item overrides 12c; icon, size and label stay read-only (backlog 38); a kind setup save is not an Undo step.
 
 Decisions (owner, 2026-11-09, "take all of a to e, pick 6 C, approve and continue", after the room): (1) a key value row edits label, path and unit; its `key` is made from the label when the row is first saved (letters and digits, a number added on a clash, never empty, at most 64 characters) and never changes after. (2) Remove is off for a key value the style rule uses, saying "Used by the style rule". (3) Alarms shows the project's View alarms link read-only, in one line saying it is set in the Designer. (4) The resolve note says N of M; listing the items a path fails for is backlog 39. (5) The preview item is the kind's first linked item by name, remembered per kind for the browser session, not stored. (6) A kind setup's conflict card offers only "Use <name>'s version"; "Apply mine on top" is hidden for setups, to be weighed again in 12b. (a) The save path and its tests are built before any panel; the pass-through test runs over all five seed setups, each part edited in turn. (b) With no linked item of the kind, one note under the Preview item select says so and no note stands under the paths. (c) A refusal shows the Gateway's words without the "Op N (id): where:" prefix, placed by the order the rows were sent in. (e) A field being typed in is never overwritten by another editor's live change: the other fields follow the store, the focused one keeps its text and meets the conflict on save. The plan stays whole (about 3,000 tokens).
+
+Decision (owner, 2026-11-10, "go with recommendation", after the review's finding 3): an emptied Comms or Alarms path removes that part; an emptied Popup view path removes the part only when it has no params, and is refused in the browser while it has any, with words beside the field saying to remove its params first, nothing sent and the stored view kept. The departures from key screen 6 the owner was shown stay as built.
 
 ## Boundaries & Constraints
 
@@ -83,7 +85,32 @@ Decisions (owner, 2026-11-09, "take all of a to e, pick 6 C, approve and continu
 
 ## Plan Change Log
 
+- 2026-11-09 (implementer): a kind setup save answered `invalid` leaves the unsaved queue once its words stand beside the field (the delegate's `kindSaves`), so no "1 edit not saved" row or Try again shows for it; the dock header says "Not saved" while such a refusal stands (`problems.ts` `kindRefused`) and the words go when the field is saved again, put back with Esc, or the panel is left. A conflict, the store unreachable and busy stay in the queue as entry 10's.
+- 2026-11-09 (implementer): decision (e) is carried by a version, not by the panel's copy: a draft remembers the setup version of its first keystroke, the delegate knows its own kind setup batches by id (their `map.changed` is not another editor's; a setup that moved across a reload is counted as another editor's), and a field typed before another editor's save is sent at the version it was typed on, with the setup still built from the newest stored one. The Gateway then answers the conflict.
+- 2026-11-09 (implementer): a create at version 0 that meets a setup deleted before anyone here typed (the conflict's `current.deleted`) is sent again once at the tombstone's version, which restores it. Without it the first setup of a kind whose setup was once deleted (the empty project after firstrun.spec, any kind a script cleared) could never be saved from the screen. Not in the matrix.
+- 2026-11-09 (implementer): a full path's "Same tag for every well pad" is said without asking `tags.resolve`: the path is stored as typed (the conversion is entry 13's), so it is one tag for every item whatever the reply says. Paths below the asset are asked as the plan has it.
+- 2026-11-09 (implementer): a `comms`, `alarms` or `popupView` path typed empty removes that part, and an empty link removes `link` (the schema takes no part without its path); the popup's Comms, Alarm count and Alarm summary and Add a param are off, saying why, until their path is set. The Comms section's switch and the Popup's Comms checkbox are one value (`comms.on`).
+- 2026-11-10 (implementer): by the owner's decision of 2026-11-10 an emptied Popup view path removes the part only when it has no params; with params it is refused in the browser ("Remove its params first. The popup view is kept."), nothing sent. This replaces the popup view half of the entry above; an emptied Comms or Alarms path stays as built.
+- 2026-11-09 (implementer): a new key value row and a new param row are saved when the cursor leaves the row or on Enter, not per field, so a row is first sent whole (its key made then) and never loses the cursor to its own save. A stored row saves per field. Params are saved as single edits (add, value, name, remove) on the stored params.
+- 2026-11-09 (implementer): while Kinds is open the Delete key and Esc outside a field leave the selected item and the selection be, since its Details is not shown ("the selection is kept and returns with Items").
+- 2026-11-09 (implementer): departures from DESIGN.md's Kind setup and key screen 6, for the owner: the line under Preview item says what it does today ("each tag path is checked for this item's asset.") in place of "Tag browser opens at its asset folder; the style rule previews on it, on the map too." (entries 13 and 12b); the Preview item label sits above its select, not beside it (the option holds the name and the folder at 320 px); a list row reads "Point - 37 items" where the mock reads "Point - 3"; the dock's title is "Kinds" with the save status beside it, as the Layers and History docks name themselves; key value rows have no tag button and no "Pick a tag" (entry 13), and Remove is the delete icon; the Popup section has no "Custom view" checkbox: the popup view's path and params are fields.
+- 2026-11-09 (implementer): backlog story 39 was already written with the plan's approval (`_bmad-output/backlog/story-the-items-a-tag-path-does-not-resolve-for.md`); nothing was added to it.
+
 ## Review Triage Log
+
+### Pass 1 (quick lens, 2026-11-10): 7 findings - 2 medium, 4 low, 1 false; 4 patches, 1 to the owner, 1 rejected
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---|---|---|---|
+| 1 | A setup deleted (by a script) while the page is open cannot be saved from the screen again until a reload: every create at 0 meets the tombstone and the restore is refused because `kindForeign` holds the delete's version | medium | patch | Confirmed: `onMapChanged` records every kind setup op's version, `kindRefused` restores only when `kindForeign <= flight.seen`, and the panel's version is 0 with no stored setup. Fix: a delete seen in `map.changed` is the tombstone to restore at, not a foreign version. |
+| 2 | A new key value row or param that met a conflict stays with its first `seen`, so every later finish conflicts again | medium | patch | Confirmed: `setRow` and `setParam` keep `seen` once set (`KindSetupPanel.tsx:561`, `:719`) and nothing resets it after "Use their version". Fix: the row's `seen` is taken again once its conflict is settled. |
+| 3 | Clearing the Popup view path removes the part with every stored param in one save, with no Undo; an empty comms or alarms path drops the part's switches | low | intent gap, to the owner | Real, and the implementer's own choice (Plan Change Log): the Gateway needs a path for each of these parts, so an empty one must remove the part or be refused, and the frozen text does not say which. Asked of the owner without reverting the build, since either answer is a few lines. Answered 2026-11-10 (option B): patched. |
+| 4 | This page's own setup save replayed after a reload (or lost in a gap) counts as another editor's, so a field typed before its `map.changed` conflicts with the editor's own change | low | rejected | Real but narrow: it needs a queued setup save replaying and a field of the same kind typed in the moment before its `map.changed`; the card's one choice recovers it. The fix (persisting the batch ids) is more than a direct correction. |
+| 5 | `kindSaved` moves on to the next edit at a stale version when `results` holds no entry for the kind | false | rejected | `WriteService` answers one result per op of a saved batch, so a saved setup batch always carries its result; the branch is not reachable. |
+| 6 | `refusalPlace` leaves "Op 0:" on the Gateway's messages that carry no "(id)" | low | patch | Confirmed: `WriteService.java:278`, `:287`, `:322` write "Op N: ..."; `OP_PREFIX` needs the parenthesis. Fix: the id optional in the pattern. |
+| 7 | The Kinds header can read "Saved" while its class and `data-save-state` say refused | low | patch | Confirmed: `renderKinds` takes the words from `headerSaveWords` and the state from `delegate.save.state`. Fix: one source for both. |
+
+Outcome (2026-11-10): four patches applied (findings 1, 2, 6, 7) and the owner's option B for finding 3 (an emptied Popup view path refused while it has params); findings 4 and 5 rejected. The orchestrator's Verification on the final code: tsc clean, Jest 868 passed, Gradle clean build offline passed, contract check OK, `ops/up.sh --fresh` and the whole e2e suite 300 passed, 0 failed, 8 skipped (the env-gated scenarios). No Gateway, `common/` or Ignition file changed. Status built; entry 12 continues with 12b and 12c.
 
 ## Design Notes
 

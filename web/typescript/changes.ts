@@ -197,6 +197,15 @@ export function onSaved(state: ChangeState, record: MapItemRecord): ChangeState 
 }
 
 /**
+ * This session's own kind setup save (epic 4 entry 12a): the record with the version its reply gave, by the version rule, so
+ * the next edit of the kind starts from it without waiting for the Gateway's map.changed; seq is not touched.
+ */
+export function onSavedKindSetup(state: ChangeState, record: KindSetupRecord): ChangeState {
+    const kindSetups = applyKindSetup(state.kindSetups, record);
+    return kindSetups === state.kindSetups ? state : { ...state, kindSetups };
+}
+
+/**
  * The store delegate's change handling, apart from Perspective so it is unit
  * tested in node: holds the state, sends map.load through `sendLoad` (at mount,
  * and once per gap, never a second while one is pending) and counts the gap
@@ -276,6 +285,14 @@ export class MapChanges {
 
     saved(record: MapItemRecord): boolean {
         const next = onSaved(this.state, record);
+        const changed = next !== this.state;
+        this.state = next;
+        return changed;
+    }
+
+    /** This session's own kind setup save, or a conflict's stored record: true when the kind setups changed. */
+    savedKindSetup(record: KindSetupRecord): boolean {
+        const next = onSavedKindSetup(this.state, record);
         const changed = next !== this.state;
         this.state = next;
         return changed;

@@ -187,12 +187,15 @@ test.describe('1366 px', () => {
         const zoom = await page.locator('.mapstudio-zoom').boundingBox();
         expect(swBox.y + swBox.height).toBeLessThanOrEqual(zoom.y + 1);
         expect(swBox.x + swBox.width).toBeGreaterThan(box.x + box.width - 100);
-        // The list has the seeded items with their badges; the empty surfaces open from the rail.
+        // The list has the seeded items with their badges; the other surfaces open from the rail.
         const rows = page.locator('.mapstudio-list-row');
         expect(await rows.count()).toBeGreaterThanOrEqual(33);
         await expect(page.locator('.mapstudio-list-row[data-item-id="' + seed.ids[TRACER.points.p1.key] + '"]')).toContainText('Point 1');
         await page.locator('.mapstudio-rail-item[data-surface="kinds"]').click();
-        await expect(page.locator('.mapstudio-dock--empty')).toHaveAttribute('data-surface', 'kinds');
+        // Kinds lists the project's kinds, the first one's setup in the properties panel's place (entry 12a; kinds.spec.mjs).
+        await expect(page.locator('.mapstudio-kinds')).toHaveAttribute('data-surface', 'kinds');
+        await expect(page.locator('.mapstudio-kind-row').first()).toHaveAttribute('aria-current', 'true');
+        await expect(page.locator('.mapstudio-kindsetup')).toBeVisible();
         await expect(map).toHaveAttribute('data-surface', 'kinds');
         await page.locator('.mapstudio-rail-item[data-surface="items"]').click();
         await expect(page.locator('.mapstudio-dock--items')).toBeVisible();

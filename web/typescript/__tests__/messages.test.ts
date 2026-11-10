@@ -2,6 +2,7 @@ import {
     MESSAGE_VERSION,
     MessageTypes,
     editsHistory,
+    tagsResolve,
     envelope,
     newMessageId,
     pointClick,
@@ -140,5 +141,21 @@ describe('edits.history (epic-editing entry 11a)', () => {
     test('a reply without entries or more is invalid', () => {
         expect(readReply({ v: 1, type: 'edits.history.reply', id: 'h', body: { entries: [] } }).kind).toBe('invalid');
         expect(readReply({ v: 1, type: 'edits.history.reply', id: 'h', body: { more: false } }).kind).toBe('invalid');
+    });
+});
+
+describe('tags.resolve (epic 4 entry 12a, the Kinds screen\'s resolve notes)', () => {
+    test('the message carries the kind, the asset and the path', () => {
+        expect(tagsResolve({ kindId: 'pad', assetId: 'P14', path: '{asset.path}/Pressure' }, 'r1')).toEqual(
+            { v: 1, type: 'tags.resolve', id: 'r1', body: { kindId: 'pad', assetId: 'P14', path: '{asset.path}/Pressure' } });
+    });
+
+    test('the reply is read with its counts, or without them for a full path; one without a path is invalid', () => {
+        expect(readReply({ v: 1, type: 'tags.resolve.reply', id: 'r1', body: { path: '{asset.path}/Pressure', relative: true, n: 2, m: 3 } }))
+            .toEqual({ kind: 'tags.resolve.reply', id: 'r1', body: { path: '{asset.path}/Pressure', relative: true, n: 2, m: 3 } });
+        const full = readReply({ v: 1, type: 'tags.resolve.reply', id: 'r2', body: { path: '[default]Shared/GasPrice', relative: false } });
+        expect(full).toEqual({ kind: 'tags.resolve.reply', id: 'r2', body: { path: '[default]Shared/GasPrice', relative: false } });
+        expect(replyText(full)).toBe('Tag path [default]Shared/GasPrice: a full path');
+        expect(readReply({ v: 1, type: 'tags.resolve.reply', id: 'r3', body: { relative: true } }).kind).toBe('invalid');
     });
 });

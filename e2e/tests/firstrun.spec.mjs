@@ -3,7 +3,7 @@
 // ops/docker-compose.yml), at 1366 px as the map editor and as a viewer, and the card at 1200 px. The plan's matrix: on the
 // empty map in Edit mode the card is centred on the stage with the project's name and "0 of 3 done"; Open Kinds opens the
 // rail's Kinds surface and a kind setup saved by script (the /empty page's button, system.mapstudio.applyEdits) ticks step 1
-// live, its delete unticks it; Open view mode leaves Edit mode with the note shown, and back in Edit mode step 3 is ticked;
+// live, its delete unticks it, and one saved from the Kinds screen itself ticks it again (entry 12a); Open view mode leaves Edit mode with the note shown, and back in Edit mode step 3 is ticked;
 // Add an item arms the Point tool and hides the card while it is in hand, a click places a pad and the card is gone for good;
 // Hide checklist holds over a reload, and Esc does not hide the card while its buttons are in the tab order; a viewer sees the
 // empty map and "Nothing on this map yet."; the seeded dev map shows neither. The spec keeps the empty map empty: every item
@@ -143,6 +143,21 @@ test.describe('the first-run checklist on the empty map, 1366 px', () => {
             expect(deleted.deleted, JSON.stringify(deleted)).toBe(true);
             await expect(step1).toHaveAttribute('data-done', 'false', { timeout: REPLY_MS });
             await expect(card.locator('.mapstudio-firstrun-count')).toHaveText('0 of 3 done');
+            // Entry 12a (matrix K9): a kind with no setup, saved from the Kinds screen as a create, ticks step 1 too. The first kind
+            // of the list is open in the properties panel's place; its Link typed and finished is its first setup.
+            const kindSetup = page.locator('.mapstudio-kindsetup');
+            await expect(page.locator('.mapstudio-kind-row').first()).toHaveAttribute('aria-current', 'true');
+            await expect(kindSetup).toHaveAttribute('data-kind', 'pad');
+            await expect(kindSetup).toHaveAttribute('data-version', '0');
+            const link = kindSetup.locator('[data-field="link"] input[type="text"]');
+            await link.fill('/pad/{item.name}');
+            await link.press('Enter');
+            await expect(step1).toHaveAttribute('data-done', 'true', { timeout: REPLY_MS });
+            await expect(card.locator('.mapstudio-firstrun-count')).toHaveText('1 of 3 done');
+            await expect(kindSetup).toHaveAttribute('data-saving', '');
+            const stored = (await send(page, 'map.load', {})).body.kindSetups.find((k) => k.kindId === 'pad' && !k.deleted);
+            expect(stored.setup).toEqual({ link: '/pad/{item.name}' });
+            await expect(kindSetup).toHaveAttribute('data-version', String(stored.version));
         } finally {
             await finish(context, page, watched);
         }

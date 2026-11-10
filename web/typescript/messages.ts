@@ -30,7 +30,7 @@ export const MessageTypes = {
     EDITS_APPLY_REPLY: 'edits.apply.reply',
     MAP_CHANGED: 'map.changed',
     ERROR: 'error',
-    /** The tag browser's lookups (epic 2 story 15); their replies are read by epic-editing. */
+    /** The tag browser's lookups (epic 2 story 15); `tags.resolve` is sent by the Kinds screen since epic 4 entry 12a, `tags.browse` by entry 13. */
     TAGS_BROWSE: 'tags.browse',
     TAGS_BROWSE_REPLY: 'tags.browse.reply',
     TAGS_RESOLVE: 'tags.resolve',
@@ -86,6 +86,8 @@ export type Reply =
     /** `body` is null when the basemap.source.reply could not be read: the basemap stays as it was. */
     | { kind: 'basemap.source.reply'; id: string; body: BasemapSourceReplyBody | null }
     | { kind: 'edits.history.reply'; id: string; body: EditsHistoryReplyBody }
+    /** What `tags.resolve` said of one path (epic 4 entry 12a, the Kinds screen's resolve notes). */
+    | { kind: 'tags.resolve.reply'; id: string; body: TagsResolveReplyBody }
     | { kind: 'error'; id: string; body: ErrorBody }
     | { kind: 'invalid'; reason: string };
 
@@ -131,6 +133,29 @@ export function editsHistory(request: EditsHistoryRequest = {}, id?: string): En
         body.limit = request.limit;
     }
     return envelope(MessageTypes.EDITS_HISTORY, body, id);
+}
+
+/** `tags.resolve`'s body (docs/contract.md): a kind, an asset of that kind and a tag path. */
+export interface TagsResolveBody {
+    kindId: string;
+    assetId: string;
+    path: string;
+}
+
+/**
+ * `tags.resolve.reply`'s body: the path as the Gateway reads it, whether it is below the asset (`{asset.path}/...`), and for one
+ * that is, the kind's linked map items it resolves for (`n`) of those with an asset (`m`).
+ */
+export interface TagsResolveReplyBody {
+    path: string;
+    relative: boolean;
+    n?: number;
+    m?: number;
+}
+
+/** The `tags.resolve` message (epic 4 entry 12a): how many of a kind's linked map items a tag path resolves for; level full only. */
+export function tagsResolve(body: TagsResolveBody, id?: string): Envelope<TagsResolveBody> {
+    return envelope(MessageTypes.TAGS_RESOLVE, { kindId: body.kindId, assetId: body.assetId, path: body.path }, id);
 }
 
 /** A UUID v4 string: `crypto.randomUUID` where the browser has it, else a Math.random fallback. */
@@ -193,6 +218,17 @@ export function readReply(raw: unknown): Reply {
             return page ? { kind: 'edits.history.reply', id: raw.id, body: page }
                 : { kind: 'invalid', reason: 'edits.history.reply needs entries and more.' };
         }
+        case MessageTypes.TAGS_RESOLVE_REPLY: {
+            if (typeof body.path !== 'string' || typeof body.relative !== 'boolean') {
+                return { kind: 'invalid', reason: 'tags.resolve.reply needs path and relative.' };
+            }
+            const resolved: TagsResolveReplyBody = { path: body.path, relative: body.relative };
+            if (typeof body.n === 'number' && typeof body.m === 'number') {
+                resolved.n = body.n;
+                resolved.m = body.m;
+            }
+            return { kind: 'tags.resolve.reply', id: raw.id, body: resolved };
+        }
         case MessageTypes.MAP_CHANGED:
             return { kind: 'map.changed', id: raw.id, body: readMapChanged(raw.body) };
         case MessageTypes.VALUES_BATCH:
@@ -242,6 +278,8 @@ export function replyText(reply: Reply): string {
                 : 'Basemap source: unreadable reply';
         case 'edits.history.reply':
             return 'Recent changes: ' + reply.body.entries.length + ' change(s)' + (reply.body.more ? ', more' : '');
+        case 'tags.resolve.reply':
+            return 'Tag path ' + reply.body.path + (reply.body.n !== undefined ? ': resolves for ' + reply.body.n + ' of ' + reply.body.m : ': a full path');
         case 'error':
             return 'Error (' + reply.body.code + '): ' + reply.body.message;
         default:

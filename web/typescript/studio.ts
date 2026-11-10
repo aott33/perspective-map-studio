@@ -47,11 +47,21 @@ export interface StudioState {
     selected: string[];
     /** An instrument being placed on the selected line (entry 9), or null; never with a tool in hand, never in View mode. */
     armed: ArmedInstrument | null;
+    /**
+     * The kind the Kinds surface shows (entry 12a), or null for the kind list's first; it stays while the page stays, so Kinds
+     * opens again on the kind last chosen.
+     */
+    kind: string | null;
+    /**
+     * The preview item chosen per kind (entry 12a, owner decision 5), by kind id: remembered for the browser session by the
+     * component, never stored on the map. A kind left out takes its first linked item by name.
+     */
+    previews: Record<string, string>;
 }
 
 /** The model at mount: the mode the `editMode` prop names, no tool, Items, nothing selected. */
 export function fromProps(editMode: boolean): StudioState {
-    return { mode: editMode ? 'edit' : 'view', tool: null, toolKind: null, surface: 'items', selected: [], armed: null };
+    return { mode: editMode ? 'edit' : 'view', tool: null, toolKind: null, surface: 'items', selected: [], armed: null, kind: null, previews: {} };
 }
 
 /** Edit mode entered: the selection stays, no tool is in hand yet, Items opens. */
@@ -121,6 +131,16 @@ export function showSurface(state: StudioState, surface: StudioSurface): StudioS
         return state;
     }
     return { ...state, surface };
+}
+
+/** A kind chosen in the Kinds list (entry 12a): its setup shows in the properties panel's place. */
+export function chooseKind(state: StudioState, kindId: string): StudioState {
+    return state.kind === kindId ? state : { ...state, kind: kindId };
+}
+
+/** A kind's preview item chosen in its setup's header (entry 12a). */
+export function choosePreview(state: StudioState, kindId: string, itemId: string): StudioState {
+    return state.previews[kindId] === itemId ? state : { ...state, previews: { ...state.previews, [kindId]: itemId } };
 }
 
 /** One map item selected: it replaces the selection, as a click on the map does today. */

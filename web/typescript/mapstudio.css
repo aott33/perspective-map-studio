@@ -2561,6 +2561,400 @@
     outline-offset: 0;
 }
 
+/* ---- Epic 4 entry 12a: the Kinds surface and a kind's setup (DESIGN.md Kind setup, kind-setup-row, key screen 6; EXPERIENCE.md
+   Kind setup). The list docks at the list's width under the dock's header: the note, the lists' status messages in the item
+   form's note look, then one row per kind (the list row: glyph, name, its geometry and item count in tiny secondary text; the
+   chosen one on the selection tint with the 3 px edge). The setup takes the properties panel's place at the panel's width:
+   the header as the panel's, the Preview item select under it with the asset folder in monospace, then the numbered sections
+   (the section label: 12 px, 600, tracked, upper case) divided by the divider. Key value rows are bordered boxes: label and
+   unit on one line, the tag path in monospace under them, then the popup switch (track off the border token, on the attention
+   token, as the editing switch), the Icon value star (outlined; filled and bold while on, no hue), and Remove (the delete icon). A refusal is a
+   save problem: the warning token on its tint with the warning glyph and the Gateway's words, beside its field. A resolve note
+   is tiny secondary text, in the warning token with the glyph when fewer than all resolve or the tag is shared. The placeholder
+   picker's menu floats over the panel (the one soft shadow). Docked: no shadow. Tokens only (AD-11); every target 24 px or more. */
+.mapstudio-kinds-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 8px 6px 12px;
+    overflow-y: auto;
+}
+
+.mapstudio-kinds-note,
+.mapstudio-kinds-status {
+    margin: 0 2px 8px;
+    padding: 8px;
+    border-radius: 6px;
+    background: var(--mapstudio-hover);
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+/* The note is plain secondary words, as key screen 6 draws it; a list's status message keeps the note box. */
+.mapstudio-kinds-note {
+    padding: 4px 8px;
+    background: transparent;
+}
+
+.mapstudio-kinds-status {
+    color: var(--label);
+}
+
+.mapstudio-kinds-empty {
+    padding: 8px;
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
+}
+
+.mapstudio-kinds-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.mapstudio-kind-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.mapstudio-kind-meta {
+    flex: 0 0 auto;
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.mapstudio-mono {
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.mapstudio-kindsetup-name {
+    margin: 0;
+}
+
+.mapstudio-kindsetup-subline {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-kindsetup-preview {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 16px 10px;
+    border-bottom: 1px solid var(--mapstudio-divider);
+}
+
+.mapstudio-kindsetup-preview-note {
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-kindsetup-folder {
+    font-size: 11px;
+    color: var(--label);
+}
+
+.mapstudio-kindsetup-body {
+    padding-top: 0;
+}
+
+.mapstudio-kindsetup-paused,
+.mapstudio-kindsetup-top-refusal {
+    margin: 8px 0 0;
+}
+
+.mapstudio-kindsetup-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--mapstudio-divider);
+}
+
+.mapstudio-kindsetup-section:last-child {
+    border-bottom: none;
+}
+
+.mapstudio-kindsetup-heading {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.mapstudio-kindsetup-tag {
+    padding: 1px 8px;
+    border-radius: 9999px;
+    background: var(--mapstudio-hover);
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+}
+
+.mapstudio-kindsetup-heading .mapstudio-kindsetup-tag {
+    margin-left: auto;
+}
+
+.mapstudio-kv-used {
+    align-self: flex-start;
+}
+
+.mapstudio-kindsetup-field,
+.mapstudio-kindsetup-readonly,
+.mapstudio-kindsetup-params,
+.mapstudio-kv-path {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.mapstudio-kindsetup-icon {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mapstudio-kindsetup-none {
+    color: var(--mapstudio-secondary);
+    font-style: italic;
+}
+
+.mapstudio-kindsetup-rule {
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-kindsetup-with-picker,
+.mapstudio-param-line,
+.mapstudio-kv-line {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.mapstudio-kindsetup-with-picker > .mapstudio-input,
+.mapstudio-kv-label,
+.mapstudio-param-value {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.mapstudio-kv-unit {
+    flex: 0 0 72px;
+}
+
+.mapstudio-param-name,
+.mapstudio-param-line > .mapstudio-param-name {
+    flex: 0 0 84px;
+    width: 84px;
+    min-width: 0;
+}
+
+.mapstudio-param-line > input.mapstudio-param-value {
+    flex: 1 1 0;
+    width: auto;
+}
+
+.mapstudio-param-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.mapstudio-kv-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid var(--mapstudio-divider);
+    border-radius: 6px;
+}
+
+.mapstudio-kv-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+}
+
+.mapstudio-kv-new-hint {
+    flex: 1 1 auto;
+}
+
+.mapstudio-dock-button.mapstudio-kv-remove {
+    margin-left: auto;
+}
+
+.mapstudio-button.mapstudio-kv-star {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+    padding: 0 8px;
+    color: var(--mapstudio-secondary);
+}
+
+.mapstudio-button.mapstudio-kv-star--on {
+    border-color: var(--mapstudio-attention);
+    color: var(--label);
+    font-weight: 700;
+}
+
+.mapstudio-button.mapstudio-kv-add,
+.mapstudio-button.mapstudio-param-add {
+    align-self: flex-start;
+}
+
+.mapstudio-kindsetup-parts {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.mapstudio-kindsetup-toggle {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* The popup switch: a track with its thumb drawn in the track's own background, so it needs no pseudo-element; the row is 24 px. */
+.mapstudio-switch {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 32px;
+    height: 18px;
+    margin: 0;
+    border: none;
+    border-radius: 9999px;
+    background: radial-gradient(circle 6px at 9px 50%, var(--mapstudio-surface) 98%, transparent) var(--neutral-40, var(--border));
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.mapstudio-switch:checked {
+    background: radial-gradient(circle 6px at 23px 50%, var(--mapstudio-surface) 98%, transparent) var(--mapstudio-attention);
+}
+
+.mapstudio-switch:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: 2px;
+}
+
+.mapstudio-switch:disabled,
+.mapstudio-kindsetup .mapstudio-field-check:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+}
+
+.mapstudio-kindsetup .mapstudio-input:disabled {
+    color: var(--label--disabled);
+    cursor: not-allowed;
+}
+
+.mapstudio-field-refusal {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 4px 8px;
+    border-left: 3px solid var(--mapstudio-warning);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--mapstudio-warning) 10%, var(--mapstudio-surface));
+    color: var(--label);
+    font-size: 12px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-field-refusal-glyph {
+    flex: 0 0 auto;
+    margin-top: 1px;
+    color: var(--mapstudio-warning);
+}
+
+.mapstudio-field-refusal-text {
+    min-width: 0;
+}
+
+.mapstudio-resolve-note {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-resolve-note--warning {
+    color: var(--mapstudio-warning);
+    font-weight: 600;
+}
+
+.mapstudio-resolve-note-glyph {
+    flex: 0 0 auto;
+}
+
+.mapstudio-placeholder {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.mapstudio-button.mapstudio-placeholder-button {
+    width: 32px;
+    padding: 0;
+    font-family: monospace;
+}
+
+.mapstudio-placeholder-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    width: max-content;
+    max-width: 280px;
+    padding: 4px;
+    border: 1px solid var(--mapstudio-divider);
+    border-radius: 6px;
+    background: var(--mapstudio-surface);
+    box-shadow: var(--mapstudio-float-shadow);
+}
+
+.mapstudio-placeholder-item {
+    min-height: 28px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--label);
+    text-align: left;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-placeholder-item:hover,
+.mapstudio-placeholder-item:focus-visible {
+    background: var(--mapstudio-hover);
+    outline: none;
+}
+
 /* The History surface docks at 340 px (the owner's option A, 2026-11-09: DESIGN.md recent-changes-panel width), wider than the list. */
 .mapstudio-dock--history {
     flex-basis: 340px;

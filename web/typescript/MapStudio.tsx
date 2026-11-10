@@ -61,8 +61,8 @@ import * as editing from './editing';
 import * as basemap from './basemapLayer';
 import { TilesState } from './basemapLayer';
 import {
-    StudioState, StudioSurface, StudioTool, addMany, clearSelection, enterEdit, fromProps, instrumentKinds, isEditing, isMultiple, keepArmed, kindsFor,
-    leaveEdit, pickTool, select, selectMany, showSurface, toggleSelect, toolKind
+    StudioState, StudioSurface, StudioTool, addMany, chooseKind, choosePreview, clearSelection, enterEdit, fromProps, instrumentKinds, isEditing, isMultiple,
+    keepArmed, kindsFor, leaveEdit, pickTool, select, selectMany, showSurface, toggleSelect, toolKind
 } from './studio';
 import { BoxSelect, DragShape, ShapeItem } from './multiSelect';
 import { SelectionCount } from './studio/SelectionCount';
@@ -78,6 +78,9 @@ import { ChromeGlyph } from './studio/ChromeGlyph';
 import { ProblemStatus } from './studio/SaveStatus';
 import { SaveCard } from './studio/SaveCard';
 import { HistoryPanel } from './studio/HistoryPanel';
+import { KindList } from './studio/KindList';
+import { KindSetupPanel } from './studio/KindSetupPanel';
+import { NO_KIND_SAVES, SetupEdit, itemsOfKind, pausedText, previewKey, readPreview, shownKind, waitingSave, writePreview } from './kindSetup';
 import { expandOps, historyRows } from './history';
 import { HistoryEntry } from './contract';
 import { busyText, undoLabel } from './undoStack';
@@ -1152,8 +1155,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
      * to put a tool down comes here handled and does nothing more (entry 26, editing.ts `onKeyDown`).
      */
     private onRootKeyDown = (ev: React.KeyboardEvent<HTMLDivElement>): void => {
+        // While Kinds is open the selected item's Details is not shown (entry 12a): Delete and Esc leave the item and the selection be.
+        const kindsOpen = this.studioOn() && this.state.studio.surface === 'kinds';
         if (ev.key === 'Delete' && !ev.defaultPrevented && !ev.ctrlKey && !ev.metaKey && !ev.altKey && !inField(ev.target)) {
-            if (editing.onDeleteKey(this)) {
+            if (!kindsOpen && editing.onDeleteKey(this)) {
                 ev.preventDefault();
             }
             return;
@@ -1186,6 +1191,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (ev.key === 'Escape' && !ev.defaultPrevented && !inField(ev.target) && editing.escapeGeometry(this)) {
             // Esc puts down Move, then the chosen point (entry 5), before it closes a popup or Details.
             ev.preventDefault();
+            return;
+        }
+        if (kindsOpen && ev.key === 'Escape') {
             return;
         }
         selection.onRootKeyDown(this, ev);
@@ -1679,7 +1687,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
             unsaved: delegate.unsaved,
             sending: delegate.sending,
             storageWarning: delegate.storageWarning,
-            shapeRefused: delegate.shapeRefused
+            shapeRefused: delegate.shapeRefused,
+            // A kind setup's refusal stands beside its field (entry 12a): nothing waits, and nothing says Saved.
+            kindRefused: Object.keys(delegate.kindSaves || {}).some((id) => delegate.kindSaves[id].refusals.some((r) => r.words !== ''))
         };
     }
 
@@ -1827,7 +1837,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /**
      * The rail's surface (entry 2): the item list with the panel header; Layers, the legend's desktop content docked under
      * two tabs as the properties panel's (entry 22: the Layers tab Show and Basemap, the Legend tab the key, drawn by the
-     * legend control from the panel's own state); or the empty Kinds surface until its entry. Each surface is keyed, so
+     * legend control from the panel's own state); or Kinds, the list of the project's kinds (entry 12a). Each surface is keyed, so
      * switching remounts it and the legend's host comes and goes whole.
      */
     private renderDock(delegate: MapStudioDelegateState): React.ReactNode {
@@ -1859,21 +1869,121 @@ export class MapStudio extends Component<Props, MapStudioState> {
             return this.renderHistory(delegate, facts);
         }
         if (surface === 'kinds') {
-            return (
-                <section key="kinds" className="mapstudio-dock mapstudio-dock--empty" aria-label="Kinds" data-surface="kinds">
-                    <header className="mapstudio-dock-header">
-                        <div className="mapstudio-dock-title-row"><h2 className="mapstudio-dock-title">Kinds</h2></div>
-                        {this.renderProblemStatus(delegate, facts)}
-                    </header>
-                    <div className="mapstudio-dock-note">Nothing here yet. The kind setup screen comes in a later entry.</div>
-                </section>
-            );
+            return this.renderKinds(delegate, facts);
         }
         if (this.state.listCollapsed) {
             // Below 1280 px the list is not docked (entry 7c): the rail's Items opens it over the map (renderListOverlay).
             return null;
         }
         return this.renderItemList(delegate, facts, false);
+    }
+
+    /** The kind the Kinds surface shows (entry 12a): the chosen one while the kind list has it, else the list's first. */
+    private kindShown(delegate: MapStudioDelegateState): Kind | null {
+        return shownKind(delegate.lists.kinds, this.state.studio.kind);
+    }
+
+    /**
+     * The Kinds list, the rail's Kinds surface (entry 12a; studio/KindList.tsx): the dock's header as the other surfaces have it,
+     * with the save status beside the title as the Items list has it, then the note, the lists' status messages and one row per
+     * kind of the kind list.
+     */
+    private renderKinds(delegate: MapStudioDelegateState, facts: ProblemFacts): React.ReactNode {
+        const kinds = delegate.lists.kinds;
+        const counts: Record<string, number> = {};
+        for (const kind of kinds) {
+            counts[kind.id] = itemsOfKind(delegate.items, kind.id).length;
+        }
+        const shown = this.kindShown(delegate);
+        const words = headerSaveWords(facts);
+        // The state is read from the words, one source, so the header never reads "Saved" while marked refused.
+        const saveState = words === 'Saving...' ? 'saving' : words === 'Saved' ? 'saved' : 'not-saved';
+        const adapters = delegate.lists.adapters;
+        return (
+            <KindList key="kinds"
+                      header={(
+                          <header className="mapstudio-dock-header">
+                              <div className="mapstudio-dock-title-row">
+                                  <h2 className="mapstudio-dock-title">Kinds</h2>
+                                  <span className={'mapstudio-panel-save mapstudio-panel-save--' + saveState} data-save-state={saveState}
+                                        role="status">{words}</span>
+                              </div>
+                              {this.renderProblemStatus(delegate, facts)}
+                          </header>
+                      )}
+                      kinds={kinds}
+                      counts={counts}
+                      chosen={shown ? shown.id : null}
+                      kindStatus={adapters ? adapters.kinds : null}
+                      assetStatus={adapters ? adapters.assets : null}
+                      onChoose={this.onChooseKind} />
+        );
+    }
+
+    /** A kind chosen in the Kinds list: its setup shows in the properties panel's place. */
+    onChooseKind = (kindId: string): void => {
+        this.setState((prev) => ({ studio: chooseKind(prev.studio, kindId) }));
+    };
+
+    /** The session key of a kind's preview item, or null while the project is unknown (the choice then holds for this page only). */
+    private previewKeyOf(kindId: string): string | null {
+        const project = this.projectName();
+        return project !== null ? previewKey(project, kindId) : null;
+    }
+
+    /** A kind's preview item chosen (entry 12a, owner decision 5): kept for the browser session, never stored on the map. */
+    onKindPreview = (kindId: string, itemId: string): void => {
+        writePreview(sessionStore(), this.previewKeyOf(kindId), itemId);
+        this.setState((prev) => ({ studio: choosePreview(prev.studio, kindId, itemId) }));
+    };
+
+    /** One finished field of a kind's setup (entry 12a): saved by the delegate as the whole setup, the edit applied when it is sent. */
+    onKindSave = (kindId: string, field: string, edit: SetupEdit, seen: number): boolean => {
+        const delegate = this.storeDelegate();
+        return delegate ? delegate.saveKindSetup(kindId, field, edit, seen) : false;
+    };
+
+    onKindClear = (kindId: string, field?: string): void => {
+        const delegate = this.storeDelegate();
+        if (delegate) {
+            delegate.clearKindRefusals(kindId, field);
+        }
+    };
+
+    onKindResolve = (kindId: string, assetId: string, paths: string[]): void => {
+        const delegate = this.storeDelegate();
+        if (delegate) {
+            delegate.askResolve(kindId, assetId, paths);
+        }
+    };
+
+    /**
+     * A kind's setup in the properties panel's place while Kinds is open (entry 12a; studio/KindSetupPanel.tsx), keyed by the kind
+     * so its drafts start from the stored setup. The selected item is kept and its Details returns with Items.
+     */
+    private renderKindSetup(delegate: MapStudioDelegateState): React.ReactNode {
+        const kind = this.kindShown(delegate);
+        if (!kind) {
+            return null;
+        }
+        const id = kind.id;
+        const chosen = this.state.studio.previews[id];
+        return (
+            <KindSetupPanel key={'kind:' + id}
+                            kind={kind}
+                            record={delegate.kindSetups.find((k) => k.kindId === id)}
+                            items={delegate.items}
+                            assets={delegate.lists.assets || []}
+                            previewId={chosen !== undefined ? chosen : readPreview(sessionStore(), this.previewKeyOf(id))}
+                            onPreview={(itemId) => this.onKindPreview(id, itemId)}
+                            saves={(delegate.kindSaves || {})[id] || NO_KIND_SAVES}
+                            paused={pausedText(delegate.editing === 'off', waitingSave(delegate.unsaved, id))}
+                            resolves={delegate.resolves || {}}
+                            alarmPage={delegate.alarmPage}
+                            onSave={(field, edit, seen) => this.onKindSave(id, field, edit, seen)}
+                            onClearRefusal={(field) => this.onKindClear(id, field)}
+                            onResolve={(assetId, paths) => this.onKindResolve(id, assetId, paths)} />
+        );
     }
 
     /**
@@ -2175,7 +2285,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                           collapsed={this.state.listCollapsed} listOpen={this.state.listOpen} />
                 ) : null}
                 {studioOn && delegate ? this.renderDock(delegate) : null}
-                {studioOn && delegate ? this.renderPanel(delegate) : null}
+                {/* While Kinds is open the chosen kind's setup takes the properties panel's place (entry 12a); the selection is kept. */}
+                {studioOn && delegate ? (studio.surface === 'kinds' ? this.renderKindSetup(delegate) : this.renderPanel(delegate)) : null}
                 <div className="mapstudio-stage">
                     <div className="mapstudio-map" ref={this.setMapContainer}
                          data-edit-level={delegate && delegate.level ? delegate.level : ''}

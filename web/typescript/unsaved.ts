@@ -808,7 +808,9 @@ export function yourChangeText(entry: UnsavedEntry, records: MapItemRecord[], ki
     const items = entry.batch.ops.filter((o) => o.entity === 'item');
     const op = items[0];
     if (!op) {
-        return 'Edit a kind setup';
+        const setup = entry.batch.ops.find((o) => o.entity === 'kindSetup');
+        const kind = setup ? kinds.find((k) => k.id === setup.id) : undefined;
+        return kind ? 'a change to the ' + kind.name + ' kind setup' : 'Edit a kind setup';
     }
     const more = items.length > 1 ? ' and ' + (items.length - 1) + (items.length === 2 ? ' more item' : ' more items') : '';
     const label = editLabel(entry.batch, records);
@@ -839,12 +841,13 @@ function mergeOnto(stored: Record<string, unknown>, mine: Record<string, unknown
  * Apply mine on top (entry 10, decision 1): a new batch with a new `batchId`, each stale op at its conflict's
  * `current.version` with my op's data; `properties` and `overrides`, which an update carries whole, take only the keys I
  * changed from where I started (`before`) onto the stored ones, so a field the other editor changed and I did not stays
- * theirs. The other ops are as stored. Null when it is not offered: no conflict kept, or they deleted the item or my add met
- * one that already exists (`onTopBlockedText`). The stored entry is not changed: the caller discards it.
+ * theirs. The other ops are as stored. Null when it is not offered: no conflict kept, they deleted the item or my add met
+ * one that already exists (`onTopBlockedText`), or the batch saves a kind setup (`isSetupSave`, entry 12a). The stored entry is not
+ * changed: the caller discards it.
  */
 export function onTopBatch(entry: UnsavedEntry, batchId: string): EditBatch | null {
     const conflicts = entry.conflict || [];
-    if (conflicts.length === 0 || onTopBlockedText(entry) !== '') {
+    if (conflicts.length === 0 || onTopBlockedText(entry) !== '' || isSetupSave(entry)) {
         return null;
     }
     const ops: EditOp[] = [];
@@ -870,6 +873,15 @@ export function onTopBatch(entry: UnsavedEntry, batchId: string): EditBatch | nu
         ops.push(next);
     }
     return { batchId, ops };
+}
+
+/**
+ * Whether an entry saves a kind setup (epic 4 entry 12a). A setup is stored whole, so mine cannot go on top of another editor's
+ * without taking their other parts back: its conflict card offers only "Use <name>'s version" (owner decision 6, 2026-11-09; to be
+ * weighed again in entry 12b).
+ */
+export function isSetupSave(entry: UnsavedEntry): boolean {
+    return entry.batch.ops.some((op) => op.entity === 'kindSetup');
 }
 
 /** Which card shows: the store unreachable, a conflict or busy (entry 10, R26). */
