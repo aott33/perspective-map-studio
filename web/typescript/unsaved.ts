@@ -19,6 +19,7 @@ import { stepLabel } from './undoStack';
 import { Kind } from './adapters';
 import { distanceM } from './shared';
 import { distanceWords } from './linePopup';
+import { KpiLabels, NO_LABELS, overrideChanges } from './itemOverrides';
 
 /** The storage the queue writes to: `localStorage` in the browser, a fake in tests. */
 export interface KeyValueStore {
@@ -634,7 +635,7 @@ function beforeOf(entry: UnsavedEntry, id: string): MapItemRecord | undefined {
 }
 
 /** The fields that differ between two records of one map item, in words ("name", "Gas rate", "asset link"); the geometry apart. */
-function fieldWords(a: MapItemRecord, b: MapItemRecord, kinds: Kind[]): string[] {
+function fieldWords(a: MapItemRecord, b: MapItemRecord, kinds: Kind[], labels: KpiLabels = NO_LABELS): string[] {
     const words: string[] = [];
     if (a.name !== b.name) {
         words.push('name');
@@ -648,8 +649,9 @@ function fieldWords(a: MapItemRecord, b: MapItemRecord, kinds: Kind[]): string[]
     for (const key of changedKeys(a.properties, b.properties)) {
         words.push(fieldLabel(kinds, b.kind, key));
     }
-    if (!same(a.overrides, b.overrides)) {
-        words.push('style');
+    // Entry 12c1 (owner decision 3): an override by its part ("Pressure path", "comms path"), a key value by its label.
+    for (const c of overrideChanges(a.overrides, b.overrides, (key) => labels(b.kind, key))) {
+        words.push(c.words);
     }
     if (!same(a.ends, b.ends)) {
         words.push('ends');
@@ -678,7 +680,8 @@ function opOf(entry: UnsavedEntry, c: Conflict): EditOp | undefined {
  * at 10:42", "Sam changed P14's name and Gas rate at 10:42", "Sam deleted P14 at 10:42"; with no `before` (an older entry) or
  * nothing it can name, "Sam changed P14 at 10:42". The first stale op is named, "and 2 more" after it when there are more.
  */
-export function theirChangeText(entry: UnsavedEntry, kinds: Kind[] = [], locale: string = '', records: MapItemRecord[] = []): string {
+export function theirChangeText(entry: UnsavedEntry, kinds: Kind[] = [], locale: string = '', records: MapItemRecord[] = [],
+    labels: KpiLabels = NO_LABELS): string {
     const conflicts = entry.conflict || [];
     if (conflicts.length === 0) {
         // Refused before entry 10 kept the conflict (decision 3's fallback): who, and the item as Undo names it.
@@ -715,7 +718,7 @@ export function theirChangeText(entry: UnsavedEntry, kinds: Kind[] = [], locale:
     const to = pointOf(current);
     const moved = from && to && !same(from, to) ? 'moved ' + name + ' ' + moveWords(from, to, locale) : '';
     const reshaped = !moved && !same(mine.geometry, current.geometry) ? 'shape' : '';
-    const fields = (reshaped ? [reshaped] : []).concat(fieldWords(mine, current, kinds));
+    const fields = (reshaped ? [reshaped] : []).concat(fieldWords(mine, current, kinds, labels));
     if (moved && fields.length > 0) {
         return who + ' ' + moved + ' and changed its ' + joinWords(fields) + more + when;
     }
@@ -774,7 +777,7 @@ function valueWords(value: unknown): string {
 }
 
 /** One update op of mine in words: "label position Right, Gas rate switched on", "moved about 40 m north", "name P14b". */
-function updateWords(op: EditOp, mine: MapItemRecord | undefined, kinds: Kind[], locale: string): string[] {
+function updateWords(op: EditOp, mine: MapItemRecord | undefined, kinds: Kind[], locale: string, labels: KpiLabels = NO_LABELS): string[] {
     const data = op.data || {};
     const kindId = typeof data.kind === 'string' ? data.kind : mine ? mine.kind : '';
     const words: string[] = [];
@@ -802,7 +805,13 @@ function updateWords(op: EditOp, mine: MapItemRecord | undefined, kinds: Kind[],
                 words.push(fieldLabel(kinds, kindId, k) + ' ' + valueWords(props[k]));
             }
         } else if (key === 'overrides') {
-            words.push('style');
+            const changes = overrideChanges(mine ? mine.overrides : {}, value, (k) => labels(mine ? mine.kind : kindId, k));
+            if (changes.length === 0) {
+                words.push('overrides');
+            }
+            for (const c of changes) {
+                words.push(c.words + (c.reset ? ' reset' : c.after !== '' ? ' ' + c.after : ''));
+            }
         } else if (key === 'ends') {
             words.push('its ends');
         } else if (key === 'attachment') {
@@ -819,7 +828,7 @@ function updateWords(op: EditOp, mine: MapItemRecord | undefined, kinds: Kind[],
  * more items" after it when the batch changes more.
  */
 export function yourChangeText(entry: UnsavedEntry, records: MapItemRecord[], kinds: Kind[] = [], locale: string = '',
-    named: boolean = false): string {
+    named: boolean = false, labels: KpiLabels = NO_LABELS): string {
     const items = entry.batch.ops.filter((o) => o.entity === 'item');
     const op = items[0];
     if (!op) {
@@ -833,7 +842,7 @@ export function yourChangeText(entry: UnsavedEntry, records: MapItemRecord[], ki
         return label.charAt(0).toUpperCase() + label.slice(1) + more;
     }
     const mine = beforeOf(entry, op.id) || records.find((r) => r.id === op.id);
-    const words = updateWords(op, beforeOf(entry, op.id), kinds, locale);
+    const words = updateWords(op, beforeOf(entry, op.id), kinds, locale, labels);
     const name = op.data && typeof op.data.name === 'string' && op.data.name !== '' ? op.data.name : mine && mine.name !== '' ? mine.name : 'an item';
     const detail = words.length > 0 ? words.join(', ') : 'a change to ' + name;
     return (named && words.length > 0 ? name + ' ' : '') + detail + more;
@@ -935,6 +944,8 @@ export interface SaveCardFacts {
     records: MapItemRecord[];
     kinds: Kind[];
     locale: string;
+    /** A key value's label by kind and key (itemOverrides.ts `kpiLabelsOf` of the stored kind setups), for an override's words. */
+    kpiLabel?: KpiLabels;
 }
 
 /**
@@ -979,12 +990,12 @@ export function saveCardFor(facts: SaveCardFacts): SaveCardData | null {
         const entry = open[0];
         const who = otherEditor(entry);
         const blocked = onTopBlockedText(entry);
-        const their = theirChangeText(entry, facts.kinds, facts.locale, facts.records);
+        const their = theirChangeText(entry, facts.kinds, facts.locale, facts.records, facts.kpiLabel);
         return {
             kind: 'conflict', batchId: entry.batchId,
             title: 'Not saved - conflict with ' + (who !== '' ? who + "'s" : "another editor's") + ' change',
             text: their + (blocked === '' ? ', while you were editing it.' : '. ' + blocked),
-            kept: 'Your change, kept here and not saved: ' + yourChangeText(entry, facts.records, facts.kinds, facts.locale) + '.',
+            kept: 'Your change, kept here and not saved: ' + yourChangeText(entry, facts.records, facts.kinds, facts.locale, false, facts.kpiLabel) + '.',
             position: conflicts.length >= 2 ? (conflicts.indexOf(entry) + 1) + ' of ' + conflicts.length : '',
             who, onTop: blocked === '' && onTopBatch(entry, 'check') !== null, blocked, count: n, closeKey: dismissKey(entry)
         };
@@ -993,7 +1004,7 @@ export function saveCardFor(facts: SaveCardFacts): SaveCardData | null {
     if (busy && busy.reason) {
         return {
             kind: 'busy', batchId: busy.batchId, title: 'Not saved - Map Studio is busy', text: busy.reason.message,
-            kept: 'Your change, kept here: ' + yourChangeText(busy, facts.records, facts.kinds, facts.locale, true) + '.',
+            kept: 'Your change, kept here: ' + yourChangeText(busy, facts.records, facts.kinds, facts.locale, true, facts.kpiLabel) + '.',
             position: '', who: '', onTop: false, blocked: '', count: n, closeKey: dismissKey(busy)
         };
     }

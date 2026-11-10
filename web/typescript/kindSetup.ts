@@ -23,6 +23,7 @@
 import { Asset, Kind } from './adapters';
 import { EditBatch, EditOp, ErrorCodes, KindSetupRecord, MapItemRecord } from './contract';
 import { isRecord } from './json';
+import { appliedParts, ownRuleApplied } from './itemOverrides';
 import { ItemState, PRESETS, TINTS, itemPreset } from './live';
 import { ASSET_ID, ASSET_PATH, ITEM_ID, ITEM_NAME, PROPERTY_PREFIX } from './placeholders';
 import { plural } from './history';
@@ -509,12 +510,15 @@ const OVERRIDES_NAMED = 2;
 /**
  * The kind's overrides, counted and named (EXPERIENCE.md Override mark: "1 override (P14 label)"): one per item and overridden
  * part, the items by name; "No overrides", "1 override (P2 style rule)", "3 overrides (P2 style rule, P4 comms and 1 more)".
+ * From entry 12c1 only what the Gateway applies is counted (itemOverrides.ts `appliedParts`; owner decision 5): a comms or
+ * alarms path or a key value's path of one of the kind's keys (`kpiKeys`) when it is a full path, and a style rule; a stored
+ * link, popup view or tints override and a key the kind no longer has are not.
  */
-export function overridesText(items: readonly MapItemRecord[]): string {
+export function overridesText(items: readonly MapItemRecord[], kpiKeys: readonly string[] = []): string {
     const named: string[] = [];
     const sorted = items.filter((i) => !i.deleted).slice().sort((a, b) => compareNames(a.name, b.name));
     for (const item of sorted) {
-        for (const part of Object.keys(item.overrides || {})) {
+        for (const part of appliedParts(item.overrides, kpiKeys)) {
             named.push(item.name + ' ' + (PART_WORDS[part] || part));
         }
     }
@@ -526,10 +530,10 @@ export function overridesText(items: readonly MapItemRecord[]): string {
     return named.length + (named.length === 1 ? ' override (' : ' overrides (') + shown + more + ')';
 }
 
-/** The header's subline: "Point - applies to 5 items - 1 override (P2 style rule)". */
-export function headerSubline(kind: Kind, items: readonly MapItemRecord[]): string {
+/** The header's subline: "Point - applies to 5 items - 1 override (P2 style rule)"; `kpiKeys` are the keys of the kind's key values. */
+export function headerSubline(kind: Kind, items: readonly MapItemRecord[], kpiKeys: readonly string[] = []): string {
     const own = itemsOfKind(items, kind.id);
-    return geometryWord(kind) + ' - applies to ' + itemsText(own.length) + ' - ' + overridesText(own).replace(/^No overrides$/, 'no overrides');
+    return geometryWord(kind) + ' - applies to ' + itemsText(own.length) + ' - ' + overridesText(own, kpiKeys).replace(/^No overrides$/, 'no overrides');
 }
 
 /** Names in order, digits by value ("P2" before "P12"), letter case aside. */
@@ -593,9 +597,9 @@ export interface LiveNowFacts {
     unsaved: boolean;
 }
 
-/** Whether a map item has a style rule of its own. */
+/** Whether a map item has a style rule of its own that the Gateway applies (entry 12c1: one it ignores is not the item's rule). */
 export function hasOwnRule(item: MapItemRecord | undefined): boolean {
-    return !!item && isRecord(item.overrides) && item.overrides.styleRule !== undefined && item.overrides.styleRule !== null;
+    return !!item && isRecord(item.overrides) && ownRuleApplied(item.overrides);
 }
 
 /** The kind's stored rule as the Live now note reads it. */

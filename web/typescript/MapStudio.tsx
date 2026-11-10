@@ -81,10 +81,11 @@ import { HistoryPanel } from './studio/HistoryPanel';
 import { KindList } from './studio/KindList';
 import { KindSetupPanel } from './studio/KindSetupPanel';
 import {
-    NO_KIND_SAVES, PreviewOption, SetupEdit, hasOwnRule, itemsOfKind, pausedText, previewKey, previewOf, previewOptions, readPreview, shownKind, waitingSave,
+    NO_KIND_SAVES, PreviewOption, SetupEdit, hasOwnRule, itemsOfKind, pausedText, previewKey, previewOf, previewOptions, readPreview, readSetup, shownKind, waitingSave,
     writePreview
 } from './kindSetup';
 import { expandOps, historyRows } from './history';
+import { kpiLabelsOf, liveNowBlock } from './itemOverrides';
 import { HistoryEntry } from './contract';
 import { busyText, undoLabel } from './undoStack';
 import { FirstRunChecklist, ViewerNote } from './studio/FirstRunChecklist';
@@ -1782,7 +1783,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private renderSaveCard(delegate: MapStudioDelegateState, belowChip: boolean): React.ReactNode {
         const card = saveCardFor({
             unsaved: delegate.unsaved, paused: !!delegate.savePaused, dismissed: this.state.cardsClosed, records: delegate.items,
-            kinds: delegate.lists.kinds, locale: browserLocale()
+            kinds: delegate.lists.kinds, locale: browserLocale(),
+            kpiLabel: kpiLabelsOf(delegate.kindSetups)
         });
         if (!card) {
             return null;
@@ -1932,6 +1934,33 @@ export class MapStudio extends Component<Props, MapStudioState> {
                       onChoose={this.onChooseKind} />
         );
     }
+
+    /** Entry 12c1: one Live now row's path overridden for the selected item (a full path), or reset (null). */
+    onOverride = (row: string, path: string | null, rowName: string): void => {
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        const selected = this.state.selected;
+        if (delegate && selected) {
+            delegate.editOverride(selected.id, row, path, rowName);
+        }
+    };
+
+    /** The words of an item's refused override cleared (its field put back or typed in again, or its Details left). */
+    onClearOverrideRefusal = (itemId: string): void => {
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        if (delegate) {
+            delegate.clearOverrideRefusal(itemId);
+        }
+    };
+
+    /** "Open <kind>'s setup" in Details (entry 12c1): Kinds at the selected item's kind, the selection kept. */
+    onOpenKindSetup = (): void => {
+        const selected = this.state.selected;
+        const item = selected ? this.itemFor(selected.id) : undefined;
+        if (item) {
+            this.onChooseKind(item.kind);
+            this.onRailSurface('kinds');
+        }
+    };
 
     /** A kind chosen in the Kinds list: its setup shows in the properties panel's place. */
     onChooseKind = (kindId: string): void => {
@@ -2085,7 +2114,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             itemName: (id) => {
                 const item = delegate.items.find((i) => i.id === id);
                 return item ? item.name : '';
-            }
+            },
+            kpiLabel: kpiLabelsOf(delegate.kindSetups)
         });
         return (
             <HistoryPanel key="history"
@@ -2096,7 +2126,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                               </header>
                           )}
                           history={delegate.history}
-                          rows={historyRows(delegate.history.entries, kinds, locale)}
+                          rows={historyRows(delegate.history.entries, kinds, locale, new Date(), kpiLabelsOf(delegate.kindSetups))}
                           expand={expand}
                           lastStep={stack.done > 0 ? stack.steps[stack.done - 1].label : ''}
                           undoLabel={busy !== '' ? '' : undoLabel(stack)}
@@ -2198,6 +2228,18 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const onLine = attachedTo && attachedTo.geometry.type === 'LineString'
             ? { name: attachedTo.name, lengthM: lengthM(attachedTo.geometry.coordinates) } : undefined;
         const armed = this.state.studio.armed;
+        // Entry 12c1: the Live now block, from the kind's stored setup, the item's newest overrides (those in flight included),
+        // its asset's folder and its live values. An item whose kind is not in the kind list has none.
+        const setupRecord = delegate.kindSetups.find((k) => k.kindId === item.kind);
+        const asset = item.assetId !== null ? assets.find((a) => a.id === item.assetId) : undefined;
+        const liveNow = kind ? liveNowBlock({
+            kindName: kind.name,
+            setup: setupRecord ? readSetup(setupRecord.setup) : null,
+            overrides: (delegate.inFlightOverrides || {})[item.id] || item.overrides,
+            view: { itemId: item.id, itemName: item.name, assetId: item.assetId, assetPath: asset ? asset.basePath : null, properties: item.properties },
+            values: delegate.live.items[item.id],
+            now: Date.now()
+        }) : undefined;
         return (
             <PropertiesPanel key={item.id}
                              item={item}
@@ -2236,7 +2278,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              onAddInstrument={this.onAddInstrument}
                              onSelectInstrument={this.onRowSelect}
                              onLine={onLine}
-                             onMoveAlong={this.onMoveAlong} />
+                             onMoveAlong={this.onMoveAlong}
+                             liveNow={liveNow}
+                             overrideRefusal={(delegate.overrideRefusals || {})[item.id] || null}
+                             onOverride={this.onOverride}
+                             onClearOverrideRefusal={this.onClearOverrideRefusal}
+                             onOpenKindSetup={this.onOpenKindSetup} />
         );
     }
 

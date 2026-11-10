@@ -57,6 +57,38 @@ describe('the sentence of a batch (B2, B6, B8)', () => {
             after: { properties: { gasRate: 2 } } })]), KINDS)).toBe("Changed P14's Gas rate");
     });
 
+    test('entry 12c1: an override is named by its part, a Reset as a reset (owner decision 3)', () => {
+        const labels = (kind: string, key: string) => (kind === 'pad' && key === 'pressure' ? 'Pressure' : undefined);
+        const RULE = { source: { path: '[default]Mesa/P14/Pressure' }, type: 'expression', expression: "'normal'" };
+        const set = entry(6, [op({ op: 'update', id: 'p2', name: 'Point 2', before: { overrides: { styleRule: RULE } },
+            after: { overrides: { styleRule: RULE, kpis: [{ key: 'pressure', path: '[default]Mesa/P12/Pressure' }] } } })]);
+        expect(batchSentence(set, KINDS, '', labels)).toBe("Changed Point 2's Pressure path");
+        // With no label known (the kind setups not loaded) the key is said.
+        expect(batchSentence(set, KINDS)).toBe("Changed Point 2's pressure path");
+        const reset = entry(7, [op({ op: 'update', id: 'p2', name: 'Point 2', before: { overrides: { comms: { path: '[default]c', on: true } } },
+            after: { overrides: {} } })]);
+        expect(batchSentence(reset, KINDS, '', labels)).toBe("Reset Point 2's comms path");
+        expect(batchSentence(entry(8, [op({ op: 'update', id: 'p2', name: 'Point 2', before: { overrides: {} }, after: { overrides: { styleRule: RULE } } })]), KINDS))
+            .toBe("Changed Point 2's style rule");
+        // A kind change that dropped the overrides in the same save (owner decision 2).
+        expect(batchSentence(entry(9, [op({ op: 'update', id: 'p2', name: 'Point 2', before: { kind: 'pad', properties: {}, overrides: { styleRule: RULE } },
+            after: { kind: 'tap', properties: {}, overrides: {} } })]), KINDS)).toBe("Changed Point 2's kind to pressure tap and dropped its overrides");
+        // A value changed with the kind: the fields as before, then the overrides.
+        expect(batchSentence(entry(10, [op({ op: 'update', id: 'p2', name: 'Point 2', before: { kind: 'pad', properties: { gasRate: 1 }, overrides: { styleRule: RULE } },
+            after: { kind: 'tap', properties: {}, overrides: {} } })]), KINDS)).toMatch(/^Changed Point 2's kind and .+ and dropped its overrides$/);
+        // A switch changed alone (a script) is the part's override, not its path.
+        const switched = entry(11, [op({ op: 'update', id: 'p2', name: 'Point 2', before: { overrides: { comms: { path: '[default]c', on: true } } },
+            after: { overrides: { comms: { path: '[default]c', on: false } } } })]);
+        expect(batchSentence(switched, KINDS, '', labels)).toBe("Changed Point 2's comms override");
+        expect(expandOps(switched, { kinds: KINDS, kpiLabel: labels })[0].fields.map((f) => f.label)).toEqual(['Comms override']);
+        // The row expanded: each path before and after, "From kind" where the item had none of its own.
+        expect(expandOps(set, { kinds: KINDS, kpiLabel: labels })[0].fields)
+            .toEqual([{ label: 'Pressure path override', before: 'From kind', after: '[default]Mesa/P12/Pressure' }]);
+        expect(expandOps(reset, { kinds: KINDS, kpiLabel: labels })[0].fields)
+            .toEqual([{ label: 'Comms path override', before: '[default]c', after: 'From kind' }]);
+        expect(historyRows([set], KINDS, '', new Date('2026-11-09T10:43:00Z'), labels)[0].sentence).toBe("Changed Point 2's Pressure path");
+    });
+
     test('a line deleted with its instruments in one change (EXPERIENCE.md Instruments)', () => {
         const line = op({ op: 'delete', id: 'l', name: 'L-TEST', kind: 'pipe', version: 4, before: record('L-TEST', 'pipe', { type: 'LineString', coordinates: [[0, 0], [1, 1]] }) });
         const tap = (id: string) => op({ op: 'delete', id, name: id, kind: 'tap', version: 2,

@@ -1576,7 +1576,7 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                     </span>
                     <div className="mapstudio-popup-title">
                         <h2 className="mapstudio-popup-name mapstudio-panel-name mapstudio-kindsetup-name">{kind.name}</h2>
-                        <div className="mapstudio-popup-subline mapstudio-panel-subline mapstudio-kindsetup-subline">{headerSubline(kind, this.props.items)}</div>
+                        <div className="mapstudio-popup-subline mapstudio-panel-subline mapstudio-kindsetup-subline">{headerSubline(kind, this.props.items, this.view().kpis.map((k) => k.key))}</div>
                     </div>
                 </header>
                 <div className="mapstudio-kindsetup-preview" data-field="preview" data-options={String(options.length)}>

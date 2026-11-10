@@ -4,14 +4,14 @@ type: 'feature'
 ticket: ''
 part_of: '12'
 created: '2026-11-10'
-status: 'in-progress'
+status: 'built'
 baseline_revision: 'a6401674f7b9c253423cd522c79449997d7f58f9'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md', '{project-root}/docs/kind-setup.md']
 ---
@@ -67,11 +67,11 @@ Decisions (owner, 2026-11-10, "go with recommended", then "approve and continue"
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `web/typescript/itemOverrides.ts` (new, pure), with Jest, before the panel -- the block's rows from a setup, an item and its live values; one row's override or Reset onto the newest overrides; the full-path check; what is applied and counted; the words by part -- L1 to L7, L10 to L12.
-- [ ] `MapStudioStoreDelegate.ts`, `history.ts`, `unsaved.ts`, `kindSetup.ts` -- `editOverride` with the overrides in flight, the kind change dropping them, the labels and sentences by part, the count -- L2 to L5, L8, L9, L11.
-- [ ] `studio/PropertiesPanel.tsx`, `MapStudio.tsx`, `mapstudio.css` -- the block, the Override tag and Reset, the field; hooks `.mapstudio-livenow`, `.mapstudio-livenow-row[data-row]`, `[data-override]`, `.mapstudio-override-tag`, `.mapstudio-override-reset` -- L1 to L12.
-- [ ] `e2e/tests/overrides.spec.mjs` (new) -- L1 to L12 at 1366 px, the seed and dev tags put back; screenshots of the block, an override and a refusal.
-- [ ] Docs and playbook 8n.
+- [x] `web/typescript/itemOverrides.ts` (new, pure), with Jest, before the panel -- the block's rows from a setup, an item and its live values; one row's override or Reset onto the newest overrides; the full-path check; what is applied and counted; the words by part -- L1 to L7, L10 to L12.
+- [x] `MapStudioStoreDelegate.ts`, `history.ts`, `unsaved.ts`, `kindSetup.ts` -- `editOverride` with the overrides in flight, the kind change dropping them, the labels and sentences by part, the count -- L2 to L5, L8, L9, L11.
+- [x] `studio/PropertiesPanel.tsx`, `MapStudio.tsx`, `mapstudio.css` -- the block, the Override tag and Reset, the field; hooks `.mapstudio-livenow`, `.mapstudio-livenow-row[data-row]`, `[data-override]`, `.mapstudio-override-tag`, `.mapstudio-override-reset` -- L1 to L12.
+- [x] `e2e/tests/overrides.spec.mjs` (new) -- L1 to L12 at 1366 px, the seed and dev tags put back; screenshots of the block, an override and a refusal.
+- [x] Docs and playbook 8n.
 
 **Acceptance Criteria:**
 - Given P12 and P14 on the dev stack, when P12's Pressure path is overridden to P14's, then P12 shows P14's pressure at the next live update in every open map, and Reset returns it to its own.
@@ -80,10 +80,39 @@ Decisions (owner, 2026-11-10, "go with recommended", then "approve and continue"
 ## Implementation Notes
 
 - Planner, 2026-11-10: the environment, commit and identity rules are entry 8's plan's (Docker by hand after a restart, JDK 17 by apt if gone, `ops/up.sh --fresh` before a whole-suite run, no em dashes, never a bare `git stash`, never a push). Leave the work uncommitted: the orchestrator commits after the whole suite.
+- Builder, 2026-11-10: built as planned, uncommitted. Picks made where the plan left room, each for the owner's eye:
+  - **The browser's full-path check is the Gateway's own** (`Placeholders.checkTagPath` for an override, the same sentence per case), so no path the Gateway refuses for its form is sent (L6); a Gateway refusal's words beside the row (L7) are proven on the delegate in Jest.
+  - **A refused override leaves the unsaved queue** (as a refused kind setup field does): its field opens again with what was typed and the Gateway's words, and the same path is not sent again as it is; Esc clears them.
+  - **Rows are drawn from the newest overrides** (those in flight included), so a row reads Override as soon as it is sent.
+  - **An overridden row's button reads "Change"** (the plan names only Override and Reset); Reset sits beside the Override tag, as the mock's Label section has it.
+  - **Each row carries its own tag** ("From kind" or Override) and the section label keeps "From kind" too, read literally from Boundaries; the mock shows only the label's tag.
+  - **Comms shows the popup's words with the data age** ("OK - 12 s ago"), read at each live update; a stale key value shows the hourglass before it with the reason as hover text, as the popup.
+  - **A part switched off in the popup** (a key value, Comms, or Alarms with both parts off) reads "Off in the popup".
+  - **The kind's header still counts one per item and part** ("Point 1 key values"), now only for the parts the Gateway applies.
+  - **Recent changes with a kind change** reads "Changed X's kind to <kind> and dropped its overrides"; the row expanded lists each path before and after, "From kind" for none.
+  - **Not done:** a replayed or applied-on-top override's Undo step reads "edit <name>" (`unsaved.ts` `editLabel` knows no row).
 
 ## Plan Change Log
 
 ## Review Triage Log
+
+### Pass 1 (quick lens, 2026-11-10): 11 findings - 2 medium, 9 low; 10 patches (one in part), 1 rejected
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---|---|---|---|
+| 1 | The browser's full-path check is looser than the Gateway's (`[default]`, a brace after the provider, a second `[` are sent and refused), against "anything else ... sends nothing" | medium | patch | Confirmed: `pathProblem` checks only the first character; `Placeholders.isFullPath` asks more. Fix: the same rule as the Gateway's, with shared cases in Jest; the Gateway-refused case (L7) is then proved on the delegate in Jest, since no typed path can reach it. |
+| 2 | The words for `{asset.path}foo`, `{asset.path}/` and a brace in the suffix differ from the Gateway's | low | patch | Confirmed against `Placeholders.checkTagPath`. Fix: with finding 1, the Gateway's sentence for each case. |
+| 3 | A linked item whose asset is not in the asset list is told "Not linked" | medium | patch | Confirmed: `unlinked` is taken from a null base path. Fix: unlinked means no `assetId`; an asset not in the list gets its own note. |
+| 4 | A refusal that arrives after its panel was left stays stored and shows stale when the item is selected again | low | patch | Confirmed: `componentWillUnmount` clears only a refusal already there. Fix: a panel that opens on an item clears what an earlier visit left. |
+| 5 | A refusal's words stay beside a field closed by typing the shown path back or by a pause | low | patch | Confirmed in `closeOverride`. Fix: closing the field clears its refusal. |
+| 6 | A second row's override held behind a refused first is dropped with only a console line | low | rejected | Real in the code, but with finding 1 fixed no typed path reaches a Gateway refusal, so it needs a role lost mid-edit; saying it would need new words and state. |
+| 7 | Changing an existing Comms or Alarms override rebuilds the part from the kind's, losing switches the override already held | low | patch | Confirmed in `applyRowEdit`. Fix: an existing override keeps its own values and takes the new path; only a new one starts from the kind's. |
+| 8 | A kind change that drops overrides reads "Changed X's kind and overrides", no longer naming the new kind | low | patch | Confirmed in `updateSentence`. Fix: the kind named as before, and that its overrides were dropped. |
+| 9 | A change of an override's switch alone (from a script) is worded as a path change | low | patch | Confirmed in `overrideChanges`. Fix: "path" only when the path differs. |
+| 10 | The unsaved list and the conflict card name a key value by its key; a replayed or applied-on-top override's Undo step reads "edit <name>" | low | patch in part | The label lookup is passed to the unsaved list and the card. The replayed step's label is left: it needs the step's words kept with the queued entry, for a case seen only after a reload. |
+| 11 | The block's accessible name is "Live now From kind"; the heading says "From kind" even when every row is overridden | low | patch | Confirmed in `renderLiveNow`. Fix: the tag outside the heading's name. |
+
+Outcome (2026-11-10): ten patches applied (findings 1 to 5, 7 to 11; 10 in part), finding 6 rejected. The orchestrator's Verification on the final code: tsc clean, Jest 954 passed, Gradle clean build offline passed, contract check OK, `ops/up.sh --fresh` and the whole e2e suite 311 passed, 0 failed, 8 skipped (the env-gated scenarios). L7 (a Gateway refusal) is proved in Jest on the delegate, since the browser's check now stops every path the Gateway would refuse. No Gateway, `common/` or Ignition file changed. Status built; 12c2 (the Style tab) is next.
 
 ## Design Notes
 

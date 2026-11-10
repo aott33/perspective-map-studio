@@ -111,6 +111,22 @@ describe('the words', () => {
     });
 });
 
+describe('an override in the cards\' words (entry 12c1)', () => {
+    const labels = (kind: string, key: string) => (kind === 'pad' && key === 'pressure' ? 'Pressure' : undefined);
+    const OVER = { kpis: [{ key: 'pressure', path: '[default]Mesa/P12/Pressure' }] };
+
+    test('a key value is named by its label, from the lookup the card is given; by its key without one', () => {
+        const batch = updateBatch('p14', 'batch-over', 3, { overrides: OVER });
+        const entry = mine(pad({ version: 4, overrides: { kpis: [{ key: 'pressure', path: '[default]Mesa/P15/Pressure' }], comms: { path: '[default]c' } } }), {}, batch);
+        expect(yourChangeText(entry, [pad()], KINDS, '', false, labels)).toBe('Pressure path [default]Mesa/P12/Pressure');
+        expect(yourChangeText(entry, [pad()], KINDS)).toBe('pressure path [default]Mesa/P12/Pressure');
+        expect(theirChangeText(entry, KINDS, '', [], labels)).toBe("Sam changed P14's comms path and Pressure path at 10:42");
+        const shown = saveCardFor({ unsaved: [entry], paused: false, dismissed: [], records: [pad()], kinds: KINDS, locale: '', kpiLabel: labels });
+        expect(shown && shown.kept).toBe('Your change, kept here and not saved: Pressure path [default]Mesa/P12/Pressure.');
+        expect(shown && shown.text).toContain("Sam changed P14's comms path and Pressure path at 10:42");
+    });
+});
+
 describe('Apply mine on top', () => {
     test('a new batch at the stored version: my keys merged onto theirs, the stored entry untouched', () => {
         const theirs = pad({ version: 4, properties: { road: 'New gate' } });

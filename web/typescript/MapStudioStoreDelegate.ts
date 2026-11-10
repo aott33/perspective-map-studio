@@ -68,6 +68,7 @@ import {
 import { UnsavedSender } from './unsavedSender';
 import { registerTestHook, takeTestReply } from './testHook';
 import { NO_SHAPE_REFUSAL, ShapeRefusal, droppedText } from './problems';
+import { applyRowEdit, kpiLabelsOf, overrideLabel, refusalWords, rowWords, sameOverrides } from './itemOverrides';
 import { FieldValue, keptProperties, prefillFor, prefillKey, readPrefill, rememberValue, withValue } from './itemForm';
 import { EventFirer, POPUP_CLOSE_EVENT, POPUP_OPEN_EVENT, firePageEvent } from './pageEvents';
 
@@ -166,6 +167,17 @@ export interface MapStudioDelegateState {
      */
     inFlight: Record<string, Record<string, unknown> | null>;
     /**
+     * Entry 12c1: the newest `overrides` of every map item whose batch in flight or waiting its turn carries any (an item none
+     * carries any for is left out): Details' Live now block draws them, so a row is marked Override as soon as it is sent.
+     */
+    inFlightOverrides: Record<string, Record<string, unknown>>;
+    /**
+     * Entry 12c1: the last override of an item the Gateway refused for good (`invalid`, `role`), by item id: the row, the words
+     * as they stand beside its field, the path that was typed and the batch. It stands until the item's next override is sent
+     * or the panel clears it.
+     */
+    overrideRefusals: Record<string, OverrideRefusal>;
+    /**
      * Who last changed each map item and when (epic 4 entry 7a), by item id: map.load's `changed` (other editors' changes as of
      * the last load), then this session's own saves (the session user, now). Empty for a viewer.
      */
@@ -195,6 +207,23 @@ export interface MapStudioDelegateState {
     kindSaves: Record<string, KindSaveState>;
     /** What `tags.resolve` said of each tag path asked (entry 12a), by kindSetup.ts `resolveKey` (kind, asset, path). */
     resolves: Record<string, ResolveState>;
+}
+
+/** An item's override the Gateway refused for good (entry 12c1): its words stand beside the row's field, the stored overrides stand. */
+export interface OverrideRefusal {
+    row: string;
+    words: string;
+    /** The path that was typed, so the field can show it again. */
+    path: string;
+    code: string;
+    batchId: string;
+}
+
+/** One override edit on its way: the item, the row and the path typed ('' for a Reset). */
+interface OverrideEdit {
+    itemId: string;
+    row: string;
+    path: string;
 }
 
 /** One edit of a kind's setup on its way: the field it was typed in, the edit, and the setup version it was typed on. */
@@ -342,6 +371,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private kindWork = new Map<string, KindWork>();
     /** The kind setup batches this page sent, by id: their map.changed is this page's own, not another editor's. */
     private kindBatches = new Map<string, string>();
+    /** Entry 12c1: each override edit by the `overrides` object its update carries, and the refusals that stand, by item id. */
+    private overrideEdits = new WeakMap<object, OverrideEdit>();
+    private overrideRefusals: Record<string, OverrideRefusal> = {};
     /** The newest version of each kind's setup that another editor's change gave: a field typed on an older one meets the conflict. */
     private kindForeign = new Map<string, number>();
     /** A deleted setup's version, from the conflict a create at 0 met: the create is sent again there, which restores it. */
@@ -431,6 +463,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             editInFlight: this.editInFlight(),
             shapeRefused: this.shapeRefused,
             inFlight: this.inFlightItems(),
+            inFlightOverrides: this.inFlightOverrides(),
+            overrideRefusals: this.overrideRefusals,
             changed: this.changed,
             justAdded: this.justAdded,
             kindSetups: this.changes.state.kindSetups,
@@ -1104,6 +1138,11 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
 
     /** The `properties` of an item's latest batch in flight or waiting its turn, or null when none carries any. */
     private sentProperties(id: string): Record<string, unknown> | null {
+        return this.sentField(id, 'properties');
+    }
+
+    /** `properties` or `overrides` as an item's latest batch in flight or waiting its turn carries it, or null when none does. */
+    private sentField(id: string, field: 'properties' | 'overrides'): Record<string, unknown> | null {
         const batches: EditBatch[] = [];
         const flight = this.inFlightByItem.get(id);
         const inFlight = flight !== undefined ? this.batchesInFlight.get(flight) : undefined;
@@ -1112,15 +1151,106 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         }
         const own = this.heldByItem.get(id) || [];
         own.forEach((h) => batches.push(h.batch));
-        let properties: Record<string, unknown> | null = null;
+        let sent: Record<string, unknown> | null = null;
         for (const batch of batches) {
             for (const op of batch.ops) {
-                if (op.entity === 'item' && op.id === id && op.op !== 'delete' && op.data && op.data.properties) {
-                    properties = op.data.properties;
+                const value = op.entity === 'item' && op.id === id && op.op !== 'delete' && op.data ? op.data[field] : undefined;
+                if (value) {
+                    sent = value;
                 }
             }
         }
-        return properties;
+        return sent;
+    }
+
+    /**
+     * The newest `overrides` this page knows for an item (entry 12c1): those of its latest batch still in flight or waiting its
+     * turn, else the record's, so a second row's update never carries the first row's old overrides (as `propertiesFor`).
+     */
+    private overridesFor(item: MapItemRecord): Record<string, unknown> {
+        const sent = this.sentField(item.id, 'overrides');
+        return sent !== null ? sent : item.overrides || {};
+    }
+
+    /** The state's `inFlightOverrides`: the newest overrides of each item whose batch in flight or waiting carries any. */
+    private inFlightOverrides(): Record<string, Record<string, unknown>> {
+        const ids = new Set<string>(Array.from(this.inFlightByItem.keys()));
+        this.heldByItem.forEach((_held, id) => ids.add(id));
+        const out: Record<string, Record<string, unknown>> = {};
+        ids.forEach((id) => {
+            const sent = this.sentField(id, 'overrides');
+            if (sent !== null) {
+                out[id] = sent;
+            }
+        });
+        return out;
+    }
+
+    /**
+     * One row of Details' Live now block overridden or reset for this one item (entry 12c1, R5; itemOverrides.ts): one update of
+     * the item's whole `overrides`, built from the newest this page knows (those in flight included) with only that row changed
+     * (`path` a full path, or null for Reset), so every other stored part passes through untouched. It is an ordinary item edit:
+     * an Undo step named by its part ("change Point 2's Pressure path", "reset Point 2's comms path") and a row of Recent changes.
+     * `rowName` is the row's name as the block shows it. False when nothing was sent (the item gone, or nothing changed).
+     */
+    editOverride(id: string, row: string, path: string | null, rowName: string): boolean {
+        const item = this.knownRecord(id);
+        if (!item) {
+            console.info('[MapStudio] The override of ' + id + ' was dropped: the item is not on the map.');
+            return false;
+        }
+        const stored = this.changes.state.kindSetups.find((k) => k.kindId === item.kind);
+        const newest = this.overridesFor(item);
+        const overrides = applyRowEdit(newest, stored ? stored.setup : null, row, path);
+        this.clearOverrideRefusal(id);
+        if (sameOverrides(overrides, newest)) {
+            return false;
+        }
+        // The overrides object is this edit's mark: a batch that carries it (sent now, held, or rebased) is this row's.
+        this.overrideEdits.set(overrides, { itemId: id, row, path: path === null ? '' : path });
+        this.sendUpdate(id, { overrides }, overrideLabel(path === null, item.name, rowWords(row, rowName)));
+        return true;
+    }
+
+    /** An override's refusal cleared (its field put back or typed in again, or the panel left). */
+    clearOverrideRefusal(id: string): void {
+        if (id in this.overrideRefusals) {
+            const next = { ...this.overrideRefusals };
+            delete next[id];
+            this.overrideRefusals = next;
+            this.notify();
+        }
+    }
+
+    /**
+     * An override's save answered with an error (entry 12c1). A transient one stays queued and replays, and a conflict stays in
+     * the queue with its card, as any item edit's. Anything else (`invalid`, `role`) leaves the queue: the Gateway's words stand
+     * beside the row's field and the stored overrides stand.
+     */
+    private overrideRefused(batchId: string, found: OverrideEdit | null, error: ErrorBody, transient: boolean): void {
+        if (!found || transient || error.code === ErrorCodes.CONFLICT) {
+            return;
+        }
+        this.sender.discard(batchId);
+        this.overrideRefusals = {
+            ...this.overrideRefusals,
+            [found.itemId]: { row: found.row, words: refusalWords(error.message), path: found.path, code: error.code, batchId }
+        };
+    }
+
+    /** The override edit a batch in flight carries (its one item op's `overrides` object is the edit's mark), or null. */
+    private overrideEditOf(batchId: string): OverrideEdit | null {
+        const batch = this.batchesInFlight.get(batchId);
+        if (!batch) {
+            return null;
+        }
+        for (const op of batch.ops) {
+            const held = op.entity === 'item' && op.data && op.data.overrides ? this.overrideEdits.get(op.data.overrides) : undefined;
+            if (held && held.itemId === op.id) {
+                return held;
+            }
+        }
+        return null;
     }
 
     /** The state's `inFlight`: every item a batch in flight or waiting its turn touches, with its newest properties sent. */
@@ -1401,6 +1531,11 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         }
         const target = this.lists.kinds.find((k) => k.id === kind);
         const data: MapItemData = item && target ? { kind, properties: keptProperties(this.propertiesFor(item), target) } : { kind };
+        // Entry 12c1 (owner decision 2): the item's overrides were written for the kind it leaves, so they go in the same save;
+        // the step's undo carries them back with the kind. An item with none sends none.
+        if (item && Object.keys(this.overridesFor(item)).length > 0) {
+            data.overrides = {};
+        }
         this.sendUpdate(id, data, stepLabel('edit', item ? item.name : id));
     }
 
@@ -1865,7 +2000,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             return false;
         }
         // The undo step names the row as it reads ("Reverted ..." included).
-        const sentence = rowSentence(entry, this.history.entries, this.lists.kinds, browserLocale());
+        const sentence = rowSentence(entry, this.history.entries, this.lists.kinds, browserLocale(), kpiLabelsOf(this.changes.state.kindSetups));
         this.revertBatches.add(batch.batchId);
         this.sendBatch(batch, batch.ops[0].id, revertLabel(sentence));
         return true;
@@ -2077,6 +2212,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             if (shown && this.save.state !== 'idle') {
                 this.save = refusedSave(this.save.itemId, reply.body);
             }
+            // An item's override (entry 12c1), read before its batch is let go.
+            const overrideEdit = outcome.kind === 'failed' ? this.overrideEditOf(outcome.batchId) : null;
             if (outcome.kind === 'failed' && !isTransient(outcome.reason.code)) {
                 // After the refusal is on the save status: a geometry change waiting on it goes now (entry 5) and says Saving...
                 this.giveUp(outcome.batchId);
@@ -2084,6 +2221,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             if (outcome.kind === 'failed') {
                 // A kind setup save (entry 12a): an invalid one leaves the queue, its words beside the field; the rest is entry 10's.
                 this.kindRefused(outcome.batchId, reply.body, isTransient(outcome.reason.code));
+                // An item's override (entry 12c1): an invalid one leaves the queue too, its words beside the row's field.
+                this.overrideRefused(outcome.batchId, overrideEdit, reply.body, isTransient(outcome.reason.code));
             }
             this.store = storeStateFromSaveError(this.store, reply.body);
             if (outcome.kind === 'failed' && !(reply.body.code === ErrorCodes.STORE_UNREACHABLE && !isBusy(reply.body)) && this.savePaused) {

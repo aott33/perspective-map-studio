@@ -8,6 +8,9 @@ import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AdapterStatus, Asset, AssetName, FormField, Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
+import { liveNowBlock } from '../itemOverrides';
+import { readSetup } from '../kindSetup';
+import { ItemValues } from '../live';
 import { createPlaceSource } from '../placeCheck';
 import { PropertiesPanel, PropertiesPanelProps } from '../studio/PropertiesPanel';
 import { SelectionCount } from '../studio/SelectionCount';
@@ -408,5 +411,121 @@ describe('instruments in Details (entry 9)', () => {
         expect(tag(html, 'mapstudio-field-lng')).toContain('readonly=""');
         expect(html).not.toContain('mapstudio-field-distance');
         expect(html).toContain('It moves along its line, which is not on the map.');
+    });
+});
+
+// Entry 12c1 (R5; DESIGN.md Properties panel, Override tag): the Live now block at the foot of Details.
+describe('the Live now block (entry 12c1)', () => {
+    const SETUP = readSetup({
+        comms: { path: '{asset.path}/Comms' },
+        kpis: [{ key: 'pressure', label: 'Pressure', path: '{asset.path}/Pressure', unit: 'psi', icon: true },
+            { key: 'gas', label: 'Gas price', path: '[default]Shared/GasPrice', on: false }],
+        alarms: { path: '{asset.path}' }
+    });
+    const VIEW = { itemId: 'p1', itemName: 'P31', assetId: 'P15', assetPath: '[default]Mesa/P15', properties: {} };
+    const good = (value: unknown) => ({ value, quality: 'Good', t: null, stale: false, reason: '' });
+    const VALUES = { id: 'p1', comms: good(true), kpis: { pressure: good(512) }, alarms: good({ active: 0, unacked: 0, priority: 0 }), problems: [] };
+    const block = (overrides: Record<string, unknown> = {}, view = VIEW) =>
+        liveNowBlock({ kindName: 'Well pad', setup: SETUP, overrides, view, values: VALUES as unknown as ItemValues, now: 0 });
+    /** One row's markup, from its opening tag to the next row's (or the block's end). */
+    function row(html: string, id: string): string {
+        const from = html.indexOf('data-row="' + id + '"');
+        if (from < 0) {
+            throw new Error('No row ' + id + '.');
+        }
+        const next = html.indexOf('mapstudio-livenow-row', from + 1);
+        return html.slice(html.lastIndexOf('<', from), next < 0 ? html.indexOf('</section>', from) : next);
+    }
+
+    test('L1: after Asset, the label with From kind, then Comms, the key values and Alarms with values and filled paths', () => {
+        const html = panel({ liveNow: block() });
+        expect(html.indexOf('mapstudio-livenow"')).toBeGreaterThan(html.indexOf('mapstudio-field--asset'));
+        expect(html.indexOf('mapstudio-livenow"')).toBeLessThan(html.indexOf('mapstudio-panel-footer'));
+        expect(tag(html, 'class="mapstudio-livenow"')).toContain('data-rows="4"');
+        // The heading that names the block holds the label alone; the tag stands beside it.
+        expect(html).toMatch(/<h3 class="mapstudio-livenow-heading" id="mapstudio-livenow-p1">Live now<\/h3><span class="mapstudio-kindsetup-tag mapstudio-fromkind-tag">From kind<\/span>/);
+        expect(tag(html, 'class="mapstudio-livenow"')).toContain('aria-labelledby="mapstudio-livenow-p1"');
+        expect((html.match(/data-row="[^"]+"/g) || [])).toEqual(['data-row="comms"', 'data-row="kpi:pressure"', 'data-row="kpi:gas"', 'data-row="alarms"']);
+        const pressure = row(html, 'kpi:pressure');
+        expect(pressure).toContain('data-override="false"');
+        expect(pressure).toContain('aria-label="Icon value"');
+        expect(pressure).toContain('mapstudio-livenow-value--icon');
+        expect(pressure).toContain('512 psi');
+        expect(pressure).toContain('<span class="mapstudio-mono mapstudio-livenow-path">[default]Mesa/P15/Pressure</span>');
+        expect(pressure).toContain('mapstudio-fromkind-tag');
+        expect(pressure).not.toContain('mapstudio-override-tag');
+        expect(pressure).not.toContain('mapstudio-override-reset');
+        expect(pressure).toMatch(/mapstudio-override-edit[^>]*>Override</);
+        expect(row(html, 'comms')).toContain('OK');
+        expect(row(html, 'kpi:gas')).toContain('data-off="true"');
+        expect(row(html, 'kpi:gas')).toContain('Off in the popup');
+        expect(row(html, 'alarms')).toContain('No active alarms');
+        expect(html).not.toContain('mapstudio-livenow-unlinked');
+        // No em dash anywhere in the panel.
+        expect(html).not.toContain(String.fromCharCode(0x2014));
+    });
+
+    test('L2: an overridden row carries the Override tag and Reset; the others keep From kind', () => {
+        const html = panel({ liveNow: block({ kpis: [{ key: 'pressure', path: '[default]Mesa/P14/Pressure' }] }) });
+        const pressure = row(html, 'kpi:pressure');
+        expect(pressure).toContain('data-override="true"');
+        expect(pressure).toContain('<span class="mapstudio-override-tag">Override</span>');
+        expect(pressure).toMatch(/mapstudio-override-reset[^>]*>Reset</);
+        expect(pressure).toContain('[default]Mesa/P14/Pressure');
+        expect(pressure).not.toContain('mapstudio-fromkind-tag');
+        expect(row(html, 'comms')).toContain('data-override="false"');
+        expect((html.match(/mapstudio-override-tag/g) || [])).toHaveLength(1);
+    });
+
+    test('L7: a refused Reset\'s words stand under its row; paused, the buttons take no input', () => {
+        const refused = panel({ liveNow: block({ comms: { path: '[default]Mesa/P14/Comms' } }),
+            overrideRefusal: { row: 'comms', words: 'Editing needs the full editing role.', path: '', batchId: 'b1' } });
+        expect(row(refused, 'comms')).toMatch(/mapstudio-override-problem" role="alert">Editing needs the full editing role\.</);
+        expect(row(refused, 'alarms')).not.toContain('mapstudio-override-problem');
+        const paused = panel({ liveNow: block({ comms: { path: '[default]Mesa/P14/Comms' } }), paused: true });
+        expect(tag(row(paused, 'comms'), 'mapstudio-override-reset')).toContain('disabled');
+        expect(tag(row(paused, 'comms'), 'mapstudio-override-edit')).toContain('disabled');
+    });
+
+    test('L10: an unlinked item shows the paths as written and the note', () => {
+        const html = panel({ liveNow: block({}, { ...VIEW, assetId: null as unknown as string, assetPath: null as unknown as string }) });
+        expect(tag(html, 'class="mapstudio-livenow"')).toContain('data-unlinked="true"');
+        expect(row(html, 'kpi:pressure')).toContain('{asset.path}/Pressure');
+        expect(html).toContain('Not linked, so the paths show as the kind has them. Linking an asset fills them.');
+    });
+
+    test('a linked item whose asset is not in the asset list is not told "Not linked"', () => {
+        const html = panel({ liveNow: block({}, { ...VIEW, assetPath: null as unknown as string }) });
+        expect(tag(html, 'class="mapstudio-livenow"')).toContain('data-unlinked="false"');
+        expect(tag(html, 'class="mapstudio-livenow"')).toContain('data-asset-missing="true"');
+        expect(html).toContain('The paths show as the kind has them, since its asset is not in the asset list.');
+        expect(html).not.toContain('Not linked, so the paths');
+    });
+
+    test('a refusal an earlier visit left is cleared when the panel opens, and a closed field takes its refusal with it', () => {
+        const cleared: string[] = [];
+        const refusal = { row: 'comms', words: 'no', path: '[default]x', batchId: 'b1' };
+        const opened = new PropertiesPanel(props({ liveNow: block(), overrideRefusal: refusal, onClearOverrideRefusal: (id) => cleared.push(id) }));
+        opened.componentDidMount();
+        expect(cleared).toEqual(['p1']);
+        const typing = new PropertiesPanel(props({ liveNow: block(), overrideRefusal: refusal, onClearOverrideRefusal: (id) => cleared.push(id) }));
+        typing.setState = (() => undefined) as typeof typing.setState;
+        (typing as unknown as { closeOverride(row: string): void }).closeOverride('alarms');
+        expect(cleared).toEqual(['p1']);
+        (typing as unknown as { closeOverride(row: string): void }).closeOverride('comms');
+        expect(cleared).toEqual(['p1', 'p1']);
+        // With no refusal nothing is cleared.
+        new PropertiesPanel(props({ liveNow: block(), onClearOverrideRefusal: (id) => cleared.push(id) })).componentDidMount();
+        expect(cleared).toHaveLength(2);
+    });
+
+    test('L12: a kind with no setup shows one line and the button; an unknown kind shows no block', () => {
+        const none = liveNowBlock({ kindName: 'Well pad', setup: null, overrides: {}, view: VIEW, values: undefined, now: 0 });
+        const html = panel({ liveNow: none });
+        expect(tag(html, 'class="mapstudio-livenow"')).toContain('data-rows="0"');
+        expect(html).toContain('Well pad has no setup yet, so its items show no live values.');
+        expect(html).toMatch(/mapstudio-livenow-setup[^>]*>Open Well pad&#x27;s setup</);
+        expect(panel({ liveNow: block(), kind: undefined })).not.toContain('mapstudio-livenow');
+        expect(panel()).not.toContain('mapstudio-livenow');
     });
 });

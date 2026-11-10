@@ -2,7 +2,7 @@
 
 A walk through what epic 4 has built so far, grouped by what you do, on the local development stack. Tick each box and note anything that looks or feels off in the Notes line under each section (a screenshot helps). Each note goes into `_bmad-output/initiative-flowmap/tickets/epic-editing/epic-editing.md` Notes or a new entry. The playbook grows as entries land; entry 18 (the 0.4.0 release) finishes it for the release test and the 30-minute test.
 
-Built so far (2026-11-10): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems) and 11a (the edit record, Gateway only). Also built: 11b (Recent changes and History), 12a (the Kinds surface and a kind's setup), 12b1 (the style rule editor and area tints, section 8l) and 12b2 (the preview item on the map and the Live now note, section 8m). Still to come: 12c (per-item overrides), 13 (the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
+Built so far (2026-11-10): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems) and 11a (the edit record, Gateway only). Also built: 11b (Recent changes and History), 12a (the Kinds surface and a kind's setup), 12b1 (the style rule editor and area tints, section 8l) 12b2 (the preview item on the map and the Live now note, section 8m) and 12c1 (Details' Live now block and path overrides, section 8n). Still to come: 12c2 (the Style tab and an item's own style rule), 13 (the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
 
 ## Results so far
 
@@ -29,6 +29,7 @@ Built so far (2026-11-10): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item li
 | 8k. Kinds and a kind's setup | | |
 | 8l. The style rule editor and area tints | | |
 | 8m. The preview item on the map | | |
+| 8n. Live now and path overrides | | |
 | 9. View mode, unchanged | | |
 | 10. Phone (390 px) | | |
 | 11. Designer | | |
@@ -360,6 +361,26 @@ On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor
 - [ ] Tab from the Preview item select: Show on map is next, and Enter presses it.
 
 Notes:
+
+
+## 8n. Live now and path overrides
+
+On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor, with a second browser on `/live` (its dev buttons drive P12, the asset of **Point 1**, and P14, the asset of **Point 2**, and it is another open map to compare with). Compare the block with DESIGN.md's Properties panel and Override tag and the Details panel of key screen 6 ([key-screen-6-kinds-tags-override.png](../_bmad-output/initiative-flowmap/ux-map-studio/mockups/key-screen-6-kinds-tags-override.png); the tag button and the tag browser in it are entry 13). First press **P12 pressure 400** and **P14 pressure 700** on `/live`.
+
+- [ ] Select **Point 1** and scroll Details to its foot: after Asset stands **LIVE NOW** with a grey "From kind" tag, then Comms, Pressure (a star after it, its value bold), Flow and Alarms. Each value is right-aligned ("OK - ...", "400 psi", "... bbl/d", "No active alarms") and each path is in monospace under its name: `[default]Mesa/P12/Comms`, `[default]Mesa/P12/Pressure`, `[default]Mesa/P12/Flow`, `[default]Mesa/P12`. Every row reads "From kind" and has an **Override** button.
+- [ ] On `/live` press **P12 pressure 950**: within ten seconds, with no reload, Pressure reads "950 psi" and Alarms "1 alarm - Priority 1, unacknowledged". Press **P12 pressure 400** and **Acknowledge P12**: both go back.
+- [ ] Press **Override** on Pressure: the path becomes a text field holding `[default]Mesa/P12/Pressure`, selected. Type `[default]Mesa/P14/Pressure` and press Enter: the header says Saved, the row reads **Override** with a **Reset** link, its path is P14's, and the focus is on the row's Change button. Within ten seconds Pressure reads "700 psi", Point 1's icon on this map and on `/live` shows 700 psi, and Point 3 is as it was. There was no save button and no toast.
+- [ ] Hover **Undo**: "Undo: change Point 1's Pressure path". Open **Kinds** and choose **Well pad**: the subline counts it, "... - 2 overrides (Point 1 key values, Point 2 style rule)". Open **Items**: Point 1's Details are back.
+- [ ] Press **Override** on Flow, type `[default]Mesa/P14/Flow` and click into Name: it saves on leaving the field, and both rows read Override.
+- [ ] Press **Override** on Comms, type `{asset.path}/X` and press Enter: under the field, "an override's tag path is a full path such as [default]Mesa/P12/Pressure, not {asset.path}/X." Type `Mesa/X` and press Enter: "Mesa/X is not a tag path; use a full path such as [default]Shared/GasPrice." Nothing was saved (History has no new row). Press Esc: the field closes, Comms reads "From kind" with its own path, and Details is still open.
+- [ ] Press **Override** on Comms, type `[default]` and press Enter: under the field, "[default] is not a tag path; use a full path such as [default]Shared/GasPrice.", and nothing was saved. Pressure and Flow still read Override. Press Esc.
+- [ ] Press **Undo**: Flow reads "From kind" again and Pressure is still overridden. Press **Redo**: Flow is overridden again. Open **History**: rows read "Changed Point 1's Flow path" and "Changed Point 1's Pressure path", each with Revert; expand one to see the path before ("From kind") and after. Open **Items**.
+- [ ] Override Comms with `[default]Mesa/P14/Comms` and Alarms with `[default]Mesa/P14`: each saves and reads Override. Press **Reset** on each: each reads "From kind" with Point 1's own path, and Undo reads "Undo: reset Point 1's alarms path".
+- [ ] Press **Reset** on Pressure: it reads "From kind", Flow is still overridden, and within ten seconds Pressure reads "400 psi" here and on `/live`. Press **Reset** on Flow: no row reads Override, and the Well pad header in Kinds counts one override again.
+- [ ] Select **Pad 1** (a pad with no asset): the paths read as the kind has them (`{asset.path}/Comms`, ...) with the note "Not linked, so the paths show as the kind has them. Linking an asset fills them." Override Comms with `[default]Mesa/P14/Comms`: it saves and reads Override. Reset it.
+- [ ] Select **Point 2** (it has its own style rule): no row of its Live now block reads Override, since the block shows tag paths only (the item's own rule is the Style tab's, entry 12c2).
+- [ ] Select **PT-1** (a tap) and override its Comms with `[default]Mesa/PT2/Comms`. Change **Kind** to Meter: Live now reads "Meter has no setup yet, so its items show no live values." with the button **Open Meter's setup**. Press it: Kinds opens at Meter. Open **Items**: PT-1 is still selected. Press **Undo** once: the kind is Tap again and Comms reads Override, so the kind change took the override with it and one Undo brought both back. Reset Comms.
+- [ ] Tab through the block: every Override, Change and Reset is reached in order and pressed with Enter or Space, and the focus ring is visible.
 
 ## 9. View mode, unchanged
 

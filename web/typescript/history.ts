@@ -18,6 +18,7 @@ import { EditBatch, EditOp, HistoryEntry, HistoryOp, ItemGeometry, MapItemData }
 import { distanceM } from './shared';
 import { distanceWords } from './linePopup';
 import { clockText, fieldLabel, joinWords, moveWords } from './unsaved';
+import { FROM_KIND, KpiLabels, NO_LABELS, overrideChanges, overrideSentence } from './itemOverrides';
 
 /** The page size Recent changes asks for (the most `edits.history` gives). */
 export const HISTORY_PAGE = 50;
@@ -180,7 +181,7 @@ function attachedTo(record: Record<string, unknown> | null): string | null {
 }
 
 /** An update op in a sentence: what changed of one item. */
-function updateSentence(op: HistoryOp, kinds: Kind[], locale: string, split: boolean): string {
+function updateSentence(op: HistoryOp, kinds: Kind[], locale: string, split: boolean, labels: KpiLabels): string {
     const name = nameOf(op);
     if (notKept(op)) {
         return 'Changed ' + name;
@@ -203,9 +204,17 @@ function updateSentence(op: HistoryOp, kinds: Kind[], locale: string, split: boo
     if (keys.length === 1 && keys[0] === 'assetId') {
         return after.assetId === null || after.assetId === undefined ? 'Unlinked ' + name : 'Linked ' + name + ' to an asset';
     }
+    // Entry 12c1 (owner decision 3): an override is named by its part, "Changed Point 2's Pressure path", "Reset Point 2's comms path".
+    const kindId = typeof after.kind === 'string' ? after.kind : typeof before.kind === 'string' ? before.kind : op.kind || '';
+    const overridden = keys.indexOf('overrides') >= 0 ? overrideChanges(before.overrides, after.overrides, (key) => labels(kindId, key)) : [];
+    if (keys.length === 1 && keys[0] === 'overrides' && overridden.length > 0) {
+        return overrideSentence(name, overridden);
+    }
     if (keys.length === 1 && keys[0] === 'kind') {
         return 'Changed ' + name + "'s kind to " + kindWords(kinds, typeof after.kind === 'string' ? after.kind : null);
     }
+    // A kind change that dropped the item's overrides in the same save (owner decision 2).
+    const dropped = keys.indexOf('kind') >= 0 && overridden.length > 0 && Object.keys((after.overrides || {}) as Record<string, unknown>).length === 0;
     const words: string[] = [];
     for (const key of keys) {
         if (key === 'name') {
@@ -226,7 +235,10 @@ function updateSentence(op: HistoryOp, kinds: Kind[], locale: string, split: boo
                 }
             }
         } else if (key === 'overrides') {
-            words.push('style');
+            // With the kind changed too, the overrides went with it (owner decision 2): said after the rest, below.
+            if (!dropped) {
+                overridden.forEach((c) => words.push(c.words));
+            }
         } else if (key === 'ends') {
             words.push('ends');
         } else if (key === 'attachment') {
@@ -234,6 +246,12 @@ function updateSentence(op: HistoryOp, kinds: Kind[], locale: string, split: boo
         } else if (key === 'setup') {
             words.push('setup');
         }
+    }
+    if (dropped) {
+        // The new kind is named as for a kind change alone, unless a value changed with it.
+        const what = words.length === 1 && words[0] === 'kind'
+            ? "'s kind to " + kindWords(kinds, typeof after.kind === 'string' ? after.kind : null) : "'s " + joinWords(words);
+        return 'Changed ' + name + what + ' and dropped its overrides';
     }
     return words.length > 0 ? 'Changed ' + name + "'s " + joinWords(words) : 'Changed ' + name;
 }
@@ -282,7 +300,7 @@ function setupWords(setups: HistoryOp[], kinds: Kind[]): string {
  * as a count ("Changed 20 well pads in one change", "Added 120 items in one change"); a kind setup as "Changed the well pad kind
  * setup". The name each op carries is the one used, so an old change reads the name the item had then.
  */
-export function batchSentence(entry: HistoryEntry, kinds: Kind[] = [], locale: string = ''): string {
+export function batchSentence(entry: HistoryEntry, kinds: Kind[] = [], locale: string = '', labels: KpiLabels = NO_LABELS): string {
     const items = entry.ops.filter((o) => o.entity === 'item');
     const setups = entry.ops.filter((o) => o.entity === 'kindSetup');
     if (items.length === 0) {
@@ -291,12 +309,12 @@ export function batchSentence(entry: HistoryEntry, kinds: Kind[] = [], locale: s
         }
         return 'Changed ' + setupWords(setups, kinds) + (setups.length > 1 ? ' in one change' : '');
     }
-    const sentence = itemSentence(entry, items, kinds, locale);
+    const sentence = itemSentence(entry, items, kinds, locale, labels);
     // A batch with kind setups too names them, so a row never hides one.
     return setups.length === 0 ? sentence : sentence + ', and changed ' + setupWords(setups, kinds);
 }
 
-function itemSentence(entry: HistoryEntry, items: HistoryOp[], kinds: Kind[], locale: string): string {
+function itemSentence(entry: HistoryEntry, items: HistoryOp[], kinds: Kind[], locale: string, labels: KpiLabels): string {
     const lead = items[0];
     const sameKind = (ops: HistoryOp[]): string =>
         ops.every((o) => o.kind === ops[0].kind) ? kindWords(kinds, ops[0].kind) : 'item';
@@ -319,7 +337,7 @@ function itemSentence(entry: HistoryEntry, items: HistoryOp[], kinds: Kind[], lo
     const others = items.filter((o) => o.op !== 'delete');
     if (deletes.length > 0 && others.every((o) => o.op === 'update' && changedKeys(o).every((k) => k === 'ends'))) {
         // A delete that cleared the ends of lines that named the item (entry 25): the delete is the change.
-        return itemSentence(entry, deletes, kinds, locale);
+        return itemSentence(entry, deletes, kinds, locale, labels);
     }
     if (items.every((o) => o.op === 'create')) {
         if (items.length === 1) {
@@ -335,7 +353,7 @@ function itemSentence(entry: HistoryEntry, items: HistoryOp[], kinds: Kind[], lo
         const lineIds = new Set([lead.id].concat(split ? items.filter((o) => o.op === 'create').map((o) => o.id) : []));
         const rest = items.filter((o) => o !== lead && !followsLead(o, lead, lineIds) && !(split && o.op === 'create'));
         if (rest.length === 0) {
-            return updateSentence(lead, kinds, locale, split);
+            return updateSentence(lead, kinds, locale, split, labels);
         }
         const all = [lead].concat(rest);
         if (all.every((o) => o.op === 'update')) {
@@ -395,9 +413,10 @@ export function revertedOf(entry: HistoryEntry, entries: HistoryEntry[]): Histor
 }
 
 /** The row's sentence: its own, or "Reverted "..."" when it reverses an older loaded row. */
-export function rowSentence(entry: HistoryEntry, entries: HistoryEntry[], kinds: Kind[] = [], locale: string = ''): string {
+export function rowSentence(entry: HistoryEntry, entries: HistoryEntry[], kinds: Kind[] = [], locale: string = '',
+    labels: KpiLabels = NO_LABELS): string {
     const reverted = revertedOf(entry, entries);
-    return reverted ? 'Reverted "' + batchSentence(reverted, kinds, locale) + '"' : batchSentence(entry, kinds, locale);
+    return reverted ? 'Reverted "' + batchSentence(reverted, kinds, locale, labels) + '"' : batchSentence(entry, kinds, locale, labels);
 }
 
 /** The undo step's words for a Revert (undoStack.ts labels: lower case after "Undo: "): "revert "Moved P31 about 40 m north"". */
@@ -544,6 +563,8 @@ interface NameLookup {
     /** A map item's name by id (the loaded items), else ''. */
     itemName: (id: string) => string;
     locale: string;
+    /** A key value's label by kind and key (the stored kind setups), for an override's row. */
+    kpiLabel: KpiLabels;
 }
 
 function endsWords(value: unknown, look: NameLookup): string {
@@ -626,7 +647,17 @@ function fieldsOf(op: HistoryOp, look: NameLookup): ExpandField[] {
             if (op.op !== 'update' && Object.keys(op.op === 'create' ? b : a).length === 0) {
                 continue;
             }
-            fields.push({ label: 'Style', before: empty || plainWords(a), after: gone || plainWords(b) });
+            // Entry 12c1: each overridden path on its own row, "From kind" where the item had or has none of its own. A key
+            // value is named by the kind the overrides were written for (a kind change drops them).
+            const labelKind = typeof before.kind === 'string' ? before.kind : kindId || '';
+            for (const c of overrideChanges(a, b, (k) => look.kpiLabel(labelKind, k))) {
+                const path = c.before !== '' || c.after !== '';
+                fields.push({
+                    label: c.words.charAt(0).toUpperCase() + c.words.slice(1) + (/ override$/.test(c.words) ? '' : ' override'),
+                    before: empty || (path ? c.before || FROM_KIND : a[c.part] === undefined ? FROM_KIND : plainWords(a[c.part])),
+                    after: gone || (path ? c.after || FROM_KIND : b[c.part] === undefined ? FROM_KIND : plainWords(b[c.part]))
+                });
+            }
             continue;
         }
         if ((key === 'ends' || key === 'attachment' || key === 'assetId') && op.op !== 'update') {
@@ -649,6 +680,7 @@ export function expandOps(entry: HistoryEntry, look: Partial<NameLookup> = {}): 
         kinds: look.kinds || [],
         assetName: look.assetName || ((id) => id),
         itemName: look.itemName || (() => ''),
+        kpiLabel: look.kpiLabel || NO_LABELS,
         locale: look.locale || ''
     };
     return entry.ops.map((op) => {
@@ -682,14 +714,15 @@ export interface HistoryRowData {
 }
 
 /** The rows, newest first, one per batch. */
-export function historyRows(entries: HistoryEntry[], kinds: Kind[] = [], locale: string = '', now: Date = new Date()): HistoryRowData[] {
+export function historyRows(entries: HistoryEntry[], kinds: Kind[] = [], locale: string = '', now: Date = new Date(),
+    labels: KpiLabels = NO_LABELS): HistoryRowData[] {
     return entries.map((e) => ({
         seq: e.seq,
         batchId: e.batchId,
         actor: e.actor,
         initial: initialOf(e.actor),
         when: whenText(e.at, now),
-        sentence: rowSentence(e, entries, kinds, locale),
+        sentence: rowSentence(e, entries, kinds, locale, labels),
         blocked: revertBlocked(e),
         ops: e.ops.length
     }));

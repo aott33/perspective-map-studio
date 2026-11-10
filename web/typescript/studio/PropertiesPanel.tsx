@@ -11,6 +11,7 @@ import { round1 } from '../geometry';
 import { distanceText } from '../linePopup';
 import { Glyph } from '../popupParts';
 import { roundCoordinate } from '../save';
+import { FROM_KIND, LiveNowBlock, LiveNowRow, OVERRIDE, openSetupText, pathProblem } from '../itemOverrides';
 import { ChromeGlyph } from './ChromeGlyph';
 import { PAUSED_TEXT } from './UndoGroup';
 
@@ -95,6 +96,22 @@ export function deleteButton(paused: boolean, pending: boolean, toolInHand: bool
  * while the data loads and "The place check is not available" if it failed, never stopping a save. The data is asked for when the
  * panel first shows a point (`places`, one fetch per page); a line or an area never asks. Zoom to location, beside Move, moves the
  * map to the saved point at zoom 15 or more, the selection and Details kept (`onZoomTo`).
+ *
+ * From entry 12c1 (R5; itemOverrides.ts holds the rules, docs/kind-setup.md "Overridden from Details") the Live now block stands
+ * at the foot of Details, after Asset (DESIGN.md Properties panel, Override tag): the section label "LIVE NOW" with the "From
+ * kind" tag, then Comms, one row per key value of the kind's setup in its order and Alarms, each its name (the icon value bold
+ * and starred), its live value right-aligned in the popup's words, and its tag path in monospace under it: the kind's path
+ * filled for this item, tagged "From kind", or the item's own full path, tagged Override with a Reset link. Override on a row
+ * makes its path a text field starting from the path shown: Enter or blur saves it through `onOverride` (one update of the
+ * item's whole `overrides`, an Undo step and a row of Recent changes), Esc puts it back. Only a full path is taken: anything
+ * else says so under the field in the Gateway's words and nothing is sent; a path the Gateway refuses shows its words there too
+ * (`overrideRefusal`) and the stored overrides stand. A kind with no comms, key values or alarms shows one line and "Open
+ * <kind>'s setup"; an unlinked item shows the kind's paths as written and a note. No block for an item whose kind is unknown.
+ * Test hooks: `.mapstudio-livenow` (`data-rows`, `data-unlinked`, `data-asset-missing`), a row `.mapstudio-livenow-row[data-row]` (`comms`,
+ * `kpi:<key>`, `alarms`; `data-override` true or false, `data-off`), its value `.mapstudio-livenow-value`, its path
+ * `.mapstudio-livenow-path`, its tag `.mapstudio-override-tag` or `.mapstudio-fromkind-tag`, the buttons
+ * `.mapstudio-override-edit` and `.mapstudio-override-reset`, the field `.mapstudio-override-input` and its words
+ * `.mapstudio-override-problem`, and `.mapstudio-livenow-setup` for the button of a kind with no setup.
  */
 export interface PropertiesPanelProps {
     item: MapItemRecord;
@@ -168,6 +185,16 @@ export interface PropertiesPanelProps {
     onLine?: { name: string; lengthM: number };
     /** The distance along the line typed (Enter or blur): the instrument moves there along it, one change. */
     onMoveAlong?: (distanceM: number) => void;
+    /** Entry 12c1: the Live now block (itemOverrides.ts `liveNowBlock`, from the item's newest overrides); undefined for none. */
+    liveNow?: LiveNowBlock;
+    /** The item's last override the Gateway refused: the row, its words and the path that was typed ('' for a Reset). */
+    overrideRefusal?: { row: string; words: string; path: string; batchId: string } | null;
+    /** One row's path overridden for this item (a full path), or reset (null); `rowName` is the row's name as shown. */
+    onOverride?: (row: string, path: string | null, rowName: string) => void;
+    /** The refusal's words of this item cleared (the field put back or typed in again, or the panel left). */
+    onClearOverrideRefusal?: (itemId: string) => void;
+    /** "Open <kind>'s setup": Kinds at this item's kind, the selection kept. */
+    onOpenKindSetup?: () => void;
 }
 
 interface Drafts {
@@ -184,6 +211,10 @@ interface Drafts {
     fields: Record<string, string>;
     /** A typed field's problem in words, by key ("Wells takes a whole number"); nothing of it was saved. */
     problems: Record<string, string>;
+    /** Entry 12c1: the Live now row whose path is being typed (null for none), its text and why it was not sent ('' for none). */
+    overrideRow: string | null;
+    overrideText: string;
+    overrideProblem: string;
 }
 
 type FixedField = 'name' | 'lat' | 'lng' | 'distance';
@@ -199,7 +230,10 @@ function draftsOf(item: MapItemRecord): Drafts {
         distanceProblem: '',
         kindMenu: false,
         fields: {},
-        problems: {}
+        problems: {},
+        overrideRow: null,
+        overrideText: '',
+        overrideProblem: ''
     };
 }
 
@@ -232,6 +266,11 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
     private sent = new Map<string, string>();
     /** False once unmounted: the place data's load may settle after the panel has gone. */
     private mounted = false;
+    /** Entry 12c1: the Live now block's element, and the row whose Override button takes the focus back once its field closed. */
+    private liveNowEl: HTMLElement | null = null;
+    private refocusRow: string | null = null;
+    /** True while Enter blurs the override's field: a field that closes then gives the focus back to its row's button. */
+    private enterCommit = false;
 
     constructor(props: PropertiesPanelProps) {
         super(props);
@@ -240,12 +279,20 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
 
     componentDidMount(): void {
         this.mounted = true;
+        // Entry 12c1: a refusal an earlier visit to this item left (one that came after its panel was left) is not shown again.
+        if (this.props.overrideRefusal && this.props.onClearOverrideRefusal) {
+            this.props.onClearOverrideRefusal(this.props.item.id);
+        }
         this.focusName();
         this.watchPlaces();
     }
 
     componentWillUnmount(): void {
         this.mounted = false;
+        // Entry 12c1: a refused override's words do not wait for the item to be selected again.
+        if (this.props.overrideRefusal && this.props.onClearOverrideRefusal) {
+            this.props.onClearOverrideRefusal(this.props.item.id);
+        }
     }
 
     /** A point's Location asks for the place data (once per page; a later panel waits on the same load) and draws again when it settles. */
@@ -315,6 +362,22 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         }
         if (!prev.autoFocusName && this.props.autoFocusName) {
             this.focusName();
+        }
+        // Entry 12c1: a set path the Gateway refused opens its field again with what was typed and the Gateway's words.
+        const refusal = this.props.overrideRefusal;
+        const before = prev.item.id === this.props.item.id ? prev.overrideRefusal : null;
+        if (refusal && refusal.path !== '' && (!before || before.batchId !== refusal.batchId) && this.state.overrideRow === null) {
+            this.setState({ overrideRow: refusal.row, overrideText: refusal.path, overrideProblem: refusal.words });
+        }
+        if (this.refocusRow !== null && this.state.overrideRow === null) {
+            const row = this.refocusRow;
+            this.refocusRow = null;
+            const rows = this.liveNowEl ? Array.from(this.liveNowEl.querySelectorAll('.mapstudio-livenow-row')) as HTMLElement[] : [];
+            const el = rows.find((r) => r.getAttribute('data-row') === row);
+            const button = el ? el.querySelector('.mapstudio-override-edit') as HTMLButtonElement | null : null;
+            if (button) {
+                button.focus();
+            }
         }
     }
 
@@ -594,6 +657,175 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         this.props.onLink(null);
     };
 
+    /** Override (or Change) on a Live now row (entry 12c1): its path becomes a text field starting from the path shown. */
+    private startOverride(row: LiveNowRow): void {
+        if (this.props.overrideRefusal && this.props.onClearOverrideRefusal) {
+            this.props.onClearOverrideRefusal(this.props.item.id);
+        }
+        this.setState({ overrideRow: row.id, overrideText: row.path, overrideProblem: '' });
+    }
+
+    /**
+     * The override's field finished (Enter or blur): the path shown already sends nothing; anything but a full path says so in
+     * the Gateway's words and sends nothing, the field kept open; a full path is sent and the field closes.
+     */
+    private commitOverride(row: LiveNowRow): void {
+        if (!row || this.state.overrideRow !== row.id) {
+            return;
+        }
+        const text = this.state.overrideText.trim();
+        const refusal = this.props.overrideRefusal;
+        if (refusal && refusal.row === row.id && refusal.path === text) {
+            // The path the Gateway just refused: its words stand and it is not sent again as it is.
+            this.setState({ overrideText: text, overrideProblem: refusal.words });
+            return;
+        }
+        if (this.props.paused || !this.props.onOverride || text === row.path) {
+            this.closeOverride(row.id);
+            return;
+        }
+        const problem = pathProblem(text);
+        if (problem !== '') {
+            this.setState({ overrideText: text, overrideProblem: problem });
+            return;
+        }
+        this.closeOverride(row.id);
+        this.props.onOverride(row.id, text, row.name);
+    }
+
+    /** The override's field closed; after Enter the focus goes back to the row's button. */
+    private closeOverride(row: string): void {
+        if (this.enterCommit) {
+            this.refocusRow = row;
+        }
+        // A closed field takes its refusal's words with it (the shown path typed back, or a pause).
+        const refusal = this.props.overrideRefusal;
+        if (refusal && refusal.row === row && this.props.onClearOverrideRefusal) {
+            this.props.onClearOverrideRefusal(this.props.item.id);
+        }
+        this.setState({ overrideRow: null, overrideProblem: '' });
+    }
+
+    /** Enter finishes the override's field, as leaving it does; Esc puts the path back, sends nothing and goes no further. */
+    private onOverrideKey = (ev: React.KeyboardEvent<HTMLInputElement>): void => {
+        if (ev.key === 'Enter') {
+            ev.preventDefault();
+            this.enterCommit = true;
+            this.commitOverride(this.rowOf(this.state.overrideRow));
+            this.enterCommit = false;
+        } else if (ev.key === 'Escape') {
+            ev.preventDefault();
+            ev.stopPropagation();
+            this.refocusRow = this.state.overrideRow;
+            if (this.props.overrideRefusal && this.props.onClearOverrideRefusal) {
+                this.props.onClearOverrideRefusal(this.props.item.id);
+            }
+            this.setState({ overrideRow: null, overrideProblem: '' });
+        }
+    };
+
+    /** The Live now row with this id (the one being typed in). */
+    private rowOf(id: string | null): LiveNowRow {
+        const rows = this.props.liveNow ? this.props.liveNow.rows : [];
+        return rows.find((r) => r.id === id) as LiveNowRow;
+    }
+
+    /** Reset on an overridden row: the item's own path goes and the kind's shows again. */
+    private resetOverride(row: LiveNowRow): void {
+        if (this.props.onOverride && !this.props.paused) {
+            this.refocusRow = row.id;
+            this.setState({ overrideRow: null, overrideProblem: '' });
+            this.props.onOverride(row.id, null, row.name);
+        }
+    }
+
+    /** One row of the Live now block (entry 12c1): the name, its tag and the live value, then the path with its buttons, or its field. */
+    private renderLiveRow(row: LiveNowRow, frozen: boolean): React.ReactElement {
+        const overridden = row.override !== null;
+        const editing = this.state.overrideRow === row.id;
+        const refusal = this.props.overrideRefusal && this.props.overrideRefusal.row === row.id ? this.props.overrideRefusal : null;
+        const problem = editing ? this.state.overrideProblem : refusal ? refusal.words : '';
+        const id = 'mapstudio-livenow-' + this.props.item.id + '-' + row.id;
+        return (
+            <div key={row.id} className={'mapstudio-livenow-row' + (overridden ? ' mapstudio-livenow-row--override' : '')} data-row={row.id}
+                 data-override={overridden ? 'true' : 'false'} data-off={row.off ? 'true' : 'false'} data-problem={problem}>
+                <div className="mapstudio-livenow-line">
+                    <span className={'mapstudio-livenow-name' + (row.icon ? ' mapstudio-livenow-name--icon' : '')}>{row.name}</span>
+                    {row.icon ? (
+                        <span className="mapstudio-livenow-star" role="img" aria-label="Icon value" title="Icon value">
+                            <svg viewBox="0 0 24 24" width={12} height={12} aria-hidden="true" focusable="false">
+                                <path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="currentColor"
+                                      stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+                            </svg>
+                        </span>
+                    ) : null}
+                    {overridden
+                        ? <span className="mapstudio-override-tag">{OVERRIDE}</span>
+                        : <span className="mapstudio-kindsetup-tag mapstudio-fromkind-tag">{FROM_KIND}</span>}
+                    {overridden ? (
+                        <button type="button" className="mapstudio-override-reset" disabled={frozen} title="Reset to the kind's path"
+                                aria-label={'Reset ' + row.name + ' to the kind\'s path'} onClick={() => this.resetOverride(row)}>Reset</button>
+                    ) : null}
+                    <span className={'mapstudio-livenow-value' + (row.icon ? ' mapstudio-livenow-value--icon' : '') + (row.off ? ' mapstudio-livenow-value--off' : '')}
+                          title={row.note !== '' ? row.note : undefined} data-stale={row.stale ? 'true' : 'false'}>
+                        {row.lost ? <Glyph id="comms-lost" className="mapstudio-popup-state-glyph" size={14} />
+                            : row.stale ? <Glyph id="stale" className="mapstudio-popup-state-glyph" size={14} /> : null}
+                        {row.stale ? <span className="mapstudio-visually-hidden">Stale - </span> : null}
+                        {row.value}
+                    </span>
+                </div>
+                {editing ? (
+                    <input className="mapstudio-input mapstudio-mono mapstudio-override-input" type="text" value={this.state.overrideText} autoFocus
+                           spellCheck={false} aria-label={row.name + ' path for ' + this.props.item.name + ' only'}
+                           aria-invalid={problem !== ''} aria-describedby={problem !== '' ? id + '-problem' : undefined}
+                           onFocus={(ev) => ev.currentTarget.select()}
+                           onChange={(ev) => this.setState({ overrideText: ev.target.value })}
+                           onBlur={() => this.commitOverride(row)} onKeyDown={this.onOverrideKey} />
+                ) : (
+                    <div className="mapstudio-livenow-pathline">
+                        <span className="mapstudio-mono mapstudio-livenow-path">{row.path}</span>
+                        <span className="mapstudio-livenow-actions">
+                            <button type="button" className="mapstudio-button mapstudio-override-edit" disabled={frozen}
+                                    title={overridden ? 'Change this path for ' + this.props.item.name + ' only' : 'Use another tag for ' + this.props.item.name + ' only'}
+                                    aria-label={(overridden ? 'Change the ' : 'Override the ') + row.name + ' path'}
+                                    onClick={() => this.startOverride(row)}>{overridden ? 'Change' : 'Override'}</button>
+                        </span>
+                    </div>
+                )}
+                {problem !== '' ? (
+                    <span id={id + '-problem'} className="mapstudio-field-hint mapstudio-field-problem mapstudio-override-problem" role="alert">{problem}</span>
+                ) : null}
+            </div>
+        );
+    }
+
+    /** The Live now block at the foot of Details (entry 12c1): the label with "From kind", the rows, or the one line of a kind with none. */
+    private renderLiveNow(frozen: boolean): React.ReactNode {
+        const block = this.props.liveNow;
+        const kind = this.props.kind;
+        if (!block || !kind) {
+            return null;
+        }
+        return (
+            <section className="mapstudio-livenow" aria-labelledby={'mapstudio-livenow-' + this.props.item.id} ref={(el) => { this.liveNowEl = el; }}
+                     data-rows={String(block.rows.length)} data-unlinked={block.unlinked ? 'true' : 'false'}
+                     data-asset-missing={block.assetMissing ? 'true' : 'false'}>
+                {/* The tag stands beside the label, outside the heading that names the block. */}
+                <div className="mapstudio-kindsetup-heading mapstudio-livenow-head">
+                    <h3 className="mapstudio-livenow-heading" id={'mapstudio-livenow-' + this.props.item.id}>Live now</h3>
+                    <span className="mapstudio-kindsetup-tag mapstudio-fromkind-tag">{FROM_KIND}</span>
+                </div>
+                {block.rows.length === 0 ? (
+                    <div className="mapstudio-livenow-empty">
+                        <span className="mapstudio-field-hint">{block.empty}</span>
+                        <button type="button" className="mapstudio-button mapstudio-livenow-setup" onClick={this.props.onOpenKindSetup}>{openSetupText(kind.name)}</button>
+                    </div>
+                ) : block.rows.map((row) => this.renderLiveRow(row, frozen))}
+                {block.rows.length > 0 && block.note !== '' ? <span className="mapstudio-field-hint mapstudio-livenow-unlinked">{block.note}</span> : null}
+            </section>
+        );
+    }
+
     /** One of the kind's fields (entry 6) as its type, its draft or else the record's value. */
     private renderField(field: FormField, index: number): React.ReactElement {
         const { item, paused } = this.props;
@@ -844,6 +1076,7 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                             <span className="mapstudio-field-asset-status" role="status" data-status={assetStatus ? assetStatus.status : ''}>{assetNote}</span>
                         ) : null}
                     </div>
+                    {this.renderLiveNow(frozen)}
                 </div>
                 <footer className="mapstudio-panel-footer">
                     <button type="button" className="mapstudio-dock-button mapstudio-panel-delete" disabled={remove.off !== ''} title={remove.title}

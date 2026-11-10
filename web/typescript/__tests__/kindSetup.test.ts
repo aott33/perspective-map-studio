@@ -319,8 +319,8 @@ describe('a refusal placed (K5, K6, owner decision c)', () => {
 
 describe('the list and the header (K1)', () => {
     const items = [
-        item('1', 'P12', { assetId: 'P12' }), item('2', 'P2', { assetId: 'P14', overrides: { styleRule: { source: { path: 'x' } } } }),
-        item('3', 'P4', { overrides: { comms: { path: 'y' }, kpis: [] } }), item('4', 'Gone', { deleted: true }),
+        item('1', 'P12', { assetId: 'P12' }), item('2', 'P2', { assetId: 'P14', overrides: { styleRule: { source: { path: '[default]x' } } } }),
+        item('3', 'P4', { overrides: { comms: { path: '[default]y' }, kpis: [{ key: 'pressure', path: '[default]z' }] } }), item('4', 'Gone', { deleted: true }),
         item('5', 'L1', { kind: 'line' })
     ];
 
@@ -332,7 +332,17 @@ describe('the list and the header (K1)', () => {
     test('the overrides counted and named, one per item and part, the items by name', () => {
         expect(overridesText([])).toBe('No overrides');
         expect(overridesText([items[1]])).toBe('1 override (P2 style rule)');
-        expect(overridesText(items.filter((i) => i.kind === 'pad'))).toBe('3 overrides (P2 style rule, P4 comms and 1 more)');
+        expect(overridesText(items.filter((i) => i.kind === 'pad'), ['pressure'])).toBe('3 overrides (P2 style rule, P4 comms and 1 more)');
+    });
+
+    test('entry 12c1: only what the Gateway applies is counted (owner decision 5)', () => {
+        // A key the kind does not have, a link, a popup view, tints and a path that is not full are stored and not counted.
+        expect(overridesText(items.filter((i) => i.kind === 'pad'), [])).toBe('2 overrides (P2 style rule, P4 comms)');
+        const ignored = item('6', 'P6', { overrides: { link: '/x', popupView: { path: 'A/B' }, areaTints: { property: 'p', tints: [] },
+            comms: { path: '{asset.path}/Comms' }, kpis: [{ key: 'gone', path: '[default]a' }, { key: 'pressure', path: 'Mesa/x' }] } });
+        expect(overridesText([ignored], ['pressure'])).toBe('No overrides');
+        expect(overridesText([item('7', 'P7', { overrides: { alarms: { path: '[default]Mesa/P7' }, kpis: [{ key: 'pressure', path: '[default]a' }] } })],
+            ['pressure'])).toBe('2 overrides (P7 key values, P7 alarms)');
     });
 
     test('the subline: geometry, how many items, the overrides', () => {
@@ -445,7 +455,10 @@ describe('the Live now note and the preview item\'s words (12b2)', () => {
     });
 
     test('an item\'s own rule and the kind\'s stored rule as the note reads them', () => {
-        expect(hasOwnRule(item('a', 'P2', { overrides: { styleRule: { source: { path: 'x' } } } }))).toBe(true);
+        expect(hasOwnRule(item('a', 'P2', { overrides: { styleRule: { source: { path: '[default]x' } } } }))).toBe(true);
+        expect(hasOwnRule(item('a', 'P2', { overrides: { styleRule: { source: { kpi: 'pressure' }, type: 'states', cases: [] } } }))).toBe(true);
+        // A rule whose path is not full is ignored by the Gateway: the kind's rule draws on the item.
+        expect(hasOwnRule(item('a', 'P2', { overrides: { styleRule: { source: { path: '{asset.path}/x' } } } }))).toBe(false);
         expect(hasOwnRule(item('a', 'P2', { overrides: { label: 'x' } }))).toBe(false);
         expect(hasOwnRule(item('a', 'P2'))).toBe(false);
         expect(hasOwnRule(undefined)).toBe(false);

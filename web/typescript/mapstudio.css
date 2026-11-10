@@ -4178,6 +4178,172 @@ textarea.mapstudio-input.mapstudio-rule-expression {
     flex: 1 1 auto;
 }
 
+/* The Live now block at the foot of Details (entry 12c1; DESIGN.md Properties panel, Override tag, Typography: "Values in
+   popups and the Live now block are right-aligned; the key value marked as the icon value is bold. Paths are monospace at 11 or
+   12 px"): the section label with the neutral "From kind" tag at its right, then one row per part: the name with its tag, the
+   live value right-aligned, and under them the path in monospace with its small buttons (24 px, WCAG 2.2's target minimum). An
+   overridden row carries the override tag (the selection token on its tint, the one hue here, which marks what the editor did
+   and never a state) and Reset as a link. Tokens only. */
+.mapstudio-livenow {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 0 8px;
+}
+
+.mapstudio-livenow-heading {
+    margin: 0;
+    font: inherit;
+    letter-spacing: inherit;
+}
+
+.mapstudio-livenow-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.mapstudio-livenow-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 24px;
+}
+
+.mapstudio-livenow-name {
+    flex: 0 1 auto;
+    min-width: 0;
+    color: var(--mapstudio-secondary);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-livenow-star {
+    display: inline-flex;
+    flex: 0 0 auto;
+    margin-left: -2px;
+    color: var(--mapstudio-secondary);
+}
+
+.mapstudio-livenow .mapstudio-fromkind-tag,
+.mapstudio-override-tag {
+    flex: 0 0 auto;
+}
+
+.mapstudio-override-tag {
+    padding: 1px 8px;
+    border-radius: 9999px;
+    background: var(--mapstudio-selection-tint);
+    color: var(--callToAction);
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.mapstudio-livenow-value {
+    display: inline-flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    min-width: 0;
+    color: var(--label);
+    font-size: 13px;
+    text-align: right;
+}
+
+.mapstudio-livenow-value--icon {
+    font-weight: 700;
+}
+
+.mapstudio-livenow-value--off {
+    color: var(--mapstudio-secondary);
+}
+
+.mapstudio-livenow-value .mapstudio-popup-state-glyph {
+    width: 14px;
+    height: 14px;
+    color: var(--mapstudio-glyph, var(--neutral-80));
+}
+
+.mapstudio-livenow-pathline {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.mapstudio-livenow-path {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-top: 4px;
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-livenow-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+}
+
+.mapstudio-button.mapstudio-override-edit {
+    height: 24px;
+    padding: 0 10px;
+}
+
+.mapstudio-override-reset {
+    box-sizing: border-box;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 4px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: var(--callToAction);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.mapstudio-override-reset:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: 2px;
+}
+
+.mapstudio-button.mapstudio-override-edit:disabled,
+.mapstudio-override-reset:disabled {
+    opacity: 0.42;
+    cursor: default;
+}
+
+.mapstudio-input.mapstudio-override-input {
+    height: 28px;
+    font-family: monospace;
+    font-size: 11px;
+}
+
+.mapstudio-override-problem {
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-livenow-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.mapstudio-livenow-empty .mapstudio-field-hint,
+.mapstudio-livenow-unlinked {
+    font-size: 12px;
+}
+
 /* The item form (entry 6; DESIGN.md Properties panel): the kind's fields between Location and Asset, "Required" by a required
    field's label, the missing ones named at the top in the note box, a typed field's problem in words under it (the input's
    edge in the warning token, as a typed latitude's), a checkbox with its label beside it, an unknown kind's stored values as
