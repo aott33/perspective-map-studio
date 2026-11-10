@@ -19,7 +19,7 @@ Ignition's built-in Perspective Map shows places, but it is hard to change them.
 
 The oil and gas template shows the cost. It built its own editor on the built-in Map: a sound draft, change set and review path, resting on a weak drawing layer. That layer has five actions and makes one Gateway call per vertex. It cannot draw areas, delete a site or edit below 768 px, and it needs a run of workarounds against the component (listed in the addendum). It works, and it looks cobbled together.
 
-Today's alternatives are a packaged Perspective project, such as Nader Chinichian's Map Administration Tool, or building one in-house, as the template did.
+Today's alternatives are a packaged Perspective map administration project, bought for a fee, or building one in-house, as the template did.
 
 ## The solution
 

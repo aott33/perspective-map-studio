@@ -2,7 +2,7 @@
 
 Detail for the PRD and architecture authors, and research that earned a place but does not fit the brief. Map Studio is the product the brief describes: an Ignition 8.3 Perspective component module for drawing and editing maps, named "Flow Map" in its source idea. That source is `docs/idea.md` in this repository, written by someone else and treated as proposals, not settled requirements.
 
-**Labels.** [IA docs]: the Inductive Automation documentation. [live 8.3.9]: observed on a live Gateway, as recorded in the template's docs. [DM]: Nader Chinichian's LinkedIn message to the owner. [owner]: the owner's account, not seen in a source. (confirmed) or (fetched): read from the cited source this session. (unconfirmed): background knowledge or a recommendation; verify before relying on it, above all for licences.
+**Labels.** [IA docs]: the Inductive Automation documentation. [live 8.3.9]: observed on a live Gateway, as recorded in the template's docs. [DM]: a LinkedIn message to the owner from the packaged project's author. [owner]: the owner's account, not seen in a source. (confirmed) or (fetched): read from the cited source this session. (unconfirmed): background knowledge or a recommendation; verify before relying on it, above all for licences.
 
 **Where to look.** PRD: Open items, Parked, Current state, and the Ranked list under Map UI practices. Architecture: Parked (module shape, data contract, supply chain, risks), Editing libraries, Icons.
 
@@ -10,7 +10,7 @@ Detail for the PRD and architecture authors, and research that earned a place bu
 
 | Item | Owner |
 |---|---|
-| Feature list of Nader's tool from his video (not fetched this session) | Owner |
+| Feature list of the packaged project from its author's video (not fetched this session) | Owner |
 | Built-in Map editing, clustering and animation confirmed absent on a live Gateway | Architect |
 | Signing key custody and rotation | Architect |
 | Licence and 2026 maintenance of every library before it becomes a dependency | Architect |
@@ -57,9 +57,9 @@ Source: `ign-scada-template` `docs/map-editor.md` and `docs/map.md` section 4, r
 - **Guards.** Roles (engineer, integrator) re-checked on the Gateway; a hash-based conflict refusal; a stale-draft refusal against the `_Model/Map` hash; an audit row per write; a one-year purge of discarded drafts. Bulk and as-built geometry go in through `prov map import-geojson`.
 - **Interaction.** Three tool chips (Add pipeline, Add site, Move site), one tap per vertex, snapping by a Gateway script call, popup forms for attributes. The editor is hidden below 768 px.
 
-### Comparable: Nader Chinichian's Map Administration Tool
+### Comparable: a packaged Perspective map administration project
 
-Sources: his LinkedIn post and video, both titled "Ignition Perspective Map Administration Tool" (video not fetched), and his DM to the owner, 2024-11-01.
+Sources: its author's LinkedIn post and video about the project (video not fetched), and the author's DM to the owner, 2024-11-01.
 
 - A pure Perspective project, not a module, in two parts: an admin project and an end-user project. [DM]
 - Includes many icons, CSS classes and widgets. [DM]

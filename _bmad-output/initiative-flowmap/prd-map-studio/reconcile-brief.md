@@ -22,7 +22,7 @@ Priority: H = fix before finalizing, M = should carry, L = optional.
 - Fix: one sentence in section 1 or 4.11 naming ISA-101, WCAG 2.2 and map-editing practice as the design basis, pointing to BA "Map UI practices" and to the UX spec.
 
 ### A4 (M). "Advantages of execution, not a moat", differentiators and the problem
-- Input: Brief, Solution: "Open source and free" vs about 25,000 USD packaged project; "Editing on the map itself"; "These are advantages of execution, not a moat". Problem section: built-in Map has no snapping, no vertex drag, no areas; Leaflet resists styling. BA Comparable: Nader Chinichian's Map Administration Tool.
+- Input: Brief, Solution: "Open source and free" vs about 25,000 USD packaged project; "Editing on the map itself"; "These are advantages of execution, not a moat". Problem section: built-in Map has no snapping, no vertex drag, no areas; Leaflet resists styling. BA Comparable: a packaged Perspective map administration project.
 - PRD: section 0 says it "does not repeat" the brief. No problem statement, no competitor, no differentiator, no open-source/free intent in section 1 (open-source release is only in 6.2 out of scope).
 - Fix: add 3 to 5 lines to section 1 (why: built-in Map cannot be edited; alternatives: packaged project at about 25,000 USD, or in-house) so the PRD stands alone for Sofia and the architect. Optional.
 
@@ -125,7 +125,7 @@ Priority: H = fix before finalizing, M = should carry, L = optional.
 - Fix: add as an PA list "Built-in Map defects to avoid" and a consequence in FR-4 (a click on an item does not also fire a map click; missing optional parts never crash).
 
 ### D5 (M). Open items from the brief addendum
-- Input: BA Open items: Nader's feature list (video not fetched); built-in Map editing/clustering/animation confirmed absent on a live Gateway (architect); signing key custody; "Licence and 2026 maintenance of every library before it becomes a dependency" (architect); module id and npm package renamed.
+- Input: BA Open items: the packaged project's feature list (video not fetched); built-in Map editing/clustering/animation confirmed absent on a live Gateway (architect); signing key custody; "Licence and 2026 maintenance of every library before it becomes a dependency" (architect); module id and npm package renamed.
 - PRD: only rename (Open question 2) and licence of the module itself (Open question 1). Library licence/maintenance check (Terra Draw, MapLibre, deck.gl, icon seeds, GeoNames attribution) and the live confirmation of built-in Map absence are not tracked. PA says GeoNames needs attribution but no check task.
 - Fix: add two open questions or a PA "Open items" table.
 

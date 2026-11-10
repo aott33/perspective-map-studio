@@ -1,6 +1,6 @@
 # Addendum - Map Studio PRD
 
-Technical choices, references and detail for the UX specification and the architecture, kept out of the PRD itself. The brief's addendum (`../brief-flowmap/addendum.md`) holds the earlier research (built-in Map, the template's editor, Nader's tool, map objects, icons, editing libraries, map UI practices) and is not repeated here.
+Technical choices, references and detail for the UX specification and the architecture, kept out of the PRD itself. The brief's addendum (`../brief-flowmap/addendum.md`) holds the earlier research (built-in Map, the template's editor, a packaged map administration project, map objects, icons, editing libraries, map UI practices) and is not repeated here.
 
 ## Open-source module references (from the owner, 2026-10-25)
 
