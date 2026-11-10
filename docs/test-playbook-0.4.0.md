@@ -2,7 +2,7 @@
 
 A walk through what epic 4 has built so far, grouped by what you do, on the local development stack. Tick each box and note anything that looks or feels off in the Notes line under each section (a screenshot helps). Each note goes into `_bmad-output/initiative-flowmap/tickets/epic-editing/epic-editing.md` Notes or a new entry. The playbook grows as entries land; entry 18 (the 0.4.0 release) finishes it for the release test and the 30-minute test.
 
-Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems) and 11a (the edit record, Gateway only). Also built: 11b (Recent changes and History), 12a (the Kinds surface and a kind's setup) and 12b1 (the style rule editor and area tints, section 8l). Still to come: 12b2 (the style rule's preview on the map), 12c (per-item overrides), 13 (the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
+Built so far (2026-11-10): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems) and 11a (the edit record, Gateway only). Also built: 11b (Recent changes and History), 12a (the Kinds surface and a kind's setup), 12b1 (the style rule editor and area tints, section 8l) and 12b2 (the preview item on the map and the Live now note, section 8m). Still to come: 12c (per-item overrides), 13 (the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
 
 ## Results so far
 
@@ -28,6 +28,7 @@ Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item li
 | 8j. Recent changes | | |
 | 8k. Kinds and a kind's setup | | |
 | 8l. The style rule editor and area tints | | |
+| 8m. The preview item on the map | | |
 | 9. View mode, unchanged | | |
 | 10. Phone (390 px) | | |
 | 11. Designer | | |
@@ -326,7 +327,7 @@ Notes:
 
 ## 8l. The style rule editor and area tints
 
-On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor, with a second browser in View mode on `/live`. Open **Kinds** and scroll a kind's setup to **6 STYLE RULE**. Compare it with DESIGN.md's Kind setup and key screen 6 ([key-screen-6-kinds-style.png](../_bmad-output/initiative-flowmap/ux-map-studio/mockups/key-screen-6-kinds-style.png)): the type, the value, then a row per case with its preset and a preview tile. The preview on the map, its "Preview" word and the note box are a later entry (12b2).
+On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor, with a second browser in View mode on `/live`. Open **Kinds** and scroll a kind's setup to **6 STYLE RULE**. Compare it with DESIGN.md's Kind setup and key screen 6 ([key-screen-6-kinds-style.png](../_bmad-output/initiative-flowmap/ux-map-studio/mockups/key-screen-6-kinds-style.png)): the type, the value, then a row per case with its preset and a preview tile. The preview item's "Preview" word on the map and the note box are section 8m.
 
 - [ ] Well pad: the type row reads None, States, Bands, Expression, with **States** underlined; Value reads "A tag path" with `{asset.path}/Status` and its resolve note; four rows "When the value is" 1 to 4, each with its preset by name and a tile of the pad's icon in that preset with its word (Attention, Warning, Fault, Out of service). No colour is offered anywhere.
 - [ ] Press **Bands**: "Not saved yet. Add a band." and the header still says Saved. Choose the value **Pressure**, press **Add a band**, type from `900` and to `600`: "Not saved yet. Band 1: its from (900) is not below its to (600). Band 1 has no preset." Press **States**: the four cases are back; press **Bands**: the band is as you typed it. Nothing was saved (History has no new row).
@@ -338,6 +339,25 @@ On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor
 - [ ] Geofence: under the rule, **Area tints by** reads Operator, with the rows North tint-1 and South tint-4, each with its swatch. Change South to tint-2: saved, and the South fence changes its tint on the map with no reload. Press **Add a category**, type `West` and press Enter: "Not saved yet. West has no tint."; pick a tint: saved. Choose **No tints**: saved, and both fences draw the neutral dashed outline; choose Operator again: the three rows are back and saved. Well pad and Gathering line show no tints.
 - [ ] Tab through section 6: every type, select, field, Add and delete icon is reached and worked by the keyboard (Enter finishes a typed field).
 - [ ] Press **Seed the dev map** to put the seed's kind setups back.
+
+Notes:
+
+## 8m. The preview item on the map
+
+On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor, with a second browser on `/live` (its dev buttons drive P12, the asset of **Point 1**, and it is another open map to compare with). Compare the map and the note with key screen 6 ([key-screen-6-kinds-style.png](../_bmad-output/initiative-flowmap/ux-map-studio/mockups/key-screen-6-kinds-style.png)). Nothing here is saved.
+
+- [ ] Before Kinds is open, no item on the map reads "Preview". Open **Kinds** and choose **Well pad**: the Preview item is CTB1, and the line under the select reads "[default]Mesa/CTB1 - each tag path is checked for this item's asset, and it carries the word Preview on the map." The map has not moved.
+- [ ] Choose the preview item **Point 1**: the map still has not moved. Press **Show on map**: the map goes to Point 1 at zoom 15, and its chip beside its name reads "Preview". Nothing is selected by the move. Scroll section 6 to its foot: the note box reads "Live now: Point 1 is Normal."
+- [ ] On `/live` press **P12 status 2**: within ten seconds, with no reload and the map still, the note reads "Live now: Point 1 is Warning." and Point 1 draws the warning ring, its chip still reading "Preview"; the `/live` map draws the same ring with the word "Warning". Press **P12 status 3**: "Live now: Point 1 is Fault."
+- [ ] On `/live` press **P12 pressure 950**: Point 1 shows its priority 1 alarm glyph and the note reads "Live now: Point 1 is Fault, but its priority 1 alarm wins over the rule." Press **P12 pressure 400** and **Acknowledge P12**.
+- [ ] On `/live` press **P12 comms off**: Point 1's chip reads "Comms lost" (not "Preview") and the note reads "Live now: Point 1 shows only as Comms lost until a fresh value comes." Press **P12 comms on** and **P12 status 0**.
+- [ ] Choose the preview item **Point 2**: the word moves to Point 2, and the note reads "Point 2 has its own style rule, so this kind's rule does not draw on it. Choose another preview item." Choose Point 1 again.
+- [ ] Press **Bands** in section 6: under "Not saved yet. ..." the Live now note ends "The map shows the stored rule until this one is whole." Press **States**: the note says only what Point 1 is. Nothing was saved (History has no new row).
+- [ ] Choose **Geofence**: no item on the map reads "Preview", the line under the select does not mention the word, and the note reads "An area draws its category tint, not a preset, so the style rule has no preview on the map."
+- [ ] Choose **Gathering line** and the preview item **Tracer line**, then **Show on map**: the line's label reads "Tracer line Preview".
+- [ ] Choose **Meter**: Show on map is off, its hover text "No meter is linked to an asset yet, so there is no preview item to show.", and the note says the kind has no item to show the rule on.
+- [ ] Choose **Well pad** again (Point 1 reads "Preview"), then open **Items**: the word is gone. Open **Kinds**: it is back. Turn **Editing** off: it is gone.
+- [ ] Tab from the Preview item select: Show on map is next, and Enter presses it.
 
 Notes:
 

@@ -26,7 +26,7 @@ import { Place } from './place';
 import { LiveState, itemPreset, itemState } from './live';
 import { CONNECTED } from './connection';
 import { ThemeWatch } from './themeWatch';
-import { MarkerColors, SpriteSymbol, markerProperties, stateWord } from './markers';
+import { MarkerColors, SpriteSymbol, markerProperties, previewWord, stateWord } from './markers';
 import { PresetPalette, StylePreview, TintPalette } from './StylePreview';
 import { MapFeatures, SegmentRef, Selection } from './features';
 import { ZoomControl } from './ZoomControl';
@@ -80,7 +80,10 @@ import { SaveCard } from './studio/SaveCard';
 import { HistoryPanel } from './studio/HistoryPanel';
 import { KindList } from './studio/KindList';
 import { KindSetupPanel } from './studio/KindSetupPanel';
-import { NO_KIND_SAVES, SetupEdit, itemsOfKind, pausedText, previewKey, readPreview, shownKind, waitingSave, writePreview } from './kindSetup';
+import {
+    NO_KIND_SAVES, PreviewOption, SetupEdit, hasOwnRule, itemsOfKind, pausedText, previewKey, previewOf, previewOptions, readPreview, shownKind, waitingSave,
+    writePreview
+} from './kindSetup';
 import { expandOps, historyRows } from './history';
 import { HistoryEntry } from './contract';
 import { busyText, undoLabel } from './undoStack';
@@ -310,6 +313,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
     drawnFulls = -1;
     /** The selection last drawn (its id and kind), so a changed selection redraws the sources once. */
     drawnSelection = '';
+    /** The preview item last drawn with its word (epic 4 entry 12b2), '' for none. */
+    drawnPreview = '';
+    /** The preview item last worked out, with what it was worked out from (`kindPreview`). */
+    private previewMemo: { kindId: string; items: number; assets: unknown; remembered: string | null; option: PreviewOption | null } | null = null;
     /** The zoom card with Fit and Return (epic 3 entries 7 and 14). */
     zoomControl: ZoomControl | null = null;
     /** The search field top-left, the View-mode top bar (epic 3 entry 9). */
@@ -1631,6 +1638,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         const delegate = this.props.delegate;
         const items = delegate ? delegate.items : [];
+        const previewId = this.previewItemId();
         return (
             <div className="mapstudio-live" hidden data-live-seq={String(live.seq)} data-live-batches={String(live.batches)}
                  data-live-full={String(live.fulls)} data-live-items={String(ids.length)}>
@@ -1649,6 +1657,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
                             && (selected.segment.fromId === id || selected.segment.toId === id))));
                     const spec = markerProperties(id, item ? item.name : '', item ? item.kind : '', kind ? kind.icon : '', state,
                         { labelRank: kind ? kind.labelRank : 0, selected: ringed, instrument: !!(kind && kind.instrument) });
+                    // The preview item of the kind whose setup is open (entry 12b2): its word is "Preview" unless it is Stale or
+                    // Comms lost; an item sharing its marker keeps the group's chip, so its own word stands here.
+                    const preview = id === previewId;
+                    const word = preview && !this.anchors[id] ? previewWord(state) : stateWord(state);
                     return (
                         <div key={id} className="mapstudio-live-item" data-item-id={id} data-state={state.badge}
                              data-preset={itemPreset(state)}
@@ -1660,7 +1672,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              data-kpi-stale={state.iconKpi && state.iconKpi.stale ? 'true' : 'false'}
                              data-marker={spec.marker}
                              data-ringed={ringed ? 'true' : 'false'}
-                             data-word={stateWord(state)}
+                             data-word={word}
+                             data-preview={preview ? 'true' : 'false'}
                              data-rank={String(spec.rank)}
                              data-segments={values.segments ? JSON.stringify(values.segments.map((g) => ({
                                  from: g.from, to: g.to, preset: g.preset, stale: g.stale, reason: g.reason,
@@ -1937,6 +1950,64 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.setState((prev) => ({ studio: choosePreview(prev.studio, kindId, itemId) }));
     };
 
+    /**
+     * The preview item of a kind (entry 12a, owner decision 5): the one chosen on this page, else the session's, else the kind's
+     * first linked item by name; null with none. Worked out again only when the items, the asset list, the kind or the choice
+     * changed, since the map asks at every draw (entry 12b2).
+     */
+    private kindPreview(delegate: MapStudioDelegateState, kindId: string): PreviewOption | null {
+        const chosen = this.state.studio.previews[kindId];
+        const remembered = chosen !== undefined ? chosen : readPreview(sessionStore(), this.previewKeyOf(kindId));
+        const memo = this.previewMemo;
+        if (memo && memo.kindId === kindId && memo.items === delegate.itemsRevision && memo.assets === delegate.lists.assets
+            && memo.remembered === remembered) {
+            return memo.option;
+        }
+        const option = previewOf(previewOptions(delegate.items, kindId, delegate.lists.assets || []), remembered);
+        this.previewMemo = { kindId, items: delegate.itemsRevision, assets: delegate.lists.assets, remembered, option };
+        return option;
+    }
+
+    /**
+     * The item that carries the "Preview" word on the map (entry 12b2): the preview item of the kind whose setup is open, only
+     * in Edit mode with Kinds open and a kind shown; never for an area kind, which draws its tint and no word (owner decision
+     * 4). Null otherwise, so the word goes at the next draw when Kinds closes, the kind or the preview item changes, or Editing
+     * goes off.
+     */
+    previewItemId(): string | null {
+        const delegate = this.props.delegate;
+        if (!delegate || !this.studioOn() || this.state.studio.surface !== 'kinds') {
+            return null;
+        }
+        const kind = this.kindShown(delegate);
+        if (!kind || kind.area) {
+            return null;
+        }
+        const option = this.kindPreview(delegate, kind.id);
+        return option ? option.itemId : null;
+    }
+
+    /**
+     * Show on map, beside the Preview item select (entry 12b2, owner decision 2): the map goes to the preview item as Details'
+     * Zoom to location does (a point at zoom 15 or more, a line or an area fitted), centred in what a person sees. Nothing else
+     * of the preview moves the map; the selection stays. A move of the component's own, so a kept Fit ends here.
+     */
+    onShowPreview = (itemId: string): void => {
+        const item = this.itemFor(itemId);
+        const map = this.map;
+        if (!item || !map) {
+            return;
+        }
+        this.fitKey = null;
+        if (item.geometry.type === 'Point') {
+            const at = this.anchorFor(itemId, [item.geometry.coordinates[0], item.geometry.coordinates[1]]);
+            map.easeTo({ center: at, zoom: Math.max(map.getZoom(), CHOSEN_POINT_ZOOM), padding: camera.cameraPadding(this), duration: 300 });
+        } else {
+            this.fitTo(camera.boundsOf(item.geometry.coordinates));
+        }
+        this.publishFit();
+    };
+
     /** One finished field of a kind's setup (entry 12a): saved by the delegate as the whole setup, the edit applied when it is sent. */
     onKindSave = (kindId: string, field: string, edit: SetupEdit, seen: number): boolean => {
         const delegate = this.storeDelegate();
@@ -1967,7 +2038,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
             return null;
         }
         const id = kind.id;
-        const chosen = this.state.studio.previews[id];
+        const preview = this.kindPreview(delegate, id);
+        const values = preview ? delegate.live.items[preview.itemId] : undefined;
+        const previewItem = preview ? delegate.items.find((i) => i.id === preview.itemId) : undefined;
         if (this.symbols === null) {
             // The preset tiles draw the kind's glyph from the sprite (entry 12b1), as the style preview does.
             items.loadSprite(this).then(() => this.forceUpdate());
@@ -1980,8 +2053,11 @@ export class MapStudio extends Component<Props, MapStudioState> {
                             record={delegate.kindSetups.find((k) => k.kindId === id)}
                             items={delegate.items}
                             assets={delegate.lists.assets || []}
-                            previewId={chosen !== undefined ? chosen : readPreview(sessionStore(), this.previewKeyOf(id))}
+                            previewId={preview ? preview.itemId : null}
                             onPreview={(itemId) => this.onKindPreview(id, itemId)}
+                            previewState={values ? itemState(values, delegate.live.display[id]) : null}
+                            previewOwnRule={hasOwnRule(previewItem)}
+                            onShowPreview={this.onShowPreview}
                             saves={(delegate.kindSaves || {})[id] || NO_KIND_SAVES}
                             paused={pausedText(delegate.editing === 'off', waitingSave(delegate.unsaved, id))}
                             resolves={delegate.resolves || {}}

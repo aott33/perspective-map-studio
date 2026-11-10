@@ -157,7 +157,9 @@ test.describe('1440 px', () => {
             expect(a.calls).toEqual({ kinds: 1, assets: 1 });
             expect(b.calls).toEqual({ kinds: 1, assets: 1 });
         } finally {
-            await press(page, 'ok', 'ok');
+            // The slow call sleeps 8 s and can outlive this test: back to ok, and asked again until the kind list answers ok, so the
+            // next test never meets a list still called slow.
+            await expect.poll(async () => (await press(page, 'ok', 'ok')).kinds.status, { timeout: 60_000, intervals: [2_000] }).toBe('ok');
             await other.close();
         }
     });

@@ -2654,6 +2654,28 @@
     overflow-wrap: anywhere;
 }
 
+/* The Preview item select with Show on map beside it (entry 12b2): the select takes the room left, the button keeps its words. */
+.mapstudio-kindsetup-preview-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mapstudio-kindsetup-preview-row .mapstudio-kindsetup-preview-select {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+}
+
+.mapstudio-kindsetup-show-holder {
+    display: inline-flex;
+    flex: 0 0 auto;
+}
+
+.mapstudio-kindsetup-show {
+    white-space: nowrap;
+}
+
 .mapstudio-kindsetup-folder {
     font-size: 11px;
     color: var(--label);
@@ -2901,6 +2923,8 @@ textarea.mapstudio-input.mapstudio-rule-expression {
     gap: 2px;
 }
 
+/* The Live now note, last in section 6 (entry 12b2): DESIGN.md's note box, as the notes above it. */
+.mapstudio-rule-live,
 .mapstudio-rule-unsaved,
 .mapstudio-tints-unsaved {
     padding: 6px 8px;

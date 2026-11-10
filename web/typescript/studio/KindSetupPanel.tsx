@@ -4,10 +4,11 @@ import { KindSetupRecord, MapItemRecord } from '../contract';
 import {
     BandRow, CaseType, Fields, KeyValue, KindRefusal, KindSaveState, MAX_KEY_VALUES, NewRowTexts, forgetSeen, Param, PreviewOption, RULE_TYPE_WORDS, ResolveState, RuleDraft,
     RuleSource, RuleType, SetupEdit, SetupView, StateRow, TINT_NAMES, TintRow, TintsDraft, checkRule, checkTints, draftSource, expressionPresets, fixedCategories, foldRule,
-    headerSubline, inStepVersion, insertAt, keyFromLabel, noPreviewText, paramMissing, pathsToResolve, placeholderList, popupPathEdit, presetsFor, previewOf, previewOptions,
-    readSetup, removeBlocked, resolveKey, resolveNote, rowMissing, ruleDraft, ruleTypes, sameRule, sameTints, sourceName, tintRows, tintsDraft, unsavedText, withSource
+    headerSubline, inStepVersion, insertAt, keyFromLabel, liveNowText, noPreviewText, paramMissing, pathsToResolve, placeholderList, popupPathEdit, presetsFor, previewLine,
+    previewOf, previewOptions, readSetup, removeBlocked, resolveKey, resolveNote, rowMissing, ruleDraft, ruleTypes, sameRule, sameTints, showOnMapOff, sourceName,
+    storedRuleOf, tintRows, tintsDraft, unsavedText, withSource
 } from '../kindSetup';
-import { Preset, Tint } from '../live';
+import { ItemState, Preset, Tint } from '../live';
 import { MarkerColors, PRESET_WORDS, SpriteSymbol, tintSampleSvg } from '../markers';
 import { Glyph } from '../popupParts';
 import { Sample, presetSampleSvg } from '../StylePreview';
@@ -50,6 +51,12 @@ import { ChromeGlyph } from './ChromeGlyph';
  * when a path is saved or the preview item changes. With no linked item of the kind, one note under the Preview item select
  * says so and no note stands under the paths.
  *
+ * **The preview item on the map** (entry 12b2). While this setup is open the preview item carries the word "Preview" on the map
+ * (the map's part: features.ts); the line under the select says so, and **Show on map** beside the select takes the map to it,
+ * the one thing here that moves the map (off, with its reason, with no preview item). At the foot of section 6 a note box, a
+ * polite live region, says what the preview item shows now from its live state and when its alarm wins over the rule
+ * (kindSetup.ts `liveNowText`); nothing of the rule is worked out in the browser, so the note follows each live update.
+ *
  * For tests: the panel `.mapstudio-kindsetup` (`data-kind`, `data-version`, `data-paused`, `data-saving`, `data-preview`), each
  * section `[data-section]` (`icon`, `keyValues`, `comms`, `alarms`, `popup`, `styleRule`), each field's wrapper `[data-field]`
  * (kindSetup.ts `Fields`: `comms.path`, `kpis.pressure.path`, `link`, `popupView.params.padName`, ...; the Popup's checkboxes
@@ -60,6 +67,7 @@ import { ChromeGlyph } from './ChromeGlyph';
  * a case `.mapstudio-rule-case[data-index]`, its tile `.mapstudio-rule-tile[data-preset]`, the expression
  * `[data-field="styleRule.expression"]`, what is missing `.mapstudio-rule-unsaved`, the tints `[data-field="areaTints"]` with
  * `[data-field="areaTints.property"]`, a category `.mapstudio-tint-row[data-category]` and `.mapstudio-tints-unsaved`.
+ * Entry 12b2: Show on map `.mapstudio-kindsetup-show` and the Live now note `.mapstudio-rule-live`.
  */
 export interface KindSetupPanelProps {
     kind: Kind;
@@ -72,6 +80,12 @@ export interface KindSetupPanelProps {
     /** The preview item remembered for this kind, or null (the first linked item by name). */
     previewId: string | null;
     onPreview: (itemId: string) => void;
+    /** The preview item's live state as the map draws it (entry 12b2), or null before its first values or with no preview item. */
+    previewState?: ItemState | null;
+    /** Whether the preview item has a style rule of its own: the kind's rule does not draw on it. */
+    previewOwnRule?: boolean;
+    /** Show on map: the map goes to the preview item. */
+    onShowPreview?: (itemId: string) => void;
     /** The kind's saves in flight or waiting, the refusals that stand and the count of saves settled. */
     saves: KindSaveState;
     /** Why the fields take no input, in words, or '' (kindSetup.ts `pausedText`). */
@@ -1409,7 +1423,23 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                     {section.nodes}
                 </div>
                 {this.renderTints(view)}
+                {this.renderLiveNow(view, missing !== '')}
             </section>
+        );
+    }
+
+    /**
+     * The Live now note, last in section 6 (entry 12b2; DESIGN.md's note box): what the preview item shows now and when its
+     * alarm wins over the rule, from what the Gateway already sends. A polite live region: it is read again when its words change.
+     */
+    private renderLiveNow(view: SetupView, unsaved: boolean): React.ReactElement {
+        const preview = this.preview();
+        const text = liveNowText({
+            kind: this.props.kind, name: preview ? preview.name : null, state: preview ? this.props.previewState || null : null,
+            ownRule: !!preview && this.props.previewOwnRule === true, stored: storedRuleOf(view.styleRule), unsaved
+        });
+        return (
+            <div className="mapstudio-rule-live" role="status" aria-live="polite" data-preview={preview ? preview.itemId : ''}>{text}</div>
         );
     }
 
@@ -1459,6 +1489,7 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         const options = previewOptions(this.props.items, kind.id, this.props.assets);
         const preview = previewOf(options, this.props.previewId);
         const previewId = this.dom('preview', 'select');
+        const showOff = showOnMapOff(kind, preview !== null);
         const rows = view.kpis.length + this.state.newRows.length;
         const noComms = view.comms === null ? 'Set the heartbeat path first' : '';
         const noAlarms = view.alarms === null ? 'Set the alarm source first' : '';
@@ -1550,16 +1581,27 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                 </header>
                 <div className="mapstudio-kindsetup-preview" data-field="preview" data-options={String(options.length)}>
                     <label className="mapstudio-field-label" htmlFor={previewId}>Preview item</label>
-                    <select id={previewId} className="mapstudio-input mapstudio-kindsetup-preview-select" value={preview ? preview.itemId : ''}
-                            disabled={options.length === 0} aria-describedby={previewId + '-note'}
-                            onChange={(ev) => ev.target.value !== '' && this.props.onPreview(ev.target.value)}>
-                        {options.length === 0 ? <option value="">No linked item</option> : null}
-                        {options.map((o) => <option key={o.itemId} value={o.itemId}>{o.name + ' - ' + o.folder}</option>)}
-                    </select>
+                    <div className="mapstudio-kindsetup-preview-row">
+                        <select id={previewId} className="mapstudio-input mapstudio-kindsetup-preview-select" value={preview ? preview.itemId : ''}
+                                disabled={options.length === 0} aria-describedby={previewId + '-note'}
+                                onChange={(ev) => ev.target.value !== '' && this.props.onPreview(ev.target.value)}>
+                            {options.length === 0 ? <option value="">No linked item</option> : null}
+                            {options.map((o) => <option key={o.itemId} value={o.itemId}>{o.name + ' - ' + o.folder}</option>)}
+                        </select>
+                        {/* Off with its reason: the words on the button's holder, since an inert button shows no hover text everywhere. */}
+                        <span className="mapstudio-kindsetup-show-holder" title={showOff || undefined}>
+                            <button type="button" className="mapstudio-button mapstudio-kindsetup-show" disabled={showOff !== ''}
+                                    title={showOff !== '' ? showOff : 'Move the map to ' + (preview ? preview.name : 'the preview item')}
+                                    aria-describedby={showOff !== '' ? previewId + '-show-off' : undefined} data-off={showOff}
+                                    onClick={() => preview && this.props.onShowPreview && this.props.onShowPreview(preview.itemId)}>Show on map</button>
+                            {/* The reason as the button's description: a hidden element still describes what points at it. */}
+                            {showOff !== '' ? <span id={previewId + '-show-off'} hidden>{showOff}</span> : null}
+                        </span>
+                    </div>
                     {preview ? (
                         <span id={previewId + '-note'} className="mapstudio-field-hint mapstudio-kindsetup-preview-note">
                             <span className="mapstudio-mono mapstudio-kindsetup-folder">{preview.folder}</span>
-                            {' - each tag path is checked for this item\'s asset.'}
+                            {previewLine(kind)}
                         </span>
                     ) : (
                         <span id={previewId + '-note'} className="mapstudio-field-hint mapstudio-kindsetup-preview-note mapstudio-kindsetup-preview-none">

@@ -117,6 +117,42 @@ describe('a kind\'s setup', () => {
         expect(html).toContain('data-preview="a"');
     });
 
+    test('12b2: Show on map beside the select, the line under it, and the Live now note last in section 6', () => {
+        const NORMAL = { commsLost: false, stale: false, alarm: null, iconKpi: null, badge: 'normal' as const, preset: 'warning' as const };
+        // P2 has its own rule (decision 3): the note says so.
+        const own = panel({ previewState: NORMAL, previewOwnRule: true });
+        const preview = slice(own, 'data-field="preview"', 'mapstudio-kindsetup-body');
+        expect(preview).toContain('mapstudio-kindsetup-show');
+        expect(preview).toContain('>Show on map</button>');
+        expect(preview).toContain('data-off=""');
+        expect(preview).not.toContain('disabled=""');
+        expect(preview).toContain('each tag path is checked for this item&#x27;s asset, and it carries the word Preview on the map.');
+        const note = (html: string): string => slice(html, 'class="mapstudio-rule-live"', '</section>');
+        expect(note(own)).toContain('role="status" aria-live="polite" data-preview="a"');
+        expect(note(own)).toContain('P2 has its own style rule, so this kind&#x27;s rule does not draw on it. Choose another preview item.');
+        // The note is the section's last child.
+        expect(own.indexOf('mapstudio-rule-live')).toBeGreaterThan(own.indexOf('mapstudio-rule-case'));
+        expect(note(own)).toMatch(/<\/div>$/);
+        // Another item, its state from the Gateway; with an alarm the note says it wins.
+        const items = [item('b', 'P3', { assetId: 'P14' })];
+        expect(note(panel({ items, previewState: NORMAL }))).toContain('Live now: P3 is Warning.');
+        expect(note(panel({ items, previewState: { ...NORMAL, alarm: { priority: 1, unacked: true, active: 1, stale: false }, badge: 'alarm' } })))
+            .toContain('Live now: P3 is Warning, but its priority 1 alarm wins over the rule.');
+        expect(note(panel({ items }))).toContain('Live now: no live values for P3 yet.');
+        // No preview item: the button is off with its reason, and the note says the kind has no item.
+        const none = panel({ items: [item('b', 'P3')] });
+        const off = slice(none, 'mapstudio-kindsetup-show-holder', '</div>');
+        expect(off).toContain('title="No well pad is linked to an asset yet, so there is no preview item to show."');
+        expect(off).toContain('disabled=""');
+        // The reason is the button's description, not only hover text.
+        const described = /aria-describedby="([^"]+)"/.exec(off)![1];
+        expect(none).toContain('<span id="' + described + '" hidden="">No well pad is linked to an asset yet, so there is no preview item to show.</span>');
+        expect(note(none)).toContain('No well pad is linked to an asset yet, so this kind has no item to show the rule on.');
+        // An area kind (decision 4).
+        const fence = panel({ kind: FENCE, record: undefined, items: [] });
+        expect(note(fence)).toContain('An area draws its category tint, not a preset, so the style rule has no preview on the map.');
+    });
+
     test('the six sections in DESIGN.md\'s order, numbered', () => {
         const html = panel();
         const order = ['icon', 'keyValues', 'comms', 'alarms', 'popup', 'styleRule'].map((s) => html.indexOf('data-section="' + s + '"'));

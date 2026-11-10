@@ -23,7 +23,7 @@
 import { Asset, Kind } from './adapters';
 import { EditBatch, EditOp, ErrorCodes, KindSetupRecord, MapItemRecord } from './contract';
 import { isRecord } from './json';
-import { PRESETS, TINTS } from './live';
+import { ItemState, PRESETS, TINTS, itemPreset } from './live';
 import { ASSET_ID, ASSET_PATH, ITEM_ID, ITEM_NAME, PROPERTY_PREFIX } from './placeholders';
 import { plural } from './history';
 import { UnsavedEntry, isBusy, isTransient } from './unsaved';
@@ -568,6 +568,95 @@ export function previewOf(options: readonly PreviewOption[], remembered: string 
 /** The note under the Preview item select when no item of the kind is linked (owner decision b): the one note, none under the paths. */
 export function noPreviewText(kind: Kind): string {
     return 'No ' + lowerKind(kind) + ' is linked to an asset yet, so its tag paths cannot be checked.';
+}
+
+/** The word the map draws on a kind's preview item while its setup is open (entry 12b2, owner decision 1). */
+export const PREVIEW_WORD = 'Preview';
+
+/** The words a preset is named by in the Live now note: the map's state word, the line patterns by name, else Normal. */
+const NOTE_WORDS: Record<string, string> = {
+    attention: 'Attention', warning: 'Warning', fault: 'Fault', dimmed: 'Out of service', solid: 'Solid', dashed: 'Dashed', dotted: 'Dotted'
+};
+
+/** What the Live now note at the foot of section 6 is said from (entry 12b2): only what the Gateway already sends. */
+export interface LiveNowFacts {
+    kind: Kind;
+    /** The preview item's name, or null with no preview item. */
+    name: string | null;
+    /** The preview item's live state as the map draws it, or null before its first values. */
+    state: ItemState | null;
+    /** Whether the preview item has a style rule of its own (`overrides.styleRule`): the kind's rule does not draw on it. */
+    ownRule: boolean;
+    /** The kind's stored rule: none, the instruments source (a line's look per segment), or a rule with cases or an expression. */
+    stored: 'none' | 'instruments' | 'rule';
+    /** Whether section 6 says "Not saved yet": the draft is not whole, so nothing of it was sent. */
+    unsaved: boolean;
+}
+
+/** Whether a map item has a style rule of its own. */
+export function hasOwnRule(item: MapItemRecord | undefined): boolean {
+    return !!item && isRecord(item.overrides) && item.overrides.styleRule !== undefined && item.overrides.styleRule !== null;
+}
+
+/** The kind's stored rule as the Live now note reads it. */
+export function storedRuleOf(rule: Record<string, unknown> | null | undefined): LiveNowFacts['stored'] {
+    if (!isRecord(rule)) {
+        return 'none';
+    }
+    return isRecord(rule.source) && rule.source.instruments !== undefined ? 'instruments' : 'rule';
+}
+
+/**
+ * The Live now note (entry 12b2; DESIGN.md Kind setup, "a note box with the live state and the precedence rule"): what the
+ * preview item shows now, from its live state, and when its alarm wins over the rule. Nothing of the rule is worked out here:
+ * the state is the Gateway's, so the note changes at the next live update. An area kind draws its tint and never a preset
+ * (owner decision 4); an item with its own rule is not drawn by the kind's (owner decision 3).
+ */
+export function liveNowText(facts: LiveNowFacts): string {
+    const kind = facts.kind;
+    if (kind.area) {
+        return 'An area draws its category tint, not a preset, so the style rule has no preview on the map.';
+    }
+    if (facts.name === null) {
+        return 'No ' + lowerKind(kind) + ' is linked to an asset yet, so this kind has no item to show the rule on.';
+    }
+    const name = facts.name;
+    if (facts.ownRule) {
+        return name + ' has its own style rule, so this kind\'s rule does not draw on it. Choose another preview item.';
+    }
+    // The section's own note says "Not saved yet" and what is missing; this one says only what the map does meanwhile.
+    const unsaved = !facts.unsaved ? ''
+        : facts.stored === 'none' ? ' The map draws no rule until this one is whole.'
+            : ' The map shows the stored rule until this one is whole.';
+    const state = facts.state;
+    if (state !== null && (state.commsLost || state.stale)) {
+        return 'Live now: ' + name + ' shows only as ' + (state.commsLost ? 'Comms lost' : 'Stale') + ' until a fresh value comes.' + unsaved;
+    }
+    if (facts.stored === 'none') {
+        // With no rule the item draws as Normal whether or not it has a live row: a kind that shows nothing live never has one.
+        const over = state && state.alarm ? ', but its priority ' + state.alarm.priority + ' alarm shows over it.' : '.';
+        return 'Live now: ' + name + ' draws as Normal' + over + (unsaved !== '' ? unsaved : ' This kind has no style rule.');
+    }
+    if (state === null) {
+        return 'Live now: no live values for ' + name + ' yet.' + unsaved;
+    }
+    if (facts.stored === 'instruments') {
+        return 'Live now: each segment of ' + name + ' takes the worst of the instruments at its ends.' + unsaved;
+    }
+    const word = NOTE_WORDS[itemPreset(state)] || 'Normal';
+    const alarm = state.alarm ? ', but its priority ' + state.alarm.priority + ' alarm wins over the rule.' : '.';
+    return 'Live now: ' + name + ' is ' + word + alarm + unsaved;
+}
+
+/** The line under the Preview item select, after the asset folder: the two things the preview item does (entry 12b2). */
+export function previewLine(kind: Kind): string {
+    return kind.area ? ' - each tag path is checked for this item\'s asset.'
+        : ' - each tag path is checked for this item\'s asset, and it carries the word ' + PREVIEW_WORD + ' on the map.';
+}
+
+/** Why Show on map is off, or '' while there is a preview item to go to. */
+export function showOnMapOff(kind: Kind, hasPreview: boolean): string {
+    return hasPreview ? '' : 'No ' + lowerKind(kind) + ' is linked to an asset yet, so there is no preview item to show.';
 }
 
 const PREVIEW_PREFIX = 'mapstudio.kindpreview.v1:';

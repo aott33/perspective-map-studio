@@ -6,7 +6,7 @@ import {
     MARKER_TOKENS, MarkerColors, RANK_ALARM, RANK_COMMS_LOST, RANK_NORMAL,
     BADGE_GLYPH_SIZE, BADGE_HALO_RADIUS, HALO_WIDTH, LINE_DASH, LINE_DOT, LINE_HALO_WIDTH, RANK_SELECTED, RANK_STALE, RANK_STYLE, areaProperties,
     badgeImageId, chipOffsetEm, dotImageId, imageFor, labelRank, lineHaloDash, lineLook,
-    lineProperties, lineSampleSvg, lineWeight, markerImageId, markerProperties, markerSpec, markerSvg, parseImageId, parseSprite, pipeSize, stateWord,
+    lineProperties, lineSampleSvg, lineWeight, markerImageId, markerProperties, markerSpec, markerSvg, parseImageId, parseSprite, pipeSize, previewWord, stateWord,
     textWidthPx, tintSampleSvg
 } from '../markers';
 
@@ -203,6 +203,11 @@ describe('line looks (DESIGN.md map-line)', () => {
         expect(lineProperties('l', 'L', 'line', lineLook({ ...NORMAL, preset: 'attention' }, 6), COLORS, false).color).toBe(COLORS.attention);
         expect(stateWord({ ...NORMAL, preset: 'fault' })).toBe('Fault');
         expect(stateWord({ ...NORMAL, preset: 'dimmed' })).toBe('Out of service');
+        // The preview item's word (entry 12b2): Preview in place of the preset's word; Stale and Comms lost keep theirs.
+        expect(previewWord({ ...NORMAL, preset: 'fault' })).toBe('Preview');
+        expect(previewWord(NORMAL)).toBe('Preview');
+        expect(previewWord(STALE)).toBe('Stale');
+        expect(previewWord({ ...NORMAL, commsLost: true, stale: true })).toBe('Comms lost');
         expect(stateWord({ ...NORMAL, preset: 'dotted' })).toBe('');
         expect(stateWord({ ...STALE, preset: 'fault' })).toBe('Stale');
         expect(labelRank({ ...NORMAL, preset: 'fault' }, 0, false)).toBe(RANK_STYLE);

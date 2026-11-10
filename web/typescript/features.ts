@@ -20,7 +20,7 @@ import { Position, instrumentsOn, lengthM, pointAt } from './geometry';
 import { ItemState, LiveState, SEGMENT_END, SEGMENT_START, areaTint, iconKpiOf, itemState, segmentState } from './live';
 import {
     AreaProperties, LineProperties, MarkerColors, MarkerProperties, areaProperties, badgeImageId, labelRank, lineLook, lineProperties,
-    markerProperties, stateWord
+    RANK_SELECTED, markerProperties, previewWord, stateWord
 } from './markers';
 import { SHARED_M, groupShared, sharedCentre, sharedName, sharedState } from './shared';
 
@@ -195,10 +195,14 @@ function pointFeature<P>(coordinates: Position, properties: P): Feature<Point, P
  * members is selected); lines take their look from their own live state, their `diameter`
  * property (inches) and whether an instrument is attached. `withinM` is the sharing distance at the
  * map's zoom (shared.ts `sharedWithinM`, owner review notes item 20): 20 m until 20 m is more than a
- * marker apart on screen.
+ * marker apart on screen. `previewId` is the preview item of the kind whose setup is open (epic 4 entry 12b2), or null: a point
+ * with a marker of its own reads "Preview" in its chip in place of its state word (the ring, the badge and the preset drawn
+ * as ever, its labels placed first), a line's label its name and "Preview"; Stale and Comms lost keep their own word, a shared marker keeps the
+ * group's chip, and an area carries no word.
  */
 export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveState, selected: Selection | null,
-                              colors: MarkerColors, withinM: number = SHARED_M, set: readonly string[] = []): MapFeatures {
+                              colors: MarkerColors, withinM: number = SHARED_M, set: readonly string[] = [],
+                              previewId: string | null = null): MapFeatures {
     // A selection of several (epic 4 entry 8): every item in the set takes today's ring or casing; an area in it its casing.
     const inSet = new Set(set);
     const kindById = new Map<string, Kind>();
@@ -244,9 +248,16 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
             || members.some((m) => highlighted.has(m.id) || inSet.has(m.id));
         members.forEach((m) => extend((m.geometry as Point).coordinates as Position));
         if (members.length === 1) {
-            points.push(pointFeature((first.geometry as Point).coordinates as Position,
-                markerProperties(first.id, first.name, first.kind, kind ? kind.icon : '', stateOf(first),
-                    { labelRank: kind ? kind.labelRank : 0, selected: isSelected, instrument: !!(kind && kind.instrument) })));
+            const state = stateOf(first);
+            const properties = markerProperties(first.id, first.name, first.kind, kind ? kind.icon : '', state,
+                { labelRank: kind ? kind.labelRank : 0, selected: isSelected, instrument: !!(kind && kind.instrument) });
+            if (first.id === previewId) {
+                properties.word = previewWord(state);
+                // Placed first, as the selected item's label is: a Normal item's own rank is the lowest, and its chip would be
+                // the first dropped among crowded items.
+                properties.rank = RANK_SELECTED;
+            }
+            points.push(pointFeature((first.geometry as Point).coordinates as Position, properties));
             continue;
         }
         shared++;
@@ -331,7 +342,7 @@ export function buildFeatures(items: MapItemRecord[], kinds: Kind[], live: LiveS
         }
         if (coords.length >= 2) {
             const mid = alongLine(coords, 0.5);
-            const word = stateWord(state);
+            const word = item.id === previewId ? previewWord(state) : stateWord(state);
             marks.push(pointFeature(mid.point, {
                 id: item.id, name: item.name, kind: item.kind,
                 label: word ? item.name + ' ' + word : item.name,

@@ -4,14 +4,14 @@ type: 'feature'
 ticket: ''
 part_of: '12'
 created: '2026-11-10'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '7e6c70e9640fa401881fdd338cde529902607820'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md']
 ---
@@ -65,12 +65,12 @@ Decisions (owner, 2026-11-10, "go with recommended", then "approve and continue"
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `web/typescript/kindSetup.ts`, with Jest -- the note's words for every state of the matrix -- P1, P3 to P7, P11.
-- [ ] `features.ts`, `itemsLayer.ts`, `MapStudio.tsx` -- the Preview word for one item, the guard's key, the hidden rows' `data-preview`, cleared as the Always says -- P1, P2, P5, P8, P9.
-- [ ] `studio/KindSetupPanel.tsx`, `mapstudio.css` -- the note box (`.mapstudio-rule-live`), "Show on map" (`.mapstudio-kindsetup-show`), the line under the select -- P1 to P11.
-- [ ] Jest -- the features for a point, a line, a shared marker and an area with the preview set.
-- [ ] `e2e/tests/kindpreview.spec.mjs` (new) -- P1 to P11 at 1366 px, the dev tags and the seed put back after; screenshots of the map with the word and of the note box.
-- [ ] Docs and playbook 8m.
+- [x] `web/typescript/kindSetup.ts`, with Jest -- the note's words for every state of the matrix -- P1, P3 to P7, P11.
+- [x] `features.ts`, `itemsLayer.ts`, `MapStudio.tsx` -- the Preview word for one item, the guard's key, the hidden rows' `data-preview`, cleared as the Always says -- P1, P2, P5, P8, P9.
+- [x] `studio/KindSetupPanel.tsx`, `mapstudio.css` -- the note box (`.mapstudio-rule-live`), "Show on map" (`.mapstudio-kindsetup-show`), the line under the select -- P1 to P11.
+- [x] Jest -- the features for a point, a line, a shared marker and an area with the preview set.
+- [x] `e2e/tests/kindpreview.spec.mjs` (new) -- P1 to P11 at 1366 px, the dev tags and the seed put back after; screenshots of the map with the word and of the note box.
+- [x] Docs and playbook 8m.
 
 **Acceptance Criteria:**
 - Given a kind's setup open, when the preview item's state changes on the Gateway, then the note and the map agree with every other open map at the next live update, and the map has not moved.
@@ -78,10 +78,27 @@ Decisions (owner, 2026-11-10, "go with recommended", then "approve and continue"
 ## Implementation Notes
 
 - Planner, 2026-11-10: the environment, commit and identity rules are entry 8's plan's (Docker by hand after a restart, JDK 17 by apt if gone, `ops/up.sh --fresh` before a whole-suite run, the session's trailers, no em dashes, never a bare `git stash`, never a push). Leave the work uncommitted: the orchestrator commits after the whole suite.
+- Build, 2026-11-10: the word is put on the one feature in `features.ts` `buildFeatures` (a new last argument, `previewId`; `markers.ts` `previewWord`), and `itemsLayer.ts` redraws when the preview item changes (`drawnPreview`, asked of the component's `previewItemId()`, which is null outside Edit mode's Kinds and for an area kind). The label rank is left as the item's own, so the chip is placed as any state word chip is. The note's words are `kindSetup.ts` `liveNowText`; beyond the matrix it also says a kind with no rule draws as Normal, a line kind whose rule is From its instruments, and an item with no live values yet. Show on map fits a line or an area as a list row does. For tests the map carries `data-preview-item` and `data-preview-word` beside the hidden rows' `data-preview`. The docs' screenshots were copied from the spec's run on the dev stack.
 
 ## Plan Change Log
 
 ## Review Triage Log
+
+### Pass 1 (quick lens, 2026-11-10): 9 findings - 8 low, 1 false; 7 patches, 2 rejected
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---|---|---|---|
+| 1 | A kind the Gateway's plan does not cover (no rule, no key values, comms or alarms) never has live values, so the note says "no live values yet" for good instead of "draws as Normal" | low | patch | Confirmed: `renderKindSetup` passes a null state when the batch has no row, and `liveNowText` answers the null state before the no-rule branch. Fix: with no rule the note says it draws as Normal whether or not a row exists; "yet" only where values can come. |
+| 2 | Show on map on a long line fits it below zoom 14, where line labels do not draw, so no word shows | low | rejected | Real, but the button's job is done: the map goes to the line and fits it. Forcing zoom 14 would cut the line off, and drawing labels lower changes every line's label; more than a correction. Told to the owner. |
+| 3 | A Normal preview point's chip takes the item's own, lowest, label rank and is the first dropped among crowded items | low | patch | Confirmed: `buildFeatures` sets only `word`. Fix: the preview item's chip takes the highest rank so it is placed first. |
+| 4 | A kind with no rule and an active alarm on the preview item reads "draws as Normal" | low | patch | Confirmed: the no-rule branch returns before the alarm is read. Fix: the alarm clause applies there too. |
+| 5 | Two screenshots are the same picture; two are linked from no doc | low | patch | Confirmed (same sha1). Fix: the duplicate removed, each kept render linked. |
+| 6 | Show on map's reason when off is hover text only | low | patch | Confirmed: `title` only, and `aria-describedby` points at another note. Fix: the reason described to assistive technology. |
+| 7 | While a rule is not whole, two status regions both say "Not saved yet" | low | patch | Both are asked for, but the note need not repeat the words: it says only that the map shows the stored rule until this one is whole. |
+| 8 | The frozen block's Decisions line gained the owner's "approve and continue" | false | rejected | The orchestrator records the owner's approval there at the checkpoint, as every plan of this epic does; the intent is unchanged. |
+| 9 | The playbook's "Built so far (2026-11-09)" lists 12b2, built on 2026-11-10 | low | patch | Confirmed. Fix: the date. |
+
+Outcome (2026-11-10): seven patches applied (findings 1, 3 to 7, 9), findings 2 and 8 rejected. The orchestrator's Verification on the final code: tsc clean, Jest 912 passed, Gradle clean build offline passed, contract check OK, `ops/up.sh --fresh` and the whole e2e suite 308 passed, 1 failed, 8 skipped (the env-gated scenarios). The one failure was `adapters.spec.mjs:165`, outside this entry: the test before it left the dev adapter's 8 s slow call in flight, so the kind list still read slow. Fixed at its cause (that test's clean-up now asks again until the list answers ok); the adapters spec then passed three runs in a row on the same stack. The whole suite was not run again after that test fix. No Gateway, `common/` or Ignition file changed. Status built; 12c is next.
 
 ## Verification
 

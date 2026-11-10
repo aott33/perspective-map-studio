@@ -7,13 +7,15 @@ import { Asset, Kind } from '../adapters';
 import { Conflict, EditBatch, KindSetupRecord, MapItemRecord } from '../contract';
 import {
     Fields, MAX_KEY, NO_RULE, POPUP_VIEW_HAS_PARAMS, RuleDraft, RuleSource, SetupEdit, applyEdit, checkRule, checkTints, draftSource, expressionPresets, fixedCategories, foldRule,
-    forgetSeen, inStepVersion, popupPathEdit, batchSetup, compareNames, geometryWord, headerSubline, insertAt, isFullPath, itemsOfKind, keyFromLabel,
+    forgetSeen, hasOwnRule, inStepVersion, liveNowText, popupPathEdit, previewLine, showOnMapOff, storedRuleOf, batchSetup, compareNames, geometryWord, headerSubline, insertAt,
+    isFullPath, itemsOfKind, keyFromLabel, LiveNowFacts,
     noPreviewText, overridesText, paramMissing, pathsToResolve, pausedText, placeholderList, presetsFor, previewKey, previewOf, previewOptions, readPreview,
     readSetup, refusalPlace, removeBlocked, resolveKey, resolveNote, rowMissing, ruleDraft, ruleKpi, ruleTypes, sameRule, sameSetup, sameTints, setupBatch,
     shownKind, sourceName, tintRows, tintsDraft, typedNumber, typedValue, unsavedText, valueText, waitingSave, withSource, writePreview
 } from '../kindSetup';
 import { KeyValueStore, UnsavedEntry, UnsavedQueue, isSetupSave, onTopBatch, readEntries, saveCardFor, storageKey } from '../unsaved';
 import { headerSaveWords } from '../problems';
+import { ItemState } from '../live';
 import { CONNECTED } from '../connection';
 import { STORE_UNKNOWN } from '../storeState';
 import { SAVE_IDLE } from '../save';
@@ -386,6 +388,83 @@ describe('the preview item (owner decision 5)', () => {
         expect(() => writePreview(refusing, key, 'b')).not.toThrow();
         expect(readPreview(null, key)).toBeNull();
         expect(() => writePreview(store, null, 'b')).not.toThrow();
+    });
+});
+
+describe('the Live now note and the preview item\'s words (12b2)', () => {
+    const NORMAL: ItemState = { commsLost: false, stale: false, alarm: null, iconKpi: null, badge: 'normal', preset: 'normal' };
+    const facts = (over: Partial<LiveNowFacts> = {}): LiveNowFacts => ({ kind: PAD, name: 'P12', state: NORMAL, ownRule: false, stored: 'rule', unsaved: false, ...over });
+
+    test('P1, P3: what the preview item is now, by the state the Gateway sent', () => {
+        expect(liveNowText(facts())).toBe('Live now: P12 is Normal.');
+        expect(liveNowText(facts({ state: { ...NORMAL, preset: 'warning' } }))).toBe('Live now: P12 is Warning.');
+        expect(liveNowText(facts({ state: { ...NORMAL, preset: 'dimmed' } }))).toBe('Live now: P12 is Out of service.');
+        // A state with no preset slot reads as Normal; a line's pattern by its name.
+        expect(liveNowText(facts({ state: { ...NORMAL, preset: undefined } }))).toBe('Live now: P12 is Normal.');
+        expect(liveNowText(facts({ kind: LINE, name: 'L-1', state: { ...NORMAL, preset: 'dashed' } }))).toBe('Live now: L-1 is Dashed.');
+    });
+
+    test('P4: an active alarm wins over the rule, and the note says so with its priority', () => {
+        const alarm = { priority: 2 as const, unacked: true, active: 1, stale: false };
+        expect(liveNowText(facts({ state: { ...NORMAL, preset: 'fault', alarm, badge: 'alarm' } })))
+            .toBe('Live now: P12 is Fault, but its priority 2 alarm wins over the rule.');
+    });
+
+    test('P5: Comms lost and Stale show only as that until a fresh value comes', () => {
+        expect(liveNowText(facts({ state: { ...NORMAL, commsLost: true, stale: true, badge: 'comms-lost' } })))
+            .toBe('Live now: P12 shows only as Comms lost until a fresh value comes.');
+        expect(liveNowText(facts({ state: { ...NORMAL, stale: true, badge: 'stale' } }))).toBe('Live now: P12 shows only as Stale until a fresh value comes.');
+    });
+
+    test('no rule, the instruments source, and no values yet', () => {
+        expect(liveNowText(facts({ stored: 'none' }))).toBe('Live now: P12 draws as Normal. This kind has no style rule.');
+        expect(liveNowText(facts({ kind: LINE, name: 'L-1', stored: 'instruments' })))
+            .toBe('Live now: each segment of L-1 takes the worst of the instruments at its ends.');
+        expect(liveNowText(facts({ state: null }))).toBe('Live now: no live values for P12 yet.');
+        // A kind that shows nothing live never has a live row: with no rule its item draws as Normal all the same.
+        expect(liveNowText(facts({ state: null, stored: 'none' }))).toBe('Live now: P12 draws as Normal. This kind has no style rule.');
+        // With no rule an active alarm still shows on the map, and the note says so.
+        expect(liveNowText(facts({ stored: 'none', state: { ...NORMAL, alarm: { priority: 1, unacked: true, active: 1, stale: false }, badge: 'alarm' } })))
+            .toBe('Live now: P12 draws as Normal, but its priority 1 alarm shows over it. This kind has no style rule.');
+    });
+
+    test('P11: "Not saved yet": the map shows the stored rule until this one is whole', () => {
+        expect(liveNowText(facts({ unsaved: true, state: { ...NORMAL, preset: 'attention' } })))
+            .toBe('Live now: P12 is Attention. The map shows the stored rule until this one is whole.');
+        expect(liveNowText(facts({ unsaved: true, stored: 'none' })))
+            .toBe('Live now: P12 draws as Normal. The map draws no rule until this one is whole.');
+        expect(liveNowText(facts({ unsaved: true }))).not.toContain('Not saved yet');
+    });
+
+    test('P6: a preview item with its own rule is not drawn by the kind\'s; P7: an area draws its tint; and a kind with no item', () => {
+        expect(liveNowText(facts({ name: 'Point 2', ownRule: true, state: { ...NORMAL, preset: 'warning' } })))
+            .toBe('Point 2 has its own style rule, so this kind\'s rule does not draw on it. Choose another preview item.');
+        expect(liveNowText(facts({ kind: FENCE, name: 'P14 lease' }))).toBe('An area draws its category tint, not a preset, so the style rule has no preview on the map.');
+        expect(liveNowText(facts({ kind: FENCE, name: null, state: null }))).toContain('An area draws its category tint');
+        expect(liveNowText(facts({ name: null, state: null }))).toBe('No well pad is linked to an asset yet, so this kind has no item to show the rule on.');
+    });
+
+    test('an item\'s own rule and the kind\'s stored rule as the note reads them', () => {
+        expect(hasOwnRule(item('a', 'P2', { overrides: { styleRule: { source: { path: 'x' } } } }))).toBe(true);
+        expect(hasOwnRule(item('a', 'P2', { overrides: { label: 'x' } }))).toBe(false);
+        expect(hasOwnRule(item('a', 'P2'))).toBe(false);
+        expect(hasOwnRule(undefined)).toBe(false);
+        expect(storedRuleOf(null)).toBe('none');
+        expect(storedRuleOf({ source: { instruments: 'worst' } })).toBe('instruments');
+        expect(storedRuleOf(PAD_SETUP.styleRule)).toBe('rule');
+    });
+
+    test('the line under the select says both things the preview item does; Show on map is off with its reason with none', () => {
+        expect(previewLine(PAD)).toBe(' - each tag path is checked for this item\'s asset, and it carries the word Preview on the map.');
+        expect(previewLine(FENCE)).toBe(' - each tag path is checked for this item\'s asset.');
+        expect(showOnMapOff(PAD, true)).toBe('');
+        expect(showOnMapOff(PAD, false)).toBe('No well pad is linked to an asset yet, so there is no preview item to show.');
+    });
+
+    test('no em dash in any of the words', () => {
+        const all = [facts(), facts({ ownRule: true }), facts({ kind: FENCE }), facts({ name: null }), facts({ unsaved: true }), facts({ stored: 'none' })]
+            .map(liveNowText).join(' ') + previewLine(PAD) + showOnMapOff(PAD, false);
+        expect(all).not.toContain(String.fromCharCode(0x2014));
     });
 });
 

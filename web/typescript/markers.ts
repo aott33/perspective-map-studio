@@ -336,6 +336,14 @@ export function stateWord(state: ItemState): string {
     return state.commsLost ? 'Comms lost' : state.stale ? 'Stale' : PRESET_WORDS[itemPreset(state)];
 }
 
+/**
+ * The chip's word on a kind's preview item while its setup is open (epic 4 entry 12b2): "Preview" in place of the state word;
+ * Comms lost and Stale keep their own word, since nothing of the rule draws then.
+ */
+export function previewWord(state: ItemState): string {
+    return state.commsLost || state.stale ? stateWord(state) : 'Preview';
+}
+
 /** The bundled fonts' ASCII advances at 24 px (web/fonts/advances.json, kept in step with the fonts by glyphs.mjs --check). */
 const ADVANCES = advances as { size: number; stacks: Record<string, Record<string, number>> };
 /** The advance of a character outside ASCII, in ems. */

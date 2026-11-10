@@ -45,6 +45,8 @@ export interface ItemsHost {
     drawnFulls: number;
     drawnSelection: string;
     drawnWithinM: number;
+    /** The preview item last drawn with its word (epic 4 entry 12b2), '' for none. */
+    drawnPreview: string;
     /** The unsaved and items revisions last drawn into the unsaved sources. */
     drawnUnsaved: string;
     /** Whether the e2e item counts were asked for (after the first loaded items are drawn). */
@@ -75,6 +77,8 @@ export interface ItemsHost {
     readonly userLocation: UserLocation;
     /** The selection's attributes and Return (selection.tsx); a kept Fit's follow and its attribute (camera.ts). */
     publishSelection(): void;
+    /** The preview item of the kind whose setup is open in Edit mode's Kinds (entry 12b2), or null: it carries the Preview word. */
+    previewItemId(): string | null;
     fitTo(bounds: [number, number, number, number]): void;
     publishFit(): void;
 }
@@ -92,14 +96,18 @@ export function drawItems(host: ItemsHost): void {
     const several = set.length >= 2;
     const selected = several ? null : host.state.selected;
     const selectionKey = several ? 'set:' + set.join(',') : selected ? selected.kind + ':' + selected.id : '';
+    // The preview item's word (entry 12b2) comes and goes with Kinds, the kind chosen, the preview item and Editing: a change of
+    // it redraws the sources once, as a changed selection does.
+    const previewId = host.previewItemId();
+    const previewKey = previewId || '';
     if (!host.map || !host.itemsReady || !delegate || !host.markerColors
         || (delegate.itemsRevision === host.drawnRevision && delegate.liveRevision === host.drawnLive
-            && selectionKey === host.drawnSelection && host.withinM === host.drawnWithinM)) {
+            && selectionKey === host.drawnSelection && host.withinM === host.drawnWithinM && previewKey === host.drawnPreview)) {
         return;
     }
     // No store item is drawn as current while map.load says the store is unavailable; a save's pause (entry 10) keeps them.
     const items = delegate.editing === 'off' && !delegate.savePaused ? [] : delegate.items;
-    const data = buildFeatures(items, delegate.lists.kinds, delegate.live, selected, host.markerColors, host.withinM, several ? set : []);
+    const data = buildFeatures(items, delegate.lists.kinds, delegate.live, selected, host.markerColors, host.withinM, several ? set : [], previewId);
     host.anchors = data.anchors;
     host.drawnWithinM = host.withinM;
     const source = (id: string): GeoJSONSource | undefined => host.map!.getSource(id) as GeoJSONSource | undefined;
@@ -134,6 +142,7 @@ export function drawItems(host: ItemsHost): void {
         host.drawnRevision = delegate.itemsRevision;
         host.drawnLive = delegate.liveRevision;
         host.drawnSelection = selectionKey;
+        host.drawnPreview = previewKey;
         host.itemBounds = data.bounds;
         host.itemBoundsKey = data.boundsKey;
         if (host.mapContainer) {
@@ -144,6 +153,12 @@ export function drawItems(host: ItemsHost): void {
             host.mapContainer.setAttribute('data-arrow', String(data.arrow.features.length));
             // The selected line's floating ends drawn with the mark (entry 4): 0, 1 or 2, '' with no line selected.
             host.mapContainer.setAttribute('data-floating-ends', data.arrow.features.length > 0 ? String(data.ends.features.length) : '');
+            // The preview item and the words the map draws for it (entry 12b2), for tests: its chip's word (a point with a marker
+            // of its own; '' when it shares a marker, is an area or is not drawn) or its line's label.
+            const previewPoint = previewId ? data.points.features.find((f) => f.properties.id === previewId) : undefined;
+            const previewMark = previewId ? data.marks.features.find((f) => f.properties.id === previewId) : undefined;
+            host.mapContainer.setAttribute('data-preview-item', previewKey);
+            host.mapContainer.setAttribute('data-preview-word', previewPoint ? previewPoint.properties.word : previewMark ? previewMark.properties.label : '');
             // The areas and their tints (entry 1), for tests: id, tint name and the resolved colour.
             host.mapContainer.setAttribute('data-areas', JSON.stringify(data.areas.features.map((f) => ({
                 id: f.properties.id, tint: f.properties.tint, color: f.properties.color

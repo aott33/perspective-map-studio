@@ -29,7 +29,7 @@ A script and the screen write the same record, so a setup saved by `system.mapst
 
 ### The style rule and the area tints from the Kinds screen
 
-Epic 4 entry 12b1 (R15; the owner's decisions of 2026-11-10). Section 6 is the Style rule editor of DESIGN.md's Kind setup and key screen 6 (kinds-style); the preview on the map is entry 12b2. Browser only: the parts are the schema's below, saved through the same one-part save (`web/typescript/kindSetup.ts`, `checkRule`, `checkTints`; the `styleRule` and `areaTints` edits of `applyEdit`).
+Epic 4 entry 12b1 (R15; the owner's decisions of 2026-11-10). Section 6 is the Style rule editor of DESIGN.md's Kind setup and key screen 6 (kinds-style); the preview item's "Preview" word on the map, Show on map and the Live now note at the section's foot are entry 12b2 ([contract.md](contract.md), "The preview item on the map and the Live now note"). Browser only: the parts are the schema's below, saved through the same one-part save (`web/typescript/kindSetup.ts`, `checkRule`, `checkTints`; the `styleRule` and `areaTints` edits of `applyEdit`).
 
 - **The type** is a segmented choice in the panel tabs' look: None, States, Bands, Expression and, for a line kind that is not an area, From its instruments. None removes `styleRule`; From its instruments saves `{"source": {"instruments": "worst"}}` and shows one line, "Each segment takes the worst of the instruments at its ends."
 - **The value** (States and Bands; optional for Expression) is a select of the kind's key values, those switched off in the popup too (`{"kpi": key}`), and "A tag path" with a typed path (`{"path": ...}`) and the resolve note of any stored path. The key value a saved rule reads carries "Used by style rule" and its Remove is off.

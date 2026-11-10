@@ -179,6 +179,66 @@ describe('the floating ends of the selected line (epic 4 entry 4)', () => {
     });
 });
 
+describe('the preview item\'s word (entry 12b2)', () => {
+    const AREA_KIND: Kind = { id: 'geofence', name: 'Geofence', geometry: 'line', icon: 'geofence', labelRank: 0, fields: [], area: true };
+    const G = item('g', 'geofence', 'North fence', { type: 'LineString', coordinates: [[-104.99, 39.74], [-104.98, 39.74], [-104.98, 39.75]] });
+    const live: LiveState = {
+        ...LIVE_INITIAL,
+        display: {
+            pad: { ...display, styleRule: { type: 'states', source: 'tag', cases: [{ label: '2', preset: 'warning' }] } },
+            line: { ...display, kindId: 'line', kpis: [], styleRule: { type: 'bands', source: 'kpi:flow', cases: [{ label: '50 to 200', preset: 'attention' }] } }
+        },
+        items: {
+            far: { id: 'far', comms: value(true), kpis: { p: value(400) }, style: { preset: 'warning', stale: false, reason: '' },
+                alarms: value({ active: 1, unacked: 1, priority: 1 }), problems: [] },
+            l: { id: 'l', comms: value(true), kpis: {}, style: { preset: 'attention', stale: false, reason: '' }, problems: [] }
+        }
+    };
+    const point = (out: ReturnType<typeof buildFeatures>, id: string) => out.points.features.find((f) => f.properties.id === id)!.properties;
+
+    test('a point: "Preview" in place of its state word, placed first; the marker, badge and preset as ever; no other item changes', () => {
+        const plain = buildFeatures([A, FAR, L], KINDS, live, null, COLORS);
+        const out = buildFeatures([A, FAR, L], KINDS, live, null, COLORS, undefined, [], 'far');
+        expect(point(plain, 'far').word).toBe('Warning');
+        expect(point(out, 'far')).toEqual({ ...point(plain, 'far'), word: 'Preview', rank: RANK_SELECTED });
+        expect(point(out, 'far').marker).toContain('"warning"]');
+        expect(point(out, 'a')).toEqual(point(plain, 'a'));
+        expect(out.marks.features).toEqual(plain.marks.features);
+        // A normal item, with no word of its own, reads Preview too.
+        // A Normal item's own rank is the lowest: as the preview item its chip is placed first, not dropped first.
+        expect(point(plain, 'a').rank).toBeGreaterThan(RANK_SELECTED);
+        expect(point(buildFeatures([A, FAR], KINDS, live, null, COLORS, undefined, [], 'a'), 'a')).toMatchObject({ word: 'Preview', rank: RANK_SELECTED });
+    });
+
+    test('Stale and Comms lost keep their own word', () => {
+        const lost: LiveState = { ...live, items: { ...live.items, far: { id: 'far', comms: value(false), kpis: { p: value(400) }, problems: [] } } };
+        expect(point(buildFeatures([FAR], KINDS, lost, null, COLORS, undefined, [], 'far'), 'far').word).toBe('Comms lost');
+        const stale: LiveState = { ...live, items: { ...live.items,
+            far: { id: 'far', comms: value(true), kpis: { p: value(400) }, style: { preset: 'normal', stale: true, reason: 'Bad_Stale' }, problems: [] } } };
+        expect(point(buildFeatures([FAR], KINDS, stale, null, COLORS, undefined, [], 'far'), 'far').word).toBe('Stale');
+        const staleLine: LiveState = { ...live, items: { l: { id: 'l', comms: value(true), kpis: {}, style: { preset: 'normal', stale: true, reason: 'Bad_Stale' }, problems: [] } } };
+        expect(buildFeatures([L], KINDS, staleLine, null, COLORS, undefined, [], 'l').marks.features[0].properties.label).toBe('L-1 Stale');
+    });
+
+    test('a line: its label reads its name and "Preview"', () => {
+        const plain = buildFeatures([A, FAR, L], KINDS, live, null, COLORS);
+        const out = buildFeatures([A, FAR, L], KINDS, live, null, COLORS, undefined, [], 'l');
+        expect(plain.marks.features[0].properties.label).toBe('L-1 Attention');
+        expect(out.marks.features[0].properties).toEqual({ ...plain.marks.features[0].properties, label: 'L-1 Preview' });
+        expect(out.lines.features).toEqual(plain.lines.features);
+        expect(out.points.features).toEqual(plain.points.features);
+    });
+
+    test('an item sharing its marker keeps the group\'s chip; an area carries no word', () => {
+        const plain = buildFeatures([A, B, G], [...KINDS, AREA_KIND], live, null, COLORS);
+        const shared = buildFeatures([A, B, G], [...KINDS, AREA_KIND], live, null, COLORS, undefined, [], 'a');
+        expect(shared.points.features).toEqual(plain.points.features);
+        expect(shared.points.features[0].properties.word).toBe('');
+        const area = buildFeatures([A, B, G], [...KINDS, AREA_KIND], live, null, COLORS, undefined, [], 'g');
+        expect(area).toEqual(plain);
+    });
+});
+
 describe('a selection of several (entry 8)', () => {
     const FENCE_KIND: Kind = { id: 'fence', name: 'Geofence', geometry: 'line', icon: 'geofence', labelRank: 1, fields: [], area: true };
     const FENCE = item('f', 'fence', 'Fence', { type: 'LineString', coordinates: [[-104.9, 39.7], [-104.8, 39.7], [-104.8, 39.6]] });

@@ -221,7 +221,11 @@ editorTest.describe('the Style rule editor at 1366 px', () => {
             await expect(ctb1).toHaveAttribute('data-style', 'fault', { timeout: INTERVAL_MS });
             await expect(swd1).toHaveAttribute('data-style', 'fault', { timeout: INTERVAL_MS });
             expect(Date.now() - changed).toBeLessThan(INTERVAL_MS);
-            await expect(ctb1).toHaveAttribute('data-word', 'Fault');
+            // CTB1 is the Well pad's preview item while its setup is open (entry 12b2): its chip reads "Preview" in place of the
+            // state word, the preset drawn as ever; SWD1 says the word.
+            await expect(ctb1).toHaveAttribute('data-word', 'Preview');
+            await expect(ctb1).toHaveAttribute('data-preset', 'fault');
+            await expect(swd1).toHaveAttribute('data-word', 'Fault');
             await expect(map).toHaveAttribute('data-map-reloads', reloads);
         });
 
