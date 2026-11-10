@@ -4,7 +4,7 @@ type: 'feature'
 ticket: ''
 part_of: '12'
 created: '2026-11-10'
-status: 'draft'
+status: 'ready-for-dev'
 baseline_revision: ''
 route: 'full'
 route_source: 'auto'
@@ -25,6 +25,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 **Approach:** Add the Style tab beside Details (DESIGN.md, Properties panel and tabs): the item's icon, size and label read-only, then its style rule, shown "From kind" with "Edit the kind's rule", or as the item's own rule marked Override with Reset. The rule editor built for Kinds in 12b1 is shared by both. An item's rule saves as part of the item, like 12c1's path overrides: an Undo step, listed in Recent changes with Revert.
 
 Decisions carried (owner, 2026-11-09 and 2026-11-10): icon, size and label are read-only (editable is backlog 38); an item's override replaces the whole rule; a rule is sent as soon as it is whole, "Not saved yet" until then; each type's cases are remembered until the item is left.
+
+Decisions (owner, 2026-11-10, "go with recommended, approve and continue"): (1) pressing Override saves the copy of the kind's rule at once as the item's own, so it is marked Override straight away and Undo takes it back. (2) Size says what sets it (a point's marker is one size; a line's width follows its diameter) and Label shows the item's name, both read-only. (3) The value select of an item's rule lists only the kind's key values.
 
 ## Boundaries & Constraints
 
@@ -50,14 +52,6 @@ Decisions carried (owner, 2026-11-09 and 2026-11-10): icon, size and label are r
 | T12 Kinds unchanged | The 12b1 and 12b2 specs | Pass with no change to what they expect | No error expected |
 
 </frozen-after-approval>
-
-## Open Questions
-
-The planner's picks (first option) for the owner to confirm at the checkpoint:
-
-1. **When Override is pressed.** (A) The copy of the kind's rule is saved at once as the item's own (it is whole), so the item is marked Override straight away and Undo takes it back. (B) Nothing is saved until the copy is changed.
-2. **Size and Label rows.** Nothing stores a size or a label per item or kind. (A) Size says what sets it (a point's marker is one size; a line's width follows its diameter) and Label shows the item's name, both read-only. (B) Leave both rows out until backlog 38 makes them real.
-3. **A key value the kind does not have.** The Gateway would give such an override no style at all. (A) The value select lists only the kind's key values. (B) Any key may be typed.
 
 ## Code Map
 
