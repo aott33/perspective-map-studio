@@ -6,11 +6,11 @@
 import { Asset, Kind } from '../adapters';
 import { Conflict, EditBatch, KindSetupRecord, MapItemRecord } from '../contract';
 import {
-    Fields, MAX_KEY, NO_RULE, POPUP_VIEW_HAS_PARAMS, RuleDraft, SetupEdit, applyEdit, checkRule, checkTints, expressionPresets, fixedCategories, foldRule,
+    Fields, MAX_KEY, NO_RULE, POPUP_VIEW_HAS_PARAMS, RuleDraft, RuleSource, SetupEdit, applyEdit, checkRule, checkTints, draftSource, expressionPresets, fixedCategories, foldRule,
     forgetSeen, popupPathEdit, batchSetup, compareNames, geometryWord, headerSubline, insertAt, isFullPath, itemsOfKind, keyFromLabel,
     noPreviewText, overridesText, paramMissing, pathsToResolve, pausedText, placeholderList, presetsFor, previewKey, previewOf, previewOptions, readPreview,
     readSetup, refusalPlace, removeBlocked, resolveKey, resolveNote, rowMissing, ruleDraft, ruleKpi, ruleTypes, sameRule, sameSetup, sameTints, setupBatch,
-    shownKind, sourceName, styleRuleLine, tintRows, tintsDraft, typedNumber, typedValue, unsavedText, valueText, waitingSave, writePreview
+    shownKind, sourceName, styleRuleLine, tintRows, tintsDraft, typedNumber, typedValue, unsavedText, valueText, waitingSave, withSource, writePreview
 } from '../kindSetup';
 import { KeyValueStore, UnsavedEntry, UnsavedQueue, isSetupSave, onTopBatch, readEntries, saveCardFor, storageKey } from '../unsaved';
 import { headerSaveWords } from '../problems';
@@ -443,7 +443,11 @@ describe('the stored style rule in words', () => {
 
 // Entry 12b1: section 6's editor. The plan's matrix rows S1 to S10 as logic; the screen itself is e2e/tests/kindstyle.spec.mjs.
 describe('the Style rule editor (12b1)', () => {
-    const draft = (over: Partial<RuleDraft>): RuleDraft => ({ ...NO_RULE, ...over });
+    /** A draft whose every type reads `source` (as a stored rule's value is offered to each type). */
+    const draft = (over: Partial<RuleDraft> & { source?: RuleSource }): RuleDraft => {
+        const { source, ...rest } = over;
+        return { ...NO_RULE, ...(source ? { sources: { states: source, bands: source, expression: source } } : {}), ...rest };
+    };
 
     test('the types and presets of a kind: From its instruments only for a line that is not an area; line presets only for a line kind', () => {
         expect(ruleTypes(PAD)).toEqual(['none', 'states', 'bands', 'expression']);
@@ -493,7 +497,7 @@ describe('the Style rule editor (12b1)', () => {
             { value: 'Open', preset: 'attention' }] };
         expect((checkRule(distinct, PAD).rule as { cases: unknown[] }).cases)
             .toEqual([{ value: 1, preset: 'normal' }, { value: '1', preset: 'fault' }, { value: true, preset: 'dimmed' }, { value: 'Open', preset: 'attention' }]);
-        expect(checkRule({ ...states, source: { from: 'path', path: ' ' }, states: [{ value: '', preset: '' }] }, PAD).missing)
+        expect(checkRule({ ...withSource(states, { from: 'path', path: ' ' }), states: [{ value: '', preset: '' }] }, PAD).missing)
             .toEqual(['Type the tag path the rule reads.', 'Case 1 has no value.', 'Case 1 has no preset.']);
     });
 
@@ -511,7 +515,7 @@ describe('the Style rule editor (12b1)', () => {
     });
 
     test('S3: a half-built band says why and gives no rule: from not below to, an overlap, an open end in the middle, text for a number', () => {
-        const on: RuleDraft['source'] = { from: 'kpi', key: 'pressure' };
+        const on: RuleSource = { from: 'kpi', key: 'pressure' };
         const bands = (rows: Array<[string, string, string]>): RuleDraft =>
             draft({ type: 'bands', source: on, bands: rows.map(([from, to, preset]) => ({ from, to, preset })) });
         expect(checkRule(bands([['900', '600', '']]), PAD))
@@ -567,11 +571,19 @@ describe('the Style rule editor (12b1)', () => {
         const theirs = ruleDraft(PAD_SETUP.styleRule);
         const folded = foldRule(typed, theirs);
         expect(folded.type).toBe('states');
-        expect(folded.source).toEqual({ from: 'path', path: '{asset.path}/Status' });
+        expect(draftSource(folded)).toEqual({ from: 'path', path: '{asset.path}/Status' });
         expect(folded.states).toHaveLength(4);
         expect(folded.bands).toBe(typed.bands);
-        // None stored: the value picked is kept for the next rule.
+        expect(folded.sources.bands).toEqual({ from: 'kpi', key: 'flow' });
+        // None stored: the values picked are kept for the next rule.
         expect(foldRule(typed, NO_RULE)).toEqual({ ...typed, type: 'none' });
+        expect(draftSource(foldRule(typed, NO_RULE))).toEqual({ from: '' });
+        // A value picked for one type never changes another's: States on the stored path, Bands on Pressure, States back as stored.
+        const pad = ruleDraft(PAD_SETUP.styleRule);
+        const asBands = withSource({ ...pad, type: 'bands' as const }, { from: 'kpi', key: 'pressure' });
+        expect(draftSource(asBands)).toEqual({ from: 'kpi', key: 'pressure' });
+        expect(sameRule({ ...asBands, type: 'states' }, PAD_SETUP.styleRule, PAD)).toBe(true);
+        expect(withSource(NO_RULE, { from: 'kpi', key: 'pressure' })).toBe(NO_RULE);
     });
 
     test('S8: a refused case is the row at that place as sent; the source and the expression each have their place', () => {

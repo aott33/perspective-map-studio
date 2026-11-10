@@ -171,7 +171,7 @@ editorTest.describe('recent changes at 1366 px', () => {
             }
         });
 
-    editorTest('B5: a Revert after a later change is refused, the conflict card naming who; nothing saved', async ({ page, browser }) => {
+    editorTest('B5: a Revert after a later change is refused, the conflict card naming who and offering only their version, after a reload too; nothing saved', async ({ page, browser }) => {
         editorTest.setTimeout(240_000);
         const map = await openEditor(page);
         const other = await openSecond(browser, EDITOR2_USER);
@@ -194,8 +194,23 @@ editorTest.describe('recent changes at 1366 px', () => {
             expect((await stored(other.page, p31)).geometry.coordinates).toEqual([-104.9690, 39.7448]);
             await expect(other.page.locator('.mapstudio-history-row').first().locator('.mapstudio-history-sentence'))
                 .toHaveText(new RegExp('^Moved ' + name + ' '));
+            // Entry 12b1 (S11): a refused Revert's card offers only the other editor's version; the reverse put on top would take
+            // their later change back unseen. The marker is kept with the queued entry, so it is the same after a reload.
+            await expect(card).toHaveAttribute('data-on-top', 'false');
+            await expect(card.locator('.mapstudio-save-card-theirs')).toHaveText(`Use ${EDITOR2_USER}'s version`);
+            await expect(card.locator('.mapstudio-save-card-ontop')).toHaveCount(0);
+            await expect(card.locator('.mapstudio-save-card-actions button')).toHaveCount(1);
+            const batchId = await card.getAttribute('data-batch-id');
+            await openEditor(page);
+            await expect(card).toHaveAttribute('data-card', 'conflict', { timeout: REPLY_MS });
+            await expect(card).toHaveAttribute('data-batch-id', batchId);
+            await expect(card).toHaveAttribute('data-on-top', 'false');
+            await expect(card.locator('.mapstudio-save-card-ontop')).toHaveCount(0);
+            await expect(card.locator('.mapstudio-save-card-actions button')).toHaveText([`Use ${EDITOR2_USER}'s version`]);
+            expect((await stored(page, p31)).geometry.coordinates).toEqual([-104.9690, 39.7448]);
             await card.locator('.mapstudio-save-card-theirs').click();
             await expect(card).toHaveCount(0, { timeout: REPLY_MS });
+            await expect(map).toHaveAttribute('data-unsaved-count', '0');
         } finally {
             await cleanUp(page, [p31]);
             await other.context.close();

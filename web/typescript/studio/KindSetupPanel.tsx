@@ -3,9 +3,9 @@ import { Asset, Kind } from '../adapters';
 import { KindSetupRecord, MapItemRecord } from '../contract';
 import {
     BandRow, Fields, KeyValue, KindRefusal, KindSaveState, MAX_KEY_VALUES, NewRowTexts, forgetSeen, Param, PreviewOption, RULE_TYPE_WORDS, ResolveState, RuleDraft,
-    RuleSource, RuleType, SetupEdit, SetupView, StateRow, TINT_NAMES, TintRow, TintsDraft, checkRule, checkTints, expressionPresets, fixedCategories, foldRule,
+    RuleSource, RuleType, SetupEdit, SetupView, StateRow, TINT_NAMES, TintRow, TintsDraft, checkRule, checkTints, draftSource, expressionPresets, fixedCategories, foldRule,
     headerSubline, insertAt, keyFromLabel, noPreviewText, paramMissing, pathsToResolve, placeholderList, popupPathEdit, presetsFor, previewOf, previewOptions,
-    readSetup, removeBlocked, resolveKey, resolveNote, rowMissing, ruleDraft, ruleTypes, sameRule, sameTints, sourceName, tintRows, tintsDraft, unsavedText
+    readSetup, removeBlocked, resolveKey, resolveNote, rowMissing, ruleDraft, ruleTypes, sameRule, sameTints, sourceName, tintRows, tintsDraft, unsavedText, withSource
 } from '../kindSetup';
 import { Preset, Tint } from '../live';
 import { MarkerColors, PRESET_WORDS, SpriteSymbol, tintSampleSvg } from '../markers';
@@ -185,6 +185,9 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
     /** The rule's and the tints' controls: while the cursor is in one, its draft is left as typed. */
     private readonly ruleBox = React.createRef<HTMLDivElement>();
     private readonly tintsBox = React.createRef<HTMLDivElement>();
+    /** A change of the rule (the tints) is about to be sent: the stored part is not taken into the draft before it has been. */
+    private ruleCommitting = false;
+    private tintsCommitting = false;
     /** The rows typed for a tints property left for another, by property, until the kind is left. */
     private tintMemory: Record<string, TintRow[]> = {};
 
@@ -904,13 +907,13 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         const kind = this.props.kind;
         const view = this.view();
         const rule = this.state.rule;
-        if (rule !== null && !this.focusIn(this.ruleBox) && !this.held(Fields.styleRule) && checkRule(rule, kind).rule !== undefined
+        if (rule !== null && !this.ruleCommitting && !this.focusIn(this.ruleBox) && !this.held(Fields.styleRule) && checkRule(rule, kind).rule !== undefined
             && !sameRule(rule, view.styleRule, kind)) {
             this.ruleSeen = null;
             this.setState({ rule: foldRule(rule, ruleDraft(view.styleRule)) });
         }
         const tints = this.state.tints;
-        if (tints !== null && !this.focusIn(this.tintsBox) && !this.held(Fields.areaTints) && checkTints(tints, kind).tints !== undefined
+        if (tints !== null && !this.tintsCommitting && !this.focusIn(this.tintsBox) && !this.held(Fields.areaTints) && checkTints(tints, kind).tints !== undefined
             && !sameTints(tints, view.areaTints, kind)) {
             this.tintsSeen = null;
             this.setState({ tints: null });
@@ -934,7 +937,13 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
             // The rows moved: the words of the last refusal no longer stand beside the row they named.
             this.props.onClearRefusal(Fields.styleRule);
         }
-        this.setState((prev) => ({ rule: change(prev.rule || ruleDraft(this.view().styleRule)) }), commit ? () => this.commitRule() : undefined);
+        // The commit runs once the draft is in the state, after this update's componentDidUpdate: a pressed button need not hold
+        // the focus (some browsers give it none), so the flag, not the cursor, keeps the draft until it has been sent.
+        this.ruleCommitting = this.ruleCommitting || commit;
+        this.setState((prev) => ({ rule: change(prev.rule || ruleDraft(this.view().styleRule)) }), commit ? () => {
+            this.ruleCommitting = false;
+            this.commitRule();
+        } : undefined);
     }
 
     /**
@@ -983,8 +992,11 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         if (structure && this.hasRefusal(Fields.areaTints)) {
             this.props.onClearRefusal(Fields.areaTints);
         }
-        this.setState((prev) => ({ tints: change(prev.tints || tintsDraft(this.view().areaTints, this.props.kind)) }),
-            commit ? () => this.commitTints() : undefined);
+        this.tintsCommitting = this.tintsCommitting || commit;
+        this.setState((prev) => ({ tints: change(prev.tints || tintsDraft(this.view().areaTints, this.props.kind)) }), commit ? () => {
+            this.tintsCommitting = false;
+            this.commitTints();
+        } : undefined);
     }
 
     /** The tints sent when they are whole and not what is stored: one `areaTints` edit, the whole part; no property removes it. */
@@ -1064,13 +1076,13 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
 
     /** The value the rule reads: a key value (switched-off ones too) or a typed tag path with its resolve note. */
     private renderSource(draft: RuleDraft, view: SetupView, optional: boolean): React.ReactElement {
-        const source = draft.source;
+        const source = draftSource(draft);
         const m = this.messages(Fields.ruleSource);
         const id = this.dom(Fields.ruleSource, 'select');
         const chosen = source.from === 'kpi' ? 'kpi:' + source.key : source.from;
         const pick = (value: string): RuleSource => (value === 'path' ? { from: 'path', path: '' }
             : value.indexOf('kpi:') === 0 ? { from: 'kpi', key: value.slice(4) } : { from: '' });
-        const stored = view.styleRule ? ruleDraft(view.styleRule).source : null;
+        const stored = view.styleRule ? draftSource(ruleDraft(view.styleRule)) : null;
         return (
             <div className="mapstudio-kindsetup-field mapstudio-rule-source" data-field={Fields.ruleSource} data-source={chosen}>
                 <label className="mapstudio-field-label" htmlFor={id}>Value</label>
@@ -1078,7 +1090,7 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                         aria-invalid={m.invalid} aria-describedby={m.ids.length > 0 ? m.ids.join(' ') : undefined}
                         onChange={(ev) => {
                             const next = pick(ev.target.value);
-                            this.editRule((d) => ({ ...d, source: next }), true);
+                            this.editRule((d) => withSource(d, next), true);
                         }}>
                     <option value="">{optional ? 'No value' : 'Pick a value'}</option>
                     {source.from === 'kpi' && !view.kpis.some((k) => k.key === source.key) ? <option value={chosen}>{source.key}</option> : null}
@@ -1093,7 +1105,7 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                            autoComplete="off" spellCheck={false}
                            onChange={(ev) => {
                                const path = ev.target.value;
-                               this.editRule((d) => ({ ...d, source: { from: 'path', path } }), false);
+                               this.editRule((d) => withSource(d, { from: 'path', path }), false);
                            }}
                            onBlur={() => this.commitRule()} onKeyDown={this.onDraftKey} />
                 ) : null}
@@ -1104,7 +1116,7 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
     }
 
     private renderStates(draft: RuleDraft, view: SetupView, marked: number[]): React.ReactNode {
-        const name = sourceName(draft.source, view.kpis);
+        const name = sourceName(draftSource(draft), view.kpis);
         const set = (i: number, patch: Partial<StateRow>, commit: boolean): void =>
             this.editRule((d) => ({ ...d, states: d.states.map((r, at) => (at === i ? { ...r, ...patch } : r)) }), commit);
         return (

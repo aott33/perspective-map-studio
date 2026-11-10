@@ -833,19 +833,38 @@ export interface BandRow {
     preset: string;
 }
 
+/** The types that read a value and have cases (or an expression) of their own. */
+export type CaseType = 'states' | 'bands' | 'expression';
+
 /**
- * A rule as the editor holds it (owner decision 3): the type chosen, the value read, and each type's own cases side by side, so
- * a type switched away from and back has its cases again. Only the chosen type's part is saved.
+ * A rule as the editor holds it (owner decision 3): the type chosen and each type's own value and cases side by side, so a type
+ * switched away from and back is as it was left, and a value picked for one type never changes another's. Only the chosen
+ * type's part is saved.
  */
 export interface RuleDraft {
     type: RuleType;
-    source: RuleSource;
+    /** The value each type reads; a stored rule's value is offered to the other types until one is picked for them. */
+    sources: Record<CaseType, RuleSource>;
     states: StateRow[];
     bands: BandRow[];
     expression: string;
 }
 
-export const NO_RULE: RuleDraft = { type: 'none', source: { from: '' }, states: [], bands: [], expression: '' };
+const NO_SOURCE: RuleSource = { from: '' };
+
+export const NO_RULE: RuleDraft = {
+    type: 'none', sources: { states: NO_SOURCE, bands: NO_SOURCE, expression: NO_SOURCE }, states: [], bands: [], expression: ''
+};
+
+/** The value the chosen type reads; none for None and From its instruments. */
+export function draftSource(draft: RuleDraft): RuleSource {
+    return draft.type === 'none' || draft.type === 'instruments' ? NO_SOURCE : draft.sources[draft.type];
+}
+
+/** A draft with the chosen type's value set; the other types keep theirs. */
+export function withSource(draft: RuleDraft, source: RuleSource): RuleDraft {
+    return draft.type === 'none' || draft.type === 'instruments' ? draft : { ...draft, sources: { ...draft.sources, [draft.type]: source } };
+}
 
 /** The types a kind's rule may have: From its instruments only for a line kind that is not an area. */
 export function ruleTypes(kind: Kind): RuleType[] {
@@ -916,29 +935,31 @@ export function ruleDraft(rule: Record<string, unknown> | null | undefined): Rul
         return { ...NO_RULE, type: 'instruments' };
     }
     const source: RuleSource = typeof src.kpi === 'string' ? { from: 'kpi', key: src.kpi }
-        : typeof src.path === 'string' ? { from: 'path', path: src.path } : { from: '' };
+        : typeof src.path === 'string' ? { from: 'path', path: src.path } : NO_SOURCE;
+    const sources = { states: source, bands: source, expression: source };
     const cases = Array.isArray(rule.cases) ? rule.cases.filter(isRecord) : [];
     if (rule.type === 'states') {
-        return { ...NO_RULE, type: 'states', source, states: cases.map((c) => ({ value: valueText(c.value), preset: text(c.preset) })) };
+        return { ...NO_RULE, type: 'states', sources, states: cases.map((c) => ({ value: valueText(c.value), preset: text(c.preset) })) };
     }
     if (rule.type === 'bands') {
-        return { ...NO_RULE, type: 'bands', source,
+        return { ...NO_RULE, type: 'bands', sources,
             bands: cases.map((c) => ({ from: numberText(c.min), to: numberText(c.max), preset: text(c.preset) })) };
     }
     if (rule.type === 'expression') {
-        return { ...NO_RULE, type: 'expression', source, expression: text(rule.expression) };
+        return { ...NO_RULE, type: 'expression', sources, expression: text(rule.expression) };
     }
     return NO_RULE;
 }
 
 /**
- * The stored rule taken into a draft (another editor saved it, or a save of this one was given up): the stored type, value and
- * that type's cases, the other types' cases kept as they were typed (owner decision 3).
+ * The stored rule taken into a draft (another editor saved it, or a save of this one was given up): the stored type with its
+ * value and cases, the other types' values and cases kept as they were typed (owner decision 3).
  */
 export function foldRule(draft: RuleDraft, stored: RuleDraft): RuleDraft {
     return {
         type: stored.type,
-        source: stored.type === 'none' || stored.type === 'instruments' ? draft.source : stored.source,
+        sources: stored.type === 'none' || stored.type === 'instruments' ? draft.sources
+            : { ...draft.sources, [stored.type]: stored.sources[stored.type] },
         states: stored.type === 'states' ? stored.states : draft.states,
         bands: stored.type === 'bands' ? stored.bands : draft.bands,
         expression: stored.type === 'expression' ? stored.expression : draft.expression
@@ -1003,7 +1024,7 @@ export function checkRule(draft: RuleDraft, kind: Kind): RuleCheck {
             mark(i, noun + ' ' + (i + 1) + ': ' + name + ' is not a preset of this kind.');
         }
     };
-    const source = sourceOf(draft.source, missing, draft.type !== 'expression');
+    const source = sourceOf(draft.sources[draft.type], missing, draft.type !== 'expression');
     if (draft.type === 'expression') {
         const expression = draft.expression.trim();
         if (expression === '') {

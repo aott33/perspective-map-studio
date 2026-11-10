@@ -2,7 +2,7 @@
 
 A walk through what epic 4 has built so far, grouped by what you do, on the local development stack. Tick each box and note anything that looks or feels off in the Notes line under each section (a screenshot helps). Each note goes into `_bmad-output/initiative-flowmap/tickets/epic-editing/epic-editing.md` Notes or a new entry. The playbook grows as entries land; entry 18 (the 0.4.0 release) finishes it for the release test and the 30-minute test.
 
-Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems) and 11a (the edit record, Gateway only). Also built: 11b (Recent changes and History) and 12a (the Kinds surface and a kind's setup). Still to come: 12b (the style rule editor and area tints), 12c (per-item overrides), 13 (the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
+Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems) and 11a (the edit record, Gateway only). Also built: 11b (Recent changes and History), 12a (the Kinds surface and a kind's setup) and 12b1 (the style rule editor and area tints, section 8l). Still to come: 12b2 (the style rule's preview on the map), 12c (per-item overrides), 13 (the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
 
 ## Results so far
 
@@ -27,6 +27,7 @@ Built so far (2026-11-09): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item li
 | 8i. The edit record | | |
 | 8j. Recent changes | | |
 | 8k. Kinds and a kind's setup | | |
+| 8l. The style rule editor and area tints | | |
 | 9. View mode, unchanged | | |
 | 10. Phone (390 px) | | |
 | 11. Designer | | |
@@ -294,7 +295,7 @@ On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor
 - [ ] Move P14 (Select, drag it); in the second browser move P31 (its sheet's Edit, Move). Within seconds both the first and the third browser list "Moved P31 about ... north" by mapoperator (the avatar "M", "mapoperator - 10:42") above "Moved P14 ..." by mapeditor, with no reload. A change from an earlier day reads its date, "Nov 7, 10:42".
 - [ ] Tab to P31's row and press Enter: it expands to "Location" with the latitude and longitude before and after; Space closes it.
 - [ ] Press **Revert** on P31's row: P31 moves back in every browser, and a new row "Reverted "Moved P31 about ... north"" shows on top in the first and the third. The note box reads "Next undo is one step: Undo: revert "Moved P31 ..."", as the toolbar's Undo names it on hover; press the note box's **Undo**: P31 goes where the phone editor put it.
-- [ ] In the second browser move P31 again, then in the first press **Revert** on the phone editor's first move of P31: refused, the conflict card reads "Not saved - conflict with mapoperator's change", and nothing moves. Press **Use mapoperator's version**.
+- [ ] In the second browser move P31 again, then in the first press **Revert** on the phone editor's first move of P31: refused, the conflict card reads "Not saved - conflict with mapoperator's change" with one button, **Use mapoperator's version** (no "Apply mine on top"), and nothing moves. Reload the page: the card is back with the same one button. Press it.
 - [ ] Rename a pad, then delete a line with its instruments: the rows read "Renamed P12 to ..." and "Deleted ... and its 2 instruments in one change"; the delete's **Revert** brings the line and its instruments back in one change and one undo step.
 - [ ] Select twenty pads and set one field on all of them: one row "Changed 20 well pads in one change". A kind setup saved by **Seed the dev map** reads "Changed the well pad kind setup" with no Revert and "Kind setups change from the Kinds screen, so this change has no Revert." under it.
 - [ ] Scroll to the end of the rows: **Show older** adds the next 50 below; at the end of the record it goes.
@@ -305,12 +306,12 @@ Notes:
 
 ## 8k. Kinds and a kind's setup
 
-On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor, with a second browser (a private window) signed in as the second map editor `mapeditor2` on `/edit`, and a third in View mode on `/live`. Compare the surface with DESIGN.md's Kind setup and key screen 6 ([key-screen-6-kinds-style.png](../_bmad-output/initiative-flowmap/ux-map-studio/mockups/key-screen-6-kinds-style.png)): the list of kinds in the dock, the kind's setup beside it with its header, the Preview item and the numbered sections. The style rule editor, the tag button and the tag browser are later entries (12b, 13).
+On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor, with a second browser (a private window) signed in as the second map editor `mapeditor2` on `/edit`, and a third in View mode on `/live`. Compare the surface with DESIGN.md's Kind setup and key screen 6 ([key-screen-6-kinds-style.png](../_bmad-output/initiative-flowmap/ux-map-studio/mockups/key-screen-6-kinds-style.png)): the list of kinds in the dock, the kind's setup beside it with its header, the Preview item and the numbered sections. The style rule editor is section 8l; the tag button and the tag browser are a later entry (13).
 
 - [ ] Select a pad, then press **Kinds** on the rail: the dock lists the note "Setup applies to every item of a kind. Items can override." and six kinds (Well pad, Gathering line, Geofence, Tap, Line valve, Meter), each with its glyph, "Point", "Line" or "Area" and its item count. Well pad is chosen and its setup shows where the pad's Details was. Press **Items**: the pad's Details is back.
 - [ ] The setup's header reads "Well pad", "Point - applies to 37 items - 1 override (Point 2 style rule)" and **Preview item** "CTB1 - [default]Mesa/CTB1", the folder again in monospace under it. The sections read 1 ICON, 2 KEY VALUES, 3 COMMS, 4 ALARMS, 5 POPUP, 6 STYLE RULE ("Builds on key values"), in that order.
 - [ ] Under Pressure's path: "Resolves for 4 of 5 well pads" in the warning colour with its glyph (Pad 15 has no Pressure tag); under Flow's: "Resolves for 5 of 5 well pads" in grey. Choose Point 2 as the preview item: the notes are asked again. Reload the page and open Kinds: the preview item is still Point 2.
-- [ ] Change Pressure's path to `{asset.path}/Flow` and press Enter: the header says "Saving..." then "Saved", and within ten seconds every linked pad's icon value on the map (and in the third browser) is its flow, with no reload. 6 Style rule still reads "States on {asset.path}/Status: 4 states". Hover the toolbar's Undo: it names the same step as before. Open **History**: the top row reads "Changed the well pad kind setup" with no Revert. Put the path back.
+- [ ] Change Pressure's path to `{asset.path}/Flow` and press Enter: the header says "Saving..." then "Saved", and within ten seconds every linked pad's icon value on the map (and in the third browser) is its flow, with no reload. 6 Style rule still shows States on the tag path `{asset.path}/Status` with its four cases. Hover the toolbar's Undo: it names the same step as before. Open **History**: the top row reads "Changed the well pad kind setup" with no Revert. Put the path back.
 - [ ] **Add a key value**, type the label "Gas price" and press Enter: "Type a tag path. This row is not saved yet." and nothing is saved. Type `[default]Shared/GasPrice` and press Enter: saved, and under it "Same tag for every well pad" in the warning colour. Add a fourth row: **Add a key value** is gone. Press its **Icon value** star: Pressure's star goes. Switch Flow's **In popup** off: in the third browser a pad's popup no longer lists Flow.
 - [ ] In 5 Popup untick **Comms**: the Comms section's switch goes off too, and the third browser's popup has no Comms row. The line "Order is fixed: comms, values, alarms" stands under the three checkboxes.
 - [ ] Type the link `//x` and press Enter: under Link, on the warning tint with its glyph, "link is a Perspective page path starting with one / (/pad/{item.name}), not //x."; the field still reads `//x`, the header says "Not saved" and nothing says Saved. Press Esc in the field: the stored link is back and the words go.
@@ -319,6 +320,23 @@ On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor
 - [ ] Two editors: in the first browser click in Well pad's Link and type `/mine` without leaving the field. In the second browser open Kinds and change the heartbeat path. In the first, the heartbeat path changes at once and Link still reads `/mine`; press Enter: the conflict card reads "Not saved - conflict with mapeditor2's change" with one button, **Use mapeditor2's version**; the fields are paused with the same words. Press it: Link shows the stored link.
 - [ ] Tab through the whole panel: every field, switch, star, picker and Remove is reached and worked by the keyboard (Enter saves a field, Esc puts it back, Esc closes the picker).
 - [ ] On `/adapters` press **incomplete**, reload `/edit` and open Kinds: the kind list's message stands above the rows. Press **ok** again.
+- [ ] Press **Seed the dev map** to put the seed's kind setups back.
+
+Notes:
+
+## 8l. The style rule editor and area tints
+
+On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor, with a second browser in View mode on `/live`. Open **Kinds** and scroll a kind's setup to **6 STYLE RULE**. Compare it with DESIGN.md's Kind setup and key screen 6 ([key-screen-6-kinds-style.png](../_bmad-output/initiative-flowmap/ux-map-studio/mockups/key-screen-6-kinds-style.png)): the type, the value, then a row per case with its preset and a preview tile. The preview on the map, its "Preview" word and the note box are a later entry (12b2).
+
+- [ ] Well pad: the type row reads None, States, Bands, Expression, with **States** underlined; Value reads "A tag path" with `{asset.path}/Status` and its resolve note; four rows "When the value is" 1 to 4, each with its preset by name and a tile of the pad's icon in that preset with its word (Attention, Warning, Fault, Out of service). No colour is offered anywhere.
+- [ ] Press **Bands**: "Not saved yet. Add a band." and the header still says Saved. Choose the value **Pressure**, press **Add a band**, type from `900` and to `600`: "Not saved yet. Band 1: its from (900) is not below its to (600). Band 1 has no preset." Press **States**: the four cases are back; press **Bands**: the band is as you typed it. Nothing was saved (History has no new row).
+- [ ] Empty the from, type to `0` and pick **normal**: saved. **Add a band**, from `0`: "Not saved yet. Band 2 has no preset."; pick **fault**: saved, and within ten seconds every pad with a pressure draws the fault ring and the word "Fault", in the second browser too, with no reload. Pressure's row in 2 Key values reads "Used by style rule" and its Remove is off.
+- [ ] Press **Expression** and type `if({value} > 600, 'warning', 'normal')`, then click elsewhere: saved, with two tiles (warning, normal) under the hint. Change it to `if(` and click elsewhere: the Gateway's reason stands under the field on the warning tint ("the expression could not be read: ..."), the field still reads `if(`, the header says "Not saved". Put it right: saved, and the reason goes.
+- [ ] Press **States**, add a fifth case with the value `2` and a preset: "Not saved yet. Case 5 has the same value as case 2 (2): each value has one case." Change its value to `"2"` (with the quotes): saved, the text 2 being another case than the number 2. Remove it with its delete icon.
+- [ ] Choose **Gathering line**: the type row ends with **From its instruments**, and a preset select lists solid, dashed and dotted too. Press **From its instruments**: saved, one line "Each segment takes the worst of the instruments at its ends.", no value and no rows; Flow no longer reads "Used by style rule". Press **Bands**: the three bands are back and saved. Press **None**: "No style rule", saved, and Flow's Remove is on.
+- [ ] Choose **Well pad** and **Geofence**: neither offers From its instruments.
+- [ ] Geofence: under the rule, **Area tints by** reads Operator, with the rows North tint-1 and South tint-4, each with its swatch. Change South to tint-2: saved, and the South fence changes its tint on the map with no reload. Press **Add a category**, type `West` and press Enter: "Not saved yet. West has no tint."; pick a tint: saved. Choose **No tints**: saved, and both fences draw the neutral dashed outline; choose Operator again: the three rows are back and saved. Well pad and Gathering line show no tints.
+- [ ] Tab through section 6: every type, select, field, Add and delete icon is reached and worked by the keyboard (Enter finishes a typed field).
 - [ ] Press **Seed the dev map** to put the seed's kind setups back.
 
 Notes:

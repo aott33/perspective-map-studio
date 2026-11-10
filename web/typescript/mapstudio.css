@@ -2860,7 +2860,7 @@
     max-width: 100%;
     font-size: 10px;
     line-height: 1.2;
-    white-space: nowrap;
+    text-align: center;
     background: var(--mapstudio-surface);
     color: var(--label);
 }
