@@ -2,9 +2,9 @@ import * as React from 'react';
 import { Asset, Kind } from '../adapters';
 import { KindSetupRecord, MapItemRecord } from '../contract';
 import {
-    BandRow, Fields, KeyValue, KindRefusal, KindSaveState, MAX_KEY_VALUES, NewRowTexts, forgetSeen, Param, PreviewOption, RULE_TYPE_WORDS, ResolveState, RuleDraft,
+    BandRow, CaseType, Fields, KeyValue, KindRefusal, KindSaveState, MAX_KEY_VALUES, NewRowTexts, forgetSeen, Param, PreviewOption, RULE_TYPE_WORDS, ResolveState, RuleDraft,
     RuleSource, RuleType, SetupEdit, SetupView, StateRow, TINT_NAMES, TintRow, TintsDraft, checkRule, checkTints, draftSource, expressionPresets, fixedCategories, foldRule,
-    headerSubline, insertAt, keyFromLabel, noPreviewText, paramMissing, pathsToResolve, placeholderList, popupPathEdit, presetsFor, previewOf, previewOptions,
+    headerSubline, inStepVersion, insertAt, keyFromLabel, noPreviewText, paramMissing, pathsToResolve, placeholderList, popupPathEdit, presetsFor, previewOf, previewOptions,
     readSetup, removeBlocked, resolveKey, resolveNote, rowMissing, ruleDraft, ruleTypes, sameRule, sameTints, sourceName, tintRows, tintsDraft, unsavedText, withSource
 } from '../kindSetup';
 import { Preset, Tint } from '../live';
@@ -176,9 +176,18 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
     private asked = '';
     /** The fields drawn in this render: a refusal that names none of them stands at the panel's top. */
     private drawn = new Set<string>();
-    /** The setup version the rule draft (the tints draft) was first changed on since its last save, or null. */
-    private ruleSeen: number | null = null;
-    private tintsSeen: number | null = null;
+    /**
+     * The setup version the rule draft (the tints draft) is in step with the store at (kindSetup.ts `inStepVersion`): the version
+     * it was made from the stored part on, folded from the store on, or its own save settled on; null with no draft. Every send
+     * of the draft goes at it, so another editor's save since meets the conflict.
+     */
+    private ruleBase: number | null = null;
+    private tintsBase: number | null = null;
+    /** A save of the draft was not taken: the draft is kept as typed, not replaced by the stored part, until it is changed. */
+    private ruleKept = false;
+    private tintsKept = false;
+    /** The tag path typed for a type's value, kept while the value select is on something else, until the kind is left. */
+    private pathMemory: Partial<Record<CaseType, string>> = {};
     /** The rule (the tints) last sent, so one refused is not sent again unchanged. */
     private ruleSent = '';
     private tintsSent = '';
@@ -907,16 +916,30 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         const kind = this.props.kind;
         const view = this.view();
         const rule = this.state.rule;
-        if (rule !== null && !this.ruleCommitting && !this.focusIn(this.ruleBox) && !this.held(Fields.styleRule) && checkRule(rule, kind).rule !== undefined
-            && !sameRule(rule, view.styleRule, kind)) {
-            this.ruleSeen = null;
-            this.setState({ rule: foldRule(rule, ruleDraft(view.styleRule)) });
+        if (rule !== null && !this.ruleCommitting) {
+            const held = this.held(Fields.styleRule);
+            const whole = checkRule(rule, kind).rule;
+            const same = sameRule(rule, view.styleRule, kind);
+            const stored = checkRule(ruleDraft(view.styleRule), kind).rule;
+            const settled = this.ruleSent !== '' && stored !== undefined && JSON.stringify(stored) === this.ruleSent;
+            this.ruleBase = inStepVersion(this.ruleBase !== null ? this.ruleBase : this.version(), this.version(), { held, same, settled });
+            if (!held && !same && whole !== undefined && !this.ruleKept && !this.focusIn(this.ruleBox)) {
+                this.ruleBase = this.version();
+                this.setState({ rule: foldRule(rule, ruleDraft(view.styleRule)) });
+            }
         }
         const tints = this.state.tints;
-        if (tints !== null && !this.tintsCommitting && !this.focusIn(this.tintsBox) && !this.held(Fields.areaTints) && checkTints(tints, kind).tints !== undefined
-            && !sameTints(tints, view.areaTints, kind)) {
-            this.tintsSeen = null;
-            this.setState({ tints: null });
+        if (tints !== null && !this.tintsCommitting) {
+            const held = this.held(Fields.areaTints);
+            const whole = checkTints(tints, kind).tints;
+            const same = sameTints(tints, view.areaTints, kind);
+            const stored = checkTints(tintsDraft(view.areaTints, kind), kind).tints;
+            const settled = this.tintsSent !== '' && stored !== undefined && JSON.stringify(stored) === this.tintsSent;
+            this.tintsBase = inStepVersion(this.tintsBase !== null ? this.tintsBase : this.version(), this.version(), { held, same, settled });
+            if (!held && !same && whole !== undefined && !this.tintsKept && !this.focusIn(this.tintsBox)) {
+                this.tintsBase = null;
+                this.setState({ tints: null });
+            }
         }
     }
 
@@ -929,10 +952,11 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         if (this.off()) {
             return;
         }
-        if (this.ruleSeen === null) {
-            // The version the rule is built on: another editor's save after this meets the conflict when the rule is sent.
-            this.ruleSeen = this.version();
+        if (this.ruleBase === null) {
+            // The draft is made from the stored rule now: the version it is in step with the store at.
+            this.ruleBase = this.version();
         }
+        this.ruleKept = false;
         if (structure && this.hasRefusal(Fields.styleRule)) {
             // The rows moved: the words of the last refusal no longer stand beside the row they named.
             this.props.onClearRefusal(Fields.styleRule);
@@ -965,17 +989,19 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
             if (this.hasRefusal(field)) {
                 this.props.onClearRefusal(field);
             }
-            this.ruleSeen = null;
             return;
         }
         if (this.ruleSent === json && this.held(field)) {
             // On its way, or refused as it is: nothing new to send until it is changed.
             return;
         }
+        const before = this.ruleSent;
         this.ruleSent = json;
-        const seen = this.ruleSeen;
-        this.ruleSeen = null;
-        this.send(field, { part: 'styleRule', rule: check.rule }, seen);
+        if (!this.send(field, { part: 'styleRule', rule: check.rule }, this.ruleBase)) {
+            // Not taken (as 12a's fields): the marker is undone and the draft stays as typed.
+            this.ruleSent = before;
+            this.ruleKept = true;
+        }
     }
 
     private tintsNow(view: SetupView): TintsDraft {
@@ -986,9 +1012,10 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         if (this.off()) {
             return;
         }
-        if (this.tintsSeen === null) {
-            this.tintsSeen = this.version();
+        if (this.tintsBase === null) {
+            this.tintsBase = this.version();
         }
+        this.tintsKept = false;
         if (structure && this.hasRefusal(Fields.areaTints)) {
             this.props.onClearRefusal(Fields.areaTints);
         }
@@ -1015,16 +1042,17 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
             if (this.hasRefusal(field)) {
                 this.props.onClearRefusal(field);
             }
-            this.tintsSeen = null;
             return;
         }
         if (this.tintsSent === json && this.held(field)) {
             return;
         }
+        const before = this.tintsSent;
         this.tintsSent = json;
-        const seen = this.tintsSeen;
-        this.tintsSeen = null;
-        this.send(field, { part: 'areaTints', tints: check.tints }, seen);
+        if (!this.send(field, { part: 'areaTints', tints: check.tints }, this.tintsBase)) {
+            this.tintsSent = before;
+            this.tintsKept = true;
+        }
     }
 
     /** Enter finishes a typed field of the rule or the tints (its blur sends the part when it is whole). */
@@ -1080,7 +1108,8 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         const m = this.messages(Fields.ruleSource);
         const id = this.dom(Fields.ruleSource, 'select');
         const chosen = source.from === 'kpi' ? 'kpi:' + source.key : source.from;
-        const pick = (value: string): RuleSource => (value === 'path' ? { from: 'path', path: '' }
+        const type = draft.type as CaseType;
+        const pick = (value: string): RuleSource => (value === 'path' ? { from: 'path', path: this.pathMemory[type] || '' }
             : value.indexOf('kpi:') === 0 ? { from: 'kpi', key: value.slice(4) } : { from: '' });
         const stored = view.styleRule ? draftSource(ruleDraft(view.styleRule)) : null;
         return (
@@ -1089,6 +1118,10 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                 <select id={id} className="mapstudio-input mapstudio-rule-source-select" value={chosen} disabled={this.off()}
                         aria-invalid={m.invalid} aria-describedby={m.ids.length > 0 ? m.ids.join(' ') : undefined}
                         onChange={(ev) => {
+                            if (source.from === 'path') {
+                                // The typed path comes back when "A tag path" is chosen again, as a type's cases do.
+                                this.pathMemory[type] = source.path;
+                            }
                             const next = pick(ev.target.value);
                             this.editRule((d) => withSource(d, next), true);
                         }}>
@@ -1115,7 +1148,7 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         );
     }
 
-    private renderStates(draft: RuleDraft, view: SetupView, marked: number[]): React.ReactNode {
+    private renderStates(draft: RuleDraft, view: SetupView, marked: number[], noteId: string): React.ReactNode {
         const name = sourceName(draftSource(draft), view.kpis);
         const set = (i: number, patch: Partial<StateRow>, commit: boolean): void =>
             this.editRule((d) => ({ ...d, states: d.states.map((r, at) => (at === i ? { ...r, ...patch } : r)) }), commit);
@@ -1124,19 +1157,21 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                 {draft.states.map((row, i) => {
                     const m = this.messages(Fields.ruleCase(i));
                     const bad = m.invalid || marked.indexOf(i) >= 0;
+                    // A row the note names is tied to the note's words.
+                    const ids = marked.indexOf(i) >= 0 ? m.ids.concat([noteId]) : m.ids;
                     return (
                         <div key={i} className="mapstudio-rule-case" role="group" aria-label={'Case ' + (i + 1)} data-index={i} data-rule="states"
                              data-field={Fields.ruleCase(i)}>
                             <label className="mapstudio-rule-when">
                                 <span className="mapstudio-field-label">When {name} is</span>
                                 <input type="text" className="mapstudio-input mapstudio-kindsetup-input mapstudio-rule-value" value={row.value}
-                                       aria-invalid={bad} aria-describedby={m.ids.length > 0 ? m.ids.join(' ') : undefined} disabled={this.off()}
+                                       aria-invalid={bad} aria-describedby={ids.length > 0 ? ids.join(' ') : undefined} disabled={this.off()}
                                        autoComplete="off" spellCheck={false}
                                        onChange={(ev) => set(i, { value: ev.target.value }, false)}
                                        onBlur={() => this.commitRule()} onKeyDown={this.onDraftKey} />
                             </label>
                             <div className="mapstudio-rule-look">
-                                {this.presetSelect(row.preset, 'Preset of case ' + (i + 1), m.ids, bad, (preset) => set(i, { preset }, true))}
+                                {this.presetSelect(row.preset, 'Preset of case ' + (i + 1), ids, bad, (preset) => set(i, { preset }, true))}
                                 {this.tile(row.preset)}
                                 {this.removeButton('Remove case ' + (i + 1),
                                     () => this.editRule((d) => ({ ...d, states: d.states.filter((_, at) => at !== i) }), true, true))}
@@ -1147,12 +1182,12 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                 })}
                 <span className="mapstudio-field-hint">A number, true or false is read as typed; text in double quotes stays text ("1").</span>
                 <button type="button" className="mapstudio-button mapstudio-rule-add" disabled={this.off()}
-                        onClick={() => this.editRule((d) => ({ ...d, states: d.states.concat([{ value: '', preset: '' }]) }), false, true)}>Add a case</button>
+                        onClick={() => this.editRule((d) => ({ ...d, states: d.states.concat([{ value: '', preset: '' }]) }), false)}>Add a case</button>
             </React.Fragment>
         );
     }
 
-    private renderBands(draft: RuleDraft, marked: number[]): React.ReactNode {
+    private renderBands(draft: RuleDraft, marked: number[], noteId: string): React.ReactNode {
         const set = (i: number, patch: Partial<BandRow>, commit: boolean): void =>
             this.editRule((d) => ({ ...d, bands: d.bands.map((r, at) => (at === i ? { ...r, ...patch } : r)) }), commit);
         const last = draft.bands.length - 1;
@@ -1176,15 +1211,16 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                 {draft.bands.map((row, i) => {
                     const m = this.messages(Fields.ruleCase(i));
                     const bad = m.invalid || marked.indexOf(i) >= 0;
+                    const ids = marked.indexOf(i) >= 0 ? m.ids.concat([noteId]) : m.ids;
                     return (
                         <div key={i} className="mapstudio-rule-case" role="group" aria-label={'Band ' + (i + 1)} data-index={i} data-rule="bands"
                              data-field={Fields.ruleCase(i)}>
                             <div className="mapstudio-rule-ends">
-                                {end(i, 'from', row, bad, m.ids)}
-                                {end(i, 'to', row, bad, m.ids)}
+                                {end(i, 'from', row, bad, ids)}
+                                {end(i, 'to', row, bad, ids)}
                             </div>
                             <div className="mapstudio-rule-look">
-                                {this.presetSelect(row.preset, 'Preset of band ' + (i + 1), m.ids, bad, (preset) => set(i, { preset }, true))}
+                                {this.presetSelect(row.preset, 'Preset of band ' + (i + 1), ids, bad, (preset) => set(i, { preset }, true))}
                                 {this.tile(row.preset)}
                                 {this.removeButton('Remove band ' + (i + 1),
                                     () => this.editRule((d) => ({ ...d, bands: d.bands.filter((_, at) => at !== i) }), true, true))}
@@ -1197,7 +1233,7 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                     A band holds a value from its from up to, not including, its to. Leave the first from or the last to empty for an open end.
                 </span>
                 <button type="button" className="mapstudio-button mapstudio-rule-add" disabled={this.off()}
-                        onClick={() => this.editRule((d) => ({ ...d, bands: d.bands.concat([{ from: '', to: '', preset: '' }]) }), false, true)}>Add a band</button>
+                        onClick={() => this.editRule((d) => ({ ...d, bands: d.bands.concat([{ from: '', to: '', preset: '' }]) }), false)}>Add a band</button>
             </React.Fragment>
         );
     }
@@ -1282,22 +1318,25 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                     </span>
                 </div>
                 {draft.rows.map((row, i) => {
-                    const m = this.messages(Fields.tint(row.category.trim()));
-                    const bad = m.invalid || (this.state.tints !== null && check.rows.indexOf(i) >= 0);
+                    const m = this.messages(Fields.tint(fixed ? row.category : row.category.trim()));
+                    const named = this.state.tints !== null && check.rows.indexOf(i) >= 0;
+                    const bad = m.invalid || named;
+                    const ids = named ? m.ids.concat([unsavedId]) : m.ids;
                     const name = row.category.trim() !== '' ? row.category.trim() : 'category ' + (i + 1);
                     return (
                         <div key={fixed ? 'c:' + row.category : i} className="mapstudio-tint-row" role="group" aria-label={'Tint of ' + name}
-                             data-category={row.category.trim()} data-tint={row.tint}>
+                             data-category={fixed ? row.category : row.category.trim()} data-tint={row.tint}>
                             <div className="mapstudio-tint-line">
                                 {fixed ? <span className="mapstudio-tint-category">{row.category}</span> : (
                                     <input type="text" className="mapstudio-input mapstudio-kindsetup-input mapstudio-tint-category" value={row.category}
-                                           placeholder="Category" aria-label={'Category ' + (i + 1)} aria-invalid={bad} disabled={this.off()}
+                                           placeholder="Category" aria-label={'Category ' + (i + 1)} aria-invalid={bad}
+                                           aria-describedby={ids.length > 0 ? ids.join(' ') : undefined} disabled={this.off()}
                                            autoComplete="off" spellCheck={false}
                                            onChange={(ev) => set(i, { category: ev.target.value }, false)}
                                            onBlur={() => this.commitTints()} onKeyDown={this.onDraftKey} />
                                 )}
                                 <select className="mapstudio-input mapstudio-tint-select" value={row.tint} aria-label={'Tint of ' + name} aria-invalid={bad}
-                                        aria-describedby={m.ids.length > 0 ? m.ids.join(' ') : undefined} disabled={this.off()}
+                                        aria-describedby={ids.length > 0 ? ids.join(' ') : undefined} disabled={this.off()}
                                         onChange={(ev) => set(i, { tint: ev.target.value }, true)}>
                                     <option value="">No tint</option>
                                     {row.tint !== '' && TINT_NAMES.indexOf(row.tint) < 0 ? <option value={row.tint}>{row.tint}</option> : null}
@@ -1320,7 +1359,7 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                     <button type="button" className="mapstudio-button mapstudio-rule-add mapstudio-tint-add" disabled={this.off()}
                             onClick={() => this.editTints((d) => ({ ...d, rows: d.rows.concat([{ category: '', tint: '' }]) }), false, true)}>Add a category</button>
                 ) : null}
-                {missing !== '' ? <span id={unsavedId} className="mapstudio-rule-unsaved mapstudio-tints-unsaved" role="status">{missing}</span> : null}
+                {missing !== '' ? <span id={unsavedId} className="mapstudio-tints-unsaved" role="status">{missing}</span> : null}
                 {part.nodes}
             </div>
         );
@@ -1339,6 +1378,7 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         const missing = touched ? unsavedText(check.missing) : '';
         const marked = touched ? check.rows : [];
         const section = this.messages(Fields.styleRule);
+        const noteId = this.dom(Fields.styleRule, 'unsaved');
         return (
             <section className="mapstudio-kindsetup-section" data-section="styleRule" data-rule={draft.type} data-unsaved={missing !== '' ? 'true' : 'false'}
                      aria-labelledby={headingId}>
@@ -1348,7 +1388,12 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                         {ruleTypes(kind).map((type: RuleType) => (
                             <button key={type} type="button" data-type={type} aria-pressed={draft.type === type} disabled={this.off()}
                                     className={'mapstudio-panel-tab mapstudio-rule-type' + (draft.type === type ? ' mapstudio-panel-tab--active' : '')}
-                                    onClick={() => this.editRule((d) => ({ ...d, type }), true, true)}>{RULE_TYPE_WORDS[type]}</button>
+                                    onClick={() => {
+                                        // The type already chosen changes nothing.
+                                        if (type !== draft.type) {
+                                            this.editRule((d) => ({ ...d, type }), true, true);
+                                        }
+                                    }}>{RULE_TYPE_WORDS[type]}</button>
                         ))}
                     </div>
                     {draft.type === 'none' ? <span className="mapstudio-field-text mapstudio-kindsetup-none mapstudio-rule-none">No style rule</span> : null}
@@ -1357,10 +1402,10 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                     ) : null}
                     {draft.type === 'states' || draft.type === 'bands' || draft.type === 'expression'
                         ? this.renderSource(draft, view, draft.type === 'expression') : null}
-                    {draft.type === 'states' ? this.renderStates(draft, view, marked) : null}
-                    {draft.type === 'bands' ? this.renderBands(draft, marked) : null}
+                    {draft.type === 'states' ? this.renderStates(draft, view, marked, noteId) : null}
+                    {draft.type === 'bands' ? this.renderBands(draft, marked, noteId) : null}
                     {draft.type === 'expression' ? this.renderExpression(draft) : null}
-                    {missing !== '' ? <span className="mapstudio-rule-unsaved" role="status">{missing}</span> : null}
+                    {missing !== '' ? <span id={noteId} className="mapstudio-rule-unsaved" role="status">{missing}</span> : null}
                     {section.nodes}
                 </div>
                 {this.renderTints(view)}

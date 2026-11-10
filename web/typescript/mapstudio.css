@@ -2734,10 +2734,6 @@
     font-style: italic;
 }
 
-.mapstudio-kindsetup-rule {
-    overflow-wrap: anywhere;
-}
-
 /* Section 6, the Style rule editor (entry 12b1; DESIGN.md Kind setup, key screen 6 kinds-style): the type as a segmented choice in
    the panel tabs' look, the value, then one bordered row per case with its preset select and a 64 px preview tile
    (kind-setup-row.preview-tile-width) on the blank map's surface; what is missing in the note box's look. Tokens only: a tile's
@@ -2905,7 +2901,8 @@ textarea.mapstudio-input.mapstudio-rule-expression {
     gap: 2px;
 }
 
-.mapstudio-rule-unsaved {
+.mapstudio-rule-unsaved,
+.mapstudio-tints-unsaved {
     padding: 6px 8px;
     border-radius: 6px;
     background: var(--mapstudio-hover);

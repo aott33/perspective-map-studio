@@ -7,10 +7,10 @@ import { Asset, Kind } from '../adapters';
 import { Conflict, EditBatch, KindSetupRecord, MapItemRecord } from '../contract';
 import {
     Fields, MAX_KEY, NO_RULE, POPUP_VIEW_HAS_PARAMS, RuleDraft, RuleSource, SetupEdit, applyEdit, checkRule, checkTints, draftSource, expressionPresets, fixedCategories, foldRule,
-    forgetSeen, popupPathEdit, batchSetup, compareNames, geometryWord, headerSubline, insertAt, isFullPath, itemsOfKind, keyFromLabel,
+    forgetSeen, inStepVersion, popupPathEdit, batchSetup, compareNames, geometryWord, headerSubline, insertAt, isFullPath, itemsOfKind, keyFromLabel,
     noPreviewText, overridesText, paramMissing, pathsToResolve, pausedText, placeholderList, presetsFor, previewKey, previewOf, previewOptions, readPreview,
     readSetup, refusalPlace, removeBlocked, resolveKey, resolveNote, rowMissing, ruleDraft, ruleKpi, ruleTypes, sameRule, sameSetup, sameTints, setupBatch,
-    shownKind, sourceName, styleRuleLine, tintRows, tintsDraft, typedNumber, typedValue, unsavedText, valueText, waitingSave, withSource, writePreview
+    shownKind, sourceName, tintRows, tintsDraft, typedNumber, typedValue, unsavedText, valueText, waitingSave, withSource, writePreview
 } from '../kindSetup';
 import { KeyValueStore, UnsavedEntry, UnsavedQueue, isSetupSave, onTopBatch, readEntries, saveCardFor, storageKey } from '../unsaved';
 import { headerSaveWords } from '../problems';
@@ -425,15 +425,7 @@ describe('the resolve notes (K8)', () => {
     });
 });
 
-describe('the stored style rule in words', () => {
-    test('one line of what is stored', () => {
-        expect(styleRuleLine(readSetup(PAD_SETUP))).toBe('States on {asset.path}/Status: 4 states');
-        expect(styleRuleLine(readSetup(LINE_SETUP))).toBe('Bands on Flow: 3 bands');
-        expect(styleRuleLine(readSetup(GEOFENCE_SETUP))).toBe('No style rule');
-        expect(styleRuleLine(readSetup({ styleRule: { source: { instruments: 'worst' } } }))).toBe('From the instruments on the line: the worst of them');
-        expect(styleRuleLine(readSetup({ styleRule: { type: 'expression', expression: 'x', source: { kpi: 'flow' } } }))).toBe('Expression on flow');
-    });
-
+describe('the key value a style rule is built on', () => {
     test('Remove is off for the key value the rule is built on (owner decision 2)', () => {
         expect(removeBlocked(readSetup(LINE_SETUP), 'flow')).toBe('Used by the style rule');
         expect(removeBlocked(readSetup(PAD_SETUP), 'pressure')).toBe('');
@@ -604,6 +596,18 @@ describe('the Style rule editor (12b1)', () => {
             .toEqual({ at: 'styleRule', words: 'styleRule.type must be states, bands, expression.' });
     });
 
+    test('the version a draft is in step with the store at: every send goes at it, so another editor\'s save since is a conflict', () => {
+        const free = { held: false, same: false, settled: false };
+        // Made from the stored rule at 5 and changed: another editor's save (6) does not move it while the draft differs.
+        expect(inStepVersion(5, 6, free)).toBe(5);
+        // The store holds what the draft says (its fold, or nothing changed): in step at the stored version.
+        expect(inStepVersion(5, 6, { ...free, same: true })).toBe(6);
+        // Its own save settled, the draft typed on since: in step at the version that save gave.
+        expect(inStepVersion(5, 6, { ...free, settled: true })).toBe(6);
+        // A save of it on its way or refused: nothing moves until it settles.
+        expect(inStepVersion(5, 6, { held: true, same: true, settled: true })).toBe(5);
+    });
+
     test('the value named in a States row', () => {
         const kpis = readSetup(PAD_SETUP).kpis;
         expect(sourceName({ from: 'kpi', key: 'pressure' }, kpis)).toBe('Pressure');
@@ -638,6 +642,10 @@ describe('an area kind\'s tints (12b1, S9)', () => {
         const west = { ...draft, rows: draft.rows.map((r) => (r.category === 'West' ? { ...r, tint: 'tint-6' } : r)) };
         expect(sameTints(west, stored, CHOICE)).toBe(false);
         expect((checkTints(west, CHOICE).tints as { tints: unknown[] }).tints).toHaveLength(3);
+        // A choice field's rows are sent exactly as the field has them, never trimmed.
+        const spaced: Kind = { ...FENCE, fields: [{ key: 'operator', label: 'Operator', type: 'choice', required: false, choices: [' North ', 'North'] }] };
+        expect(checkTints({ property: 'operator', rows: [{ category: ' North ', tint: 'tint-1' }, { category: 'North', tint: 'tint-2' }] }, spaced).tints)
+            .toEqual({ property: 'operator', tints: [{ category: ' North ', tint: 'tint-1' }, { category: 'North', tint: 'tint-2' }] });
         const none = { property: 'operator', rows: tintRows(CHOICE, 'operator', []) };
         expect(checkTints(none, CHOICE)).toEqual({ missing: ['Pick a tint for a category.'], rows: [] });
     });
@@ -646,7 +654,12 @@ describe('an area kind\'s tints (12b1, S9)', () => {
         const typed = { property: 'note', rows: [{ category: ' East ', tint: 'tint-2' }, { category: 'East', tint: 'tint-3' }, { category: '', tint: '' },
             { category: 'Far', tint: '' }] };
         expect(checkTints(typed, CHOICE)).toEqual({ rows: [1, 2, 3], missing: ['Category 2 repeats East: each category has one tint.',
-            'Category 3 has no name.', 'Category 3 has no tint.', 'Far has no tint.'] });
+            'Category 3 has no tint.', 'Far has no tint.'] });
+        // The empty category is one category, as the Gateway takes it (KindSetup.java reads it with text(..., false)); still one per category.
+        expect(checkTints({ property: 'note', rows: [{ category: '', tint: 'tint-5' }, { category: 'East', tint: 'tint-2' }] }, CHOICE).tints)
+            .toEqual({ property: 'note', tints: [{ category: '', tint: 'tint-5' }, { category: 'East', tint: 'tint-2' }] });
+        expect(checkTints({ property: 'note', rows: [{ category: '', tint: 'tint-5' }, { category: '  ', tint: 'tint-2' }] }, CHOICE))
+            .toEqual({ rows: [1], missing: ['Category 2 repeats the empty category: each category has one tint.'] });
         expect(checkTints({ property: 'note', rows: [{ category: ' East ', tint: 'tint-2' }] }, CHOICE).tints)
             .toEqual({ property: 'note', tints: [{ category: 'East', tint: 'tint-2' }] });
         expect(checkTints({ property: 'note', rows: [] }, CHOICE).missing).toEqual(['Add a category.']);

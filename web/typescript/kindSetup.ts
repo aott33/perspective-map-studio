@@ -11,7 +11,7 @@
  * Also here: the setup read with its defaults (`readSetup`: `on`, `count` and `summary` true, `icon` false), a key value's `key`
  * made from its label when the row is first saved (`keyFromLabel`), a refusal's Gateway words placed beside the field they name
  * (`refusalPlace`, by the order the rows were sent in), the header's override count and words, the resolve note's words, the
- * stored style rule in one line, and the preview item (the kind's first linked item by name, remembered per kind for
+ * key value a style rule is built on, and the preview item (the kind's first linked item by name, remembered per kind for
  * the browser session, never stored).
  *
  * From entry 12b1, section 6's editor: the style rule and an area kind's tints as they are typed (`RuleDraft`, `TintsDraft`),
@@ -691,39 +691,6 @@ export function removeBlocked(setup: SetupView, key: string): string {
     return ruleKpi(setup) === key ? 'Used by the style rule' : '';
 }
 
-/**
- * The stored style rule in one line: "No style rule", "States on Status: 4 states", "Bands on Flow: 3 bands",
- * "Expression on Pressure", "From the instruments on the line: the worst of them".
- */
-export function styleRuleLine(setup: SetupView): string {
-    const rule = setup.styleRule;
-    if (!rule) {
-        return 'No style rule';
-    }
-    const source = isRecord(rule.source) ? rule.source : {};
-    if ('instruments' in source) {
-        return 'From the instruments on the line: the worst of them';
-    }
-    let on = '';
-    if (typeof source.kpi === 'string') {
-        const kpi = setup.kpis.find((k) => k.key === source.kpi);
-        on = ' on ' + (kpi && kpi.label !== '' ? kpi.label : source.kpi);
-    } else if (typeof source.path === 'string') {
-        on = ' on ' + source.path;
-    }
-    const cases = Array.isArray(rule.cases) ? rule.cases.length : 0;
-    if (rule.type === 'states') {
-        return 'States' + on + ': ' + cases + (cases === 1 ? ' state' : ' states');
-    }
-    if (rule.type === 'bands') {
-        return 'Bands' + on + ': ' + cases + (cases === 1 ? ' band' : ' bands');
-    }
-    if (rule.type === 'expression') {
-        return 'Expression' + on;
-    }
-    return 'A style rule is stored';
-}
-
 // ---- The placeholder picker ----
 
 /** The closed placeholder list with the kind's field keys (docs/kind-setup.md, Placeholders), as the picker lists it. */
@@ -1091,6 +1058,16 @@ export function checkRule(draft: RuleDraft, kind: Kind): RuleCheck {
     return missing.length > 0 ? { missing, rows } : { rule: { source, type: draft.type, cases }, missing, rows };
 }
 
+/**
+ * The setup version a draft of the rule (or the tints) is in step with the store at: the stored version once nothing holds the
+ * draft (no save of it on its way or refused) and the store holds what the draft says (`same`) or what it last sent (`settled`,
+ * its own save saved); else the version it was in step at before. Every send of the draft goes at this version, so another
+ * editor's save since then meets the Gateway's conflict instead of being overwritten.
+ */
+export function inStepVersion(base: number, version: number, o: { held: boolean; same: boolean; settled: boolean }): number {
+    return !o.held && (o.same || o.settled) ? version : base;
+}
+
 /** "Not saved yet. Band 2 has no preset." under the rows, or '' when nothing is missing (owner decision 2). */
 export function unsavedText(missing: readonly string[]): string {
     return missing.length === 0 ? '' : 'Not saved yet. ' + missing.join(' ');
@@ -1173,7 +1150,8 @@ export interface TintsCheck {
 
 /**
  * The tints checked as the Gateway will (`KindSetup.java` `areaTints`): no property removes the part; a choice field's rows
- * without a tint are left out and one at least has a tint; a typed row has a category of its own and a tint.
+ * without a tint are left out, one at least has a tint, and each is sent exactly as the field has it; a typed row has a
+ * category of its own (trimmed; the empty category is one category, as the Gateway takes it) and a tint.
  */
 export function checkTints(draft: TintsDraft, kind: Kind): TintsCheck {
     const missing: string[] = [];
@@ -1184,13 +1162,10 @@ export function checkTints(draft: TintsDraft, kind: Kind): TintsCheck {
     const fixed = fixedCategories(kind, draft.property);
     const tints: TintRow[] = [];
     draft.rows.forEach((row, i) => {
-        const category = row.category.trim();
+        const category = fixed ? row.category : row.category.trim();
         let ok = true;
-        if (!fixed && category === '') {
-            missing.push('Category ' + (i + 1) + ' has no name.');
-            ok = false;
-        } else if (tints.some((t) => t.category === category)) {
-            missing.push('Category ' + (i + 1) + ' repeats ' + category + ': each category has one tint.');
+        if (tints.some((t) => t.category === category)) {
+            missing.push('Category ' + (i + 1) + ' repeats ' + (category === '' ? 'the empty category' : category) + ': each category has one tint.');
             ok = false;
         }
         if (row.tint === '') {

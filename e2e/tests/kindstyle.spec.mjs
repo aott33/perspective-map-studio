@@ -13,7 +13,7 @@
 
 import { randomUUID } from 'node:crypto';
 import {
-    EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot, signedInContext, test
+    EDITOR2_USER, EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot, signedInContext, test
 } from './fixtures.mjs';
 
 /** The Gateway's answer to a save. */
@@ -92,7 +92,7 @@ const typeButton = (page, type) => rule(page).locator('.mapstudio-rule-type[data
 const source = (page) => rule(page).locator('[data-field="styleRule.source"]');
 const cases = (page) => rule(page).locator('.mapstudio-rule-case');
 const caseRow = (page, index) => rule(page).locator('.mapstudio-rule-case[data-index="' + index + '"]');
-const unsaved = (page) => rule(page).locator('.mapstudio-rule > .mapstudio-rule-unsaved');
+const unsaved = (page) => rule(page).locator('.mapstudio-rule-unsaved');
 const tints = (page) => rule(page).locator('[data-field="areaTints"]');
 const tintRow = (page, category) => tints(page).locator('.mapstudio-tint-row[data-category="' + category + '"]');
 const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
@@ -161,6 +161,8 @@ editorTest.describe('the Style rule editor at 1366 px', () => {
             await type(caseRow(page, 0).locator('.mapstudio-rule-from'), '900');
             await type(caseRow(page, 0).locator('.mapstudio-rule-to'), '600');
             await expect(unsaved(page)).toHaveText('Not saved yet. Band 1: its from (900) is not below its to (600). Band 1 has no preset.');
+            await expect(caseRow(page, 0).locator('.mapstudio-rule-from')).toHaveAttribute('aria-invalid', 'true');
+            await expect(caseRow(page, 0).locator('.mapstudio-rule-from')).toHaveAttribute('aria-describedby', await unsaved(page).getAttribute('id'));
             await expect(rule(page)).toHaveAttribute('data-unsaved', 'true');
             await expect(caseRow(page, 0).locator('.mapstudio-rule-tile')).toHaveAttribute('data-preset', '');
             await nothingSent(page, map, seq, 'pad', before.version);
@@ -331,13 +333,27 @@ editorTest.describe('the Style rule editor at 1366 px', () => {
 
             // S8: a tag path the Gateway refuses: its words beside the value, the stored rule as it was.
             const stored = await setupOf(page, 'pad');
+            // The typed path comes back when the value leaves "A tag path" and returns; nothing is saved by the round trip's end.
+            await source(page).locator('select').selectOption('kpi:pressure');
+            await settled(page);
+            await source(page).locator('select').selectOption('path');
+            await expect(source(page).locator('.mapstudio-rule-path')).toHaveValue('{asset.path}/Status');
+            await settled(page);
+            expect((await setupOf(page, 'pad')).setup).toEqual(stored.setup);
+            // The type already chosen, pressed again, changes nothing.
+            const version = (await setupOf(page, 'pad')).version;
+            await typeButton(page, 'expression').click();
             await type(source(page).locator('.mapstudio-rule-path'), 'nope');
             const words = source(page).locator('.mapstudio-field-refusal-text');
             await expect(words).toContainText('nope is not a tag path', { timeout: REPLY_MS });
             await expect(words).not.toContainText('Op 0');
             await expect(rule(page).locator('.mapstudio-field-refusal')).toHaveCount(1);
             await expect(page.locator('.mapstudio-kindsetup-top-refusal')).toHaveCount(0);
-            expect(await setupOf(page, 'pad')).toEqual(stored);
+            expect((await setupOf(page, 'pad')).setup).toEqual(stored.setup);
+            expect((await setupOf(page, 'pad')).version).toBe(version);
+            // The refusal stands when the chosen type is pressed again.
+            await typeButton(page, 'expression').click();
+            await expect(words).toContainText('nope is not a tag path');
         });
 
     editorTest('S5, S6: From its instruments on a line kind only; None removes the rule and "Used by style rule"', async ({ page, browser }) => {
@@ -438,6 +454,10 @@ editorTest.describe('the Style rule editor at 1366 px', () => {
             const fresh = tints(page).locator('.mapstudio-tint-row').nth(2);
             await type(fresh.locator('input.mapstudio-tint-category'), 'West');
             await expect(tints(page).locator('.mapstudio-tints-unsaved')).toHaveText('Not saved yet. West has no tint.');
+            // One hook each: the tints' note is not the rule's, and the row it names is tied to its words.
+            await expect(unsaved(page)).toHaveCount(0);
+            await expect(fresh.locator('.mapstudio-tint-select')).toHaveAttribute('aria-describedby',
+                await tints(page).locator('.mapstudio-tints-unsaved').getAttribute('id'));
             await page.waitForTimeout(NOTHING_MS);
             await expect(map).toHaveAttribute('data-store-seq', seq);
             await tintRow(page, 'West').locator('.mapstudio-tint-select').selectOption('tint-6');
@@ -462,6 +482,52 @@ editorTest.describe('the Style rule editor at 1366 px', () => {
                 await expect(page.locator('.mapstudio-kindsetup')).toHaveAttribute('data-kind', kindId);
                 await expect(rule(page)).toBeVisible();
                 await expect(tints(page)).toHaveCount(0);
+            }
+        });
+
+    editorTest('two editors: another editor\'s rule saved while the cursor rests in section 6 is not overwritten; the next change is a conflict',
+        async ({ page, browser }) => {
+            editorTest.setTimeout(300_000);
+            await restore(browser);
+            const map = await openEditor(page);
+            const other = await signedInContext(browser, EDITOR2_USER, { viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1 });
+            try {
+                const theirs = await other.newPage();
+                await mapLoaded(await openMap(theirs, '/edit'));
+                const panel = await openKind(page, map, 'pad');
+                // A changes a case's preset: saved. The cursor stays in the section.
+                await caseRow(page, 0).locator('.mapstudio-rule-preset').selectOption('normal');
+                await settled(page);
+                const mine = await setupOf(page, 'pad');
+                await caseRow(page, 1).locator('.mapstudio-rule-preset').focus();
+                // B saves another rule for the kind.
+                const rule9 = { source: { path: '{asset.path}/Status' }, type: 'states', cases: [{ value: 9, preset: 'fault' }] };
+                const reply = await send(theirs, 'edits.apply', { batchId: randomUUID(), ops: [{ op: 'update', entity: 'kindSetup', id: 'pad',
+                    baseVersion: mine.version, data: { setup: { ...mine.setup, styleRule: rule9 } } }] });
+                expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
+                await expect(panel).toHaveAttribute('data-version', String(mine.version + 1), { timeout: REPLY_MS });
+                // A's rows stay as typed while the cursor rests there.
+                await expect(caseRow(page, 1).locator('.mapstudio-rule-preset')).toBeFocused();
+                await expect(cases(page)).toHaveCount(4);
+                // A's next change goes at the version its draft was in step with: a conflict, B's rule still stored.
+                await caseRow(page, 1).locator('.mapstudio-rule-preset').selectOption('fault');
+                const card = page.locator('.mapstudio-save-card[data-card="conflict"]');
+                await expect(card).toBeVisible({ timeout: REPLY_MS });
+                await expect(card.locator('.mapstudio-save-card-title')).toHaveText('Not saved - conflict with ' + EDITOR2_USER + "'s change");
+                await expect(card).toHaveAttribute('data-on-top', 'false');
+                expect((await setupOf(page, 'pad')).setup.styleRule).toEqual(rule9);
+                await card.locator('.mapstudio-save-card-theirs').click();
+                await expect(card).toHaveCount(0);
+                // B's rule shows, and a change typed on it saves.
+                await expect(cases(page)).toHaveCount(1);
+                await expect(caseRow(page, 0).locator('.mapstudio-rule-value')).toHaveValue('9');
+                await caseRow(page, 0).locator('.mapstudio-rule-preset').selectOption('warning');
+                await settled(page);
+                const after = await setupOf(page, 'pad');
+                expect(after.setup.styleRule).toEqual({ ...rule9, cases: [{ value: 9, preset: 'warning' }] });
+                expect(after.version).toBe(mine.version + 2);
+            } finally {
+                await other.close();
             }
         });
 
