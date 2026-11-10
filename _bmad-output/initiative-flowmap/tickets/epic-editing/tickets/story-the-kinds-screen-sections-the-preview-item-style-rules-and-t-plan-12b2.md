@@ -4,8 +4,8 @@ type: 'feature'
 ticket: ''
 part_of: '12'
 created: '2026-11-10'
-status: 'draft'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: '7e6c70e9640fa401881fdd338cde529902607820'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
@@ -24,7 +24,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 **Approach:** While a kind's setup is open, its preview item carries a "Preview" word on the map, a "Show on map" button beside the Preview item select goes to it, and a note box at the foot of section 6 says what it shows now, from what the Gateway already sends.
 
-Decisions (owner, 2026-11-10, "go with recommended"): option A, slim: no TypeScript port of the rule and no drawing from an unsaved draft. Since 12b1 a rule saves as soon as it is whole and the Gateway draws it at the next live update, so the port would cover only that gap; this replaces the 2026-11-09 decision that States and Bands preview through a port. (1) The chip reads "Preview"; an item that is Stale or Comms lost keeps that word. (2) The map never moves on its own; "Show on map" does it. (3) A preview item with its own style rule gets a note saying the kind's rule does not draw on it and to choose another. (4) An area kind has no map preview; the note says an area draws its tint, not a preset.
+Decisions (owner, 2026-11-10, "go with recommended", then "approve and continue" on the plan): option A, slim: no TypeScript port of the rule and no drawing from an unsaved draft. Since 12b1 a rule saves as soon as it is whole and the Gateway draws it at the next live update, so the port would cover only that gap; this replaces the 2026-11-09 decision that States and Bands preview through a port. (1) The chip reads "Preview"; an item that is Stale or Comms lost keeps that word. (2) The map never moves on its own; "Show on map" does it. (3) A preview item with its own style rule gets a note saying the kind's rule does not draw on it and to choose another. (4) An area kind has no map preview; the note says an area draws its tint, not a preset.
 
 ## Boundaries & Constraints
 
