@@ -4,7 +4,7 @@ type: 'feature'
 ticket: ''
 part_of: '12'
 created: '2026-11-10'
-status: 'draft'
+status: 'ready-for-dev'
 baseline_revision: ''
 route: 'full'
 route_source: 'auto'
@@ -24,7 +24,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 **Approach:** Make section 6 the Style rule editor of DESIGN.md's Kind setup and key screen 6 (kinds-style): the type (None, States, Bands, Expression and, for a line kind that is not an area, From its instruments), the value it reads (a key value or a typed tag path), and one row per case with its preset select and a 64 px preview tile; under it, for an area kind, the category tints. It saves through 12a's save path as the `styleRule` and `areaTints` parts.
 
-Decisions (owner, 2026-11-10, "go with recommended"): 12b is split: this plan is the editor, 12b2 is the preview on the map (the TypeScript port of the rule, the Preview word, the note box). (2) A rule is saved as soon as the whole rule is valid in shape; until then the section says "Not saved yet" and what is missing, and nothing is sent. (3) The panel remembers each type's cases until the kind is left, so switching the type back restores them. (4) An area kind's tint rows are the choices of a choice field; for a text field the categories are typed. (5) "Apply mine on top" stays hidden for a kind setup's conflict. Rider (owner, 2026-11-10): a refused Revert's conflict card also offers only "Use <name>'s version".
+Decisions (owner, 2026-11-10, "go with recommended", then "approve and continue" on the plan and its smaller picks): 12b is split: this plan is the editor, 12b2 is the preview on the map (the TypeScript port of the rule, the Preview word, the note box). (2) A rule is saved as soon as the whole rule is valid in shape; until then the section says "Not saved yet" and what is missing, and nothing is sent. (3) The panel remembers each type's cases until the kind is left, so switching the type back restores them. (4) An area kind's tint rows are the choices of a choice field; for a text field the categories are typed. (5) "Apply mine on top" stays hidden for a kind setup's conflict. Rider (owner, 2026-11-10): a refused Revert's conflict card also offers only "Use <name>'s version".
 
 ## Boundaries & Constraints
 
