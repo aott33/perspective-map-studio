@@ -4,8 +4,8 @@ type: 'feature'
 ticket: ''
 part_of: '12'
 created: '2026-11-10'
-status: 'draft'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: 'a6401674f7b9c253423cd522c79449997d7f58f9'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
@@ -24,7 +24,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 **Approach:** Add DESIGN.md's Live now block at the foot of the Details tab: Comms, the key values (the icon value starred) and Alarms, each with its live value and its tag path, under a "From kind" tag. Each path can be overridden for this one item as a full path, marked Override with Reset. An override is part of the item, so it saves as an ordinary item edit: an Undo step, listed in Recent changes with Revert.
 
-Decisions (owner, 2026-11-10, "go with recommended"): 12c is split: this plan, then 12c2 (the Style tab and the whole-rule override). (1) A key value's override changes its path only. (2) Changing an item's kind drops its overrides in the same save; Undo brings both back. (3) Undo and Recent changes name an override by its part ("Changed Point 2's Pressure path", "Reset Point 2's comms path"), no longer "style" for all. (4) "From kind" shows the path filled in for this item, which is also the starting text of an override. (5) Overrides the Gateway stores but does not apply (a link, popup view or tints override, a key the kind no longer has) stay stored and untouched, and are neither counted in the kind's header nor marked Override.
+Decisions (owner, 2026-11-10, "go with recommended", then "approve and continue" on the plan and its smaller picks): 12c is split: this plan, then 12c2 (the Style tab and the whole-rule override). (1) A key value's override changes its path only. (2) Changing an item's kind drops its overrides in the same save; Undo brings both back. (3) Undo and Recent changes name an override by its part ("Changed Point 2's Pressure path", "Reset Point 2's comms path"), no longer "style" for all. (4) "From kind" shows the path filled in for this item, which is also the starting text of an override. (5) Overrides the Gateway stores but does not apply (a link, popup view or tints override, a key the kind no longer has) stay stored and untouched, and are neither counted in the kind's header nor marked Override.
 
 ## Boundaries & Constraints
 
