@@ -210,9 +210,11 @@ test.describe('1366 px', () => {
 
             // The table and the map answered each other (the map's event selected the row, the row wrote the same id): it settles
             // with one onItemSelected and the camera where the one move left it.
+            // The move's end reaches the page through the Gateway after the popup shows: wait for it, never read it at once.
+            await expect.poll(async () => (await counted(page, LABELS.viewport)).count, { timeout: REPLY_MS, message: 'the camera moved to P14' })
+                .toBeGreaterThan(before.viewport);
             const center = await map.getAttribute('data-center');
             const moved = (await counted(page, LABELS.viewport)).count;
-            expect(moved, 'the camera moved to P14').toBeGreaterThan(before.viewport);
             await page.waitForTimeout(SETTLE_MS);
             expect((await counted(page, LABELS.item)).count, 'one onItemSelected').toBe(1);
             expect((await counted(page, LABELS.viewport)).count, 'no second camera move').toBe(moved);

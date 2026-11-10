@@ -4,14 +4,14 @@ type: 'feature'
 ticket: ''
 part_of: '12'
 created: '2026-11-10'
-status: 'in-progress'
+status: 'built'
 baseline_revision: 'd4623b5c79c314b63ac8a2cc3241de911f63a1ef'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md', '{project-root}/docs/kind-setup.md', '{project-root}/docs/styles.md']
 ---
@@ -81,6 +81,22 @@ Decisions (owner, 2026-11-10, "go with recommended", then "approve and continue"
 ## Plan Change Log
 
 ## Review Triage Log
+
+### Pass 1 (quick lens, 2026-11-10): 9 findings - 1 high, 8 low; 7 patches, 1 rejected, 1 deferred
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---|---|---|---|
+| 1 | A rule (or tints) draft that outlives the version it was built on overwrites another editor's rule with no conflict: after a send `ruleSeen` is null, `foldStored` is held off while the cursor rests in the section, and the next change or blur sends at the newest version | high | patch | Confirmed in `KindSetupPanel.tsx` `foldStored`, `editRule`, `commitRule` (and the tints' twins): `ruleSeen` is taken from `version()` at the next edit, after their save. Fix: the draft carries the setup version it was last in step with the store (made, folded, or its own save settled), and every send goes at that. |
+| 2 | `commitRule` and `commitTints` ignore `send`'s answer: a save not taken leaves `ruleSent` set, and the draft is then replaced by the stored rule with no word | low | patch | Confirmed; `off()` stops most cases, a kind that left the list is the rest. Fix: as 12a's `commit`, the sent marker undone when the save is not taken. |
+| 3 | Pressing the type already chosen, Add a case and Add a band clear a standing refusal though no row moved | low | patch | Confirmed: `structure = true` on all three. Fix: the same type is no change; adding a row does not clear. |
+| 4 | `checkTints` refuses an empty category the Gateway accepts, and trims a choice field's fixed categories | low | patch | Confirmed against `KindSetup.java` (`text(..., false)`). Fix: an empty category is one category; a choice's rows are sent as the field has them. |
+| 5 | An area kind's tile is a line sample | low | rejected | `presetSampleSvg` draws a line sample for every line geometry, as the styles preview has since epic 3: a preset changes an area's outline, which is a line. A new area sample is more than a correction; told to the owner as a departure. |
+| 6 | S8's refused case row and S9's rows from a choice field are Jest only, not e2e | low | deferred | Real: the browser's check stops a bad case before the Gateway can refuse it, and the dev geofence's `operator` is a text field. Both rows have passing Jest tests; an e2e of the choice rows needs a choice field on a dev area kind (deferred-work). |
+| 7 | The tints' note carries `.mapstudio-rule-unsaved` too, so the hook matches two elements; the marked inputs are not tied to the words by `aria-describedby` | low | patch | Confirmed in `renderTints`. Fix: one class each, and the inputs described by their note. |
+| 8 | A typed tag path is lost when the value select leaves "A tag path" and comes back | low | patch | Confirmed: `pick('path')` gives an empty path. Fix: the typed path remembered per type until the kind is left (owner decision 3). |
+| 9 | `styleRuleLine` and `.mapstudio-kindsetup-rule` have no user left | low | patch | Confirmed: only a test calls it. Fix: both removed with the test. |
+
+Outcome (2026-11-10): seven patches applied (findings 1 to 4, 7 to 9), finding 5 rejected, finding 6 deferred (deferred-work). A flaky `events.spec.mjs` test fixed at its cause (it read the camera move's count at once; it now waits for it). The orchestrator's Verification on the final code: tsc clean, Jest 898 passed, Gradle clean build offline passed, contract check OK, `ops/up.sh --fresh` and the whole e2e suite 307 passed, 0 failed, 8 skipped (the env-gated scenarios). No Gateway, `common/` or Ignition file changed. Status built; 12b2 (the preview on the map) is next.
 
 ## Design Notes
 

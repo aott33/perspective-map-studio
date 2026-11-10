@@ -203,3 +203,7 @@
 - source_plan: none
   summary: Entry 12c, per-item overrides: the Style tab (icon, size and label read-only, the style rule override with "Edit the kind's rule"), Details' Live now block with full-path overrides, Override with Reset and From kind, the kind header's override count, after 12a.
   evidence: Entry 12 split by the owner on 2026-11-09 ("go with recommended").
+
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-editing/tickets/story-the-kinds-screen-sections-the-preview-item-style-rules-and-t-plan-12b1.md`
+  summary: An e2e check that an area kind's tint rows are a choice field's choices, which needs a choice field on a dev area kind.
+  evidence: Entry 12b1's review, finding 6: the dev geofence's `operator` is a text field, so the choice rows (fixed rows, "No tint" rows left out, a refusal placed by category) are covered by Jest only and never run against the Gateway.
