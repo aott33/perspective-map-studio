@@ -3,8 +3,8 @@ title: "13a: one tag path rule on the Gateway, the items a path fails for, and t
 type: 'feature'
 ticket: '13'
 created: '2026-11-11'
-status: 'ready-for-dev'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: 'af44153d455cd87145b54c5602e032114a0e7ea6'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
@@ -78,6 +78,7 @@ Decisions (owner, 2026-11-11, "go with recommended", then "approve and continue"
 ## Implementation Notes
 
 - Planner, 2026-11-11: the environment and identity rules are entry 8's plan's (Docker by hand after a restart, JDK 17, `ops/up.sh --fresh` before a whole-suite run and after any `ops/config` change, no em dashes, never a bare `git stash`, never a push). Leave the work uncommitted: the orchestrator commits after the whole suite. Two findings of the survey to settle while building: a stopped provider probably answers `invalid` today (`provider()` null, :99); and the dev pads are five, so the ticket's "2 of 3" reads "4 of 5".
+- Planner, 2026-11-11, before the build: the browser files moved under entries 12c1 to 12c3 after this Code Map was written, so its line numbers in `kindSetup.ts`, `itemOverrides.ts`, `messages.ts` and `MapStudioStoreDelegate.ts` are a guide only; find the symbols by name.
 
 ## Plan Change Log
 
