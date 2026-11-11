@@ -1,0 +1,9 @@
+[
+  {
+    "name": "WindSpeed",
+    "tagType": "AtomicTag",
+    "valueSource": "memory",
+    "dataType": "Float8",
+    "value": 6.5
+  }
+]

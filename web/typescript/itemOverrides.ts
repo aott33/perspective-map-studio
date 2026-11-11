@@ -72,38 +72,93 @@ export function isApplied(path: unknown): path is string {
     return typeof path === 'string' && path.charAt(0) === '[' && path.indexOf(']') > 1 && path.indexOf('{') < 0;
 }
 
-/** `{asset.path}/` then a non-empty suffix with no braces (`Placeholders.isAssetSuffix`). */
-function isAssetSuffix(path: string): boolean {
-    const prefix = '{asset.path}/';
-    if (path.indexOf(prefix) !== 0 || path.length === prefix.length) {
-        return false;
+/** The longest tag path the Gateway takes (`TagPaths.MAX_LENGTH`). */
+export const MAX_TAG_PATH = 1024;
+
+/** What is wrong with a tag path's form (`TagPaths.Fault`, entry 13a): the one rule every stored tag path is checked by. */
+export type TagPathFault = 'empty' | 'too-long' | 'no-provider' | 'relative-provider' | 'no-path' | 'other-placeholder' | 'no-suffix'
+    | 'bracket' | 'brace' | 'empty-part';
+
+/** The path after the provider or after `{asset.path}/`, a trailing `/` not counted: plain parts only (`TagPaths.partsFault`). */
+function partsFault(path: string): TagPathFault | null {
+    if (path.indexOf('[') >= 0 || path.indexOf(']') >= 0) {
+        return 'bracket';
     }
-    const suffix = path.slice(prefix.length);
-    return suffix.indexOf('{') < 0 && suffix.indexOf('}') < 0 && suffix.trim() !== '';
+    if (path.indexOf('{') >= 0 || path.indexOf('}') >= 0) {
+        return 'brace';
+    }
+    return path.split('/').some((part) => part.trim() === '') ? 'empty-part' : null;
 }
 
-/** `[provider]path`: a non-empty provider, then a non-empty path, no braces and no second `[` (`Placeholders.isFullPath`). */
-export function isFullTagPath(path: string): boolean {
+/**
+ * The Gateway's tag path rule (`TagPaths.fault`), case for case: null for a full path `[provider]a/b`, `{asset.path}` or
+ * `{asset.path}/<suffix>`, else what is wrong with it. No empty part (`a//b`), no bracket after the provider, no brace in a suffix.
+ */
+export function tagPathFault(path: string): TagPathFault | null {
+    if (path === '') {
+        return 'empty';
+    }
+    if (path.length > MAX_TAG_PATH) {
+        return 'too-long';
+    }
+    if (path.charAt(0) === '{') {
+        if (path === '{asset.path}') {
+            return null;
+        }
+        const prefix = '{asset.path}/';
+        if (path.indexOf(prefix) !== 0) {
+            return 'other-placeholder';
+        }
+        const suffix = path.slice(prefix.length).replace(/\/+$/, '');
+        return suffix === '' ? 'no-suffix' : partsFault(suffix);
+    }
     const close = path.indexOf(']');
-    return path.charAt(0) === '[' && close > 1 && close < path.length - 1 && path.indexOf('{') < 0 && path.indexOf('}') < 0
-        && path.indexOf('[', 1) < 0;
+    if (path.charAt(0) !== '[' || close < 2) {
+        return 'no-provider';
+    }
+    const provider = path.slice(1, close);
+    if (provider === '~' || provider === '.' || provider.indexOf('[') >= 0 || provider.trim() === '') {
+        return 'relative-provider';
+    }
+    const rest = path.slice(close + 1).replace(/\/+$/, '');
+    return rest === '' ? 'no-path' : partsFault(rest);
+}
+
+/** `[provider]path` by the Gateway's rule: its provider named, then plain parts (`TagPaths.parseFull`). */
+export function isFullTagPath(path: string): boolean {
+    return path.charAt(0) === '[' && tagPathFault(path) === null;
 }
 
 /**
  * Why a typed path is not taken as an override, in the Gateway's words, or '' for a full path: the same rule and the same
- * sentence per case as `Placeholders.checkTagPath` for an override, so nothing the Gateway would refuse for its form is sent.
+ * sentence per case as `Placeholders.checkTagPath` for an override (`faultWords`), so nothing the Gateway would refuse for its
+ * form is sent.
  */
 export function pathProblem(path: string): string {
     if (path.trim() === '') {
         return 'a tag path is needed.';
     }
-    if (path === '{asset.path}' || isAssetSuffix(path)) {
+    const fault = tagPathFault(path);
+    // The full-path rule first (`Placeholders.checkTagPath`): a path below the asset is told that once, whatever else is wrong with it.
+    if (path === '{asset.path}' || (path.indexOf('{asset.path}/') === 0 && fault !== 'no-suffix' && fault !== 'too-long')) {
         return "an override's tag path is a full path such as [default]Mesa/P12/Pressure, not " + echo(path) + '.';
     }
-    if (isFullTagPath(path)) {
-        return '';
+    switch (fault) {
+        case null:
+            return '';
+        case 'too-long':
+            return 'the tag path is longer than ' + MAX_TAG_PATH + ' characters.';
+        case 'empty-part':
+            return echo(path) + ' has an empty part between two /; a tag path has a name between every two /.';
+        case 'bracket':
+            return echo(path) + ' has a [ or ] after its start; a tag path names its provider once, at its start.';
+        case 'brace':
+            return echo(path) + ' has a { or } inside it; braces only mark {asset.path} at the start of a tag path.';
+        case 'relative-provider':
+            return echo(path) + ' does not name its provider; use a full path such as [default]Shared/GasPrice, not a relative one.';
+        default:
+            return echo(path) + ' is not a tag path; use a full path such as [default]Shared/GasPrice.';
     }
-    return echo(path) + ' is not a tag path; use a full path such as [default]Shared/GasPrice.';
 }
 
 /** "Op 0 (id): " (or "Op 0: "), then "overrides: ", then the part's name and a colon. */

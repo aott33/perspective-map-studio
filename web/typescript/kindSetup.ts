@@ -792,7 +792,8 @@ export function lowerKind(kind: Kind): string {
 /** What `tags.resolve` said of one path for the preview item's asset, or that it is still being asked. */
 export type ResolveState =
     | { state: 'asking' }
-    | { state: 'resolved'; n: number; m: number }
+    /** `failing`: the names of the items it does not resolve for (at most 20, by name); `failingMore`: how many more (entry 13a). */
+    | { state: 'resolved'; n: number; m: number; failing?: readonly string[]; failingMore?: number }
     /** The reply had no count (the Gateway read the path as a full path). */
     | { state: 'shared' }
     | { state: 'failed'; message: string };
@@ -816,8 +817,8 @@ export function resolveKey(kindId: string, assetId: string, path: string): strin
 
 /**
  * The note under a tag path (EXPERIENCE.md Voice and Tone): a full path "Same tag for every well pad", in the warning token;
- * else what `tags.resolve` said for the preview item's asset, "Resolves for 3 of 5 well pads" (the warning token when fewer than
- * all), "Checking..." while it is asked, a failed check in words. Null for no path, or a path not asked yet.
+ * else what `tags.resolve` said for the preview item's asset, "Resolves for 5 of 5 well pads", or with fewer than all, in the
+ * warning token, "Resolves for 4 of 5 well pads. Not for P15." (up to three names, then "and N more"; entry 13a), "Checking..." while it is asked, a failed check in words. Null for no path, or a path not asked yet.
  */
 export function resolveNote(path: string, kind: Kind, state: ResolveState | undefined): ResolveNote | null {
     if (path === '') {
@@ -835,7 +836,22 @@ export function resolveNote(path: string, kind: Kind, state: ResolveState | unde
     if (state.state === 'failed') {
         return { text: 'Could not check this path: ' + state.message, warning: true, state: 'failed' };
     }
-    return { text: 'Resolves for ' + state.n + ' of ' + state.m + ' ' + plural(lowerKind(kind)), warning: state.n < state.m, state: 'resolved' };
+    const count = 'Resolves for ' + state.n + ' of ' + state.m + ' ' + plural(lowerKind(kind));
+    const failing = state.n < state.m ? notFor(state.failing || [], state.failingMore || 0) : '';
+    return { text: failing === '' ? count : count + '. ' + failing, warning: state.n < state.m, state: 'resolved' };
+}
+
+/** The most items a resolve note names; the rest are counted. */
+export const MAX_NOTE_NAMES = 3;
+
+/** "Not for P15." or "Not for A, B, C and 4 more.": the items a path does not resolve for (entry 13a); '' when none is named. */
+function notFor(names: readonly string[], more: number): string {
+    if (names.length === 0) {
+        return '';
+    }
+    const shown = names.slice(0, MAX_NOTE_NAMES).map((n) => (n.trim() === '' ? 'an item with no name' : n));
+    const rest = names.length - shown.length + more;
+    return 'Not for ' + shown.join(', ') + (rest > 0 ? ' and ' + rest + ' more' : '') + '.';
 }
 
 /**

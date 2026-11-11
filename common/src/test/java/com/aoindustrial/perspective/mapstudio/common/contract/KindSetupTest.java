@@ -121,6 +121,50 @@ class KindSetupTest {
             .getMessage().startsWith("icon is not a part of overrides"));
     }
 
+    @Test
+    void everyStoredTagPathIsCheckedByTheOneRule() {
+        // Entry 13a, G1 and G2: comms, a KPI, alarms, a rule's path and a popup param's suffix.
+        String words = " has an empty part between two /; a tag path has a name between every two /.";
+        assertEquals("comms.path: {asset.path}/a//b" + words, refused("{\"comms\":{\"path\":\"{asset.path}/a//b\"}}", PAD));
+        assertEquals("kpis[0].path: [default]a//b" + words,
+            refused("{\"kpis\":[{\"key\":\"a\",\"path\":\"[default]a//b\"}]}", PAD));
+        assertEquals("alarms.path: {asset.path}/a[0] has a [ or ] after its start; a tag path names its provider once, at"
+            + " its start.", refused("{\"alarms\":{\"path\":\"{asset.path}/a[0]\"}}", PAD));
+        assertEquals("styleRule.source.path: {asset.path}/a//b" + words, refused("{\"styleRule\":{\"source\":{\"path\":"
+            + "\"{asset.path}/a//b\"},\"type\":\"states\",\"cases\":[{\"value\":1,\"preset\":\"fault\"}]}}", PAD));
+        assertEquals("popupView.params.pressure: {asset.path}/a//b" + words,
+            refused("{\"popupView\":{\"path\":\"Popups/P\",\"params\":{\"pressure\":\"{asset.path}/a//b\"}}}", PAD));
+        InvalidValue override = assertThrows(InvalidValue.class, () -> KindSetup.parse(json("{\"comms\":{\"path\":"
+            + "\"[default]a//b\"}}"), PAD, true));
+        assertEquals("comms.path: [default]a//b" + words, override.getMessage());
+    }
+
+    @Test
+    void theStoredPathsTheRuleRefusesAreListedWithoutThrowing() {
+        // G5: the report reads a stored row; it never refuses or changes it.
+        JsonObject bad = json("{\"comms\":{\"path\":\"{asset.path}/a//b\"},\"alarms\":{\"path\":\"{asset.path}\"},"
+            + "\"kpis\":[{\"key\":\"a\",\"path\":\"{asset.path}/A\"},{\"key\":\"b\",\"path\":\"[default]x[1]\"}],"
+            + "\"styleRule\":{\"source\":{\"path\":\"[default]s//t\"},\"type\":\"states\",\"cases\":[]},"
+            + "\"popupView\":{\"path\":\"Popups/P\",\"params\":{\"p\":\"{asset.path}/a//b\",\"lit\":\"a//b\",\"n\":\"{item.name}\"}}}");
+        JsonObject before = bad.deepCopy();
+        java.util.List<KindSetup.PathFault> faults = KindSetup.pathFaults(bad, false);
+        assertEquals(java.util.List.of("comms.path", "kpis[1].path", "styleRule.source.path", "popupView.params.p"),
+            faults.stream().map(KindSetup.PathFault::where).toList());
+        assertEquals("{asset.path}/a//b", faults.get(0).path());
+        assertEquals("comms.path: {asset.path}/a//b has an empty part between two /; a tag path has a name between every"
+            + " two /.", faults.get(0).refusal());
+        assertEquals(before, bad);
+        assertEquals(java.util.List.of(), KindSetup.pathFaults(json(PAD_SETUP), false));
+        // An override: full paths only, by the same rule.
+        assertEquals(java.util.List.of("comms.path", "kpis[0].path"), KindSetup.pathFaults(json("{\"comms\":{\"path\":"
+            + "\"[default]a//b\"},\"kpis\":[{\"key\":\"p\",\"path\":\"{asset.path}/X\"}],\"alarms\":{\"path\":"
+            + "\"[default]Mesa/P12\"}}"), true).stream().map(KindSetup.PathFault::where).toList());
+        // Another shape is passed over.
+        assertEquals(java.util.List.of(), KindSetup.pathFaults(json("{\"comms\":3,\"kpis\":{},\"styleRule\":[],"
+            + "\"popupView\":{\"params\":[]}}"), false));
+        assertEquals(java.util.List.of(), KindSetup.pathFaults(null, false));
+    }
+
     private static String rule(String type, String cases) {
         return "{\"styleRule\":{\"source\":{\"path\":\"{asset.path}/State\"},\"type\":\"" + type + "\",\"cases\":"
             + cases + "}}";

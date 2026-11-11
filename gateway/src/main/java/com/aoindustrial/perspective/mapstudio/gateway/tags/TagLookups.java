@@ -35,8 +35,8 @@ import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
 /**
  * The tag browser's two lookups (entry 15, docs/contract.md): {@code tags.browse} lists the
  * tag providers and one folder's children, {@code tags.resolve} turns a picked path into the
- * asset-relative {@code {asset.path}/...} form and counts the kind's linked map items it resolves
- * for. Checks, in order: the project's setup ({@code store-unreachable}), the session's level
+ * asset-relative {@code {asset.path}/...} form, counts the kind's linked map items it resolves
+ * for and, when it is fewer than all, names those it does not ({@code failing}, entry 13a). Checks, in order: the project's setup ({@code store-unreachable}), the session's level
  * (anything but {@code full} is {@code role}, before the body is read), the body and the names
  * ({@code invalid}), the map store for {@code tags.resolve} ({@code store-unreachable}), then the
  * tag calls ({@code tags-unavailable}). For {@code tags.resolve} the level is decided again on the
@@ -49,6 +49,9 @@ public final class TagLookups {
 
     /** The most children one {@code tags.browse} returns. */
     public static final int MAX_CHILDREN = 1000;
+
+    /** The most items {@code tags.resolve.reply} names in {@code failing}; {@code failingMore} counts the rest. */
+    public static final int MAX_FAILING = 20;
 
     static final String ROLE_MESSAGE = "Browsing tags needs a full editing role. Ask for a Map Studio editing role.";
 
@@ -83,6 +86,11 @@ public final class TagLookups {
         } else {
             provider = named(providers, askedProvider);
             if (provider == null) {
+                // The Gateway has it, stopped: unavailable, naming it; a name it does not have at all is invalid (entry 13a).
+                String stopped = named(source.stopped(), askedProvider);
+                if (stopped != null) {
+                    throw new MapStudioException(Messages.CODE_TAGS_UNAVAILABLE, TagSource.notAnsweringWords(stopped));
+                }
                 throw new MapStudioException(Messages.CODE_INVALID,
                     "There is no tag provider named " + Rows.echo(askedProvider) + " on this Gateway.");
             }
@@ -157,30 +165,50 @@ public final class TagLookups {
             return reply;
         }
         // An item whose asset's basePath is not a usable full path counts in m but never in n.
-        int m = 0;
-        List<String> candidates = new ArrayList<>();
+        List<MapItemRecord> linked = new ArrayList<>();
+        Map<String, String> candidateOf = new LinkedHashMap<>();
         for (MapItemRecord item : liveItems(project, readable.setup())) {
             if (kindId.equals(item.kind()) && item.assetId() != null && assets.containsKey(item.assetId())) {
-                m++;
+                linked.add(item);
                 String base = assets.get(item.assetId()).basePath();
                 if (usable(base)) {
-                    candidates.add(TagPaths.under(base, resolved.suffix()));
+                    candidateOf.put(item.id(), TagPaths.under(base, resolved.suffix()));
                 }
             }
         }
-        Set<String> existing = candidates.isEmpty()
+        Set<String> existing = candidateOf.isEmpty()
             ? Set.of()
-            : source.existing(new LinkedHashSet<>(candidates), roles);
-        int n = 0;
-        for (String candidate : candidates) {
-            if (existing.contains(candidate)) {
-                n++;
+            : source.existing(new LinkedHashSet<>(candidateOf.values()), roles);
+        List<MapItemRecord> failing = new ArrayList<>();
+        for (MapItemRecord item : linked) {
+            String candidate = candidateOf.get(item.id());
+            if (candidate == null || !existing.contains(candidate)) {
+                failing.add(item);
             }
         }
-        reply.addProperty("n", n);
-        reply.addProperty("m", m);
+        reply.addProperty("n", linked.size() - failing.size());
+        reply.addProperty("m", linked.size());
+        if (!failing.isEmpty()) {
+            // The items the path does not resolve for (entry 13a, backlog 39), by name; the count of the rest.
+            failing.sort(BY_NAME);
+            JsonArray list = new JsonArray();
+            for (MapItemRecord item : failing.subList(0, Math.min(MAX_FAILING, failing.size()))) {
+                JsonObject f = new JsonObject();
+                f.addProperty("id", item.id());
+                f.addProperty("name", item.name() == null ? "" : item.name());
+                list.add(f);
+            }
+            reply.add("failing", list);
+            reply.addProperty("failingMore", Math.max(0, failing.size() - MAX_FAILING));
+        }
         return reply;
     }
+
+    /** By name, ignoring letter case first, then by id, so the list is the same every time. */
+    private static final Comparator<MapItemRecord> BY_NAME = Comparator
+        .comparing((MapItemRecord i) -> (i.name() == null ? "" : i.name()).toLowerCase(Locale.ROOT))
+        .thenComparing(i -> i.name() == null ? "" : i.name())
+        .thenComparing(MapItemRecord::id);
 
     /**
      * The provider marked {@code isDefault} (owner decision, 2026-10-27): the project's default tag

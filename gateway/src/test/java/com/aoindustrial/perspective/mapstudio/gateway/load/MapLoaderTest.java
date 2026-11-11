@@ -70,6 +70,95 @@ class MapLoaderTest {
     }
 
     @Test
+    void aStoredRowTheTagPathRuleRefusesIsReportedOnceAndLoadsAsItIs() {
+        // Entry 13a, G5: rows put into the store directly, as an older module could have saved them.
+        java.util.List<StoredPathReport> reports = new java.util.ArrayList<>();
+        loader = new MapLoader(new StoreGate(setups, c -> state), store, project -> LISTS, reports::add);
+        JsonObject badSetup = JsonParser.parseString("{\"kpis\":[{\"key\":\"p\",\"path\":\"{asset.path}/a//b\"}],"
+            + "\"comms\":{\"path\":\"{asset.path}/Comms\"}}").getAsJsonObject();
+        JsonObject badOverrides = JsonParser.parseString("{\"comms\":{\"path\":\"[default]a//b\"}}").getAsJsonObject();
+        String good = UUID.randomUUID().toString();
+        String bad = "c0ffee00-0000-4000-8000-00000000000a";
+        JsonObject point = JsonParser.parseString("{\"type\":\"Point\",\"coordinates\":[1,2]}").getAsJsonObject();
+        store.committed.kindSetups.computeIfAbsent("mapstudio-dev", p -> new java.util.TreeMap<>()).put("pad",
+            new com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord("pad", badSetup, 1, false));
+        java.util.TreeMap<String, com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord> items =
+            store.committed.items.computeIfAbsent("mapstudio-dev", p -> new java.util.TreeMap<>());
+        items.put(good, new com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord(good, "pad", "P12", point,
+            new JsonObject(), "P12", new JsonObject(), null, null, 1, false));
+        items.put(bad, new com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord(bad, "pad", "P14", point,
+            new JsonObject(), "P12", badOverrides, null, null, 1, false));
+
+        JsonObject body = loader.mapLoadReply("mapstudio-dev", Messages.LEVEL_FULL);
+        // The rows load as they are stored: nothing is rewritten or left out.
+        assertEquals(2, body.getAsJsonArray("items").size());
+        assertEquals(badSetup, body.getAsJsonArray("kindSetups").get(0).getAsJsonObject().get("setup"));
+        assertEquals(badSetup, store.committed.kindSetups.get("mapstudio-dev").get("pad").setup());
+        assertEquals(badOverrides, store.committed.items.get("mapstudio-dev").get(bad).overrides());
+        assertEquals(1, store.committed.kindSetups.get("mapstudio-dev").get("pad").version());
+
+        assertEquals(1, reports.size());
+        assertEquals(List.of(
+            "Project mapstudio-dev: the kind setup of pad holds a tag path a save refuses: kpis[0].path: {asset.path}/a//b"
+                + " has an empty part between two /; a tag path has a name between every two /. It loads and draws as before"
+                + " and is refused when it is next saved: mend the path on the Kinds screen or with"
+                + " system.mapstudio.applyEdits.",
+            "Project mapstudio-dev: the overrides of map item P14 (" + bad + ", kind pad) hold a tag path a save refuses:"
+                + " overrides: comms.path: [default]a//b has an empty part between two /; a tag path has a name between"
+                + " every two /. It loads and draws as before and is refused when it is next saved: mend the path in the"
+                + " item's Details or with system.mapstudio.applyEdits."), reports.get(0).warnings());
+        assertEquals("Project mapstudio-dev: 3 stored rows (1 kind setup, 2 map items) checked against the tag path rule:"
+            + " 2 would be refused at their next save; nothing was changed.", reports.get(0).info());
+
+        // Once per project since the start: a second read, the live cache's or getMap's, says nothing more.
+        loader.mapLoadReply("mapstudio-dev", Messages.LEVEL_NONE);
+        loader.snapshot("mapstudio-dev");
+        assertEquals(1, reports.size());
+
+        // The row's next save is refused in the same words; a mended one is saved.
+        MapStudioException refused = assertThrows(MapStudioException.class, () -> writes.apply("mapstudio-dev",
+            JsonParser.parseString("{\"batchId\":\"" + UUID.randomUUID() + "\",\"ops\":[{\"op\":\"update\",\"entity\":"
+                + "\"kindSetup\",\"id\":\"pad\",\"baseVersion\":1,\"data\":{\"setup\":" + badSetup + "}}]}"),
+            Actor.script("t"), Messages.LEVEL_FULL));
+        assertEquals(Messages.CODE_INVALID, refused.code());
+        assertTrue(refused.getMessage().contains("kpis[0].path: {asset.path}/a//b has an empty part between two /"),
+            refused.getMessage());
+        MapStudioException item = assertThrows(MapStudioException.class, () -> writes.apply("mapstudio-dev",
+            JsonParser.parseString("{\"batchId\":\"" + UUID.randomUUID() + "\",\"ops\":[{\"op\":\"update\",\"entity\":"
+                + "\"item\",\"id\":\"" + bad + "\",\"baseVersion\":1,\"data\":{\"name\":\"P14 renamed\"}}]}"),
+            Actor.script("t"), Messages.LEVEL_FULL));
+        assertTrue(item.getMessage().contains("overrides: comms.path: [default]a//b has an empty part"), item.getMessage());
+        writes.apply("mapstudio-dev", JsonParser.parseString("{\"batchId\":\"" + UUID.randomUUID() + "\",\"ops\":[{"
+            + "\"op\":\"update\",\"entity\":\"kindSetup\",\"id\":\"pad\",\"baseVersion\":1,\"data\":{\"setup\":{\"kpis\":"
+            + "[{\"key\":\"p\",\"path\":\"{asset.path}/a/b\"}]}}}]}"), Actor.script("t"), Messages.LEVEL_FULL);
+    }
+
+    @Test
+    void anItemsPopupParamIsMendedByScriptOnly() {
+        JsonObject point = JsonParser.parseString("{\"type\":\"Point\",\"coordinates\":[1,2]}").getAsJsonObject();
+        JsonObject overrides = JsonParser.parseString("{\"popupView\":{\"path\":\"Popups/P\",\"params\":{\"p\":"
+            + "\"{asset.path}/a//b\"}}}").getAsJsonObject();
+        StoredPathReport report = StoredPathReport.of("mapstudio-dev", List.of(), List.of(
+            new com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord("i1", "pad", "P14", point,
+                new JsonObject(), null, overrides, null, null, 1, false)));
+        assertEquals(1, report.warnings().size());
+        assertTrue(report.warnings().get(0).endsWith("overrides: popupView.params.p: {asset.path}/a//b has an empty part"
+            + " between two /; a tag path has a name between every two /. It loads and draws as before and is refused when"
+            + " it is next saved: mend the path with system.mapstudio.applyEdits (no screen edits an item's popup view"
+            + " params)."), report.warnings().get(0));
+    }
+
+    @Test
+    void aStoreWhoseEveryPathPassesIsCountedInOneInfoLine() {
+        java.util.List<StoredPathReport> reports = new java.util.ArrayList<>();
+        loader = new MapLoader(new StoreGate(setups, c -> state), store, project -> LISTS, reports::add);
+        loader.snapshot("mapstudio-dev");
+        assertEquals(List.of(), reports.get(0).warnings());
+        assertEquals("Project mapstudio-dev: 0 stored rows (0 kind setups, 0 map items) checked against the tag path rule:"
+            + " every stored tag path passes.", reports.get(0).info());
+    }
+
+    @Test
     void anEmptyMapIsSeqZeroWithNoItems() {
         JsonObject body = loader.mapLoadReply("mapstudio-dev", Messages.LEVEL_FULL);
         assertEquals(0, body.get("seq").getAsLong());

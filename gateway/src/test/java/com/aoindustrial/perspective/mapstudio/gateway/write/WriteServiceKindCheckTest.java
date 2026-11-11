@@ -80,6 +80,29 @@ class WriteServiceKindCheckTest extends WriteFixture {
     }
 
     @Test
+    void aTagPathTheLookupsRefuseIsRefusedAtSaveAndNothingIsWritten() {
+        // Entry 13a, G1 to G3: the save rule is the resolve rule, for a kind setup, a popup param and an override.
+        String words = " has an empty part between two /; a tag path has a name between every two /.";
+        for (String[] bad : new String[][] {
+            {"{\"kpis\":[{\"key\":\"p\",\"path\":\"{asset.path}/a//b\"}]}", "Op 0 (pad): kpis[0].path: {asset.path}/a//b" + words},
+            {"{\"comms\":{\"path\":\"{asset.path}/a[0]\"}}", "Op 0 (pad): comms.path: {asset.path}/a[0] has a [ or ] after its"
+                + " start; a tag path names its provider once, at its start."},
+            {"{\"alarms\":{\"path\":\"[default]a//b\"}}", "Op 0 (pad): alarms.path: [default]a//b" + words},
+            {"{\"popupView\":{\"path\":\"Popups/P\",\"params\":{\"pressure\":\"{asset.path}/a//b\"}}}",
+                "Op 0 (pad): popupView.params.pressure: {asset.path}/a//b" + words}}) {
+            MapStudioException ex = refused(batch(uuid(), WriteServiceKindSetupTest.kindSetup("create", "pad", 0, bad[0])),
+                Messages.LEVEL_FULL);
+            assertEquals(Messages.CODE_INVALID, ex.code());
+            assertEquals(bad[1], ex.plainMessage());
+        }
+        assertEquals("Op 0 (%s): overrides: comms.path: [default]a//b" + words,
+            refusedWith(createItem("%s", "pad", POINT, ",\"overrides\":{\"comms\":{\"path\":\"[default]a//b\"}}")));
+        assertNothingWritten(0, 0);
+        save(batch(uuid(), WriteServiceKindSetupTest.kindSetup("create", "pad", 0,
+            "{\"kpis\":[{\"key\":\"p\",\"path\":\"{asset.path}/Meter/Flow\"}],\"alarms\":{\"path\":\"[default]Mesa/P12\"}}")));
+    }
+
+    @Test
     void anExpressionRuleMustParseInAnOverrideAndInAKindSetup() {
         // Epic 3 entry 1: Ignition's expression language, {value} its one reference, checked at save.
         String good = ",\"overrides\":{\"styleRule\":{\"source\":{\"path\":\"[default]Mesa/P14/Pressure\"},"

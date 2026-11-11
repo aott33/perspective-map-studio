@@ -389,6 +389,13 @@ describe('the resolve notes (K8)', () => {
         expect(state().lastReply).toBe('');
     });
 
+    test('the items a path fails for reach the note\'s state by name (entry 13a)', () => {
+        delegate.askResolve('pad', 'P14', ['{asset.path}/Pressure']);
+        reply(MessageTypes.TAGS_RESOLVE_REPLY, lastOf(MessageTypes.TAGS_RESOLVE).id, { path: '{asset.path}/Pressure', relative: true, n: 3, m: 30,
+            failing: [{ id: 'i1', name: 'P15' }, { id: 'i2', name: 'P16' }], failingMore: 25 });
+        expect(state().resolves[key('{asset.path}/Pressure')]).toEqual({ state: 'resolved', n: 3, m: 30, failing: ['P15', 'P16'], failingMore: 25 });
+    });
+
     test('a path being asked is not asked twice; asked again later, the earlier answer shows until the new one comes', () => {
         delegate.askResolve('pad', 'P14', ['{asset.path}/Pressure']);
         delegate.askResolve('pad', 'P14', ['{asset.path}/Pressure']);

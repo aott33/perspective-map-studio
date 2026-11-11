@@ -28,6 +28,15 @@ public final class FakeTagSource implements TagSource {
     public final List<Collection<String>> rolesSeen = new ArrayList<>();
     /** When set, every call that asks the tag system fails as {@code tags-unavailable} (a timeout). */
     public boolean slow;
+    /** Providers the Gateway has configured but is not running (stopped): never in {@link #providers}. */
+    public final List<String> stopped = new ArrayList<>();
+    /** Providers that are listed but do not answer (faulted): {@code tags-unavailable} naming it. */
+    public final Set<String> faulted = new HashSet<>();
+
+    @Override
+    public List<String> stopped() {
+        return stopped;
+    }
 
     public FakeTagSource folder(String full) {
         add(full, TagChild.FOLDER, null);
@@ -71,6 +80,9 @@ public final class FakeTagSource implements TagSource {
         browseCalls.add("[" + provider + "]" + folder);
         rolesSeen.add(roles);
         timeout();
+        if (faulted.contains(provider)) {
+            throw new MapStudioException(Messages.CODE_TAGS_UNAVAILABLE, TagSource.notAnsweringWords(provider));
+        }
         String parent = ("[" + provider + "]" + folder).toLowerCase(Locale.ROOT);
         if (!folder.isEmpty() && !nodes.containsKey(parent)) {
             return new Browse(false, List.of(), false);
@@ -99,6 +111,10 @@ public final class FakeTagSource implements TagSource {
         timeout();
         Set<String> found = new HashSet<>();
         for (String p : fullPaths) {
+            String provider = p.substring(1, p.indexOf(']'));
+            if (faulted.contains(provider) || stopped.stream().anyMatch(provider::equalsIgnoreCase)) {
+                throw new MapStudioException(Messages.CODE_TAGS_UNAVAILABLE, TagSource.notAnsweringWords(provider));
+            }
             if (nodes.containsKey(p.toLowerCase(Locale.ROOT))) {
                 found.add(p);
             }

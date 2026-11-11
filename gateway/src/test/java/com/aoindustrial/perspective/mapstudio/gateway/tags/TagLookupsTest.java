@@ -226,6 +226,117 @@ class TagLookupsTest {
         assertEquals(3, tags.existingCalls.get(0).size());
     }
 
+    String named(String assetId, String name) {
+        String id = UUID.randomUUID().toString();
+        writes.apply(P, json("{\"batchId\":\"" + UUID.randomUUID() + "\",\"ops\":[{\"op\":\"create\",\"entity\":\"item\","
+            + "\"id\":\"" + id + "\",\"baseVersion\":0,\"data\":{\"kind\":\"pad\",\"name\":\"" + name + "\",\"assetId\":\""
+            + assetId + "\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[1,2]}}}]}"), Actor.script("t"),
+            Messages.LEVEL_FULL);
+        return id;
+    }
+
+    @Test
+    void theItemsAPathFailsForAreNamedByName() {
+        // Entry 13a, G6: backlog 39.
+        named("P12", "P12");
+        String p15 = named("P15", "P15");
+        named("P14", "P14");
+        String px = named("PX", "b pad on a bad base path");
+        JsonObject r = resolve("{asset.path}/Pressure");
+        assertEquals(2, r.get("n").getAsInt());
+        assertEquals(4, r.get("m").getAsInt());
+        assertEquals(json("{\"failing\":[{\"id\":\"" + px + "\",\"name\":\"b pad on a bad base path\"},{\"id\":\"" + p15
+            + "\",\"name\":\"P15\"}]}").get("failing"), r.get("failing"));
+        assertEquals(0, r.get("failingMore").getAsInt());
+    }
+
+    @Test
+    void atMostTwentyFailingItemsAreNamedAndTheRestCounted() {
+        // G7: 25 fail; the first 20 by name, then how many more.
+        named("P12", "A good pad");
+        for (int i = 25; i >= 1; i--) {
+            named("P15", String.format("Pad %02d", i));
+        }
+        JsonObject r = resolve("[default]Mesa/P12/Pressure");
+        assertEquals(1, r.get("n").getAsInt());
+        assertEquals(26, r.get("m").getAsInt());
+        assertEquals(TagLookups.MAX_FAILING, r.getAsJsonArray("failing").size());
+        assertEquals("Pad 01", r.getAsJsonArray("failing").get(0).getAsJsonObject().get("name").getAsString());
+        assertEquals("Pad 20", r.getAsJsonArray("failing").get(19).getAsJsonObject().get("name").getAsString());
+        assertEquals(5, r.get("failingMore").getAsInt());
+    }
+
+    @Test
+    void noFailingWhenEveryItemResolvesOrThePathIsFull() {
+        // G8.
+        named("P12", "P12");
+        named("P14", "P14");
+        JsonObject all = resolve("{asset.path}/Pressure");
+        assertEquals(2, all.get("n").getAsInt());
+        assertFalse(all.has("failing"));
+        assertFalse(all.has("failingMore"));
+        named("P15", "P15");
+        JsonObject full = resolve("[default]Plant/Header/Pressure");
+        assertFalse(full.get("relative").getAsBoolean());
+        assertFalse(full.has("failing"));
+        assertFalse(full.has("failingMore"));
+        // A kind with no linked item: 0 of 0, nothing failing.
+        assertFalse(lookups.resolveReply(P, FULL, json("{\"kindId\":\"line\",\"assetId\":\"L3\",\"path\":\"{asset.path}/Flow\"}"))
+            .has("failing"));
+    }
+
+    @Test
+    void aViewerLearnsNothingOfTheFailingItems() {
+        // G9: refused role before a map item or a tag is read.
+        named("P15", "P15");
+        for (List<String> roles : List.of(List.<String>of(), PHONE)) {
+            MapStudioException ex = refused(() -> lookups.resolveReply(P, roles,
+                json("{\"kindId\":\"pad\",\"assetId\":\"P12\",\"path\":\"{asset.path}/Pressure\"}")));
+            assertEquals("role", ex.code());
+            assertFalse(ex.getMessage().contains("P15"));
+        }
+        assertTrue(tags.existingCalls.isEmpty());
+    }
+
+    @Test
+    void aStoppedProviderIsTagsUnavailableNamingItAndAnUnknownOneStaysInvalid() {
+        // G10. On 8.3.10 a stopped provider leaves the tag manager's list and stays in the Gateway's config.
+        tags.providers.add("Site2");
+        tags.tag("[Site2]Yard/Tank1/Level", "Float8");
+        assertEquals(1, lookups.browseReply(P, FULL, json("{\"provider\":\"site2\",\"folder\":\"Yard/Tank1\"}"))
+            .getAsJsonArray("children").size());
+        tags.providers.remove("Site2");
+        tags.stopped.add("Site2");
+        MapStudioException ex = refused(() -> lookups.browseReply(P, FULL, json("{\"provider\":\"site2\"}")));
+        assertEquals("tags-unavailable", ex.code());
+        assertEquals("The tag provider Site2 is on this Gateway but does not answer; it is stopped or faulted. Start it on"
+            + " the Gateway's tag provider page.", ex.plainMessage());
+        MapStudioException unknown = refused(() -> lookups.browseReply(P, FULL, json("{\"provider\":\"Site3\"}")));
+        assertEquals("invalid", unknown.code());
+        assertEquals("There is no tag provider named Site3 on this Gateway.", unknown.plainMessage());
+        // The default provider still answers; the stopped one is not offered.
+        assertEquals(2, lookups.browseReply(P, FULL, json("{}")).getAsJsonArray("providers").size());
+        // A provider that is listed and does not answer says the same.
+        tags.providers.add("Edge");
+        tags.faulted.add("Edge");
+        MapStudioException faulted = refused(() -> lookups.browseReply(P, FULL, json("{\"provider\":\"Edge\"}")));
+        assertEquals("tags-unavailable", faulted.code());
+        assertTrue(faulted.plainMessage().startsWith("The tag provider Edge is on this Gateway but does not answer"));
+    }
+
+    @Test
+    void anItemWhoseTagsAreOnAStoppedProviderIsNeverCountedAsMissing() {
+        // tags.resolve: a stopped provider is tags-unavailable naming it, never a low n with the item listed as failing.
+        lists = new AdapterSnapshot(lists.kinds(), List.of(new Asset("P12", "Pad 12", "pad", "[default]Mesa/P12"),
+            new Asset("T1", "Tank 1", "pad", "[Site2]Yard/Tank1")), OK, OK);
+        named("P12", "P12");
+        named("T1", "Tank 1");
+        tags.stopped.add("Site2");
+        MapStudioException ex = refused(() -> resolve("{asset.path}/Pressure"));
+        assertEquals("tags-unavailable", ex.code());
+        assertTrue(ex.plainMessage().contains("Site2"), ex.plainMessage());
+    }
+
     @Test
     void anAlreadyRelativePathGivesTheSameAnswer() {
         pad("P12");

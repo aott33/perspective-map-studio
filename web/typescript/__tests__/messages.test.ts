@@ -157,5 +157,17 @@ describe('tags.resolve (epic 4 entry 12a, the Kinds screen\'s resolve notes)', (
         expect(full).toEqual({ kind: 'tags.resolve.reply', id: 'r2', body: { path: '[default]Shared/GasPrice', relative: false } });
         expect(replyText(full)).toBe('Tag path [default]Shared/GasPrice: a full path');
         expect(readReply({ v: 1, type: 'tags.resolve.reply', id: 'r3', body: { relative: true } }).kind).toBe('invalid');
+        // Entry 13a: the items a relative path fails for; a malformed entry is left out, a count that is not a number reads 0.
+        expect(readReply({ v: 1, type: 'tags.resolve.reply', id: 'r4', body: { path: '{asset.path}/Pressure', relative: true, n: 4, m: 5,
+            failing: [{ id: 'i15', name: 'P15' }], failingMore: 0 } }))
+            .toEqual({ kind: 'tags.resolve.reply', id: 'r4', body: { path: '{asset.path}/Pressure', relative: true, n: 4, m: 5,
+                failing: [{ id: 'i15', name: 'P15' }], failingMore: 0 } });
+        const odd = readReply({ v: 1, type: 'tags.resolve.reply', id: 'r5', body: { path: '{asset.path}/X', relative: true, n: 0, m: 30,
+            failing: [{ id: 'a', name: 'A' }, { id: 7, name: 'B' }, null, 'C'], failingMore: '10' } });
+        expect(odd.kind === 'tags.resolve.reply' && odd.body.failing).toEqual([{ id: 'a', name: 'A' }]);
+        expect(odd.kind === 'tags.resolve.reply' && odd.body.failingMore).toBe(0);
+        const more = readReply({ v: 1, type: 'tags.resolve.reply', id: 'r6', body: { path: '{asset.path}/X', relative: true, n: 0, m: 30,
+            failing: [{ id: 'a', name: 'A' }], failingMore: 29 } });
+        expect(more.kind === 'tags.resolve.reply' && more.body.failingMore).toBe(29);
     });
 });

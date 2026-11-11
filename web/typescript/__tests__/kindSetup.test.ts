@@ -490,6 +490,25 @@ describe('the resolve notes (K8)', () => {
         expect(resolveNote('{asset.path}/Level', CTB, { state: 'resolved', n: 1, m: 1 })!.text).toBe('Resolves for 1 of 1 CTB batteries');
     });
 
+    test('the items a path fails for are named: up to three, then how many more (entry 13a, G6, G7)', () => {
+        expect(resolveNote('{asset.path}/Pressure', PAD, { state: 'resolved', n: 4, m: 5, failing: ['P15'], failingMore: 0 }))
+            .toEqual({ text: 'Resolves for 4 of 5 well pads. Not for P15.', warning: true, state: 'resolved' });
+        expect(resolveNote('{asset.path}/Pressure', PAD, { state: 'resolved', n: 2, m: 5, failing: ['P13', 'P15', 'P16'], failingMore: 0 })!.text)
+            .toBe('Resolves for 2 of 5 well pads. Not for P13, P15, P16.');
+        expect(resolveNote('{asset.path}/Pressure', PAD, { state: 'resolved', n: 1, m: 5, failing: ['A', 'B', 'C', 'D'], failingMore: 0 })!.text)
+            .toBe('Resolves for 1 of 5 well pads. Not for A, B, C and 1 more.');
+        const twenty = Array.from({ length: 20 }, (_, i) => 'Pad ' + (i + 1));
+        expect(resolveNote('{asset.path}/Pressure', PAD, { state: 'resolved', n: 1, m: 26, failing: twenty, failingMore: 5 })!.text)
+            .toBe('Resolves for 1 of 26 well pads. Not for Pad 1, Pad 2, Pad 3 and 22 more.');
+        expect(resolveNote('{asset.path}/Pressure', PAD, { state: 'resolved', n: 0, m: 1, failing: [''], failingMore: 0 })!.text)
+            .toBe('Resolves for 0 of 1 well pads. Not for an item with no name.');
+        // Every item resolves: no names, whatever the reply held; a Gateway that names none: the count alone.
+        expect(resolveNote('{asset.path}/Pressure', PAD, { state: 'resolved', n: 5, m: 5, failing: ['P15'], failingMore: 0 })!.text)
+            .toBe('Resolves for 5 of 5 well pads');
+        expect(resolveNote('{asset.path}/Pressure', PAD, { state: 'resolved', n: 3, m: 5, failing: [], failingMore: 0 })!.text)
+            .toBe('Resolves for 3 of 5 well pads');
+    });
+
     test('a full path is the same tag for every item, in the warning token, without asking', () => {
         expect(isFullPath('[default]Shared/GasPrice')).toBe(true);
         expect(isFullPath('{asset.path}/Pressure')).toBe(false);

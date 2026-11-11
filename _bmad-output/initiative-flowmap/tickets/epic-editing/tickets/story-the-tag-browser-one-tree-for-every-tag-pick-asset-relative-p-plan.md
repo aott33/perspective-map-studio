@@ -3,15 +3,15 @@ title: "13a: one tag path rule on the Gateway, the items a path fails for, and t
 type: 'feature'
 ticket: '13'
 created: '2026-11-11'
-status: 'in-progress'
+status: 'built'
 baseline_revision: 'af44153d455cd87145b54c5602e032114a0e7ea6'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
-review_loop_iteration: 0
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
+review_loop_iteration: 1
 context: ['{project-root}/docs/contract.md', '{project-root}/docs/kind-setup.md']
 ---
 
@@ -63,13 +63,14 @@ Decisions (owner, 2026-11-11, "go with recommended", then "approve and continue"
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `Placeholders.java`, `KindSetup.java`, with `PlaceholdersTest`, `KindSetupTest`, `WriteServiceKindCheckTest` -- the one rule for every stored path, tests first -- G1 to G4.
-- [ ] A seeds test (the `DevSeedTest` harness) -- every path of both seeds and the template's documented ones passes -- G4.
-- [ ] The stored-row report on the Gateway, with a unit test and an `ops/store-checks.sh` scenario -- G5.
-- [ ] `TagLookups.java`, `common/` reply, tests -- `failing`, `failingMore`; the provider answers -- G6 to G10.
-- [ ] `web/typescript/messages.ts`, `kindSetup.ts`, `itemOverrides.ts`, Jest -- the note's names; the override check aligned -- G3, G6, G7.
-- [ ] `ops/config` (the second provider, `Plant/AmbientTemp`), `e2e/tests/tags.spec.mjs`, `kinds.spec.mjs` -- G1, G6, G9, G10 live; ignition-lint on the changed Ignition files.
-- [ ] Docs, `CHANGELOG.md`, playbook section 8p.
+- [x] `Placeholders.java`, `KindSetup.java`, with `PlaceholdersTest`, `KindSetupTest`, `WriteServiceKindCheckTest` -- the one rule for every stored path, tests first -- G1 to G4.
+- [x] A seeds test (the `DevSeedTest` harness) -- every path of both seeds and the template's documented ones passes -- G4.
+- [x] The stored-row report on the Gateway, with a unit test and an `ops/store-checks.sh` scenario -- G5.
+- [x] `TagLookups.java`, `common/` reply, tests -- `failing`, `failingMore`; the provider answers -- G6 to G10.
+- [x] `web/typescript/messages.ts`, `kindSetup.ts`, `itemOverrides.ts`, Jest -- the note's names; the override check aligned -- G3, G6, G7.
+- [x] `ops/config` (the second provider, `Plant/AmbientTemp`), `e2e/tests/tags.spec.mjs`, `kinds.spec.mjs` -- G1, G6, G9, G10 live.
+- [ ] ignition-lint on the changed Ignition files -- not run: it could not be installed in this environment (see the triage log).
+- [x] Docs, `CHANGELOG.md`, playbook section 8p.
 
 **Acceptance Criteria:**
 - Given the dev Gateway, when a kind setup with a double slash in a path is saved, then it is refused in words, and every setup the seeds store still saves.
@@ -79,10 +80,25 @@ Decisions (owner, 2026-11-11, "go with recommended", then "approve and continue"
 
 - Planner, 2026-11-11: the environment and identity rules are entry 8's plan's (Docker by hand after a restart, JDK 17, `ops/up.sh --fresh` before a whole-suite run and after any `ops/config` change, no em dashes, never a bare `git stash`, never a push). Leave the work uncommitted: the orchestrator commits after the whole suite. Two findings of the survey to settle while building: a stopped provider probably answers `invalid` today (`provider()` null, :99); and the dev pads are five, so the ticket's "2 of 3" reads "4 of 5".
 - Planner, 2026-11-11, before the build: the browser files moved under entries 12c1 to 12c3 after this Code Map was written, so its line numbers in `kindSetup.ts`, `itemOverrides.ts`, `messages.ts` and `MapStudioStoreDelegate.ts` are a guide only; find the symbols by name.
+- Implementer, 2026-11-11: built as planned, left uncommitted. What the two survey findings came to: (1) on 8.3.10 a stopped (disabled) provider is not "listed but silent": it leaves `getTagProviderNames()` and `getTagProvider` answers null, exactly as an unknown name, while the Gateway's config resource stays (`enabled: false`). So "a provider the Gateway lists" is read from the Gateway's configured providers (`ConfigurationManager.getResources(ignition/tag-provider)`): configured and not running is `tags-unavailable` naming it, a name in neither list stays `invalid`; `providers` in the reply still holds the running ones only (`docs/platform-checks.md`, "Epic 4 entry 13a"). (2) the note reads "4 of 5 ... Not for Point 3." on the dev seed (the pad linked to P15 is named Point 3). The second dev provider is `Site2`. The rule also refuses, as `TagPaths` does, a relative provider (`[~]`, `[.]`) and a path over 1024 characters, which a save took before; both are in the docs and the changelog. A map item's whole record is checked on every save, so an item with a failing stored override is refused on any edit but a delete until the path is mended (`docs/operations.md`). `failingMore` is sent (0) whenever `failing` is. ignition-lint is not installed in this environment and could not be installed (no package index has it), so it was not run on the new `ops/config` files; the fresh Gateway loaded them with no error and the specs browse them. Backlog 39's "each opening its item" is not built (not in this plan).
 
 ## Plan Change Log
 
 ## Review Triage Log
+
+Quick review, 2026-11-11 (one reviewer, by inspection). No unmet acceptance criterion; G1 to G10 each have code and a test.
+
+- patch: the ignition-lint task was ticked though the lint never ran. The task is split and left open. The orchestrator's install was refused by the session's permission check, so it stays not run: the 13 changed files parse as JSON, the fresh Gateway loaded them with no error and `tags.spec.mjs` browses them. To run on a machine that has the tool.
+- patch: `IgnitionTagSource.existing()` read the Gateway's configured providers once per distinct parent of an unknown provider. Read once per call.
+- patch: a warning per lookup of a stopped provider, and none on the browse path. No warning per lookup.
+- patch: the refusal named the provider as the caller spelled it in one path. Always as the Gateway spells it.
+- patch: an override path both relative and malformed met the form fault first, then the full-path refusal. The full-path rule first, Gateway and browser.
+- patch: the stored-row warning pointed at the item's Details for a popup view override's param, which no screen edits. The script route only, in the warning and in `docs/operations.md`.
+- patch: `tagsForTest()` in production code. Removed.
+- defer: the stored-row report is keyed by project name, so a project re-pointed to another database is not reported again until a restart. Beyond the plan's wording ("first read after the Gateway starts"); in `_bmad-output/deferred-work.md`.
+- dismiss: the template's documented paths in `SeedTagPathsTest` are literals. Both seeds are executed for real; the documented paths are prose in `docs/template-install.md` with no machine-readable source in this repository.
+
+Outcome (2026-11-11): six patches applied, one finding deferred, one dismissed; the ignition-lint task stays open (the tool could not be installed here). The orchestrator's Verification on the patched code: tsc clean, Jest 1012 passed, Gradle BUILD SUCCESSFUL, the contract check OK, `ops/store-checks.sh badrow` passed, and on a fresh stack the whole suite 315 passed, 9 skipped (the store-check and Gateway-stop scenarios, run by hand), 0 failed in 1.2 h.
 
 ## Design Notes
 

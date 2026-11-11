@@ -2,10 +2,13 @@
 // tags.resolve sent through the component's real session path with the test hook
 // window.__mapStudioTest (web/typescript/testHook.ts), against the dev tag provider `default`
 // seeded on a fresh volume from ops/config/core (Mesa/P12 and P14 instances of the UDT Pad,
-// Mesa/P15 a folder with Flow only, Plant/Header/Pressure). The Gateway checks the session
-// user's roles; only a full editor gets an answer. Nothing here writes a tag.
+// Mesa/P15 a folder with Flow only, Plant/Header/Pressure, Plant/AmbientTemp) and, from epic 4
+// entry 13a, the second provider `Site2` (Yard/WindSpeed, Yard/Tank1/Level and Comms). The Gateway
+// checks the session user's roles; only a full editor gets an answer. Nothing here writes a tag; one
+// test stops the second provider through the Gateway's REST API and starts it again.
 
 import { randomUUID } from 'node:crypto';
+import { setTagProviderEnabled } from '../lib/gateway.mjs';
 import {
     OPERATOR_USER, editorTest, expect, mapLoaded, openMap, send, signedInContext, test, watch
 } from './fixtures.mjs';
@@ -46,7 +49,8 @@ editorTest.describe('tag browse and resolve', () => {
         const root = expectReply(await send(page, 'tags.browse', {}), 'tags.browse.reply');
         expect(root.provider).toBe('default');
         expect(root.folder).toBe('');
-        expect(root.providers).toEqual([{ name: 'default', isDefault: true }, { name: 'System', isDefault: false }]);
+        expect(root.providers).toEqual([{ name: 'default', isDefault: true }, { name: 'Site2', isDefault: false },
+            { name: 'System', isDefault: false }]);
         expect(names(root)).toEqual(expect.arrayContaining(['Mesa', 'Plant']));
         expect(root.truncated).toBe(false);
 
@@ -66,6 +70,11 @@ editorTest.describe('tag browse and resolve', () => {
             ['P14', 'udt-instance', null], ['P15', 'folder', null], ['PT1', 'udt-instance', null], ['PT2', 'udt-instance', null],
             ['SWD1', 'udt-instance', null]
         ]);
+
+        // A tag beside folders (entry 13a's dev fixture): Plant holds AmbientTemp, Header and Secret.
+        const plant = expectReply(await send(page, 'tags.browse', { folder: 'Plant' }), 'tags.browse.reply');
+        expect(plant.children.map((c) => [c.name, c.type, c.dataType])).toEqual([
+            ['AmbientTemp', 'tag', 'Float8'], ['Header', 'folder', null], ['Secret', 'folder', null]]);
 
         // A second provider, and the unknown ones.
         const system = expectReply(await send(page, 'tags.browse', { provider: 'System' }), 'tags.browse.reply');
@@ -87,11 +96,17 @@ editorTest.describe('tag browse and resolve', () => {
             const n = m - linked.filter((i) => i.assetId === 'P15').length;
             expect(m).toBeGreaterThanOrEqual(3);
 
+            // Entry 13a (G6): the items it fails for, the pads linked to P15, by name (then by id), and none beyond them.
+            const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+            const byName = (a, b) => cmp(a.name.toLowerCase(), b.name.toLowerCase()) || cmp(a.name, b.name) || cmp(a.id, b.id);
+            const failing = linked.filter((i) => i.assetId === 'P15').map((i) => ({ id: i.id, name: i.name })).sort(byName);
+            expect(failing.length).toBeGreaterThanOrEqual(2);
+            expect(failing.map((f) => f.name)).toContain('Tag check P15');
             const inside = { kindId: 'pad', assetId: 'P12', path: '[default]Mesa/P12/Pressure' };
             expect(expectReply(await send(page, 'tags.resolve', inside), 'tags.resolve.reply'))
-                .toEqual({ path: '{asset.path}/Pressure', relative: true, n, m });
+                .toEqual({ path: '{asset.path}/Pressure', relative: true, n, m, failing, failingMore: 0 });
             expect(expectReply(await send(page, 'tags.resolve', { ...inside, path: '{asset.path}/Pressure' }),
-                'tags.resolve.reply')).toEqual({ path: '{asset.path}/Pressure', relative: true, n, m });
+                'tags.resolve.reply')).toEqual({ path: '{asset.path}/Pressure', relative: true, n, m, failing, failingMore: 0 });
             // Flow exists on all three.
             expect(expectReply(await send(page, 'tags.resolve', { ...inside, path: '[default]Mesa/P12/Flow' }),
                 'tags.resolve.reply')).toEqual({ path: '{asset.path}/Flow', relative: true, n: m, m });
@@ -110,6 +125,41 @@ editorTest.describe('tag browse and resolve', () => {
                 expectReply(await send(page, 'edits.apply', { batchId: randomUUID(), ops }), 'edits.apply.reply');
             }
         }
+    });
+
+    editorTest('the second provider is browsed; stopped, it is unavailable by name, and an unknown one stays invalid', async ({ page }) => {
+        // Entry 13a, G10. On 8.3.10 a stopped (disabled) provider leaves the tag manager's list while the Gateway keeps its
+        // config resource (docs/platform-checks.md): Map Studio says tags-unavailable naming it, never "no such provider".
+        const map = await openMap(page, '/edit');
+        await mapLoaded(map);
+        const yard = expectReply(await send(page, 'tags.browse', { provider: 'site2', folder: 'Yard' }), 'tags.browse.reply');
+        expect(yard.provider).toBe('Site2');
+        expect(yard.children).toEqual([
+            { name: 'Tank1', path: '[Site2]Yard/Tank1', type: 'folder', dataType: null, hasChildren: true },
+            { name: 'WindSpeed', path: '[Site2]Yard/WindSpeed', type: 'tag', dataType: 'Float8', hasChildren: false }
+        ]);
+        const tank = expectReply(await send(page, 'tags.browse', { provider: 'Site2', folder: 'Yard/Tank1' }), 'tags.browse.reply');
+        expect(tank.children.map((c) => [c.name, c.path, c.dataType])).toEqual([
+            ['Comms', '[Site2]Yard/Tank1/Comms', 'Boolean'], ['Level', '[Site2]Yard/Tank1/Level', 'Float8']]);
+        await setTagProviderEnabled('Site2', false);
+        try {
+            await expect.poll(async () => (await send(page, 'tags.browse', { provider: 'Site2', folder: 'Yard' })).type,
+                { timeout: 30_000 }).toBe('error');
+            const stopped = expectRefused(await send(page, 'tags.browse', { provider: 'Site2', folder: 'Yard' }), 'tags-unavailable');
+            expect(stopped.message).toBe('The tag provider Site2 is on this Gateway but does not answer; it is stopped or faulted. '
+                + "Start it on the Gateway's tag provider page.");
+            // The other providers answer as before, without the stopped one; a name the Gateway never had stays invalid.
+            const root = expectReply(await send(page, 'tags.browse', {}), 'tags.browse.reply');
+            expect(root.providers).toEqual([{ name: 'default', isDefault: true }, { name: 'System', isDefault: false }]);
+            expect(expectRefused(await send(page, 'tags.browse', { provider: 'nope' }), 'invalid').message)
+                .toBe('There is no tag provider named nope on this Gateway.');
+        } finally {
+            await setTagProviderEnabled('Site2', true);
+        }
+        await expect.poll(async () => (await send(page, 'tags.browse', { provider: 'Site2', folder: 'Yard' })).type,
+            { timeout: 60_000 }).toBe('tags.browse.reply');
+        expect(names(expectReply(await send(page, 'tags.browse', { provider: 'Site2', folder: 'Yard' }), 'tags.browse.reply')))
+            .toEqual(['Tank1', 'WindSpeed']);
     });
 
     editorTest('a phone editor is refused role for both lookups', async ({ browser }) => {
@@ -144,5 +194,9 @@ test.describe('tag browse for a viewer', () => {
         const browse = expectRefused(await send(page, 'tags.browse', { provider: 'nope' }), 'role');
         expect(browse.message).not.toContain('nope');
         expectRefused(await send(page, 'tags.resolve', { kindId: 'pad', assetId: 'P12', path: '{asset.path}' }), 'role');
+        // Entry 13a (G9): a path that fails for an item names nothing to a viewer: the refusal alone, before any tag is read.
+        const resolve = await send(page, 'tags.resolve', { kindId: 'pad', assetId: 'P12', path: '{asset.path}/Pressure' });
+        expect(expectRefused(resolve, 'role').message).toBe('Browsing tags needs a full editing role. Ask for a Map Studio editing role.');
+        expect(resolve.body).not.toHaveProperty('failing');
     });
 });

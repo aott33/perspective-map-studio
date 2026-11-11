@@ -13,22 +13,27 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 
 import com.google.common.collect.ImmutableList;
 import com.inductiveautomation.ignition.common.browsing.BrowseFilter;
 import com.inductiveautomation.ignition.common.browsing.Results;
 import com.inductiveautomation.ignition.common.model.values.QualityCode;
+import com.inductiveautomation.ignition.common.resourcecollection.Resource;
+import com.inductiveautomation.ignition.common.resourcecollection.ResourceType;
 import com.inductiveautomation.ignition.common.tags.browsing.NodeDescription;
 import com.inductiveautomation.ignition.common.tags.model.SecurityContext;
 import com.inductiveautomation.ignition.common.tags.model.TagPath;
 import com.inductiveautomation.ignition.common.tags.model.TagProvider;
 import com.inductiveautomation.ignition.common.tags.paths.parser.TagPathParser;
 import com.inductiveautomation.ignition.common.util.LoggerEx;
+import com.inductiveautomation.ignition.gateway.config.ConfigurationManager;
 import com.inductiveautomation.ignition.gateway.project.ProjectManager;
 import com.inductiveautomation.ignition.gateway.tags.model.GatewayTagManager;
 
 import com.aoindustrial.perspective.mapstudio.common.Messages;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
+import com.aoindustrial.perspective.mapstudio.common.contract.Rows;
 import com.aoindustrial.perspective.mapstudio.common.contract.TagChild;
 
 /**
@@ -41,7 +46,11 @@ import com.aoindustrial.perspective.mapstudio.common.contract.TagChild;
  * {@code tags-unavailable}. Existence is checked by browsing each distinct parent folder once, at
  * most {@link #MAX_IN_FLIGHT} at a time, within one 5 s deadline: 300 distinct parents took 55 ms
  * on the dev Gateway, one after another. On a timeout or a failure every browse still running is
- * cancelled. Structure only: no value is read.
+ * cancelled. A stopped (disabled) provider leaves {@code getTagProviderNames()} and
+ * {@code getTagProvider(name)} answers null for it, while its config resource
+ * ({@code ignition/tag-provider}) stays (docs/platform-checks.md, epic 4 entry 13a, live 8.3.10): a
+ * lookup that names one is {@code tags-unavailable} naming it, never "not found". Structure only:
+ * no value is read.
  */
 public final class IgnitionTagSource implements TagSource {
 
@@ -62,16 +71,28 @@ public final class IgnitionTagSource implements TagSource {
     private final GatewayTagManager tags;
     private final ProjectManager projects;
     private final long timeoutMs;
+    /** The names of the Gateway's configured tag providers, the stopped (disabled) ones included. */
+    private final Supplier<List<String>> configured;
 
-    public IgnitionTagSource(GatewayTagManager tags, ProjectManager projects) {
-        this(tags, projects, TIMEOUT_MS);
+    /** The Gateway's tag provider config resources ({@code ignition/tag-provider}, 8.3). */
+    static final ResourceType PROVIDER_RESOURCE = new ResourceType("ignition", "tag-provider");
+
+    public IgnitionTagSource(GatewayTagManager tags, ProjectManager projects, ConfigurationManager config) {
+        this(tags, projects, TIMEOUT_MS, () -> config.getResources(PROVIDER_RESOURCE).stream()
+            .map(Resource::getResourceName).toList());
     }
 
-    /** With another deadline (tests). */
+    /** With another deadline and no configured provider beyond the running ones (tests). */
     IgnitionTagSource(GatewayTagManager tags, ProjectManager projects, long timeoutMs) {
+        this(tags, projects, timeoutMs, List::of);
+    }
+
+    /** With another deadline and another list of configured providers (tests). */
+    IgnitionTagSource(GatewayTagManager tags, ProjectManager projects, long timeoutMs, Supplier<List<String>> configured) {
         this.tags = tags;
         this.projects = projects;
         this.timeoutMs = timeoutMs;
+        this.configured = configured;
     }
 
     @Override
@@ -97,6 +118,11 @@ public final class IgnitionTagSource implements TagSource {
     public Browse browse(String provider, String folder, Collection<String> roles, int max) {
         TagProvider p = provider(provider);
         if (p == null) {
+            // A name from providers() with no provider behind it: listed, but not answering (entry 13a).
+            String known = new Known().named(provider);
+            if (known != null) {
+                throw notAnswering(known);
+            }
             return new Browse(false, List.of(), false);
         }
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
@@ -149,6 +175,8 @@ public final class IgnitionTagSource implements TagSource {
             parents.putIfAbsent(key, parent);
             byParent.computeIfAbsent(key, k -> new ArrayList<>()).add(full);
         }
+        // The running and the stopped providers, read at most once for this call, and only when a provider is null.
+        Known known = new Known();
         List<Map.Entry<String, TagPath>> pending = new ArrayList<>(parents.entrySet());
         Set<String> found = new HashSet<>();
         for (int start = 0; start < pending.size(); start += MAX_IN_FLIGHT) {
@@ -156,9 +184,13 @@ public final class IgnitionTagSource implements TagSource {
             Map<String, CompletableFuture<Results<NodeDescription>>> calls = new LinkedHashMap<>();
             try {
                 for (Map.Entry<String, TagPath> e : batch) {
-                    TagProvider p = provider(e.getValue().getSource());
+                    String name = e.getValue().getSource();
+                    TagProvider p = provider(name);
                     if (p != null) {
                         calls.put(e.getKey(), p.browseAsync(e.getValue(), new BrowseFilter(), context));
+                    } else if (known.named(name) != null) {
+                        // The Gateway has the provider but it does not answer: never a low n (docs/contract.md, tags.resolve).
+                        throw notAnswering(known.named(name));
                     }
                 }
                 for (Map.Entry<String, CompletableFuture<Results<NodeDescription>>> e : calls.entrySet()) {
@@ -200,6 +232,58 @@ public final class IgnitionTagSource implements TagSource {
         } catch (RuntimeException ex) {
             throw unavailable("find a tag provider", ex);
         }
+    }
+
+    @Override
+    public List<String> stopped() {
+        List<String> configuredNames;
+        try {
+            configuredNames = configured.get();
+        } catch (RuntimeException ex) {
+            // The lookups go on without it: a stopped provider then reads as not on this Gateway.
+            log.debugf("Could not read the configured tag providers: %s", ex.getClass().getSimpleName());
+            return List.of();
+        }
+        List<String> running = providers();
+        List<String> out = new ArrayList<>();
+        for (String name : configuredNames) {
+            if (name != null && running.stream().noneMatch(name::equalsIgnoreCase)) {
+                out.add(name);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * The providers the Gateway has, running or stopped, read once on first use and kept for one lookup, so a
+     * kind whose assets name a provider the Gateway does not have costs one read, not one per item.
+     */
+    private final class Known {
+        private List<String> names;
+
+        /** The Gateway's spelling of a provider it has under this name (without letter case), or null. */
+        String named(String name) {
+            if (name == null) {
+                return null;
+            }
+            if (names == null) {
+                names = new ArrayList<>(providers());
+                names.addAll(stopped());
+            }
+            for (String known : names) {
+                if (known.equalsIgnoreCase(name)) {
+                    return known;
+                }
+            }
+            return null;
+        }
+    }
+
+    /** A provider the Gateway has that does not answer: {@code tags-unavailable}, in words naming it as the Gateway spells it. */
+    private static MapStudioException notAnswering(String provider) {
+        log.debugf("The tag provider %s is on this Gateway but did not answer a tag lookup (stopped or faulted).",
+            Rows.echo(provider));
+        return new MapStudioException(Messages.CODE_TAGS_UNAVAILABLE, TagSource.notAnsweringWords(provider));
     }
 
     private static SecurityContext context(Collection<String> roles) {

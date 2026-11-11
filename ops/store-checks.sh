@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Map store checks on the dev stack (epic 2 story 5): rights, a failed migration, the
 # lazy retry, a schema newer than the module, (epic 2 story 14) an upgrade from schema 1
-# with data and (epic-editing entry 11a) an upgrade from schema 2 with edit rows. Development only; run by hand (owner decision, 2026-10-26), results recorded in
+# with data, (epic-editing entry 11a) an upgrade from schema 2 with edit rows and (entry 13a) a stored
+# row whose tag path the save rule refuses. Development only; run by hand (owner decision, 2026-10-26), results recorded in
 # docs/platform-checks.md.
 #
-# Usage: ops/store-checks.sh [scenario ...]    (default: rights partial healed newer upgrade)
+# Usage: ops/store-checks.sh [scenario ...]    (default: rights partial healed newer upgrade badrow)
 #
 # Needs the dev stack from ops/up.sh on volumes made after this story (the MapStudioCheck
 # connection is seeded into a fresh Gateway volume and the check database into a fresh
@@ -20,7 +21,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
 SCENARIOS=("$@")
 if [[ ${#SCENARIOS[@]} -eq 0 ]]; then
-  SCENARIOS=(rights partial healed newer upgrade)
+  SCENARIOS=(rights partial healed newer upgrade badrow)
 fi
 LINE_PREFIX="Map Studio cannot prepare its map store on database connection MapStudioCheck"
 CHECK_CONN="/usr/local/bin/ignition/data/config/resources/core/ignition/database-connection/MapStudioCheck/config.json"
@@ -288,6 +289,42 @@ for scenario in "${SCENARIOS[@]}"; do
       [[ "${old_rows}" == "3 cutover Schema 2 pad renamed pad, 2 mapoperator Schema 2 pad renamed pad, 1 mapeditor Schema 2 pad renamed pad" ]] \
         || fail "the old rows read back as '${old_rows}'"
       ok "schema 2 to 3 with edit rows: ${old_rows}"
+      ;;
+    badrow)
+      # Epic 4 entry 13a (G5): a store at the module's schema holding a kind setup and an item's overrides with a
+      # tag path the save rule refuses (an empty part, a//b), put there directly as an older module could have
+      # saved them. At the first read after the start the Gateway logs one warning per row and one info line with
+      # the count; nothing is rewritten, the map loads and the rows read back through getMap and map.load as stored.
+      reset_check_db
+      migrations="${PROJECT_ROOT}/gateway/src/main/resources/com/aoindustrial/perspective/mapstudio/gateway/store/migrations"
+      versions=""
+      for file in "${migrations}"/*.sql; do
+        check_sql < "${file}"
+        number="$(basename "${file}" | cut -c1-4 | sed 's/^0*//')"
+        versions="${versions}${versions:+, }(${number}, 'store-checks')"
+      done
+      check_sql -c "CREATE TABLE mapstudio_schema_version (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now(), module_version text NOT NULL)" \
+        -c "INSERT INTO mapstudio_schema_version (version, module_version) VALUES ${versions}" \
+        -c "INSERT INTO mapstudio_project (project, seq) VALUES ('mapstudio-check', 2)" \
+        -c "INSERT INTO mapstudio_kind_setup (project, kind_id, setup, version) VALUES ('mapstudio-check', 'pad', '{\"comms\":{\"path\":\"{asset.path}/Comms\"},\"kpis\":[{\"key\":\"p\",\"path\":\"{asset.path}/a//b\"}]}', 1)" \
+        -c "INSERT INTO mapstudio_item (project, id, kind, name, geometry, overrides, version) VALUES ('mapstudio-check', 'c0ffee00-0000-4000-8000-00000000000a', 'pad', 'Bad path pad', '{\"type\":\"Point\",\"coordinates\":[-104.97,39.74]}', '{\"comms\":{\"path\":\"[default]a//b\"}}', 1), ('mapstudio-check', 'c0ffee00-0000-4000-8000-00000000000b', 'pad', 'Good pad', '{\"type\":\"Point\",\"coordinates\":[-104.96,39.74]}', '{}', 1)" \
+        -c "GRANT CREATE ON SCHEMA public TO mapstudio_check" \
+        -c "DO \$\$ DECLARE t text; BEGIN FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'mapstudio_%' LOOP EXECUTE format('ALTER TABLE %I OWNER TO mapstudio_check', t); END LOOP; END \$\$"
+      rows_sql="SELECT (SELECT string_agg(kind_id || ':' || version || ':' || setup::text || ':' || updated_at, ',' ORDER BY kind_id) FROM mapstudio_kind_setup) || ' / ' || (SELECT string_agg(id || ':' || version || ':' || overrides::text || ':' || updated_at, ',' ORDER BY id) FROM mapstudio_item)"
+      rows_before="$(check_sql -c "${rows_sql}")"
+      restart_gateway
+      run_spec badrow
+      if wait_for_log "Project mapstudio-check: 3 stored rows (1 kind setup, 2 map items) checked against the tag path rule: 2 would be refused at their next save; nothing was changed." 60; then
+        expect_one_line "checked against the tag path rule" || true
+        expect_one_line "Project mapstudio-check: the kind setup of pad holds a tag path a save refuses: kpis[0].path: {asset.path}/a//b has an empty part between two /" || true
+        expect_one_line "Project mapstudio-check: the overrides of map item Bad path pad (c0ffee00-0000-4000-8000-00000000000a, kind pad) hold a tag path a save refuses: overrides: comms.path: [default]a//b has an empty part between two /" || true
+        [[ "$(log_lines "a save refuses" | wc -l)" -eq 2 ]] || fail "expected two warnings, one per failing row: $(log_lines "a save refuses" | wc -l)"
+      else
+        fail "no 'checked against the tag path rule' info line for mapstudio-check: $(log_lines "tag path rule" | sed 's/^.*\]: //')"
+      fi
+      [[ "$(check_sql -c "${rows_sql}")" == "${rows_before}" ]] || fail "a stored row changed: the report must not rewrite anything"
+      [[ "$(check_sql -c "SELECT count(*) FROM mapstudio_edit")" == "0" ]] || fail "the edit record gained rows"
+      ok "stored rows unchanged after the report: $(check_sql -c "SELECT count(*) FROM mapstudio_kind_setup") kind setup, $(check_sql -c "SELECT count(*) FROM mapstudio_item") map items"
       ;;
     *)
       fail "unknown scenario ${scenario}"

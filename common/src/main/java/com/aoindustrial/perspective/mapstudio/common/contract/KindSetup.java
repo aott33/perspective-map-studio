@@ -26,7 +26,8 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
  * </pre>
  *
  * <p>Tag paths are {@code {asset.path}}, {@code {asset.path}/<path>} or a full
- * {@code [provider]path}; an item override (a partial kind setup with the same parts, owner
+ * {@code [provider]path}, each by the one rule the tag lookups use ({@link TagPaths#fault}, entry
+ * 13a: no empty part, no bracket after the provider, no brace in a suffix); an item override (a partial kind setup with the same parts, owner
  * 2026-10-27) takes full paths only, and its {@code {kpi}} source is not checked against a
  * setup (it may name a KPI of the kind setup, which can change). A style rule names presets,
  * area tints name tints ({@link StylePresets}); never a colour code. Pure: the Designer, the
@@ -114,6 +115,70 @@ public final class KindSetup {
             styleRule(o.get("styleRule"), kind, override, kpiKeys, "styleRule");
         }
         return o.deepCopy();
+    }
+
+    /** One stored tag path the rule refuses: where it is ({@code kpis[0].path}), the path and why, in words. */
+    public record PathFault(String where, String path, String words) {
+
+        /** {@code "kpis[0].path: {asset.path}/a//b has an empty part ..."}: the refusal as a save would say it. */
+        public String refusal() {
+            return where + ": " + words;
+        }
+    }
+
+    /**
+     * The tag paths of a stored kind setup ({@code override} false) or of an item's stored overrides
+     * ({@code override} true) that the tag path rule refuses (entry 13a): comms, each KPI, alarms, a
+     * rule's path and a popup param's {@code {asset.path}/} suffix, each as {@link #parse} checks it.
+     * Reads only, changes nothing, and never throws: a part of another shape is passed over, since
+     * a stored row is refused only at its next save.
+     */
+    public static List<PathFault> pathFaults(JsonElement value, boolean override) {
+        List<PathFault> out = new ArrayList<>();
+        if (value == null || !value.isJsonObject()) {
+            return out;
+        }
+        JsonObject o = value.getAsJsonObject();
+        storedPath(out, o.get("comms"), "comms.path", override);
+        storedPath(out, o.get("alarms"), "alarms.path", override);
+        JsonElement kpis = o.get("kpis");
+        if (kpis != null && kpis.isJsonArray()) {
+            for (int i = 0; i < kpis.getAsJsonArray().size(); i++) {
+                storedPath(out, kpis.getAsJsonArray().get(i), "kpis[" + i + "].path", override);
+            }
+        }
+        JsonElement rule = o.get("styleRule");
+        if (rule != null && rule.isJsonObject()) {
+            storedPath(out, rule.getAsJsonObject().get("source"), "styleRule.source.path", override);
+        }
+        JsonElement view = o.get("popupView");
+        JsonElement params = view != null && view.isJsonObject() ? view.getAsJsonObject().get("params") : null;
+        if (params != null && params.isJsonObject()) {
+            for (Map.Entry<String, JsonElement> param : params.getAsJsonObject().entrySet()) {
+                String text = isString(param.getValue()) ? param.getValue().getAsString() : "";
+                if (!text.startsWith(Placeholders.ASSET_PATH + "/")) {
+                    continue;
+                }
+                TagPaths.Fault fault = TagPaths.fault(text);
+                if (fault != null && fault != TagPaths.Fault.NO_SUFFIX) {
+                    out.add(new PathFault("popupView.params." + Rows.echo(param.getKey()), text,
+                        Placeholders.faultWords(text, fault, true)));
+                }
+            }
+        }
+        return out;
+    }
+
+    private static void storedPath(List<PathFault> out, JsonElement holder, String where, boolean override) {
+        JsonElement path = holder != null && holder.isJsonObject() ? holder.getAsJsonObject().get("path") : null;
+        if (!isString(path)) {
+            return;
+        }
+        try {
+            Placeholders.checkTagPath(path.getAsString(), !override);
+        } catch (InvalidValue ex) {
+            out.add(new PathFault(where, path.getAsString(), ex.getMessage()));
+        }
     }
 
     private static Set<String> kpis(JsonElement v, boolean relative) {

@@ -5,7 +5,7 @@
 import { readSetup } from '../kindSetup';
 import {
     ALARMS_ROW, ASSET_MISSING_NOTE, COMMS_ROW, OFF_IN_POPUP, UNLINKED_NOTE, isFullTagPath, appliedParts, applyRowEdit, changeWords, isApplied, kpiLabelsOf, kpiRow, liveNowBlock, openSetupText,
-    overrideChanges, overrideLabel, overridePath, overrideSentence, ownRuleApplied, pathProblem, refusalWords, rowKey, rowWords, sameOverrides
+    overrideChanges, overrideLabel, overridePath, overrideSentence, ownRuleApplied, pathProblem, refusalWords, rowKey, rowWords, sameOverrides, tagPathFault
 } from '../itemOverrides';
 import { ItemValues, LiveValue } from '../live';
 import { ItemView } from '../placeholders';
@@ -182,12 +182,39 @@ describe('the full-path check and a refusal\'s words (L6, L7)', () => {
         expect(pathProblem('{asset.path}')).toBe("an override's tag path is a full path such as [default]Mesa/P12/Pressure, not {asset.path}.");
         expect(pathProblem('Mesa/X')).toBe('Mesa/X is not a tag path; use a full path such as [default]Shared/GasPrice.');
         expect(pathProblem('  ')).toBe('a tag path is needed.');
-        // The Gateway's rule and sentence per case (Placeholders.checkTagPath for an override, isFullPath, isAssetSuffix).
+        // The Gateway's rule and sentence per case (Placeholders.checkTagPath for an override, TagPaths.fault).
         const notPath = (v: string) => v + ' is not a tag path; use a full path such as [default]Shared/GasPrice.';
-        for (const v of ['[default]', '[default]a{item.id}', '[a][b]x', '[]x', '[x', '{asset.path}foo', '{asset.path}/', '{asset.path}/a{b}', '{item.name}', '[default]a}']) {
+        for (const v of ['[default]', '[]x', '[x', '{asset.path}foo', '{asset.path}/', '{item.name}']) {
             expect(pathProblem(v)).toBe(notPath(v));
             expect(isFullTagPath(v)).toBe(false);
         }
+        // Entry 13a, G3: what tags.resolve refuses is refused here first, in the Gateway's words (PlaceholdersTest's vectors).
+        expect(pathProblem('[default]a//b')).toBe('[default]a//b has an empty part between two /; a tag path has a name between every two /.');
+        expect(pathProblem('[default]a/ /b')).toContain('has an empty part between two /');
+        expect(pathProblem('[default]/Mesa/P12')).toContain('has an empty part between two /');
+        // Below the asset and malformed: the full-path rule, once, before the fault of its form.
+        for (const v of ['{asset.path}/a//b', '{asset.path}/a[0]', '{asset.path}/a{b}']) {
+            expect(pathProblem(v)).toBe("an override's tag path is a full path such as [default]Mesa/P12/Pressure, not " + v + '.');
+        }
+        const bracket = (v: string) => v + ' has a [ or ] after its start; a tag path names its provider once, at its start.';
+        for (const v of ['[a][b]x', '[default]a[0]', '[default]a/b]']) {
+            expect(pathProblem(v)).toBe(bracket(v));
+        }
+        const brace = (v: string) => v + ' has a { or } inside it; braces only mark {asset.path} at the start of a tag path.';
+        for (const v of ['[default]a{item.id}', '[default]a}']) {
+            expect(pathProblem(v)).toBe(brace(v));
+        }
+        expect(pathProblem('[~]Mesa/P12')).toBe('[~]Mesa/P12 does not name its provider; use a full path such as [default]Shared/GasPrice, not a relative one.');
+        expect(pathProblem('[.]X')).toContain('does not name its provider');
+        expect(pathProblem('[default]' + 'a'.repeat(1024))).toBe('the tag path is longer than 1024 characters.');
+        for (const v of ['[default]a//b', '[a][b]x', '[default]a}', '[~]x', '{asset.path}/X']) {
+            expect(isFullTagPath(v)).toBe(false);
+        }
+        // A trailing / is not a part, as for a lookup.
+        expect(pathProblem('[default]Mesa/P12/')).toBe('');
+        expect(tagPathFault('{asset.path}/Meter/Flow/')).toBeNull();
+        expect(tagPathFault('{asset.path}')).toBeNull();
+        expect(tagPathFault('')).toBe('empty');
         expect(['[default]a', '[edge]A/B C', '[d]x'].every((v) => pathProblem(v) === '' && isFullTagPath(v))).toBe(true);
         // As the Gateway repeats a long value: 64 characters, then "...".
         expect(pathProblem('x'.repeat(70))).toBe('x'.repeat(64) + '... is not a tag path; use a full path such as [default]Shared/GasPrice.');

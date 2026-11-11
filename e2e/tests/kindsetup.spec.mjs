@@ -93,6 +93,21 @@ editorTest.describe('kind setups and item checks', () => {
             }
             await expectInvalid(page, batch(pad({ popupView: { path: 'Popups/PadDetails', params: { mapItem: '{item.id}' } } })),
                 /popupView\.params\.mapItem: the popup view always receives the map item/);
+            // Entry 13a (G1, G2): the save rule is the rule tags.resolve reads a path by, for a kind setup's paths and a param's suffix.
+            const kpi = (path) => pad({ kpis: [{ ...PAD_SETUP.kpis[0], path }, PAD_SETUP.kpis[1]] });
+            await expectInvalid(page, batch(kpi('{asset.path}/a//b')),
+                /^Op 0 \(pad\): kpis\[0\]\.path: \{asset\.path\}\/a\/\/b has an empty part between two \/; a tag path has a name between every two \/\.$/);
+            await expectInvalid(page, batch(kpi('{asset.path}/a[0]')),
+                /^Op 0 \(pad\): kpis\[0\]\.path: \{asset\.path\}\/a\[0\] has a \[ or \] after its start; a tag path names its provider once, at its start\.$/);
+            await expectInvalid(page, batch(pad({ comms: { path: '[default]a//b', on: true } })),
+                /^Op 0 \(pad\): comms\.path: \[default\]a\/\/b has an empty part between two \//);
+            await expectInvalid(page, batch(pad({ alarms: { path: '[default]a//b' } })), /^Op 0 \(pad\): alarms\.path: \[default\]a\/\/b has an empty part/);
+            await expectInvalid(page, batch(pad({ popupView: { path: 'Popups/PadDetails', params: { pressure: '{asset.path}/a//b' } } })),
+                /^Op 0 \(pad\): popupView\.params\.pressure: \{asset\.path\}\/a\/\/b has an empty part between two \//);
+            // What the lookup refuses, the save refuses, and the other way round: tags.resolve on the same path.
+            const asked = await send(page, 'tags.resolve', { kindId: 'pad', assetId: 'P12', path: '{asset.path}/a//b' });
+            expect(asked.type, JSON.stringify(asked.body)).toBe('error');
+            expect(asked.body.code).toBe('invalid');
             for (const preset of ['red', '#ff0000']) {
                 await expectInvalid(page, batch(pad({ styleRule: { source: { kpi: 'pressure' }, type: 'states',
                     cases: [{ value: 1, preset }] } })), /Pick a preset: normal, attention, warning, fault, dimmed; colour codes are not accepted\.$/);
@@ -146,6 +161,9 @@ editorTest.describe('kind setups and item checks', () => {
             /properties\.colour is not a form field of kind pad/);
         await expectInvalid(page, batch(createItem({ kind: 'pad', geometry: point,
             overrides: { kpis: [{ key: 'x', path: '{asset.path}/X' }] } })), /an override's tag path is a full path/);
+        // Entry 13a (G3): an override's path by the same rule.
+        await expectInvalid(page, batch(createItem({ kind: 'pad', geometry: point, overrides: { comms: { path: '[default]a//b' } } })),
+            /: overrides: comms\.path: \[default\]a\/\/b has an empty part between two \/; a tag path has a name between every two \/\.$/);
     });
 
     editorTest('system.mapstudio.applyEdits saves a kind setup that getMap returns unchanged', async ({ page }) => {

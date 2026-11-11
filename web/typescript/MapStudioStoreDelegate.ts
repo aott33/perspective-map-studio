@@ -686,7 +686,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.resolveAsks.delete(reply.id);
         const state: ResolveState = reply.kind === 'error' ? { state: 'failed', message: reply.body.message }
             : reply.body.relative && reply.body.n !== undefined && reply.body.m !== undefined
-                ? { state: 'resolved', n: reply.body.n, m: reply.body.m } : { state: 'shared' };
+                ? {
+                    state: 'resolved', n: reply.body.n, m: reply.body.m,
+                    ...(reply.body.failing ? { failing: reply.body.failing.map((f) => f.name), failingMore: reply.body.failingMore || 0 } : {})
+                } : { state: 'shared' };
         this.resolves = { ...this.resolves, [ask.key]: state };
         console.debug('[MapStudio] ' + replyText(reply));
         this.notify();

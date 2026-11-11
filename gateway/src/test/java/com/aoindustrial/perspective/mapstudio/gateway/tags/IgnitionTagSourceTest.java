@@ -48,6 +48,13 @@ class IgnitionTagSourceTest {
     final List<CompletableFuture<?>> futures = new CopyOnWriteArrayList<>();
 
     IgnitionTagSource source(long timeoutMs) {
+        return new IgnitionTagSource(manager(), null, timeoutMs);
+    }
+
+    /** How often the stub was asked for its provider names. */
+    final java.util.concurrent.atomic.AtomicInteger namesAsked = new java.util.concurrent.atomic.AtomicInteger();
+
+    GatewayTagManager manager() {
         TagProvider provider = (TagProvider) Proxy.newProxyInstance(TagProvider.class.getClassLoader(),
             new Class<?>[] {TagProvider.class}, (proxy, method, args) -> {
                 if (method.getName().equals("browseAsync")) {
@@ -61,13 +68,15 @@ class IgnitionTagSourceTest {
                 }
                 return null;
             });
-        GatewayTagManager manager = (GatewayTagManager) Proxy.newProxyInstance(GatewayTagManager.class.getClassLoader(),
+        return (GatewayTagManager) Proxy.newProxyInstance(GatewayTagManager.class.getClassLoader(),
             new Class<?>[] {GatewayTagManager.class}, (proxy, method, args) -> switch (method.getName()) {
-                case "getTagProviderNames" -> List.of("default");
+                case "getTagProviderNames" -> {
+                    namesAsked.incrementAndGet();
+                    yield List.of("default");
+                }
                 case "getTagProvider" -> "default".equalsIgnoreCase((String) args[0]) ? provider : null;
                 default -> null;
             });
-        return new IgnitionTagSource(manager, null, timeoutMs);
     }
 
     static CompletableFuture<Results<NodeDescription>> done(Results<NodeDescription> r) {
@@ -158,6 +167,47 @@ class IgnitionTagSourceTest {
         answer = p -> done(Results.error(QualityCode.Bad_AccessDenied));
         assertEquals("tags-unavailable", refused(() -> source(1000).browse("default", "Mesa", ROLES, 10)).code());
         assertFalse(source(1000).browse("nope", "", ROLES, 10).found(), "an unknown provider has no folder");
+    }
+
+    @Test
+    void aStoppedProviderIsConfiguredButNotRunningAndALookupOfItIsTagsUnavailable() {
+        // Entry 13a, G10 (live 8.3.10): the tag manager lists "default" only; the Gateway's config still holds Site2.
+        java.util.concurrent.atomic.AtomicInteger configRead = new java.util.concurrent.atomic.AtomicInteger();
+        IgnitionTagSource s = new IgnitionTagSource(manager(), null, 1000, () -> {
+            configRead.incrementAndGet();
+            return List.of("default", "Site2");
+        });
+        assertEquals(List.of("Site2"), s.stopped());
+        MapStudioException browse = refused(() -> s.browse("Site2", "", ROLES, 10));
+        assertEquals("tags-unavailable", browse.code());
+        assertEquals("The tag provider Site2 is on this Gateway but does not answer; it is stopped or faulted. Start it on"
+            + " the Gateway's tag provider page.", browse.plainMessage());
+        MapStudioException existing = refused(() -> s.existing(List.of("[default]Mesa/P12/Pressure", "[site2]Yard/Tank1/Level"),
+            ROLES));
+        assertEquals("tags-unavailable", existing.code());
+        // Named as the Gateway spells it, whatever the caller wrote.
+        assertTrue(existing.plainMessage().startsWith("The tag provider Site2 is on this Gateway"), existing.plainMessage());
+        assertEquals("The tag provider Site2 is on this Gateway but does not answer; it is stopped or faulted. Start it on"
+            + " the Gateway's tag provider page.", refused(() -> s.browse("SITE2", "", ROLES, 10)).plainMessage());
+        // A provider the Gateway does not have at all is still only missing.
+        assertFalse(s.browse("nope", "", ROLES, 10).found());
+        assertEquals(Set.of(), s.existing(List.of("[nope]Mesa/P12/Pressure"), ROLES));
+        // Many parents on a provider the Gateway does not have: its providers are read once for the call, not per parent.
+        configRead.set(0);
+        namesAsked.set(0);
+        List<String> many = new java.util.ArrayList<>();
+        for (int i = 0; i < 40; i++) {
+            many.add("[nope]Mesa/P" + i + "/Pressure");
+        }
+        assertEquals(Set.of(), s.existing(many, ROLES));
+        assertEquals(1, configRead.get());
+        assertTrue(namesAsked.get() <= 2, "provider names asked " + namesAsked.get() + " times");
+        // The config cannot be read: the lookups go on, with no provider known as stopped.
+        IgnitionTagSource blind = new IgnitionTagSource(manager(), null, 1000, () -> {
+            throw new IllegalStateException("no config");
+        });
+        assertEquals(List.of(), blind.stopped());
+        assertFalse(blind.browse("Site2", "", ROLES, 10).found());
     }
 
     @Test

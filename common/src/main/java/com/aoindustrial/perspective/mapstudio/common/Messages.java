@@ -64,7 +64,11 @@ public final class Messages {
     public static final String TAGS_BROWSE_REPLY = "tags.browse.reply";
     /** Browser turns a picked tag path asset-relative: body {kindId, assetId, path} (entry 15). */
     public static final String TAGS_RESOLVE = "tags.resolve";
-    /** Body {path, relative, n?, m?}: {@code n} and {@code m} only when {@code relative} (entry 15). */
+    /**
+     * Body {path, relative, n?, m?, failing?, failingMore?}: {@code n} and {@code m} only when {@code relative}
+     * (entry 15); {@code failing} (at most 20 {id, name}, by name) and {@code failingMore} only when {@code n} is
+     * below {@code m} (0.4.0, epic 4 entry 13a).
+     */
     public static final String TAGS_RESOLVE_REPLY = "tags.resolve.reply";
     /**
      * Live values to an open map (AD-6, epic 3 entry 5): body {seq, full, items: [{id, comms?, kpis: {key:

@@ -3,6 +3,9 @@ package com.aoindustrial.perspective.mapstudio.gateway.load;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import com.inductiveautomation.ignition.common.gson.JsonArray;
@@ -17,6 +20,7 @@ import com.aoindustrial.perspective.mapstudio.common.contract.Kind;
 import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
+import com.aoindustrial.perspective.mapstudio.common.contract.Rows;
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 import com.aoindustrial.perspective.mapstudio.gateway.adapter.AdapterSnapshot;
 import com.aoindustrial.perspective.mapstudio.gateway.store.HistoryPage;
@@ -65,14 +69,49 @@ public final class MapLoader {
     public record Loaded(Snapshot snapshot, String readOnly) {
     }
 
+    private static final LoggerEx storeLog = LoggerEx.newBuilder().build("MapStudio.store");
+
     private final StoreGate gate;
     private final MapStore store;
     private final Function<String, AdapterSnapshot> adapters;
+    /** The projects whose stored tag paths were reported since this Gateway (this module) started (entry 13a). */
+    private final Set<String> pathsReported = ConcurrentHashMap.newKeySet();
+    private final Consumer<StoredPathReport> pathReports;
 
     public MapLoader(StoreGate gate, MapStore store, Function<String, AdapterSnapshot> adapters) {
+        this(gate, store, adapters, MapLoader::logPaths);
+    }
+
+    /** With another sink for the stored tag path report (tests). */
+    MapLoader(StoreGate gate, MapStore store, Function<String, AdapterSnapshot> adapters,
+            Consumer<StoredPathReport> pathReports) {
         this.gate = gate;
         this.store = store;
         this.adapters = adapters;
+        this.pathReports = pathReports;
+    }
+
+    /** One warning per stored row the tag path rule refuses, then one info line (logger MapStudio.store). */
+    private static void logPaths(StoredPathReport report) {
+        report.warnings().forEach(storeLog::warn);
+        storeLog.info(report.info());
+    }
+
+    /**
+     * The first read of a project's store after the Gateway starts reports the stored tag paths the
+     * rule would refuse (entry 13a). The rows are read as they are and returned unchanged; a report
+     * that fails never fails the read.
+     */
+    private void reportPaths(String project, Snapshot snapshot) {
+        if (!pathsReported.add(project)) {
+            return;
+        }
+        try {
+            pathReports.accept(StoredPathReport.of(project, snapshot.kindSetups(), snapshot.items()));
+        } catch (RuntimeException ex) {
+            storeLog.warnf("Project %s: its stored tag paths could not be checked against the tag path rule (%s).",
+                Rows.echo(project), ex.getClass().getSimpleName());
+        }
     }
 
     /** @throws MapStudioException {@code store-unreachable} when the project's map store cannot be read */
@@ -89,10 +128,11 @@ public final class MapLoader {
     private Loaded load(String project, StoreGate.Readable readable, boolean withChanged) {
         Setup setup = readable.setup();
         try {
-            return new Loaded(store.inTransaction(setup.connection(),
+            Snapshot snapshot = store.inTransaction(setup.connection(),
                 tx -> new Snapshot(tx.currentSeq(project), tx.liveItems(project), tx.liveKindSetups(project),
-                    withChanged ? tx.lastEdits(project) : Map.of())),
-                readable.readOnly());
+                    withChanged ? tx.lastEdits(project) : Map.of()));
+            reportPaths(project, snapshot);
+            return new Loaded(snapshot, readable.readOnly());
         } catch (SQLException ex) {
             log.errorf("Map Studio could not read the map of project %s on database connection %s (SQLState %s): %s",
                 project, setup.connection(), ex.getSQLState(), ex.getClass().getSimpleName());

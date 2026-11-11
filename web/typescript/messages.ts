@@ -144,13 +144,16 @@ export interface TagsResolveBody {
 
 /**
  * `tags.resolve.reply`'s body: the path as the Gateway reads it, whether it is below the asset (`{asset.path}/...`), and for one
- * that is, the kind's linked map items it resolves for (`n`) of those with an asset (`m`).
+ * that is, the kind's linked map items it resolves for (`n`) of those with an asset (`m`) and, when `n` is below `m`, the items it
+ * does not resolve for (`failing`, at most 20 by name, entry 13a) and how many more there are (`failingMore`).
  */
 export interface TagsResolveReplyBody {
     path: string;
     relative: boolean;
     n?: number;
     m?: number;
+    failing?: { id: string; name: string }[];
+    failingMore?: number;
 }
 
 /** The `tags.resolve` message (epic 4 entry 12a): how many of a kind's linked map items a tag path resolves for; level full only. */
@@ -226,6 +229,14 @@ export function readReply(raw: unknown): Reply {
             if (typeof body.n === 'number' && typeof body.m === 'number') {
                 resolved.n = body.n;
                 resolved.m = body.m;
+                // The items it fails for (0.4.0, entry 13a): a malformed entry is left out, a Gateway without them reads as none.
+                if (Array.isArray(body.failing)) {
+                    resolved.failing = (body.failing as unknown[])
+                        .filter((f): f is { id: string; name: string } => typeof f === 'object' && f !== null
+                            && typeof (f as { id?: unknown }).id === 'string' && typeof (f as { name?: unknown }).name === 'string')
+                        .map((f) => ({ id: f.id, name: f.name }));
+                    resolved.failingMore = typeof body.failingMore === 'number' && body.failingMore > 0 ? Math.floor(body.failingMore) : 0;
+                }
             }
             return { kind: 'tags.resolve.reply', id: raw.id, body: resolved };
         }

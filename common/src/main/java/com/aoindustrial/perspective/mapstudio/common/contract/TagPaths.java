@@ -65,6 +65,99 @@ public final class TagPaths {
     }
 
     /**
+     * What is wrong with a tag path's form, one per refusal of the rule (entry 13a): the one rule every
+     * lookup and every stored tag path (a kind setup's, an item override's, a popup param's suffix) is
+     * checked by, here in {@link #fault}; each caller says it in its own words.
+     */
+    public enum Fault {
+        /** Null or empty. */
+        EMPTY,
+        /** Over {@link #MAX_LENGTH} characters. */
+        TOO_LONG,
+        /** Neither a {@code [provider]} nor a placeholder at its start. */
+        NO_PROVIDER,
+        /** {@code [~]}, {@code [.]}, a blank provider or one holding a bracket. */
+        RELATIVE_PROVIDER,
+        /** A provider and nothing after it. */
+        NO_PATH,
+        /** A placeholder at its start that is not {@code {asset.path}}, or text straight after it. */
+        OTHER_PLACEHOLDER,
+        /** {@code {asset.path}/} and nothing after it. */
+        NO_SUFFIX,
+        /** A {@code [} or {@code ]} after the provider, or after {@code {asset.path}/}. */
+        BRACKET,
+        /** A brace after the provider, or after {@code {asset.path}/}. */
+        BRACE,
+        /** An empty or blank part between two {@code /}. */
+        EMPTY_PART
+    }
+
+    /**
+     * The rule: null for a full path {@code [provider]a/b}, {@code {asset.path}} or
+     * {@code {asset.path}/<suffix>} (a trailing {@code /} is not counted), else what is wrong with it.
+     * No empty part ({@code a//b}), no bracket after the provider, no brace in a suffix. Pure.
+     */
+    public static Fault fault(String raw) {
+        if (raw == null || raw.isEmpty()) {
+            return Fault.EMPTY;
+        }
+        if (raw.length() > MAX_LENGTH) {
+            return Fault.TOO_LONG;
+        }
+        return raw.startsWith("{") ? relativeFault(raw) : fullFault(raw);
+    }
+
+    private static Fault fullFault(String raw) {
+        int close = raw.indexOf(']');
+        if (!raw.startsWith("[") || close < 2) {
+            return Fault.NO_PROVIDER;
+        }
+        String provider = raw.substring(1, close);
+        if (provider.equals("~") || provider.equals(".") || provider.indexOf('[') >= 0 || provider.isBlank()) {
+            return Fault.RELATIVE_PROVIDER;
+        }
+        String path = trimTrailing(raw.substring(close + 1));
+        if (path.isEmpty()) {
+            return Fault.NO_PATH;
+        }
+        return partsFault(path);
+    }
+
+    private static Fault relativeFault(String raw) {
+        if (raw.equals(Placeholders.ASSET_PATH)) {
+            return null;
+        }
+        String prefix = Placeholders.ASSET_PATH + "/";
+        if (!raw.startsWith(prefix)) {
+            return Fault.OTHER_PLACEHOLDER;
+        }
+        String suffix = trimTrailing(raw.substring(prefix.length()));
+        if (suffix.isEmpty()) {
+            return Fault.NO_SUFFIX;
+        }
+        return partsFault(suffix);
+    }
+
+    /** The path after the provider or after {@code {asset.path}/}: plain parts only. */
+    private static Fault partsFault(String path) {
+        if (path.indexOf('[') >= 0 || path.indexOf(']') >= 0) {
+            return Fault.BRACKET;
+        }
+        if (path.indexOf('{') >= 0 || path.indexOf('}') >= 0) {
+            return Fault.BRACE;
+        }
+        return segmentsOk(path) ? null : Fault.EMPTY_PART;
+    }
+
+    private static String trimTrailing(String path) {
+        int end = path.length();
+        while (end > 0 && path.charAt(end - 1) == '/') {
+            end--;
+        }
+        return path.substring(0, end);
+    }
+
+    /**
      * Read a full path {@code [provider]a/b}; a trailing {@code /} is trimmed.
      *
      * @throws MapStudioException {@code invalid} without a provider, with {@code [~]} or {@code [.]}
@@ -72,34 +165,21 @@ public final class TagPaths {
      *                            empty segment, with a brace (a placeholder), or over {@link #MAX_LENGTH}
      */
     public static Full parseFull(String raw) {
-        if (raw == null || raw.isEmpty()) {
-            throw invalid("The tag path is empty.");
-        }
-        if (raw.length() > MAX_LENGTH) {
-            throw invalid("The tag path is longer than " + MAX_LENGTH + " characters.");
+        Fault fault = raw == null || raw.isEmpty() ? Fault.EMPTY
+            : raw.length() > MAX_LENGTH ? Fault.TOO_LONG : fullFault(raw);
+        if (fault != null) {
+            throw invalid(switch (fault) {
+                case EMPTY -> "The tag path is empty.";
+                case TOO_LONG -> "The tag path is longer than " + MAX_LENGTH + " characters.";
+                case NO_PROVIDER -> "The tag path " + Rows.echo(raw) + " does not start with a [provider].";
+                case RELATIVE_PROVIDER -> "The tag path " + Rows.echo(raw) + " must name its provider, not a relative one.";
+                case NO_PATH -> "The tag path " + Rows.echo(raw) + " names a provider but no tag or folder.";
+                case EMPTY_PART -> "The tag path " + Rows.echo(raw) + " has an empty part between two /.";
+                default -> "The tag path " + Rows.echo(raw) + " holds a bracket or a brace after its provider.";
+            });
         }
         int close = raw.indexOf(']');
-        if (!raw.startsWith("[") || close < 2) {
-            throw invalid("The tag path " + Rows.echo(raw) + " does not start with a [provider].");
-        }
-        String provider = raw.substring(1, close);
-        if (provider.equals("~") || provider.equals(".") || provider.indexOf('[') >= 0 || provider.isBlank()) {
-            throw invalid("The tag path " + Rows.echo(raw) + " must name its provider, not a relative one.");
-        }
-        String path = raw.substring(close + 1);
-        while (path.endsWith("/")) {
-            path = path.substring(0, path.length() - 1);
-        }
-        if (path.isEmpty()) {
-            throw invalid("The tag path " + Rows.echo(raw) + " names a provider but no tag or folder.");
-        }
-        if (path.indexOf('[') >= 0 || path.indexOf(']') >= 0 || path.indexOf('{') >= 0 || path.indexOf('}') >= 0) {
-            throw invalid("The tag path " + Rows.echo(raw) + " holds a bracket or a brace after its provider.");
-        }
-        if (!segmentsOk(path)) {
-            throw invalid("The tag path " + Rows.echo(raw) + " has an empty part between two /.");
-        }
-        return new Full(provider, path);
+        return new Full(raw.substring(1, close), trimTrailing(raw.substring(close + 1)));
     }
 
     /**
@@ -144,25 +224,22 @@ public final class TagPaths {
     }
 
     private static Resolved relative(String raw) {
-        if (raw.length() > MAX_LENGTH) {
+        Fault fault = raw.length() > MAX_LENGTH ? Fault.TOO_LONG : relativeFault(raw);
+        String prefix = Placeholders.ASSET_PATH + "/";
+        if (fault == Fault.TOO_LONG) {
             throw invalid("The tag path is longer than " + MAX_LENGTH + " characters.");
+        }
+        if (fault == Fault.OTHER_PLACEHOLDER) {
+            throw invalid("The tag path " + Rows.echo(raw) + " uses a placeholder other than "
+                    + Placeholders.ASSET_PATH + ".");
+        }
+        if (fault != null) {
+            throw invalid("The tag path " + Rows.echo(raw) + " needs a plain path after " + prefix + ".");
         }
         if (raw.equals(Placeholders.ASSET_PATH)) {
             return new Resolved(Placeholders.ASSET_PATH, true, "");
         }
-        String prefix = Placeholders.ASSET_PATH + "/";
-        if (!raw.startsWith(prefix)) {
-            throw invalid("The tag path " + Rows.echo(raw) + " uses a placeholder other than "
-                    + Placeholders.ASSET_PATH + ".");
-        }
-        String suffix = raw.substring(prefix.length());
-        while (suffix.endsWith("/")) {
-            suffix = suffix.substring(0, suffix.length() - 1);
-        }
-        if (suffix.isEmpty() || suffix.indexOf('[') >= 0 || suffix.indexOf(']') >= 0 || suffix.indexOf('{') >= 0
-                || suffix.indexOf('}') >= 0 || !segmentsOk(suffix)) {
-            throw invalid("The tag path " + Rows.echo(raw) + " needs a plain path after " + prefix + ".");
-        }
+        String suffix = trimTrailing(raw.substring(prefix.length()));
         return new Resolved(prefix + suffix, true, suffix);
     }
 

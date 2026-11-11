@@ -126,8 +126,18 @@ public final class Placeholders {
         }
         try {
             List<String> found = placeholders(value, fieldKeys);
-            if (found.isEmpty() || (found.size() == 1 && found.get(0).equals(value)) || isAssetSuffix(value)) {
+            if (found.isEmpty() || (found.size() == 1 && found.get(0).equals(value))) {
                 return;
+            }
+            // {asset.path}/ and a tag path: the suffix by the one tag path rule (TagPaths, entry 13a).
+            if (found.size() == 1 && value.startsWith(ASSET_PATH + "/")) {
+                TagPaths.Fault fault = TagPaths.fault(value);
+                if (fault == null) {
+                    return;
+                }
+                if (fault != TagPaths.Fault.NO_SUFFIX) {
+                    throw new InvalidValue(faultWords(value, fault, true));
+                }
             }
         } catch (InvalidValue ex) {
             throw new InvalidValue(Rows.echo(name) + ": " + ex.getMessage());
@@ -137,8 +147,10 @@ public final class Placeholders {
     }
 
     /**
-     * A tag path: {@code {asset.path}} or {@code {asset.path}/<suffix>} (when
-     * {@code assetRelativeAllowed}), or a full {@code [provider]path}.
+     * A stored tag path, by the one rule the lookups use ({@link TagPaths#fault}, entry 13a):
+     * {@code {asset.path}} or {@code {asset.path}/<suffix>} (when {@code assetRelativeAllowed}), or a
+     * full {@code [provider]path}; no empty part ({@code a//b}), no bracket after the provider, no
+     * brace in a suffix.
      *
      * @throws InvalidValue naming the problem
      */
@@ -146,36 +158,34 @@ public final class Placeholders {
         if (value == null || value.isBlank()) {
             throw new InvalidValue("a tag path is needed.");
         }
-        if (value.equals(ASSET_PATH) || isAssetSuffix(value)) {
-            if (!assetRelativeAllowed) {
-                throw new InvalidValue("an override's tag path is a full path such as [default]Mesa/P12/Pressure, not "
-                    + Rows.echo(value) + ".");
-            }
-            return;
+        TagPaths.Fault fault = TagPaths.fault(value);
+        // An override's full-path rule first: a path below the asset is told that once, whatever else is wrong with it.
+        boolean belowAsset = value.equals(ASSET_PATH)
+            || (value.startsWith(ASSET_PATH + "/") && fault != TagPaths.Fault.NO_SUFFIX && fault != TagPaths.Fault.TOO_LONG);
+        if (belowAsset && !assetRelativeAllowed) {
+            throw new InvalidValue("an override's tag path is a full path such as [default]Mesa/P12/Pressure, not "
+                + Rows.echo(value) + ".");
         }
-        if (isFullPath(value)) {
-            return;
+        if (fault != null) {
+            throw new InvalidValue(faultWords(value, fault, assetRelativeAllowed));
         }
-        throw new InvalidValue(Rows.echo(value) + " is not a tag path; use " + (assetRelativeAllowed
-            ? "{asset.path}, {asset.path}/<path> or a full path such as [default]Shared/GasPrice."
-            : "a full path such as [default]Shared/GasPrice."));
     }
 
-    /** {@code {asset.path}/} then a non-empty suffix with no braces. */
-    static boolean isAssetSuffix(String value) {
-        String prefix = ASSET_PATH + "/";
-        if (!value.startsWith(prefix) || value.length() == prefix.length()) {
-            return false;
-        }
-        String suffix = value.substring(prefix.length());
-        return suffix.indexOf('{') < 0 && suffix.indexOf('}') < 0 && !suffix.isBlank();
-    }
-
-    /** {@code [provider]path}: a non-empty provider, then a non-empty path, no braces. */
-    static boolean isFullPath(String value) {
-        int close = value.indexOf(']');
-        return value.startsWith("[") && close > 1 && close < value.length() - 1
-            && value.indexOf('{') < 0 && value.indexOf('}') < 0 && value.indexOf('[', 1) < 0;
+    /** A fault of the rule in the words of a refused save; the browser says the same (itemOverrides.ts). */
+    static String faultWords(String value, TagPaths.Fault fault, boolean assetRelativeAllowed) {
+        String path = Rows.echo(value);
+        return switch (fault) {
+            case EMPTY -> "a tag path is needed.";
+            case TOO_LONG -> "the tag path is longer than " + TagPaths.MAX_LENGTH + " characters.";
+            case EMPTY_PART -> path + " has an empty part between two /; a tag path has a name between every two /.";
+            case BRACKET -> path + " has a [ or ] after its start; a tag path names its provider once, at its start.";
+            case BRACE -> path + " has a { or } inside it; braces only mark {asset.path} at the start of a tag path.";
+            case RELATIVE_PROVIDER -> path + " does not name its provider; use a full path such as"
+                + " [default]Shared/GasPrice, not a relative one.";
+            default -> path + " is not a tag path; use " + (assetRelativeAllowed
+                ? "{asset.path}, {asset.path}/<path> or a full path such as [default]Shared/GasPrice."
+                : "a full path such as [default]Shared/GasPrice.");
+        };
     }
 
     /**

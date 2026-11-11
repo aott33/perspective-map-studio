@@ -183,10 +183,15 @@ editorTest.describe('the Kinds surface at 1366 px', () => {
             const note = field(page, 'kpis.pressure.path').locator('.mapstudio-resolve-note');
             await expect(note).toHaveAttribute('data-state', 'resolved', { timeout: REPLY_MS });
             const words = (await note.innerText()).trim();
-            expect(words).toMatch(/^Resolves for [0-5] of 5 well pads$/);
+            // Entry 13a (G6): fewer than all names the items it fails for, here the pad linked to P15, by its name.
+            expect(words).toMatch(/^Resolves for [0-4] of 5 well pads\. Not for .+\.$/);
             const n = Number(words.match(/for (\d)/)[1]);
             await expect(note).toHaveAttribute('data-warning', n < 5 ? 'true' : 'false');
-            expect(n).toBeLessThan(5);
+            expect(n).toBe(4);
+            const loaded = (await send(page, 'map.load', {})).body;
+            const onP15 = loaded.items.filter((i) => i.kind === 'pad' && i.assetId === 'P15').map((i) => i.name);
+            expect(onP15).toHaveLength(1);
+            expect(words).toBe('Resolves for 4 of 5 well pads. Not for ' + onP15[0] + '.');
             const warning = await page.evaluate(() => {
                 const probe = document.createElement('span');
                 probe.style.color = 'var(--mapstudio-warning)';
@@ -196,8 +201,8 @@ editorTest.describe('the Kinds surface at 1366 px', () => {
                 return color;
             });
             expect(await note.evaluate((el) => getComputedStyle(el).color)).toBe(warning);
-            await expect(field(page, 'comms.path').locator('.mapstudio-resolve-note')).toHaveText(/^Resolves for [0-5] of 5 well pads$/, { timeout: REPLY_MS });
-            await expect(field(page, 'alarms.path').locator('.mapstudio-resolve-note')).toHaveText(/^Resolves for [0-5] of 5 well pads$/, { timeout: REPLY_MS });
+            await expect(field(page, 'comms.path').locator('.mapstudio-resolve-note')).toHaveText(/^Resolves for [0-5] of 5 well pads(\. Not for .+\.)?$/, { timeout: REPLY_MS });
+            await expect(field(page, 'alarms.path').locator('.mapstudio-resolve-note')).toHaveText(/^Resolves for [0-5] of 5 well pads(\. Not for .+\.)?$/, { timeout: REPLY_MS });
             await shot(page, 'mapstudio-kinds-1366.png');
 
             // The preview item chosen is remembered for the browser session: after a reload Kinds opens on it.

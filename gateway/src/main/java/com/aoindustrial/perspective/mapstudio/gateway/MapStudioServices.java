@@ -105,7 +105,8 @@ public final class MapStudioServices {
         this.writes = new WriteService(gate, store, changes, adapters::snapshot);
         this.loader = new MapLoader(gate, store, adapters::snapshot);
         this.tags = new TagLookups(setups, gate, store, adapters::snapshot,
-            new IgnitionTagSource(context.getTagManager(), context.getProjectManager()));
+            new IgnitionTagSource(context.getTagManager(), context.getProjectManager(),
+                context.getConfigurationManager()));
         this.basemaps = new BasemapSources(new IgnitionTokenSource(context.getSecretProviderManager()));
         this.scriptModule = new GatewayScriptModule(writes, loader, adapters);
         this.liveThread = Executors.newSingleThreadScheduledExecutor(daemon("MapStudio-live"));

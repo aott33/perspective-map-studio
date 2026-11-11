@@ -105,6 +105,82 @@ class PlaceholdersTest {
         }
     }
 
+    @Test
+    void aStoredTagPathIsCheckedByTheRuleTheLookupsUse() {
+        // Entry 13a: what tags.resolve refuses, a save refuses too, in words naming the path.
+        assertEquals("{asset.path}/a//b has an empty part between two /; a tag path has a name between every two /.",
+            refusedPath("{asset.path}/a//b", true));
+        assertEquals("[default]a//b has an empty part between two /; a tag path has a name between every two /.",
+            refusedPath("[default]a//b", true));
+        assertEquals("[default]a//b has an empty part between two /; a tag path has a name between every two /.",
+            refusedPath("[default]a//b", false));
+        assertEquals("{asset.path}/a[0] has a [ or ] after its start; a tag path names its provider once, at its start.",
+            refusedPath("{asset.path}/a[0]", true));
+        assertTrue(refusedPath("[default]a/b]", true).contains("has a [ or ] after its start"));
+        assertTrue(refusedPath("[default]a/[x]b", false).contains("has a [ or ] after its start"));
+        assertTrue(refusedPath("{asset.path}/a/{item.name}", true).contains("has a { or } inside it"));
+        assertTrue(refusedPath("[default]a/ /b", true).contains("has an empty part"));
+        assertEquals("[~]Mesa/P12 does not name its provider; use a full path such as [default]Shared/GasPrice, not a"
+            + " relative one.", refusedPath("[~]Mesa/P12", true));
+        assertTrue(refusedPath("[.]X", false).contains("does not name its provider"));
+        // An override below the asset is told the full-path rule, once, before any fault of its form.
+        for (String below : new String[] {"{asset.path}/a//b", "{asset.path}/a[0]", "{asset.path}/a{b}", "{asset.path}/X"}) {
+            assertEquals("an override's tag path is a full path such as [default]Mesa/P12/Pressure, not " + below + ".",
+                refusedPath(below, false));
+        }
+        assertTrue(refusedPath("{asset.path}/", false).contains("is not a tag path; use a full path"));
+        assertEquals("the tag path is longer than 1024 characters.",
+            refusedPath("[default]" + "a".repeat(TagPaths.MAX_LENGTH), true));
+        // The words kept from before the rule was shared.
+        assertEquals("Mesa/P12 is not a tag path; use {asset.path}, {asset.path}/<path> or a full path such as"
+            + " [default]Shared/GasPrice.", refusedPath("Mesa/P12", true));
+        assertEquals("Mesa/P12 is not a tag path; use a full path such as [default]Shared/GasPrice.",
+            refusedPath("Mesa/P12", false));
+        assertEquals("a tag path is needed.", refusedPath(" ", true));
+        // A trailing / is not a part, as for a lookup.
+        for (String ok : new String[] {"{asset.path}/Meter/Flow/", "[default]Mesa/P12/", "[Site 2]Yard/Tank 1/Level"}) {
+            assertDoesNotThrow(() -> Placeholders.checkTagPath(ok, true), ok);
+        }
+    }
+
+    @Test
+    void everyPathTheRuleRefusesIsRefusedAtSaveAndTheOtherWayRound() {
+        // One rule: a full or asset-relative path passes checkTagPath exactly when TagPaths.resolve takes it.
+        for (String path : new String[] {"{asset.path}", "{asset.path}/Comms", "{asset.path}/a//b", "{asset.path}/a[0]",
+            "{asset.path}/", "{asset.path}X", "{asset.id}/X", "{asset.path}/{x}", "[default]a//b", "[default]a/b",
+            "[default]", "[]Mesa", "[~]Mesa/P12", "[.]X", "Mesa/P12", "[default]Mesa/{asset.path}", "[default]a]b",
+            "[default]/Mesa/P12", "[default]Mesa/P12/"}) {
+            boolean lookup = true;
+            try {
+                TagPaths.resolve(path, "[default]Mesa/P12");
+            } catch (MapStudioException ex) {
+                lookup = false;
+            }
+            boolean save = true;
+            try {
+                Placeholders.checkTagPath(path, true);
+            } catch (InvalidValue ex) {
+                save = false;
+            }
+            assertEquals(lookup, save, path);
+        }
+    }
+
+    @Test
+    void aParamsSuffixIsATagPathByTheSameRule() {
+        assertEquals("pressure: {asset.path}/a//b has an empty part between two /; a tag path has a name between every"
+            + " two /.", refusedParam("pressure", "{asset.path}/a//b"));
+        assertTrue(refusedParam("pressure", "{asset.path}/a[0]").contains("has a [ or ] after its start"));
+        assertTrue(refusedParam("pressure", "{asset.path}/").contains("mixes text and placeholders"));
+        // A literal is not a tag path: it is the view's own business.
+        assertDoesNotThrow(() -> Placeholders.checkParam("p", "a//b", FIELDS));
+        assertDoesNotThrow(() -> Placeholders.checkParam("p", "{asset.path}/Meter/Flow/", FIELDS));
+    }
+
+    private static String refusedPath(String value, boolean relative) {
+        return assertThrows(InvalidValue.class, () -> Placeholders.checkTagPath(value, relative)).getMessage();
+    }
+
     private static String refusedParam(String name, String value) {
         return assertThrows(InvalidValue.class, () -> Placeholders.checkParam(name, value, FIELDS)).getMessage();
     }

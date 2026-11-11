@@ -75,6 +75,7 @@
   summary: Two tag path rules disagree: a kind setup save checks tag paths with `Placeholders.checkTagPath` (`isAssetSuffix`), which accepts `{asset.path}/a//b` and a `[` in the suffix, while the tag browser's `tags.resolve` (`TagPaths.resolve`) refuses both.
   evidence: Owner decision 2026-10-27 (sweep Open Question 3, option a): the sweep must not tighten validation, so both rules stay. Today the tag browser stores only what `tags.resolve` returns, so the looser rule is reached only by a hand-written or scripted kind setup. Aligning the save rule to `TagPaths` refuses kind setups that save today, so it needs a decision on existing rows.
   goes_to: epic-editing (the kind setup editor and tag browser), with a check of stored kind setups before tightening.
+  closed: 2026-11-11 by epic-editing entry 13a (`story-the-tag-browser-one-tree-for-every-tag-pick-asset-relative-p-plan.md`): the save rule is `TagPaths.fault`, for kind setups, popup params and item overrides together (owner decision 3); stored rows are not rewritten, each one the rule refuses is logged at the first read after a start and refused at its next save (owner decision 2), and a test holds both seeds and the template's documented paths to the rule.
 
 - source_plan: `_bmad-output/initiative-flowmap/tickets/epic-map-store-and-data/tickets/story-refactor-sweep-plan.md`
   summary: Live checks the sweep could not make with the dev stack and e2e harness: `onShutdown` on page or session close, a redundant pair (standby refusal, migration on becoming active), a `storage` event between two real tabs, a real browser closed and reopened with unsaved edits, a slow tag system (`tags-unavailable`), a kind setup saved by the least-privilege runtime role, the example adapters run live, another project's maps getting no `map.changed`, and a signed-in user without an editing role (no such dev user).
@@ -207,3 +208,7 @@
 - source_plan: `_bmad-output/initiative-flowmap/tickets/epic-editing/tickets/story-the-kinds-screen-sections-the-preview-item-style-rules-and-t-plan-12b1.md`
   summary: An e2e check that an area kind's tint rows are a choice field's choices, which needs a choice field on a dev area kind.
   evidence: Entry 12b1's review, finding 6: the dev geofence's `operator` is a text field, so the choice rows (fixed rows, "No tint" rows left out, a refusal placed by category) are covered by Jest only and never run against the Gateway.
+
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-editing/tickets/story-the-tag-browser-one-tree-for-every-tag-pick-asset-relative-p-plan.md`
+  summary: The stored tag path report keyed by project and database connection, not by project name alone.
+  evidence: Entry 13a's review: the report runs once per project name after a Gateway start, so a project whose setup is re-pointed to another database connection is not reported again until the module restarts.

@@ -46,6 +46,24 @@ async function getJson(apiPath) {
 const MODULE_ID = 'com.aoindustrial.perspective.mapstudio';
 
 /**
+ * Enable or stop (disable) a tag provider of the dev Gateway (epic 4 entry 13a, G10): its config resource read by name
+ * (GET /data/api/v1/resources/find/ignition/tag-provider/<name>) and put back with `enabled` changed
+ * (PUT /data/api/v1/resources/ignition/tag-provider, [live 8.3.10]). Only test equipment: Map Studio never does this.
+ */
+export async function setTagProviderEnabled(name, enabled) {
+    const found = await getJson(`/data/api/v1/resources/find/ignition/tag-provider/${encodeURIComponent(name)}`);
+    if (found.enabled === enabled) return;
+    const res = await fetch(`${gatewayUrl()}/data/api/v1/resources/ignition/tag-provider`, {
+        method: 'PUT',
+        headers: { 'X-Ignition-API-Token': apiToken(), 'Content-Type': 'application/json' },
+        body: JSON.stringify([{ name: found.name, collection: found.collection, enabled, description: found.description,
+            signature: found.signature, config: found.config }]),
+        signal: AbortSignal.timeout(30_000)
+    });
+    if (!res.ok) throw new Error(`The tag provider ${name} could not be ${enabled ? 'enabled' : 'stopped'} (HTTP ${res.status}).`);
+}
+
+/**
  * The Gateway's uptime (ms, GET /data/api/v1/overview) and when the Map Studio module
  * last started (GET /data/api/v1/modules/healthy) [live 8.3.10]: a restart of either
  * resets the uptime or changes the start time.

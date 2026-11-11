@@ -17,3 +17,7 @@ risk: low
 Raised while planning epic 4 entry 12a (2026-11-09; the owner agreed): EXPERIENCE.md's surface state "Path does not resolve" says each path reads "Resolves for N of M items", listing the items it fails for. `tags.resolve.reply` carries `n` and `m` only, and the browser never sees tags, so it cannot work the list out itself. Entry 12a shows N of M in the warning token when fewer than all resolve.
 
 Add the failing items (their ids, capped, with a count of the rest) to `tags.resolve.reply` in `common/` and `docs/contract.md`, a contract change, and show them under the path in the kind's setup, each opening its item.
+
+## Outcome
+
+Closed 2026-11-11 by epic-editing entry 13a (owner decision 1 of that plan: the failing items are added now, while contract 0.4.0 is unreleased). `tags.resolve.reply` carries `failing` (at most 20 `{id, name}`, by name) and `failingMore` when `n` is below `m`, under the reply's own role check, and the Kinds screen's resolve note names them ("Resolves for 4 of 5 well pads. Not for P15.", up to three, then "and N more"). Not built, and not in entry 13a's plan: a name in the note opening its item.

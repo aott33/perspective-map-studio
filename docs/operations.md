@@ -58,6 +58,29 @@ Map Studio's map store on database connection MapStudioCheck is at schema versio
 
 An editor's map says "Map store: read only. The map store was upgraded by a newer Map Studio (schema 999, this module knows 3); saving is off until the module is upgraded." (the save status row in Edit mode, the top-centre chip in View mode; a viewer's map shows no words for it and keeps the reason in `data-store-reason`) **[live 8.3.10]**. To downgrade for real, restore the `mapstudio_` tables from a backup taken before the upgrade; there is no down migration.
 
+## A stored tag path the rule refuses
+
+From 0.4.0 (epic-editing entry 13a) every tag path is saved by the rule the tag lookups read it by: no empty part (`a//b`), no `[` or `]` after the provider, no brace in a suffix, no relative provider (`[~]`), at most 1024 characters ([kind-setup.md](kind-setup.md), "Tag paths"). Earlier versions saved such paths, so a store may hold some. Upgrading changes none of them: there is no migration, and nothing stored is rewritten or refused when it is read.
+
+**What the Gateway logs.** The first time a project's map store is read after the Gateway (or the module) starts, Map Studio checks the project's live kind setups and its live map items' overrides and writes, on the logger `MapStudio.store` (shown as `M.store`), one warning per row that fails and then one info line with the count **[live 8.3.10]** (`ops/store-checks.sh badrow`):
+
+```text
+W [M.store] Project mapstudio-check: the kind setup of pad holds a tag path a save refuses: kpis[0].path: {asset.path}/a//b has an empty part between two /; a tag path has a name between every two /. It loads and draws as before and is refused when it is next saved: mend the path on the Kinds screen or with system.mapstudio.applyEdits.
+W [M.store] Project mapstudio-check: the overrides of map item Bad path pad (c0ffee00-0000-4000-8000-00000000000a, kind pad) hold a tag path a save refuses: overrides: comms.path: [default]a//b has an empty part between two /; a tag path has a name between every two /. It loads and draws as before and is refused when it is next saved: mend the path in the item's Details or with system.mapstudio.applyEdits.
+I [M.store] Project mapstudio-check: 3 stored rows (1 kind setup, 2 map items) checked against the tag path rule: 2 would be refused at their next save; nothing was changed.
+```
+
+A store with nothing to mend logs the info line alone ("... every stored tag path passes."). A warning names the project, the kind or the item (its name, id and kind), the part and the path, a row's paths each in turn (five at most, then "And N more."); a value from the store is cut to 64 characters and its control characters shown as `?`, so it cannot add a line to the log. The check runs once per project per start and reads only: to see it again after mending, restart the module or the Gateway. A project whose store was empty at that first read (a fresh install) logs "0 stored rows" and is not checked again until the next start.
+
+**What a failing row does meanwhile.** It loads, draws and takes its live values exactly as before the upgrade (the path is subscribed as it is stored; a path the tag system does not have shows as stale, as it did). It is refused only when it is next saved, with the same words as the warning ("Op 0 (pad): kpis[0].path: ... has an empty part between two /; ..."): a kind setup is saved whole, so the first field an editor finishes in that kind's setup meets the refusal beside the failing path; a map item's whole record is checked on every save, so an item with a failing override cannot be moved, renamed or edited until the path is mended (it can still be deleted).
+
+**How to mend a row.** Either:
+
+- In the studio, as a map editor: for a kind, open Kinds, choose the kind, correct the path the warning names and leave the field; for an item, select it, and in Details' Live now block correct the row marked Override, or Reset it. No screen edits a popup view param stored in an item's overrides: when the warning names `overrides: popupView.params.<name>` it says so and names the script alone.
+- From a script, with the stored version: read the record from `system.mapstudio.getMap(project)` (`.kindSetups` for a kind), correct the path and send it back through `system.mapstudio.applyEdits` as an `update` at its `version` ([kind-setup.md](kind-setup.md), "From a script"; for an item, an update whose `data` is `{"overrides": {...}}` with the path corrected).
+
+Never edit the `mapstudio_` tables by hand to mend one: the versions, the edit record and the open maps would not follow.
+
 ## Redundant pairs
 
 **[unverified]**: written from the SDK's signatures (`GatewayContext.getRedundancyManager()`, `RedundancyManager.isRedundancyEnabled()`, `isActive()`, `addRedundancyStateListener`) **[SDK 8.3.0 javap]** and unit tested over a stand-in; only an independent Gateway has been seen live.
@@ -69,7 +92,7 @@ An editor's map says "Map store: read only. The map store was upgraded by a newe
 
 ## Proof
 
-`ops/store-checks.sh` (development only, run by hand) adds a check project on the connection `MapStudioCheck` and runs five scenarios against it: a role without CREATE, a table in the way, the retry after the fix, a newer schema, and (epic 2 story 14) an upgrade from schema 1 with a map item, first refused because the connection's role does not own the tables, then done once it does, followed (epic-editing entry 11a) by an upgrade from schema 2 with edit rows to 3. Screenshots of the unavailable and read-only states at 1440 and 390 px:
+`ops/store-checks.sh` (development only, run by hand) adds a check project on the connection `MapStudioCheck` and runs its scenarios against it (from epic-editing entry 13a also `badrow`: a kind setup and an item's overrides stored with `a//b`, logged once at the first read, read back unchanged through `getMap` and `map.load`, the tables compared before and after): a role without CREATE, a table in the way, the retry after the fix, a newer schema, and (epic 2 story 14) an upgrade from schema 1 with a map item, first refused because the connection's role does not own the tables, then done once it does, followed (epic-editing entry 11a) by an upgrade from schema 2 with edit rows to 3. Screenshots of the unavailable and read-only states at 1440 and 390 px:
 
 ![Unavailable map store, 1440 px](screenshots/mapstudio-store-unavailable-1440.png)
 ![Unavailable map store, 390 px](screenshots/mapstudio-store-unavailable-390.png)

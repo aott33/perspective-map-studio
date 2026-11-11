@@ -7,6 +7,8 @@
 //                read-only, nothing is written, getMap's list says readOnly
 //   upgraded     (epic 2 story 14) a schema 1 store with an item, upgraded to 3: the item reads back
 //                through getMap and map.load with attachment null and nothing else changed
+//   badrow       (epic 4 entry 13a) a kind setup and an item's overrides stored with a tag path the save rule
+//                refuses: the map loads, the rows read back as stored, and the Gateway log names them (the script)
 // Skipped in the plain suite (no scenario set). Screenshots at 1440 and 390 px (AD-15).
 
 import { gatewayUrl } from '../lib/env.mjs';
@@ -151,5 +153,26 @@ test.describe('healing', () => {
         const reply = await page.evaluate(() => window.__mapStudioTest.send('map.load', {}));
         expect(reply.type, JSON.stringify(reply.body)).toBe('map.load.reply');
         expect(reply.body.items).toEqual([schema1]);
+    });
+
+    test('a stored row whose tag path the save rule refuses still loads and reads back as stored', async ({ page }) => {
+        test.skip(SCENARIO !== 'badrow');
+        // Entry 13a, G5: nothing is refused or rewritten on read. The warning per row and the info line are checked by
+        // ops/store-checks.sh in the Gateway log; that the row's next save is refused is MapLoaderTest's and kindsetup.spec.mjs's.
+        const map = await openCheckMap(page);
+        await expect(map).toHaveAttribute('data-store-state', 'ready');
+        await expect(map).toHaveAttribute('data-load-state', 'loaded');
+        await expect(map).toHaveAttribute('data-items-loaded', '2');
+        await expect(page.locator('.mapstudio-chip')).toHaveCount(0);
+        const answer = await getMapAnswer(page);
+        expect({ count: answer.count, readOnly: answer.readOnly }).toEqual({ count: 2, readOnly: null });
+        const bad = answer.items.find((i) => i.id === 'c0ffee00-0000-4000-8000-00000000000a');
+        expect(bad).toMatchObject({ name: 'Bad path pad', kind: 'pad', overrides: { comms: { path: '[default]a//b' } }, version: 1, deleted: false });
+        // This anonymous viewer's map.load carries the two items (overrides emptied for a viewer, as always) and draws them.
+        await page.waitForFunction(() => Boolean(window.__mapStudioTest));
+        const reply = await page.evaluate(() => window.__mapStudioTest.send('map.load', {}));
+        expect(reply.type, JSON.stringify(reply.body)).toBe('map.load.reply');
+        expect(reply.body.items.map((i) => i.name).sort()).toEqual(['Bad path pad', 'Good pad']);
+        expect(reply.body.seq).toBe(2);
     });
 });
