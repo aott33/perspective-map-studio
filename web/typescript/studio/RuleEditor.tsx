@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Kind } from '../adapters';
 import {
     BandRow, CaseType, Fields, KeyValue, RULE_TYPE_WORDS, RuleDraft, RuleSource, RuleType, StateRow, checkRule, draftSource, expressionPresets,
-    foldRule, inStepVersion, ownRuleTypes, presetsFor, ruleDraft, ruleTypes, sameRule, sourceName, unsavedText, withSource
+    foldRule, inStepVersion, ownRuleTypes, presetWord, presetsFor, ruleDraft, ruleTypes, sameRule, sourceName, unsavedText, withSource
 } from '../kindSetup';
 import { Preset } from '../live';
 import { MarkerColors, PRESET_WORDS, SpriteSymbol } from '../markers';
@@ -31,6 +31,18 @@ import { ChromeGlyph } from './ChromeGlyph';
  * `.mapstudio-rule-type[data-type]` (`aria-pressed`), the value `[data-field="styleRule.source"]`, a case
  * `.mapstudio-rule-case[data-index]`, its tile `.mapstudio-rule-tile[data-preset]`, the expression
  * `[data-field="styleRule.expression"]`, what is missing `.mapstudio-rule-unsaved`.
+ *
+ * From entry 12c3 (the Style tab reordered; the editor is shared, so Kinds changes with it): a preset select shows the tiles'
+ * words ("Out of service", "Attention"; kindSetup.ts `presetWord`), its values the stored names as before; the case and band
+ * rows have no card border and are parted by a divider, "When <value> is" said once above the States rows
+ * (`.mapstudio-rule-when-label`); the type choice keeps only its active underline. Enter in a typed field sends the rule when it
+ * is complete and keeps the focus in the field; removing a row moves the focus to the row before it (its Remove), or to Add;
+ * a stored rule changed by this session's Undo or Redo of this item (`undoing`), and the stored rule after a save of the draft
+ * was given up (never while its conflict still waits for the card's choice), shows in the editor wherever the focus is, unless a save is on its way, the draft is still being built or a field holds
+ * keystrokes not yet finished (another editor's save still waits for the cursor to leave, as built in 12b1). The "Not saved yet" note is one node that stays
+ * mounted (`.mapstudio-rule-unsaved`, `role="status"`), empty and not shown while nothing is missing, in the warning tint with
+ * its warning edge; `unsavedTail` is what it ends with after the reason. A half-built own rule is handed back (`keep()`) and
+ * taken again (`kept`) so the Style tab finds it as it was left.
  */
 
 /** A refusal as the editor places it: the field it stands beside (kindSetup.ts `Fields`) and the Gateway's words. */
@@ -60,7 +72,10 @@ export interface RuleEditorProps {
     idBase: string;
     /** The refusals that stand, each beside the field it names. */
     refusals: ReadonlyArray<RuleRefusal>;
-    /** A save of the rule stands refused: the draft is left as typed and not sent again unchanged. */
+    /**
+     * A save of the rule stands refused, or waits in the queue with its conflict card (entry 12c3): the draft is left as typed,
+     * not sent again unchanged, and the stored rule is not taken until the refusal is cleared or the card's choice is made.
+     */
     refused: boolean;
     /** A save of the rule is in flight or waiting its turn. */
     saving: boolean;
@@ -80,9 +95,32 @@ export interface RuleEditorProps {
     own?: boolean;
     /** The draft the editor opens with, not yet stored (an own rule started empty); the stored rule shows when absent. */
     initial?: RuleDraft | null;
+    /**
+     * An Undo or a Redo of this very item is on its way (entry 12c3; known by its batch, never by the clock): the stored rule
+     * it changes shows in the editor wherever the focus is. Never for a kind's rule, which has no Undo.
+     */
+    undoing?: boolean;
+    /** What the "Not saved yet" note ends with, after the reason (the Style tab's "The map keeps the saved rule until then."). */
+    unsavedTail?: string;
+    /** A draft left not saved when the editor last went (entry 12c3): it opens as it was left, in step with the store as it was. */
+    kept?: RuleKeep | null;
     /** The element around the editor's box; the box alone when absent. */
     frame?: (body: React.ReactElement, info: RuleFrameInfo) => React.ReactElement;
 }
+
+/**
+ * A draft that was not saved when its editor went (entry 12c3: the item left for another, for Kinds), as the editor takes it
+ * again: the draft with each type's cases, the version and the stored rule it was last in step with, and the typed paths.
+ */
+export interface RuleKeep {
+    draft: RuleDraft;
+    base: number | null;
+    stepStored: string | null;
+    paths: Partial<Record<CaseType, string>>;
+}
+
+/** What the note says of a complete rule that was not saved when its item was left (entry 12c3). */
+export const KEPT_WHOLE_TEXT = 'Change the rule to try again.';
 
 interface EditorState {
     /** The style rule as it is being built, each type's cases with it; null shows the stored rule. */
@@ -106,24 +144,26 @@ export function ruleFields(draft: RuleDraft): string[] {
 }
 
 /** The 64 px tile of a case: the kind's icon (or its line sample) in the preset, with the preset's state word. */
-export function RuleTile(props: { kind: Kind; preset: string; symbols?: Record<string, SpriteSymbol>; colors?: MarkerColors | null }): React.ReactElement {
+export function RuleTile(props: { kind: Kind; preset: string; symbols?: Record<string, SpriteSymbol>; colors?: MarkerColors | null;
+    /** False leaves the word out of the tile: the caller says it beside the tile (the Style tab's read-only cases). */
+    word?: boolean }): React.ReactElement {
     const { kind, colors, preset } = props;
     const known = preset !== '' && presetsFor(kind).indexOf(preset) >= 0;
     const word = known ? PRESET_WORDS[preset as Preset] : '';
     return (
-        <span className="mapstudio-rule-tile" data-preset={preset} title={known ? 'The ' + preset + ' preset' : 'No preset picked'}>
+        <span className="mapstudio-rule-tile" data-preset={preset} title={known ? presetWord(preset) : 'No preset picked'}>
             {known && colors ? (
                 <Sample svg={presetSampleSvg({ id: kind.id, name: kind.name, geometry: kind.geometry, icon: kind.icon, area: kind.area },
                             preset as Preset, props.symbols || {}, colors)}
                         className={'mapstudio-rule-sample mapstudio-rule-sample--' + kind.geometry} />
             ) : null}
-            {word !== '' ? <span className="mapstudio-style-word mapstudio-rule-word">{word}</span> : null}
+            {word !== '' && props.word !== false ? <span className="mapstudio-style-word mapstudio-rule-word">{word}</span> : null}
         </span>
     );
 }
 
 export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
-    state: EditorState = { rule: this.props.initial || null };
+    state: EditorState = { rule: this.props.kept ? this.props.kept.draft : this.props.initial || null };
 
     /** The rule's save sent and not yet settled: the token when it was sent, and whether its save was seen on its way. */
     private awaiting: { done: number | string; seenSaving: boolean } | null = null;
@@ -132,27 +172,85 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
      * rule on, folded from the store on, or its own save settled on; null with no draft. Every send of the draft goes at it, so
      * another editor's save of a kind's rule since meets the conflict.
      */
-    private ruleBase: number | null = this.props.initial ? this.props.version : null;
+    private ruleBase: number | null = this.props.kept
+        // A kept draft is still in step when the stored rule is the one it was left with (an item's version moves with any edit).
+        ? (this.props.kept.stepStored === JSON.stringify(this.props.stored) ? this.props.version : this.props.kept.base)
+        : this.props.initial ? this.props.version : null;
     /**
      * An own rule (entry 12c2): the stored rule the draft was last in step with. An item's version moves with every edit of the
      * item, so the base follows it while the stored rule is still that one; once another editor's rule is stored, the base stays
      * and the draft's save meets the conflict.
      */
-    private stepStored: string | null = this.props.initial ? JSON.stringify(this.props.stored) : null;
+    private stepStored: string | null = this.props.kept ? this.props.kept.stepStored : this.props.initial ? JSON.stringify(this.props.stored) : null;
     /** A save of the draft was not taken: the draft is kept as typed, not replaced by the stored rule, until it is changed. */
     private ruleKept = false;
     /** The tag path typed for a type's value, kept while the value select is on something else, while the editor stays. */
-    private pathMemory: Partial<Record<CaseType, string>> = {};
+    private pathMemory: Partial<Record<CaseType, string>> = this.props.kept ? { ...this.props.kept.paths } : {};
     /** The rule last sent, so one refused is not sent again unchanged. */
     private ruleSent = '';
     /** The rule's controls: while the cursor is in one, the draft is left as typed. */
     private readonly ruleBox = React.createRef<HTMLDivElement>();
     /** A change of the rule is about to be sent: the stored rule is not taken into the draft before it has been. */
     private ruleCommitting = false;
+    /**
+     * Entry 12c3: the stored rule as last seen; whether it changed while an Undo or Redo of this item was on its way and is not
+     * yet shown in the editor; and whether a save of the draft settled, and was given up (not saved, nothing refused or
+     * waiting). Either shows the stored rule wherever the focus is.
+     */
+    private lastStored = JSON.stringify(this.props.stored);
+    private byUndo = false;
+    /** A kept draft that was complete and not saved (refused, or not taken) is back: the note says so until it is changed. */
+    private keptWhole = !!this.props.kept && checkRule(this.props.kept.draft, this.props.kind, this.props.own ? { own: true } : {}).rule !== undefined;
+    private settledNow = false;
+    private dropped = false;
+    /** Entry 12c3: a field of the rule was typed in and not finished yet (Enter or blur): its keystrokes are never replaced under it. */
+    private typed = false;
+    /** Entry 12c3: where the focus goes once a row is gone: the row before it by its place, or Add (-1); null for nowhere. */
+    private focusRow: number | null = null;
 
     componentDidUpdate(): void {
         this.settle();
         this.foldStored();
+        this.refocus();
+    }
+
+    /**
+     * The draft as the Style tab keeps it when the editor goes (entry 12c3): one that is not saved, which is a draft touched and
+     * not complete, and a complete one that is not what is stored with no save of it on its way (the Gateway refused it, its
+     * conflict waits, or the save was not taken). Nothing saved or being saved is kept; null otherwise.
+     */
+    keep(): RuleKeep | null {
+        const rule = this.state.rule;
+        if (rule === null) {
+            return null;
+        }
+        const o = this.options();
+        if (checkRule(rule, this.props.kind, o).rule !== undefined
+            && (sameRule(rule, this.props.stored, this.props.kind, o) || (this.held() && !this.props.refused))) {
+            return null;
+        }
+        return { draft: rule, base: this.ruleBase, stepStored: this.stepStored, paths: { ...this.pathMemory } };
+    }
+
+    /** Whether the rule is not saved: its draft is not complete, or is complete, not what is stored and not on its way. */
+    unsaved(): boolean {
+        return this.keep() !== null;
+    }
+
+    /** After a row was removed the focus goes to the row before it (its Remove), or to Add: the keyboard keeps its place. */
+    private refocus(): void {
+        const at = this.focusRow;
+        const box = this.ruleBox.current;
+        if (at === null || !box) {
+            return;
+        }
+        this.focusRow = null;
+        const rows = Array.from(box.querySelectorAll('.mapstudio-rule-case')) as HTMLElement[];
+        const row = at >= 0 ? rows.find((r) => r.getAttribute('data-index') === String(at)) : undefined;
+        const target = (row ? row.querySelector('.mapstudio-rule-remove') : box.querySelector('.mapstudio-rule-add')) as HTMLElement | null;
+        if (target && typeof target.focus === 'function') {
+            target.focus();
+        }
     }
 
     /** The draft as it shows: what is being built, else the stored rule. */
@@ -182,6 +280,7 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
             a.seenSaving = true;
         } else if (a.seenSaving || this.props.done !== a.done) {
             this.awaiting = null;
+            this.settledNow = true;
         }
     }
 
@@ -199,11 +298,23 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
     /**
      * The stored rule taken into the draft once nothing holds it (no save on its way or refused, the cursor elsewhere, the draft
      * whole): another editor's rule shows, and a save that was given up leaves the store's. A draft still being built ("Not
-     * saved yet") is never overwritten; the other types' cases stay as typed (owner decision 3).
+     * saved yet") is never overwritten; the other types' cases stay as typed (owner decision 3). From entry 12c3 a stored rule
+     * changed by this session's Undo or Redo, and the stored rule once a save of the draft was given up (the conflict card's
+     * "Use their version", a discard), is taken with the cursor in the rule too, so Ctrl+Z from a rule button shows what is now
+     * stored; only keystrokes not yet finished (`typed`) keep the draft under the cursor. Another editor's save still waits
+     * for the cursor to leave the rule (12b1: the rows do not move under it, and the next change meets the conflict).
      */
     private foldStored(): void {
         const kind = this.props.kind;
         const rule = this.state.rule;
+        const seen = JSON.stringify(this.props.stored);
+        if (seen !== this.lastStored) {
+            this.lastStored = seen;
+            // The reverse batch of this item's Undo shows as its newest overrides at once, so the change comes while it is on its way.
+            if (rule !== null && this.props.undoing === true) {
+                this.byUndo = true;
+            }
+        }
         if (rule !== null && !this.ruleCommitting) {
             const o = this.options();
             const stored = this.props.stored;
@@ -224,7 +335,20 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
             }
             // An own rule with nothing stored yet (started empty, or its first save refused) has no stored rule to take.
             const nothing = this.props.own === true && stored === null;
-            if (!held && !same && whole !== undefined && !this.ruleKept && !nothing && !this.focusIn()) {
+            // Read once nothing holds the draft: while a refusal stands or the conflict waits for its card, nothing is given up yet
+            // ("Apply mine on top" saves the draft; "Use their version" drops it, and only then does their rule show).
+            if (this.settledNow && !held) {
+                this.settledNow = false;
+                this.dropped = !settled && !same;
+            }
+            if (same) {
+                this.byUndo = false;
+                this.dropped = false;
+            }
+            const free = !this.focusIn() || ((this.byUndo || this.dropped) && !this.typed);
+            if (!held && !same && whole !== undefined && !this.ruleKept && !nothing && free) {
+                this.byUndo = false;
+                this.dropped = false;
                 this.ruleBase = version;
                 this.stepStored = JSON.stringify(stored);
                 this.setState({ rule: foldRule(rule, ruleDraft(stored)) });
@@ -232,8 +356,11 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
         }
     }
 
-    /** One change of the rule's draft; `commit` sends it at once when it is whole (a select, a button), else its field's blur does. */
-    private editRule(change: (draft: RuleDraft) => RuleDraft, commit: boolean, structure = false): void {
+    /**
+     * One change of the rule's draft; `commit` sends it at once when it is whole (a select, a button), else its field's blur or
+     * Enter does; `typing` marks keystrokes in a field, which are not replaced under the cursor until the field is finished.
+     */
+    private editRule(change: (draft: RuleDraft) => RuleDraft, commit: boolean, structure = false, typing = !commit): void {
         if (this.off()) {
             return;
         }
@@ -243,6 +370,14 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
             this.stepStored = JSON.stringify(this.props.stored);
         }
         this.ruleKept = false;
+        // The draft is the user's again: nothing of an Undo or a save given up is taken over what is changed from here.
+        this.byUndo = false;
+        this.dropped = false;
+        this.settledNow = false;
+        this.keptWhole = false;
+        if (typing) {
+            this.typed = true;
+        }
         if (structure && this.props.refused) {
             // The rows moved: the words of the last refusal no longer stand beside the row they named.
             this.props.onClearRefusal();
@@ -261,6 +396,7 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
      * was first changed on. A draft that is not whole sends nothing; the editor says what is missing.
      */
     private commitRule(): void {
+        this.typed = false;
         const draft = this.state.rule;
         if (draft === null || this.off()) {
             return;
@@ -292,11 +428,11 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
         }
     }
 
-    /** Enter finishes a typed field of the rule (its blur sends the rule when it is whole). */
+    /** Enter finishes a typed field of the rule: the rule is sent when it is complete, and the focus stays in the field (entry 12c3). */
     private onDraftKey = (ev: React.KeyboardEvent<HTMLInputElement>): void => {
         if (ev.key === 'Enter') {
             ev.preventDefault();
-            ev.currentTarget.blur();
+            this.commitRule();
         }
     };
 
@@ -336,15 +472,19 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
                     onChange={(ev) => onPick(ev.target.value)}>
                 <option value="">Pick a preset</option>
                 {value !== '' && presets.indexOf(value) < 0 ? <option value={value}>{value}</option> : null}
-                {presets.map((p) => <option key={p} value={p}>{p}</option>)}
+                {presets.map((p) => <option key={p} value={p}>{presetWord(p)}</option>)}
             </select>
         );
     }
 
-    private removeButton(label: string, onRemove: () => void): React.ReactElement {
+    /** A row's Remove; once the row is gone the focus is on the row before it (`index - 1`), or on Add. */
+    private removeButton(label: string, index: number, onRemove: () => void): React.ReactElement {
         return (
             <button type="button" className="mapstudio-dock-button mapstudio-rule-remove" disabled={this.off()} title={label} aria-label={label}
-                    onClick={onRemove}>
+                    onClick={() => {
+                        this.focusRow = index - 1;
+                        onRemove();
+                    }}>
                 <ChromeGlyph name="trash" size={16} />
             </button>
         );
@@ -403,28 +543,29 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
         const name = sourceName(draftSource(draft), this.props.kpis);
         const set = (i: number, patch: Partial<StateRow>, commit: boolean): void =>
             this.editRule((d) => ({ ...d, states: d.states.map((r, at) => (at === i ? { ...r, ...patch } : r)) }), commit);
+        const whenId = this.dom(Fields.styleRule, 'when');
         return (
             <React.Fragment>
+                {/* Said once above the rows (entry 12c3), not in every row; each row's value is labelled by it and by its row ("Case 2"). */}
+                {draft.states.length > 0 ? <span id={whenId} className="mapstudio-field-label mapstudio-rule-when-label">When {name} is</span> : null}
                 {draft.states.map((row, i) => {
                     const m = this.messages(Fields.ruleCase(i));
                     const bad = m.invalid || marked.indexOf(i) >= 0;
                     // A row the note names is tied to the note's words.
                     const ids = marked.indexOf(i) >= 0 ? m.ids.concat([noteId]) : m.ids;
                     return (
-                        <div key={i} className="mapstudio-rule-case" role="group" aria-label={'Case ' + (i + 1)} data-index={i} data-rule="states"
-                             data-field={Fields.ruleCase(i)}>
-                            <label className="mapstudio-rule-when">
-                                <span className="mapstudio-field-label">When {name} is</span>
-                                <input type="text" className="mapstudio-input mapstudio-kindsetup-input mapstudio-rule-value" value={row.value}
-                                       aria-invalid={bad} aria-describedby={ids.length > 0 ? ids.join(' ') : undefined} disabled={this.off()}
-                                       autoComplete="off" spellCheck={false}
-                                       onChange={(ev) => set(i, { value: ev.target.value }, false)}
-                                       onBlur={() => this.commitRule()} onKeyDown={this.onDraftKey} />
-                            </label>
+                        <div key={i} id={whenId + '-' + i} className="mapstudio-rule-case" role="group" aria-label={'Case ' + (i + 1)} data-index={i}
+                             data-rule="states" data-field={Fields.ruleCase(i)}>
+                            <input type="text" className="mapstudio-input mapstudio-kindsetup-input mapstudio-rule-value" value={row.value}
+                                   aria-labelledby={whenId + ' ' + whenId + '-' + i}
+                                   aria-invalid={bad} aria-describedby={ids.length > 0 ? ids.join(' ') : undefined} disabled={this.off()}
+                                   autoComplete="off" spellCheck={false}
+                                   onChange={(ev) => set(i, { value: ev.target.value }, false)}
+                                   onBlur={() => this.commitRule()} onKeyDown={this.onDraftKey} />
                             <div className="mapstudio-rule-look">
                                 {this.presetSelect(row.preset, 'Preset of case ' + (i + 1), ids, bad, (preset) => set(i, { preset }, true))}
                                 {this.tile(row.preset)}
-                                {this.removeButton('Remove case ' + (i + 1),
+                                {this.removeButton('Remove case ' + (i + 1), i,
                                     () => this.editRule((d) => ({ ...d, states: d.states.filter((_, at) => at !== i) }), true, true))}
                             </div>
                             {m.nodes}
@@ -433,7 +574,7 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
                 })}
                 <span className="mapstudio-field-hint">A number, true or false is read as typed; text in double quotes stays text ("1").</span>
                 <button type="button" className="mapstudio-button mapstudio-rule-add" disabled={this.off()}
-                        onClick={() => this.editRule((d) => ({ ...d, states: d.states.concat([{ value: '', preset: '' }]) }), false)}>Add a case</button>
+                        onClick={() => this.editRule((d) => ({ ...d, states: d.states.concat([{ value: '', preset: '' }]) }), false, false, false)}>Add a case</button>
             </React.Fragment>
         );
     }
@@ -473,7 +614,7 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
                             <div className="mapstudio-rule-look">
                                 {this.presetSelect(row.preset, 'Preset of band ' + (i + 1), ids, bad, (preset) => set(i, { preset }, true))}
                                 {this.tile(row.preset)}
-                                {this.removeButton('Remove band ' + (i + 1),
+                                {this.removeButton('Remove band ' + (i + 1), i,
                                     () => this.editRule((d) => ({ ...d, bands: d.bands.filter((_, at) => at !== i) }), true, true))}
                             </div>
                             {m.nodes}
@@ -484,7 +625,7 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
                     A band holds a value from its from up to, not including, its to. Leave the first from or the last to empty for an open end.
                 </span>
                 <button type="button" className="mapstudio-button mapstudio-rule-add" disabled={this.off()}
-                        onClick={() => this.editRule((d) => ({ ...d, bands: d.bands.concat([{ from: '', to: '', preset: '' }]) }), false)}>Add a band</button>
+                        onClick={() => this.editRule((d) => ({ ...d, bands: d.bands.concat([{ from: '', to: '', preset: '' }]) }), false, false, false)}>Add a band</button>
             </React.Fragment>
         );
     }
@@ -531,7 +672,9 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
         const check = checkRule(draft, kind, this.options());
         // What is missing shows once the rule has been touched: a stored rule is whole, and a kind with none says nothing.
         const touched = this.state.rule !== null;
-        const missing = touched ? unsavedText(check.missing) : '';
+        // A complete rule that came back not saved (refused or not taken before the item was left) says so until it is changed.
+        const lost = this.keptWhole && check.rule !== undefined && !this.held() && !sameRule(draft, this.props.stored, kind, this.options());
+        const missing = touched ? unsavedText(lost ? [KEPT_WHOLE_TEXT] : check.missing, lost ? '' : this.props.unsavedTail || '') : '';
         const marked = touched ? check.rows : [];
         const pathWords = touched && check.path ? check.path : '';
         const section = this.messages(Fields.styleRule);
@@ -560,7 +703,8 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
                 {draft.type === 'states' ? this.renderStates(draft, marked, noteId) : null}
                 {draft.type === 'bands' ? this.renderBands(draft, marked, noteId) : null}
                 {draft.type === 'expression' ? this.renderExpression(draft) : null}
-                {missing !== '' ? <span id={noteId} className="mapstudio-rule-unsaved" role="status">{missing}</span> : null}
+                {/* One node that stays mounted, only its words changing (entry 12c3): assistive technology hears each change. */}
+                <span id={noteId} className="mapstudio-rule-unsaved" role="status" data-unsaved={missing !== '' ? 'true' : 'false'}>{missing}</span>
                 {section.nodes}
             </div>
         );

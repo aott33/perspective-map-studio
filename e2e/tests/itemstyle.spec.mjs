@@ -13,6 +13,16 @@
 // the tab's read-only rows, its rule from the kind, overridden and not saved yet for the docs under E2E_DOCS=1. Kinds' section 6 through the shared editor
 // (T12) is the 12b1 and 12b2 specs', unchanged. A rule half built while another editor stores a rule for the item is sent at the
 // version it was built on: a conflict with the ordinary card, their rule standing. The spec leaves the seed and the dev tags as it found them.
+//
+// Entry 12c3 (the tab reordered after three reviews, its words made plain, its flow mended; the plan's matrix U1 to U11). U1: on
+// a pad at 1366 by 768 the heading, Live now, the rule's sentence and the actions show without scrolling, From kind last. U2: the
+// action line, and overridden the own-rule line and the link to the kind's rule. U3: Live now, one line; the alarm clause and
+// the Comms lost words only when true. U4: a half-built own rule is as it was left after another item and after Kinds, nothing
+// sent. U5: Esc on a rule button while not saved leaves the panel and the draft. U6: Enter in a rule field keeps the focus;
+// a removed row gives the focus to the row before, or to Add. U7: after Override by keyboard the focus is on the chosen type,
+// and Enter again changes nothing. U8: Ctrl+Z with the focus on a rule button shows the stored rule in the editor. U9: "Edit
+// the kind's rule", then "Back to Point 1". U10: Override on an unlinked line saves at once; on an unlinked pad whose kind
+// reads a path under {asset.path} it starts empty. U11 (Kinds' section 6) is kindstyle.spec.mjs's.
 
 import { randomUUID } from 'node:crypto';
 import {
@@ -131,6 +141,19 @@ const editor = (page) => rule(page).locator('.mapstudio-rule');
 const ruleCase = (page, i) => editor(page).locator('.mapstudio-rule-case[data-index="' + i + '"]');
 const unsaved = (page) => editor(page).locator('.mapstudio-rule-unsaved');
 const shows = (page) => style(page).locator('.mapstudio-style-shows');
+const kindLink = (page) => rule(page).locator('.mapstudio-style-kind');
+const actionLine = (page) => rule(page).locator('.mapstudio-style-line');
+const chosenType = (page) => editor(page).locator('.mapstudio-rule-type[aria-pressed="true"]');
+const back = (page) => page.locator('.mapstudio-kindsetup .mapstudio-kindsetup-back');
+/** What the "Not saved yet" note ends with in the Style tab, after the reason (entry 12c3). */
+const KEEPS = ' The map keeps the saved rule until then.';
+
+/** Nothing is missing: the note is one node that stays mounted (entry 12c3), with no words and not shown. */
+async function noUnsaved(page) {
+    await expect(unsaved(page)).toHaveCount(1);
+    await expect(unsaved(page)).toHaveText('');
+    await expect(unsaved(page)).toBeHidden();
+}
 const undo = (page) => page.locator('.mapstudio-toolbar .mapstudio-undo');
 const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
 
@@ -172,7 +195,7 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
     editorTest.use({ viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1, actionTimeout: REPLY_MS });
     editorTest.describe.configure({ mode: 'serial' });
 
-    editorTest('T1 to T5, T7, T8, T10, T11: the tabs, the rule from the kind, Edit the kind\'s rule, Override, a path not full, a half-built rule, Undo and Recent changes, Reset',
+    editorTest('T1 to T5, T7, T8, T10, T11, U1 to U9: the tabs, the order, the rule from the kind, Edit the kind\'s rule and Back, Override, a path not full, a half-built rule kept, Undo and Recent changes, Reset',
         async ({ page, context }) => {
             editorTest.setTimeout(480_000);
             const p1 = seed.ids['tracer/p1'];
@@ -232,39 +255,77 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
             await selectRow(page, p1);
             await expect(style(page)).toBeVisible();
 
-            // T2: Icon, Size and Label read only, each saying where it comes from; then the kind's rule under "From kind".
-            await expect(style(page).locator('.mapstudio-style-row')).toHaveCount(3);
-            const iconRow = style(page).locator('.mapstudio-style-row[data-row="icon"]');
-            await expect(iconRow.locator('.mapstudio-field-label')).toHaveText('Icon');
-            await expect(iconRow.locator('.mapstudio-style-value')).toHaveText('well-pad');
-            await expect(iconRow.locator('.mapstudio-popup-glyph')).toHaveCount(1);
-            await expect(iconRow.locator('.mapstudio-field-hint')).toHaveText("The icon comes from the project's kind list and is not changed here.");
-            const sizeRow = style(page).locator('.mapstudio-style-row[data-row="size"]');
-            await expect(sizeRow.locator('.mapstudio-style-value')).toHaveText("One size: every point's marker is the same size.");
-            await expect(sizeRow.locator('.mapstudio-field-hint')).toHaveText("The size comes from the project's kind list and is not changed here.");
-            const labelRow = style(page).locator('.mapstudio-style-row[data-row="label"]');
-            await expect(labelRow.locator('.mapstudio-style-value')).toHaveText('Point 1');
-            await expect(labelRow.locator('.mapstudio-field-hint')).toContainText("comes from the project's kind list and is not changed here.");
-            await expect(style(page).locator('.mapstudio-style-row').locator('input, select, button, textarea')).toHaveCount(0);
+            // T2, U1: the order of entry 12c3. The Style rule heading with its "From kind" tag, Live now, the kind's rule in words,
+            // the actions with their one line, and From kind (icon and size) last; no read-only rows above the rule.
+            await expect(style(page).locator('.mapstudio-style-row')).toHaveCount(0);
             await expect(rule(page)).toHaveAttribute('data-own', 'false');
             const heading = rule(page).locator('.mapstudio-livenow-heading');
             await expect(heading).toHaveText(/^Style rule$/i);
             expect(await rule(page).getAttribute('aria-labelledby')).toBe(await heading.getAttribute('id'));
-            await expect(rule(page).locator('.mapstudio-style-rule-head > .mapstudio-fromkind-tag')).toHaveText('From kind');
+            const ruleTag = rule(page).locator('.mapstudio-style-rule-head > .mapstudio-style-tag');
+            await expect(ruleTag).toHaveText('From kind');
+            await expect(ruleTag).toHaveClass(/mapstudio-fromkind-tag/);
+            // The rule's section is described by its tag.
+            expect(await rule(page).getAttribute('aria-describedby')).toBe(await ruleTag.getAttribute('id'));
             await expect(rule(page).locator('.mapstudio-override-tag')).toHaveCount(0);
+            // U3: Live now, one line; no alarm, Stale or Comms lost words while none is true.
+            await expect(rule(page).locator('.mapstudio-style-live-label')).toHaveText('Live now');
+            await expect(shows(page)).toHaveText('Point 1 is Normal, by the well pad rule.', { timeout: LIVE_MS });
+            await expect(shows(page)).toHaveAttribute('role', 'status');
+            // The kind's rule: its sentence, the path filled for Point 1, and one line per case, the tile and its words.
             const kindRule = rule(page).locator('.mapstudio-style-kindrule');
             await expect(kindRule).toHaveAttribute('data-rule', 'states');
-            await expect(kindRule.locator('.mapstudio-style-summary')).toHaveText('States on the tag {asset.path}/Status');
+            await expect(kindRule.locator('.mapstudio-style-summary')).toHaveText('States on the tag ' + P12 + '/Status');
             expect(await kindRule.locator('.mapstudio-style-kindcase').evaluateAll((els) => els.map((e) => e.dataset.preset)))
                 .toEqual(['attention', 'warning', 'fault', 'dimmed']);
-            await expect(kindRule.locator('.mapstudio-style-kindcase').first()).toContainText('When the value is 1');
+            await expect(kindRule.locator('.mapstudio-style-kindcase-text')).toHaveText(
+                ['When the value is 1Attention', 'When the value is 2Warning', 'When the value is 3Fault', 'When the value is 4Out of service']);
+            // No code name: the preset is said in the tiles' words, once.
+            await expect(kindRule.locator('.mapstudio-mono')).toHaveCount(0);
+            await expect(kindRule.locator('.mapstudio-rule-word')).toHaveCount(0);
             // Each case has its tile, drawn by the map's own code.
             await expect(kindRule.locator('.mapstudio-rule-tile .mapstudio-rule-sample > svg')).toHaveCount(4, { timeout: REPLY_MS });
             await expect(editor(page)).toHaveCount(0);
-            await expect(rule(page).locator('.mapstudio-style-kind')).toHaveText("Edit the kind's rule");
-            await expect(rule(page).locator('.mapstudio-style-override')).toHaveText('Override');
-            await expect(shows(page)).toHaveText('Shows now: Point 1 is Normal by the well pad rule. An alarm wins over the rule; a stale value shows only as Stale.',
-                { timeout: LIVE_MS });
+            // U2: Override is the one bordered button, the kind's rule a text link, and one line in view says what each does.
+            const override = rule(page).locator('.mapstudio-style-override');
+            await expect(override).toHaveText('Override');
+            await expect(kindLink(page)).toHaveText("Edit the kind's rule");
+            expect(await override.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe('1px');
+            expect(await kindLink(page).evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe('0px');
+            expect(await kindLink(page).evaluate((el) => getComputedStyle(el).textDecorationLine)).toBe('underline');
+            await expect(rule(page).locator('.mapstudio-button')).toHaveCount(1);
+            await expect(actionLine(page)).toHaveText("Override gives Point 1 its own copy, saved at once. Edit the kind's rule changes every well pad.");
+            expect(await override.getAttribute('aria-describedby')).toBe(await actionLine(page).getAttribute('id'));
+            expect(await kindLink(page).getAttribute('aria-describedby')).toBe(await actionLine(page).getAttribute('id'));
+            expect(await override.getAttribute('title')).toBeNull();
+            // U1: all of it shows at 1366 by 768 without scrolling, in this order, with From kind last.
+            expect(await style(page).evaluate((el) => el.scrollTop)).toBe(0);
+            const parts = [rule(page).locator('.mapstudio-style-rule-head'), rule(page).locator('.mapstudio-style-live'), kindRule,
+                rule(page).locator('.mapstudio-style-actions'), actionLine(page)];
+            for (const part of parts) {
+                await expect(part).toBeInViewport({ ratio: 1 });
+            }
+            const foot = style(page).locator('.mapstudio-style-fromkind');
+            const tops = [];
+            for (const part of [...parts, foot]) {
+                tops.push((await part.boundingBox()).y);
+            }
+            expect(tops.slice().sort((a, b) => a - b)).toEqual(tops);
+            expect(await foot.evaluate((el) => el === el.parentElement.lastElementChild)).toBe(true);
+            // From kind: the icon and the size in one line with one hint, read only; no Label row.
+            await expect(foot.locator('.mapstudio-style-fromkind-head')).toHaveText(/^From kind$/i);
+            await expect(foot.locator('[data-row]')).toHaveCount(2);
+            await expect(foot.locator('[data-row="icon"] .mapstudio-style-value')).toHaveText('well-pad');
+            await expect(foot.locator('[data-row="icon"] .mapstudio-popup-glyph')).toHaveCount(1);
+            await expect(foot.locator('[data-row="size"] .mapstudio-style-value')).toHaveText('One size');
+            const rowTops = await foot.locator('[data-row]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2)));
+            expect(Math.abs(rowTops[0] - rowTops[1])).toBeLessThanOrEqual(2);
+            await expect(foot.locator('.mapstudio-field-hint')).toHaveText(["The icon and the size come from the project's kind list and are not changed here."]);
+            await expect(foot.locator('input, select, button, textarea')).toHaveCount(0);
+            await expect(style(page).locator('[data-row="label"]')).toHaveCount(0);
+            // One divider in the tab: the foot's.
+            expect(await foot.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe('1px');
+            expect(await rule(page).evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe('0px');
             // Every control is a 24 px target at least, and the panel has no em dash.
             for (const box of await page.locator('.mapstudio-panel .mapstudio-panel-tab, .mapstudio-panel .mapstudio-style button')
                 .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()))) {
@@ -272,32 +333,77 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
                 expect(box.height).toBeGreaterThanOrEqual(24);
             }
             expect(await page.locator('.mapstudio-panel').innerText()).not.toContain(String.fromCharCode(0x2014));
-            await shot(page, 'mapstudio-itemstyle-rows-1366.png', style(page).locator('.mapstudio-style-row[data-row="icon"]'));
-            await shot(page, 'mapstudio-itemstyle-fromkind-1366.png', shows(page));
+            await shot(page, 'mapstudio-itemstyle-fromkind-1366.png');
 
-            // T3: Edit the kind's rule opens Kinds at Well pad with section 6 in view; the item is still selected.
-            await rule(page).locator('.mapstudio-style-kind').click();
+            // U3: an active alarm adds its clause; Comms lost is said alone; neither stays once it is no longer true.
+            await press(dev, 'pressure-high');
+            await expect(shows(page)).toHaveText('Point 1 is Normal, by the well pad rule. Its priority 1 alarm shows over it.', { timeout: LIVE_MS });
+            await press(dev, 'pressure-low');
+            await press(dev, 'ack');
+            await press(dev, 'comms-off');
+            await expect(shows(page)).toHaveText('Point 1 shows only as Comms lost until a fresh value comes.', { timeout: LIVE_MS });
+            await press(dev, 'comms-on');
+            await expect(shows(page)).toHaveText('Point 1 is Normal, by the well pad rule.', { timeout: LIVE_MS });
+
+            // T3, U9: Edit the kind's rule opens Kinds at Well pad with section 6 in view; the item is still selected, and
+            // "Back to Point 1" returns to it with the Style tab chosen.
+            await kindLink(page).click();
             await expect(map).toHaveAttribute('data-surface', 'kinds');
             await expect(page.locator('.mapstudio-kindsetup')).toHaveAttribute('data-kind', 'pad');
             const section = page.locator('.mapstudio-kindsetup [data-section="styleRule"]');
             await expect(section.locator('.mapstudio-kindsetup-heading')).toBeInViewport();
             await expect(section.locator('.mapstudio-rule-type[data-type="states"]')).toBeFocused();
+            await expect(back(page)).toHaveText('Back to Point 1');
+            const backBox = await back(page).boundingBox();
+            expect(backBox.height).toBeGreaterThanOrEqual(24);
+            await back(page).click();
+            await expect(map).toHaveAttribute('data-surface', 'items');
+            await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', p1);
+            await expect(tab(page, 'style')).toHaveAttribute('aria-selected', 'true');
+            await expect(style(page)).toBeVisible();
+            // The keyboard is back on the link it left from.
+            await expect(kindLink(page)).toBeFocused();
+            // Left by the rail instead of Back, the item's panel is there as ever, on the same tab.
+            await kindLink(page).click();
+            await expect(back(page)).toHaveText('Back to Point 1');
             await openItems(page, map);
             await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', p1);
             await expect(style(page)).toBeVisible();
+            // Kinds opened from the rail has no item to go back to.
+            await openKinds(page, map);
+            await expect(page.locator('.mapstudio-kindsetup')).toBeVisible();
+            await expect(back(page)).toHaveCount(0);
+            await openItems(page, map);
+            await expect(style(page)).toBeVisible();
 
             // T4: Override saves the copy of the kind's rule at once, its path filled for Point 1: marked Override, with Reset.
+            // U7: by keyboard. The focus goes to the rule's chosen type, never to Reset, so Enter again changes nothing.
             let seq = await seqOf(map);
-            await rule(page).locator('.mapstudio-style-override').click();
+            await rule(page).locator('.mapstudio-style-override').focus();
+            await page.keyboard.press('Enter');
             await expect(rule(page)).toHaveAttribute('data-own', 'true');
+            await expect(chosenType(page)).toBeFocused();
+            await expect(chosenType(page)).toHaveAttribute('data-type', 'states');
+            await page.keyboard.press('Enter');
             await expectOneBatch(page, map, seq, "change Point 1's style rule");
+            await expect(rule(page)).toHaveAttribute('data-own', 'true');
+            await expect(chosenType(page)).toBeFocused();
             const copy = { source: { path: P12 + '/Status' }, type: 'states', cases: PAD_CASES };
             expect((await stored(page, p1)).overrides).toEqual({ kpis, styleRule: copy });
-            await expect(rule(page).locator('.mapstudio-override-tag')).toHaveText('Override');
+            await expect(ruleTag).toHaveText('Override');
+            await expect(ruleTag).toHaveClass(/mapstudio-override-tag/);
+            expect(await rule(page).getAttribute('aria-describedby')).toBe(await ruleTag.getAttribute('id'));
             await expect(rule(page).locator('.mapstudio-style-reset')).toHaveText('Reset');
-            await expect(rule(page).locator('.mapstudio-style-reset')).toBeFocused();
             await expect(rule(page).locator('.mapstudio-fromkind-tag')).toHaveCount(0);
-            await expect(rule(page).locator('.mapstudio-style-kind')).toHaveCount(0);
+            await expect(rule(page).locator('.mapstudio-style-override')).toHaveCount(0);
+            // U2 overridden: whose the rule is and how it saves, and a link to the kind's rule.
+            await expect(actionLine(page)).toHaveText('For Point 1 only. Changes save as you make them.');
+            await expect(kindLink(page)).toHaveText("Open the kind's rule");
+            await expect(shows(page)).toHaveText('Point 1 is Normal, by its own rule.', { timeout: LIVE_MS });
+            // The selects say the tiles' words; their values are the stored names.
+            await expect(ruleCase(page, 3).locator('.mapstudio-rule-preset option')).toHaveText(
+                ['Pick a preset', 'Normal', 'Attention', 'Warning', 'Fault', 'Out of service']);
+            await expect(ruleCase(page, 3).locator('.mapstudio-rule-preset')).toHaveValue('dimmed');
             // The shared editor: no None type, the value a typed full path, the kind's four cases, no resolve note.
             expect(await editor(page).locator('.mapstudio-rule-type').evaluateAll((els) => els.map((e) => e.dataset.type))).toEqual(['states', 'bands', 'expression']);
             await expect(editor(page).locator('.mapstudio-rule-type[data-type="states"]')).toHaveAttribute('aria-pressed', 'true');
@@ -307,7 +413,7 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
                 .toEqual(['', 'kpi:pressure', 'kpi:flow', 'path']);
             await expect(editor(page).locator('.mapstudio-rule-case')).toHaveCount(4);
             await expect(style(page).locator('.mapstudio-resolve-note')).toHaveCount(0);
-            await expect(unsaved(page)).toHaveCount(0);
+            await noUnsaved(page);
             // The override tag wears the selection token on its tint, never a colour of its own.
             expect(await rule(page).locator('.mapstudio-override-tag').evaluate((el) => {
                 const probe = document.createElement('span');
@@ -330,8 +436,7 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
             await expect(liveItem(page, p1)).toHaveAttribute('data-preset', 'fault', { timeout: LIVE_MS });
             await expect(liveItem(dev, p1)).toHaveAttribute('data-preset', 'fault', { timeout: LIVE_MS });
             await expect(liveItem(page, p3)).toHaveAttribute('data-preset', p3Before);
-            await expect(shows(page)).toHaveText('Shows now: Point 1 is Fault by its own rule. An alarm wins over the rule; a stale value shows only as Stale.',
-                { timeout: LIVE_MS });
+            await expect(shows(page)).toHaveText('Point 1 is Fault, by its own rule.', { timeout: LIVE_MS });
             for (const box of await style(page).locator('button').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()))) {
                 expect(box.width).toBeGreaterThanOrEqual(24);
                 expect(box.height).toBeGreaterThanOrEqual(24);
@@ -355,6 +460,28 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
             await page.locator('.mapstudio-toolbar .mapstudio-redo').click();
             await expect.poll(async () => (await stored(page, p1)).overrides, { timeout: REPLY_MS }).toEqual({ kpis, styleRule: own });
             await expect(ruleCase(page, 0).locator('.mapstudio-rule-preset')).toHaveValue('fault', { timeout: REPLY_MS });
+            // U8: Ctrl+Z with the focus on a rule button: the editor shows the rule as it now is stored, the focus where it was.
+            await chosenType(page).focus();
+            await page.keyboard.press('Control+z');
+            await expect.poll(async () => (await stored(page, p1)).overrides, { timeout: REPLY_MS }).toEqual({ kpis, styleRule: copy });
+            await expect(ruleCase(page, 0).locator('.mapstudio-rule-preset')).toHaveValue('attention', { timeout: REPLY_MS });
+            await expect(ruleCase(page, 0).locator('.mapstudio-rule-tile')).toHaveAttribute('data-preset', 'attention');
+            await expect(chosenType(page)).toBeFocused();
+            await noUnsaved(page);
+            await page.keyboard.press('Control+Shift+z');
+            await expect.poll(async () => (await stored(page, p1)).overrides, { timeout: REPLY_MS }).toEqual({ kpis, styleRule: own });
+            await expect(ruleCase(page, 0).locator('.mapstudio-rule-preset')).toHaveValue('fault', { timeout: REPLY_MS });
+            await expect(chosenType(page)).toBeFocused();
+            // The same with the focus on a row's Remove.
+            await ruleCase(page, 1).locator('.mapstudio-rule-remove').focus();
+            await page.keyboard.press('Control+z');
+            await expect(ruleCase(page, 0).locator('.mapstudio-rule-preset')).toHaveValue('attention', { timeout: REPLY_MS });
+            await expect(ruleCase(page, 1).locator('.mapstudio-rule-remove')).toBeFocused();
+            await expect(page.locator('.mapstudio-toolbar .mapstudio-redo')).toBeEnabled({ timeout: REPLY_MS });
+            await expect.poll(async () => (await stored(page, p1)).overrides, { timeout: REPLY_MS }).toEqual({ kpis, styleRule: copy });
+            await page.keyboard.press('Control+Shift+z');
+            await expect(ruleCase(page, 0).locator('.mapstudio-rule-preset')).toHaveValue('fault', { timeout: REPLY_MS });
+            await expect.poll(async () => (await stored(page, p1)).overrides, { timeout: REPLY_MS }).toEqual({ kpis, styleRule: own });
             await page.locator('.mapstudio-rail-item[data-surface="history"]').click();
             const history = page.locator('.mapstudio-history');
             await expect(history).toBeVisible();
@@ -376,7 +503,19 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
             await expect(source.locator('.mapstudio-field-problem'))
                 .toHaveText("an override's tag path is a full path such as [default]Mesa/P12/Pressure, not {asset.path}/Status.");
             await expect(path).toHaveAttribute('aria-invalid', 'true');
-            await expect(unsaved(page)).toHaveText('Not saved yet. The tag path is not a full path.');
+            // U6: Enter in a rule field commits and keeps the focus there.
+            await expect(path).toBeFocused();
+            // One note box: the reason first, then what the map keeps; on the warning tint with its 3 px warning edge.
+            await expect(unsaved(page)).toHaveText('Not saved yet. The tag path is not a full path.' + KEEPS);
+            expect(await unsaved(page).evaluate((el) => getComputedStyle(el).borderLeftWidth)).toBe('3px');
+            expect(await unsaved(page).evaluate((el) => {
+                const probe = document.createElement('span');
+                probe.style.borderLeft = '3px solid var(--warning)';
+                el.parentElement.appendChild(probe);
+                const token = getComputedStyle(probe).borderLeftColor;
+                probe.remove();
+                return getComputedStyle(el).borderLeftColor === token;
+            })).toBe(true);
             await path.fill('Mesa/Status');
             await page.keyboard.press('Enter');
             await expect(source.locator('.mapstudio-field-problem')).toHaveText('Mesa/Status is not a tag path; use a full path such as [default]Shared/GasPrice.');
@@ -391,7 +530,7 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
             await path.fill(P12 + '/Status');
             await page.keyboard.press('Enter');
             await expect(source.locator('.mapstudio-field-problem')).toHaveCount(0);
-            await expect(unsaved(page)).toHaveCount(0);
+            await noUnsaved(page);
             await expectNothingSent(page, map, seq);
 
             // T8: a case without a value and a preset: "Not saved yet" and why; the stored override stands.
@@ -399,29 +538,84 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
             await expect(editor(page).locator('.mapstudio-rule-case')).toHaveCount(5);
             await ruleCase(page, 4).locator('.mapstudio-rule-value').fill('5');
             await page.keyboard.press('Enter');
-            await expect(unsaved(page)).toHaveText('Not saved yet. Case 5 has no preset.');
-            await expect(shows(page)).toContainText('The map shows the stored rule until this one is whole.');
+            const missing = 'Not saved yet. Case 5 has no preset.' + KEEPS;
+            await expect(unsaved(page)).toHaveText(missing);
+            await expect(ruleCase(page, 4).locator('.mapstudio-rule-value')).toBeFocused();
+            // No second box, and no "whole": the Live now line says only what the item shows.
+            await expect(shows(page)).toHaveText('Point 1 is Fault, by its own rule.');
+            expect(await style(page).innerText()).not.toMatch(/\bwhole\b/);
+            expect((await style(page).innerText()).match(/Not saved yet/g)).toHaveLength(1);
             await expectNothingSent(page, map, seq);
             expect((await stored(page, p1)).overrides).toEqual({ kpis, styleRule: own });
             await expect(liveItem(page, p1)).toHaveAttribute('data-preset', 'fault');
-            await shot(page, 'mapstudio-itemstyle-unsaved-1366.png', shows(page));
+            await shot(page, 'mapstudio-itemstyle-unsaved-1366.png', unsaved(page));
+            // U5: Esc on a rule button while the rule is not saved: the panel stays, and so does the draft.
+            await chosenType(page).focus();
+            await page.keyboard.press('Escape');
+            await ruleCase(page, 4).locator('.mapstudio-rule-remove').focus();
+            await page.keyboard.press('Escape');
+            await rule(page).locator('.mapstudio-style-reset').focus();
+            await page.keyboard.press('Escape');
+            await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', p1);
+            await expect(editor(page).locator('.mapstudio-rule-case')).toHaveCount(5);
+            await expect(unsaved(page)).toHaveText(missing);
             // The half-built rule is kept while the item stays selected: across the tabs.
             await tab(page, 'details').click();
             await expect(style(page)).toBeHidden();
             await tab(page, 'style').click();
             await expect(editor(page).locator('.mapstudio-rule-case')).toHaveCount(5);
             await expect(ruleCase(page, 4).locator('.mapstudio-rule-value')).toHaveValue('5');
-            await expect(unsaved(page)).toHaveText('Not saved yet. Case 5 has no preset.');
+            await expect(unsaved(page)).toHaveText(missing);
+            // U4: and per item for the session: another item selected, Kinds opened, and back; nothing is sent meanwhile.
+            await selectRow(page, p3);
+            await expect(rule(page)).toHaveAttribute('data-own', 'false');
+            await expect(editor(page)).toHaveCount(0);
+            await selectRow(page, p1);
+            await expect(editor(page).locator('.mapstudio-rule-case')).toHaveCount(5);
+            await expect(ruleCase(page, 4).locator('.mapstudio-rule-value')).toHaveValue('5');
+            await expect(ruleCase(page, 4).locator('.mapstudio-rule-preset')).toHaveValue('');
+            await expect(unsaved(page)).toHaveText(missing);
+            await kindLink(page).click();
+            await expect(map).toHaveAttribute('data-surface', 'kinds');
+            await back(page).click();
+            await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', p1);
+            await expect(editor(page).locator('.mapstudio-rule-case')).toHaveCount(5);
+            await expect(unsaved(page)).toHaveText(missing);
+            await openKinds(page, map);
+            await openItems(page, map);
+            await expect(editor(page).locator('.mapstudio-rule-case')).toHaveCount(5);
+            await expect(ruleCase(page, 4).locator('.mapstudio-rule-value')).toHaveValue('5');
+            await expect(unsaved(page)).toHaveText(missing);
+            await expectNothingSent(page, map, seq);
+            expect((await stored(page, p1)).overrides).toEqual({ kpis, styleRule: own });
+            // U6: a removed row gives the focus to the row before it.
+            await editor(page).locator('.mapstudio-rule-add').click();
+            await expect(editor(page).locator('.mapstudio-rule-case')).toHaveCount(6);
+            await ruleCase(page, 5).locator('.mapstudio-rule-remove').focus();
+            await page.keyboard.press('Enter');
+            await expect(editor(page).locator('.mapstudio-rule-case')).toHaveCount(5);
+            await expect(ruleCase(page, 4).locator('.mapstudio-rule-remove')).toBeFocused();
             // Each type keeps its own cases: Bands has none yet, and States comes back as it was typed.
             await editor(page).locator('.mapstudio-rule-type[data-type="bands"]').click();
-            await expect(unsaved(page)).toHaveText('Not saved yet. Add a band.');
+            await expect(unsaved(page)).toHaveText('Not saved yet. Add a band.' + KEEPS);
+            // U6: Enter in a band's field keeps the focus in it; the last band removed gives the focus to Add.
+            await editor(page).locator('.mapstudio-rule-add').click();
+            const from = ruleCase(page, 0).locator('.mapstudio-rule-from');
+            await from.fill('1');
+            await page.keyboard.press('Enter');
+            await expect(from).toBeFocused();
+            await expect(from).toHaveValue('1');
+            await ruleCase(page, 0).locator('.mapstudio-rule-remove').focus();
+            await page.keyboard.press('Enter');
+            await expect(editor(page).locator('.mapstudio-rule-case')).toHaveCount(0);
+            await expect(editor(page).locator('.mapstudio-rule-add')).toBeFocused();
             await editor(page).locator('.mapstudio-rule-type[data-type="states"]').click();
             await expect(editor(page).locator('.mapstudio-rule-case')).toHaveCount(5);
             await expectNothingSent(page, map, seq);
             // Its preset picked, the rule is whole and is saved at once.
             await ruleCase(page, 4).locator('.mapstudio-rule-preset').selectOption('warning');
             await expectOneBatch(page, map, seq, "change Point 1's style rule");
-            await expect(unsaved(page)).toHaveCount(0);
+            await noUnsaved(page);
             expect((await stored(page, p1)).overrides).toEqual({ kpis, styleRule: { ...own, cases: [...own.cases, { value: 5, preset: 'warning' }] } });
 
             // T5: Reset removes the rule: "From kind" again, and Point 1 draws by the kind's rule; T11: the path override stands.
@@ -437,7 +631,7 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
             await expect(rule(page).locator('.mapstudio-style-override')).toBeFocused();
             await expect(liveItem(page, p1)).toHaveAttribute('data-preset', 'attention', { timeout: LIVE_MS });
             await expect(liveItem(dev, p1)).toHaveAttribute('data-preset', 'attention', { timeout: LIVE_MS });
-            await expect(shows(page)).toHaveText(/^Shows now: Point 1 is Attention by the well pad rule\./, { timeout: LIVE_MS });
+            await expect(shows(page)).toHaveText('Point 1 is Attention, by the well pad rule.', { timeout: LIVE_MS });
             await page.locator('.mapstudio-rail-item[data-surface="history"]').click();
             await expect(page.locator('.mapstudio-history .mapstudio-history-sentence', { hasText: /^Reset Point 1's style rule$/ }).first())
                 .toBeVisible({ timeout: REPLY_MS });
@@ -458,13 +652,14 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
             await expect(rule(page)).toHaveAttribute('data-own', 'true');
             await expect(rule(page).locator('.mapstudio-override-tag')).toHaveText('Override');
             await expect(rule(page).locator('.mapstudio-style-reset')).toBeVisible();
+            await expect(actionLine(page)).toHaveText('For Point 2 only. Changes save as you make them.');
             await expect(editor(page).locator('.mapstudio-rule-type[data-type="expression"]')).toHaveAttribute('aria-pressed', 'true');
             await expect(editor(page).locator('.mapstudio-rule-type[data-type="none"]')).toHaveCount(0);
             await expect(editor(page).locator('.mapstudio-rule-expression')).toHaveValue("if({value} > 600, 'warning', 'normal')");
             await expect(editor(page).locator('.mapstudio-rule-path')).toHaveValue(P14 + '/Pressure');
             expect(await editor(page).locator('.mapstudio-rule-named .mapstudio-rule-tile').evaluateAll((els) => els.map((e) => e.dataset.preset)))
                 .toEqual(['warning', 'normal']);
-            await expect(unsaved(page)).toHaveCount(0);
+            await noUnsaved(page);
             await expect(shows(page)).toContainText('by its own rule');
 
             // T9: L-SWD's own rule is From its instruments, offered for a line that is not an area.
@@ -476,9 +671,8 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
                 .toEqual(['states', 'bands', 'expression', 'instruments']);
             await expect(editor(page).locator('.mapstudio-rule-type[data-type="instruments"]')).toHaveAttribute('aria-pressed', 'true');
             await expect(editor(page).locator('.mapstudio-rule-instruments')).toHaveText('Each segment takes the worst of the instruments at its ends.');
-            await expect(style(page).locator('.mapstudio-style-row[data-row="size"] .mapstudio-style-value'))
-                .toHaveText('Its width follows its diameter; a line with no diameter draws thin.');
-            await expect(style(page).locator('.mapstudio-style-row[data-row="label"] .mapstudio-style-value')).toHaveText('L-SWD');
+            await expect(style(page).locator('.mapstudio-style-fromkind [data-row="size"] .mapstudio-style-value')).toHaveText('Width by diameter');
+            await expect(shows(page)).toContainText('by its own rule.');
 
             // An unlinked pad has no path to fill, so Override starts empty: nothing is sent until the rule is built.
             const pad = randomUUID();
@@ -488,11 +682,34 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
             await selectRow(page, pad);
             await expect(rule(page)).toHaveAttribute('data-own', 'false');
             let seq = await seqOf(map);
+            // U10: the kind's rule reads a path under {asset.path}, which an unlinked pad cannot fill; the line says so.
+            await expect(actionLine(page)).toHaveText("Override gives Style pad its own rule, saved once it is complete. Edit the kind's rule changes every well pad.");
+            await expect(rule(page).locator('.mapstudio-style-kindrule .mapstudio-style-summary')).toHaveText('States on the tag {asset.path}/Status');
             await rule(page).locator('.mapstudio-style-override').click();
             await expect(rule(page)).toHaveAttribute('data-editing', 'true');
             await expect(rule(page).locator('.mapstudio-override-tag')).toHaveCount(0);
-            await expect(unsaved(page)).toHaveText('Not saved yet. Pick the value the rule reads. Add a case.');
-            await expect(rule(page).locator('.mapstudio-style-keep')).toBeFocused();
+            // Until it is stored the pad still draws from its kind, and the tag says so.
+            await expect(rule(page).locator('.mapstudio-style-rule-head > .mapstudio-style-tag')).toHaveText('From kind');
+            await expect(unsaved(page)).toHaveText('Not saved yet. Pick the value the rule reads. Add a case.' + KEEPS);
+            // The focus is on the rule's chosen type, not on a button that would give the rule up.
+            await expect(chosenType(page)).toBeFocused();
+            await expect(chosenType(page)).toHaveAttribute('data-type', 'states');
+            await expect(rule(page).locator('.mapstudio-style-keep')).toBeVisible();
+            // U5: Esc here leaves the panel and the editor.
+            await page.keyboard.press('Escape');
+            await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', pad);
+            await expect(rule(page)).toHaveAttribute('data-editing', 'true');
+            // U4: a rule never stored is kept too: another item and back, still being built and not saved.
+            await selectRow(page, p2);
+            await selectRow(page, pad);
+            await expect(rule(page)).toHaveAttribute('data-editing', 'true');
+            await expect(unsaved(page)).toHaveText('Not saved yet. Pick the value the rule reads. Add a case.' + KEEPS);
+            // U6: with no row before it, a removed row gives the focus to Add.
+            await editor(page).locator('.mapstudio-rule-add').click();
+            await ruleCase(page, 0).locator('.mapstudio-rule-remove').focus();
+            await page.keyboard.press('Enter');
+            await expect(editor(page).locator('.mapstudio-rule-case')).toHaveCount(0);
+            await expect(editor(page).locator('.mapstudio-rule-add')).toBeFocused();
             await expectNothingSent(page, map, seq);
             // Keep the kind's rule gives it up; nothing was sent.
             await rule(page).locator('.mapstudio-style-keep').click();
@@ -500,6 +717,11 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
             await expect(rule(page).locator('.mapstudio-style-rule-head > .mapstudio-fromkind-tag')).toHaveText('From kind');
             await expect(rule(page).locator('.mapstudio-style-override')).toBeFocused();
             await expectNothingSent(page, map, seq);
+            // Given up, it is not kept: another item and back shows the kind's rule.
+            await selectRow(page, p2);
+            await selectRow(page, pad);
+            await expect(rule(page)).toHaveAttribute('data-editing', 'false');
+            await expect(editor(page)).toHaveCount(0);
             // Built on a key value of the kind, it is saved as soon as it is whole, and marked Override.
             await rule(page).locator('.mapstudio-style-override').click();
             await editor(page).locator('.mapstudio-rule-source-select').selectOption('kpi:pressure');
@@ -513,12 +735,53 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
             await expect(rule(page).locator('.mapstudio-override-tag')).toHaveText('Override');
             await expect(rule(page).locator('.mapstudio-style-keep')).toHaveCount(0);
             await expect(editor(page).locator('.mapstudio-rule-case')).toHaveCount(1);
-            await expect(unsaved(page)).toHaveCount(0);
+            await noUnsaved(page);
             // Undo takes the rule back, and the editor goes with it.
             await undo(page).click();
             await expect.poll(async () => (await stored(page, pad)).overrides, { timeout: REPLY_MS }).toEqual({});
             await expect(rule(page)).toHaveAttribute('data-own', 'false', { timeout: REPLY_MS });
             await expect(editor(page)).toHaveCount(0);
+            await expect(page.locator('.mapstudio-unsaved-row')).toHaveCount(0);
+
+            // U10: an unlinked line. Its kind's rule needs nothing of an asset's folder, so Override saves the copy at once:
+            // the seed's Bands on a key value first, then From its instruments.
+            const lineSetup = (await send(page, 'map.load', {})).body.kindSetups.find((k) => k.kindId === 'line' && !k.deleted);
+            const stray = randomUUID();
+            await apply(page, [{ op: 'create', entity: 'item', id: stray, baseVersion: 0, data: { kind: 'line', name: 'Style line',
+                geometry: { type: 'LineString', coordinates: [AWAY, [AWAY[0] + 0.01, AWAY[1]]] }, properties: {} } }]);
+            await expect(page.locator('.mapstudio-list-row[data-item-id="' + stray + '"]')).toHaveCount(1, { timeout: REPLY_MS });
+            await selectRow(page, stray);
+            await expect(rule(page)).toHaveAttribute('data-own', 'false');
+            await expect(actionLine(page)).toHaveText("Override gives Style line its own copy, saved at once. Edit the kind's rule changes every gathering line.");
+            seq = await seqOf(map);
+            await rule(page).locator('.mapstudio-style-override').click();
+            await expectOneBatch(page, map, seq, "change Style line's style rule");
+            expect((await stored(page, stray)).overrides).toEqual({ styleRule: lineSetup.setup.styleRule });
+            await expect(rule(page)).toHaveAttribute('data-own', 'true');
+            await noUnsaved(page);
+            seq = await seqOf(map);
+            await rule(page).locator('.mapstudio-style-reset').click();
+            await expectOneBatch(page, map, seq, "reset Style line's style rule");
+            await expect(rule(page)).toHaveAttribute('data-own', 'false');
+            // The kind's rule made From its instruments (through the test hook; the seed's rule is put back below).
+            const instruments = { source: { instruments: 'worst' } };
+            await apply(page, [{ op: 'update', entity: 'kindSetup', id: 'line', baseVersion: lineSetup.version,
+                data: { setup: { ...lineSetup.setup, styleRule: instruments } } }]);
+            try {
+                await expect(rule(page).locator('.mapstudio-style-kindrule')).toHaveAttribute('data-rule', 'instruments', { timeout: REPLY_MS });
+                await expect(actionLine(page)).toHaveText("Override gives Style line its own copy, saved at once. Edit the kind's rule changes every gathering line.");
+                seq = await seqOf(map);
+                await rule(page).locator('.mapstudio-style-override').click();
+                await expectOneBatch(page, map, seq, "change Style line's style rule");
+                expect((await stored(page, stray)).overrides).toEqual({ styleRule: instruments });
+                await expect(rule(page)).toHaveAttribute('data-own', 'true');
+                await expect(rule(page)).toHaveAttribute('data-editing', 'false');
+                await expect(chosenType(page)).toHaveAttribute('data-type', 'instruments');
+                await noUnsaved(page);
+            } finally {
+                const now = (await send(page, 'map.load', {})).body.kindSetups.find((k) => k.kindId === 'line' && !k.deleted);
+                await apply(page, [{ op: 'update', entity: 'kindSetup', id: 'line', baseVersion: now.version, data: { setup: lineSetup.setup } }]);
+            }
             await expect(page.locator('.mapstudio-unsaved-row')).toHaveCount(0);
         });
 
@@ -537,7 +800,7 @@ editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', ()
             await editor(page).locator('.mapstudio-rule-add').click();
             await ruleCase(page, 1).locator('.mapstudio-rule-value').fill('2');
             await page.keyboard.press('Enter');
-            await expect(unsaved(page)).toHaveText('Not saved yet. Case 2 has no preset.');
+            await expect(unsaved(page)).toHaveText('Not saved yet. Case 2 has no preset.' + KEEPS);
             const other = await signedInContext(browser, EDITOR2_USER, { viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1 });
             try {
                 const theirs = await other.newPage();

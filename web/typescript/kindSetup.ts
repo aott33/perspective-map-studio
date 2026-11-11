@@ -594,6 +594,14 @@ const NOTE_WORDS: Record<string, string> = {
     attention: 'Attention', warning: 'Warning', fault: 'Fault', dimmed: 'Out of service', solid: 'Solid', dashed: 'Dashed', dotted: 'Dotted'
 };
 
+/**
+ * A preset in the words a person reads (entry 12c3): the tile's own word where it has one ("Attention", "Out of service"), the
+ * line patterns and Normal by name. What is stored is the preset's name, unchanged; a name that is no preset is shown as it is.
+ */
+export function presetWord(preset: string): string {
+    return NOTE_WORDS[preset] || (preset === 'normal' ? 'Normal' : preset);
+}
+
 /** What the Live now note at the foot of section 6 is said from (entry 12b2): only what the Gateway already sends. */
 export interface LiveNowFacts {
     kind: Kind;
@@ -642,8 +650,8 @@ export function liveNowText(facts: LiveNowFacts): string {
     }
     // The section's own note says "Not saved yet" and what is missing; this one says only what the map does meanwhile.
     const unsaved = !facts.unsaved ? ''
-        : facts.stored === 'none' ? ' The map draws no rule until this one is whole.'
-            : ' The map shows the stored rule until this one is whole.';
+        : facts.stored === 'none' ? ' The map draws no rule until this one is complete.'
+            : ' The map shows the stored rule until this one is complete.';
     const state = facts.state;
     if (state !== null && (state.commsLost || state.stale)) {
         return 'Live now: ' + name + ' shows only as ' + (state.commsLost ? 'Comms lost' : 'Stale') + ' until a fresh value comes.' + unsaved;
@@ -659,12 +667,11 @@ export function liveNowText(facts: LiveNowFacts): string {
     if (facts.stored === 'instruments') {
         return 'Live now: each segment of ' + name + ' takes the worst of the instruments at its ends.' + unsaved;
     }
-    const word = NOTE_WORDS[itemPreset(state)] || 'Normal';
     const alarm = state.alarm ? ', but its priority ' + state.alarm.priority + ' alarm wins over the rule.' : '.';
-    return 'Live now: ' + name + ' is ' + word + alarm + unsaved;
+    return 'Live now: ' + name + ' is ' + presetWord(itemPreset(state)) + alarm + unsaved;
 }
 
-/** What the Style tab's "shows now" line is said from (entry 12c2): only what the Gateway already sends. */
+/** What the Style tab's Live now line is said from (entries 12c2 and 12c3): only what the Gateway already sends. */
 export interface ShowsNowFacts {
     kind: Kind;
     /** The item's name. */
@@ -675,14 +682,13 @@ export interface ShowsNowFacts {
     own: boolean;
     /** The rule the item draws by: its own when it has one, else the kind's. */
     rule: LiveNowFacts['stored'];
-    /** Whether the item's rule says "Not saved yet": the draft is not whole, so nothing of it was sent. */
-    unsaved: boolean;
 }
 
 /**
- * The one line under an item's style rule in the Style tab (entry 12c2): what the item shows now, from its live state, by its
- * own rule or its kind's, and when its alarm wins over the rule. Nothing of the rule is worked out here: the state is the
- * Gateway's, so the line changes at the next live update.
+ * The Style tab's Live now line (entry 12c3, in place of 12c2's "Shows now"): one line, "<name> is <state word>, by the <kind>
+ * rule." or "by its own rule."; the alarm, Stale and Comms lost words only when they are true. Nothing of the rule is worked
+ * out here: the state is the Gateway's, so the line changes at the next live update. What a rule not saved yet means for the
+ * map is the rule's own note's to say (`UNSAVED_KEEPS`), never this line's.
  */
 export function showsNowText(facts: ShowsNowFacts): string {
     const kind = facts.kind;
@@ -690,31 +696,38 @@ export function showsNowText(facts: ShowsNowFacts): string {
     if (kind.area) {
         return 'An area draws its category tint, not a preset, so a style rule does not show on ' + name + '.';
     }
-    // An item with no rule of its own draws by its kind's, and a kind with none draws no rule at all.
-    const unsaved = !facts.unsaved ? ''
-        : facts.own ? ' The map shows the stored rule until this one is whole.'
-            : facts.rule === 'none' ? ' The map draws no rule until this one is whole.' : ' The map shows the kind\'s rule until this one is whole.';
     const state = facts.state;
     if (state !== null && (state.commsLost || state.stale)) {
-        return 'Shows now: ' + name + ' shows only as ' + (state.commsLost ? 'Comms lost' : 'Stale') + ' until a fresh value comes.' + unsaved;
+        return name + ' shows only as ' + (state.commsLost ? 'Comms lost' : 'Stale') + ' until a fresh value comes.';
     }
+    const alarm = state && state.alarm ? ' Its priority ' + state.alarm.priority + ' alarm shows over it.' : '';
     if (facts.rule === 'none') {
-        const over = state && state.alarm ? ', but its priority ' + state.alarm.priority + ' alarm shows over it.' : '.';
-        return 'Shows now: ' + name + ' draws as Normal' + over + ' ' + kind.name + ' has no style rule.' + unsaved;
+        // An item with no rule of its own draws by its kind's, and a kind with none draws no rule at all.
+        return name + ' is Normal. ' + kind.name + ' has no style rule.' + alarm;
     }
     if (state === null) {
-        return 'Shows now: no live values for ' + name + ' yet.' + unsaved;
+        return 'No live values for ' + name + ' yet.';
     }
-    const by = facts.own ? 'its own rule' : 'the ' + lowerKind(kind) + ' rule';
+    const by = facts.own ? 'by its own rule.' : 'by the ' + lowerKind(kind) + ' rule.';
     if (facts.rule === 'instruments') {
-        return 'Shows now: by ' + by + ', each segment of ' + name + ' takes the worst of the instruments at its ends. An alarm wins over it.'
-            + unsaved;
+        return 'Each segment of ' + name + ' takes the worst of the instruments at its ends, ' + by + alarm;
     }
-    const word = NOTE_WORDS[itemPreset(state)] || 'Normal';
-    const alarm = state.alarm ? ', but its priority ' + state.alarm.priority + ' alarm wins over the rule.'
-        : '. An alarm wins over the rule; a stale value shows only as Stale.';
-    return 'Shows now: ' + name + ' is ' + word + ' by ' + by + alarm + unsaved;
+    return name + ' is ' + presetWord(itemPreset(state)) + ', ' + by + alarm;
 }
+
+/** The Style tab's one visible line under Override and "Edit the kind's rule" (entry 12c3): what each of the two does. */
+export function overrideLineText(name: string, kind: Kind, atOnce: boolean): string {
+    return (atOnce ? 'Override gives ' + name + ' its own copy, saved at once.' : 'Override gives ' + name + ' its own rule, saved once it is complete.')
+        + ' Edit the kind\'s rule changes every ' + lowerKind(kind) + '.';
+}
+
+/** The line under an item's own rule (entry 12c3): whose it is and how it saves. */
+export function ownLineText(name: string): string {
+    return 'For ' + name + ' only. Changes save as you make them.';
+}
+
+/** What the rule's "Not saved yet" note ends with in the Style tab (entry 12c3): the reason first, then this. */
+export const UNSAVED_KEEPS = 'The map keeps the saved rule until then.';
 
 /** The line under the Preview item select, after the asset folder: the two things the preview item does (entry 12b2). */
 export function previewLine(kind: Kind): string {
@@ -1247,9 +1260,12 @@ export function inStepVersion(base: number, version: number, o: { held: boolean;
     return !o.held && (o.same || o.settled) ? version : base;
 }
 
-/** "Not saved yet. Band 2 has no preset." under the rows, or '' when nothing is missing (owner decision 2). */
-export function unsavedText(missing: readonly string[]): string {
-    return missing.length === 0 ? '' : 'Not saved yet. ' + missing.join(' ');
+/**
+ * "Not saved yet. Band 2 has no preset." under the rows, or '' when nothing is missing (owner decision 2); `tail` is what the
+ * note ends with after the reason (the Style tab's `UNSAVED_KEEPS`, entry 12c3).
+ */
+export function unsavedText(missing: readonly string[], tail = ''): string {
+    return missing.length === 0 ? '' : 'Not saved yet. ' + missing.join(' ') + (tail !== '' ? ' ' + tail : '');
 }
 
 /** Whether a draft is what is stored: both whole and the same rule, whatever order the stored rule's keys are in. */
@@ -1279,12 +1295,14 @@ export function ownRuleTypes(kind: Kind): RuleType[] {
 export const OWN_RULE_EMPTY: RuleDraft = { ...NO_RULE, type: 'states' };
 
 /**
- * What Override starts an item's own rule from (entry 12c2): a copy of the kind's rule, a path under `{asset.path}` filled for
- * this item so it is the full path an override takes. An item with no asset, a kind with no rule (or one of no known shape)
- * and a path that cannot be filled (the asset is not in the asset list) start empty.
+ * What Override starts an item's own rule from (entries 12c2 and 12c3): a copy of the kind's rule, a path under `{asset.path}`
+ * filled for this item so it is the full path an override takes. It starts empty only when there is nothing to copy (a kind
+ * with no rule, or one of no known shape) or the kind's rule reads a tag path that cannot be filled for this item (a path
+ * under `{asset.path}` on an item with no asset, or whose asset is not in the asset list). By what the kind's rule needs, not
+ * by the link (owner's ruling on 12c2): an unlinked item copies From its instruments, a key value and a full path as they are.
  */
 export function ownRuleStart(kindRule: Record<string, unknown> | null | undefined, view: ItemView): RuleDraft {
-    if (!kindRule || view.assetId === null) {
+    if (!kindRule) {
         return OWN_RULE_EMPTY;
     }
     const draft = ruleDraft(kindRule);
@@ -1306,19 +1324,22 @@ export function ownRuleStart(kindRule: Record<string, unknown> | null | undefine
     return { ...draft, sources: { states: full, bands: full, expression: full } };
 }
 
-/** A rule in words, read only (entry 12c2, the Style tab's "From kind"): one line, then a line per case with its preset. */
+/** A rule in words, read only (entries 12c2 and 12c3, the Style tab's "From kind"): one sentence, then a line per case. */
 export interface RuleWords {
     type: RuleType;
     /** "Bands on Pressure", "From its instruments: ...", "Well pad has no style rule." */
     summary: string;
-    /** One per case, in order: "Below 900", "When Status is 2"; for an expression, the presets its text names. */
+    /** One per case, in order: "Below 900", "When Status is 2"; for an expression, the presets its text names, in their words. */
     cases: Array<{ label: string; preset: string }>;
     /** An expression rule's text, '' otherwise. */
     expression: string;
 }
 
-/** A stored rule said in words for the kind it is of; a rule of no known shape reads as none. */
-export function ruleWords(rule: Record<string, unknown> | null | undefined, kpis: readonly KeyValue[], kind: Kind): RuleWords {
+/**
+ * A stored rule said in words for the kind it is of; a rule of no known shape reads as none. With `view` (the Style tab), a
+ * tag path under `{asset.path}` is said filled for that item; one that cannot be filled is said as written.
+ */
+export function ruleWords(rule: Record<string, unknown> | null | undefined, kpis: readonly KeyValue[], kind: Kind, view?: ItemView): RuleWords {
     const draft = ruleDraft(rule);
     if (draft.type === 'none') {
         return { type: 'none', summary: kind.name + ' has no style rule.', cases: [], expression: '' };
@@ -1328,10 +1349,11 @@ export function ruleWords(rule: Record<string, unknown> | null | undefined, kpis
     }
     const source = draft.sources[draft.type];
     const name = sourceName(source, kpis);
-    const on = source.from === 'kpi' ? ' on ' + name : source.from === 'path' ? ' on the tag ' + source.path : '';
+    const filled = source.from === 'path' && view ? fill(source.path, view) : null;
+    const on = source.from === 'kpi' ? ' on ' + name : source.from === 'path' ? ' on the tag ' + (filled !== null ? filled : source.path) : '';
     if (draft.type === 'expression') {
-        return { type: 'expression', summary: 'Expression' + on, cases: expressionPresets(draft.expression, kind).map((p) => ({ label: p, preset: p })),
-            expression: draft.expression };
+        return { type: 'expression', summary: 'Expression' + on,
+            cases: expressionPresets(draft.expression, kind).map((p) => ({ label: presetWord(p), preset: p })), expression: draft.expression };
     }
     if (draft.type === 'states') {
         return { type: 'states', summary: 'States' + on, cases: draft.states.map((r) => ({ label: 'When ' + name + ' is ' + r.value, preset: r.preset })),

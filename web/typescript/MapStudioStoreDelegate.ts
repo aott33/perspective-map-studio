@@ -2187,16 +2187,19 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.savePaused = false;
             // The undo a run waits on (entry 23): read before the stack settles it.
             const runStep = this.undoRun !== null && this.isPendingUndo(reply.body.batchId);
-            if (outcome.entry) {
-                this.noteSaved(outcome.entry.batch, new Date());
-                for (const record of savedRecords(outcome.entry.batch, reply.body.results)) {
+            // The batch as the queue held it, else as this page sent it (entry 12c3): another tab of the same browser replays an
+            // unsent entry it learns from storage, and its reply takes the entry off the queue before this page's own reply comes.
+            const saved = outcome.entry ? outcome.entry.batch : this.batchesInFlight.get(reply.body.batchId) || null;
+            if (saved) {
+                this.noteSaved(saved, new Date());
+                for (const record of savedRecords(saved, reply.body.results)) {
                     if (this.changes.saved(record)) {
                         this.itemsRevision++;
                     }
                 }
                 // An update's new version (a rename, a move, a link, a reverse) reaches the drawn record here,
                 // ahead of the Gateway's map.changed, so the next field saves at the right version.
-                for (const op of outcome.entry.batch.ops) {
+                for (const op of saved.ops) {
                     const result = reply.body.results.find((r) => r.entity === 'item' && r.id === op.id);
                     const drawn = this.changes.state.items.find((i) => i.id === op.id);
                     if (op.op === 'update' && op.entity === 'item' && result && drawn && drawn.version < result.version) {
@@ -2211,7 +2214,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
                 }
             }
             this.shapesSent.delete(reply.body.batchId);
-            this.settleUndo(reply.body.batchId, reply.body.results, outcome.entry ? outcome.entry.batch : null);
+            this.settleUndo(reply.body.batchId, reply.body.results, saved);
             if (shown && this.save.state !== 'idle') {
                 const itemId = this.save.itemId;
                 const result = reply.body.results.find((r) => r.id === itemId);

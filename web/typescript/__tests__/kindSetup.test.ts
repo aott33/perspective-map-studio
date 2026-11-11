@@ -438,11 +438,11 @@ describe('the Live now note and the preview item\'s words (12b2)', () => {
             .toBe('Live now: P12 draws as Normal, but its priority 1 alarm shows over it. This kind has no style rule.');
     });
 
-    test('P11: "Not saved yet": the map shows the stored rule until this one is whole', () => {
+    test('P11: "Not saved yet": the map shows the stored rule until this one is complete', () => {
         expect(liveNowText(facts({ unsaved: true, state: { ...NORMAL, preset: 'attention' } })))
-            .toBe('Live now: P12 is Attention. The map shows the stored rule until this one is whole.');
+            .toBe('Live now: P12 is Attention. The map shows the stored rule until this one is complete.');
         expect(liveNowText(facts({ unsaved: true, stored: 'none' })))
-            .toBe('Live now: P12 draws as Normal. The map draws no rule until this one is whole.');
+            .toBe('Live now: P12 draws as Normal. The map draws no rule until this one is complete.');
         expect(liveNowText(facts({ unsaved: true }))).not.toContain('Not saved yet');
     });
 

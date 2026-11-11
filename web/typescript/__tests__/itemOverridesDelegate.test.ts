@@ -252,6 +252,20 @@ describe('the item\'s own style rule is the styleRule row (entry 12c2: T4, T5, T
         expect(record('p12').overrides).toEqual({});
     });
 
+    test('12c3: another tab replayed the batch and its reply took the entry off the queue first: this page\'s own reply still makes the Undo step', () => {
+        expect(delegate.editOverride('p12', 'styleRule', OWN, '')).toBe(true);
+        const mine = last();
+        // The other tab's reply: the entry leaves the shared queue before this page's reply is handled.
+        (delegate as unknown as { sender: { queue: { saved(id: string): void; get(id: string): unknown } } }).sender.queue.saved(mine.body.batchId);
+        expect((delegate as unknown as { sender: { queue: { get(id: string): unknown } } }).sender.queue.get(mine.body.batchId)).toBeUndefined();
+        save(mine);
+        expect(record('p12').overrides).toEqual({ styleRule: OWN });
+        expect(record('p12').version).toBe(4);
+        expect(undoLabel(state().undo)).toBe("Undo: change P12's style rule");
+        delegate.undo();
+        expect(last().body.ops[0]).toMatchObject({ id: 'p12', baseVersion: 4, data: { overrides: {} } });
+    });
+
     test('T5: Reset removes the rule alone, named "reset"; one with no rule sends nothing', () => {
         expect(delegate.editOverride('p2', 'styleRule', null, '')).toBe(true);
         expect(last().body.ops[0]).toMatchObject({ id: 'p2', baseVersion: 5, data: { overrides: { link: '/other' } } });

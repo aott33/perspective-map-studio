@@ -12,12 +12,14 @@ import { distanceText } from '../linePopup';
 import { Glyph } from '../popupParts';
 import { roundCoordinate } from '../save';
 import { FROM_KIND, LiveNowBlock, LiveNowRow, OVERRIDE, RULE_ROW, openSetupText, pathProblem } from '../itemOverrides';
-import { Fields, KeyValue, RuleDraft, checkRule, ownRuleStart, ruleWords, showsNowText, storedRuleOf } from '../kindSetup';
+import {
+    Fields, KeyValue, RuleDraft, UNSAVED_KEEPS, checkRule, overrideLineText, ownLineText, ownRuleStart, presetWord, ruleWords, showsNowText, storedRuleOf
+} from '../kindSetup';
 import { ItemState } from '../live';
 import { MarkerColors, SpriteSymbol } from '../markers';
 import { ItemView } from '../placeholders';
 import { ChromeGlyph } from './ChromeGlyph';
-import { RuleEditor, RuleTile } from './RuleEditor';
+import { RuleEditor, RuleKeep, RuleTile } from './RuleEditor';
 import { PAUSED_TEXT } from './UndoGroup';
 
 /** The footer's delete icon on hover (entry 25): what it does and its key; no question is asked and Undo restores the item. */
@@ -46,17 +48,18 @@ export function tabForKey(tab: PanelTab, key: string): PanelTab | null {
     return to < 0 ? null : PANEL_TABS[to][0];
 }
 
-/** What sets an item's size, in words (entry 12c2, owner decision 2): read only. */
+/** What sets an item's size, in a few words for the Style tab's "From kind" line (entries 12c2 and 12c3): read only. */
 export function sizeText(kind: Kind): string {
-    return kind.geometry === 'point' ? 'One size: every point\'s marker is the same size.'
-        : kind.area ? 'One outline: an area has no size of its own.'
-            : 'Its width follows its diameter; a line with no diameter draws thin.';
+    return kind.geometry === 'point' ? 'One size' : kind.area ? 'One outline' : 'Width by diameter';
 }
 
-/** The words under each read-only row of the Style tab: where the value comes from, and that it is not changed here. */
-export const STYLE_ICON_HINT = 'The icon comes from the project\'s kind list and is not changed here.';
-export const STYLE_SIZE_HINT = 'The size comes from the project\'s kind list and is not changed here.';
-export const STYLE_LABEL_HINT = 'The label is the item\'s name. What it shows comes from the project\'s kind list and is not changed here.';
+/** The one hint under the Style tab's "From kind" line (entry 12c3): where the icon and the size come from, and that they are not changed here. */
+export const STYLE_FROM_KIND_HINT = 'The icon and the size come from the project\'s kind list and are not changed here.';
+
+/** The Style tab's words that are not a rule's (entry 12c3). */
+export const LIVE_NOW = 'Live now';
+export const EDIT_KIND_RULE = 'Edit the kind\'s rule';
+export const OPEN_KIND_RULE = 'Open the kind\'s rule';
 
 /** What the Style tab is drawn from (entry 12c2). */
 export interface StyleFacts {
@@ -164,21 +167,32 @@ export function deleteButton(paused: boolean, pending: boolean, toolInHand: bool
  * and Style, a real tab list: one tab stop, the arrow keys (Home, End) move between them and choose, each names its panel
  * (`aria-controls`), the active one underlined. The tab chosen is the component's (`tab`, `onTab`), so it is kept while another
  * item is selected and across a visit to Kinds (an item just placed, which opens with the cursor in Name, shows Details until a
- * tab is chosen; the remembered tab is not changed by it). Both panels stay mounted, the one not chosen hidden, so a rule being built is
- * kept until the item is left. **Style** holds Icon (the kind's glyph and its name), Size and Label (the item's name) read only,
- * each saying where it comes from, then the **style rule**: tagged "From kind", the kind's rule in words with its case tiles
- * (or that the kind has none), "Edit the kind's rule" (Kinds at that kind with section 6 in view, the selection kept) and
- * Override; or the item's own rule in the shared editor (studio/RuleEditor.tsx, no None type, a typed path a full path), tagged
- * Override with Reset. Override saves a copy of the kind's rule at once as the item's own (a path under `{asset.path}` filled
- * for this item); an item with no asset, a kind with no rule and a path that cannot be filled start empty, saved once built.
- * The rule saves through `onStyleRule` (one update of the item's whole `overrides`, only `styleRule` changed: an Undo step and
- * a row of Recent changes); a refusal's words stand beside the part of the rule they name. One line under the rule says what
- * the item shows now and when its alarm wins. Esc in a typed field of the rule stays in the field (the draft is kept).
- * Test hooks: the tabs `.mapstudio-panel-tab[data-tab]` (`aria-selected`), the Style panel `.mapstudio-style`, a read-only row
- * `.mapstudio-style-row[data-row]` (`icon`, `size`, `label`), the rule `.mapstudio-style-rule[data-own]` (`data-editing` while
- * an own rule not yet stored is being built), `.mapstudio-style-override`, `.mapstudio-style-reset`, `.mapstudio-style-kind`,
- * the kind's rule in words `.mapstudio-style-kindrule[data-rule]` with a case `.mapstudio-style-kindcase[data-preset]`, "Keep
- * the kind's rule" `.mapstudio-style-keep`, a refusal `.mapstudio-style-refusal` and the line `.mapstudio-style-shows`.
+ * tab is chosen; the remembered tab is not changed by it). Both panels stay mounted, the one not chosen hidden.
+ *
+ * **Style**, in the order of entry 12c3 (the owner's layout after three reviews), top to bottom: (1) the **Style rule** heading
+ * with its tag, "From kind", or Override with Reset; the section is described by the tag. (2) **Live now**, one line: what the
+ * item shows now, by its kind's rule or its own (kindSetup.ts `showsNowText`). (3) The rule: from the kind, its sentence (a
+ * path under `{asset.path}` filled for this item) and one line per case, the tile and its words; or the item's own rule in the
+ * shared editor (studio/RuleEditor.tsx, no None type, a typed path a full path). (4) The actions: Override, the one bordered
+ * button, and "Edit the kind's rule" as a text link (Kinds at that kind with section 6 in view, the selection kept, and "Back
+ * to <name>" there), with one visible line saying what each does; while overridden, "For <name> only. Changes save as you make
+ * them." and a link to the kind's rule. (5) Behind a divider, **From kind**: the icon and the size in one line with one hint
+ * (no Label row until backlog 38).
+ *
+ * Override saves a copy of the kind's rule at once as the item's own (a path under `{asset.path}` filled for this item); a
+ * kind with no rule and a path that cannot be filled start empty, saved once built. The rule saves through `onStyleRule` (one
+ * update of the item's whole `overrides`, only `styleRule` changed: an Undo step and a row of Recent changes); a refusal's
+ * words stand beside the part of the rule they name. A rule not saved yet says so in the editor's one note, the reason first,
+ * then "The map keeps the saved rule until then."; it is kept per item for the session (`ruleKeep`, `onRuleKeep`), so another
+ * item, Kinds or the other tab and back finds it as it was left. Esc inside the rule never closes the panel while a rule is
+ * not saved (and never from a typed field of it); after Override the focus is on the rule's chosen type, never on Reset.
+ * Test hooks: the tabs `.mapstudio-panel-tab[data-tab]` (`aria-selected`), the Style panel `.mapstudio-style`, the rule
+ * `.mapstudio-style-rule[data-own]` (`data-editing` while an own rule not yet stored is being built), its tag
+ * `.mapstudio-style-tag`, the line `.mapstudio-style-shows`, `.mapstudio-style-override`, `.mapstudio-style-reset`,
+ * `.mapstudio-style-kind` (the link to the kind's rule), the visible line `.mapstudio-style-line`, the kind's rule in words
+ * `.mapstudio-style-kindrule[data-rule]` with a case `.mapstudio-style-kindcase[data-preset]`, "Keep the kind's rule"
+ * `.mapstudio-style-keep`, a refusal `.mapstudio-style-refusal`, and the foot `.mapstudio-style-fromkind` with
+ * `[data-row="icon"]` and `[data-row="size"]`.
  */
 export interface PropertiesPanelProps {
     item: MapItemRecord;
@@ -275,6 +289,14 @@ export interface PropertiesPanelProps {
     onStyleRule?: (rule: Record<string, unknown> | null, base?: number) => boolean;
     /** "Edit the kind's rule": Kinds at this item's kind with section 6 in view, the selection kept. */
     onEditKindRule?: () => void;
+    /** Entry 12c3: the own rule left not saved when this item's panel last went, or null; the editor opens on it as it was left. */
+    ruleKeep?: RuleKeep | null;
+    /** Entry 12c3: an Undo or a Redo of this item is on its way: the stored rule it changes shows in the editor wherever the focus is. */
+    undoing?: boolean;
+    /** Entry 12c3: a save of this item waits in the queue with a reason (its conflict card stands): the rule's draft is left alone until the card's choice. */
+    waiting?: boolean;
+    /** The panel is going: the own rule not saved yet (null for none) is kept for this item until its panel is back. */
+    onRuleKeep?: (itemId: string, keep: RuleKeep | null) => void;
 }
 
 interface Drafts {
@@ -363,10 +385,21 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
     /** The focus is moved only while the press is fresh: a save not taken changes no button, and nothing is focused later. */
     private styleFocusUntil = 0;
     private readonly tabEls: Partial<Record<PanelTab, HTMLButtonElement | null>> = {};
+    /** Entry 12c3: the rule's editor, asked for its draft when the panel goes and whether it says "Not saved yet". */
+    private readonly ruleEditor = React.createRef<RuleEditor>();
+    /** The draft kept for this item, handed to the editor the panel first draws; none once the panel is mounted. */
+    private kept: RuleKeep | null;
 
     constructor(props: PropertiesPanelProps) {
         super(props);
-        this.state = { ...draftsOf(props.item), placed: props.autoFocusName && props.tab === 'style' };
+        this.kept = props.ruleKeep || null;
+        const own = !!props.style && props.style.ownRule !== null;
+        this.state = {
+            ...draftsOf(props.item),
+            // A kept draft of a rule not stored yet opens its editor again, still "Not saved yet".
+            ruleStart: this.kept !== null && !!props.style && !own ? this.kept.draft : null,
+            placed: props.autoFocusName && props.tab === 'style'
+        };
     }
 
     componentDidMount(): void {
@@ -377,10 +410,17 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         }
         this.focusName();
         this.watchPlaces();
+        // The editor first drawn took the kept draft; one drawn later (after a Reset, say) starts from what is stored.
+        this.kept = null;
     }
 
     componentWillUnmount(): void {
         this.mounted = false;
+        // Entry 12c3: a rule not saved yet is kept for this item (another item, Kinds); nothing is sent meanwhile.
+        if (this.props.onRuleKeep) {
+            const editor = this.ruleEditor.current;
+            this.props.onRuleKeep(this.props.item.id, editor ? editor.keep() : null);
+        }
         // Entry 12c1: a refused override's words do not wait for the item to be selected again.
         if (this.props.overrideRefusal && this.props.onClearOverrideRefusal) {
             this.props.onClearOverrideRefusal(this.props.item.id);
@@ -475,8 +515,9 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
             this.styleFocus = null;
         }
         if (this.styleFocus !== null && this.styleEl) {
+            // After Override the focus is on the rule's chosen type, never on Reset: a second Enter changes nothing (entry 12c3).
             const target = this.styleFocus === 'override' ? this.styleEl.querySelector('.mapstudio-style-override')
-                : this.styleEl.querySelector('.mapstudio-style-reset, .mapstudio-style-keep');
+                : this.styleEl.querySelector('.mapstudio-rule-type[aria-pressed="true"]');
             if (target) {
                 this.styleFocus = null;
                 (target as HTMLElement).focus();
@@ -1039,30 +1080,27 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         this.setState({ ruleStart: null });
     };
 
-    /** Esc in a typed field of the rule stays there: the draft is kept, and the panel is not closed under it. */
+    /**
+     * Esc in a typed field of the rule stays there: the draft is kept, and the panel is not closed under it. From entry 12c3 Esc
+     * anywhere in the rule (a type button, a Remove, Reset, a link) never closes the panel while a rule is not saved.
+     */
     private onStyleKey = (ev: React.KeyboardEvent<HTMLDivElement>): void => {
+        if (ev.key !== 'Escape') {
+            return;
+        }
         const target = ev.target as HTMLElement;
         const tag = target && typeof target.tagName === 'string' ? target.tagName.toUpperCase() : '';
-        if (ev.key === 'Escape' && (tag === 'TEXTAREA' || tag === 'SELECT' || (tag === 'INPUT' && (target as HTMLInputElement).type === 'text'))
-            && !!target.closest('.mapstudio-rule')) {
+        const field = (tag === 'TEXTAREA' || tag === 'SELECT' || (tag === 'INPUT' && (target as HTMLInputElement).type === 'text'))
+            && !!target.closest('.mapstudio-rule');
+        const editor = this.ruleEditor.current;
+        if (field || (editor !== null && editor.unsaved() && !!target.closest('.mapstudio-style-rule'))) {
             ev.stopPropagation();
         }
     };
 
-    /** A read-only row of the Style tab: its label, its value, and where the value comes from. */
-    private styleRow(row: string, label: string, value: React.ReactNode, hint: string): React.ReactElement {
-        return (
-            <div className="mapstudio-field mapstudio-style-row" data-row={row}>
-                <span className="mapstudio-field-label">{label}</span>
-                <span className="mapstudio-field-text mapstudio-style-value">{value}</span>
-                <span className="mapstudio-field-hint">{hint}</span>
-            </div>
-        );
-    }
-
-    /** The kind's rule in words, read only, with a tile per case. */
+    /** The kind's rule in words, read only: its sentence, then one line per case, the tile and its words (no code name). */
     private renderKindRule(kind: Kind, style: StyleFacts): React.ReactElement {
-        const words = ruleWords(style.kindRule, style.kpis, kind);
+        const words = ruleWords(style.kindRule, style.kpis, kind, style.view);
         return (
             <div className="mapstudio-style-kindrule" data-rule={words.type}>
                 <span className={'mapstudio-field-text mapstudio-style-summary' + (words.type === 'none' ? ' mapstudio-kindsetup-none' : '')}>{words.summary}</span>
@@ -1071,10 +1109,10 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                     <ul className="mapstudio-style-kindcases" aria-label={'The cases of the ' + kind.name + ' rule'}>
                         {words.cases.map((c, i) => (
                             <li key={i} className="mapstudio-style-kindcase" data-preset={c.preset}>
-                                <RuleTile kind={kind} preset={c.preset} symbols={style.symbols} colors={style.colors} />
+                                <RuleTile kind={kind} preset={c.preset} symbols={style.symbols} colors={style.colors} word={false} />
                                 <span className="mapstudio-style-kindcase-text">
                                     <span>{c.label}</span>
-                                    {words.type !== 'expression' ? <span className="mapstudio-mono mapstudio-style-kindcase-preset">{c.preset}</span> : null}
+                                    {words.type !== 'expression' ? <span className="mapstudio-style-kindcase-preset">{presetWord(c.preset)}</span> : null}
                                 </span>
                             </li>
                         ))}
@@ -1084,7 +1122,10 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         );
     }
 
-    /** The Style tab (entry 12c2): Icon, Size and Label read only, then the style rule, from the kind or the item's own. */
+    /**
+     * The Style tab (entries 12c2 and 12c3), top to bottom: the Style rule heading with its tag, Live now, the rule (the kind's
+     * in words, or the item's own in the editor), the actions with their one visible line, then "From kind": icon and size.
+     */
     private renderStyle(frozen: boolean): React.ReactNode {
         const { item, kind, style } = this.props;
         if (!kind || !style) {
@@ -1094,77 +1135,95 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         const editing = !own && this.state.ruleStart !== null;
         const refusal = this.ruleRefusal();
         const headingId = 'mapstudio-style-rule-' + item.id;
-        const shows = (unsaved: boolean): React.ReactElement => (
-            <div className="mapstudio-style-shows" role="status" aria-live="polite">
-                {showsNowText({ kind, name: item.name, state: style.state, own, rule: storedRuleOf(own ? style.ownRule : style.kindRule), unsaved })}
-            </div>
-        );
+        const tagId = headingId + '-tag';
+        const lineId = headingId + '-line';
+        const footId = headingId + '-fromkind';
+        // Whether Override would save its copy at once: by what the kind's rule needs of this item (owner's ruling on 12c2).
+        const atOnce = !own && !editing && checkRule(ownRuleStart(style.kindRule, style.view), kind, { own: true }).rule !== undefined;
         return (
             <React.Fragment>
-                {this.styleRow('icon', 'Icon', (
-                    <span className="mapstudio-kindsetup-icon" data-icon={kind.icon}>
-                        <span className="mapstudio-popup-disc">
-                            {kind.icon !== '' ? <Glyph id={kind.icon} className="mapstudio-popup-glyph" size={18} /> : null}
-                        </span>
-                        <span className="mapstudio-mono">{kind.icon !== '' ? kind.icon : 'No icon'}</span>
-                    </span>
-                ), STYLE_ICON_HINT)}
-                {this.styleRow('size', 'Size', sizeText(kind), STYLE_SIZE_HINT)}
-                {this.styleRow('label', 'Label', item.name, STYLE_LABEL_HINT)}
-                <section className="mapstudio-style-rule" aria-labelledby={headingId} data-own={own ? 'true' : 'false'}
+                <section className="mapstudio-style-rule" aria-labelledby={headingId} aria-describedby={tagId} data-own={own ? 'true' : 'false'}
                          data-editing={editing ? 'true' : 'false'}>
-                    {/* The tag stands beside the label, outside the heading that names the rule. */}
+                    {/* The tag stands beside the label, outside the heading that names the rule, and describes the section. One node
+                        in every state, only its words and look changing; an own rule not stored yet still draws from the kind. */}
                     <div className="mapstudio-kindsetup-heading mapstudio-style-rule-head">
                         <h3 className="mapstudio-livenow-heading" id={headingId}>Style rule</h3>
-                        {own ? <span className="mapstudio-override-tag">{OVERRIDE}</span>
-                            : editing ? null : <span className="mapstudio-kindsetup-tag mapstudio-fromkind-tag">{FROM_KIND}</span>}
+                        <span id={tagId} className={'mapstudio-style-tag ' + (own ? 'mapstudio-override-tag' : 'mapstudio-kindsetup-tag mapstudio-fromkind-tag')}>
+                            {own ? OVERRIDE : FROM_KIND}
+                        </span>
                         {own ? (
                             <button type="button" className="mapstudio-override-reset mapstudio-style-reset" disabled={frozen}
                                     title="Reset to the kind's rule" aria-label={'Reset ' + item.name + ' to the kind\'s style rule'}
                                     onClick={this.onResetRule}>Reset</button>
                         ) : null}
                     </div>
+                    {/* One line, one node that stays mounted in every state: only its words change, so each change is heard once. */}
+                    <div className="mapstudio-style-live">
+                        <span className="mapstudio-field-label mapstudio-style-live-label">{LIVE_NOW}</span>
+                        <span className="mapstudio-style-shows" role="status" aria-live="polite">
+                            {showsNowText({ kind, name: item.name, state: style.state, own, rule: storedRuleOf(own ? style.ownRule : style.kindRule) })}
+                        </span>
+                    </div>
                     {own || editing ? (
-                        <RuleEditor kind={kind} kpis={style.kpis} stored={style.ownRule} version={item.version} off={frozen}
-                                    idBase={'mapstudio-style-' + item.id} refusals={refusal ? [refusal] : []} refused={refusal !== null}
+                        <RuleEditor ref={this.ruleEditor} kind={kind} kpis={style.kpis} stored={style.ownRule} version={item.version} off={frozen}
+                                    idBase={'mapstudio-style-' + item.id} refusals={refusal ? [refusal] : []} refused={refusal !== null || this.props.waiting === true}
                                     saving={this.props.saving} done={item.version + ':' + (refusal && this.props.overrideRefusal ? this.props.overrideRefusal.batchId : '')}
                                     onSend={(rule, base) => rule !== null && !!this.props.onStyleRule
                                         && this.props.onStyleRule(rule, base !== null ? base : undefined)}
                                     onClearRefusal={() => this.props.onClearOverrideRefusal && this.props.onClearOverrideRefusal(item.id)}
-                                    symbols={style.symbols} colors={style.colors} own initial={this.state.ruleStart}
-                                    frame={(body, info) => (
-                                        <React.Fragment>
-                                            <span className="mapstudio-field-hint mapstudio-style-own-note">
-                                                {own ? 'For ' + item.name + ' only: this rule replaces the kind\'s whole rule.'
-                                                    : 'For ' + item.name + ' only. It replaces the kind\'s whole rule once it is whole and saved.'}
-                                            </span>
-                                            {body}
-                                            {editing ? (
-                                                <button type="button" className="mapstudio-button mapstudio-style-keep" disabled={frozen}
-                                                        onClick={this.onKeepKindRule}>Keep the kind's rule</button>
-                                            ) : null}
-                                            {shows(info.unsaved)}
-                                        </React.Fragment>
-                                    )} />
+                                    symbols={style.symbols} colors={style.colors} own initial={this.state.ruleStart} kept={this.kept}
+                                    unsavedTail={UNSAVED_KEEPS} undoing={this.props.undoing === true} />
+                    ) : this.renderKindRule(kind, style)}
+                    {own || editing ? (
+                        <React.Fragment>
+                            <span id={lineId} className="mapstudio-field-hint mapstudio-style-line mapstudio-style-own-note">{ownLineText(item.name)}</span>
+                            <div className="mapstudio-style-actions">
+                                {editing ? (
+                                    <button type="button" className="mapstudio-button mapstudio-style-keep" disabled={frozen}
+                                            onClick={this.onKeepKindRule}>Keep the kind's rule</button>
+                                ) : null}
+                                <button type="button" className="mapstudio-style-link mapstudio-style-kind" onClick={this.props.onEditKindRule}>{OPEN_KIND_RULE}</button>
+                            </div>
+                        </React.Fragment>
                     ) : (
                         <React.Fragment>
-                            {this.renderKindRule(kind, style)}
+                            {/* Override is the one bordered button; the kind's rule is a text link. What each does is said in view. */}
                             <div className="mapstudio-style-actions">
-                                <button type="button" className="mapstudio-button mapstudio-style-kind" title={'Open ' + kind.name + '\'s style rule in Kinds'}
-                                        onClick={this.props.onEditKindRule}>Edit the kind's rule</button>
-                                <button type="button" className="mapstudio-button mapstudio-style-override" disabled={frozen}
-                                        title={'Give ' + item.name + ' a style rule of its own'} onClick={this.onOverrideRule}>Override</button>
+                                <button type="button" className="mapstudio-button mapstudio-style-override" disabled={frozen} aria-describedby={lineId}
+                                        onClick={this.onOverrideRule}>Override</button>
+                                <button type="button" className="mapstudio-style-link mapstudio-style-kind" aria-describedby={lineId}
+                                        onClick={this.props.onEditKindRule}>{EDIT_KIND_RULE}</button>
                             </div>
+                            <span id={lineId} className="mapstudio-field-hint mapstudio-style-line">{overrideLineText(item.name, kind, atOnce)}</span>
                             {refusal ? (
                                 <span className="mapstudio-field-refusal mapstudio-style-refusal" role="alert">
                                     <ChromeGlyph name="warning" className="mapstudio-field-refusal-glyph" size={14} />
                                     <span className="mapstudio-field-refusal-text">{refusal.words}</span>
                                 </span>
                             ) : null}
-                            {shows(false)}
                         </React.Fragment>
                     )}
                 </section>
+                {/* Behind the divider, what the kind alone sets (entry 12c3): the icon and the size in one line, with one hint. */}
+                <div className="mapstudio-style-fromkind" role="group" aria-labelledby={footId}>
+                    <span id={footId} className="mapstudio-kindsetup-heading mapstudio-style-fromkind-head">{FROM_KIND}</span>
+                    <div className="mapstudio-style-fromkind-line">
+                        <span className="mapstudio-style-fromkind-part" data-row="icon">
+                            <span className="mapstudio-field-label">Icon</span>
+                            <span className="mapstudio-kindsetup-icon mapstudio-style-value" data-icon={kind.icon}>
+                                <span className="mapstudio-popup-disc">
+                                    {kind.icon !== '' ? <Glyph id={kind.icon} className="mapstudio-popup-glyph" size={18} /> : null}
+                                </span>
+                                <span className="mapstudio-mono">{kind.icon !== '' ? kind.icon : 'No icon'}</span>
+                            </span>
+                        </span>
+                        <span className="mapstudio-style-fromkind-part" data-row="size">
+                            <span className="mapstudio-field-label">Size</span>
+                            <span className="mapstudio-style-value">{sizeText(kind)}</span>
+                        </span>
+                    </div>
+                    <span className="mapstudio-field-hint">{STYLE_FROM_KIND_HINT}</span>
+                </div>
             </React.Fragment>
         );
     }

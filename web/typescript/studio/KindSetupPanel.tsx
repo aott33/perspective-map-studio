@@ -70,6 +70,7 @@ import { RuleEditor, ruleFields } from './RuleEditor';
  * `[data-field="styleRule.expression"]`, what is missing `.mapstudio-rule-unsaved`, the tints `[data-field="areaTints"]` with
  * `[data-field="areaTints.property"]`, a category `.mapstudio-tint-row[data-category]` and `.mapstudio-tints-unsaved`.
  * Entry 12b2: Show on map `.mapstudio-kindsetup-show` and the Live now note `.mapstudio-rule-live`.
+ * Entry 12c3: "Back to <name>" `.mapstudio-kindsetup-back`, shown when the setup was opened from an item's link.
  */
 export interface KindSetupPanelProps {
     kind: Kind;
@@ -106,6 +107,10 @@ export interface KindSetupPanelProps {
     symbols?: Record<string, SpriteSymbol>;
     /** The theme's token values the tiles and swatches draw with; null before the map has read them (no tile is drawn). */
     colors?: MarkerColors | null;
+    /** Entry 12c3: the item whose link opened this setup, by name: "Back to <name>" shows above the header; absent from the rail. */
+    backName?: string;
+    /** "Back to <name>": Items again with that item and the tab its link was on. */
+    onBack?: () => void;
 }
 
 /** A key value row not yet stored: typed here until it has a label and a path, then saved with its key. */
@@ -1272,6 +1277,11 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
             <section className="mapstudio-panel mapstudio-kindsetup" aria-label={kind.name + ' setup'} data-kind={kind.id}
                      data-version={String(this.version())} data-paused={paused} data-saving={this.props.saves.saving.join(' ')}
                      data-preview={preview ? preview.itemId : ''}>
+                {this.props.backName !== undefined && this.props.onBack ? (
+                    <button type="button" className="mapstudio-style-link mapstudio-kindsetup-back" onClick={this.props.onBack}>
+                        {'Back to ' + this.props.backName}
+                    </button>
+                ) : null}
                 <header className="mapstudio-panel-header mapstudio-kindsetup-header">
                     <span className="mapstudio-popup-disc">
                         {kind.icon !== '' ? <Glyph id={kind.icon} className="mapstudio-popup-glyph" size={18} /> : null}

@@ -2757,9 +2757,12 @@
 }
 
 /* Section 6, the Style rule editor (entry 12b1; DESIGN.md Kind setup, key screen 6 kinds-style): the type as a segmented choice in
-   the panel tabs' look, the value, then one bordered row per case with its preset select and a 64 px preview tile
-   (kind-setup-row.preview-tile-width) on the blank map's surface; what is missing in the note box's look. Tokens only: a tile's
-   look is the marker's own drawing from the theme's token values, and a preset is picked by name. */
+   the panel tabs' look, the value, then one row per case with its preset select and a 64 px preview tile
+   (kind-setup-row.preview-tile-width) on the blank map's surface. Tokens only: a tile's look is the marker's own drawing from the
+   theme's token values, and a preset is picked by name. From entry 12c3 (owner, 2026-11-11; the editor is shared with an item's
+   Style tab): the type choice keeps only its active underline, the case and band rows have no card border and are parted by a
+   divider, "When <value> is" stands once above the States rows, and what is missing is one note box in the warning tint with its
+   3 px warning edge (a save problem, in words), not shown while it is empty. Spacing on the 4 px base, type sizes from DESIGN.md. */
 .mapstudio-rule,
 .mapstudio-kindsetup-tints {
     display: flex;
@@ -2776,8 +2779,7 @@
 .mapstudio-rule-types {
     display: flex;
     flex-wrap: wrap;
-    gap: 0 14px;
-    border-bottom: 1px solid var(--mapstudio-divider);
+    gap: 0 16px;
 }
 
 .mapstudio-panel-tab.mapstudio-rule-type {
@@ -2795,7 +2797,6 @@
     cursor: not-allowed;
 }
 
-.mapstudio-rule-case,
 .mapstudio-tint-row {
     display: flex;
     flex-direction: column;
@@ -2805,7 +2806,19 @@
     border-radius: 6px;
 }
 
-.mapstudio-rule-when,
+.mapstudio-rule-case {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--mapstudio-divider);
+}
+
+.mapstudio-rule-when-label + .mapstudio-rule-case {
+    padding-top: 0;
+    border-top: none;
+}
+
 .mapstudio-rule-end {
     display: flex;
     flex: 1 1 0;
@@ -2815,7 +2828,13 @@
 }
 
 .mapstudio-rule-ends,
-.mapstudio-rule-look,
+.mapstudio-rule-look {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
 .mapstudio-tint-line {
     display: flex;
     align-items: center;
@@ -2876,7 +2895,7 @@
 
 .mapstudio-rule-word {
     max-width: 100%;
-    font-size: 10px;
+    font-size: 11px;
     line-height: 1.2;
     text-align: center;
     background: var(--mapstudio-surface);
@@ -2913,19 +2932,18 @@ textarea.mapstudio-input.mapstudio-rule-expression {
 .mapstudio-rule-named {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
 }
 
 .mapstudio-rule-named-tile {
     display: inline-flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
+    gap: 4px;
 }
 
-/* The Live now note, last in section 6 (entry 12b2): DESIGN.md's note box, as the notes above it. */
+/* The Live now note, last in section 6 (entry 12b2): DESIGN.md's note box, as the tints' note above it. */
 .mapstudio-rule-live,
-.mapstudio-rule-unsaved,
 .mapstudio-tints-unsaved {
     padding: 6px 8px;
     border-radius: 6px;
@@ -2933,6 +2951,23 @@ textarea.mapstudio-input.mapstudio-rule-expression {
     color: var(--label);
     font-size: 12px;
     overflow-wrap: anywhere;
+}
+
+/* "Not saved yet" (entry 12c3): the one note box of a rule that is not saved, on the warning tint with its 3 px warning edge
+   (DESIGN.md warning, warning-tint: a save problem, always in words). One node that stays mounted; with no words it is not shown. */
+.mapstudio-rule-unsaved {
+    padding: 8px;
+    border-left: 3px solid var(--mapstudio-warning);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--mapstudio-warning) 10%, var(--mapstudio-surface));
+    color: var(--label);
+    font-size: 12px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-rule-unsaved:empty {
+    display: none;
 }
 
 .mapstudio-kindsetup select.mapstudio-input:disabled,
@@ -4322,12 +4357,14 @@ textarea.mapstudio-input.mapstudio-rule-expression {
     cursor: default;
 }
 
-/* The properties panel's two tabs and the Style tab (entry 12c2; DESIGN.md Properties panel and tabs, panel-tabs, Override
-   tag): Details and Style as a tab list, one tab stop, the active tab underlined in the attention token; the panel not chosen
-   is hidden and stays mounted. Style holds three read-only rows (Icon, Size, Label), then the style rule under its section
-   label with the neutral "From kind" tag, or the override tag and Reset: the kind's rule in words with a 64 px tile per case
-   and two buttons, or the item's own rule in the shared editor (the rule editor's own classes, as in Kinds); one note box under
-   it says what the item shows now. Targets are 24 px at least (WCAG 2.2). Tokens only. */
+/* The properties panel's two tabs and the Style tab (entries 12c2 and 12c3; DESIGN.md Properties panel and tabs, panel-tabs,
+   Override tag): Details and Style as a tab list, one tab stop, the active tab underlined in the attention token; the panel not
+   chosen is hidden and stays mounted. Style, top to bottom (entry 12c3, the owner's layout): the style rule under its section
+   label with the neutral "From kind" tag, or the override tag and Reset; "Live now", one plain line; the kind's rule in words
+   with a 64 px tile per case, or the item's own rule in the shared editor (the rule editor's own classes, as in Kinds); the
+   actions, Override the one bordered button and the kind's rule a text link, with one line in view saying what each does; then,
+   behind the one divider, "From kind": the icon and the size in one line with one hint. Targets are 24 px at least (WCAG 2.2).
+   Spacing on the 4 px base. Tokens only. */
 .mapstudio-panel-body[hidden],
 .mapstudio-style[hidden] {
     display: none;
@@ -4347,14 +4384,10 @@ textarea.mapstudio-input.mapstudio-rule-expression {
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     min-height: 0;
-    padding: 8px 16px 76px;
+    padding: 12px 16px 76px;
     overflow-y: auto;
-}
-
-.mapstudio-style-row {
-    gap: 2px;
 }
 
 .mapstudio-style-value {
@@ -4368,8 +4401,6 @@ textarea.mapstudio-input.mapstudio-rule-expression {
     flex-direction: column;
     gap: 8px;
     min-width: 0;
-    padding-top: 12px;
-    border-top: 1px solid var(--mapstudio-divider);
 }
 
 .mapstudio-style-rule-head {
@@ -4390,10 +4421,25 @@ textarea.mapstudio-input.mapstudio-rule-expression {
     text-transform: none;
 }
 
+/* Live now: its label and one line of text, no box (the one box of the tab is the rule's "Not saved yet"). */
+.mapstudio-style-live {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.mapstudio-style-shows {
+    color: var(--label);
+    font-size: 13px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
 .mapstudio-style-kindrule {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
     min-width: 0;
 }
 
@@ -4403,7 +4449,7 @@ textarea.mapstudio-input.mapstudio-rule-expression {
 }
 
 .mapstudio-style-expression {
-    padding: 6px 8px;
+    padding: 8px;
     border: 1px solid var(--mapstudio-divider);
     border-radius: 6px;
     color: var(--label);
@@ -4415,7 +4461,7 @@ textarea.mapstudio-input.mapstudio-rule-expression {
 .mapstudio-style-kindcases {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -4446,17 +4492,13 @@ textarea.mapstudio-input.mapstudio-rule-expression {
 .mapstudio-style-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    align-items: center;
+    gap: 4px 12px;
 }
 
-.mapstudio-button.mapstudio-style-kind,
 .mapstudio-button.mapstudio-style-override,
 .mapstudio-button.mapstudio-style-keep {
     min-height: 24px;
-}
-
-.mapstudio-button.mapstudio-style-keep {
-    align-self: flex-start;
 }
 
 .mapstudio-button.mapstudio-style-override:disabled,
@@ -4465,13 +4507,63 @@ textarea.mapstudio-input.mapstudio-rule-expression {
     cursor: default;
 }
 
-.mapstudio-style-shows {
-    padding: 6px 8px;
+/* A text link of the Style tab and of a kind's setup ("Edit the kind's rule", "Back to Point 1"): Reset's look, a 24 px target. */
+.mapstudio-style-link {
+    box-sizing: border-box;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0 4px;
+    border: none;
     border-radius: 6px;
-    background: var(--mapstudio-hover);
-    color: var(--label);
+    background: none;
+    color: var(--callToAction);
+    font: inherit;
     font-size: 12px;
-    overflow-wrap: anywhere;
+    font-weight: 500;
+    text-align: left;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.mapstudio-style-link:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: 2px;
+}
+
+.mapstudio-style-link.mapstudio-kindsetup-back {
+    flex: 0 0 auto;
+    align-self: flex-start;
+    margin: 8px 12px 0;
+}
+
+.mapstudio-field-hint.mapstudio-style-line {
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* "From kind", the foot: the one divider of the tab, the section label, the icon and the size in one line, one hint. */
+.mapstudio-style-fromkind {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--mapstudio-divider);
+}
+
+.mapstudio-style-fromkind-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 16px;
+    min-width: 0;
+}
+
+.mapstudio-style-fromkind-part {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
 }
 
 .mapstudio-style select.mapstudio-input:disabled,

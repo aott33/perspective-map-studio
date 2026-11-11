@@ -98,6 +98,13 @@ const tintRow = (page, category) => tints(page).locator('.mapstudio-tint-row[dat
 const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
 const saveWords = (page) => page.locator('.mapstudio-kinds .mapstudio-panel-save');
 
+/** Nothing is missing: the note is one node that stays mounted (entry 12c3), with no words and not shown. */
+async function noUnsaved(page) {
+    await expect(unsaved(page)).toHaveCount(1);
+    await expect(unsaved(page)).toHaveText('');
+    await expect(unsaved(page)).toBeHidden();
+}
+
 /** Type a text input's whole value and finish it with Enter. */
 async function type(locator, text) {
     await locator.fill(text);
@@ -148,7 +155,7 @@ editorTest.describe('the Style rule editor at 1366 px', () => {
             await expect(typeButton(page, 'states')).toHaveAttribute('aria-pressed', 'true');
             await expect(rule(page).locator('.mapstudio-rule-type')).toHaveText(['None', 'States', 'Bands', 'Expression']);
             await expect(cases(page)).toHaveCount(4);
-            await expect(unsaved(page)).toHaveCount(0);
+            await noUnsaved(page);
 
             // Bands chosen: not whole, so "Not saved yet" says what is missing and nothing is sent.
             await typeButton(page, 'bands').click();
@@ -164,6 +171,8 @@ editorTest.describe('the Style rule editor at 1366 px', () => {
             await expect(caseRow(page, 0).locator('.mapstudio-rule-from')).toHaveAttribute('aria-invalid', 'true');
             await expect(caseRow(page, 0).locator('.mapstudio-rule-from')).toHaveAttribute('aria-describedby', await unsaved(page).getAttribute('id'));
             await expect(rule(page)).toHaveAttribute('data-unsaved', 'true');
+            // The one note box, on the warning tint with its 3 px warning edge (entry 12c3).
+            expect(await unsaved(page).evaluate((el) => getComputedStyle(el).borderLeftWidth)).toBe('3px');
             await expect(caseRow(page, 0).locator('.mapstudio-rule-tile')).toHaveAttribute('data-preset', '');
             await nothingSent(page, map, seq, 'pad', before.version);
             expect((await setupOf(page, 'pad')).setup).toEqual(before.setup);
@@ -172,7 +181,7 @@ editorTest.describe('the Style rule editor at 1366 px', () => {
             // S7: States again has the four stored cases; Bands again has the band as typed. Still nothing sent.
             await typeButton(page, 'states').click();
             await expect(cases(page)).toHaveCount(4);
-            await expect(unsaved(page)).toHaveCount(0);
+            await noUnsaved(page);
             await typeButton(page, 'bands').click();
             await expect(cases(page)).toHaveCount(1);
             await expect(caseRow(page, 0).locator('.mapstudio-rule-from')).toHaveValue('900');
@@ -198,7 +207,7 @@ editorTest.describe('the Style rule editor at 1366 px', () => {
             const changed = Date.now();
             await caseRow(page, 1).locator('.mapstudio-rule-preset').selectOption('fault');
             await settled(page);
-            await expect(unsaved(page)).toHaveCount(0);
+            await noUnsaved(page);
             const after = await setupOf(page, 'pad');
             expect(after.version).toBe(before.version + 2);
             expect(after.setup.styleRule).toEqual({ source: { kpi: 'pressure' }, type: 'bands',
@@ -246,7 +255,10 @@ editorTest.describe('the Style rule editor at 1366 px', () => {
         const presets = ['attention', 'warning', 'fault', 'dimmed'];
         for (let i = 0; i < 4; i++) {
             await rule(page).locator('.mapstudio-rule-add').click();
-            await expect(caseRow(page, i).locator('.mapstudio-field-label')).toHaveText('When the value is');
+            // Said once above the rows (entry 12c3), each row's field named by it and its place.
+            await expect(rule(page).locator('.mapstudio-rule-when-label')).toHaveText(['When the value is']);
+            await expect(caseRow(page, i).locator('.mapstudio-field-label')).toHaveCount(0);
+            await expect(caseRow(page, i).locator('.mapstudio-rule-value')).toHaveAccessibleName('When the value is Case ' + (i + 1));
             await type(caseRow(page, i).locator('.mapstudio-rule-value'), String(i + 1));
             if (i < 3) {
                 // Whole after each preset: the rule is saved as it grows, one save at a time.
@@ -267,7 +279,20 @@ editorTest.describe('the Style rule editor at 1366 px', () => {
             await expect(caseRow(page, i).locator('.mapstudio-rule-word')).toHaveText(words[i]);
         }
         // A point kind is offered no line preset, and never a colour.
-        await expect(caseRow(page, 0).locator('.mapstudio-rule-preset option')).toHaveText(['Pick a preset', 'normal', 'attention', 'warning', 'fault', 'dimmed']);
+        // U11 (entry 12c3): the selects say the tiles' words; what is stored is the preset's name, as before.
+        await expect(caseRow(page, 0).locator('.mapstudio-rule-preset option')).toHaveText(['Pick a preset', 'Normal', 'Attention', 'Warning', 'Fault', 'Out of service']);
+        expect(await caseRow(page, 0).locator('.mapstudio-rule-preset option').evaluateAll((els) => els.map((e) => e.value)))
+            .toEqual(['', 'normal', 'attention', 'warning', 'fault', 'dimmed']);
+        await expect(caseRow(page, 3).locator('.mapstudio-rule-preset')).toHaveValue('dimmed');
+        // The rows have no card border and are parted by a divider; the first stands under "When the value is" with none.
+        const edges = await cases(page).evaluateAll((els) => els.map((e) => {
+            const c = getComputedStyle(e);
+            return [c.borderTopWidth, c.borderLeftWidth, c.borderRightWidth, c.borderBottomWidth].join(' ');
+        }));
+        expect(edges).toEqual(['0px 0px 0px 0px', '1px 0px 0px 0px', '1px 0px 0px 0px', '1px 0px 0px 0px']);
+        // The type choice keeps only its active underline.
+        expect(await rule(page).locator('.mapstudio-rule-types').evaluate((el) => getComputedStyle(el).borderBottomWidth)).toBe('0px');
+        expect(await typeButton(page, 'states').evaluate((el) => getComputedStyle(el).borderBottomWidth)).toBe('2px');
         await expect(rule(page).locator('input[type="color"]')).toHaveCount(0);
         await ruleShot(page, 'mapstudio-kindstyle-states-1366.png');
 
@@ -373,7 +398,7 @@ editorTest.describe('the Style rule editor at 1366 px', () => {
         await expect(flow.locator('.mapstudio-kv-remove')).toBeDisabled();
         // A line kind is offered the line presets too.
         await expect(caseRow(page, 0).locator('.mapstudio-rule-preset option')).toHaveText(
-            ['Pick a preset', 'normal', 'attention', 'warning', 'fault', 'dimmed', 'solid', 'dashed', 'dotted']);
+            ['Pick a preset', 'Normal', 'Attention', 'Warning', 'Fault', 'Out of service', 'Solid', 'Dashed', 'Dotted']);
         await expect(caseRow(page, 1).locator('.mapstudio-rule-tile .mapstudio-rule-sample > svg')).toHaveCount(1);
 
         // S5: From its instruments: no value, no cases, one line; saved as the instruments source.
@@ -459,7 +484,7 @@ editorTest.describe('the Style rule editor at 1366 px', () => {
             await type(fresh.locator('input.mapstudio-tint-category'), 'West');
             await expect(tints(page).locator('.mapstudio-tints-unsaved')).toHaveText('Not saved yet. West has no tint.');
             // One hook each: the tints' note is not the rule's, and the row it names is tied to its words.
-            await expect(unsaved(page)).toHaveCount(0);
+            await noUnsaved(page);
             await expect(fresh.locator('.mapstudio-tint-select')).toHaveAttribute('aria-describedby',
                 await tints(page).locator('.mapstudio-tints-unsaved').getAttribute('id'));
             await page.waitForTimeout(NOTHING_MS);

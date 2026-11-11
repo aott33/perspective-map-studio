@@ -299,7 +299,7 @@ editorTest.describe('the preview item on the map and the Live now note at 1366 p
             const seq = await map.getAttribute('data-store-seq');
             await rule(page).locator('.mapstudio-rule-type[data-type="bands"]').click();
             await expect(rule(page)).toHaveAttribute('data-unsaved', 'true');
-            await expect(note(page)).toHaveText('Live now: Point 1 is Normal. The map shows the stored rule until this one is whole.');
+            await expect(note(page)).toHaveText('Live now: Point 1 is Normal. The map shows the stored rule until this one is complete.');
             await noteShot(page, 'mapstudio-kindpreview-note-unsaved-1366.png');
             // The stored type again: the rule is the stored one, and the note says only what the item is.
             await rule(page).locator('.mapstudio-rule-type[data-type="states"]').click();

@@ -71,6 +71,7 @@ import { FieldValue, assetListKnown } from './itemForm';
 import { Rail } from './studio/Rail';
 import { ItemList, ListView, newListView } from './studio/ItemList';
 import { PanelTab, PropertiesPanel } from './studio/PropertiesPanel';
+import { RuleKeep } from './studio/RuleEditor';
 import { DrawToolbar } from './studio/DrawToolbar';
 import { DrawingBar, InstrumentBar } from './studio/DrawingBar';
 import { GeometryBar } from './studio/GeometryBar';
@@ -173,6 +174,11 @@ export interface MapStudioState {
     /** The properties panel's tab (entry 12c2): kept while another item is selected and across a visit to Kinds. */
     panelTab: PanelTab;
     /**
+     * Entry 12c3: the item whose link opened Kinds ("Edit the kind's rule", "Open <kind>'s setup") and the tab "Back to <name>"
+     * returns to; null when Kinds was opened from the rail, and once Kinds is left.
+     */
+    kindsBack: { id: string; tab: PanelTab; link: string } | null;
+    /**
      * The geometry change in hand with Select (entry 5, drawing.ts): a chosen point of the selected line or area, or Move waiting
      * for a click; kept only for the selected item (selectionState) and dropped when a tool is picked (toolState).
      */
@@ -228,7 +234,7 @@ export type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
 export class MapStudio extends Component<Props, MapStudioState> {
     state: MapStudioState = {
         drawing: null, snap: false, snapHint: '', popup: null, clock: Date.now(), pick: null, selected: null, panel: null,
-        studio: fromProps(this.props.props.editMode), layersTab: 'layers', panelTab: 'details', geometry: null, listCollapsed: listCollapsedNow(), listOpen: false,
+        studio: fromProps(this.props.props.editMode), layersTab: 'layers', panelTab: 'details', kindsBack: null, geometry: null, listCollapsed: listCollapsedNow(), listOpen: false,
         cardsClosed: [], showEdits: 0
     };
 
@@ -349,6 +355,13 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private layersHost: HTMLDivElement | null = null;
     /** Entry 12c2: the section of the kind's setup to bring into view once Kinds shows it ("Edit the kind's rule"), or null. */
     private kindSectionWanted: string | null = null;
+    /**
+     * Entry 12c3: "Back to <name>" was pressed: the focus goes to the link that opened Kinds once it is drawn (the Style tab's
+     * link to the kind's rule, or Details' "Open <kind>'s setup"), for the item it was on and only while the press is fresh.
+     */
+    private backLinkWanted: { id: string; selector: string; until: number } | null = null;
+    /** Entry 12c3: an item's own style rule left not saved when its panel went, by item, for this page's session; never sent. */
+    private readonly ruleKeeps = new Map<string, RuleKeep>();
     /** The Layers surface's tab and tab panel ids, unique to this component (two maps may share a page). */
     private readonly layersTabsId = 'mapstudio-layers-' + Math.random().toString(36).slice(2, 8);
     /** The Mapbox logo control, bottom-right, while Satellite is drawn. */
@@ -661,6 +674,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         camera.applyRestore(this);
         camera.saveSelection(this);
         this.showKindSection();
+        this.showBackLink();
     }
 
     /**
@@ -1339,7 +1353,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
             return;
         }
         const open = collapsed && surface === 'items';
-        this.dockChange((prev) => ({ studio: showSurface(prev.studio, surface), listOpen: open }), this.selectedPlace());
+        // Kinds opened from the rail has no item to go back to, and leaving Kinds forgets the one it had (entry 12c3).
+        this.dockChange((prev) => ({ studio: showSurface(prev.studio, surface), listOpen: open, kindsBack: null }), this.selectedPlace());
     };
 
     /** Whether the collapsed list shows over the map: Edit mode's studio on, below 1280 px, on Items, opened from the rail. */
@@ -1962,8 +1977,41 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const selected = this.state.selected;
         const item = selected ? this.itemFor(selected.id) : undefined;
         if (item) {
-            this.onChooseKind(item.kind);
-            this.onRailSurface('kinds');
+            this.openKindsFrom(item, this.state.panelTab, '.mapstudio-panel-body:not([hidden]) .mapstudio-livenow-setup');
+        }
+    };
+
+    /** Kinds at an item's kind, opened from that item's link (entry 12c3): the setup shows "Back to <name>", which returns to `tab`. */
+    private openKindsFrom(item: MapItemRecord, tab: PanelTab, link: string): void {
+        this.onChooseKind(item.kind);
+        this.onRailSurface('kinds');
+        this.setState({ kindsBack: { id: item.id, tab, link } });
+    }
+
+    /**
+     * "Back to <name>" in a kind's setup (entry 12c3): Items again with that item selected and the tab it was left from (Style,
+     * for "Edit the kind's rule"); the focus goes back to the link that opened Kinds.
+     */
+    onKindsBack = (): void => {
+        const back = this.state.kindsBack;
+        if (!back) {
+            return;
+        }
+        this.backLinkWanted = { id: back.id, selector: back.link, until: Date.now() + 3000 };
+        this.dockChange((prev) => ({ studio: showSurface(prev.studio, 'items'), listOpen: false, kindsBack: null, panelTab: back.tab }), this.selectedPlace());
+        const selected = this.state.selected;
+        if (!selected || selected.id !== back.id || this.state.panel !== back.id) {
+            // The selection moved while Kinds was open (a click on the map): the item the link was on is selected again.
+            this.onRowSelect(back.id);
+        }
+    };
+
+    /** Entry 12c3: an item's panel went with an own rule not saved yet (kept), or with none (forgotten). */
+    onRuleKeep = (itemId: string, keep: RuleKeep | null): void => {
+        if (keep) {
+            this.ruleKeeps.set(itemId, keep);
+        } else {
+            this.ruleKeeps.delete(itemId);
         }
     };
 
@@ -1982,9 +2030,35 @@ export class MapStudio extends Component<Props, MapStudioState> {
 
     /** "Edit the kind's rule" in the Style tab (entry 12c2): Kinds at the selected item's kind with section 6 in view, the selection kept. */
     onEditKindRule = (): void => {
-        this.kindSectionWanted = 'styleRule';
-        this.onOpenKindSetup();
+        const selected = this.state.selected;
+        const item = selected ? this.itemFor(selected.id) : undefined;
+        if (item) {
+            this.kindSectionWanted = 'styleRule';
+            this.openKindsFrom(item, 'style', '.mapstudio-style:not([hidden]) .mapstudio-style-kind');
+        }
     };
+
+    /** After "Back to <name>" the focus is on the link Kinds was opened from, where the keyboard left (entry 12c3); 3 s at most, as the Style tab's own focus moves. */
+    private showBackLink(): void {
+        const wanted = this.backLinkWanted;
+        if (wanted === null) {
+            return;
+        }
+        if (Date.now() > wanted.until) {
+            this.backLinkWanted = null;
+            return;
+        }
+        if (!this.studioOn() || this.state.studio.surface !== 'items') {
+            return;
+        }
+        const root = this.mapContainer && typeof this.mapContainer.closest === 'function' ? this.mapContainer.closest('.mapstudio') : null;
+        const panel = root ? Array.from(root.querySelectorAll('.mapstudio-panel')).find((p) => p.getAttribute('data-item-id') === wanted.id) : undefined;
+        const link = panel ? panel.querySelector(wanted.selector) as HTMLElement | null : null;
+        if (link && typeof link.focus === 'function') {
+            this.backLinkWanted = null;
+            link.focus({ preventScroll: true });
+        }
+    }
 
     /**
      * The section of the kind's setup asked for is brought into view once the setup is drawn (entry 12c2), the focus on the
@@ -2118,6 +2192,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const preview = this.kindPreview(delegate, id);
         const values = preview ? delegate.live.items[preview.itemId] : undefined;
         const previewItem = preview ? delegate.items.find((i) => i.id === preview.itemId) : undefined;
+        const back = this.state.kindsBack;
+        const backItem = back ? this.liveItem(back.id) : undefined;
         if (this.symbols === null) {
             // The preset tiles draw the kind's glyph from the sprite (entry 12b1), as the style preview does.
             items.loadSprite(this).then(() => this.forceUpdate());
@@ -2139,6 +2215,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                             paused={pausedText(delegate.editing === 'off', waitingSave(delegate.unsaved, id))}
                             resolves={delegate.resolves || {}}
                             alarmPage={delegate.alarmPage}
+                            backName={backItem ? backItem.name : undefined}
+                            onBack={this.onKindsBack}
                             onSave={(field, edit, seen) => this.onKindSave(id, field, edit, seen)}
                             onClearRefusal={(field) => this.onKindClear(id, field)}
                             onResolve={(assetId, paths) => this.onKindResolve(id, assetId, paths)} />
@@ -2305,6 +2383,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
             symbols: this.symbols || {},
             colors: this.markerColors
         } : undefined;
+        // Entry 12c3: an Undo or Redo of this very item on its way, known by its batch.
+        const reverse = delegate.undo.pending;
+        const undoing = reverse !== null && reverse.batch.ops.some((o) => o.entity === 'item' && o.id === item.id);
         return (
             <PropertiesPanel key={item.id}
                              tab={this.state.panelTab}
@@ -2312,6 +2393,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
                              style={style}
                              onStyleRule={this.onStyleRule}
                              onEditKindRule={this.onEditKindRule}
+                             ruleKeep={this.ruleKeeps.get(item.id) || null}
+                             onRuleKeep={this.onRuleKeep}
+                             undoing={undoing}
+                             waiting={delegate.unsaved.some((e) => e.reason !== undefined && e.batch.ops.some((o) => o.entity === 'item' && o.id === item.id))}
                              item={item}
                              kind={kind}
                              kinds={kindOptions}

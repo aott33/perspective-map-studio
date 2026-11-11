@@ -292,7 +292,7 @@ describe('a kind\'s setup', () => {
             const second = slice(html, 'data-index="1"', 'Add a band');
             expect(second).toContain('class="mapstudio-input mapstudio-kindsetup-input mapstudio-rule-from" value="900"');
             expect(second).toContain('placeholder="Open above"');
-            expect(second).toContain('<option selected="" value="warning">warning</option>');
+            expect(second).toContain('<option selected="" value="warning">Warning</option>');
             // The closed list by name, never a colour: a point kind has no line presets.
             expect(second).not.toContain('value="dashed"');
             expect(second).not.toMatch(/#[0-9a-fA-F]{3,6}"?>/);
@@ -302,7 +302,8 @@ describe('a kind\'s setup', () => {
             expect(tile).toContain('mapstudio-rule-word">Warning</span>');
             // A stored rule is whole: nothing says Not saved yet.
             expect(html).toContain('data-unsaved="false"');
-            expect(html).not.toContain('mapstudio-rule-unsaved');
+            // The note is one node that stays mounted (entry 12c3), with no words while nothing is missing.
+            expect(html).toMatch(/class="mapstudio-rule-unsaved" role="status" data-unsaved="false"><\/span>/);
         });
 
         test('S2: States on a tag path: "When the value is", the typed path with its resolve note, a tile per case', () => {
@@ -312,7 +313,15 @@ describe('a kind\'s setup', () => {
             expect(html).toContain('data-source="path"');
             expect(html).toContain('mapstudio-rule-path" value="{asset.path}/Status"');
             expect(html).toContain('Resolves for 1 of 1 well pads');
-            expect(html.match(/When the value is/g)).toHaveLength(2);
+            // Said once above the rows (entry 12c3); each row's field is named by it and its place.
+            expect(html.match(/mapstudio-rule-when-label">When the value is</g)).toHaveLength(1);
+            // Each row's value is labelled by the one label and by its own row ("Case 2").
+            const when = /<span id="([^"]+)" class="mapstudio-field-label mapstudio-rule-when-label">/.exec(html)![1];
+            expect(html).toContain('<div id="' + when + '-1" class="mapstudio-rule-case" role="group" aria-label="Case 2"');
+            expect(html).toContain('aria-labelledby="' + when + ' ' + when + '-1"');
+            // The rows are parted by a divider, with no card border: no label of their own, and the selects say the tiles' words.
+            expect(html).not.toContain('mapstudio-rule-when"');
+            expect(html).toContain('<option value="dimmed">Out of service</option>');
             expect(html).toContain('mapstudio-rule-value" value="1"');
             expect(html).toContain('mapstudio-rule-value" value="&quot;1&quot;"');
             expect(html.match(/class="mapstudio-rule-tile" data-preset="(attention|fault)"/g)).toHaveLength(2);
@@ -360,8 +369,8 @@ describe('a kind\'s setup', () => {
             expect(second).toContain('aria-invalid="true"');
             expect(html.match(/mapstudio-field-refusal-text/g)).toHaveLength(1);
             const line = rule(withRule({ source: { kpi: 'pressure' }, type: 'bands', cases: [{ min: 0, max: 1, preset: 'dashed' }] }, LINE));
-            expect(line).toContain('<option selected="" value="dashed">dashed</option>');
-            expect(line).toContain('<option value="dotted">dotted</option>');
+            expect(line).toContain('<option selected="" value="dashed">Dashed</option>');
+            expect(line).toContain('<option value="dotted">Dotted</option>');
         });
 
         test('S9: an area kind\'s tints under the rule: the property, a choice field\'s choices as rows, each with its tint and swatch', () => {
