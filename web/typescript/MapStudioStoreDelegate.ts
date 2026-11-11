@@ -35,7 +35,7 @@
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
 import { MapChanges, MapChangedBody } from './changes';
 import { EditBatch, EditLevel, ErrorCodes, KindSetupRecord, LastChange, MapItemData, MapItemRecord } from './contract';
-import { KindRefusal, KindSaveState, ResolveState, SetupEdit, applyEdit, refusalPlace, resolveKey, sameSetup, setupBatch } from './kindSetup';
+import { KindRefusal, KindSaveState, ResolveState, SetupEdit, applyEdit, refusalPlace, resolveKey, ruleRefusalPlace, sameSetup, setupBatch } from './kindSetup';
 import {
     Position, instrumentCreateBatch, instrumentMoveBatch, itemDeleteBatch, itemsDeleteBatch, lineGeometryBatch, pointMoveBatch, splitAtBatch, vertexDeleteBatch,
     vertexMoveBatch
@@ -68,7 +68,7 @@ import {
 import { UnsavedSender } from './unsavedSender';
 import { registerTestHook, takeTestReply } from './testHook';
 import { NO_SHAPE_REFUSAL, ShapeRefusal, droppedText } from './problems';
-import { applyRowEdit, kpiLabelsOf, overrideLabel, refusalWords, rowWords, sameOverrides } from './itemOverrides';
+import { RULE_ROW, applyRowEdit, applyRuleEdit, kpiLabelsOf, overrideLabel, refusalWords, rowWords, ruleLabel, sameOverrides } from './itemOverrides';
 import { FieldValue, keptProperties, prefillFor, prefillKey, readPrefill, rememberValue, withValue } from './itemForm';
 import { EventFirer, POPUP_CLOSE_EVENT, POPUP_OPEN_EVENT, firePageEvent } from './pageEvents';
 
@@ -217,9 +217,14 @@ export interface OverrideRefusal {
     path: string;
     code: string;
     batchId: string;
+    /**
+     * Entry 12c2, the item's own style rule (`row` is `styleRule`, `path` ''): the field of the rule the words stand beside
+     * (kindSetup.ts `Fields`: the rule's box, its value, its expression or one case); absent for a path's row.
+     */
+    at?: string;
 }
 
-/** One override edit on its way: the item, the row and the path typed ('' for a Reset). */
+/** One override edit on its way: the item, the row and the path typed ('' for a Reset, and for the item's own style rule). */
 interface OverrideEdit {
     itemId: string;
     row: string;
@@ -1192,8 +1197,13 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * (`path` a full path, or null for Reset), so every other stored part passes through untouched. It is an ordinary item edit:
      * an Undo step named by its part ("change Point 2's Pressure path", "reset Point 2's comms path") and a row of Recent changes.
      * `rowName` is the row's name as the block shows it. False when nothing was sent (the item gone, or nothing changed).
+     * From entry 12c2 the row `styleRule` is the item's own style rule, from the Style tab: `path` is then the whole rule (it
+     * replaces the kind's for this item) or null for Reset, only `styleRule` changed, the step named "change Point 2's style
+     * rule" or "reset Point 2's style rule"; a refusal of it carries the part of the rule its words stand beside (`at`).
+     * `baseVersion` is the item version the rule's draft was last in step with the stored rule at: the update goes at it, not
+     * at the newest version, so a rule another editor stored since is answered with a conflict and the ordinary conflict card.
      */
-    editOverride(id: string, row: string, path: string | null, rowName: string): boolean {
+    editOverride(id: string, row: string, path: string | Record<string, unknown> | null, rowName: string, baseVersion?: number): boolean {
         const item = this.knownRecord(id);
         if (!item) {
             console.info('[MapStudio] The override of ' + id + ' was dropped: the item is not on the map.');
@@ -1201,14 +1211,22 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         }
         const stored = this.changes.state.kindSetups.find((k) => k.kindId === item.kind);
         const newest = this.overridesFor(item);
-        const overrides = applyRowEdit(newest, stored ? stored.setup : null, row, path);
+        // Entry 12c2: the item's own style rule is the `styleRule` row, a whole rule or null; any other row takes a path.
+        const rule = row === RULE_ROW;
+        if (rule ? typeof path === 'string' : path !== null && typeof path !== 'string') {
+            console.info('[MapStudio] The override of ' + id + ' was dropped: ' + row + ' does not take that value.');
+            return false;
+        }
+        const overrides = rule ? applyRuleEdit(newest, path as Record<string, unknown> | null)
+            : applyRowEdit(newest, stored ? stored.setup : null, row, path as string | null);
         this.clearOverrideRefusal(id);
         if (sameOverrides(overrides, newest)) {
             return false;
         }
         // The overrides object is this edit's mark: a batch that carries it (sent now, held, or rebased) is this row's.
-        this.overrideEdits.set(overrides, { itemId: id, row, path: path === null ? '' : path });
-        this.sendUpdate(id, { overrides }, overrideLabel(path === null, item.name, rowWords(row, rowName)));
+        this.overrideEdits.set(overrides, { itemId: id, row, path: typeof path === 'string' ? path : '' });
+        this.sendUpdate(id, { overrides }, rule ? ruleLabel(path === null, item.name) : overrideLabel(path === null, item.name, rowWords(row, rowName)),
+            baseVersion);
         return true;
     }
 
@@ -1231,11 +1249,15 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         if (!found || transient || error.code === ErrorCodes.CONFLICT) {
             return;
         }
-        this.sender.discard(batchId);
+        // Entry 12c2: the own style rule's refusal stands beside the part of the rule it names.
+        const place = found.row === RULE_ROW ? ruleRefusalPlace(error.message) : null;
+        // Recorded before the batch is let go (which redraws): the panel never sees the rule gone with no refusal to say why.
         this.overrideRefusals = {
             ...this.overrideRefusals,
-            [found.itemId]: { row: found.row, words: refusalWords(error.message), path: found.path, code: error.code, batchId }
+            [found.itemId]: place ? { row: found.row, words: place.words, path: '', code: error.code, batchId, at: place.at }
+                : { row: found.row, words: refusalWords(error.message), path: found.path, code: error.code, batchId }
         };
+        this.sender.discard(batchId);
     }
 
     /** The override edit a batch in flight carries (its one item op's `overrides` object is the edit's mark), or null. */
@@ -1539,7 +1561,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.sendUpdate(id, data, stepLabel('edit', item ? item.name : id));
     }
 
-    private sendUpdate(id: string, data: MapItemData, label: string): void {
+    private sendUpdate(id: string, data: MapItemData, label: string, baseVersion?: number): void {
         const item = this.knownRecord(id);
         if (!item) {
             console.info('[MapStudio] The change to ' + id + ' was dropped: the item is not on the map.');
@@ -1553,7 +1575,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             });
             return;
         }
-        this.sendBatch(updateBatch(id, newId(), item.version, data), id, label);
+        this.sendBatch(updateBatch(id, newId(), baseVersion !== undefined && baseVersion < item.version ? baseVersion : item.version, data), id, label);
     }
 
     /**

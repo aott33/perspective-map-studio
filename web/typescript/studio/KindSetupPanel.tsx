@@ -2,17 +2,18 @@ import * as React from 'react';
 import { Asset, Kind } from '../adapters';
 import { KindSetupRecord, MapItemRecord } from '../contract';
 import {
-    BandRow, CaseType, Fields, KeyValue, KindRefusal, KindSaveState, MAX_KEY_VALUES, NewRowTexts, forgetSeen, Param, PreviewOption, RULE_TYPE_WORDS, ResolveState, RuleDraft,
-    RuleSource, RuleType, SetupEdit, SetupView, StateRow, TINT_NAMES, TintRow, TintsDraft, checkRule, checkTints, draftSource, expressionPresets, fixedCategories, foldRule,
-    headerSubline, inStepVersion, insertAt, keyFromLabel, liveNowText, noPreviewText, paramMissing, pathsToResolve, placeholderList, popupPathEdit, presetsFor, previewLine,
-    previewOf, previewOptions, readSetup, removeBlocked, resolveKey, resolveNote, rowMissing, ruleDraft, ruleTypes, sameRule, sameTints, showOnMapOff, sourceName,
-    storedRuleOf, tintRows, tintsDraft, unsavedText, withSource
+    Fields, KeyValue, KindRefusal, KindSaveState, MAX_KEY_VALUES, NewRowTexts, forgetSeen, Param, PreviewOption, ResolveState,
+    SetupEdit, SetupView, TINT_NAMES, TintRow, TintsDraft, checkTints, fixedCategories,
+    headerSubline, inStepVersion, insertAt, keyFromLabel, liveNowText, noPreviewText, paramMissing, pathsToResolve, placeholderList, popupPathEdit, previewLine,
+    previewOf, previewOptions, readSetup, removeBlocked, resolveKey, resolveNote, rowMissing, ruleDraft, sameTints, showOnMapOff,
+    storedRuleOf, tintRows, tintsDraft, unsavedText
 } from '../kindSetup';
-import { ItemState, Preset, Tint } from '../live';
-import { MarkerColors, PRESET_WORDS, SpriteSymbol, tintSampleSvg } from '../markers';
+import { ItemState, Tint } from '../live';
+import { MarkerColors, SpriteSymbol, tintSampleSvg } from '../markers';
 import { Glyph } from '../popupParts';
-import { Sample, presetSampleSvg } from '../StylePreview';
+import { Sample } from '../StylePreview';
 import { ChromeGlyph } from './ChromeGlyph';
+import { RuleEditor, ruleFields } from './RuleEditor';
 
 /**
  * A kind's setup, in the properties panel's place while the rail's Kinds surface is open (epic 4 entry 12a; DESIGN.md Kind setup
@@ -36,6 +37,7 @@ import { ChromeGlyph } from './ChromeGlyph';
  *   under it (the property, then a row per category with its tint and swatch). A rule is one part, sent whole: the section
  *   holds one draft and sends it as soon as it is whole in shape (a select at once, a typed field when finished); until then
  *   it says "Not saved yet" and what is missing, and nothing is sent. Each type's cases are remembered until the kind is left.
+ *   From entry 12c2 the rule's editor is studio/RuleEditor.tsx, shared with an item's own rule in the Style tab; the tints stay here.
  *
  * **Saving.** There is no save button: a text field saves when it is finished (blur or Enter; Esc puts the stored value back),
  * a switch, a checkbox and the star at once. Each save is one edit of one part (`SetupEdit`), which the delegate applies to the
@@ -137,8 +139,6 @@ interface PanelState {
     newParams: NewParam[];
     /** The field whose placeholder picker is open, or null. */
     picker: string | null;
-    /** The style rule as it is being built, each type's cases with it; null shows the stored rule. */
-    rule: RuleDraft | null;
     /** The area tints as they are being built; null shows the stored ones. */
     tints: TintsDraft | null;
 }
@@ -167,7 +167,7 @@ function Star(props: { on: boolean }): React.ReactElement {
 let panelCount = 0;
 
 export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelState> {
-    state: PanelState = { drafts: {}, problems: {}, newRows: [], newParams: [], picker: null, rule: null, tints: null };
+    state: PanelState = { drafts: {}, problems: {}, newRows: [], newParams: [], picker: null, tints: null };
 
     private readonly idBase = 'mapstudio-kindsetup-' + (++panelCount);
     private rowCount = 0;
@@ -191,26 +191,21 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
     /** The fields drawn in this render: a refusal that names none of them stands at the panel's top. */
     private drawn = new Set<string>();
     /**
-     * The setup version the rule draft (the tints draft) is in step with the store at (kindSetup.ts `inStepVersion`): the version
-     * it was made from the stored part on, folded from the store on, or its own save settled on; null with no draft. Every send
-     * of the draft goes at it, so another editor's save since meets the conflict.
+     * The setup version the tints draft is in step with the store at (kindSetup.ts `inStepVersion`): the version it was made from
+     * the stored part on, folded from the store on, or its own save settled on; null with no draft. Every send of the draft goes
+     * at it, so another editor's save since meets the conflict. (The rule's draft is the shared editor's, studio/RuleEditor.tsx.)
      */
-    private ruleBase: number | null = null;
     private tintsBase: number | null = null;
     /** A save of the draft was not taken: the draft is kept as typed, not replaced by the stored part, until it is changed. */
-    private ruleKept = false;
     private tintsKept = false;
-    /** The tag path typed for a type's value, kept while the value select is on something else, until the kind is left. */
-    private pathMemory: Partial<Record<CaseType, string>> = {};
-    /** The rule (the tints) last sent, so one refused is not sent again unchanged. */
-    private ruleSent = '';
+    /** The tints last sent, so ones refused are not sent again unchanged. */
     private tintsSent = '';
-    /** The rule's and the tints' controls: while the cursor is in one, its draft is left as typed. */
-    private readonly ruleBox = React.createRef<HTMLDivElement>();
+    /** The tints' controls: while the cursor is in one, the draft is left as typed. */
     private readonly tintsBox = React.createRef<HTMLDivElement>();
-    /** A change of the rule (the tints) is about to be sent: the stored part is not taken into the draft before it has been. */
-    private ruleCommitting = false;
+    /** A change of the tints is about to be sent: the stored part is not taken into the draft before it has been. */
     private tintsCommitting = false;
+    /** The style rule's editor (entry 12c2): its draft says which of the rule's fields are drawn. */
+    private readonly ruleEditor = React.createRef<RuleEditor>();
     /** The rows typed for a tints property left for another, by property, until the kind is left. */
     private tintMemory: Record<string, TintRow[]> = {};
 
@@ -922,26 +917,13 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
     }
 
     /**
-     * The stored rule and tints taken into their drafts once nothing holds them (no save on its way or refused, the cursor
-     * elsewhere, the draft whole): another editor's rule shows, and a save that was given up leaves the store's. A draft still
-     * being built ("Not saved yet") is never overwritten; the other types' cases stay as typed (owner decision 3).
+     * The stored tints taken into their draft once nothing holds it (no save on its way or refused, the cursor elsewhere, the
+     * draft whole): another editor's tints show, and a save that was given up leaves the store's. A draft still being built
+     * ("Not saved yet") is never overwritten. The rule's draft does the same in its own editor.
      */
     private foldStored(): void {
         const kind = this.props.kind;
         const view = this.view();
-        const rule = this.state.rule;
-        if (rule !== null && !this.ruleCommitting) {
-            const held = this.held(Fields.styleRule);
-            const whole = checkRule(rule, kind).rule;
-            const same = sameRule(rule, view.styleRule, kind);
-            const stored = checkRule(ruleDraft(view.styleRule), kind).rule;
-            const settled = this.ruleSent !== '' && stored !== undefined && JSON.stringify(stored) === this.ruleSent;
-            this.ruleBase = inStepVersion(this.ruleBase !== null ? this.ruleBase : this.version(), this.version(), { held, same, settled });
-            if (!held && !same && whole !== undefined && !this.ruleKept && !this.focusIn(this.ruleBox)) {
-                this.ruleBase = this.version();
-                this.setState({ rule: foldRule(rule, ruleDraft(view.styleRule)) });
-            }
-        }
         const tints = this.state.tints;
         if (tints !== null && !this.tintsCommitting) {
             const held = this.held(Fields.areaTints);
@@ -954,67 +936,6 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                 this.tintsBase = null;
                 this.setState({ tints: null });
             }
-        }
-    }
-
-    private ruleNow(view: SetupView): RuleDraft {
-        return this.state.rule || ruleDraft(view.styleRule);
-    }
-
-    /** One change of the rule's draft; `commit` sends it at once when it is whole (a select, a button), else its field's blur does. */
-    private editRule(change: (draft: RuleDraft) => RuleDraft, commit: boolean, structure = false): void {
-        if (this.off()) {
-            return;
-        }
-        if (this.ruleBase === null) {
-            // The draft is made from the stored rule now: the version it is in step with the store at.
-            this.ruleBase = this.version();
-        }
-        this.ruleKept = false;
-        if (structure && this.hasRefusal(Fields.styleRule)) {
-            // The rows moved: the words of the last refusal no longer stand beside the row they named.
-            this.props.onClearRefusal(Fields.styleRule);
-        }
-        // The commit runs once the draft is in the state, after this update's componentDidUpdate: a pressed button need not hold
-        // the focus (some browsers give it none), so the flag, not the cursor, keeps the draft until it has been sent.
-        this.ruleCommitting = this.ruleCommitting || commit;
-        this.setState((prev) => ({ rule: change(prev.rule || ruleDraft(this.view().styleRule)) }), commit ? () => {
-            this.ruleCommitting = false;
-            this.commitRule();
-        } : undefined);
-    }
-
-    /**
-     * The rule sent when it is whole in shape and not what is stored (owner decision 2): one `styleRule` edit, the whole rule,
-     * at the version the draft was first changed on. A draft that is not whole sends nothing; the section says what is missing.
-     */
-    private commitRule(): void {
-        const draft = this.state.rule;
-        if (draft === null || this.off()) {
-            return;
-        }
-        const field = Fields.styleRule;
-        const check = checkRule(draft, this.props.kind);
-        if (check.rule === undefined) {
-            return;
-        }
-        const json = JSON.stringify(check.rule);
-        if (!this.awaiting.has(field) && sameRule(draft, this.view().styleRule, this.props.kind)) {
-            if (this.hasRefusal(field)) {
-                this.props.onClearRefusal(field);
-            }
-            return;
-        }
-        if (this.ruleSent === json && this.held(field)) {
-            // On its way, or refused as it is: nothing new to send until it is changed.
-            return;
-        }
-        const before = this.ruleSent;
-        this.ruleSent = json;
-        if (!this.send(field, { part: 'styleRule', rule: check.rule }, this.ruleBase)) {
-            // Not taken (as 12a's fields): the marker is undone and the draft stays as typed.
-            this.ruleSent = before;
-            this.ruleKept = true;
         }
     }
 
@@ -1077,213 +998,12 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         }
     };
 
-    /** The 64 px tile of a case: the kind's icon (or its line sample) in the preset, with the preset's state word. */
-    private tile(preset: string): React.ReactElement {
-        const { kind, colors } = this.props;
-        const known = preset !== '' && presetsFor(kind).indexOf(preset) >= 0;
-        const word = known ? PRESET_WORDS[preset as Preset] : '';
-        return (
-            <span className="mapstudio-rule-tile" data-preset={preset} title={known ? 'The ' + preset + ' preset' : 'No preset picked'}>
-                {known && colors ? (
-                    <Sample svg={presetSampleSvg({ id: kind.id, name: kind.name, geometry: kind.geometry, icon: kind.icon, area: kind.area },
-                                preset as Preset, this.props.symbols || {}, colors)}
-                            className={'mapstudio-rule-sample mapstudio-rule-sample--' + kind.geometry} />
-                ) : null}
-                {word !== '' ? <span className="mapstudio-style-word mapstudio-rule-word">{word}</span> : null}
-            </span>
-        );
-    }
-
-    private presetSelect(value: string, label: string, describedBy: string[], invalid: boolean, onPick: (preset: string) => void): React.ReactElement {
-        const presets = presetsFor(this.props.kind);
-        return (
-            <select className="mapstudio-input mapstudio-rule-preset" value={value} aria-label={label} aria-invalid={invalid}
-                    aria-describedby={describedBy.length > 0 ? describedBy.join(' ') : undefined} disabled={this.off()}
-                    onChange={(ev) => onPick(ev.target.value)}>
-                <option value="">Pick a preset</option>
-                {value !== '' && presets.indexOf(value) < 0 ? <option value={value}>{value}</option> : null}
-                {presets.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
-        );
-    }
-
     private removeButton(label: string, onRemove: () => void): React.ReactElement {
         return (
             <button type="button" className="mapstudio-dock-button mapstudio-rule-remove" disabled={this.off()} title={label} aria-label={label}
                     onClick={onRemove}>
                 <ChromeGlyph name="trash" size={16} />
             </button>
-        );
-    }
-
-    /** The value the rule reads: a key value (switched-off ones too) or a typed tag path with its resolve note. */
-    private renderSource(draft: RuleDraft, view: SetupView, optional: boolean): React.ReactElement {
-        const source = draftSource(draft);
-        const m = this.messages(Fields.ruleSource);
-        const id = this.dom(Fields.ruleSource, 'select');
-        const chosen = source.from === 'kpi' ? 'kpi:' + source.key : source.from;
-        const type = draft.type as CaseType;
-        const pick = (value: string): RuleSource => (value === 'path' ? { from: 'path', path: this.pathMemory[type] || '' }
-            : value.indexOf('kpi:') === 0 ? { from: 'kpi', key: value.slice(4) } : { from: '' });
-        const stored = view.styleRule ? draftSource(ruleDraft(view.styleRule)) : null;
-        return (
-            <div className="mapstudio-kindsetup-field mapstudio-rule-source" data-field={Fields.ruleSource} data-source={chosen}>
-                <label className="mapstudio-field-label" htmlFor={id}>Value</label>
-                <select id={id} className="mapstudio-input mapstudio-rule-source-select" value={chosen} disabled={this.off()}
-                        aria-invalid={m.invalid} aria-describedby={m.ids.length > 0 ? m.ids.join(' ') : undefined}
-                        onChange={(ev) => {
-                            if (source.from === 'path') {
-                                // The typed path comes back when "A tag path" is chosen again, as a type's cases do.
-                                this.pathMemory[type] = source.path;
-                            }
-                            const next = pick(ev.target.value);
-                            this.editRule((d) => withSource(d, next), true);
-                        }}>
-                    <option value="">{optional ? 'No value' : 'Pick a value'}</option>
-                    {source.from === 'kpi' && !view.kpis.some((k) => k.key === source.key) ? <option value={chosen}>{source.key}</option> : null}
-                    {view.kpis.map((k) => (
-                        <option key={k.key} value={'kpi:' + k.key}>{(k.label !== '' ? k.label : k.key) + (k.on ? '' : ' (off in the popup)')}</option>
-                    ))}
-                    <option value="path">A tag path</option>
-                </select>
-                {source.from === 'path' ? (
-                    <input type="text" className="mapstudio-input mapstudio-kindsetup-input mapstudio-mono mapstudio-rule-path" value={source.path}
-                           placeholder="{asset.path}/Status" aria-label="Tag path the rule reads" aria-invalid={m.invalid} disabled={this.off()}
-                           autoComplete="off" spellCheck={false}
-                           onChange={(ev) => {
-                               const path = ev.target.value;
-                               this.editRule((d) => withSource(d, { from: 'path', path }), false);
-                           }}
-                           onBlur={() => this.commitRule()} onKeyDown={this.onDraftKey} />
-                ) : null}
-                {m.nodes}
-                {source.from === 'path' && stored && stored.from === 'path' && stored.path === source.path.trim() ? this.note(stored.path) : null}
-            </div>
-        );
-    }
-
-    private renderStates(draft: RuleDraft, view: SetupView, marked: number[], noteId: string): React.ReactNode {
-        const name = sourceName(draftSource(draft), view.kpis);
-        const set = (i: number, patch: Partial<StateRow>, commit: boolean): void =>
-            this.editRule((d) => ({ ...d, states: d.states.map((r, at) => (at === i ? { ...r, ...patch } : r)) }), commit);
-        return (
-            <React.Fragment>
-                {draft.states.map((row, i) => {
-                    const m = this.messages(Fields.ruleCase(i));
-                    const bad = m.invalid || marked.indexOf(i) >= 0;
-                    // A row the note names is tied to the note's words.
-                    const ids = marked.indexOf(i) >= 0 ? m.ids.concat([noteId]) : m.ids;
-                    return (
-                        <div key={i} className="mapstudio-rule-case" role="group" aria-label={'Case ' + (i + 1)} data-index={i} data-rule="states"
-                             data-field={Fields.ruleCase(i)}>
-                            <label className="mapstudio-rule-when">
-                                <span className="mapstudio-field-label">When {name} is</span>
-                                <input type="text" className="mapstudio-input mapstudio-kindsetup-input mapstudio-rule-value" value={row.value}
-                                       aria-invalid={bad} aria-describedby={ids.length > 0 ? ids.join(' ') : undefined} disabled={this.off()}
-                                       autoComplete="off" spellCheck={false}
-                                       onChange={(ev) => set(i, { value: ev.target.value }, false)}
-                                       onBlur={() => this.commitRule()} onKeyDown={this.onDraftKey} />
-                            </label>
-                            <div className="mapstudio-rule-look">
-                                {this.presetSelect(row.preset, 'Preset of case ' + (i + 1), ids, bad, (preset) => set(i, { preset }, true))}
-                                {this.tile(row.preset)}
-                                {this.removeButton('Remove case ' + (i + 1),
-                                    () => this.editRule((d) => ({ ...d, states: d.states.filter((_, at) => at !== i) }), true, true))}
-                            </div>
-                            {m.nodes}
-                        </div>
-                    );
-                })}
-                <span className="mapstudio-field-hint">A number, true or false is read as typed; text in double quotes stays text ("1").</span>
-                <button type="button" className="mapstudio-button mapstudio-rule-add" disabled={this.off()}
-                        onClick={() => this.editRule((d) => ({ ...d, states: d.states.concat([{ value: '', preset: '' }]) }), false)}>Add a case</button>
-            </React.Fragment>
-        );
-    }
-
-    private renderBands(draft: RuleDraft, marked: number[], noteId: string): React.ReactNode {
-        const set = (i: number, patch: Partial<BandRow>, commit: boolean): void =>
-            this.editRule((d) => ({ ...d, bands: d.bands.map((r, at) => (at === i ? { ...r, ...patch } : r)) }), commit);
-        const last = draft.bands.length - 1;
-        const end = (i: number, part: 'from' | 'to', row: BandRow, bad: boolean, ids: string[]): React.ReactElement => {
-            const open = part === 'from' ? i === 0 : i === last;
-            return (
-                <label className="mapstudio-rule-end">
-                    <span className="mapstudio-field-label">{part === 'from' ? 'From' : 'To'}</span>
-                    <input type="text" inputMode="decimal" className={'mapstudio-input mapstudio-kindsetup-input mapstudio-rule-' + part} value={row[part]}
-                           placeholder={open ? (part === 'from' ? 'Open below' : 'Open above') : undefined}
-                           aria-label={(part === 'from' ? 'From' : 'To') + ' of band ' + (i + 1) + (open ? ', empty for an open end' : '')}
-                           aria-invalid={bad} aria-describedby={ids.length > 0 ? ids.join(' ') : undefined} disabled={this.off()}
-                           autoComplete="off" spellCheck={false}
-                           onChange={(ev) => set(i, { [part]: ev.target.value }, false)}
-                           onBlur={() => this.commitRule()} onKeyDown={this.onDraftKey} />
-                </label>
-            );
-        };
-        return (
-            <React.Fragment>
-                {draft.bands.map((row, i) => {
-                    const m = this.messages(Fields.ruleCase(i));
-                    const bad = m.invalid || marked.indexOf(i) >= 0;
-                    const ids = marked.indexOf(i) >= 0 ? m.ids.concat([noteId]) : m.ids;
-                    return (
-                        <div key={i} className="mapstudio-rule-case" role="group" aria-label={'Band ' + (i + 1)} data-index={i} data-rule="bands"
-                             data-field={Fields.ruleCase(i)}>
-                            <div className="mapstudio-rule-ends">
-                                {end(i, 'from', row, bad, ids)}
-                                {end(i, 'to', row, bad, ids)}
-                            </div>
-                            <div className="mapstudio-rule-look">
-                                {this.presetSelect(row.preset, 'Preset of band ' + (i + 1), ids, bad, (preset) => set(i, { preset }, true))}
-                                {this.tile(row.preset)}
-                                {this.removeButton('Remove band ' + (i + 1),
-                                    () => this.editRule((d) => ({ ...d, bands: d.bands.filter((_, at) => at !== i) }), true, true))}
-                            </div>
-                            {m.nodes}
-                        </div>
-                    );
-                })}
-                <span className="mapstudio-field-hint">
-                    A band holds a value from its from up to, not including, its to. Leave the first from or the last to empty for an open end.
-                </span>
-                <button type="button" className="mapstudio-button mapstudio-rule-add" disabled={this.off()}
-                        onClick={() => this.editRule((d) => ({ ...d, bands: d.bands.concat([{ from: '', to: '', preset: '' }]) }), false)}>Add a band</button>
-            </React.Fragment>
-        );
-    }
-
-    private renderExpression(draft: RuleDraft): React.ReactNode {
-        const m = this.messages(Fields.ruleExpression);
-        const id = this.dom(Fields.ruleExpression, 'text');
-        const hintId = this.dom(Fields.ruleExpression, 'hint');
-        const named = expressionPresets(draft.expression, this.props.kind);
-        return (
-            <div className="mapstudio-kindsetup-field" data-field={Fields.ruleExpression}>
-                <label className="mapstudio-field-label" htmlFor={id}>Expression</label>
-                <textarea id={id} className="mapstudio-input mapstudio-mono mapstudio-rule-expression" rows={4} value={draft.expression}
-                          placeholder={'if({value} > 600, \'warning\', \'normal\')'} aria-invalid={m.invalid}
-                          aria-describedby={m.ids.concat([hintId]).join(' ')} disabled={this.off()} autoComplete="off" spellCheck={false}
-                          onChange={(ev) => {
-                              const expression = ev.target.value;
-                              this.editRule((d) => ({ ...d, expression }), false);
-                          }}
-                          onBlur={() => this.commitRule()} />
-                {m.nodes}
-                <span id={hintId} className="mapstudio-field-hint">
-                    <span className="mapstudio-mono">{'{value}'}</span> is the one reference: the value picked above. The result is a preset name,
-                    as text: {presetsFor(this.props.kind).join(', ')}. Saved when you leave the field.
-                </span>
-                {named.length > 0 ? (
-                    <div className="mapstudio-rule-named" role="group" aria-label="The presets the expression names">
-                        {named.map((p) => (
-                            <span key={p} className="mapstudio-rule-named-tile">
-                                {this.tile(p)}
-                                <span className="mapstudio-mono">{p}</span>
-                            </span>
-                        ))}
-                    </div>
-                ) : null}
-            </div>
         );
     }
 
@@ -1380,51 +1100,33 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
     }
 
     /**
-     * Section 6 (key screen 6, kinds-style): the type, the value, the type's rows with their tiles, what is missing while the
-     * rule is not whole, the Gateway's words when it refused the rule, and for an area kind the tints.
+     * Section 6 (key screen 6, kinds-style): the rule's editor (studio/RuleEditor.tsx: the type, the value, the type's rows with
+     * their tiles, what is missing while the rule is not whole, the Gateway's words when it refused the rule), and for an area kind
+     * the tints. The editor owns the rule's draft and tells the section its type and whether it says "Not saved yet".
      */
     private renderStyleRule(view: SetupView, headingId: string): React.ReactElement {
         const kind = this.props.kind;
-        const draft = this.ruleNow(view);
-        const check = checkRule(draft, kind);
-        // What is missing shows once the rule has been touched: a stored rule is whole, and a kind with none says nothing.
-        const touched = this.state.rule !== null;
-        const missing = touched ? unsavedText(check.missing) : '';
-        const marked = touched ? check.rows : [];
-        const section = this.messages(Fields.styleRule);
-        const noteId = this.dom(Fields.styleRule, 'unsaved');
+        const field = Fields.styleRule;
+        // The tints are drawn now, in this render, so the fields they draw are known before the refusals at the top are.
+        const tints = this.renderTints(view);
+        const editor = this.ruleEditor.current;
+        ruleFields(editor ? editor.draft() : ruleDraft(view.styleRule)).forEach((at) => this.drawn.add(at));
         return (
-            <section className="mapstudio-kindsetup-section" data-section="styleRule" data-rule={draft.type} data-unsaved={missing !== '' ? 'true' : 'false'}
-                     aria-labelledby={headingId}>
-                {this.heading(6, 'Style rule', headingId, 'Builds on key values')}
-                <div ref={this.ruleBox} className="mapstudio-rule" data-field={Fields.styleRule}>
-                    <div className="mapstudio-rule-types" role="group" aria-label="Rule type">
-                        {ruleTypes(kind).map((type: RuleType) => (
-                            <button key={type} type="button" data-type={type} aria-pressed={draft.type === type} disabled={this.off()}
-                                    className={'mapstudio-panel-tab mapstudio-rule-type' + (draft.type === type ? ' mapstudio-panel-tab--active' : '')}
-                                    onClick={() => {
-                                        // The type already chosen changes nothing.
-                                        if (type !== draft.type) {
-                                            this.editRule((d) => ({ ...d, type }), true, true);
-                                        }
-                                    }}>{RULE_TYPE_WORDS[type]}</button>
-                        ))}
-                    </div>
-                    {draft.type === 'none' ? <span className="mapstudio-field-text mapstudio-kindsetup-none mapstudio-rule-none">No style rule</span> : null}
-                    {draft.type === 'instruments' ? (
-                        <span className="mapstudio-field-text mapstudio-rule-instruments">Each segment takes the worst of the instruments at its ends.</span>
-                    ) : null}
-                    {draft.type === 'states' || draft.type === 'bands' || draft.type === 'expression'
-                        ? this.renderSource(draft, view, draft.type === 'expression') : null}
-                    {draft.type === 'states' ? this.renderStates(draft, view, marked, noteId) : null}
-                    {draft.type === 'bands' ? this.renderBands(draft, marked, noteId) : null}
-                    {draft.type === 'expression' ? this.renderExpression(draft) : null}
-                    {missing !== '' ? <span id={noteId} className="mapstudio-rule-unsaved" role="status">{missing}</span> : null}
-                    {section.nodes}
-                </div>
-                {this.renderTints(view)}
-                {this.renderLiveNow(view, missing !== '')}
-            </section>
+            <RuleEditor ref={this.ruleEditor} kind={kind} kpis={view.kpis} stored={view.styleRule} version={this.version()} off={this.off()}
+                        idBase={this.idBase} refusals={this.props.saves.refusals} refused={this.hasRefusal(field)}
+                        saving={this.props.saves.saving.indexOf(field) >= 0} done={this.props.saves.done}
+                        onSend={(rule, base) => this.send(field, { part: 'styleRule', rule }, base)}
+                        onClearRefusal={() => this.props.onClearRefusal(field)}
+                        pathNote={(path) => this.note(path)} symbols={this.props.symbols} colors={this.props.colors}
+                        frame={(body, info) => (
+                            <section className="mapstudio-kindsetup-section" data-section="styleRule" data-rule={info.type}
+                                     data-unsaved={info.unsaved ? 'true' : 'false'} aria-labelledby={headingId}>
+                                {this.heading(6, 'Style rule', headingId, 'Builds on key values')}
+                                {body}
+                                {tints}
+                                {this.renderLiveNow(view, info.unsaved)}
+                            </section>
+                        )} />
         );
     }
 

@@ -70,7 +70,7 @@ import { listRows } from './itemList';
 import { FieldValue, assetListKnown } from './itemForm';
 import { Rail } from './studio/Rail';
 import { ItemList, ListView, newListView } from './studio/ItemList';
-import { PropertiesPanel } from './studio/PropertiesPanel';
+import { PanelTab, PropertiesPanel } from './studio/PropertiesPanel';
 import { DrawToolbar } from './studio/DrawToolbar';
 import { DrawingBar, InstrumentBar } from './studio/DrawingBar';
 import { GeometryBar } from './studio/GeometryBar';
@@ -85,7 +85,7 @@ import {
     writePreview
 } from './kindSetup';
 import { expandOps, historyRows } from './history';
-import { kpiLabelsOf, liveNowBlock } from './itemOverrides';
+import { RULE_ROW, kpiLabelsOf, liveNowBlock, ownRule } from './itemOverrides';
 import { HistoryEntry } from './contract';
 import { busyText, undoLabel } from './undoStack';
 import { FirstRunChecklist, ViewerNote } from './studio/FirstRunChecklist';
@@ -170,6 +170,8 @@ export interface MapStudioState {
     studio: StudioState;
     /** The Layers surface's open tab (entry 22): it stays while Edit mode stays, and every entry to Edit mode opens on Layers. */
     layersTab: LayersTab;
+    /** The properties panel's tab (entry 12c2): kept while another item is selected and across a visit to Kinds. */
+    panelTab: PanelTab;
     /**
      * The geometry change in hand with Select (entry 5, drawing.ts): a chosen point of the selected line or area, or Move waiting
      * for a click; kept only for the selected item (selectionState) and dropped when a tool is picked (toolState).
@@ -226,7 +228,7 @@ export type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
 export class MapStudio extends Component<Props, MapStudioState> {
     state: MapStudioState = {
         drawing: null, snap: false, snapHint: '', popup: null, clock: Date.now(), pick: null, selected: null, panel: null,
-        studio: fromProps(this.props.props.editMode), layersTab: 'layers', geometry: null, listCollapsed: listCollapsedNow(), listOpen: false,
+        studio: fromProps(this.props.props.editMode), layersTab: 'layers', panelTab: 'details', geometry: null, listCollapsed: listCollapsedNow(), listOpen: false,
         cardsClosed: [], showEdits: 0
     };
 
@@ -345,6 +347,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
     legendControl: LegendControl | null = null;
     /** The rail's Layers surface's open tab panel, the docked legend's host (epic 4 entry 22), while it is mounted, else null. */
     private layersHost: HTMLDivElement | null = null;
+    /** Entry 12c2: the section of the kind's setup to bring into view once Kinds shows it ("Edit the kind's rule"), or null. */
+    private kindSectionWanted: string | null = null;
     /** The Layers surface's tab and tab panel ids, unique to this component (two maps may share a page). */
     private readonly layersTabsId = 'mapstudio-layers-' + Math.random().toString(36).slice(2, 8);
     /** The Mapbox logo control, bottom-right, while Satellite is drawn. */
@@ -656,6 +660,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         camera.applyRestore(this);
         camera.saveSelection(this);
+        this.showKindSection();
     }
 
     /**
@@ -1962,6 +1967,49 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     };
 
+    /** Entry 12c2: a tab of the properties panel chosen. */
+    onPanelTab = (tab: PanelTab): void => this.setState({ panelTab: tab });
+
+    /**
+     * Entry 12c2: the selected item's own style rule saved (a whole rule) or removed (null, Reset), as one override of the item,
+     * at the item version its draft was last in step with the stored rule (`base`; the newest when absent). False when not taken.
+     */
+    onStyleRule = (rule: Record<string, unknown> | null, base?: number): boolean => {
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        const selected = this.state.selected;
+        return !!delegate && !!selected && delegate.editOverride(selected.id, RULE_ROW, rule, '', base);
+    };
+
+    /** "Edit the kind's rule" in the Style tab (entry 12c2): Kinds at the selected item's kind with section 6 in view, the selection kept. */
+    onEditKindRule = (): void => {
+        this.kindSectionWanted = 'styleRule';
+        this.onOpenKindSetup();
+    };
+
+    /**
+     * The section of the kind's setup asked for is brought into view once the setup is drawn (entry 12c2), the focus on the
+     * rule's chosen type so the keyboard is there too.
+     */
+    private showKindSection(): void {
+        const wanted = this.kindSectionWanted;
+        if (wanted === null || !this.studioOn() || this.state.studio.surface !== 'kinds') {
+            return;
+        }
+        const root = this.mapContainer && typeof this.mapContainer.closest === 'function' ? this.mapContainer.closest('.mapstudio') : null;
+        const section = root ? root.querySelector('.mapstudio-kindsetup [data-section="' + wanted + '"]') as HTMLElement | null : null;
+        if (!section) {
+            return;
+        }
+        this.kindSectionWanted = null;
+        const first = (section.querySelector('.mapstudio-rule-type[aria-pressed="true"]') || section.querySelector('button, input, select')) as HTMLElement | null;
+        if (first && typeof first.focus === 'function') {
+            first.focus({ preventScroll: true });
+        }
+        if (typeof section.scrollIntoView === 'function') {
+            section.scrollIntoView({ block: 'start' });
+        }
+    }
+
     /** A kind chosen in the Kinds list: its setup shows in the properties panel's place. */
     onChooseKind = (kindId: string): void => {
         this.setState((prev) => ({ studio: chooseKind(prev.studio, kindId) }));
@@ -2240,8 +2288,30 @@ export class MapStudio extends Component<Props, MapStudioState> {
             values: delegate.live.items[item.id],
             now: Date.now()
         }) : undefined;
+        // Entry 12c2: the Style tab, from the kind's stored rule, the item's own (its newest overrides) and its live state.
+        const newestOverrides = (delegate.inFlightOverrides || {})[item.id] || item.overrides;
+        const setupView = setupRecord ? readSetup(setupRecord.setup) : null;
+        const liveValues = delegate.live.items[item.id];
+        if (kind && this.state.panelTab === 'style' && this.symbols === null) {
+            // The case tiles draw the kind's glyph from the sprite, as the kind's own do.
+            items.loadSprite(this).then(() => this.forceUpdate());
+        }
+        const style = kind ? {
+            kpis: setupView ? setupView.kpis : [],
+            kindRule: setupView ? setupView.styleRule : null,
+            ownRule: ownRule(newestOverrides),
+            view: { itemId: item.id, itemName: item.name, assetId: item.assetId, assetPath: asset ? asset.basePath : null, properties: item.properties },
+            state: liveValues ? itemState(liveValues, delegate.live.display[item.kind]) : null,
+            symbols: this.symbols || {},
+            colors: this.markerColors
+        } : undefined;
         return (
             <PropertiesPanel key={item.id}
+                             tab={this.state.panelTab}
+                             onTab={this.onPanelTab}
+                             style={style}
+                             onStyleRule={this.onStyleRule}
+                             onEditKindRule={this.onEditKindRule}
                              item={item}
                              kind={kind}
                              kinds={kindOptions}

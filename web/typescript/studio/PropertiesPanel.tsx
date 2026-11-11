@@ -11,8 +11,13 @@ import { round1 } from '../geometry';
 import { distanceText } from '../linePopup';
 import { Glyph } from '../popupParts';
 import { roundCoordinate } from '../save';
-import { FROM_KIND, LiveNowBlock, LiveNowRow, OVERRIDE, openSetupText, pathProblem } from '../itemOverrides';
+import { FROM_KIND, LiveNowBlock, LiveNowRow, OVERRIDE, RULE_ROW, openSetupText, pathProblem } from '../itemOverrides';
+import { Fields, KeyValue, RuleDraft, checkRule, ownRuleStart, ruleWords, showsNowText, storedRuleOf } from '../kindSetup';
+import { ItemState } from '../live';
+import { MarkerColors, SpriteSymbol } from '../markers';
+import { ItemView } from '../placeholders';
 import { ChromeGlyph } from './ChromeGlyph';
+import { RuleEditor, RuleTile } from './RuleEditor';
 import { PAUSED_TEXT } from './UndoGroup';
 
 /** The footer's delete icon on hover (entry 25): what it does and its key; no question is asked and Undo restores the item. */
@@ -27,6 +32,48 @@ export const TOOL_IN_HAND_TEXT = 'Off while a tool is in hand - Esc puts it down
 /** Zoom to location beside Move (entry 27): its words and its hover text. */
 export const ZOOM_TO_TEXT = 'Zoom to location';
 export const ZOOM_TO_TITLE = 'Zoom to location: the map moves to the saved point';
+
+/** The properties panel's tabs (entry 12c2; DESIGN.md Properties panel and tabs), in order. */
+export type PanelTab = 'details' | 'style';
+export const PANEL_TABS: ReadonlyArray<[PanelTab, string]> = [['details', 'Details'], ['style', 'Style']];
+
+/** The tab an arrow key, Home or End moves to from `tab` (the tabs wrap), or null for any other key. */
+export function tabForKey(tab: PanelTab, key: string): PanelTab | null {
+    const at = PANEL_TABS.findIndex(([t]) => t === tab);
+    const last = PANEL_TABS.length - 1;
+    const to = key === 'ArrowRight' ? (at >= last ? 0 : at + 1) : key === 'ArrowLeft' ? (at <= 0 ? last : at - 1)
+        : key === 'Home' ? 0 : key === 'End' ? last : -1;
+    return to < 0 ? null : PANEL_TABS[to][0];
+}
+
+/** What sets an item's size, in words (entry 12c2, owner decision 2): read only. */
+export function sizeText(kind: Kind): string {
+    return kind.geometry === 'point' ? 'One size: every point\'s marker is the same size.'
+        : kind.area ? 'One outline: an area has no size of its own.'
+            : 'Its width follows its diameter; a line with no diameter draws thin.';
+}
+
+/** The words under each read-only row of the Style tab: where the value comes from, and that it is not changed here. */
+export const STYLE_ICON_HINT = 'The icon comes from the project\'s kind list and is not changed here.';
+export const STYLE_SIZE_HINT = 'The size comes from the project\'s kind list and is not changed here.';
+export const STYLE_LABEL_HINT = 'The label is the item\'s name. What it shows comes from the project\'s kind list and is not changed here.';
+
+/** What the Style tab is drawn from (entry 12c2). */
+export interface StyleFacts {
+    /** The kind's key values: the value an own rule may read. */
+    kpis: KeyValue[];
+    /** The kind's stored style rule, or null. */
+    kindRule: Record<string, unknown> | null;
+    /** The item's own style rule when the Gateway applies it (from its newest overrides, those in flight included), else null. */
+    ownRule: Record<string, unknown> | null;
+    /** What a path under `{asset.path}` fills from when the kind's rule is copied for this item. */
+    view: ItemView;
+    /** The item's live state as the map draws it, or null before its first values. */
+    state: ItemState | null;
+    /** The sprite's symbols and the theme's token values, for the case tiles. */
+    symbols?: Record<string, SpriteSymbol>;
+    colors?: MarkerColors | null;
+}
 
 /** Whether a typed latitude or longitude reads as a number (in range or not): the place line follows a typed pair once both do. */
 export function readsAsNumber(text: string): number | null {
@@ -112,6 +159,26 @@ export function deleteButton(paused: boolean, pending: boolean, toolInHand: bool
  * `.mapstudio-livenow-path`, its tag `.mapstudio-override-tag` or `.mapstudio-fromkind-tag`, the buttons
  * `.mapstudio-override-edit` and `.mapstudio-override-reset`, the field `.mapstudio-override-input` and its words
  * `.mapstudio-override-problem`, and `.mapstudio-livenow-setup` for the button of a kind with no setup.
+ *
+ * From entry 12c2 (R5, R15; docs/kind-setup.md "An item's own style rule from the Style tab") the panel has its two tabs, Details
+ * and Style, a real tab list: one tab stop, the arrow keys (Home, End) move between them and choose, each names its panel
+ * (`aria-controls`), the active one underlined. The tab chosen is the component's (`tab`, `onTab`), so it is kept while another
+ * item is selected and across a visit to Kinds (an item just placed, which opens with the cursor in Name, shows Details until a
+ * tab is chosen; the remembered tab is not changed by it). Both panels stay mounted, the one not chosen hidden, so a rule being built is
+ * kept until the item is left. **Style** holds Icon (the kind's glyph and its name), Size and Label (the item's name) read only,
+ * each saying where it comes from, then the **style rule**: tagged "From kind", the kind's rule in words with its case tiles
+ * (or that the kind has none), "Edit the kind's rule" (Kinds at that kind with section 6 in view, the selection kept) and
+ * Override; or the item's own rule in the shared editor (studio/RuleEditor.tsx, no None type, a typed path a full path), tagged
+ * Override with Reset. Override saves a copy of the kind's rule at once as the item's own (a path under `{asset.path}` filled
+ * for this item); an item with no asset, a kind with no rule and a path that cannot be filled start empty, saved once built.
+ * The rule saves through `onStyleRule` (one update of the item's whole `overrides`, only `styleRule` changed: an Undo step and
+ * a row of Recent changes); a refusal's words stand beside the part of the rule they name. One line under the rule says what
+ * the item shows now and when its alarm wins. Esc in a typed field of the rule stays in the field (the draft is kept).
+ * Test hooks: the tabs `.mapstudio-panel-tab[data-tab]` (`aria-selected`), the Style panel `.mapstudio-style`, a read-only row
+ * `.mapstudio-style-row[data-row]` (`icon`, `size`, `label`), the rule `.mapstudio-style-rule[data-own]` (`data-editing` while
+ * an own rule not yet stored is being built), `.mapstudio-style-override`, `.mapstudio-style-reset`, `.mapstudio-style-kind`,
+ * the kind's rule in words `.mapstudio-style-kindrule[data-rule]` with a case `.mapstudio-style-kindcase[data-preset]`, "Keep
+ * the kind's rule" `.mapstudio-style-keep`, a refusal `.mapstudio-style-refusal` and the line `.mapstudio-style-shows`.
  */
 export interface PropertiesPanelProps {
     item: MapItemRecord;
@@ -188,13 +255,26 @@ export interface PropertiesPanelProps {
     /** Entry 12c1: the Live now block (itemOverrides.ts `liveNowBlock`, from the item's newest overrides); undefined for none. */
     liveNow?: LiveNowBlock;
     /** The item's last override the Gateway refused: the row, its words and the path that was typed ('' for a Reset). */
-    overrideRefusal?: { row: string; words: string; path: string; batchId: string } | null;
+    overrideRefusal?: { row: string; words: string; path: string; batchId: string; at?: string } | null;
     /** One row's path overridden for this item (a full path), or reset (null); `rowName` is the row's name as shown. */
     onOverride?: (row: string, path: string | null, rowName: string) => void;
     /** The refusal's words of this item cleared (the field put back or typed in again, or the panel left). */
     onClearOverrideRefusal?: (itemId: string) => void;
     /** "Open <kind>'s setup": Kinds at this item's kind, the selection kept. */
     onOpenKindSetup?: () => void;
+    /** Entry 12c2: the tab chosen (Details when absent) and a tab chosen; the component keeps it across items and Kinds. */
+    tab?: PanelTab;
+    onTab?: (tab: PanelTab) => void;
+    /** What the Style tab is drawn from; undefined for an item whose kind is not in the kind list. */
+    style?: StyleFacts;
+    /**
+     * The item's own style rule saved (a whole rule) or removed (null, Reset); `base` is the item version the rule's draft was
+     * last in step with the stored rule at (the newest when absent), so another editor's rule since meets the conflict.
+     * False when the save was not taken.
+     */
+    onStyleRule?: (rule: Record<string, unknown> | null, base?: number) => boolean;
+    /** "Edit the kind's rule": Kinds at this item's kind with section 6 in view, the selection kept. */
+    onEditKindRule?: () => void;
 }
 
 interface Drafts {
@@ -215,6 +295,10 @@ interface Drafts {
     overrideRow: string | null;
     overrideText: string;
     overrideProblem: string;
+    /** Entry 12c2: an own style rule being built that is not stored yet (Override on an item that starts empty), or null. */
+    ruleStart: RuleDraft | null;
+    /** Entry 12c2: this item was just placed, so its panel shows Details (the cursor in Name) until a tab is chosen; the remembered tab stays. */
+    placed: boolean;
 }
 
 type FixedField = 'name' | 'lat' | 'lng' | 'distance';
@@ -233,7 +317,9 @@ function draftsOf(item: MapItemRecord): Drafts {
         problems: {},
         overrideRow: null,
         overrideText: '',
-        overrideProblem: ''
+        overrideProblem: '',
+        ruleStart: null,
+        placed: false
     };
 }
 
@@ -271,10 +357,16 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
     private refocusRow: string | null = null;
     /** True while Enter blurs the override's field: a field that closes then gives the focus back to its row's button. */
     private enterCommit = false;
+    /** Entry 12c2: the Style panel's element, and where the focus goes once the rule's buttons changed (Override, Reset). */
+    private styleEl: HTMLElement | null = null;
+    private styleFocus: 'editor' | 'override' | null = null;
+    /** The focus is moved only while the press is fresh: a save not taken changes no button, and nothing is focused later. */
+    private styleFocusUntil = 0;
+    private readonly tabEls: Partial<Record<PanelTab, HTMLButtonElement | null>> = {};
 
     constructor(props: PropertiesPanelProps) {
         super(props);
-        this.state = draftsOf(props.item);
+        this.state = { ...draftsOf(props.item), placed: props.autoFocusName && props.tab === 'style' };
     }
 
     componentDidMount(): void {
@@ -361,13 +453,34 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
             });
         }
         if (!prev.autoFocusName && this.props.autoFocusName) {
-            this.focusName();
+            if (this.tabNow() !== 'details') {
+                this.setState({ placed: true }, () => this.focusName());
+            } else {
+                this.focusName();
+            }
         }
         // Entry 12c1: a set path the Gateway refused opens its field again with what was typed and the Gateway's words.
         const refusal = this.props.overrideRefusal;
         const before = prev.item.id === this.props.item.id ? prev.overrideRefusal : null;
         if (refusal && refusal.path !== '' && (!before || before.batchId !== refusal.batchId) && this.state.overrideRow === null) {
             this.setState({ overrideRow: refusal.row, overrideText: refusal.path, overrideProblem: refusal.words });
+        }
+        // Entry 12c2: an own rule that went with nothing refused (Reset, an Undo, another editor) closes the editor it was built in.
+        const owned = !!this.props.style && this.props.style.ownRule !== null;
+        const wasOwned = prev.item.id === this.props.item.id && !!prev.style && prev.style.ownRule !== null;
+        if (wasOwned && !owned && this.state.ruleStart !== null && !this.ruleRefusal()) {
+            this.setState({ ruleStart: null });
+        }
+        if (this.styleFocus !== null && Date.now() > this.styleFocusUntil) {
+            this.styleFocus = null;
+        }
+        if (this.styleFocus !== null && this.styleEl) {
+            const target = this.styleFocus === 'override' ? this.styleEl.querySelector('.mapstudio-style-override')
+                : this.styleEl.querySelector('.mapstudio-style-reset, .mapstudio-style-keep');
+            if (target) {
+                this.styleFocus = null;
+                (target as HTMLElement).focus();
+            }
         }
         if (this.refocusRow !== null && this.state.overrideRow === null) {
             const row = this.refocusRow;
@@ -826,6 +939,236 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         );
     }
 
+    // ---- The tabs and the Style tab (entry 12c2) ----
+
+    private tabNow(): PanelTab {
+        return this.props.tab === 'style' && !this.state.placed ? 'style' : 'details';
+    }
+
+    /** A tab chosen: the component remembers it, and a just-placed item's hold on Details ends. */
+    private chooseTab(tab: PanelTab): void {
+        if (this.state.placed) {
+            this.setState({ placed: false });
+        }
+        if (this.props.onTab) {
+            this.props.onTab(tab);
+        }
+    }
+
+    private tabId(tab: PanelTab, part: 'tab' | 'panel'): string {
+        return 'mapstudio-panel-' + this.props.item.id + '-' + tab + '-' + part;
+    }
+
+    /** The arrow keys, Home and End move between the tabs and choose (one tab stop; the focus follows the choice). */
+    private onTabKey = (ev: React.KeyboardEvent<HTMLButtonElement>): void => {
+        const to = tabForKey(this.tabNow(), ev.key);
+        if (to === null) {
+            return;
+        }
+        ev.preventDefault();
+        this.chooseTab(to);
+        const el = this.tabEls[to];
+        if (el) {
+            el.focus();
+        }
+    };
+
+    private renderTabs(): React.ReactElement {
+        const now = this.tabNow();
+        return (
+            <div className="mapstudio-panel-tabs" role="tablist" aria-label={this.props.item.name}>
+                {PANEL_TABS.map(([tab, label]) => (
+                    <button key={tab} ref={(el) => { this.tabEls[tab] = el; }} type="button" role="tab" id={this.tabId(tab, 'tab')} data-tab={tab}
+                            aria-selected={now === tab} aria-controls={this.tabId(tab, 'panel')} tabIndex={now === tab ? 0 : -1}
+                            className={'mapstudio-panel-tab' + (now === tab ? ' mapstudio-panel-tab--active' : '')}
+                            onClick={() => this.chooseTab(tab)} onKeyDown={this.onTabKey}>{label}</button>
+                ))}
+            </div>
+        );
+    }
+
+    /** The refusal of the item's own style rule that stands, or null. */
+    private ruleRefusal(): { at: string; words: string } | null {
+        const refusal = this.props.overrideRefusal;
+        return refusal && refusal.row === RULE_ROW ? { at: refusal.at || Fields.styleRule, words: refusal.words } : null;
+    }
+
+    /**
+     * Override on the rule (owner decision 1): the copy of the kind's rule is saved at once as the item's own, so it is marked
+     * Override straight away and Undo takes it back; a copy that is not a whole rule (an item with no asset, a kind with no rule)
+     * opens the editor on it, saved once it is built.
+     */
+    private onOverrideRule = (): void => {
+        const { kind, style } = this.props;
+        if (!kind || !style || this.props.paused || !this.props.onStyleRule) {
+            return;
+        }
+        const start = ownRuleStart(style.kindRule, style.view);
+        const rule = checkRule(start, kind, { own: true }).rule;
+        this.focusStyle('editor');
+        if (rule) {
+            this.props.onStyleRule(rule);
+        } else {
+            this.setState({ ruleStart: start });
+        }
+    };
+
+    /** Once the rule's buttons have changed, the focus goes to the one that took the pressed one's place. */
+    private focusStyle(to: 'editor' | 'override'): void {
+        this.styleFocus = to;
+        this.styleFocusUntil = Date.now() + 3000;
+    }
+
+    /** Reset: the item's own rule goes and the kind's draws it again. */
+    private onResetRule = (): void => {
+        if (this.props.paused || !this.props.onStyleRule) {
+            return;
+        }
+        this.focusStyle('override');
+        this.setState({ ruleStart: null });
+        this.props.onStyleRule(null);
+    };
+
+    /** An own rule not stored yet given up: the kind's rule shows again, and nothing was sent. */
+    private onKeepKindRule = (): void => {
+        const refusal = this.ruleRefusal();
+        if (refusal && this.props.onClearOverrideRefusal) {
+            this.props.onClearOverrideRefusal(this.props.item.id);
+        }
+        this.focusStyle('override');
+        this.setState({ ruleStart: null });
+    };
+
+    /** Esc in a typed field of the rule stays there: the draft is kept, and the panel is not closed under it. */
+    private onStyleKey = (ev: React.KeyboardEvent<HTMLDivElement>): void => {
+        const target = ev.target as HTMLElement;
+        const tag = target && typeof target.tagName === 'string' ? target.tagName.toUpperCase() : '';
+        if (ev.key === 'Escape' && (tag === 'TEXTAREA' || tag === 'SELECT' || (tag === 'INPUT' && (target as HTMLInputElement).type === 'text'))
+            && !!target.closest('.mapstudio-rule')) {
+            ev.stopPropagation();
+        }
+    };
+
+    /** A read-only row of the Style tab: its label, its value, and where the value comes from. */
+    private styleRow(row: string, label: string, value: React.ReactNode, hint: string): React.ReactElement {
+        return (
+            <div className="mapstudio-field mapstudio-style-row" data-row={row}>
+                <span className="mapstudio-field-label">{label}</span>
+                <span className="mapstudio-field-text mapstudio-style-value">{value}</span>
+                <span className="mapstudio-field-hint">{hint}</span>
+            </div>
+        );
+    }
+
+    /** The kind's rule in words, read only, with a tile per case. */
+    private renderKindRule(kind: Kind, style: StyleFacts): React.ReactElement {
+        const words = ruleWords(style.kindRule, style.kpis, kind);
+        return (
+            <div className="mapstudio-style-kindrule" data-rule={words.type}>
+                <span className={'mapstudio-field-text mapstudio-style-summary' + (words.type === 'none' ? ' mapstudio-kindsetup-none' : '')}>{words.summary}</span>
+                {words.expression !== '' ? <span className="mapstudio-mono mapstudio-style-expression">{words.expression}</span> : null}
+                {words.cases.length > 0 ? (
+                    <ul className="mapstudio-style-kindcases" aria-label={'The cases of the ' + kind.name + ' rule'}>
+                        {words.cases.map((c, i) => (
+                            <li key={i} className="mapstudio-style-kindcase" data-preset={c.preset}>
+                                <RuleTile kind={kind} preset={c.preset} symbols={style.symbols} colors={style.colors} />
+                                <span className="mapstudio-style-kindcase-text">
+                                    <span>{c.label}</span>
+                                    {words.type !== 'expression' ? <span className="mapstudio-mono mapstudio-style-kindcase-preset">{c.preset}</span> : null}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                ) : null}
+            </div>
+        );
+    }
+
+    /** The Style tab (entry 12c2): Icon, Size and Label read only, then the style rule, from the kind or the item's own. */
+    private renderStyle(frozen: boolean): React.ReactNode {
+        const { item, kind, style } = this.props;
+        if (!kind || !style) {
+            return <span className="mapstudio-field-hint mapstudio-style-unknown">The style comes from the item's kind, which is not in the kind list.</span>;
+        }
+        const own = style.ownRule !== null;
+        const editing = !own && this.state.ruleStart !== null;
+        const refusal = this.ruleRefusal();
+        const headingId = 'mapstudio-style-rule-' + item.id;
+        const shows = (unsaved: boolean): React.ReactElement => (
+            <div className="mapstudio-style-shows" role="status" aria-live="polite">
+                {showsNowText({ kind, name: item.name, state: style.state, own, rule: storedRuleOf(own ? style.ownRule : style.kindRule), unsaved })}
+            </div>
+        );
+        return (
+            <React.Fragment>
+                {this.styleRow('icon', 'Icon', (
+                    <span className="mapstudio-kindsetup-icon" data-icon={kind.icon}>
+                        <span className="mapstudio-popup-disc">
+                            {kind.icon !== '' ? <Glyph id={kind.icon} className="mapstudio-popup-glyph" size={18} /> : null}
+                        </span>
+                        <span className="mapstudio-mono">{kind.icon !== '' ? kind.icon : 'No icon'}</span>
+                    </span>
+                ), STYLE_ICON_HINT)}
+                {this.styleRow('size', 'Size', sizeText(kind), STYLE_SIZE_HINT)}
+                {this.styleRow('label', 'Label', item.name, STYLE_LABEL_HINT)}
+                <section className="mapstudio-style-rule" aria-labelledby={headingId} data-own={own ? 'true' : 'false'}
+                         data-editing={editing ? 'true' : 'false'}>
+                    {/* The tag stands beside the label, outside the heading that names the rule. */}
+                    <div className="mapstudio-kindsetup-heading mapstudio-style-rule-head">
+                        <h3 className="mapstudio-livenow-heading" id={headingId}>Style rule</h3>
+                        {own ? <span className="mapstudio-override-tag">{OVERRIDE}</span>
+                            : editing ? null : <span className="mapstudio-kindsetup-tag mapstudio-fromkind-tag">{FROM_KIND}</span>}
+                        {own ? (
+                            <button type="button" className="mapstudio-override-reset mapstudio-style-reset" disabled={frozen}
+                                    title="Reset to the kind's rule" aria-label={'Reset ' + item.name + ' to the kind\'s style rule'}
+                                    onClick={this.onResetRule}>Reset</button>
+                        ) : null}
+                    </div>
+                    {own || editing ? (
+                        <RuleEditor kind={kind} kpis={style.kpis} stored={style.ownRule} version={item.version} off={frozen}
+                                    idBase={'mapstudio-style-' + item.id} refusals={refusal ? [refusal] : []} refused={refusal !== null}
+                                    saving={this.props.saving} done={item.version + ':' + (refusal && this.props.overrideRefusal ? this.props.overrideRefusal.batchId : '')}
+                                    onSend={(rule, base) => rule !== null && !!this.props.onStyleRule
+                                        && this.props.onStyleRule(rule, base !== null ? base : undefined)}
+                                    onClearRefusal={() => this.props.onClearOverrideRefusal && this.props.onClearOverrideRefusal(item.id)}
+                                    symbols={style.symbols} colors={style.colors} own initial={this.state.ruleStart}
+                                    frame={(body, info) => (
+                                        <React.Fragment>
+                                            <span className="mapstudio-field-hint mapstudio-style-own-note">
+                                                {own ? 'For ' + item.name + ' only: this rule replaces the kind\'s whole rule.'
+                                                    : 'For ' + item.name + ' only. It replaces the kind\'s whole rule once it is whole and saved.'}
+                                            </span>
+                                            {body}
+                                            {editing ? (
+                                                <button type="button" className="mapstudio-button mapstudio-style-keep" disabled={frozen}
+                                                        onClick={this.onKeepKindRule}>Keep the kind's rule</button>
+                                            ) : null}
+                                            {shows(info.unsaved)}
+                                        </React.Fragment>
+                                    )} />
+                    ) : (
+                        <React.Fragment>
+                            {this.renderKindRule(kind, style)}
+                            <div className="mapstudio-style-actions">
+                                <button type="button" className="mapstudio-button mapstudio-style-kind" title={'Open ' + kind.name + '\'s style rule in Kinds'}
+                                        onClick={this.props.onEditKindRule}>Edit the kind's rule</button>
+                                <button type="button" className="mapstudio-button mapstudio-style-override" disabled={frozen}
+                                        title={'Give ' + item.name + ' a style rule of its own'} onClick={this.onOverrideRule}>Override</button>
+                            </div>
+                            {refusal ? (
+                                <span className="mapstudio-field-refusal mapstudio-style-refusal" role="alert">
+                                    <ChromeGlyph name="warning" className="mapstudio-field-refusal-glyph" size={14} />
+                                    <span className="mapstudio-field-refusal-text">{refusal.words}</span>
+                                </span>
+                            ) : null}
+                            {shows(false)}
+                        </React.Fragment>
+                    )}
+                </section>
+            </React.Fragment>
+        );
+    }
+
     /** One of the kind's fields (entry 6) as its type, its draft or else the record's value. */
     private renderField(field: FormField, index: number): React.ReactElement {
         const { item, paused } = this.props;
@@ -954,10 +1297,9 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                         <ChromeGlyph name="close" className="mapstudio-popup-chrome" />
                     </button>
                 </header>
-                <div className="mapstudio-panel-tabs" role="tablist">
-                    <button type="button" role="tab" aria-selected="true" className="mapstudio-panel-tab mapstudio-panel-tab--active">Details</button>
-                </div>
-                <div className="mapstudio-panel-body" role="tabpanel">
+                {this.renderTabs()}
+                <div className="mapstudio-panel-body" role="tabpanel" id={this.tabId('details', 'panel')} aria-labelledby={this.tabId('details', 'tab')}
+                     hidden={this.tabNow() !== 'details'}>
                     {paused ? <div className="mapstudio-panel-note" role="status">Paused - the map store is unreachable</div>
                         : pending ? <div className="mapstudio-panel-note" role="status">Saving the new item... a field you finish now saves right after it.</div> : null}
                     {missing !== '' ? <div className="mapstudio-panel-note mapstudio-panel-missing" role="status">{missing}</div> : null}
@@ -1077,6 +1419,13 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                         ) : null}
                     </div>
                     {this.renderLiveNow(frozen)}
+                </div>
+                {/* Mounted while the item's panel is, hidden while Details is chosen: a rule being built is kept until the item is left. */}
+                <div className="mapstudio-style" role="tabpanel" id={this.tabId('style', 'panel')} aria-labelledby={this.tabId('style', 'tab')}
+                     hidden={this.tabNow() !== 'style'} ref={(el) => { this.styleEl = el; }} onKeyDown={this.onStyleKey}
+                     data-own={this.props.style && this.props.style.ownRule !== null ? 'true' : 'false'}>
+                    {paused ? <div className="mapstudio-panel-note" role="status">Paused - the map store is unreachable</div> : null}
+                    {this.renderStyle(frozen)}
                 </div>
                 <footer className="mapstudio-panel-footer">
                     <button type="button" className="mapstudio-dock-button mapstudio-panel-delete" disabled={remove.off !== ''} title={remove.title}

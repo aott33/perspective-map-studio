@@ -23,9 +23,9 @@
 import { Asset, Kind } from './adapters';
 import { EditBatch, EditOp, ErrorCodes, KindSetupRecord, MapItemRecord } from './contract';
 import { isRecord } from './json';
-import { appliedParts, ownRuleApplied } from './itemOverrides';
+import { appliedParts, ownRuleApplied, pathProblem, refusalRest } from './itemOverrides';
 import { ItemState, PRESETS, TINTS, itemPreset } from './live';
-import { ASSET_ID, ASSET_PATH, ITEM_ID, ITEM_NAME, PROPERTY_PREFIX } from './placeholders';
+import { ASSET_ID, ASSET_PATH, ITEM_ID, ITEM_NAME, ItemView, PROPERTY_PREFIX, fill } from './placeholders';
 import { plural } from './history';
 import { UnsavedEntry, isBusy, isTransient } from './unsaved';
 
@@ -482,6 +482,18 @@ export function refusalPlace(message: string, sent: Record<string, unknown> | nu
     return { at: '', words: rest };
 }
 
+/**
+ * The refusal of an item's own style rule placed (entry 12c2): the Gateway's "Op 0 (id): overrides: styleRule.cases[1].preset: ..."
+ * and "Op 0 (id): overrides.styleRule.expression: the expression could not be read: ..." (an expression's check names its part so)
+ * beside the value, the expression or the case it names, as a kind's rule is; anything that names no part of the rule (a role,
+ * a kind that left the list) stands in the rule's own box with all its words.
+ */
+export function ruleRefusalPlace(message: string): RefusalPlace {
+    const rest = refusalRest(message);
+    const place = refusalPlace(rest, null);
+    return place.at.indexOf(Fields.styleRule) === 0 ? place : { at: Fields.styleRule, words: rest };
+}
+
 // ---- The header ----
 
 /** A kind's geometry in a word: "Point", "Line" or "Area". */
@@ -650,6 +662,58 @@ export function liveNowText(facts: LiveNowFacts): string {
     const word = NOTE_WORDS[itemPreset(state)] || 'Normal';
     const alarm = state.alarm ? ', but its priority ' + state.alarm.priority + ' alarm wins over the rule.' : '.';
     return 'Live now: ' + name + ' is ' + word + alarm + unsaved;
+}
+
+/** What the Style tab's "shows now" line is said from (entry 12c2): only what the Gateway already sends. */
+export interface ShowsNowFacts {
+    kind: Kind;
+    /** The item's name. */
+    name: string;
+    /** The item's live state as the map draws it, or null before its first values. */
+    state: ItemState | null;
+    /** Whether the item draws by a style rule of its own (`overrides.styleRule`, one the Gateway applies). */
+    own: boolean;
+    /** The rule the item draws by: its own when it has one, else the kind's. */
+    rule: LiveNowFacts['stored'];
+    /** Whether the item's rule says "Not saved yet": the draft is not whole, so nothing of it was sent. */
+    unsaved: boolean;
+}
+
+/**
+ * The one line under an item's style rule in the Style tab (entry 12c2): what the item shows now, from its live state, by its
+ * own rule or its kind's, and when its alarm wins over the rule. Nothing of the rule is worked out here: the state is the
+ * Gateway's, so the line changes at the next live update.
+ */
+export function showsNowText(facts: ShowsNowFacts): string {
+    const kind = facts.kind;
+    const name = facts.name;
+    if (kind.area) {
+        return 'An area draws its category tint, not a preset, so a style rule does not show on ' + name + '.';
+    }
+    // An item with no rule of its own draws by its kind's, and a kind with none draws no rule at all.
+    const unsaved = !facts.unsaved ? ''
+        : facts.own ? ' The map shows the stored rule until this one is whole.'
+            : facts.rule === 'none' ? ' The map draws no rule until this one is whole.' : ' The map shows the kind\'s rule until this one is whole.';
+    const state = facts.state;
+    if (state !== null && (state.commsLost || state.stale)) {
+        return 'Shows now: ' + name + ' shows only as ' + (state.commsLost ? 'Comms lost' : 'Stale') + ' until a fresh value comes.' + unsaved;
+    }
+    if (facts.rule === 'none') {
+        const over = state && state.alarm ? ', but its priority ' + state.alarm.priority + ' alarm shows over it.' : '.';
+        return 'Shows now: ' + name + ' draws as Normal' + over + ' ' + kind.name + ' has no style rule.' + unsaved;
+    }
+    if (state === null) {
+        return 'Shows now: no live values for ' + name + ' yet.' + unsaved;
+    }
+    const by = facts.own ? 'its own rule' : 'the ' + lowerKind(kind) + ' rule';
+    if (facts.rule === 'instruments') {
+        return 'Shows now: by ' + by + ', each segment of ' + name + ' takes the worst of the instruments at its ends. An alarm wins over it.'
+            + unsaved;
+    }
+    const word = NOTE_WORDS[itemPreset(state)] || 'Normal';
+    const alarm = state.alarm ? ', but its priority ' + state.alarm.priority + ' alarm wins over the rule.'
+        : '. An alarm wins over the rule; a stale value shows only as Stale.';
+    return 'Shows now: ' + name + ' is ' + word + ' by ' + by + alarm + unsaved;
 }
 
 /** The line under the Preview item select, after the asset folder: the two things the preview item does (entry 12b2). */
@@ -1034,15 +1098,30 @@ export interface RuleCheck {
     missing: string[];
     /** The rows a sentence names, by their place: their inputs are marked. */
     rows: number[];
+    /** Why the typed tag path of an item's own rule is not taken, in 12c1's words beside its field; absent when it is taken. */
+    path?: string;
 }
 
-function sourceOf(source: RuleSource, missing: string[], needed: boolean): Record<string, unknown> | undefined {
+/** How a rule is checked: a kind's (the default), or one item's own (entry 12c2). */
+export interface RuleOptions {
+    /** An item's own rule: it has a type (None is Reset's), and a typed tag path is a full path (itemOverrides.ts `pathProblem`). */
+    own?: boolean;
+}
+
+/** What the "Not saved yet" note says of an own rule's path that is not full; the field itself carries 12c1's words. */
+export const OWN_PATH_TEXT = 'The tag path is not a full path.';
+
+function sourceOf(source: RuleSource, missing: string[], needed: boolean, full = false): Record<string, unknown> | undefined {
     if (source.from === 'kpi') {
         return { kpi: source.key };
     }
     if (source.from === 'path') {
         if (source.path.trim() === '') {
             missing.push('Type the tag path the rule reads.');
+            return undefined;
+        }
+        if (full && pathProblem(source.path.trim()) !== '') {
+            missing.push(OWN_PATH_TEXT);
             return undefined;
         }
         return { path: source.path.trim() };
@@ -1060,7 +1139,14 @@ function sourceOf(source: RuleSource, missing: string[], needed: boolean): Recor
  * last open above; an expression needs its text. What the Gateway alone can tell (a tag path's form, an expression that cannot
  * be read) it still refuses, with its words beside the field.
  */
-export function checkRule(draft: RuleDraft, kind: Kind): RuleCheck {
+export function checkRule(draft: RuleDraft, kind: Kind, o: RuleOptions = {}): RuleCheck {
+    const check = checkShape(draft, kind, o);
+    const typed = draftSource(draft);
+    const words = o.own === true && typed.from === 'path' && typed.path.trim() !== '' ? pathProblem(typed.path.trim()) : '';
+    return words !== '' ? { ...check, path: words } : check;
+}
+
+function checkShape(draft: RuleDraft, kind: Kind, o: RuleOptions): RuleCheck {
     const missing: string[] = [];
     const rows: number[] = [];
     const mark = (i: number, words: string): void => {
@@ -1070,7 +1156,7 @@ export function checkRule(draft: RuleDraft, kind: Kind): RuleCheck {
         }
     };
     if (draft.type === 'none') {
-        return { rule: null, missing, rows };
+        return o.own === true ? { missing: ['Pick a rule type.'], rows } : { rule: null, missing, rows };
     }
     if (draft.type === 'instruments') {
         return ruleTypes(kind).indexOf('instruments') >= 0 ? { rule: { source: { instruments: 'worst' } }, missing, rows }
@@ -1084,7 +1170,7 @@ export function checkRule(draft: RuleDraft, kind: Kind): RuleCheck {
             mark(i, noun + ' ' + (i + 1) + ': ' + name + ' is not a preset of this kind.');
         }
     };
-    const source = sourceOf(draft.sources[draft.type], missing, draft.type !== 'expression');
+    const source = sourceOf(draft.sources[draft.type], missing, draft.type !== 'expression', o.own === true);
     if (draft.type === 'expression') {
         const expression = draft.expression.trim();
         if (expression === '') {
@@ -1167,9 +1253,9 @@ export function unsavedText(missing: readonly string[]): string {
 }
 
 /** Whether a draft is what is stored: both whole and the same rule, whatever order the stored rule's keys are in. */
-export function sameRule(draft: RuleDraft, stored: Record<string, unknown> | null | undefined, kind: Kind): boolean {
-    const mine = checkRule(draft, kind).rule;
-    const theirs = checkRule(ruleDraft(stored), kind).rule;
+export function sameRule(draft: RuleDraft, stored: Record<string, unknown> | null | undefined, kind: Kind, o: RuleOptions = {}): boolean {
+    const mine = checkRule(draft, kind, o).rule;
+    const theirs = checkRule(ruleDraft(stored), kind, o).rule;
     return mine !== undefined && theirs !== undefined && JSON.stringify(mine) === JSON.stringify(theirs);
 }
 
@@ -1180,6 +1266,80 @@ export function sourceName(source: RuleSource, kpis: readonly KeyValue[]): strin
     }
     const kpi = kpis.find((k) => k.key === source.key);
     return kpi && kpi.label !== '' ? kpi.label : source.key;
+}
+
+// ---- An item's own rule (entry 12c2) ----
+
+/** The types an item's own rule may have: a kind's without None, which is Reset's. */
+export function ownRuleTypes(kind: Kind): RuleType[] {
+    return ruleTypes(kind).filter((t) => t !== 'none');
+}
+
+/** An own rule with nothing in it yet: States, no value and no case, so it says "Not saved yet" until it is built. */
+export const OWN_RULE_EMPTY: RuleDraft = { ...NO_RULE, type: 'states' };
+
+/**
+ * What Override starts an item's own rule from (entry 12c2): a copy of the kind's rule, a path under `{asset.path}` filled for
+ * this item so it is the full path an override takes. An item with no asset, a kind with no rule (or one of no known shape)
+ * and a path that cannot be filled (the asset is not in the asset list) start empty.
+ */
+export function ownRuleStart(kindRule: Record<string, unknown> | null | undefined, view: ItemView): RuleDraft {
+    if (!kindRule || view.assetId === null) {
+        return OWN_RULE_EMPTY;
+    }
+    const draft = ruleDraft(kindRule);
+    if (draft.type === 'none') {
+        return OWN_RULE_EMPTY;
+    }
+    if (draft.type === 'instruments') {
+        return draft;
+    }
+    const source = draft.sources[draft.type];
+    if (source.from !== 'path') {
+        return draft;
+    }
+    const filled = fill(source.path, view);
+    if (filled === null) {
+        return OWN_RULE_EMPTY;
+    }
+    const full: RuleSource = { from: 'path', path: filled };
+    return { ...draft, sources: { states: full, bands: full, expression: full } };
+}
+
+/** A rule in words, read only (entry 12c2, the Style tab's "From kind"): one line, then a line per case with its preset. */
+export interface RuleWords {
+    type: RuleType;
+    /** "Bands on Pressure", "From its instruments: ...", "Well pad has no style rule." */
+    summary: string;
+    /** One per case, in order: "Below 900", "When Status is 2"; for an expression, the presets its text names. */
+    cases: Array<{ label: string; preset: string }>;
+    /** An expression rule's text, '' otherwise. */
+    expression: string;
+}
+
+/** A stored rule said in words for the kind it is of; a rule of no known shape reads as none. */
+export function ruleWords(rule: Record<string, unknown> | null | undefined, kpis: readonly KeyValue[], kind: Kind): RuleWords {
+    const draft = ruleDraft(rule);
+    if (draft.type === 'none') {
+        return { type: 'none', summary: kind.name + ' has no style rule.', cases: [], expression: '' };
+    }
+    if (draft.type === 'instruments') {
+        return { type: 'instruments', summary: 'Each segment takes the worst of the instruments at its ends.', cases: [], expression: '' };
+    }
+    const source = draft.sources[draft.type];
+    const name = sourceName(source, kpis);
+    const on = source.from === 'kpi' ? ' on ' + name : source.from === 'path' ? ' on the tag ' + source.path : '';
+    if (draft.type === 'expression') {
+        return { type: 'expression', summary: 'Expression' + on, cases: expressionPresets(draft.expression, kind).map((p) => ({ label: p, preset: p })),
+            expression: draft.expression };
+    }
+    if (draft.type === 'states') {
+        return { type: 'states', summary: 'States' + on, cases: draft.states.map((r) => ({ label: 'When ' + name + ' is ' + r.value, preset: r.preset })),
+            expression: '' };
+    }
+    const band = (r: BandRow): string => (r.from === '' && r.to === '' ? 'Any value' : r.from === '' ? 'Below ' + r.to
+        : r.to === '' ? 'From ' + r.from + ' up' : 'From ' + r.from + ' up to ' + r.to);
+    return { type: 'bands', summary: 'Bands' + on, cases: draft.bands.map((r) => ({ label: band(r), preset: r.preset })), expression: '' };
 }
 
 /** The presets an expression's text names, in order, each once: its preview tiles (EXPERIENCE.md, Open Question 4). */

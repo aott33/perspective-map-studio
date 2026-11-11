@@ -4,14 +4,14 @@ type: 'feature'
 ticket: ''
 part_of: '12'
 created: '2026-11-10'
-status: 'in-progress'
+status: 'built'
 baseline_revision: 'f0fa1307db66d3b054c2c34464f44df54eac0504'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md', '{project-root}/docs/kind-setup.md']
 ---
@@ -67,12 +67,12 @@ Decisions (owner, 2026-11-10, "go with recommended, approve and continue"): (1) 
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `web/typescript/studio/RuleEditor.tsx` (new) from `KindSetupPanel.tsx`, the kind panel using it -- no change of behaviour, markup or hooks; the 12b1 and 12b2 Jest and e2e pass untouched -- T12, before anything else.
-- [ ] `kindSetup.ts`, `itemOverrides.ts`, with Jest -- the full-path option, the `styleRule` row of an override, the copy of the kind's rule for an item, the labels and refusal placement for a rule, the item's "shows now" words -- T4 to T11.
-- [ ] `MapStudioStoreDelegate.ts` -- the rule through `editOverride`, its refusal with its place -- T4, T5, T7, T10, T11.
-- [ ] `studio/PropertiesPanel.tsx`, `MapStudio.tsx`, `mapstudio.css` -- the tab list, the Style tab, the scroll into section 6; hooks `.mapstudio-panel-tab[data-tab]`, `.mapstudio-style`, `.mapstudio-style-rule[data-own]`, `.mapstudio-style-override`, `.mapstudio-style-reset`, `.mapstudio-style-kind` -- T1 to T9.
-- [ ] `e2e/tests/itemstyle.spec.mjs` (new) -- T1 to T11 at 1366 px, the seed put back; screenshots of the tab from the kind, overridden and not saved yet.
-- [ ] Docs (`docs/kind-setup.md`, `docs/contract.md`, `CHANGELOG.md`) and playbook section 8o.
+- [x] `web/typescript/studio/RuleEditor.tsx` (new) from `KindSetupPanel.tsx`, the kind panel using it -- no change of behaviour, markup or hooks; the 12b1 and 12b2 Jest and e2e pass untouched -- T12, before anything else.
+- [x] `kindSetup.ts`, `itemOverrides.ts`, with Jest -- the full-path option, the `styleRule` row of an override, the copy of the kind's rule for an item, the labels and refusal placement for a rule, the item's "shows now" words -- T4 to T11.
+- [x] `MapStudioStoreDelegate.ts` -- the rule through `editOverride`, its refusal with its place -- T4, T5, T7, T10, T11.
+- [x] `studio/PropertiesPanel.tsx`, `MapStudio.tsx`, `mapstudio.css` -- the tab list, the Style tab, the scroll into section 6; hooks `.mapstudio-panel-tab[data-tab]`, `.mapstudio-style`, `.mapstudio-style-rule[data-own]`, `.mapstudio-style-override`, `.mapstudio-style-reset`, `.mapstudio-style-kind` -- T1 to T9.
+- [x] `e2e/tests/itemstyle.spec.mjs` (new) -- T1 to T11 at 1366 px, the seed put back; screenshots of the tab from the kind, overridden and not saved yet.
+- [x] Docs (`docs/kind-setup.md`, `docs/contract.md`, `CHANGELOG.md`) and playbook section 8o.
 
 **Acceptance Criteria:**
 - Given P12 on the dev stack, when its rule is overridden in the Style tab, then P12 alone draws by it at the next live update in every open map, and Reset returns it to the kind's rule.
@@ -81,10 +81,42 @@ Decisions (owner, 2026-11-10, "go with recommended, approve and continue"): (1) 
 ## Implementation Notes
 
 - Planner, 2026-11-10: the environment, commit and identity rules are entry 8's plan's (Docker by hand after a restart, JDK 17 by apt if gone, `ops/up.sh --fresh` before a whole-suite run, no em dashes, never a bare `git stash`, never a push). Leave the work uncommitted: the orchestrator commits after the whole suite.
+- Builder, 2026-11-10: built as planned, uncommitted. Picks made where the plan left room, each for the owner's eye:
+  - **The shared editor owns the draft and is handed how to save** (`studio/RuleEditor.tsx`): the kind panel gives it the one-part save at the version the draft is in step with, the item's panel the item's override save. Section 6's own element (its heading, the tints, the Live now note) stays the kind panel's, drawn around the editor, so its markup, classes and hooks are as built; the 12a, 12b1 and 12b2 Jest and e2e pass with no change to them.
+  - **Both tab panels stay mounted while the item is selected**, the one not chosen hidden, so a rule being built is kept across the tabs "until the item is left". The Style panel is `.mapstudio-style`, not a second `.mapstudio-panel-body`, so every existing spec's Details selectors still match one element.
+  - **An item just placed shows Details** until a tab is chosen: its panel opens with the cursor in Name (owner, 2026-11-04), which is Details'. The remembered tab is not changed by it.
+  - **"An unlinked item starts empty" is read literally**: an item with no asset starts empty whatever the kind's rule reads (a key value too); a linked item whose asset is not in the asset list starts empty only when the kind's rule reads a path under `{asset.path}`, which cannot be filled then.
+  - **An empty start** opens the editor on States with no value and no case ("Not saved yet. Pick the value the rule reads. Add a case."), no tag beside the label until it is stored, and **Keep the kind's rule** to give it up (not in the plan's hooks: `.mapstudio-style-keep`).
+  - **The value select** lists the kind's key values and "A tag path" (decision 3 read with Boundaries' "its typed path must be a full path"); a path that is not full shows 12c1's words under the field and "Not saved yet. The tag path is not a full path." in the note.
+  - **Esc in a typed field of the rule stays in the field** (the panel is not closed under a draft); Esc anywhere else in the tab closes the panel as ever.
+  - **Edit the kind's rule** scrolls section 6 into view and puts the focus on its chosen rule type.
+  - **The kind's rule in words**: "States on the tag {asset.path}/Status", then per case its tile, "When the value is 1" and the preset's name; Bands read "Below 50", "From 50 up to 200", "From 200 up"; an expression shows its text and the presets it names.
+  - **Size and Label**: "One size: every point's marker is the same size.", "Its width follows its diameter; a line with no diameter draws thin.", "One outline: an area has no size of its own."; Label is the item's name. Each row says it comes from the project's kind list and is not changed here, as Boundaries ask.
+  - **Shows now**: "Shows now: Point 1 is Fault by its own rule. An alarm wins over the rule; a stale value shows only as Stale." ("by the well pad rule" from the kind; "..., but its priority 1 alarm wins over the rule." with an alarm).
+  - **A fourth render**, the read-only rows, beside the three the plan names (the panel is too short at 1366 by 768 to show the rows and the rule at once).
+  - **Not done:** as 12c1, a replayed or applied-on-top override's Undo step reads "edit <name>".
+- Builder, 2026-11-10, verified: `cd web && npx tsc --noEmit && npx jest`: clean, 987 tests in 75 suites (954 in 74 before). `./gradlew clean build --offline --rerun-tasks` on JDK 17: BUILD SUCCESSFUL. `bash scripts/ci/check-contract-versions.sh`: OK at 0.4.0. `ops/up.sh --fresh`, then the whole e2e suite: 313 passed, 8 skipped (the opt-in ones), 0 failed in 1.1 h, `itemstyle.spec.mjs` 2 of 2 and `kinds`, `kindstyle`, `kindpreview` and `overrides` untouched and green. The four renders are in `docs/screenshots/mapstudio-itemstyle-*-1366.png` for the owner's look against DESIGN.md's Properties panel prose (the plan's manual check, still open).
+- Builder, 2026-11-10, after review: an own rule's draft carries the item version it was last in step with the stored rule (the base follows the item's version while the stored rule is unchanged) and its save goes at that version, so a rule another editor stored meanwhile is a conflict with the ordinary card (`itemstyle.spec.mjs`, the two-editors case; the delegate's Jest); the Gateway's "overrides.styleRule.expression: ..." is placed beside the expression; a refusal is recorded before its batch is let go; a just-placed item no longer changes the remembered tab; "Shows now" for a kind with no rule says the map draws no rule meanwhile; the editor is told when a save was not taken. Covering Jest suites and `itemstyle.spec.mjs` (3 of 3) pass; the whole suite was not rerun by the builder.
 
 ## Plan Change Log
 
 ## Review Triage Log
+
+### Pass 1 (quick lens and the builder's own report, 2026-11-10): 9 findings - 1 high, 2 medium, 6 low; 7 patches, 1 rejected, 1 to the owner
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---|---|---|---|
+| 0 | (the builder's report) An own rule finished after another editor changed the item's rule is sent at the item's newest version and replaces theirs with no conflict | high | patch | The same loss 12b1's finding 1 closed for a kind's rule; the Design Notes did not mean a draft may outlive the version it was built on. Fix: the own rule's draft carries the item version it was last in step with, and its save goes at that version, so the ordinary conflict card answers. |
+| 1 | An unreadable expression in an own rule is not placed beside the expression field: the Gateway words it "overrides.styleRule.expression: ...", and `refusalRest` strips only "overrides: " | medium | patch | Confirmed against `WriteService.checkExpression(..., "overrides.styleRule")` and `WriteServiceKindCheckTest.java:90`; the Jest case used a form the Gateway never sends. Fix: both forms placed, the test on the real words. |
+| 2 | `overrideRefused` discards the batch (which notifies) before it records the refusal, so the panel can see the own rule gone with no refusal and close the editor | low | patch | The order is as described; whether a render falls between is not settled by reading, and recording first costs nothing. |
+| 3 | Placing an item writes Details into the one remembered tab, so Style is lost for every later selection | low | patch | Confirmed in `focusName`. Fix: a just-placed item shows Details without changing the remembered tab. |
+| 4 | "Shows now" contradicts itself for a kind with no rule while an own rule is half built | low | patch | Confirmed in `showsNowText`: the suffix is chosen from `own` alone. |
+| 5 | The Style tab's `onSend` always answers true, so a save that was not taken leaves the editor waiting for good | medium | patch | Confirmed: `onStyleRule` drops `editOverride`'s answer. Fix: the real answer passed back. |
+| 6 | Kinds' count of the rule fields drawn can lag the shared editor's draft by one render, so a case refusal may show at the top and beside its row, or in neither, until the next render | low | rejected | Real in principle, but it lasts one render in a case that needs a refusal and a change of the rule's shape together; closing it means the editor reporting what it drew, more than a correction. |
+| 7 | A doc comment now sits on the wrong field in `MapStudio.tsx` | low | patch | Confirmed. |
+| 8 | Override on an unlinked item starts empty even when the kind's rule needs no asset (its instruments, a key value, a full path) | low | to the owner | The frozen text says "an unlinked item ... starts empty"; decision 1 says the copy saves at once. Asked of the owner; as built until answered. |
+
+Outcome (2026-11-11): seven patches applied (findings 0 to 5 and 7), finding 6 rejected, finding 8 with the owner and as built until answered (an unlinked item's Override starts empty). The orchestrator's Verification on the final code: tsc clean, Jest 989 passed, Gradle clean build offline passed, contract check OK, `ops/up.sh --fresh` and the whole e2e suite 314 passed, 0 failed, 8 skipped (the env-gated scenarios); no existing Jest or e2e file changed, so Kinds' section 6 passes every 12b1 and 12b2 test as it was (T12). No Gateway, `common/` or Ignition file changed. Status built; entry 12 (12a, 12b1, 12b2, 12c1, 12c2) is built.
 
 ## Design Notes
 

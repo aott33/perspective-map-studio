@@ -4322,6 +4322,165 @@ textarea.mapstudio-input.mapstudio-rule-expression {
     cursor: default;
 }
 
+/* The properties panel's two tabs and the Style tab (entry 12c2; DESIGN.md Properties panel and tabs, panel-tabs, Override
+   tag): Details and Style as a tab list, one tab stop, the active tab underlined in the attention token; the panel not chosen
+   is hidden and stays mounted. Style holds three read-only rows (Icon, Size, Label), then the style rule under its section
+   label with the neutral "From kind" tag, or the override tag and Reset: the kind's rule in words with a 64 px tile per case
+   and two buttons, or the item's own rule in the shared editor (the rule editor's own classes, as in Kinds); one note box under
+   it says what the item shows now. Targets are 24 px at least (WCAG 2.2). Tokens only. */
+.mapstudio-panel-body[hidden],
+.mapstudio-style[hidden] {
+    display: none;
+}
+
+.mapstudio-panel-tabs > .mapstudio-panel-tab {
+    min-width: 24px;
+    min-height: 24px;
+}
+
+.mapstudio-panel-tabs > .mapstudio-panel-tab:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -2px;
+}
+
+.mapstudio-style {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+    padding: 8px 16px 76px;
+    overflow-y: auto;
+}
+
+.mapstudio-style-row {
+    gap: 2px;
+}
+
+.mapstudio-style-value {
+    color: var(--label);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-style-rule {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--mapstudio-divider);
+}
+
+.mapstudio-style-rule-head {
+    min-height: 24px;
+}
+
+.mapstudio-style-rule-head .mapstudio-livenow-heading {
+    margin-right: auto;
+}
+
+.mapstudio-style-rule-head .mapstudio-kindsetup-tag {
+    margin-left: 0;
+}
+
+.mapstudio-style-rule-head .mapstudio-override-tag,
+.mapstudio-style-rule-head .mapstudio-override-reset {
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.mapstudio-style-kindrule {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.mapstudio-style-summary {
+    color: var(--label);
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-style-expression {
+    padding: 6px 8px;
+    border: 1px solid var(--mapstudio-divider);
+    border-radius: 6px;
+    color: var(--label);
+    font-size: 11px;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.mapstudio-style-kindcases {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.mapstudio-style-kindcase {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.mapstudio-style-kindcase-text {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    color: var(--label);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-style-kindcase-preset {
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+}
+
+.mapstudio-style-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.mapstudio-button.mapstudio-style-kind,
+.mapstudio-button.mapstudio-style-override,
+.mapstudio-button.mapstudio-style-keep {
+    min-height: 24px;
+}
+
+.mapstudio-button.mapstudio-style-keep {
+    align-self: flex-start;
+}
+
+.mapstudio-button.mapstudio-style-override:disabled,
+.mapstudio-button.mapstudio-style-keep:disabled {
+    opacity: 0.42;
+    cursor: default;
+}
+
+.mapstudio-style-shows {
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--mapstudio-hover);
+    color: var(--label);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-style select.mapstudio-input:disabled,
+.mapstudio-style textarea.mapstudio-input:disabled,
+.mapstudio-style .mapstudio-input:disabled {
+    color: var(--label--disabled);
+    cursor: not-allowed;
+}
+
 .mapstudio-input.mapstudio-override-input {
     height: 28px;
     font-family: monospace;

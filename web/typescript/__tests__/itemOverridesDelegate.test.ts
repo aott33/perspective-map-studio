@@ -234,3 +234,102 @@ describe('a kind change drops the overrides in the same save (L9, owner decision
         expect(last().body.ops[0].data).toEqual({ kind: 'tank', properties: {}, overrides: {} });
     });
 });
+
+describe('the item\'s own style rule is the styleRule row (entry 12c2: T4, T5, T7, T10, T11)', () => {
+    const OWN = { source: { path: '[default]Mesa/P12/Status' }, type: 'states', cases: [{ value: 1, preset: 'fault' }] };
+
+    test('T4, T10: a rule is one update of the whole overrides with only styleRule set, an Undo step named for the style rule', () => {
+        expect(delegate.editOverride('p12', 'styleRule', OWN, '')).toBe(true);
+        expect(last().body.ops).toEqual([{ op: 'update', entity: 'item', id: 'p12', baseVersion: 3, data: { overrides: { styleRule: OWN } } }]);
+        // Marked Override at once, from the batch in flight.
+        expect(state().inFlightOverrides).toEqual({ p12: { styleRule: OWN } });
+        save(last());
+        expect(record('p12').overrides).toEqual({ styleRule: OWN });
+        expect(undoLabel(state().undo)).toBe("Undo: change P12's style rule");
+        delegate.undo();
+        expect(last().body.ops[0].data).toEqual({ overrides: {} });
+        save(last());
+        expect(record('p12').overrides).toEqual({});
+    });
+
+    test('T5: Reset removes the rule alone, named "reset"; one with no rule sends nothing', () => {
+        expect(delegate.editOverride('p2', 'styleRule', null, '')).toBe(true);
+        expect(last().body.ops[0]).toMatchObject({ id: 'p2', baseVersion: 5, data: { overrides: { link: '/other' } } });
+        save(last());
+        expect(undoLabel(state().undo)).toBe("Undo: reset Point 2's style rule");
+        const before = sent().length;
+        expect(delegate.editOverride('p12', 'styleRule', null, '')).toBe(false);
+        expect(sent()).toHaveLength(before);
+    });
+
+    test('T11: the path overrides and every other stored part pass through a rule edit, those still in flight too', () => {
+        delegate.editOverride('p12', 'kpi:pressure', P14_PRESSURE, 'Pressure');
+        const first = last();
+        delegate.editOverride('p12', 'styleRule', OWN, '');
+        expect(state().inFlightOverrides.p12).toEqual({ kpis: [{ key: 'pressure', path: P14_PRESSURE }], styleRule: OWN });
+        save(first);
+        expect(last().body.ops[0]).toMatchObject({ baseVersion: 4, data: { overrides: { kpis: [{ key: 'pressure', path: P14_PRESSURE }], styleRule: OWN } } });
+        save(last());
+        // A changed rule on Point 2 keeps its stored link; the same rule again sends nothing.
+        delegate.editOverride('p2', 'styleRule', OWN, '');
+        expect(last().body.ops[0].data).toEqual({ overrides: { styleRule: OWN, link: '/other' } });
+        save(last());
+        const before = sent().length;
+        expect(delegate.editOverride('p2', 'styleRule', { ...OWN }, '')).toBe(false);
+        expect(sent()).toHaveLength(before);
+    });
+
+    test('T7: a refusal stands beside the part of the rule it names, the entry leaves the queue and the stored overrides stand', () => {
+        delegate.editOverride('p12', 'styleRule', OWN, '');
+        const edit = last();
+        refuse(edit, 'invalid', 'Op 0 (p12): overrides: styleRule.cases[0].preset: Pick a preset: normal, attention, warning, fault, dimmed.');
+        expect(state().overrideRefusals).toEqual({ p12: { row: 'styleRule', words: 'Pick a preset: normal, attention, warning, fault, dimmed.', path: '',
+            code: 'invalid', batchId: edit.body.batchId, at: 'styleRule.cases.0' } });
+        expect(state().unsaved).toEqual([]);
+        expect(state().inFlightOverrides).toEqual({});
+        expect(record('p12').overrides).toEqual({});
+        // A refusal that names no part of the rule stands in the rule's own box; the next rule sent clears it.
+        delegate.editOverride('p12', 'styleRule', { ...OWN, cases: [{ value: 2, preset: 'fault' }] }, '');
+        expect(state().overrideRefusals).toEqual({});
+        refuse(last(), 'role', 'Editing needs the full editing role.');
+        expect(state().overrideRefusals.p12).toMatchObject({ row: 'styleRule', at: 'styleRule', words: 'Editing needs the full editing role.' });
+        // A conflict is the conflict card's, as any item edit's.
+        delegate.clearOverrideRefusal('p12');
+        delegate.editOverride('p12', 'styleRule', OWN, '');
+        refuse(last(), 'conflict', 'P12 was changed.');
+        expect(state().overrideRefusals).toEqual({});
+        expect(state().unsaved).toHaveLength(1);
+    });
+
+    test('a rule built on an older version of the item goes at that version, so another editor\'s rule since is a conflict', () => {
+        // Another editor's rule arrives while this one is half built: the item is at version 4, the draft in step at 3.
+        delegate.handleEvent(MESSAGE_EVENT, { v: 1, type: MessageTypes.MAP_CHANGED, id: 'c1', body: { seq: 1,
+            ops: [{ op: 'update', entity: 'item', id: 'p12', version: 4, record: { ...P12, overrides: { styleRule: RULE }, version: 4 } }] } });
+        expect(record('p12').version).toBe(4);
+        expect(delegate.editOverride('p12', 'styleRule', OWN, '', 3)).toBe(true);
+        expect(last().body.ops[0]).toMatchObject({ id: 'p12', baseVersion: 3, data: { overrides: { styleRule: OWN } } });
+        refuse(last(), 'conflict', 'P12 was changed.');
+        // The conflict card's, not a refusal of the rule: the batch stays in the queue and their rule stands.
+        expect(state().overrideRefusals).toEqual({});
+        expect(state().unsaved).toHaveLength(1);
+        expect(record('p12').overrides).toEqual({ styleRule: RULE });
+        // With no base, or one that is not older, it goes at the newest version.
+        delegate.editOverride('p2', 'styleRule', OWN, '');
+        expect(last().body.ops[0]).toMatchObject({ id: 'p2', baseVersion: 5 });
+    });
+
+    test('an expression the Gateway cannot read stands beside the expression, in its words without their prefix', () => {
+        delegate.editOverride('p12', 'styleRule', { type: 'expression', expression: '{pressure} > 1' }, '');
+        refuse(last(), 'invalid', 'Op 0 (p12): overrides.styleRule.expression: the expression could not be read: a style rule may'
+            + ' reference {value} only, not {pressure}');
+        expect(state().overrideRefusals.p12).toMatchObject({ row: 'styleRule', at: 'styleRule.expression',
+            words: 'the expression could not be read: a style rule may reference {value} only, not {pressure}' });
+    });
+
+    test('a value of the wrong kind for its row is dropped: a path is not a rule, and a rule is not a path', () => {
+        const before = sent().length;
+        expect(delegate.editOverride('p12', 'styleRule', '[default]Mesa/P12/Status', '')).toBe(false);
+        expect(delegate.editOverride('p12', 'comms', OWN, 'Comms')).toBe(false);
+        expect(sent()).toHaveLength(before);
+    });
+});

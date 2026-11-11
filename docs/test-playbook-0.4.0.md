@@ -2,7 +2,7 @@
 
 A walk through what epic 4 has built so far, grouped by what you do, on the local development stack. Tick each box and note anything that looks or feels off in the Notes line under each section (a screenshot helps). Each note goes into `_bmad-output/initiative-flowmap/tickets/epic-editing/epic-editing.md` Notes or a new entry. The playbook grows as entries land; entry 18 (the 0.4.0 release) finishes it for the release test and the 30-minute test.
 
-Built so far (2026-11-10): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems) and 11a (the edit record, Gateway only). Also built: 11b (Recent changes and History), 12a (the Kinds surface and a kind's setup), 12b1 (the style rule editor and area tints, section 8l) 12b2 (the preview item on the map and the Live now note, section 8m) and 12c1 (Details' Live now block and path overrides, section 8n). Still to come: 12c2 (the Style tab and an item's own style rule), 13 (the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
+Built so far (2026-11-10): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems) and 11a (the edit record, Gateway only). Also built: 11b (Recent changes and History), 12a (the Kinds surface and a kind's setup), 12b1 (the style rule editor and area tints, section 8l) 12b2 (the preview item on the map and the Live now note, section 8m) 12c1 (Details' Live now block and path overrides, section 8n) and 12c2 (the Style tab and an item's own style rule, section 8o). Still to come: 13 (the tag browser), 19 and 20 (units), 17 (sweep), 18 (release).
 
 ## Results so far
 
@@ -30,6 +30,7 @@ Built so far (2026-11-10): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item li
 | 8l. The style rule editor and area tints | | |
 | 8m. The preview item on the map | | |
 | 8n. Live now and path overrides | | |
+| 8o. The Style tab and an item's own style rule | | |
 | 9. View mode, unchanged | | |
 | 10. Phone (390 px) | | |
 | 11. Designer | | |
@@ -378,9 +379,32 @@ On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor
 - [ ] Override Comms with `[default]Mesa/P14/Comms` and Alarms with `[default]Mesa/P14`: each saves and reads Override. Press **Reset** on each: each reads "From kind" with Point 1's own path, and Undo reads "Undo: reset Point 1's alarms path".
 - [ ] Press **Reset** on Pressure: it reads "From kind", Flow is still overridden, and within ten seconds Pressure reads "400 psi" here and on `/live`. Press **Reset** on Flow: no row reads Override, and the Well pad header in Kinds counts one override again.
 - [ ] Select **Pad 1** (a pad with no asset): the paths read as the kind has them (`{asset.path}/Comms`, ...) with the note "Not linked, so the paths show as the kind has them. Linking an asset fills them." Override Comms with `[default]Mesa/P14/Comms`: it saves and reads Override. Reset it.
-- [ ] Select **Point 2** (it has its own style rule): no row of its Live now block reads Override, since the block shows tag paths only (the item's own rule is the Style tab's, entry 12c2).
+- [ ] Select **Point 2** (it has its own style rule): no row of its Live now block reads Override, since the block shows tag paths only (the item's own rule is the Style tab's, section 8o).
 - [ ] Select **PT-1** (a tap) and override its Comms with `[default]Mesa/PT2/Comms`. Change **Kind** to Meter: Live now reads "Meter has no setup yet, so its items show no live values." with the button **Open Meter's setup**. Press it: Kinds opens at Meter. Open **Items**: PT-1 is still selected. Press **Undo** once: the kind is Tap again and Comms reads Override, so the kind change took the override with it and one Undo brought both back. Reset Comms.
 - [ ] Tab through the block: every Override, Change and Reset is reached in order and pressed with Enter or Space, and the focus ring is visible.
+
+## 8o. The Style tab and an item's own style rule
+
+On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor, with a second browser on `/live` (its **Status** buttons drive P12, the asset of **Point 1**, and it is another open map to compare with). There is no mock of the Style tab: compare it with DESIGN.md's Properties panel and tabs and Override tag, and with the renders of [the read-only rows](screenshots/mapstudio-itemstyle-rows-1366.png), the rule [from the kind](screenshots/mapstudio-itemstyle-fromkind-1366.png), [overridden](screenshots/mapstudio-itemstyle-override-1366.png) and [not saved yet](screenshots/mapstudio-itemstyle-unsaved-1366.png). First press **Status 0** on `/live`.
+
+- [ ] Select **Point 1**: under the header stand two tabs, **Details** (underlined) and **Style**. Press **Style**: it is underlined and Details' fields give way to the Style tab. Click the Style tab, then press the Left and Right arrow keys: the tabs change with the keys and the focus ring follows; Tab leaves the tab list in one press.
+- [ ] Select **Point 3**: its panel opens on Style. Open **Kinds**, then **Items**: Point 3's panel is back, still on Style. Select **Point 1** again.
+- [ ] The tab reads Icon (the well pad glyph and `well-pad`), Size ("One size: every point's marker is the same size.") and Label ("Point 1"), each with a line saying it comes from the project's kind list and is not changed here; none of them is a field.
+- [ ] Under **STYLE RULE** with a grey "From kind" tag: "States on the tag {asset.path}/Status" and four rows, each a tile of the pad in its preset with "When the value is 1" to "4" (attention, warning, fault, dimmed). Under them a line: "Shows now: Point 1 is Normal by the well pad rule. An alarm wins over the rule; a stale value shows only as Stale."
+- [ ] Press **Edit the kind's rule**: Kinds opens at Well pad with "6 STYLE RULE" in view. Open **Items**: Point 1 is still selected, on Style.
+- [ ] Press **Override**: the header says Saved at once, the rule reads **Override** with a **Reset** link, and the rule editor shows States, the value "A tag path" with `[default]Mesa/P12/Status`, and the kind's four cases. There is no None type, no save button and no toast. Hover **Undo**: "Undo: change Point 1's style rule".
+- [ ] Change the preset of the first case (value 1) to **fault**: it saves at once. On `/live` press **Status 1**: within ten seconds Point 1 draws as Fault on this map and on `/live`, and the line reads "Shows now: Point 1 is Fault by its own rule. ..." The other pads are as they were.
+- [ ] Open **Kinds** and choose **Well pad**: the subline counts it, "... - 2 overrides (Point 1 style rule, Point 2 style rule)". Open **Items**.
+- [ ] In the tag path field type `{asset.path}/Status` and press Enter: under it, "an override's tag path is a full path such as [default]Mesa/P12/Pressure, not {asset.path}/Status.", and the note "Not saved yet. The tag path is not a full path." Nothing was saved. Press Esc in the field: the panel stays open. Type `[default]Mesa/P12/Status` back and press Enter: both notes go.
+- [ ] Press **Add a case**, type 5 as its value and press Enter: "Not saved yet. Case 5 has no preset.", and the line under the rule ends "The map shows the stored rule until this one is whole." Press **Details**, then **Style**: the fifth case is still there. Press **Bands**, then **States**: the five cases are back as typed. Pick **warning** for case 5: it saves at once.
+- [ ] Press **Undo**: case 5 goes. Press **Redo**: it is back. Open **History**: rows read "Changed Point 1's style rule", each with Revert. Open **Items**.
+- [ ] Press **Reset**: the rule reads "From kind" again with the kind's rule in words, the focus is on Override, Undo reads "Undo: reset Point 1's style rule", and within ten seconds Point 1 draws as Attention (the kind's rule for status 1) here and on `/live`. Press **Status 0** on `/live`.
+- [ ] Select **Point 2**: its Style tab shows its own rule marked Override: Expression, the tag path `[default]Mesa/P14/Pressure`, the text `if({value} > 600, 'warning', 'normal')` and the tiles of the presets it names.
+- [ ] Select **L-SWD**: Size reads "Its width follows its diameter; a line with no diameter draws thin.", and its own rule is **From its instruments**, marked Override, with "Each segment takes the worst of the instruments at its ends."
+- [ ] Select **Pad 1** (a pad with no asset) and press **Override**: nothing is saved; the editor opens empty with "Not saved yet. Pick the value the rule reads. Add a case." and **Keep the kind's rule**. Press it: the rule reads "From kind" again.
+- [ ] Tab through the Style tab with an own rule open: Reset, the types, the value, every case's field, preset and Remove are reached in order, and the focus ring is visible.
+
+Notes:
 
 ## 9. View mode, unchanged
 

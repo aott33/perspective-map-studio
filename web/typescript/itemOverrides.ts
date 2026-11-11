@@ -110,9 +110,17 @@ export function pathProblem(path: string): string {
 const OP_PREFIX = /^Op \d+(?: \(.*?\))?: /;
 const PART_PREFIX = /^(?:comms\.path|alarms\.path|kpis\[\d+\]\.path): /;
 
+/**
+ * A Gateway refusal of an override without "Op N (id): overrides: ", or "overrides." as the Gateway writes an own rule's
+ * expression it cannot read ("overrides.styleRule.expression: ..."): its part's name, when it names one, still leads.
+ */
+export function refusalRest(message: string): string {
+    return message.replace(OP_PREFIX, '').replace(/^overrides(?:: |\.)/, '');
+}
+
 /** A Gateway refusal of an override as it stands beside the field: without "Op N (id): overrides: " and the part's name. */
 export function refusalWords(message: string): string {
-    return message.replace(OP_PREFIX, '').replace(/^overrides: /, '').replace(PART_PREFIX, '');
+    return refusalRest(message).replace(PART_PREFIX, '');
 }
 
 /** One row of the Live now block. */
@@ -308,6 +316,27 @@ export function applyRowEdit(newest: Record<string, unknown> | null | undefined,
     return { ...overrides, kpis: rows.map((r) => (isRecord(r) && r.key === key ? { ...r, path } : r)) };
 }
 
+/** The row id of an item's own style rule (entry 12c2): the Style tab's one override. */
+export const RULE_ROW = 'styleRule';
+
+/**
+ * The newest overrides with the item's own style rule set (a whole rule, which replaces the kind's for this item) or taken away
+ * (null, Reset). Every other value is the stored object itself, and an edit that changes nothing returns `newest` itself.
+ */
+export function applyRuleEdit(newest: Record<string, unknown> | null | undefined, rule: Record<string, unknown> | null): Record<string, unknown> {
+    const overrides = newest || {};
+    if (rule === null) {
+        return withoutKey(overrides, RULE_ROW);
+    }
+    return same(overrides[RULE_ROW], rule) ? overrides : { ...overrides, [RULE_ROW]: rule };
+}
+
+/** The item's own style rule when the Gateway applies it (entry 12c2), else null: the kind's rule draws the item. */
+export function ownRule(overrides: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
+    const rule = (overrides || {})[RULE_ROW];
+    return ruleApplied(rule) ? rule as Record<string, unknown> : null;
+}
+
 /** Whether two overrides hold the same values (an edit that changed nothing sends nothing). */
 export function sameOverrides(a: Record<string, unknown> | null | undefined, b: Record<string, unknown> | null | undefined): boolean {
     return a === b || JSON.stringify(a || {}) === JSON.stringify(b || {});
@@ -460,6 +489,11 @@ export function overrideSentence(name: string, changes: readonly OverrideChange[
 /** Undo's words for one row's override: "change Point 2's Pressure path", "reset Point 2's comms path". */
 export function overrideLabel(reset: boolean, name: string, rowName: string): string {
     return (reset ? 'reset ' : 'change ') + name + "'s " + rowName + ' path';
+}
+
+/** Undo's words for an item's own style rule (entry 12c2): "change Point 2's style rule", "reset Point 2's style rule". */
+export function ruleLabel(reset: boolean, name: string): string {
+    return (reset ? 'reset ' : 'change ') + name + "'s style rule";
 }
 
 /** A row's name inside a sentence: the key value's label as it is, "comms" and "alarms" in lower case. */
