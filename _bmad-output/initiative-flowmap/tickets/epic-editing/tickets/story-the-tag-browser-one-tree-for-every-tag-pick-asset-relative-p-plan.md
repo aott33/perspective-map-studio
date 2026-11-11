@@ -3,7 +3,7 @@ title: "13a: one tag path rule on the Gateway, the items a path fails for, and t
 type: 'feature'
 ticket: '13'
 created: '2026-11-11'
-status: 'draft'
+status: 'ready-for-dev'
 baseline_revision: ''
 route: 'full'
 route_source: 'auto'
@@ -23,7 +23,7 @@ context: ['{project-root}/docs/contract.md', '{project-root}/docs/kind-setup.md'
 
 **Approach:** Make the save rule the resolve rule (`TagPaths`), once, for every stored tag path; report the stored rows it would refuse without rewriting them; add the failing items to `tags.resolve.reply` (backlog 39) and show them in the resolve note; settle how a stopped provider answers; and add the dev tag fixtures.
 
-Decisions (owner, 2026-11-11, "go with recommended"): entry 13 is split: this plan (the Gateway), 13b (the browser card and tree, with picks into a kind's key values, Comms and Alarms), 13c (the other pickers and the Path field's conversion). (1) The failing items are added now, while contract 0.4.0 is unreleased. (2) The Gateway logs, when it starts, each stored setup or override the rule would refuse, and a test proves both seeds pass. (3) Kind setups, popup params and item overrides are tightened together. (4) A provider that is listed but does not answer reads as unavailable, checked live. (5) and (6) are 13b's (a folder may be picked for Alarms only; the type column shows what the Gateway sends).
+Decisions (owner, 2026-11-11, "go with recommended", then "approve and continue" on the plan): entry 13 is split: this plan (the Gateway), 13b (the browser card and tree, with picks into a kind's key values, Comms and Alarms), 13c (the other pickers and the Path field's conversion). (1) The failing items are added now, while contract 0.4.0 is unreleased. (2) The Gateway logs, when it starts, each stored setup or override the rule would refuse, and a test proves both seeds pass. (3) Kind setups, popup params and item overrides are tightened together. (4) A provider that is listed but does not answer reads as unavailable, checked live. (5) and (6) are 13b's (a folder may be picked for Alarms only; the type column shows what the Gateway sends).
 
 ## Boundaries & Constraints
 
