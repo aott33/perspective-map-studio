@@ -4,8 +4,8 @@ type: 'feature'
 ticket: ''
 part_of: '13'
 created: '2026-11-11'
-status: 'ready-for-dev'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: '559c609e3cf3a1a8de086c228f041b16bf7c9cfd'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
@@ -83,6 +83,8 @@ Decisions (owner, 2026-11-11, "approved and continue" on the plan and its eleven
 - Given a viewer or a phone editor, when the map is open, then no tag button is drawn and no `tags.browse` is sent.
 
 ## Implementation Notes
+
+- Planner, 2026-11-11: the environment and identity rules are entry 8's plan's (Docker by hand after a restart: `rm -f /var/run/docker.pid /var/run/docker/containerd/containerd.pid; nohup dockerd > <scratch>/dockerd.log 2>&1 &`, wait 15 s, then `ops/up.sh`; JDK 17 at `/usr/lib/jvm/java-17-openjdk-amd64`; `ops/up.sh --fresh` after any `ops/config` change and before a whole-suite run; `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium` and `--trace off` for e2e; no em dashes; never a bare `git stash`; never a push; never name a competitor's product or vendor). Leave the work uncommitted: the orchestrator commits after the whole suite. Run the new spec and the specs you touch, not the whole suite (1.2 hours; the orchestrator runs it). ignition-lint is not installed here: say so, do not tick a lint task. The Code Map's line numbers are a guide; find the symbols by name. `tags.resolve` already answers a full path below the asset's base path as `{asset.path}/<suffix>` with `relative: true` (`docs/contract.md`, "tags.resolve").
 
 ## Plan Change Log
 
