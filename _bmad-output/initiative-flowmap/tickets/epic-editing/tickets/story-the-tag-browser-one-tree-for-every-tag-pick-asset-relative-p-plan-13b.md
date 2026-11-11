@@ -4,7 +4,7 @@ type: 'feature'
 ticket: ''
 part_of: '13'
 created: '2026-11-11'
-status: 'draft'
+status: 'ready-for-dev'
 baseline_revision: ''
 route: 'full'
 route_source: 'auto'
@@ -26,7 +26,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 
 Decisions (owner, 2026-11-11, "go with recommended"): entry 13 is split three ways; this is the card, the tree and the kind setup's three sections. A folder may be picked for Alarms only. The type column shows what the Gateway sends, with no value-source column.
 
-Planner's picks, for the owner's approval: (1) a tag row's type reads "Tag", the others "Folder", "UDT instance", "UDT type", "Other"; the data type as sent. (2) The Path field shows the picked row's full path and is read-only until 13c makes it typed. (3) A pick is converted by the Gateway (`tags.resolve` with the full path and the preview item's asset): inside the asset folder the note shows `{asset.path}/...` and "Resolves for N of M <kinds>" with the failing names; outside it the shared-tag note; "Use this tag" waits for that answer. (4) The shared-tag warning on the row stays the resolve note it is today; no second tag. (5) For Alarms a folder or a UDT instance is a pick and the button reads "Use this folder". (6) A small spinner is added for the Loading row, still under reduced motion. (7) The dev tags gain one empty folder, `Site2/Yard/Spare`. (8) An asset folder that does not exist (the dev asset P14L) opens the provider's root with the Gateway's words in the note. (9) A truncated folder ends in the row "Showing the first 1,000." (10) A preview item with no asset opens the default provider's root, and every pick is a full path. (11) Backlog 39's "each failing name opens its item" is not built here.
+Decisions (owner, 2026-11-11, "approved and continue" on the plan and its eleven picks; no separate UX pass, the departures from the mockups go to the owner as a contact sheet): (1) a tag row's type reads "Tag", the others "Folder", "UDT instance", "UDT type", "Other"; the data type as sent. (2) The Path field shows the picked row's full path and is read-only until 13c makes it typed. (3) A pick is converted by the Gateway (`tags.resolve` with the full path and the preview item's asset): inside the asset folder the note shows `{asset.path}/...` and "Resolves for N of M <kinds>" with the failing names; outside it the shared-tag note; "Use this tag" waits for that answer. (4) The shared-tag warning on the row stays the resolve note it is today; no second tag. (5) For Alarms a folder or a UDT instance is a pick and the button reads "Use this folder". (6) A small spinner is added for the Loading row, still under reduced motion. (7) The dev tags gain one empty folder, `Site2/Yard/Spare`. (8) An asset folder that does not exist (the dev asset P14L) opens the provider's root with the Gateway's words in the note. (9) A truncated folder ends in the row "Showing the first 1,000." (10) A preview item with no asset opens the default provider's root, and every pick is a full path. (11) Backlog 39's "each failing name opens its item" is not built here.
 
 ## Boundaries & Constraints
 
