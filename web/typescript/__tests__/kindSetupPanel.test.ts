@@ -420,3 +420,59 @@ describe('a kind\'s setup', () => {
         expect(panel({ kind: LINE, record: undefined, items: [] })).not.toContain(String.fromCharCode(0x2014));
     });
 });
+
+describe('the tag buttons (entry 13b)', () => {
+    const buttons = (html: string): string[] => html.match(/<button[^>]*mapstudio-tag-button[^>]*>/g) || [];
+    const forOf = (button: string): string => (/data-tag-for="([^"]*)"/.exec(button) || ['', ''])[1];
+
+    test('each path of Key values, Comms and Alarms ends in a tag button named for its value', () => {
+        const html = panel({ onBrowse: noop });
+        expect(buttons(html).map(forOf)).toEqual(['kpis.pressure.path', 'kpis.gas.path', 'comms.path', 'alarms.path']);
+        expect(buttons(html)[0]).toContain('title="Pick a tag" aria-label="Pick a tag for Pressure" aria-haspopup="dialog" aria-expanded="false"');
+        expect(buttons(html)[2]).toContain('aria-label="Pick a tag for heartbeat path"');
+        // The link, the popup view and its params are not tag paths.
+        expect(slice(html, 'data-field="link"', 'data-field="popupView.path"')).not.toContain('mapstudio-tag-button');
+    });
+
+    test('the row the card is open for takes the selection tint and its button says it is open', () => {
+        const kv = panel({ onBrowse: noop, browsing: 'kpis.gas.path' });
+        expect(kv.match(/mapstudio-kv-row--browsing/g)).toHaveLength(1);
+        expect(kv).toMatch(/class="mapstudio-kv-row mapstudio-kv-row--browsing" role="group" aria-label="Gas price"/);
+        expect(buttons(kv).filter((b) => b.indexOf('aria-expanded="true"') >= 0).map(forOf)).toEqual(['kpis.gas.path']);
+        const comms = panel({ onBrowse: noop, browsing: 'comms.path' });
+        expect(comms).toContain('class="mapstudio-kindsetup-field mapstudio-kindsetup-field--browsing" data-field="comms.path"');
+        expect(comms).not.toContain('mapstudio-kv-row--browsing');
+    });
+
+    test('paused, the buttons take no press; with nothing to open the browser there is no button', () => {
+        expect(buttons(panel({ onBrowse: noop, paused: 'Not saved - conflict with mapeditor2\'s change' })).every((b) => b.indexOf('disabled=""') >= 0)).toBe(true);
+        expect(buttons(panel())).toEqual([]);
+    });
+});
+
+describe('a pick the panel does not take (entry 13b)', () => {
+    const made = (over: Partial<KindSetupPanelProps> = {}): KindSetupPanel => new KindSetupPanel({
+        kind: PAD, record: RECORD, items: ITEMS, assets: ASSETS, previewId: null, onPreview: noop, saves: NO_KIND_SAVES, paused: '', resolves: {},
+        alarmPage: '', onSave: () => true, onClearRefusal: noop, onResolve: noop, ...over });
+
+    test('a key value or a new row that is gone, the fields paused, or a save not taken: said in words, nothing sent', () => {
+        const sent: string[] = [];
+        const onSave = (field: string): boolean => { sent.push(field); return true; };
+        expect(made({ onSave }).usePick('kpis.gone.path', '{asset.path}/Flow', 4)).toBe('Not saved. This key value row is gone.');
+        expect(made({ onSave }).usePick('kpis.new:r9', '{asset.path}/Flow', 4)).toBe('Not saved. This key value row is gone.');
+        expect(made({ onSave, paused: 'Not saved - conflict with mapeditor2\'s change' }).usePick('comms.path', '{asset.path}/Flow', 4))
+            .toBe('Not saved. Not saved - conflict with mapeditor2\'s change');
+        expect(sent).toEqual([]);
+        jest.spyOn(console, 'error').mockImplementation(() => undefined);
+        expect(made({ onSave: () => false }).usePick('comms.path', '{asset.path}/Flow', 4)).toBe('Not saved. Map Studio could not take the save now. Try again.');
+    });
+
+    test('a pick that is taken is sent as one edit of that path at the version the card saw; the stored path again sends nothing', () => {
+        jest.spyOn(console, 'error').mockImplementation(() => undefined);
+        const sent: unknown[] = [];
+        const onSave = (field: string, edit: unknown, seen: number): boolean => { sent.push([field, edit, seen]); return true; };
+        expect(made({ onSave }).usePick('kpis.gas.path', '{asset.path}/Flow', 3)).toBe('');
+        expect(made({ onSave }).usePick('alarms.path', '{asset.path}', 3)).toBe('');
+        expect(sent).toEqual([['kpis.gas.path', { part: 'kpi', key: 'gas', patch: { path: '{asset.path}/Flow' } }, 3]]);
+    });
+});

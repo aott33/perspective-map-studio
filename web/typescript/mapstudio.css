@@ -5504,3 +5504,422 @@ textarea.mapstudio-input.mapstudio-rule-expression {
     stroke-dasharray: 5 4;
     stroke-linejoin: round;
 }
+
+/* The tag buttons of a kind's setup (epic 4 entry 13b; DESIGN.md Kind setup): a tag icon button at the end of each tag path; the
+   one whose card is open takes the selection tint, and so does its row, with the 3 px selection edge (DESIGN.md: "The row the
+   browser is open for takes selection-tint with a 3 px selection edge"). */
+.mapstudio-dock-button.mapstudio-tag-button {
+    color: var(--mapstudio-secondary);
+}
+
+.mapstudio-dock-button.mapstudio-tag-button:hover:not(:disabled),
+.mapstudio-dock-button.mapstudio-tag-button--open {
+    color: var(--label);
+}
+
+.mapstudio-dock-button.mapstudio-tag-button--open {
+    background: var(--mapstudio-selection-tint);
+    color: var(--callToAction);
+}
+
+.mapstudio-kv-row--browsing {
+    background: var(--mapstudio-selection-tint);
+    box-shadow: inset 3px 0 0 var(--callToAction);
+}
+
+.mapstudio-kindsetup-field--browsing {
+    margin: -6px -8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--mapstudio-selection-tint);
+    box-shadow: inset 3px 0 0 var(--callToAction);
+}
+
+/* The tag browser (entry 13b; DESIGN.md components.tag-browser): a floating card over the map's left edge, beside the panel it
+   was opened from, 380 px wide, under the toolbar's row and above the map's other cards. The tree's box takes what height the
+   map leaves, up to 268 px, and scrolls. */
+.mapstudio-tagbrowser {
+    position: absolute;
+    top: calc(var(--mapstudio-map-inset) + 36px + 10px);
+    left: var(--mapstudio-map-inset);
+    z-index: 7;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-sizing: border-box;
+    width: 380px;
+    max-width: calc(100% - 2 * var(--mapstudio-map-inset));
+    max-height: calc(100% - 2 * var(--mapstudio-map-inset) - 46px);
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: var(--mapstudio-surface);
+    color: var(--label);
+    box-shadow: var(--mapstudio-float-shadow);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.mapstudio-stage[data-toolbar-row="under"] .mapstudio-tagbrowser {
+    top: calc(var(--mapstudio-map-inset) + 40px + 8px + 36px + 10px);
+    max-height: calc(100% - 2 * var(--mapstudio-map-inset) - 94px);
+}
+
+/* The card's own glyphs keep the size they are drawn at. */
+.mapstudio-tagbrowser-glyph {
+    flex: 0 0 auto;
+}
+
+.mapstudio-tagbrowser-head {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    margin: -4px -6px -4px 0;
+}
+
+.mapstudio-tagbrowser-title {
+    flex: 1 1 auto;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.mapstudio-tagbrowser-for {
+    flex: 0 0 auto;
+    margin: 0;
+    color: var(--mapstudio-secondary);
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-tagbrowser-provider {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.mapstudio-tagbrowser-provider > .mapstudio-input {
+    flex: 1 1 0;
+    width: auto;
+}
+
+.mapstudio-button.mapstudio-tagbrowser-home {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 150px;
+    height: 28px;
+    padding: 0 8px;
+    border-color: transparent;
+    background: transparent;
+    white-space: nowrap;
+}
+
+.mapstudio-button.mapstudio-tagbrowser-home:hover {
+    background: var(--mapstudio-hover);
+}
+
+.mapstudio-tagbrowser-home > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mapstudio-tagbrowser-holder {
+    flex: 0 1 auto;
+    box-sizing: border-box;
+    min-height: 76px;
+    max-height: 268px;
+    border: 1px solid var(--mapstudio-divider);
+    border-radius: 6px;
+    overflow: auto;
+    scrollbar-width: thin;
+}
+
+.mapstudio-tagbrowser-holder:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -1px;
+}
+
+.mapstudio-tagbrowser-tree {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 2px 0;
+}
+
+/* A row: 24 px, 16 px of indent per level (set on the row), the chevron on what opens, the type's glyph, the name in
+   monospace, then the type and a tag's data type in tiny secondary text. */
+.mapstudio-tag-row {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    box-sizing: border-box;
+    min-height: 24px;
+    padding-right: 8px;
+    cursor: default;
+    white-space: nowrap;
+}
+
+.mapstudio-tag-row[data-kind="node"]:hover {
+    background: var(--mapstudio-hover);
+}
+
+.mapstudio-tag-row:focus-visible {
+    outline: 2px solid var(--callToAction);
+    outline-offset: -2px;
+}
+
+/* Inside the asset folder: the 2 px guide on the left; the picked row: the selection tint and its 3 px edge. */
+.mapstudio-tag-row--guided {
+    box-shadow: inset 2px 0 0 var(--neutral-40, var(--border));
+}
+
+.mapstudio-tag-row.mapstudio-tag-row--picked,
+.mapstudio-tag-row.mapstudio-tag-row--picked:hover {
+    background: var(--mapstudio-selection-tint);
+    box-shadow: inset 3px 0 0 var(--callToAction);
+}
+
+.mapstudio-tag-chevron {
+    display: inline-flex;
+    flex: 0 0 16px;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 24px;
+    color: var(--mapstudio-secondary);
+    cursor: pointer;
+}
+
+.mapstudio-tag-chevron:empty {
+    cursor: default;
+}
+
+.mapstudio-tag-chevron-glyph {
+    transform: rotate(-90deg);
+}
+
+.mapstudio-tag-chevron--open .mapstudio-tag-chevron-glyph {
+    transform: none;
+}
+
+.mapstudio-tag-glyph {
+    flex: 0 0 auto;
+    color: var(--mapstudio-secondary);
+}
+
+.mapstudio-tag-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mapstudio-tag-row .mapstudio-tag-asset {
+    flex: 0 0 auto;
+}
+
+.mapstudio-tag-type,
+.mapstudio-tag-datatype {
+    flex: 0 0 auto;
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mapstudio-tag-type {
+    width: 76px;
+}
+
+.mapstudio-tag-datatype {
+    width: 48px;
+}
+
+/* The rows that are not tags: "Loading..." with the spinner, "No tags in this folder", the Gateway's words under a folder it
+   could not open (the warning token, with its glyph and Try again), "Showing the first 1,000.". */
+.mapstudio-tag-row--aside {
+    color: var(--mapstudio-secondary);
+    font-size: 12px;
+}
+
+.mapstudio-tag-row--aside > .mapstudio-tag-words {
+    margin-left: 22px;
+}
+
+.mapstudio-tag-row--loading > .mapstudio-tag-words,
+.mapstudio-tag-row--failed > .mapstudio-tag-words {
+    margin-left: 0;
+}
+
+.mapstudio-tag-row--loading > .mapstudio-spinner,
+.mapstudio-tag-row--failed > .mapstudio-tag-glyph {
+    margin-left: 22px;
+}
+
+.mapstudio-tag-row--empty {
+    font-style: italic;
+}
+
+.mapstudio-tag-row--failed {
+    align-items: flex-start;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    color: var(--mapstudio-warning);
+    white-space: normal;
+}
+
+.mapstudio-tag-row--failed > .mapstudio-tag-glyph {
+    margin-top: 2px;
+    color: var(--mapstudio-warning);
+}
+
+.mapstudio-tag-row--failed > .mapstudio-tag-words {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-button.mapstudio-tag-retry {
+    height: 24px;
+    padding: 0 8px;
+}
+
+/* The small spinner of a row being loaded (owner, 2026-11-11): a ring that turns, and stands still under reduced motion. */
+.mapstudio-spinner {
+    display: inline-block;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--neutral-40, var(--border));
+    border-top-color: var(--mapstudio-secondary);
+    border-radius: 9999px;
+    animation: mapstudio-spin 0.9s linear infinite;
+}
+
+@keyframes mapstudio-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mapstudio-spinner {
+        animation: none;
+    }
+}
+
+/* A provider the Gateway cannot browse, in the tree's place: the cloud glyph and "Can't browse Site2" in the warning token, the
+   sentence, and a primary Try again. A refused role or an invalid ask: the Gateway's words alone. */
+.mapstudio-tagbrowser-problem {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 14px 12px;
+}
+
+.mapstudio-tagbrowser-problem-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--mapstudio-warning);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.mapstudio-tagbrowser-problem-words {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-tagbrowser-path {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* The note under the Path field (DESIGN.md note-background); the shared-tag note and a failed check on the warning tint with
+   the 3 px warning edge, always with the glyph and words. */
+.mapstudio-tagbrowser-note {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--mapstudio-hover);
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-tagbrowser-note--shared,
+.mapstudio-tagbrowser-note--warning {
+    border-left: 3px solid var(--mapstudio-warning);
+    background: color-mix(in srgb, var(--mapstudio-warning) 10%, var(--mapstudio-surface));
+}
+
+.mapstudio-tagbrowser-note-title,
+.mapstudio-tagbrowser-note-resolve,
+.mapstudio-tagbrowser-note-text {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.mapstudio-tagbrowser-note-title > svg,
+.mapstudio-tagbrowser-note-resolve > svg,
+.mapstudio-tagbrowser-note-text > svg {
+    flex: 0 0 auto;
+    margin-top: 2px;
+}
+
+.mapstudio-tagbrowser-note-title {
+    color: var(--mapstudio-warning);
+    font-weight: 600;
+}
+
+.mapstudio-tagbrowser-note--warning .mapstudio-tagbrowser-note-glyph {
+    color: var(--mapstudio-warning);
+}
+
+.mapstudio-tagbrowser-note-path {
+    font-weight: 700;
+}
+
+.mapstudio-tagbrowser-note-resolve {
+    color: var(--mapstudio-secondary);
+    font-size: 11px;
+}
+
+.mapstudio-tagbrowser-note-resolve--warning {
+    color: var(--mapstudio-warning);
+    font-weight: 600;
+}
+
+/* A pick that was not saved: the reason by the button, in the warning token with its glyph. */
+.mapstudio-tagbrowser-refused {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: flex-start;
+    gap: 4px;
+    margin: 0;
+    color: var(--mapstudio-warning);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.mapstudio-tagbrowser-refused > svg {
+    margin-top: 2px;
+}
+
+.mapstudio-tagbrowser-actions {
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    gap: 8px;
+}

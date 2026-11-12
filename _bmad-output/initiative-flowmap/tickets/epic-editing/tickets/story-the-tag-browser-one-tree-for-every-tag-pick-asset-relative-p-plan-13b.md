@@ -4,14 +4,14 @@ type: 'feature'
 ticket: ''
 part_of: '13'
 created: '2026-11-11'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '559c609e3cf3a1a8de086c228f041b16bf7c9cfd'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md', '{project-root}/docs/contract.md', '{project-root}/docs/kind-setup.md']
 ---
@@ -70,13 +70,13 @@ Decisions (owner, 2026-11-11, "approved and continue" on the plan and its eleven
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `web/typescript/messages.ts`, `messages.test.ts` -- the `tags.browse` sender and reply reader -- nothing reads it today.
-- [ ] `web/typescript/MapStudioStoreDelegate.ts`, a delegate test -- browse asks by id with the 15 s limit, answers and errors per provider and folder, cleared when the card closes; the pick's `tags.resolve` -- B1, B8 to B10.
-- [ ] `web/typescript/tagBrowser.ts` (new, pure), `tagBrowser.test.ts` -- the tree's state: rows in view, open folders, focus moves per key, what is a pick per target, the note's words, the For line -- B4, B5, B7, B12, tests first.
-- [ ] `web/typescript/studio/TagBrowser.tsx` (new), `controls.ts`, `mapstudio.css`, a markup test -- the card, the tree, the states, the glyphs, the spinner -- B1 to B10.
-- [ ] `web/typescript/studio/KindSetupPanel.tsx`, `MapStudio.tsx` -- the tag buttons, the open row's tint, the card's place and closing, the pick saved through `send` with the seen version -- B2, B3, B5, B11.
-- [ ] `ops/config` (`Site2/Yard/Spare`), `e2e/tests/tagbrowser.spec.mjs` (new), `tags.spec.mjs` if its Site2 listing changes -- B1 to B12 live, with screenshots of each state.
-- [ ] `docs/contract.md`, `docs/kind-setup.md`, `CHANGELOG.md`, DESIGN.md and EXPERIENCE.md (the type words, the read-only Path field, "Use this folder"), `docs/test-playbook-0.4.0.md` section 8q.
+- [x] `web/typescript/messages.ts`, `messages.test.ts` -- the `tags.browse` sender and reply reader -- nothing reads it today.
+- [x] `web/typescript/MapStudioStoreDelegate.ts`, a delegate test -- browse asks by id with the 15 s limit, answers and errors per provider and folder, cleared when the card closes; the pick's `tags.resolve` -- B1, B8 to B10.
+- [x] `web/typescript/tagBrowser.ts` (new, pure), `tagBrowser.test.ts` -- the tree's state: rows in view, open folders, focus moves per key, what is a pick per target, the note's words, the For line -- B4, B5, B7, B12, tests first.
+- [x] `web/typescript/studio/TagBrowser.tsx` (new), `controls.ts`, `mapstudio.css`, a markup test -- the card, the tree, the states, the glyphs, the spinner -- B1 to B10.
+- [x] `web/typescript/studio/KindSetupPanel.tsx`, `MapStudio.tsx` -- the tag buttons, the open row's tint, the card's place and closing, the pick saved through `send` with the seen version -- B2, B3, B5, B11.
+- [x] `ops/config` (`Site2/Yard/Spare`), `e2e/tests/tagbrowser.spec.mjs` (new), `tags.spec.mjs` if its Site2 listing changes -- B1 to B12 live, with screenshots of each state.
+- [x] `docs/contract.md`, `docs/kind-setup.md`, `CHANGELOG.md`, DESIGN.md and EXPERIENCE.md (the type words, the read-only Path field, "Use this folder"), `docs/test-playbook-0.4.0.md` section 8q.
 
 **Acceptance Criteria:**
 - Given a full editor on the dev Gateway, when they open the browser from a key value and pick Pressure by keyboard alone, then the row holds `{asset.path}/Pressure` with its resolve note and one Undo-free setup save is recorded as a typed path would be.
@@ -85,10 +85,25 @@ Decisions (owner, 2026-11-11, "approved and continue" on the plan and its eleven
 ## Implementation Notes
 
 - Planner, 2026-11-11: the environment and identity rules are entry 8's plan's (Docker by hand after a restart: `rm -f /var/run/docker.pid /var/run/docker/containerd/containerd.pid; nohup dockerd > <scratch>/dockerd.log 2>&1 &`, wait 15 s, then `ops/up.sh`; JDK 17 at `/usr/lib/jvm/java-17-openjdk-amd64`; `ops/up.sh --fresh` after any `ops/config` change and before a whole-suite run; `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium` and `--trace off` for e2e; no em dashes; never a bare `git stash`; never a push; never name a competitor's product or vendor). Leave the work uncommitted: the orchestrator commits after the whole suite. Run the new spec and the specs you touch, not the whole suite (1.2 hours; the orchestrator runs it). ignition-lint is not installed here: say so, do not tick a lint task. The Code Map's line numbers are a guide; find the symbols by name. `tags.resolve` already answers a full path below the asset's base path as `{asset.path}/<suffix>` with `relative: true` (`docs/contract.md`, "tags.resolve").
+- Implementer, 2026-11-11: built as planned, left uncommitted. Where the build chose within the plan: (1) the tree's state is `web/typescript/tagBrowser.ts` (pure) and the answers are the store delegate's (`askBrowse`, `askPick`, `closeBrowse`, the state's `browse`), kept by provider and folder without letter case and dropped when the card unmounts; the default provider is asked for without a name and its answer kept under the name the reply gives too. (2) The pick goes back through `KindSetupPanel.usePick` (a ref from the map component), which builds the one `SetupEdit` and calls the panel's own `send` with the version the tag button saw; a new row takes the path and commits as when typed. (3) A chevron shows on a folder, a UDT instance or type and on whatever the Gateway says has children, so an empty folder (`hasChildren` false) still opens to say "No tags in this folder". (4) On the dev Gateway `_types_` lists first in every provider and reads "Folder" (the Gateway types it so); nothing was added to hide it. (5) A provider change shows that provider's top level with nothing open, the asset folder's provider included: the "<name> folder" button is the way back. (6) The For line, the open row's tint and "Use this folder" are as the plan has them; the note with nothing picked and another provider shown still says where the card opened. (7) `tags.browse` is sent at level full, and while a failed reload leaves the level unknown for a session that was full; never at phone or none, never before map.load answered. (8) A slow folder, a `role` reply and a folder that is gone cannot be made on the dev Gateway on demand, so `tagbrowser.spec.mjs` holds or turns those `tags.browse.reply` frames on the page's websocket (the Gateway's own words); the stopped provider, the missing asset folder (P14L), the empty folder and the conflict are live. ignition-lint is not installed in this environment and was not run on the one new `ops/config` file (`tag-definition/Site2/Yard/Spare/unary-resource.json`, a copy of `default/Mesa/Lines`'s). The whole e2e suite was not run here (the orchestrator's): the new spec, `tags.spec.mjs` and `kinds.spec.mjs` were.
 
 ## Plan Change Log
 
 ## Review Triage Log
+
+Quick review, 2026-11-12 (one reviewer, by inspection). The rules hold (no em dash, no new message type or field, no version bump, no TypeScript copy of the resolve rule); B1 to B12 each have a test in `tagbrowser.spec.mjs`. Nine findings: 0 high, 4 medium, 5 low, 0 false, 0 maybe-false. All routed patch, to the implementer.
+
+- medium, patch: when the card's first `tags.browse` fails no providers are known, so the select offers only the failing one while the words say to pick another (`onBrowseReply` fills `providers` from a good reply only). The default provider's root is asked once so the select fills, and the sentence offers another provider only where there is one.
+- medium, patch: "Use this tag" closed the card when nothing was saved (`usePick` returns early when editing is off, the row is gone or `send` is false; `onTagUse` set `tagPick: null` regardless). `usePick` says whether the pick was taken; if not, the card stays open with the reason in words.
+- medium, patch: a complete new row left while its own card was open was never committed if the card closed or moved without a pick (the `onBlur` guard on `browsing`). Committed when its card closes or moves away.
+- medium, patch: after a pick into a new row the focus fell to the page when the row became a stored row (its tag button unmounts), and no test picked into a new row. Focus follows to the stored row's tag button; an e2e case added.
+- low, patch: acceptance criterion 2 names a phone editor and only a viewer was tested live. The phone editor added to the spec.
+- low, patch: `browseGone` kept the ids of asks never answered for the page's life. Cleared at teardown and bounded.
+- low, patch: a preview item whose asset's base path is not a `[provider]` path got the note that no item is linked, and a `tags.resolve` whose answer was ignored (`assetFolderOf` null). Its own words; no unused ask.
+- low, patch: `docs/platform-checks.md` listed `[Site2]Yard` without `Spare` while `tags.spec.mjs` expects it. All three named.
+- low, patch: playbook 8p kept "until then" beside its pointer to 8q. Reworded.
+
+Outcome (2026-11-12): nine patches applied, none deferred or dismissed; the ignition-lint task stays open (the tool could not be installed here). The orchestrator's Verification on the patched code: tsc clean, Jest 1084 passed, Gradle BUILD SUCCESSFUL, the contract check OK, and on a fresh stack the whole suite 325 passed, 9 skipped (the store-check and Gateway-stop scenarios, run by hand), 0 failed in 1.3 h.
 
 ## Design Notes
 

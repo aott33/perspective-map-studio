@@ -81,6 +81,8 @@ import { SaveCard } from './studio/SaveCard';
 import { HistoryPanel } from './studio/HistoryPanel';
 import { KindList } from './studio/KindList';
 import { KindSetupPanel } from './studio/KindSetupPanel';
+import { TagBrowser } from './studio/TagBrowser';
+import { NO_BROWSE, PickTarget } from './tagBrowser';
 import {
     NO_KIND_SAVES, PreviewOption, SetupEdit, hasOwnRule, itemsOfKind, pausedText, previewKey, previewOf, previewOptions, readPreview, readSetup, shownKind, waitingSave,
     writePreview
@@ -179,6 +181,12 @@ export interface MapStudioState {
      */
     kindsBack: { id: string; tab: PanelTab; link: string } | null;
     /**
+     * The tag browser's card (entry 13b; studio/TagBrowser.tsx), or null while it is closed: the kind whose setup it was opened
+     * from, the tag button (tagBrowser.ts `TagFor`), the value being picked, and the setup's version seen when it opened, which
+     * the pick's save carries so another editor's save since meets the conflict.
+     */
+    tagPick: { kindId: string; tagFor: string; target: PickTarget; seen: number } | null;
+    /**
      * The geometry change in hand with Select (entry 5, drawing.ts): a chosen point of the selected line or area, or Move waiting
      * for a click; kept only for the selected item (selectionState) and dropped when a tool is picked (toolState).
      */
@@ -234,7 +242,7 @@ export type Props = ComponentProps<MapStudioProps, MapStudioDelegateState>;
 export class MapStudio extends Component<Props, MapStudioState> {
     state: MapStudioState = {
         drawing: null, snap: false, snapHint: '', popup: null, clock: Date.now(), pick: null, selected: null, panel: null,
-        studio: fromProps(this.props.props.editMode), layersTab: 'layers', panelTab: 'details', kindsBack: null, geometry: null, listCollapsed: listCollapsedNow(), listOpen: false,
+        studio: fromProps(this.props.props.editMode), layersTab: 'layers', panelTab: 'details', kindsBack: null, tagPick: null, geometry: null, listCollapsed: listCollapsedNow(), listOpen: false,
         cardsClosed: [], showEdits: 0
     };
 
@@ -674,6 +682,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         camera.applyRestore(this);
         camera.saveSelection(this);
         this.showKindSection();
+        this.dropTagPick();
         this.showBackLink();
     }
 
@@ -1218,6 +1227,12 @@ export class MapStudio extends Component<Props, MapStudioState> {
         if (ev.key === 'Escape' && !ev.defaultPrevented && !inField(ev.target) && editing.escapeGeometry(this)) {
             // Esc puts down Move, then the chosen point (entry 5), before it closes a popup or Details.
             ev.preventDefault();
+            return;
+        }
+        if (ev.key === 'Escape' && !ev.defaultPrevented && !inField(ev.target) && this.state.tagPick) {
+            // Esc closes the tag browser from anywhere in the studio (entry 13b); a field keeps its own Esc.
+            ev.preventDefault();
+            this.onTagClose();
             return;
         }
         if (kindsOpen && ev.key === 'Escape') {
@@ -2179,6 +2194,121 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
     };
 
+    // ---- The tag browser (entry 13b) ----
+
+    /** The kind setup panel in view: a pick is saved through it, as a typed path is. */
+    private readonly kindPanel = React.createRef<KindSetupPanel>();
+
+    /** Whether the open card still has its place: Edit mode's studio, Kinds, and the kind it was opened from in view. */
+    private tagPickShown(): boolean {
+        const pick = this.state.tagPick;
+        const delegate = this.props.delegate;
+        if (!pick || !delegate || !this.studioOn() || this.state.studio.surface !== 'kinds') {
+            return false;
+        }
+        const kind = this.kindShown(delegate);
+        return !!kind && kind.id === pick.kindId;
+    }
+
+    /** Another kind, another surface or leaving Edit mode closes the card and changes nothing. */
+    private dropTagPick(): void {
+        if (this.state.tagPick && !this.tagPickShown()) {
+            this.setState({ tagPick: null });
+        }
+    }
+
+    /** A path's tag button pressed: the card opens for it (one at a time); pressed again for the open one, it closes. */
+    onTagBrowse = (kindId: string, tagFor: string, target: PickTarget, seen: number): void => {
+        const open = this.state.tagPick;
+        if (open && open.kindId === kindId && open.tagFor === tagFor) {
+            this.onTagClose();
+            return;
+        }
+        this.setState({ tagPick: { kindId, tagFor, target, seen } });
+    };
+
+    /** Cancel, the close or Esc: nothing changes and the focus goes back to the tag button. */
+    onTagClose = (): void => {
+        const pick = this.state.tagPick;
+        if (!pick) {
+            return;
+        }
+        this.setState({ tagPick: null }, () => this.focusTagButton(pick.tagFor));
+    };
+
+    private focusTagButton(tagFor: string): void {
+        const root = this.mapContainer && typeof this.mapContainer.closest === 'function' ? this.mapContainer.closest('.mapstudio') : null;
+        const buttons = root ? Array.from(root.querySelectorAll<HTMLElement>('.mapstudio-tag-button')) : [];
+        const button = buttons.filter((b) => b.getAttribute('data-tag-for') === tagFor)[0];
+        if (button && typeof button.focus === 'function') {
+            button.focus({ preventScroll: true });
+        }
+    }
+
+    /**
+     * "Use this tag": the path is saved through the panel as a typed path is, at the version seen when the card opened, and the
+     * card closes. A pick the panel did not take (the fields paused since, the row gone, the save not taken) saves nothing: the
+     * card stays open with the reason returned here.
+     */
+    onTagUse = (path: string): string => {
+        const pick = this.state.tagPick;
+        const panel = this.kindPanel.current;
+        if (!pick || !panel || !this.tagPickShown()) {
+            return 'Not saved. The kind\'s setup is no longer open.';
+        }
+        const refused = panel.usePick(pick.tagFor, path, pick.seen);
+        if (refused !== '') {
+            return refused;
+        }
+        this.setState({ tagPick: null }, () => this.focusTagButton(pick.tagFor));
+        return '';
+    };
+
+    private onTagAsk = (provider: string | null, folder: string, again?: boolean): void => {
+        const delegate = this.storeDelegate();
+        if (delegate && typeof delegate.askBrowse === 'function') {
+            delegate.askBrowse(provider, folder, again === true);
+        }
+    };
+
+    private onTagGone = (): void => {
+        const delegate = this.storeDelegate();
+        if (delegate && typeof delegate.closeBrowse === 'function') {
+            delegate.closeBrowse();
+        }
+    };
+
+    /**
+     * The tag browser's card over the map's left edge, beside the kind's setup it was opened from (entry 13b; DESIGN.md Tag
+     * browser): only in Edit mode's studio (a full editor, 768 px and wider) with Kinds open on that kind. Keyed by the button
+     * and the preview item's asset, so another button or another preview item opens it afresh.
+     */
+    private renderTagBrowser(delegate: MapStudioDelegateState): React.ReactNode {
+        const pick = this.state.tagPick;
+        if (!pick || !this.tagPickShown()) {
+            return null;
+        }
+        const kind = this.kindShown(delegate);
+        if (!kind) {
+            return null;
+        }
+        const preview = this.kindPreview(delegate, kind.id);
+        return (
+            <TagBrowser key={kind.id + '\n' + pick.tagFor + '\n' + (preview ? preview.assetId : '')}
+                        kind={kind} tagFor={pick.tagFor} target={pick.target}
+                        preview={preview ? { name: preview.name, folder: preview.folder } : null}
+                        answers={delegate.browse || NO_BROWSE}
+                        onBrowse={this.onTagAsk}
+                        onAskPick={(path) => {
+                            const store = this.storeDelegate();
+                            if (store && preview) {
+                                store.askPick(kind.id, preview.assetId, path);
+                            }
+                        }}
+                        onUse={this.onTagUse} onClose={this.onTagClose} onGone={this.onTagGone} />
+        );
+    }
+
     /**
      * A kind's setup in the properties panel's place while Kinds is open (entry 12a; studio/KindSetupPanel.tsx), keyed by the kind
      * so its drafts start from the stored setup. The selected item is kept and its Details returns with Items.
@@ -2199,7 +2329,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
             items.loadSprite(this).then(() => this.forceUpdate());
         }
         return (
-            <KindSetupPanel key={'kind:' + id}
+            <KindSetupPanel key={'kind:' + id} ref={this.kindPanel}
+                            browsing={this.state.tagPick && this.state.tagPick.kindId === id ? this.state.tagPick.tagFor : null}
+                            onBrowse={(tagFor, target, seen) => this.onTagBrowse(id, tagFor, target, seen)}
                             symbols={this.symbols || {}}
                             colors={this.markerColors}
                             kind={kind}
@@ -2642,6 +2774,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                                      onUndoTo={this.onUndoTo} />
                     ) : null}
                     {studioOn && delegate ? this.renderSaveCard(delegate, !!chip) : null}
+                    {studioOn && delegate ? this.renderTagBrowser(delegate) : null}
                     {studioOn && delegate && studio.tool !== null ? (
                         // The one place Edit mode talks, while any tool is in hand (entry 23); with no tool nothing talks.
                         <DrawingBar tool={studio.tool}

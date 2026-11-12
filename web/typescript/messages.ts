@@ -30,7 +30,7 @@ export const MessageTypes = {
     EDITS_APPLY_REPLY: 'edits.apply.reply',
     MAP_CHANGED: 'map.changed',
     ERROR: 'error',
-    /** The tag browser's lookups (epic 2 story 15); `tags.resolve` is sent by the Kinds screen since epic 4 entry 12a, `tags.browse` by entry 13. */
+    /** The tag browser's lookups (epic 2 story 15); `tags.resolve` is sent by the Kinds screen since epic 4 entry 12a, `tags.browse` by the tag browser since entry 13b. */
     TAGS_BROWSE: 'tags.browse',
     TAGS_BROWSE_REPLY: 'tags.browse.reply',
     TAGS_RESOLVE: 'tags.resolve',
@@ -88,6 +88,8 @@ export type Reply =
     | { kind: 'edits.history.reply'; id: string; body: EditsHistoryReplyBody }
     /** What `tags.resolve` said of one path (epic 4 entry 12a, the Kinds screen's resolve notes). */
     | { kind: 'tags.resolve.reply'; id: string; body: TagsResolveReplyBody }
+    /** One folder of one tag provider (epic 4 entry 13b, the tag browser's tree). */
+    | { kind: 'tags.browse.reply'; id: string; body: TagsBrowseReplyBody }
     | { kind: 'error'; id: string; body: ErrorBody }
     | { kind: 'invalid'; reason: string };
 
@@ -159,6 +161,82 @@ export interface TagsResolveReplyBody {
 /** The `tags.resolve` message (epic 4 entry 12a): how many of a kind's linked map items a tag path resolves for; level full only. */
 export function tagsResolve(body: TagsResolveBody, id?: string): Envelope<TagsResolveBody> {
     return envelope(MessageTypes.TAGS_RESOLVE, { kindId: body.kindId, assetId: body.assetId, path: body.path }, id);
+}
+
+/** `tags.browse`'s body (docs/contract.md): a provider (none is the default one) and a folder (none is the provider's root). */
+export interface TagsBrowseBody {
+    provider?: string | null;
+    folder?: string | null;
+}
+
+/** A tag provider of the Gateway; exactly one is the default. */
+export interface TagProvider {
+    name: string;
+    isDefault: boolean;
+}
+
+/** What a browsed child is: the Gateway's five words. */
+export type TagChildType = 'folder' | 'tag' | 'udt-instance' | 'udt-type' | 'other';
+
+const TAG_CHILD_TYPES: readonly string[] = ['folder', 'tag', 'udt-instance', 'udt-type', 'other'];
+
+/** One child of a browsed folder: its name, its full path with `[provider]`, its type, a tag's data type and whether it opens. */
+export interface TagChild {
+    name: string;
+    path: string;
+    type: TagChildType;
+    dataType: string | null;
+    hasChildren: boolean;
+}
+
+/** `tags.browse.reply`'s body: one level of one provider, at most 1000 children by name, and the Gateway's providers. */
+export interface TagsBrowseReplyBody {
+    provider: string;
+    folder: string;
+    providers: TagProvider[];
+    children: TagChild[];
+    truncated: boolean;
+}
+
+/**
+ * The `tags.browse` message (epic 4 entry 13b): one folder of one tag provider, structure only; level full only. A provider or
+ * a folder that is not named is left out of the body (the default provider, the provider's root).
+ */
+export function tagsBrowse(body: TagsBrowseBody = {}, id?: string): Envelope<{ provider?: string; folder?: string }> {
+    const out: { provider?: string; folder?: string } = {};
+    if (typeof body.provider === 'string' && body.provider !== '') {
+        out.provider = body.provider;
+    }
+    if (typeof body.folder === 'string' && body.folder !== '') {
+        out.folder = body.folder;
+    }
+    return envelope(MessageTypes.TAGS_BROWSE, out, id);
+}
+
+/**
+ * Read a `tags.browse.reply` body, or null when it has no provider, folder, providers or children. A child that is not
+ * `{name, path, type, hasChildren}` is left out; a type this version does not know reads as `other`.
+ */
+export function readTagsBrowseReply(body: Record<string, unknown>): TagsBrowseReplyBody | null {
+    if (typeof body.provider !== 'string' || typeof body.folder !== 'string' || !Array.isArray(body.providers) || !Array.isArray(body.children)) {
+        return null;
+    }
+    const providers: TagProvider[] = [];
+    for (const p of body.providers as unknown[]) {
+        if (isRecord(p) && typeof p.name === 'string') {
+            providers.push({ name: p.name, isDefault: p.isDefault === true });
+        }
+    }
+    const children: TagChild[] = [];
+    for (const c of body.children as unknown[]) {
+        if (isRecord(c) && typeof c.name === 'string' && typeof c.path === 'string' && typeof c.type === 'string') {
+            children.push({
+                name: c.name, path: c.path, type: (TAG_CHILD_TYPES.indexOf(c.type) >= 0 ? c.type : 'other') as TagChildType,
+                dataType: typeof c.dataType === 'string' ? c.dataType : null, hasChildren: c.hasChildren === true
+            });
+        }
+    }
+    return { provider: body.provider, folder: body.folder, providers, children, truncated: body.truncated === true };
 }
 
 /** A UUID v4 string: `crypto.randomUUID` where the browser has it, else a Math.random fallback. */
@@ -240,6 +318,11 @@ export function readReply(raw: unknown): Reply {
             }
             return { kind: 'tags.resolve.reply', id: raw.id, body: resolved };
         }
+        case MessageTypes.TAGS_BROWSE_REPLY: {
+            const browsed = readTagsBrowseReply(body);
+            return browsed ? { kind: 'tags.browse.reply', id: raw.id, body: browsed }
+                : { kind: 'invalid', reason: 'tags.browse.reply needs provider, folder, providers and children.' };
+        }
         case MessageTypes.MAP_CHANGED:
             return { kind: 'map.changed', id: raw.id, body: readMapChanged(raw.body) };
         case MessageTypes.VALUES_BATCH:
@@ -291,6 +374,9 @@ export function replyText(reply: Reply): string {
             return 'Recent changes: ' + reply.body.entries.length + ' change(s)' + (reply.body.more ? ', more' : '');
         case 'tags.resolve.reply':
             return 'Tag path ' + reply.body.path + (reply.body.n !== undefined ? ': resolves for ' + reply.body.n + ' of ' + reply.body.m : ': a full path');
+        case 'tags.browse.reply':
+            return 'Tags of ' + reply.body.provider + (reply.body.folder !== '' ? ', ' + reply.body.folder : '') + ': ' + reply.body.children.length
+                + (reply.body.truncated ? ' or more' : '');
         case 'error':
             return 'Error (' + reply.body.code + '): ' + reply.body.message;
         default:

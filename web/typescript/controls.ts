@@ -66,7 +66,18 @@ export const GLYPH_PATHS = {
      * Warning: an exclamation mark in an octagon, the chip's glyph for every other problem (entry 24; DESIGN.md Save banner:
      * the warning glyph for Busy). An octagon, so it never reads as an alarm shape (triangle, circle or square, ER-27).
      */
-    warning: 'M8.3 3h7.4L21 8.3v7.4L15.7 21H8.3L3 15.7V8.3zM12 7.5v5.5M12 16.5h.01'
+    warning: 'M8.3 3h7.4L21 8.3v7.4L15.7 21H8.3L3 15.7V8.3zM12 7.5v5.5M12 16.5h.01',
+    /**
+     * The tag browser's glyphs (epic 4 entry 13b; DESIGN.md Tag browser, Icons: tag among the chrome glyphs). Tag: a luggage
+     * tag with its hole, the tag button at the end of a tag path ("Pick a tag") and a tag's row in the tree.
+     */
+    tag: 'M4 4h7.5l8.5 8.5a1.5 1.5 0 0 1 0 2.1l-5.4 5.4a1.5 1.5 0 0 1-2.1 0L4 11.5zM8.5 8.5h.01',
+    /** Folder: a folder's row in the tree. */
+    folder: 'M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+    /** UDT: a ruled sheet, a UDT instance's or type's row in the tree. */
+    udt: 'M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM4 9.5h16M9.5 9.5V20',
+    /** Up: the arrow of the button that returns the tree to the asset folder. */
+    up: 'M12 19V5M6 11l6-6 6 6'
 } as const;
 
 export type GlyphName = keyof typeof GLYPH_PATHS;

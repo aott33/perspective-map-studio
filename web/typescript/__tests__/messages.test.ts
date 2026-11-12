@@ -2,6 +2,7 @@ import {
     MESSAGE_VERSION,
     MessageTypes,
     editsHistory,
+    tagsBrowse,
     tagsResolve,
     envelope,
     newMessageId,
@@ -169,5 +170,40 @@ describe('tags.resolve (epic 4 entry 12a, the Kinds screen\'s resolve notes)', (
         const more = readReply({ v: 1, type: 'tags.resolve.reply', id: 'r6', body: { path: '{asset.path}/X', relative: true, n: 0, m: 30,
             failing: [{ id: 'a', name: 'A' }], failingMore: 29 } });
         expect(more.kind === 'tags.resolve.reply' && more.body.failingMore).toBe(29);
+    });
+});
+
+describe('tags.browse (epic 4 entry 13b, the tag browser\'s tree)', () => {
+    test('the message names a provider and a folder only when it has them: none is the default provider, the root', () => {
+        expect(tagsBrowse({ provider: 'default', folder: 'Mesa/P14' }, 'b1')).toEqual(
+            { v: 1, type: 'tags.browse', id: 'b1', body: { provider: 'default', folder: 'Mesa/P14' } });
+        expect(tagsBrowse({ provider: null, folder: '' }, 'b2')).toEqual({ v: 1, type: 'tags.browse', id: 'b2', body: {} });
+        expect(tagsBrowse(undefined, 'b3').body).toEqual({});
+        expect(tagsBrowse({ provider: 'Site2' }, 'b4').body).toEqual({ provider: 'Site2' });
+    });
+
+    test('the reply is read: the providers, the children as sent and whether the folder was cut short', () => {
+        const body = {
+            provider: 'default', folder: 'Mesa/P14',
+            providers: [{ name: 'default', isDefault: true }, { name: 'Site2', isDefault: false }],
+            children: [
+                { name: 'Pressure', path: '[default]Mesa/P14/Pressure', type: 'tag', dataType: 'Float8', hasChildren: false },
+                { name: 'Sub', path: '[default]Mesa/P14/Sub', type: 'folder', dataType: null, hasChildren: true }],
+            truncated: false
+        };
+        const reply = readReply({ v: 1, type: 'tags.browse.reply', id: 'b1', body });
+        expect(reply).toEqual({ kind: 'tags.browse.reply', id: 'b1', body });
+        expect(replyText(reply)).toBe('Tags of default, Mesa/P14: 2');
+    });
+
+    test('a child that is not whole is left out, an unknown type reads as other, and a reply without its parts is invalid', () => {
+        const reply = readReply({ v: 1, type: 'tags.browse.reply', id: 'b1', body: {
+            provider: 'default', folder: '', providers: [{ name: 'default', isDefault: true }, 'System', { isDefault: false }],
+            children: [{ name: 'A', path: '[default]A', type: 'atomic', hasChildren: 1 }, { name: 'B' }, null], truncated: 'yes' } });
+        expect(reply.kind === 'tags.browse.reply' && reply.body).toEqual({
+            provider: 'default', folder: '', providers: [{ name: 'default', isDefault: true }],
+            children: [{ name: 'A', path: '[default]A', type: 'other', dataType: null, hasChildren: false }], truncated: false });
+        expect(readReply({ v: 1, type: 'tags.browse.reply', id: 'b2', body: { provider: 'default', folder: '' } }).kind).toBe('invalid');
+        expect(readReply({ v: 1, type: 'tags.browse.reply', id: 'b3', body: { folder: '', providers: [], children: [] } }).kind).toBe('invalid');
     });
 });

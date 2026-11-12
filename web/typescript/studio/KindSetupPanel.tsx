@@ -12,6 +12,7 @@ import { ItemState, Tint } from '../live';
 import { MarkerColors, SpriteSymbol, tintSampleSvg } from '../markers';
 import { Glyph } from '../popupParts';
 import { Sample } from '../StylePreview';
+import { PickTarget, TagFor, readTagFor } from '../tagBrowser';
 import { ChromeGlyph } from './ChromeGlyph';
 import { RuleEditor, ruleFields } from './RuleEditor';
 
@@ -71,6 +72,12 @@ import { RuleEditor, ruleFields } from './RuleEditor';
  * `[data-field="areaTints.property"]`, a category `.mapstudio-tint-row[data-category]` and `.mapstudio-tints-unsaved`.
  * Entry 12b2: Show on map `.mapstudio-kindsetup-show` and the Live now note `.mapstudio-rule-live`.
  * Entry 12c3: "Back to <name>" `.mapstudio-kindsetup-back`, shown when the setup was opened from an item's link.
+ *
+ * **The tag buttons** (entry 13b). Each path of Key values (a new row's too), Comms and Alarms ends in a tag icon button,
+ * "Pick a tag" (`.mapstudio-tag-button[data-tag-for]`, tagBrowser.ts `TagFor`), which opens the tag browser for it
+ * (studio/TagBrowser.tsx, drawn by the map component over the map); the row the card is open for takes the selection tint with
+ * its 3 px edge (`.mapstudio-kv-row--browsing`, `.mapstudio-kindsetup-field--browsing`). A pick comes back through `usePick`
+ * and is saved as a typed path is: one edit of that path, at the setup version seen when the card opened.
  */
 export interface KindSetupPanelProps {
     kind: Kind;
@@ -111,6 +118,10 @@ export interface KindSetupPanelProps {
     backName?: string;
     /** "Back to <name>": Items again with that item and the tab its link was on. */
     onBack?: () => void;
+    /** Entry 13b: the tag button whose card is open (tagBrowser.ts `TagFor`), or null; its row takes the selection tint. */
+    browsing?: string | null;
+    /** A path's tag button pressed: the tag browser opens for it, at the setup version seen now. No tag button without it. */
+    onBrowse?: (tagFor: string, target: PickTarget, seen: number) => void;
 }
 
 /** A key value row not yet stored: typed here until it has a label and a path, then saved with its key. */
@@ -175,6 +186,7 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
     state: PanelState = { drafts: {}, problems: {}, newRows: [], newParams: [], picker: null, tints: null };
 
     private readonly idBase = 'mapstudio-kindsetup-' + (++panelCount);
+    private readonly root = React.createRef<HTMLElement>();
     private rowCount = 0;
     /** The setup version each draft's first keystroke was typed on, by field. */
     private seen: Record<string, number> = {};
@@ -222,10 +234,38 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         this.props.onClearRefusal();
     }
 
-    componentDidUpdate(): void {
+    componentDidUpdate(prevProps: KindSetupPanelProps): void {
         this.askResolve();
         this.settle();
         this.foldStored();
+        this.leftBrowsing(prevProps.browsing);
+    }
+
+    /**
+     * A new row's own card closed, or moved to another button (entry 13b): while it was open the row was not finished when the
+     * cursor left it for the card. With the focus not back in the row once the card is gone, the row is finished as a blur
+     * finishes it.
+     */
+    private leftBrowsing(before: string | null | undefined): void {
+        const was = before ? readTagFor(before) : null;
+        if (!was || was.part !== 'new' || this.props.browsing === before) {
+            return;
+        }
+        const id = was.rowId;
+        // After this draw's own focus moves (the card gives the focus back to the tag button).
+        setTimeout(() => {
+            const button = this.tagButtonOf(TagFor.newRow(id));
+            const row = button ? button.closest('.mapstudio-kv-row') : null;
+            if (row && !row.contains(document.activeElement)) {
+                this.commitRow(id);
+            }
+        }, 0);
+    }
+
+    private tagButtonOf(tagFor: string): HTMLElement | null {
+        const root = this.root.current;
+        const buttons = root ? Array.from(root.querySelectorAll<HTMLElement>('.mapstudio-tag-button')) : [];
+        return buttons.filter((b) => b.getAttribute('data-tag-for') === tagFor)[0] || null;
     }
 
     private version(): number {
@@ -290,6 +330,12 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
             delete this.seen[field];
             delete this.lastSent[field];
         }
+        // The focus on a new row's tag button (a pick just came back to it) goes with the row as it becomes a stored one: it is
+        // put on the stored row's tag button.
+        const active = typeof document !== 'undefined' ? document.activeElement : null;
+        const onNew = active && active.getAttribute ? readTagFor(active.getAttribute('data-tag-for') || '') : null;
+        const settledRow = onNew && onNew.part === 'new' ? this.state.newRows.find((r) => r.id === onNew.rowId && r.key !== null && keys.indexOf(r.key) >= 0) : undefined;
+        const refocus = settledRow && settledRow.key !== null ? TagFor.kpi(settledRow.key) : null;
         this.setState((prev) => {
             const drafts = { ...prev.drafts };
             drop.forEach((field) => delete drafts[field]);
@@ -298,6 +344,11 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                 newRows: forgetSeen(prev.newRows.filter((r) => r.key === null || keys.indexOf(r.key) < 0), rowField, settled),
                 newParams: forgetSeen(prev.newParams.filter((p) => p.sentName === null || names.indexOf(p.sentName) < 0), paramField, settled)
             };
+        }, () => {
+            const button = refocus !== null ? this.tagButtonOf(refocus) : null;
+            if (button && (!document.activeElement || document.activeElement === document.body)) {
+                button.focus({ preventScroll: true });
+            }
         });
     }
 
@@ -610,6 +661,85 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         this.picking = null;
     }
 
+    // ---- The tag buttons (entry 13b) ----
+
+    /** The tag icon button at the end of a path: it opens the tag browser for that path. */
+    private tagButton(tagFor: string, target: PickTarget, name: string): React.ReactNode {
+        const onBrowse = this.props.onBrowse;
+        if (!onBrowse) {
+            return null;
+        }
+        const open = this.props.browsing === tagFor;
+        return (
+            <button type="button" className={'mapstudio-dock-button mapstudio-tag-button' + (open ? ' mapstudio-tag-button--open' : '')}
+                    data-tag-for={tagFor} disabled={this.off()} title="Pick a tag" aria-label={'Pick a tag for ' + name}
+                    aria-haspopup="dialog" aria-expanded={open} onClick={() => onBrowse(tagFor, target, this.version())}>
+                <ChromeGlyph name="tag" size={16} />
+            </button>
+        );
+    }
+
+    /**
+     * A pick from the tag browser, saved as a typed path is: one edit of that path, sent at the setup version seen when the card
+     * opened (another editor's save since meets the conflict), the field showing the path until the save settles. A new row
+     * takes the path and is saved once it has its label, as when its path is typed. Returns '' when the pick was taken (a path
+     * that is the stored one saves nothing and is taken too), else why it was not saved, in words for the card.
+     */
+    usePick(tagFor: string, path: string, seen: number): string {
+        const what = readTagFor(tagFor);
+        if (!what || path === '') {
+            return 'Not saved. This path cannot take a pick.';
+        }
+        if (this.off()) {
+            return 'Not saved. ' + this.props.paused;
+        }
+        if (what.part === 'new') {
+            const id = what.rowId;
+            if (!this.state.newRows.some((r) => r.id === id)) {
+                return 'Not saved. This key value row is gone.';
+            }
+            this.setState((prev) => ({
+                newRows: prev.newRows.map((r) => (r.id === id ? { ...r, path, seen: r.seen !== null ? r.seen : seen } : r))
+            }), () => this.commitRow(id));
+            return '';
+        }
+        const view = this.view();
+        let field: string;
+        let stored: string;
+        let edit: SetupEdit;
+        if (what.part === 'comms') {
+            field = Fields.commsPath;
+            stored = view.comms ? view.comms.path : '';
+            edit = { part: 'comms.path', path };
+        } else if (what.part === 'alarms') {
+            field = Fields.alarmsPath;
+            stored = view.alarms ? view.alarms.path : '';
+            edit = { part: 'alarms.path', path };
+        } else {
+            const kpi = view.kpis.find((k) => k.key === what.key);
+            if (!kpi) {
+                return 'Not saved. This key value row is gone.';
+            }
+            field = Fields.kpi(what.key, 'path');
+            stored = kpi.path;
+            edit = { part: 'kpi', key: what.key, patch: { path } };
+        }
+        if (this.hasRefusal(field)) {
+            this.props.onClearRefusal(field);
+        }
+        if (path === stored) {
+            this.dropDraft(field);
+            return '';
+        }
+        if (!this.send(field, edit, seen)) {
+            this.dropDraft(field);
+            return 'Not saved. Map Studio could not take the save now. Try again.';
+        }
+        this.lastSent[field] = path;
+        this.setState((prev) => ({ drafts: { ...prev.drafts, [field]: path }, problems: without(prev.problems, field) }));
+        return '';
+    }
+
     // ---- Key values ----
 
     private rowField(row: NewRow): string {
@@ -673,6 +803,8 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         const ats = row.key !== null ? [field, Fields.kpi(row.key, 'label'), Fields.kpi(row.key, 'path'), Fields.kpi(row.key, 'unit'),
             Fields.kpi(row.key, 'on'), Fields.kpi(row.key, 'icon')] : [field];
         const m = this.messages(field, ats);
+        const tagFor = TagFor.newRow(row.id);
+        const browsing = this.props.browsing === tagFor;
         const input = (part: 'label' | 'path' | 'unit', label: string, placeholder: string, mono: boolean): React.ReactElement => (
             <input ref={(el) => { this.inputs['kpis.new:' + row.id + '.' + part] = el; }} type="text"
                    className={'mapstudio-input mapstudio-kindsetup-input' + (mono ? ' mapstudio-mono' : '')} value={row[part]} placeholder={placeholder}
@@ -687,11 +819,13 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                    }} />
         );
         return (
-            <div key={'new:' + row.id} className="mapstudio-kv-row mapstudio-kv-row--new" role="group" aria-label={'New key value ' + (index + 1)}
+            <div key={'new:' + row.id} className={'mapstudio-kv-row mapstudio-kv-row--new' + (browsing ? ' mapstudio-kv-row--browsing' : '')}
+                 role="group" aria-label={'New key value ' + (index + 1)}
                  data-key={row.key || ''} data-new="true" data-field={field}
                  onBlur={(ev) => {
                      const to = ev.relatedTarget as Node | null;
-                     if (!to || !ev.currentTarget.contains(to)) {
+                     // Into the row's own tag browser: the row is not finished until its path is picked or the card is left.
+                     if (this.props.browsing !== tagFor && (!to || !ev.currentTarget.contains(to))) {
                          this.commitRow(row.id);
                      }
                  }}>
@@ -699,7 +833,12 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                     <div className="mapstudio-kv-label">{input('label', 'Label', 'Label', false)}</div>
                     <div className="mapstudio-kv-unit">{input('unit', 'Unit', 'Unit', false)}</div>
                 </div>
-                <div className="mapstudio-kv-path">{input('path', 'Tag path', '{asset.path}/Pressure', true)}</div>
+                <div className="mapstudio-kv-path">
+                    <div className="mapstudio-kindsetup-with-picker">
+                        {input('path', 'Tag path', '{asset.path}/Pressure', true)}
+                        {this.tagButton(tagFor, { part: 'kpi', index: this.view().kpis.length + index + 1 }, 'new key value ' + (index + 1))}
+                    </div>
+                </div>
                 {m.nodes}
                 <div className="mapstudio-kv-actions">
                     <span className="mapstudio-field-hint mapstudio-kv-new-hint">Saved once it has a label and a tag path.</span>
@@ -717,6 +856,7 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
     /** A stored row: each of its values saved when finished, by its key. */
     private renderRow(kpi: KeyValue, view: SetupView): React.ReactElement {
         const key = kpi.key;
+        const tagFor = TagFor.kpi(key);
         const name = kpi.label !== '' ? kpi.label : key;
         const label = this.messages(Fields.kpi(key, 'label'));
         const unit = this.messages(Fields.kpi(key, 'unit'));
@@ -726,7 +866,8 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         const blocked = removeBlocked(view, key);
         const starred = this.flag(Fields.kpi(key, 'icon'), kpi.icon);
         return (
-            <div key={key} className="mapstudio-kv-row" role="group" aria-label={name} data-key={key} data-new="false">
+            <div key={key} className={'mapstudio-kv-row' + (this.props.browsing === tagFor ? ' mapstudio-kv-row--browsing' : '')} role="group"
+                 aria-label={name} data-key={key} data-new="false">
                 <div className="mapstudio-kv-line">
                     <div className="mapstudio-kv-label" data-field={Fields.kpi(key, 'label')}>
                         {this.text({ field: Fields.kpi(key, 'label'), stored: kpi.label, label: 'Label of ' + name, placeholder: 'Label',
@@ -741,9 +882,12 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                 {label.nodes}
                 {unit.nodes}
                 <div className="mapstudio-kv-path" data-field={Fields.kpi(key, 'path')}>
-                    {this.text({ field: Fields.kpi(key, 'path'), stored: kpi.path, label: 'Tag path of ' + name, mono: true, placeholder: '{asset.path}/Pressure',
-                        invalid: path.invalid, describedBy: path.ids,
-                        edit: (text) => (text === '' ? { problem: 'Type a tag path. This change is not saved.' } : { part: 'kpi', key, patch: { path: text } }) })}
+                    <div className="mapstudio-kindsetup-with-picker">
+                        {this.text({ field: Fields.kpi(key, 'path'), stored: kpi.path, label: 'Tag path of ' + name, mono: true, placeholder: '{asset.path}/Pressure',
+                            invalid: path.invalid, describedBy: path.ids,
+                            edit: (text) => (text === '' ? { problem: 'Type a tag path. This change is not saved.' } : { part: 'kpi', key, patch: { path: text } }) })}
+                        {this.tagButton(tagFor, { part: 'kpi', index: view.kpis.indexOf(kpi) + 1 }, name)}
+                    </div>
                     {path.nodes}
                     {this.note(kpi.path)}
                 </div>
@@ -1163,14 +1307,15 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
 
     /** One labelled text field with its messages and, for a tag path, its resolve note. */
     private field(o: { field: string; label: string; stored: string; edit: (text: string) => Result; placeholder?: string; hint?: string;
-        note?: boolean; picker?: boolean; disabled?: string }): React.ReactElement {
+        note?: boolean; picker?: boolean; disabled?: string; tag?: { tagFor: string; target: PickTarget } }): React.ReactElement {
         const m = this.messages(o.field);
         const labelId = this.dom(o.field, 'label');
         const hintId = this.dom(o.field, 'hint');
         const input = this.text({ field: o.field, stored: o.stored, label: o.label, labelledBy: labelId, mono: true, placeholder: o.placeholder,
             invalid: m.invalid, describedBy: m.ids.concat(o.hint ? [hintId] : []), edit: o.edit, picker: o.picker, disabled: !!o.disabled });
         return (
-            <div className="mapstudio-kindsetup-field" data-field={o.field} title={o.disabled || undefined}>
+            <div className={'mapstudio-kindsetup-field' + (o.tag && this.props.browsing === o.tag.tagFor ? ' mapstudio-kindsetup-field--browsing' : '')}
+                 data-field={o.field} title={o.disabled || undefined}>
                 <span id={labelId} className="mapstudio-field-label">{o.label}</span>
                 {o.picker ? (
                     <div className="mapstudio-kindsetup-with-picker">
@@ -1180,6 +1325,11 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                             const caret = this.carets[o.field] || [null, null];
                             this.setDraft(o.field, insertAt(now, p, caret[0], caret[1]));
                         }, () => this.commit(o.field, o.stored, o.edit))}
+                    </div>
+                ) : o.tag ? (
+                    <div className="mapstudio-kindsetup-with-picker">
+                        {input}
+                        {this.tagButton(o.tag.tagFor, o.tag.target, o.label.toLowerCase())}
                     </div>
                 ) : input}
                 {m.nodes}
@@ -1228,14 +1378,16 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                 <section className="mapstudio-kindsetup-section" data-section="comms" aria-labelledby={head('comms')}>
                     {this.heading(3, 'Comms', head('comms'))}
                     {this.field({ field: Fields.commsPath, label: 'Heartbeat path', stored: view.comms ? view.comms.path : '', placeholder: '{asset.path}/Comms',
-                        note: true, hint: 'The clock for data age, Stale and Comms lost.', edit: (text) => ({ part: 'comms.path', path: text }) })}
+                        note: true, hint: 'The clock for data age, Stale and Comms lost.', tag: { tagFor: TagFor.comms, target: { part: 'comms' } },
+                        edit: (text) => ({ part: 'comms.path', path: text }) })}
                     {this.toggle({ field: Fields.commsOn, stored: view.comms ? view.comms.on : false, label: 'Show comms in the popup', kind: 'switch',
                         off: noComms, edit: (on) => ({ part: 'comms.on', on }) })}
                 </section>
                 <section className="mapstudio-kindsetup-section" data-section="alarms" aria-labelledby={head('alarms')}>
                     {this.heading(4, 'Alarms', head('alarms'))}
                     {this.field({ field: Fields.alarmsPath, label: 'Alarm source', stored: view.alarms ? view.alarms.path : '', placeholder: '{asset.path}',
-                        note: true, hint: 'The alarms below this path are the item\'s.', edit: (text) => ({ part: 'alarms.path', path: text }) })}
+                        note: true, hint: 'The alarms below this path are the item\'s.', tag: { tagFor: TagFor.alarms, target: { part: 'alarms' } },
+                        edit: (text) => ({ part: 'alarms.path', path: text }) })}
                     <div className="mapstudio-kindsetup-readonly" data-field="alarmPage">
                         <span className="mapstudio-field-label">View alarms</span>
                         <span className="mapstudio-field-text">
@@ -1274,7 +1426,7 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         );
         const top = this.topRefusals();
         return (
-            <section className="mapstudio-panel mapstudio-kindsetup" aria-label={kind.name + ' setup'} data-kind={kind.id}
+            <section ref={this.root} className="mapstudio-panel mapstudio-kindsetup" aria-label={kind.name + ' setup'} data-kind={kind.id}
                      data-version={String(this.version())} data-paused={paused} data-saving={this.props.saves.saving.join(' ')}
                      data-preview={preview ? preview.itemId : ''}>
                 {this.props.backName !== undefined && this.props.onBack ? (

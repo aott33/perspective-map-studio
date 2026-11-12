@@ -30,6 +30,8 @@
  * built from the newest stored one when it is sent, one save per kind in flight and the later edits after it at the version its
  * reply gave, never an undo step; an `invalid` reply's words are kept per kind for the field they name (`kindSaves`), a conflict,
  * the store unreachable and busy stay in the queue as entry 10's; and `askResolve` sends `tags.resolve` for the resolve notes.
+ * From entry 13b the tag browser's lookups (tagBrowser.ts): `askBrowse` sends one `tags.browse` per folder opened and keeps the
+ * answers while the card is open (`browse`), `askPick` sends a picked path's `tags.resolve`, and `closeBrowse` drops them all.
  */
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
@@ -42,8 +44,9 @@ import {
 } from './geometry';
 import { HostLists, NO_HOST_LISTS } from './adapters';
 import {
-    ErrorBody, MESSAGE_EVENT, Reply, basemapSource, editsHistory, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText, tagsResolve
+    ErrorBody, MESSAGE_EVENT, Reply, basemapSource, editsHistory, mapLoad, pointClick, popupClose, popupOpen, readReply, replyText, tagsBrowse, tagsResolve
 } from './messages';
+import { BrowseAnswers, FolderAnswer, NO_BROWSE, PickAnswer, TIMEOUT_CODE, browseKey } from './tagBrowser';
 import {
     HISTORY_EMPTY, HISTORY_PAGE, HistoryState, failRead, mergeFirstPage, mergeOlderPage, readFailedText, revertBatch, revertLabel, rowSentence
 } from './history';
@@ -207,6 +210,11 @@ export interface MapStudioDelegateState {
     kindSaves: Record<string, KindSaveState>;
     /** What `tags.resolve` said of each tag path asked (entry 12a), by kindSetup.ts `resolveKey` (kind, asset, path). */
     resolves: Record<string, ResolveState>;
+    /**
+     * The tag browser's answers while its card is open (entry 13b, tagBrowser.ts): the Gateway's providers, each folder asked of
+     * `tags.browse` by provider and folder, and what `tags.resolve` said of each picked path. Empty while the card is closed.
+     */
+    browse: BrowseAnswers;
 }
 
 /** An item's override the Gateway refused for good (entry 12c1): its words stand beside the row's field, the stored overrides stand. */
@@ -251,6 +259,12 @@ export const HISTORY_TIMEOUT_MS = 15_000;
 
 /** How long a `tags.resolve` may take before its note says the check did not answer (the Gateway gives the tag system 5 s). */
 export const RESOLVE_TIMEOUT_MS = 15_000;
+
+/** How long a `tags.browse` may take before the tag browser says the Gateway did not answer (entry 13b; the Gateway gives the tag system 5 s). */
+export const BROWSE_TIMEOUT_MS = 15_000;
+
+/** The most given-up tag asks whose late replies are still watched for. */
+export const BROWSE_GONE_MAX = 64;
 
 /** `localStorage`, or null when the browser refuses it (a private window, blocked site data). */
 export function browserStorage(): KeyValueStore | null {
@@ -386,6 +400,17 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     /** The resolve notes (entry 12a): what `tags.resolve` said per kind, asset and path, and the asks in flight by message id. */
     private resolves: Record<string, ResolveState> = {};
     private resolveAsks = new Map<string, { key: string; timer: ReturnType<typeof setTimeout> }>();
+    /**
+     * The tag browser (entry 13b): its answers while the card is open, the `tags.browse` asks in flight by message id (the key of
+     * the folder each asked for), the picks' `tags.resolve` asks by message id, and the ids of asks the card closed on, whose
+     * late replies are dropped without a word.
+     */
+    private browse: BrowseAnswers = NO_BROWSE;
+    private browseAsks = new Map<string, { key: string; timer: ReturnType<typeof setTimeout> }>();
+    private pickAsks = new Map<string, { path: string; timer: ReturnType<typeof setTimeout> }>();
+    private browseGone = new Set<string>();
+    /** Whether the last level map.load reported was full: the tag lookups go on while a failed load leaves the level unknown. */
+    private lastFull = false;
 
     constructor(componentStore: AbstractUIElementStore) {
         super(componentStore);
@@ -476,7 +501,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             user: this.user,
             history: this.history,
             kindSaves: this.kindSaveStates(),
-            resolves: this.resolves
+            resolves: this.resolves,
+            browse: this.browse
         };
     }
 
@@ -693,6 +719,162 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.resolves = { ...this.resolves, [ask.key]: state };
         console.debug('[MapStudio] ' + replyText(reply));
         this.notify();
+    }
+
+    /**
+     * Whether this session may ask the tag lookups: a full editor, by the level map.load reported. A phone editor and a viewer
+     * send nothing (the Gateway would refuse `role`). While a failed load leaves the level unknown, an open card keeps asking
+     * and the Gateway decides, as it does for every message.
+     */
+    private mayBrowse(): boolean {
+        return this.level === 'full' || (this.level === null && this.lastFull);
+    }
+
+    /** An ask given up on: its late reply is dropped without a word. The oldest go beyond a small cap (a reply may never come). */
+    private forget(id: string): void {
+        this.browseGone.add(id);
+        while (this.browseGone.size > BROWSE_GONE_MAX) {
+            this.browseGone.delete(this.browseGone.values().next().value as string);
+        }
+    }
+
+    private setFolder(key: string, answer: FolderAnswer): void {
+        this.browse = { ...this.browse, folders: { ...this.browse.folders, [key]: answer } };
+    }
+
+    private setPick(path: string, answer: PickAnswer): void {
+        this.browse = { ...this.browse, picks: { ...this.browse.picks, [path]: answer } };
+    }
+
+    /**
+     * The tag browser's tree (entry 13b; EXPERIENCE.md Tag browser): one `tags.browse` per folder opened, for a full editor only
+     * (anyone else sends nothing: the Gateway would refuse `role`). `provider` null is the Gateway's default one, `folder` ''
+     * the provider's root. An answer is kept while the card is open, so a folder is asked once; `again` (Try again) asks a
+     * folder that failed, or one already listed, once more. No answer within {@link BROWSE_TIMEOUT_MS} reads as a failure.
+     */
+    askBrowse(provider: string | null, folder: string, again = false): void {
+        if (!this.mayBrowse()) {
+            return;
+        }
+        const key = browseKey(provider, folder);
+        const held = this.browse.folders[key];
+        if (held && (held.state === 'loading' || !again)) {
+            return;
+        }
+        const message = tagsBrowse({ provider, folder });
+        const timer = setTimeout(() => {
+            this.browseAsks.delete(message.id);
+            this.forget(message.id);
+            this.setFolder(key, { state: 'failed', code: TIMEOUT_CODE, message: 'The Gateway did not answer in time.' });
+            console.info('[MapStudio] A tags.browse did not answer.');
+            this.notify();
+        }, BROWSE_TIMEOUT_MS);
+        this.browseAsks.set(message.id, { key, timer });
+        this.setFolder(key, { state: 'loading' });
+        this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject);
+        this.notify();
+    }
+
+    /**
+     * A reply to one of the browse asks: the folder's children under the key it was asked by and under the Gateway's own
+     * spelling of the provider and folder (the default provider is asked for without its name), with the providers; or the
+     * Gateway's refusal in words under the key it was asked by.
+     */
+    private onBrowseReply(reply: Reply): void {
+        if (reply.kind !== 'tags.browse.reply' && reply.kind !== 'error') {
+            return;
+        }
+        const ask = this.browseAsks.get(reply.id);
+        if (!ask) {
+            if (!this.browseGone.delete(reply.id)) {
+                console.info('[MapStudio] A tags.browse.reply that nothing waits for was ignored.');
+            }
+            return;
+        }
+        clearTimeout(ask.timer);
+        this.browseAsks.delete(reply.id);
+        if (reply.kind === 'error') {
+            this.setFolder(ask.key, { state: 'failed', code: reply.body.code, message: reply.body.message });
+        } else {
+            const answer: FolderAnswer = { state: 'loaded', children: reply.body.children, truncated: reply.body.truncated };
+            const own = browseKey(reply.body.provider, reply.body.folder);
+            this.browse = {
+                ...this.browse, providers: reply.body.providers,
+                folders: { ...this.browse.folders, [own]: answer, [ask.key]: answer }
+            };
+        }
+        console.debug('[MapStudio] ' + replyText(reply));
+        this.notify();
+    }
+
+    /**
+     * A row picked in the tag browser (entry 13b, owner decision 3): `tags.resolve` with its full path and the preview item's
+     * asset, so the Gateway says how the path is saved (`{asset.path}/...` inside the asset folder, the full path outside it)
+     * and what it resolves for. A path already asked or answered is not asked twice, unless its check failed.
+     */
+    askPick(kindId: string, assetId: string, path: string): void {
+        if (!this.mayBrowse() || path === '') {
+            return;
+        }
+        const held = this.browse.picks[path];
+        if (held && held.state !== 'failed') {
+            return;
+        }
+        const message = tagsResolve({ kindId, assetId, path });
+        const timer = setTimeout(() => {
+            this.pickAsks.delete(message.id);
+            this.forget(message.id);
+            this.setPick(path, { state: 'failed', message: 'the Gateway did not answer in time.' });
+            console.info('[MapStudio] A tags.resolve did not answer.');
+            this.notify();
+        }, RESOLVE_TIMEOUT_MS);
+        this.pickAsks.set(message.id, { path, timer });
+        this.setPick(path, { state: 'asking' });
+        this.fireEvent(MESSAGE_EVENT, message as unknown as JsObject);
+        this.notify();
+    }
+
+    private onPickReply(reply: Reply): void {
+        if (reply.kind !== 'tags.resolve.reply' && reply.kind !== 'error') {
+            return;
+        }
+        const ask = this.pickAsks.get(reply.id);
+        if (!ask) {
+            return;
+        }
+        clearTimeout(ask.timer);
+        this.pickAsks.delete(reply.id);
+        if (reply.kind === 'error') {
+            this.setPick(ask.path, { state: 'failed', message: reply.body.message });
+        } else {
+            const body = reply.body;
+            this.setPick(ask.path, {
+                state: 'answered', path: body.path, relative: body.relative,
+                ...(body.n !== undefined && body.m !== undefined ? { n: body.n, m: body.m } : {}),
+                ...(body.failing ? { failing: body.failing.map((f) => f.name), failingMore: body.failingMore || 0 } : {})
+            });
+        }
+        console.debug('[MapStudio] ' + replyText(reply));
+        this.notify();
+    }
+
+    /** The tag browser's card closed: its answers go, and so do the asks still on their way (their replies are dropped). */
+    closeBrowse(): void {
+        const idle = this.browse === NO_BROWSE && this.browseAsks.size === 0 && this.pickAsks.size === 0;
+        this.browseAsks.forEach((ask, id) => {
+            clearTimeout(ask.timer);
+            this.forget(id);
+        });
+        this.pickAsks.forEach((ask, id) => {
+            clearTimeout(ask.timer);
+            this.forget(id);
+        });
+        this.browseAsks.clear();
+        this.pickAsks.clear();
+        this.browse = NO_BROWSE;
+        if (!idle) {
+            this.notify();
+        }
     }
 
     /**
@@ -1838,6 +2020,11 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.clearHistoryTimer('older');
         this.resolveAsks.forEach((ask) => clearTimeout(ask.timer));
         this.resolveAsks.clear();
+        this.browseAsks.forEach((ask) => clearTimeout(ask.timer));
+        this.browseAsks.clear();
+        this.pickAsks.forEach((ask) => clearTimeout(ask.timer));
+        this.pickAsks.clear();
+        this.browseGone.clear();
         if (this.loadRetryTimer !== null) {
             clearTimeout(this.loadRetryTimer);
             this.loadRetryTimer = null;
@@ -2065,6 +2252,18 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             }
             return;
         }
+        if (reply.kind === 'tags.browse.reply' || (reply.kind === 'error' && this.browseAsks.has(reply.id))) {
+            this.onBrowseReply(reply);
+            return;
+        }
+        if ((reply.kind === 'tags.resolve.reply' || reply.kind === 'error') && this.pickAsks.has(reply.id)) {
+            this.onPickReply(reply);
+            return;
+        }
+        if ((reply.kind === 'tags.resolve.reply' || reply.kind === 'error') && this.browseGone.delete(reply.id)) {
+            // The tag browser closed, or gave up waiting, before this answer came.
+            return;
+        }
         if (reply.kind === 'tags.resolve.reply' || (reply.kind === 'error' && this.resolveAsks.has(reply.id))) {
             this.onResolveReply(reply);
             return;
@@ -2091,6 +2290,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         console.info('[MapStudio] ' + replyText(reply));
         if (reply.kind === 'map.load.reply') {
             this.level = reply.body.level;
+            this.lastFull = reply.body.level === 'full';
             this.lists = reply.body.lists;
             // Other editors' changes as of this load (entry 7a); this session's saves since then are set as they save.
             this.changed = reply.body.changed || {};

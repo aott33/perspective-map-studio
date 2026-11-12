@@ -3,7 +3,7 @@
 // window.__mapStudioTest (web/typescript/testHook.ts), against the dev tag provider `default`
 // seeded on a fresh volume from ops/config/core (Mesa/P12 and P14 instances of the UDT Pad,
 // Mesa/P15 a folder with Flow only, Plant/Header/Pressure, Plant/AmbientTemp) and, from epic 4
-// entry 13a, the second provider `Site2` (Yard/WindSpeed, Yard/Tank1/Level and Comms). The Gateway
+// entry 13a, the second provider `Site2` (Yard/WindSpeed, Yard/Tank1/Level and Comms; from entry 13b the empty folder Yard/Spare). The Gateway
 // checks the session user's roles; only a full editor gets an answer. Nothing here writes a tag; one
 // test stops the second provider through the Gateway's REST API and starts it again.
 
@@ -135,6 +135,8 @@ editorTest.describe('tag browse and resolve', () => {
         const yard = expectReply(await send(page, 'tags.browse', { provider: 'site2', folder: 'Yard' }), 'tags.browse.reply');
         expect(yard.provider).toBe('Site2');
         expect(yard.children).toEqual([
+            // An empty folder (entry 13b, for the tag browser's "No tags in this folder").
+            { name: 'Spare', path: '[Site2]Yard/Spare', type: 'folder', dataType: null, hasChildren: false },
             { name: 'Tank1', path: '[Site2]Yard/Tank1', type: 'folder', dataType: null, hasChildren: true },
             { name: 'WindSpeed', path: '[Site2]Yard/WindSpeed', type: 'tag', dataType: 'Float8', hasChildren: false }
         ]);
@@ -159,7 +161,7 @@ editorTest.describe('tag browse and resolve', () => {
         await expect.poll(async () => (await send(page, 'tags.browse', { provider: 'Site2', folder: 'Yard' })).type,
             { timeout: 60_000 }).toBe('tags.browse.reply');
         expect(names(expectReply(await send(page, 'tags.browse', { provider: 'Site2', folder: 'Yard' }), 'tags.browse.reply')))
-            .toEqual(['Tank1', 'WindSpeed']);
+            .toEqual(['Spare', 'Tank1', 'WindSpeed']);
     });
 
     editorTest('a phone editor is refused role for both lookups', async ({ browser }) => {
