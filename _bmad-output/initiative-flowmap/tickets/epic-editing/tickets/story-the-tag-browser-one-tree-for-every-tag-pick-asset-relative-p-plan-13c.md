@@ -4,14 +4,14 @@ type: 'feature'
 ticket: ''
 part_of: '13'
 created: '2026-11-12'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '6ca752cf86f937443399d86d8dd148b2c79d4bb1'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md', '{project-root}/docs/contract.md', '{project-root}/docs/kind-setup.md']
 ---
@@ -67,12 +67,12 @@ Decisions (owner, 2026-11-12, "approve and continue" on the plan and its thirtee
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `web/typescript/tagBrowser.ts`, `tagBrowser.test.ts` -- the new targets (kind rule, param, new param, override, own rule), their For lines, button words and notes; the note from a typed path; the item target's full-path rule -- C4 to C9, tests first.
-- [ ] `web/typescript/studio/TagBrowser.tsx`, `MapStudioStoreDelegate.ts`, their tests -- the typed Path field, its ask with a pause, a refused ask's words, the field usable in every tree state -- C7 to C11.
-- [ ] `web/typescript/studio/RuleEditor.tsx`, `KindSetupPanel.tsx`, tests -- the tag button on the rule's path and on param values, picks into the draft and the param edits, the new-param guard -- C1 to C3, C5.
-- [ ] `web/typescript/studio/PropertiesPanel.tsx`, `MapStudio.tsx`, `mapstudio.css`, tests -- the tag button on an override row and the own rule, the card on the Items surface for one item, its closing and focus -- C4 to C6, C12.
-- [ ] `e2e/tests/tagbrowser.spec.mjs` (or a second spec beside it) -- C1 to C12 live on the dev Gateway, with a screenshot of each new state.
-- [ ] `docs/contract.md`, `docs/kind-setup.md`, `CHANGELOG.md`, DESIGN.md, EXPERIENCE.md, `docs/test-playbook-0.4.0.md` section 8r (and the 13c pointers in 8n, 8o, 8q) -- the "until 13c" lines made true.
+- [x] `web/typescript/tagBrowser.ts`, `tagBrowser.test.ts` -- the new targets (kind rule, param, new param, override, own rule), their For lines, button words and notes; the note from a typed path; the item target's full-path rule -- C4 to C9, tests first.
+- [x] `web/typescript/studio/TagBrowser.tsx`, `MapStudioStoreDelegate.ts`, their tests -- the typed Path field, its ask with a pause, a refused ask's words, the field usable in every tree state -- C7 to C11.
+- [x] `web/typescript/studio/RuleEditor.tsx`, `KindSetupPanel.tsx`, tests -- the tag button on the rule's path and on param values, picks into the draft and the param edits, the new-param guard -- C1 to C3, C5.
+- [x] `web/typescript/studio/PropertiesPanel.tsx`, `MapStudio.tsx`, `mapstudio.css`, tests -- the tag button on an override row and the own rule, the card on the Items surface for one item, its closing and focus -- C4 to C6, C12.
+- [x] `e2e/tests/tagbrowser.spec.mjs` (or a second spec beside it) -- C1 to C12 live on the dev Gateway, with a screenshot of each new state.
+- [x] `docs/contract.md`, `docs/kind-setup.md`, `CHANGELOG.md`, DESIGN.md, EXPERIENCE.md, `docs/test-playbook-0.4.0.md` section 8r (and the 13c pointers in 8n, 8o, 8q) -- the "until 13c" lines made true.
 
 **Acceptance Criteria:**
 - Given a full editor on the dev Gateway, when they open the browser from P14's override row and pick a tag, then Live now shows the full path marked Override with Reset, and Undo takes it back.
@@ -82,10 +82,19 @@ Decisions (owner, 2026-11-12, "approve and continue" on the plan and its thirtee
 ## Implementation Notes
 
 - Planner, 2026-11-12: the environment and identity rules are 13b's plan's first Implementation Note; they hold here unchanged. Leave the work uncommitted; run the specs you touch, not the whole suite. The Code Map's line numbers are a guide.
+- Implementer, 2026-11-12: built as planned, left uncommitted. Where the build chose within the plan: (1) `PickTarget` gained the parts `rule`, `param`, `override` and `ownRule` with `name`, `item` and `folders`; the tag buttons' ids are `styleRule.path`, `param:<name>`, `param.new:<row>`, `override:<row>` and `own.styleRule.path`. (2) A typed path is asked 400 ms after the last key (`TYPED_PAUSE_MS`) or on Enter, as the trimmed text, through the delegate's `askPick` unchanged; a failed pick now keeps the Gateway's code, so an `invalid` reply shows its words alone and any other failure keeps "Could not check this path: ...". (3) The rule's pick goes through `RuleEditor.usePath`, at the editor's own `ruleBase`. (4) An override's field and its tag button stand in one wrapper whose blur finishes the field, not while that row's card is open; a pick is the field finished with that path (`PropertiesPanel.usePick`), the focus back on the row's button. (5) An item's card also closes when the other tab is chosen, when the override's field closes (Esc in it) and when the own rule is reset, since its tag button is gone then. (6) A folder is a pick for an override of the Alarms row, as for a kind's Alarms, and nowhere else. (7) A kind with no linked item cannot ask the Gateway: a typed full path is taken by `itemOverrides.pathProblem`, and a typed `{asset.path}/...` is told "No meter is linked to an asset, so {asset.path}/X cannot be checked here. Type a full path such as [default]Shared/GasPrice." rather than in the override check's words, which name an override. (8) A new param row not named yet reads "For: A new popup param of the Well pad kind". (9) The shared-tag sentence ends by the value: "... every well pad's rule reads this one tag.", "... every well pad's popup view gets this one path." (10) The e2e matrix is a second spec, `e2e/tests/tagpicks.spec.mjs` (the dev map's Point 2 is the plan's P14); `tagbrowser.spec.mjs` B1 now lists the style rule's button and no longer expects a read-only Path field. The eleven renders were copied from `e2e/out/screenshots` to `docs/screenshots` (the same files `E2E_DOCS=1` writes). The whole e2e suite was not run here (the orchestrator's).
 
 ## Plan Change Log
 
 ## Review Triage Log
+
+Quick review, 2026-11-12 (one reviewer, by inspection). The rules hold (no em dash, no new message type or field, no version bump, no TypeScript copy of the resolve rule); C1 to C12 each have a test in `tagpicks.spec.mjs`. Three findings: 0 high, 3 medium, 0 low, 0 false, 0 maybe-false. All routed patch, to the implementer.
+
+- medium, patch: the rule's card outlives its tag button. With the card open, moving the rule's Value to a key value or changing the rule's type leaves the card, and "Use this tag" then turns the source back to a tag path and may save the rule (`RuleEditor.usePath` refuses only `none` and `instruments`; nothing closes the card). The card closes when its rule no longer shows a tag path field, for the kind and the item alike, and `usePath` refuses when the source is not a tag path.
+- medium, patch: an override pick can close the card with nothing saved. `PropertiesPanel.usePick` calls `commitOverride`, which sends nothing when the path is the one the row reads now (`text === row.path`) or the one the Gateway just refused, and still answers taken. `usePick` says so in words and the card stays open.
+- medium, patch: text typed in an override's field is dropped when, with its card open, Override or Change is pressed on another row (the wrapper's blur is skipped while browsing, and `startOverride` overwrites the field). The open field is finished as on a blur before another row's field opens.
+
+Outcome (2026-11-12): three patches applied, none deferred or dismissed. The orchestrator's Verification on the patched code: tsc clean, Jest 1116 passed, Gradle BUILD SUCCESSFUL, the contract check OK, and on a fresh stack the whole suite 331 passed, 9 skipped (the store-check and Gateway-stop scenarios, run by hand), 0 failed in 1.3 h.
 
 ## Design Notes
 

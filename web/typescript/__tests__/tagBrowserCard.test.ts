@@ -35,7 +35,7 @@ const OPENED: BrowseAnswers = {
 const noop = (): void => undefined;
 
 /** The card's markup, its tree changed first as a person's clicks and keys would change it. */
-function card(over: Partial<TagBrowserProps> = {}, change?: (tree: TreeState) => TreeState, refused?: string): string {
+function card(over: Partial<TagBrowserProps> = {}, change?: (tree: TreeState) => TreeState, refused?: string, typed?: string): string {
     const props: TagBrowserProps = {
         kind: PAD, tagFor: 'kpis.pressure.path', target: { part: 'kpi', index: 2 }, preview: { name: 'Point 2', folder: '[default]Mesa/P14' },
         answers: OPENED, onBrowse: noop, onAskPick: noop, onUse: () => '', onClose: noop, onGone: noop, ...over
@@ -48,6 +48,9 @@ function card(over: Partial<TagBrowserProps> = {}, change?: (tree: TreeState) =>
             }
             if (refused) {
                 this.state = { ...this.state, refused };
+            }
+            if (typed !== undefined) {
+                this.state = { ...this.state, typed };
             }
         }
     }
@@ -102,8 +105,12 @@ describe('the card (B1)', () => {
         expect(all.map((r) => attr(r, 'tabindex'))).toEqual(['-1', '0', '-1', '-1', '-1', '-1']);
     });
 
-    test('nothing is picked: the Path field is empty and read only, the note says where it opened, the button is inert', () => {
-        expect(html).toMatch(/<input type="text" id="[^"]+" class="mapstudio-input mapstudio-mono" readonly="" value="" placeholder="Pick in the tree"/);
+    test('nothing is picked: the Path field is empty and can be typed in, the note says where it opened, the button is inert', () => {
+        const input = (/<input type="text" id="[^"]+" class="mapstudio-input mapstudio-mono"[^>]*>/.exec(html) || [''])[0];
+        expect(input).toContain('value="" placeholder="Pick in the tree or type one"');
+        expect(input).toContain('data-typed="false"');
+        expect(input).not.toContain('readonly');
+        expect(input).not.toContain('disabled');
         expect(html).toContain('data-tone="plain" data-save=""');
         expect(html).toContain('Opened at Point 2&#x27;s asset folder, the preview item.');
         expect(html).toMatch(/class="mapstudio-button mapstudio-button--primary mapstudio-tagbrowser-use" disabled="">Use this tag<\/button>/);
@@ -232,5 +239,112 @@ describe('a pick that was not saved', () => {
         const html = card({ preview: { name: 'Pad 99', folder: 'Mesa/P99' }, answers });
         expect(html).toContain('Pad 99&#x27;s asset has no tag folder to open, so the tree starts at the top.');
         expect(html).not.toContain('is linked to an asset');
+    });
+});
+
+describe('a typed path (entry 13c, C7 to C11)', () => {
+    const answered = (path: string, answer: BrowseAnswers['picks'][string]): BrowseAnswers => ({ ...OPENED, picks: { [path]: answer } });
+
+    test('C7: a typed full path shows as typed; the note and the button follow the Gateway\'s answer as for a pick', () => {
+        const typed = '[default]Mesa/P14/Pressure';
+        const html = card({ answers: answered(typed, { state: 'answered', path: '{asset.path}/Pressure', relative: true, n: 4, m: 5, failing: ['Point 3'], failingMore: 0 }) },
+            undefined, undefined, '  ' + typed + ' ');
+        expect(html).toContain('value="  [default]Mesa/P14/Pressure "');
+        expect(html).toContain('data-typed="true"');
+        expect(html).toContain('data-tone="plain" data-save="{asset.path}/Pressure"');
+        expect(html).toMatch(/Resolves for 4 of 5 well pads\. Not for Point 3\./);
+        expect(html).toMatch(/mapstudio-tagbrowser-use">Use this tag<\/button>/);
+        // Typing drops the tree's pick: no row is picked.
+        expect(rows(html).filter((r) => attr(r, 'data-picked') === 'true')).toEqual([]);
+    });
+
+    test('C8: {asset.path}/... typed is answered the same; until the answer the button waits', () => {
+        const typed = '{asset.path}/Pressure';
+        expect(card({}, undefined, undefined, typed)).toMatch(/Checking\.\.\..*mapstudio-tagbrowser-use" disabled="">Use this tag/);
+        const html = card({ answers: answered(typed, { state: 'answered', path: typed, relative: true, n: 5, m: 5 }) }, undefined, undefined, typed);
+        expect(html).toContain('data-save="{asset.path}/Pressure"');
+        expect(html).toMatch(/Resolves for 5 of 5 well pads/);
+    });
+
+    test('C9: a path the Gateway refuses shows its words on the warning tone and the button is inert', () => {
+        const typed = '[default]Mesa//P14';
+        const words = 'The path [default]Mesa//P14 has an empty part between two /.';
+        const html = card({ answers: answered(typed, { state: 'failed', code: 'invalid', message: words }) }, undefined, undefined, typed);
+        expect(html).toContain('data-tone="warning" data-save=""');
+        expect(html).toContain('<span>' + words + '</span>');
+        expect(html).not.toContain('Could not check this path');
+        expect(html).toMatch(/mapstudio-tagbrowser-use" disabled="">Use this tag/);
+    });
+
+    test('C10: with a provider it cannot browse the Path field still takes a path and its answer is used', () => {
+        const typed = '[default]Mesa/P14/Pressure';
+        const html = card({
+            answers: { providers: PROVIDERS, folders: { [browseKey('Site2', '')]: { state: 'failed', code: 'tags-unavailable', message: 'Site2 does not answer.' } },
+                picks: { [typed]: { state: 'answered', path: '{asset.path}/Pressure', relative: true, n: 5, m: 5 } } }
+        }, (t) => chooseProvider(t, 'Site2'), undefined, typed);
+        expect(html).toContain('Can&#x27;t browse Site2');
+        expect(html).toContain('value="[default]Mesa/P14/Pressure"');
+        expect(html).toContain('data-save="{asset.path}/Pressure"');
+        expect(html).toMatch(/mapstudio-tagbrowser-use">Use this tag<\/button>/);
+    });
+
+    test('C11: with no typed text the field shows the picked row\'s path; an emptied field is the opening note again', () => {
+        expect(card({}, (t) => ({ ...t, picked: PRESSURE }))).toContain('value="[default]Mesa/P14/Pressure"');
+        const emptied = card({}, undefined, undefined, '');
+        expect(emptied).toContain('Opened at Point 2&#x27;s asset folder, the preview item.');
+        expect(emptied).toMatch(/mapstudio-tagbrowser-use" disabled="">/);
+    });
+});
+
+describe('one item\'s card (entry 13c, C4 to C6, C8)', () => {
+    const OVERRIDE = { part: 'override' as const, name: 'Casing pressure', item: 'P14' };
+    const over = (more: Partial<TagBrowserProps> = {}): Partial<TagBrowserProps> =>
+        ({ tagFor: 'override:kpi:casing', target: OVERRIDE, preview: { name: 'P14', folder: '[default]Mesa/P14' }, ...more });
+
+    test('C4: the For line, the item\'s own asset folder, and a pick saved as the full path with the Override tag and Use for P14', () => {
+        const asked: string[] = [];
+        const html = card(over({ onAskPick: (p) => asked.push(p) }), (t) => ({ ...t, picked: PRESSURE }));
+        expect(html).toContain('For: Casing pressure on P14 only - an override');
+        expect(html).toContain('data-part="override"');
+        expect(html).toContain('data-tone="plain" data-save="[default]Mesa/P14/Pressure"');
+        expect(html).toContain('<span>Saved for P14 only, as the full path</span>');
+        expect(html).toContain('<div class="mapstudio-mono mapstudio-tagbrowser-note-path">[default]Mesa/P14/Pressure</div>');
+        expect(html).toContain('<div class="mapstudio-tagbrowser-note-override"><span class="mapstudio-override-tag">Override</span></div>');
+        expect(html).toMatch(/mapstudio-tagbrowser-use">Use for P14<\/button>/);
+        expect(html).not.toContain('Checking...');
+        expect(asked).toEqual([]);
+    });
+
+    test('C5: the own rule\'s For line; nothing picked says where it opened and that a pick is for P14 only', () => {
+        const html = card(over({ tagFor: 'own.styleRule.path', target: { part: 'ownRule', item: 'P14' } }));
+        expect(html).toContain('For: Style rule of P14 only');
+        expect(html).toContain('Opened at P14&#x27;s asset folder. A pick is saved for P14 only, as the full path.');
+        expect(html).toMatch(/mapstudio-tagbrowser-use" disabled="">Use for P14/);
+    });
+
+    test('C6: an item with no asset opens the default provider\'s top; a pick is its full path', () => {
+        const top: BrowseAnswers = { providers: PROVIDERS, folders: { [browseKey(null, '')]: loaded([folder('[default]Mesa'), AMBIENT]),
+            [browseKey('default', '')]: loaded([folder('[default]Mesa'), AMBIENT]) }, picks: {} };
+        const html = card(over({ preview: null, answers: top }), (t) => ({ ...t, provider: 'default', picked: AMBIENT }));
+        expect(rows(html).map((r) => attr(r, 'data-path'))).toEqual(['[default]Mesa', '[default]Plant/AmbientTemp']);
+        expect(html).toContain('data-save="[default]Plant/AmbientTemp"');
+        expect(card(over({ preview: null, answers: top }))).toContain('P14 is not linked to an asset with a tag folder, so the tree starts at the top.');
+    });
+
+    test('C8: {asset.path}/... typed for an item is refused with the override check\'s words; a typed full path is taken', () => {
+        const refused = card(over(), undefined, undefined, '{asset.path}/Pressure');
+        expect(refused).toContain('data-tone="warning" data-save=""');
+        expect(refused).toContain('an override&#x27;s tag path is a full path such as [default]Mesa/P12/Pressure, not {asset.path}/Pressure.');
+        expect(refused).toMatch(/mapstudio-tagbrowser-use" disabled="">Use for P14/);
+        const taken = card(over(), undefined, undefined, '[default]Mesa/P14/Casing');
+        expect(taken).toContain('data-save="[default]Mesa/P14/Casing"');
+        expect(taken).toMatch(/mapstudio-tagbrowser-use">Use for P14<\/button>/);
+    });
+
+    test('a folder is a pick for an override of Alarms only', () => {
+        expect(card(over(), (t) => ({ ...t, picked: P15 }))).toContain('<span>Pick a tag, not a folder.</span>');
+        const alarms = card(over({ tagFor: 'override:alarms', target: { part: 'override', name: 'Alarms', item: 'P14', folders: true } }), (t) => ({ ...t, picked: P15 }));
+        expect(alarms).toContain('data-save="[default]Mesa/P15"');
+        expect(alarms).toMatch(/mapstudio-tagbrowser-use">Use for P14<\/button>/);
     });
 });

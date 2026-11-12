@@ -5535,6 +5535,42 @@ textarea.mapstudio-input.mapstudio-rule-expression {
     box-shadow: inset 3px 0 0 var(--callToAction);
 }
 
+.mapstudio-param-row--browsing {
+    margin: -4px -8px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--mapstudio-selection-tint);
+    box-shadow: inset 3px 0 0 var(--callToAction);
+}
+
+/* Entry 13c: the style rule's tag path with its tag button, and an override's field with its own in Details' Live now. */
+.mapstudio-rule-pathline > .mapstudio-input.mapstudio-rule-path,
+.mapstudio-override-line > .mapstudio-input.mapstudio-override-input {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+}
+
+.mapstudio-override-line {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.mapstudio-override-line--browsing {
+    margin: -4px -8px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--mapstudio-selection-tint);
+    box-shadow: inset 3px 0 0 var(--callToAction);
+}
+
+/* One item's pick in the tag browser's note: the Override tag under the full path. */
+.mapstudio-tagbrowser-note-override {
+    margin-top: 4px;
+}
+
 /* The tag browser (entry 13b; DESIGN.md components.tag-browser): a floating card over the map's left edge, beside the panel it
    was opened from, 380 px wide, under the toolbar's row and above the map's other cards. The tree's box takes what height the
    map leaves, up to 268 px, and scrolls. */

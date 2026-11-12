@@ -171,11 +171,22 @@ describe('the pick\'s tags.resolve', () => {
         expect(browse().picks['[default]Plant/AmbientTemp']).toEqual({ state: 'answered', path: '[default]Plant/AmbientTemp', relative: false });
         delegate.askPick('pad', 'P14', '[Site2]Yard/WindSpeed');
         reply(MessageTypes.ERROR, lastOf(MessageTypes.TAGS_RESOLVE).id, { code: 'tags-unavailable', message: 'The tag system did not answer.' });
-        expect(browse().picks['[Site2]Yard/WindSpeed']).toEqual({ state: 'failed', message: 'The tag system did not answer.' });
+        expect(browse().picks['[Site2]Yard/WindSpeed']).toEqual({ state: 'failed', code: 'tags-unavailable', message: 'The tag system did not answer.' });
         delegate.askPick('pad', 'P14', '[Site2]Yard/WindSpeed');
         expect(ofType(MessageTypes.TAGS_RESOLVE)).toHaveLength(3);
         jest.advanceTimersByTime(RESOLVE_TIMEOUT_MS);
-        expect(browse().picks['[Site2]Yard/WindSpeed']).toEqual({ state: 'failed', message: 'the Gateway did not answer in time.' });
+        expect(browse().picks['[Site2]Yard/WindSpeed']).toEqual({ state: 'failed', code: 'timeout', message: 'the Gateway did not answer in time.' });
+    });
+
+    test('C7 to C9: a typed path is asked as it was typed, a full path and {asset.path}/... alike; a refusal keeps the Gateway\'s code and words', () => {
+        delegate.askPick('pad', 'P14', '{asset.path}/Pressure');
+        expect(lastOf(MessageTypes.TAGS_RESOLVE).body).toEqual({ kindId: 'pad', assetId: 'P14', path: '{asset.path}/Pressure' });
+        reply(MessageTypes.TAGS_RESOLVE_REPLY, lastOf(MessageTypes.TAGS_RESOLVE).id, { path: '{asset.path}/Pressure', relative: true, n: 5, m: 5 });
+        expect(browse().picks['{asset.path}/Pressure']).toEqual({ state: 'answered', path: '{asset.path}/Pressure', relative: true, n: 5, m: 5 });
+        delegate.askPick('pad', 'P14', '[default]Mesa//P14');
+        const words = 'The path [default]Mesa//P14 has an empty part between two /.';
+        reply(MessageTypes.ERROR, lastOf(MessageTypes.TAGS_RESOLVE).id, { code: 'invalid', message: words });
+        expect(browse().picks['[default]Mesa//P14']).toEqual({ state: 'failed', code: 'invalid', message: words });
     });
 
     test('the Kinds screen\'s resolve notes are answered as before while a pick is asked', () => {

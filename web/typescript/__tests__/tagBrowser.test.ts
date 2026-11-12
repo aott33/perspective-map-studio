@@ -4,7 +4,8 @@
 import { Kind } from '../adapters';
 import { TagChild } from '../messages';
 import {
-    BrowseAnswers, EMPTY_WORDS, FolderAnswer, LOADING_WORDS, TRUNCATED_WORDS, TagFor, TreeState, ancestors, assetFolderOf, assetProblem, browseKey, canPick, cardNote,
+    BrowseAnswers, EMPTY_WORDS, FolderAnswer, LOADING_WORDS, PickAnswer, TRUNCATED_WORDS, TagFor, TreeState, ancestors, assetFolderOf, assetProblem, browseKey, canPick,
+    cardNote, isItemTarget,
     chooseProvider, closeFolder, focusRow, foldersToAsk, forLine, keyAction, needsProviders, openFolder, outsideAsset, pickProblem, providerOptions, readTagFor, rootProblem,
     rowsInView, shownProvider, splitFullPath, startState, toAssetFolder, typeWord, useText
 } from '../tagBrowser';
@@ -278,6 +279,93 @@ describe('the words', () => {
         expect(forLine({ part: 'alarms' }, PAD)).toBe('For: Alarms of the Well pad kind');
     });
 
+    test('entry 13c: the For lines of the style rule, a popup param, an override and an item\'s own rule', () => {
+        expect(forLine({ part: 'rule' }, PAD)).toBe('For: Style rule of the Well pad kind');
+        expect(forLine({ part: 'param', name: 'wellId' }, PAD)).toBe('For: Popup param wellId of the Well pad kind');
+        expect(forLine({ part: 'param', name: '' }, PAD)).toBe('For: A new popup param of the Well pad kind');
+        expect(forLine({ part: 'override', name: 'Casing pressure', item: 'P14' }, PAD)).toBe('For: Casing pressure on P14 only - an override');
+        expect(forLine({ part: 'ownRule', item: 'P14' }, PAD)).toBe('For: Style rule of P14 only');
+    });
+
+    test('entry 13c: the button reads Use for P14 on an item\'s target; a folder is a pick for Alarms only, an override of it too', () => {
+        expect(useText(null, { part: 'override', item: 'P14' })).toBe('Use for P14');
+        expect(useText(PRESSURE, { part: 'ownRule', item: 'P14' })).toBe('Use for P14');
+        expect(useText(PRESSURE, { part: 'rule' })).toBe('Use this tag');
+        expect(useText(MESA, { part: 'param', name: 'x' })).toBe('Use this tag');
+        expect((['rule', 'param', 'ownRule', 'override'] as const).map((part) => canPick(MESA, { part }))).toEqual([false, false, false, false]);
+        expect(canPick(MESA, { part: 'override', folders: true })).toBe(true);
+        expect(pickProblem(MESA, { part: 'rule' })).toBe('Pick a tag, not a folder.');
+        expect(isItemTarget({ part: 'override' }) && isItemTarget({ part: 'ownRule' }) && !isItemTarget({ part: 'param' })).toBe(true);
+    });
+
+    describe('entry 13c: a typed path and the newer targets', () => {
+        const typedNote = (over: Partial<Parameters<typeof cardNote>[0]>) =>
+            cardNote({ kind: PAD, part: 'kpi', asset: ASSET, picked: null, pick: undefined, assetProblem: '', ...over });
+        const inside: PickAnswer = { state: 'answered', path: '{asset.path}/Pressure', relative: true, n: 4, m: 5, failing: ['Point 3'], failingMore: 0 };
+
+        test('C7, C8: a typed path waits for the Gateway and then reads as a pick does', () => {
+            expect(typedNote({ typed: '[default]Mesa/P14/Pressure' })).toMatchObject({ text: 'Checking...', save: null });
+            expect(typedNote({ typed: '[default]Mesa/P14/Pressure', pick: inside })).toEqual({
+                tone: 'plain', title: '', text: 'Inside Point 2\'s asset folder - saved for every well pad as', path: '{asset.path}/Pressure',
+                resolve: { text: 'Resolves for 4 of 5 well pads. Not for Point 3.', warning: true }, save: '{asset.path}/Pressure' });
+            expect(typedNote({ typed: '{asset.path}/Pressure', pick: inside }).save).toBe('{asset.path}/Pressure');
+            expect(typedNote({ typed: '[default]Plant/AmbientTemp', pick: { state: 'answered', path: '[default]Plant/AmbientTemp', relative: false } })).toMatchObject({
+                tone: 'shared', title: 'Same tag for every well pad', save: '[default]Plant/AmbientTemp',
+                text: 'AmbientTemp is outside Point 2\'s asset folder, so it is saved as the full path and every well pad shows this one tag.' });
+        });
+
+        test('C9: the Gateway\'s refusal of a typed path shows its own words; any other failure says the check failed', () => {
+            expect(typedNote({ typed: '[default]Mesa//P14', pick: { state: 'failed', code: 'invalid', message: 'The Gateway\'s words.' } }))
+                .toEqual({ tone: 'warning', title: '', text: 'The Gateway\'s words.', path: '', resolve: null, save: null });
+            expect(typedNote({ typed: '[default]Mesa/P14', pick: { state: 'failed', code: 'timeout', message: 'the Gateway did not answer in time.' } }).text)
+                .toBe('Could not check this path: the Gateway did not answer in time.');
+        });
+
+        test('typed text replaces the pick in the note; an emptied field is nothing picked', () => {
+            expect(typedNote({ typed: '[default]Mesa/P14/Pressure', picked: P15, pick: inside }).save).toBe('{asset.path}/Pressure');
+            expect(typedNote({ typed: '' }).text).toMatch(/^Opened at Point 2's asset folder/);
+        });
+
+        test('with no linked item nothing is asked: the full-path check answers a typed path', () => {
+            expect(typedNote({ asset: null, typed: '[default]Plant/AmbientTemp' })).toMatchObject({ tone: 'shared', save: '[default]Plant/AmbientTemp' });
+            expect(typedNote({ asset: null, typed: 'Plant/AmbientTemp' })).toMatchObject({ tone: 'warning', save: null,
+                text: 'Plant/AmbientTemp is not a tag path; use a full path such as [default]Shared/GasPrice.' });
+            expect(typedNote({ asset: null, typed: '{asset.path}/Pressure' })).toMatchObject({ tone: 'warning', save: null,
+                text: 'No well pad is linked to an asset, so {asset.path}/Pressure cannot be checked here. Type a full path such as [default]Shared/GasPrice.' });
+        });
+
+        test('C1 to C3: the style rule and a popup param convert as a key value does, each with its own shared-tag sentence', () => {
+            const outside: PickAnswer = { state: 'answered', path: '[default]Plant/AmbientTemp', relative: false };
+            expect(typedNote({ part: 'rule', target: { part: 'rule' }, picked: PRESSURE, pick: inside }).save).toBe('{asset.path}/Pressure');
+            expect(typedNote({ part: 'rule', target: { part: 'rule' }, picked: AMBIENT, pick: outside }).text)
+                .toBe('AmbientTemp is outside Point 2\'s asset folder, so it is saved as the full path and every well pad\'s rule reads this one tag.');
+            expect(typedNote({ part: 'param', target: { part: 'param', name: 'wellId' }, picked: PRESSURE, pick: inside }).save).toBe('{asset.path}/Pressure');
+            expect(typedNote({ part: 'param', target: { part: 'param', name: 'wellId' }, picked: AMBIENT, pick: outside })).toMatchObject({
+                save: '[default]Plant/AmbientTemp',
+                text: 'AmbientTemp is outside Point 2\'s asset folder, so it is saved as the full path and every well pad\'s popup view gets this one path.' });
+        });
+
+        test('C4 to C6, C8: one item\'s pick is its full path at once, with no answer waited for', () => {
+            const target = { part: 'override' as const, name: 'Casing pressure', item: 'P14' };
+            const item = assetFolderOf({ name: 'P14', folder: '[default]Mesa/P14' });
+            const of = (over: Partial<Parameters<typeof cardNote>[0]>) =>
+                cardNote({ kind: PAD, part: 'override', target, asset: item, picked: null, pick: undefined, assetProblem: '', ...over });
+            expect(of({ picked: PRESSURE })).toEqual({ tone: 'plain', title: '', text: 'Saved for P14 only, as the full path', path: '[default]Mesa/P14/Pressure',
+                resolve: null, save: '[default]Mesa/P14/Pressure', override: true });
+            expect(of({ picked: P15 })).toMatchObject({ text: 'Pick a tag, not a folder.', save: null });
+            expect(of({}).text).toBe('Opened at P14\'s asset folder. A pick is saved for P14 only, as the full path.');
+            expect(of({ asset: null }).text).toBe('P14 is not linked to an asset with a tag folder, so the tree starts at the top. A pick is saved for P14 only, as the full path.');
+            expect(of({ asset: null, picked: AMBIENT }).save).toBe('[default]Plant/AmbientTemp');
+            expect(of({ assetProblem: 'The folder Mesa/P14 was not found in tag provider default.' }).text)
+                .toBe('The folder Mesa/P14 was not found in tag provider default. P14\'s asset folder could not be opened, so the tree starts at the top. A pick is saved for P14 only, as the full path.');
+            expect(of({ typed: '{asset.path}/Pressure' })).toEqual({ tone: 'warning', title: '', path: '', resolve: null, save: null,
+                text: 'an override\'s tag path is a full path such as [default]Mesa/P12/Pressure, not {asset.path}/Pressure.' });
+            expect(of({ typed: '[default]Mesa//P14' }).text).toBe('[default]Mesa//P14 has an empty part between two /; a tag path has a name between every two /.');
+            expect(of({ typed: '[default]Mesa/P14/Casing' })).toMatchObject({ save: '[default]Mesa/P14/Casing', override: true });
+            expect(of({ part: 'ownRule', target: { part: 'ownRule', item: 'P14' }, picked: PRESSURE }).save).toBe('[default]Mesa/P14/Pressure');
+        });
+    });
+
     test('the type column says what the Gateway sent', () => {
         expect((['tag', 'folder', 'udt-instance', 'udt-type', 'other'] as const).map(typeWord)).toEqual(['Tag', 'Folder', 'UDT instance', 'UDT type', 'Other']);
     });
@@ -348,5 +436,14 @@ describe('the tag buttons\' ids', () => {
         expect(readTagFor(TagFor.kpi('pressure'))).toEqual({ part: 'kpi', key: 'pressure' });
         expect(readTagFor(TagFor.newRow('r3'))).toEqual({ part: 'new', rowId: 'r3' });
         expect(readTagFor('link')).toBeNull();
+    });
+
+    test('entry 13c: the style rule, a param by its name, a new param by its row, an override by its row and the own rule', () => {
+        expect(readTagFor(TagFor.rule)).toEqual({ part: 'rule' });
+        expect(readTagFor(TagFor.param('wellId'))).toEqual({ part: 'param', name: 'wellId' });
+        expect(readTagFor(TagFor.newParam('p2'))).toEqual({ part: 'newParam', rowId: 'p2' });
+        expect(readTagFor(TagFor.override('kpi:pressure'))).toEqual({ part: 'override', row: 'kpi:pressure' });
+        expect(readTagFor(TagFor.override('alarms'))).toEqual({ part: 'override', row: 'alarms' });
+        expect(readTagFor(TagFor.ownRule)).toEqual({ part: 'ownRule' });
     });
 });

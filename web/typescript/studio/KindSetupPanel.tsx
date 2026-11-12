@@ -78,6 +78,10 @@ import { RuleEditor, ruleFields } from './RuleEditor';
  * (studio/TagBrowser.tsx, drawn by the map component over the map); the row the card is open for takes the selection tint with
  * its 3 px edge (`.mapstudio-kv-row--browsing`, `.mapstudio-kindsetup-field--browsing`). A pick comes back through `usePick`
  * and is saved as a typed path is: one edit of that path, at the setup version seen when the card opened.
+ * From entry 13c the style rule's tag path (the shared editor's button, `styleRule.path`: the pick goes into the rule's draft,
+ * sent when the rule is complete) and each popup param's value (`param:<name>`, a new row's `param.new:<id>`: the value edit,
+ * or the new row's commit, a row with no name staying a draft) have the button too; a param row the card is open for is
+ * `.mapstudio-param-row--browsing`.
  */
 export interface KindSetupPanelProps {
     kind: Kind;
@@ -122,6 +126,8 @@ export interface KindSetupPanelProps {
     browsing?: string | null;
     /** A path's tag button pressed: the tag browser opens for it, at the setup version seen now. No tag button without it. */
     onBrowse?: (tagFor: string, target: PickTarget, seen: number) => void;
+    /** The open card's place is gone (the rule no longer shows a tag path field): it closes and changes nothing. */
+    onBrowseGone?: () => void;
 }
 
 /** A key value row not yet stored: typed here until it has a label and a path, then saved with its key. */
@@ -242,22 +248,27 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
     }
 
     /**
-     * A new row's own card closed, or moved to another button (entry 13b): while it was open the row was not finished when the
+     * A new row's own card closed, or moved to another button (entry 13b; a new param's too, entry 13c): while it was open the row was not finished when the
      * cursor left it for the card. With the focus not back in the row once the card is gone, the row is finished as a blur
      * finishes it.
      */
     private leftBrowsing(before: string | null | undefined): void {
         const was = before ? readTagFor(before) : null;
-        if (!was || was.part !== 'new' || this.props.browsing === before) {
+        if (!was || (was.part !== 'new' && was.part !== 'newParam') || this.props.browsing === before) {
             return;
         }
         const id = was.rowId;
+        const param = was.part === 'newParam';
         // After this draw's own focus moves (the card gives the focus back to the tag button).
         setTimeout(() => {
-            const button = this.tagButtonOf(TagFor.newRow(id));
-            const row = button ? button.closest('.mapstudio-kv-row') : null;
+            const button = this.tagButtonOf(param ? TagFor.newParam(id) : TagFor.newRow(id));
+            const row = button ? button.closest(param ? '.mapstudio-param-row' : '.mapstudio-kv-row') : null;
             if (row && !row.contains(document.activeElement)) {
-                this.commitRow(id);
+                if (param) {
+                    this.commitParam(id);
+                } else {
+                    this.commitRow(id);
+                }
             }
         }, 0);
     }
@@ -703,11 +714,40 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
             }), () => this.commitRow(id));
             return '';
         }
+        if (what.part === 'rule') {
+            // The rule's draft takes the path and sends the rule when it is complete, at the version the draft is in step with
+            // the store at (the editor's own, not the card's): "Not saved yet" until then.
+            const editor = this.ruleEditor.current;
+            return editor ? editor.usePath(path) : 'Not saved. The style rule is no longer open.';
+        }
+        if (what.part === 'newParam') {
+            const id = what.rowId;
+            if (!this.state.newParams.some((p) => p.id === id)) {
+                return 'Not saved. This param row is gone.';
+            }
+            // The value is filled and the row commits as when typed: a row with no name stays a draft and says so.
+            this.setState((prev) => ({
+                newParams: prev.newParams.map((p) => (p.id === id ? { ...p, value: path, seen: p.seen !== null ? p.seen : seen } : p))
+            }), () => this.commitParam(id));
+            return '';
+        }
+        if (what.part === 'override' || what.part === 'ownRule') {
+            return 'Not saved. This path cannot take a pick.';
+        }
         const view = this.view();
         let field: string;
         let stored: string;
         let edit: SetupEdit;
-        if (what.part === 'comms') {
+        if (what.part === 'param') {
+            const name = what.name;
+            const param = view.popupView ? view.popupView.params.find((p) => p.name === name) : undefined;
+            if (!param) {
+                return 'Not saved. This param is gone.';
+            }
+            field = 'param:' + name + ':value';
+            stored = param.value;
+            edit = { part: 'param.value', name, value: path };
+        } else if (what.part === 'comms') {
             field = Fields.commsPath;
             stored = view.comms ? view.comms.path : '';
             edit = { part: 'comms.path', path };
@@ -977,6 +1017,8 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         // A refusal names the row by the name it was sent under.
         const named = param.sentName !== null ? Fields.param(param.sentName) : own;
         const m = this.messages(own, param.sentName !== null ? [named] : []);
+        const tagFor = TagFor.newParam(param.id);
+        const browsing = this.props.browsing === tagFor;
         const input = (part: 'name' | 'value', label: string, placeholder: string): React.ReactElement => (
             <input ref={(el) => { this.inputs[own + '.' + part] = el; }} type="text"
                    className={'mapstudio-input mapstudio-kindsetup-input mapstudio-param-' + part + (part === 'value' ? ' mapstudio-mono' : '')}
@@ -991,11 +1033,13 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                    }} />
         );
         return (
-            <div key={'new:' + param.id} className="mapstudio-param-row mapstudio-param-row--new" role="group" aria-label={'New param ' + (index + 1)}
+            <div key={'new:' + param.id} className={'mapstudio-param-row mapstudio-param-row--new' + (browsing ? ' mapstudio-param-row--browsing' : '')}
+                 role="group" aria-label={'New param ' + (index + 1)}
                  data-name={param.name.trim()} data-new="true" data-field={named}
                  onBlur={(ev) => {
                      const to = ev.relatedTarget as Node | null;
-                     if (this.picking === null && (!to || !ev.currentTarget.contains(to))) {
+                     // Into the row's own tag browser (entry 13c): the row is not finished until its value is picked or the card is left.
+                     if (this.picking === null && this.props.browsing !== tagFor && (!to || !ev.currentTarget.contains(to))) {
                          this.commitParam(param.id);
                      }
                  }}>
@@ -1003,6 +1047,7 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                     {input('name', 'Param name', 'Name')}
                     {input('value', 'Param value', 'Value')}
                     {this.pickerButton(own + '.value', (p) => this.setParam(param.id, { value: p }, () => this.focusInput(own + '.value')))}
+                    {this.tagButton(tagFor, { part: 'param', name: param.name.trim() }, 'new param ' + (index + 1))}
                     <button type="button" className="mapstudio-dock-button mapstudio-param-remove" disabled={this.off()} title="Remove this param"
                             aria-label={'Remove new param ' + (index + 1)} onMouseDown={(ev) => ev.preventDefault()}
                             onClick={() => this.removeParam(param.id)}>
@@ -1024,8 +1069,8 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
         const n = this.messages(nameField, []);
         const ids = m.ids.concat(n.ids);
         return (
-            <div key={name} className="mapstudio-param-row" role="group" aria-label={'Param ' + name} data-name={name} data-new="false"
-                 data-field={Fields.param(name)}>
+            <div key={name} className={'mapstudio-param-row' + (this.props.browsing === TagFor.param(name) ? ' mapstudio-param-row--browsing' : '')}
+                 role="group" aria-label={'Param ' + name} data-name={name} data-new="false" data-field={Fields.param(name)}>
                 <div className="mapstudio-param-line">
                     <span className="mapstudio-param-name">
                         {this.text({ field: nameField, stored: name, label: 'Name of param ' + name, placeholder: 'Name', invalid: m.invalid || n.invalid,
@@ -1041,6 +1086,7 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                     </span>
                     {this.pickerButton(valueField, (p) => this.setDraft(valueField, p),
                         () => this.commit(valueField, param.value, (text) => ({ part: 'param.value', name, value: text })))}
+                    {this.tagButton(TagFor.param(name), { part: 'param', name }, 'param ' + name)}
                     <button type="button" className="mapstudio-dock-button mapstudio-param-remove" disabled={this.off()} title="Remove this param"
                             aria-label={'Remove param ' + name} onClick={() => this.send(Fields.param(name), { part: 'param.remove', name }, this.version())}>
                         <ChromeGlyph name="trash" size={16} />
@@ -1267,6 +1313,8 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
                         onSend={(rule, base) => this.send(field, { part: 'styleRule', rule }, base)}
                         onClearRefusal={() => this.props.onClearRefusal(field)}
                         pathNote={(path) => this.note(path)} symbols={this.props.symbols} colors={this.props.colors}
+                        onBrowse={this.props.onBrowse ? () => (this.props.onBrowse as NonNullable<KindSetupPanelProps['onBrowse']>)(TagFor.rule, { part: 'rule' }, this.version()) : undefined}
+                        browseFor={TagFor.rule} browsing={this.props.browsing === TagFor.rule} onBrowseGone={this.props.onBrowseGone}
                         frame={(body, info) => (
                             <section className="mapstudio-kindsetup-section" data-section="styleRule" data-rule={info.type}
                                      data-unsaved={info.unsaved ? 'true' : 'false'} aria-labelledby={headingId}>

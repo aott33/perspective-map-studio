@@ -437,6 +437,87 @@ describe('the Live now block (entry 12c1)', () => {
         return html.slice(html.lastIndexOf('<', from), next < 0 ? html.indexOf('</section>', from) : next);
     }
 
+    describe('entry 13c: the tag button beside an override\'s field (C4)', () => {
+        const buttons = (html: string): string[] => html.match(/<button[^>]*mapstudio-tag-button[^>]*>/g) || [];
+        /** The panel with Override pressed on one row. */
+        const opened = (over: Partial<PropertiesPanelProps>, rowId = 'kpi:pressure'): string => {
+            class Opened extends PropertiesPanel {
+                constructor(p: PropertiesPanelProps) {
+                    super(p);
+                    this.state = { ...this.state, overrideRow: rowId, overrideText: '[default]Mesa/P15/Pressure' };
+                }
+            }
+            return renderToStaticMarkup(React.createElement(Opened, props({ liveNow: block(), onOverride: noop, ...over })));
+        };
+
+        test('no button until Override is pressed; then one beside the field, for a full editor only', () => {
+            expect(buttons(panel({ liveNow: block(), onOverride: noop, onBrowse: noop }))).toEqual([]);
+            expect(buttons(opened({}))).toEqual([]);
+            const html = opened({ onBrowse: noop });
+            expect(buttons(html)).toHaveLength(1);
+            expect(buttons(html)[0]).toContain('data-tag-for="override:kpi:pressure"');
+            expect(buttons(html)[0]).toContain('aria-label="Pick a tag for Pressure on P31 only" aria-haspopup="dialog" aria-expanded="false"');
+            expect(row(html, 'kpi:pressure')).toContain('<div class="mapstudio-override-line"><input ');
+            const browsing = opened({ onBrowse: noop, browsing: 'override:kpi:pressure' });
+            expect(buttons(browsing)[0]).toContain('aria-expanded="true"');
+            expect(browsing).toContain('class="mapstudio-override-line mapstudio-override-line--browsing"');
+            expect(buttons(opened({ onBrowse: noop, paused: true }))[0]).toContain('disabled=""');
+        });
+
+        const made = (over: Partial<PropertiesPanelProps> = {}): { inst: PropertiesPanel; sent: unknown[] } => {
+            const sent: unknown[] = [];
+            const inst = new PropertiesPanel(props({ liveNow: block(), onOverride: (r, path, name) => { sent.push([r, path, name]); }, ...over }));
+            const raw = inst as unknown as { state: object; setState: (u: unknown, then?: () => void) => void };
+            raw.setState = (u: unknown, then?: () => void): void => {
+                raw.state = { ...raw.state, ...(typeof u === 'function' ? (u as (s: object) => object)(raw.state) : u as object) };
+                if (then) {
+                    then();
+                }
+            };
+            return { inst, sent };
+        };
+
+        test('a pick is the override\'s edit, as the field finished with that path: one update, and the field closes', () => {
+            const { inst, sent } = made();
+            expect(inst.usePick('override:kpi:pressure', '[default]Mesa/P15/Casing')).toBe('');
+            expect(sent).toEqual([['kpi:pressure', '[default]Mesa/P15/Casing', 'Pressure']]);
+            expect((inst.state as unknown as { overrideRow: string | null }).overrideRow).toBeNull();
+            const alarms = made();
+            expect(alarms.inst.usePick('override:alarms', '[default]Mesa/P16')).toBe('');
+            expect(alarms.sent).toEqual([['alarms', '[default]Mesa/P16', 'Alarms']]);
+        });
+
+        test('the path shown already, or the one just refused, is not taken: the reason is said and nothing is sent', () => {
+            const same = made();
+            expect(same.inst.usePick('override:kpi:pressure', '[default]Mesa/P15/Pressure')).toBe('Not saved. P31 reads this tag already.');
+            expect(same.sent).toEqual([]);
+            const refused = made({ overrideRefusal: { row: 'comms', words: 'The Gateway said no.', path: '[default]a/b', batchId: 'b1' } });
+            expect(refused.inst.usePick('override:comms', '[default]a/b')).toBe('The Gateway said no.');
+            expect(refused.sent).toEqual([]);
+        });
+
+        test('Override pressed on another row finishes the field still open, as a blur does, before the other opens', () => {
+            const { inst, sent } = made();
+            const raw = inst as unknown as { state: { overrideRow: string | null; overrideText: string }; startOverride: (row: unknown) => void;
+                rowOf: (id: string) => unknown };
+            raw.startOverride(raw.rowOf('kpi:pressure'));
+            raw.state = { ...raw.state, overrideText: '[default]Mesa/P15/Casing' };
+            raw.startOverride(raw.rowOf('comms'));
+            expect(sent).toEqual([['kpi:pressure', '[default]Mesa/P15/Casing', 'Pressure']]);
+            expect(raw.state.overrideRow).toBe('comms');
+            expect(raw.state.overrideText).toBe('[default]Mesa/P15/Comms');
+        });
+
+        test('a row that is gone, a pause or a path that is not full says why', () => {
+            expect(made().inst.usePick('override:kpi:gone', '[default]a/b')).toBe('Not saved. This row is gone.');
+            expect(made({ paused: true }).inst.usePick('override:comms', '[default]a/b')).toBe('Not saved. Editing is paused.');
+            expect(made().inst.usePick('override:comms', '{asset.path}/X'))
+                .toBe('Not saved: an override\'s tag path is a full path such as [default]Mesa/P12/Pressure, not {asset.path}/X.');
+            expect(made().inst.usePick('own.styleRule.path', '[default]a/b')).toBe('Not saved. The style rule is no longer open.');
+            expect(made().inst.usePick('comms.path', '[default]a/b')).toBe('Not saved. This path cannot take a pick.');
+        });
+    });
+
     test('L1: after Asset, the label with From kind, then Comms, the key values and Alarms with values and filled paths', () => {
         const html = panel({ liveNow: block() });
         expect(html.indexOf('mapstudio-livenow"')).toBeGreaterThan(html.indexOf('mapstudio-field--asset'));

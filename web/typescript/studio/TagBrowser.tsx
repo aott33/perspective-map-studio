@@ -3,17 +3,20 @@ import { Kind } from '../adapters';
 import { GlyphName } from '../controls';
 import { TagChild, TagChildType } from '../messages';
 import {
-    BrowseAnswers, PickTarget, TreeRow, TreeState, assetFolderOf, assetProblem, browseKey, canPick, canRetry, cardNote, chooseProvider, closeFolder,
-    focusRow, foldersToAsk, forLine, keyAction, needsProviders, openFolder, outsideAsset, providerOptions, rootProblem, rowsInView, shownProvider, startState,
-    toAssetFolder, typeWord, useText
+    BrowseAnswers, PickTarget, TYPED_PAUSE_MS, TreeRow, TreeState, assetFolderOf, assetProblem, browseKey, canPick, canRetry, cardNote, chooseProvider,
+    closeFolder, focusRow, foldersToAsk, forLine, isItemTarget, keyAction, needsProviders, openFolder, outsideAsset, providerOptions, rootProblem, rowsInView,
+    shownProvider, startState, toAssetFolder, typeWord, useText
 } from '../tagBrowser';
 import { ChromeGlyph } from './ChromeGlyph';
 
 /**
- * The tag browser (epic 4 entry 13b; DESIGN.md Tag browser, EXPERIENCE.md Tag browser and its states): Map Studio's own card for
- * picking a tag, floating over the map's left edge beside the panel it was opened from, one at a time, for a full editor only.
+ * The tag browser (epic 4 entries 13b and 13c; DESIGN.md Tag browser, EXPERIENCE.md Tag browser and its states): Map Studio's own
+ * card for picking a tag, floating over the map's left edge beside the panel it was opened from, one at a time, for a full
+ * editor only. It serves a kind's setup (key values, comms, alarms, the style rule's path, popup params) and one item (an
+ * override row of Live now, the item's own style rule).
  *
- * - **Header**: "Pick a tag" with a close, and the For line naming the value ("For: Key value 2 of the Well pad kind").
+ * - **Header**: "Pick a tag" with a close, and the For line naming the value ("For: Key value 2 of the Well pad kind",
+ *   "For: Casing pressure on P14 only - an override").
  * - **Provider**: a select of the Gateway's tag providers, the default first and tagged "Default"; a change shows that
  *   provider's top level. Away from the asset folder a ghost "<name> folder" button returns to it.
  * - **The tree** of that one provider, loaded a level at a time (one `tags.browse` per folder opened, the answers kept while the
@@ -24,7 +27,13 @@ import { ChromeGlyph } from './ChromeGlyph';
  * - **States**: "Loading..." with the spinner under a folder being opened, the rest usable; "No tags in this folder"; a folder
  *   that failed shows the Gateway's words under it with Try again; a provider that does not answer replaces the tree with
  *   "Can't browse <provider>", the sentence and Try again; a refused role or an invalid ask shows the Gateway's words in place.
- * - **Path**: the picked row's full path, read only (a typed path is entry 13c).
+ * - **Path**: the picked row's full path, or a path typed (entry 13c). Typing drops the tree's pick and the tree does not move;
+ *   a typed path is asked of the Gateway after a short pause or on Enter (`tags.resolve` with the text as typed), and the note
+ *   and the button follow that answer as for a pick; a click on a row replaces the typed text. The field works whatever the
+ *   tree shows (loading, empty, a provider it cannot browse, a refusal).
+ * - **One item's pick** (an override, the own rule): the card opens at that item's own asset folder, every pick is its full
+ *   path, nothing is asked of the Gateway (the override's own full-path check answers a typed path), the note reads "Saved
+ *   for P14 only, as the full path" and the button "Use for P14".
  * - **The note**: where the card opened; "Pick a tag, not a folder."; and for a pick the Gateway's answer (`tags.resolve` with
  *   the preview item's asset): inside the asset folder `{asset.path}/...` and "Resolves for 4 of 5 well pads. Not for Point 3.",
  *   outside it the shared-tag note on the warning tint. "Use this tag" ("Use this folder" for a folder picked for Alarms) is
@@ -47,13 +56,16 @@ export interface TagBrowserProps {
     /** The tag button the card was opened from (tagBrowser.ts `TagFor`). */
     tagFor: string;
     target: PickTarget;
-    /** The kind's preview item: its name and its asset's base path; null with none (the default provider's top level). */
+    /**
+     * The kind's preview item: its name and its asset's base path; null with none (the default provider's top level). For one
+     * item's target it is that item and its own asset's base path; null for an item with no asset.
+     */
     preview: { name: string; folder: string } | null;
     /** What the Gateway answered while the card is open. */
     answers: BrowseAnswers;
     /** Ask `tags.browse` for one folder of one provider (null: the default one); `again` asks one already answered. */
     onBrowse: (provider: string | null, folder: string, again?: boolean) => void;
-    /** Ask `tags.resolve` how a picked full path is saved and what it resolves for. */
+    /** Ask `tags.resolve` how a picked full path, or a path as typed, is saved and what it resolves for. */
     onAskPick: (path: string) => void;
     /**
      * "Use this tag": the path to save, as the Gateway gave it. '' when the pick was taken (the card is closed by its owner);
@@ -75,7 +87,7 @@ export function Spinner(): React.ReactElement {
 
 let cardCount = 0;
 
-export class TagBrowser extends React.Component<TagBrowserProps, { tree: TreeState; refused?: string }> {
+export class TagBrowser extends React.Component<TagBrowserProps, { tree: TreeState; refused?: string; typed?: string | null }> {
     private readonly idBase = 'mapstudio-tagbrowser-' + (++cardCount);
     private readonly root = React.createRef<HTMLElement>();
     private readonly holder = React.createRef<HTMLDivElement>();
@@ -83,6 +95,8 @@ export class TagBrowser extends React.Component<TagBrowserProps, { tree: TreeSta
     private focusWanted: 'opening' | 'row' | null = 'opening';
     /** The asset folder was found missing and the tree taken to the top (once). */
     private fellBack = false;
+    /** The pause after the last keystroke in the Path field, before the typed path is asked. */
+    private typedTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(props: TagBrowserProps) {
         super(props);
@@ -113,8 +127,58 @@ export class TagBrowser extends React.Component<TagBrowserProps, { tree: TreeSta
     }
 
     componentWillUnmount(): void {
+        this.clearTypedTimer();
         this.props.onGone();
     }
+
+    private clearTypedTimer(): void {
+        if (this.typedTimer !== null) {
+            clearTimeout(this.typedTimer);
+            this.typedTimer = null;
+        }
+    }
+
+    /** The text typed in the Path field, trimmed; null while the field shows the tree's pick. */
+    private typed(): string | null {
+        const typed = this.state.typed;
+        return typed === undefined || typed === null ? null : typed.trim();
+    }
+
+    /** Whether a path can be asked of the Gateway: a kind's target with a preview item whose asset has a tag folder. */
+    private asks(): boolean {
+        return !isItemTarget(this.props.target) && this.asset() !== null;
+    }
+
+    /**
+     * The Path field typed in (entry 13c, owner decisions 2 and 3): the tree's pick is dropped and the tree does not move; the
+     * path is asked after a short pause, and the button waits for the answer.
+     */
+    private onType = (ev: React.ChangeEvent<HTMLInputElement>): void => {
+        const text = ev.target.value;
+        this.clearTypedTimer();
+        this.setState((prev) => ({ typed: text, refused: '', tree: prev.tree.picked ? { ...prev.tree, picked: null } : prev.tree }));
+        this.typedTimer = setTimeout(() => {
+            this.typedTimer = null;
+            this.askTyped();
+        }, TYPED_PAUSE_MS);
+    };
+
+    /** The typed path asked now (the pause is over, or Enter): as typed, a full path and `{asset.path}/...` alike. */
+    private askTyped(): void {
+        this.clearTypedTimer();
+        const typed = this.typed();
+        if (typed !== null && typed !== '' && this.asks()) {
+            this.props.onAskPick(typed);
+        }
+    }
+
+    private onPathKey = (ev: React.KeyboardEvent<HTMLInputElement>): void => {
+        if (ev.key === 'Enter') {
+            ev.preventDefault();
+            ev.stopPropagation();
+            this.askTyped();
+        }
+    };
 
     private asset() {
         return assetFolderOf(this.props.preview);
@@ -212,14 +276,18 @@ export class TagBrowser extends React.Component<TagBrowserProps, { tree: TreeSta
         this.setState((prev) => ({ tree: change(prev.tree) }));
     }
 
-    /** A row picked: it is the Path field's, and a row that can be used is asked of `tags.resolve` (with a preview item). */
+    /**
+     * A row picked: it is the Path field's, replacing any typed text, and a row that can be used is asked of `tags.resolve`
+     * (with a preview item; never for one item's target, whose pick is its full path).
+     */
     private pick(node: TagChild, id: string): void {
+        this.clearTypedTimer();
         this.setTree((tree) => ({ ...tree, picked: node, focus: id }), true);
-        if (this.state.refused) {
-            this.setState({ refused: '' });
+        if (this.state.refused || (this.state.typed !== undefined && this.state.typed !== null)) {
+            this.setState({ refused: '', typed: null });
         }
         // With no asset folder (no preview item, or an asset whose base path is no tag path) nothing is asked: a pick is its full path.
-        if (this.asset() && canPick(node, this.props.target.part)) {
+        if (this.asks() && canPick(node, this.props.target)) {
             this.props.onAskPick(node.path);
         }
     }
@@ -344,8 +412,10 @@ export class TagBrowser extends React.Component<TagBrowserProps, { tree: TreeSta
         const on = focusRow(rows, tree.focus);
         const picked = tree.picked;
         const missing = assetProblem(answers, asset);
-        const note = cardNote({ kind, part: target.part, asset, picked, pick: picked ? answers.picks[picked.path] : undefined, assetProblem: missing,
-            noFolder: this.props.preview && !asset ? this.props.preview.name : null });
+        const typed = this.typed();
+        const asked = typed !== null && typed !== '' ? typed : picked ? picked.path : null;
+        const note = cardNote({ kind, part: target.part, target, typed, asset, picked, pick: asked !== null ? answers.picks[asked] : undefined,
+            assetProblem: missing, noFolder: this.props.preview && !asset ? this.props.preview.name : null });
         const refused = this.state.refused || '';
         const home = asset && missing === '' && outsideAsset(tree, asset) ? asset : null;
         const titleId = this.idBase + '-title';
@@ -412,8 +482,10 @@ export class TagBrowser extends React.Component<TagBrowserProps, { tree: TreeSta
                 </div>
                 <div className="mapstudio-tagbrowser-path">
                     <label className="mapstudio-field-label" htmlFor={pathId}>Path</label>
-                    <input id={pathId} type="text" className="mapstudio-input mapstudio-mono" readOnly value={picked ? picked.path : ''}
-                           placeholder="Pick in the tree" aria-describedby={noteId} />
+                    <input id={pathId} type="text" className="mapstudio-input mapstudio-mono" autoComplete="off" spellCheck={false}
+                           value={this.state.typed !== undefined && this.state.typed !== null ? this.state.typed : picked ? picked.path : ''}
+                           placeholder="Pick in the tree or type one" aria-describedby={noteId} data-typed={typed !== null ? 'true' : 'false'}
+                           onChange={this.onType} onKeyDown={this.onPathKey} />
                 </div>
                 <div id={noteId} className={'mapstudio-tagbrowser-note mapstudio-tagbrowser-note--' + note.tone} role="status" aria-live="polite"
                      data-tone={note.tone} data-save={note.save || ''}>
@@ -428,6 +500,9 @@ export class TagBrowser extends React.Component<TagBrowserProps, { tree: TreeSta
                         <span>{note.text}</span>
                     </div>
                     {note.path !== '' ? <div className="mapstudio-mono mapstudio-tagbrowser-note-path">{note.path}</div> : null}
+                    {note.override ? (
+                        <div className="mapstudio-tagbrowser-note-override"><span className="mapstudio-override-tag">Override</span></div>
+                    ) : null}
                     {note.resolve ? (
                         <div className={'mapstudio-tagbrowser-note-resolve' + (note.resolve.warning ? ' mapstudio-tagbrowser-note-resolve--warning' : '')}
                              data-warning={note.resolve.warning ? 'true' : 'false'}>
@@ -450,7 +525,7 @@ export class TagBrowser extends React.Component<TagBrowserProps, { tree: TreeSta
                                     // Not taken: the card stays, with the reason by the button.
                                     this.setState({ refused: this.props.onUse(note.save) });
                                 }
-                            }}>{useText(picked, target.part)}</button>
+                            }}>{useText(picked, target)}</button>
                 </footer>
             </section>
         );

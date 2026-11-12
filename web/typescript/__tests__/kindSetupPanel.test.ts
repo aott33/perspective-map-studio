@@ -427,11 +427,48 @@ describe('the tag buttons (entry 13b)', () => {
 
     test('each path of Key values, Comms and Alarms ends in a tag button named for its value', () => {
         const html = panel({ onBrowse: noop });
-        expect(buttons(html).map(forOf)).toEqual(['kpis.pressure.path', 'kpis.gas.path', 'comms.path', 'alarms.path']);
+        // From entry 13c a popup param's value has the button too (the last one here).
+        expect(buttons(html).map(forOf)).toEqual(['kpis.pressure.path', 'kpis.gas.path', 'comms.path', 'alarms.path', 'param:padName']);
         expect(buttons(html)[0]).toContain('title="Pick a tag" aria-label="Pick a tag for Pressure" aria-haspopup="dialog" aria-expanded="false"');
         expect(buttons(html)[2]).toContain('aria-label="Pick a tag for heartbeat path"');
-        // The link, the popup view and its params are not tag paths.
-        expect(slice(html, 'data-field="link"', 'data-field="popupView.path"')).not.toContain('mapstudio-tag-button');
+        // The link and the popup view's own path are not tag paths.
+        expect(slice(html, 'data-field="link"', 'data-field="popupView.params.padName"')).not.toContain('mapstudio-tag-button');
+    });
+
+    test('entry 13c: a param\'s value and the style rule\'s tag path have the button; a rule on a key value has none', () => {
+        const html = panel({ onBrowse: noop });
+        expect(buttons(html)[4]).toContain('aria-label="Pick a tag for param padName"');
+        expect(buttons(html).map(forOf)).not.toContain('styleRule.path');
+        const onPath = { ...RECORD, setup: { ...SETUP, styleRule: { ...SETUP.styleRule, source: { path: '{asset.path}/Status' } } } };
+        const withPath = panel({ onBrowse: noop, record: onPath });
+        expect(buttons(withPath).map(forOf)).toEqual(['kpis.pressure.path', 'kpis.gas.path', 'comms.path', 'alarms.path', 'param:padName', 'styleRule.path']);
+        expect(buttons(withPath)[5]).toContain('aria-label="Pick a tag for the style rule"');
+        // Without a way to open the browser (anyone but a full editor in the studio) the rule's path stands alone.
+        expect(buttons(panel({ record: onPath }))).toEqual([]);
+        const open = panel({ onBrowse: noop, record: onPath, browsing: 'styleRule.path' });
+        expect(buttons(open).filter((b) => b.indexOf('aria-expanded="true"') >= 0).map(forOf)).toEqual(['styleRule.path']);
+        expect(open).toContain('class="mapstudio-kindsetup-field mapstudio-rule-source mapstudio-kindsetup-field--browsing"');
+        const param = panel({ onBrowse: noop, browsing: 'param:padName' });
+        expect(param).toContain('class="mapstudio-param-row mapstudio-param-row--browsing"');
+    });
+
+    test('entry 13c: a pick for a stored param is its value edit at the version the card saw; a param or a rule that is gone says so', () => {
+        jest.spyOn(console, 'error').mockImplementation(() => undefined);
+        const sent: unknown[] = [];
+        const made = (): KindSetupPanel => new KindSetupPanel({
+            kind: PAD, record: RECORD, items: ITEMS, assets: ASSETS, previewId: null, onPreview: noop, saves: NO_KIND_SAVES, paused: '', resolves: {},
+            alarmPage: '', onSave: (field: string, edit: unknown, seen: number): boolean => { sent.push([field, edit, seen]); return true; },
+            onClearRefusal: noop, onResolve: noop });
+        expect(made().usePick('param:padName', '{asset.path}/Pressure', 3)).toBe('');
+        expect(sent).toEqual([['param:padName:value', { part: 'param.value', name: 'padName', value: '{asset.path}/Pressure' }, 3]]);
+        // The stored value again sends nothing.
+        expect(made().usePick('param:padName', '{item.name}', 3)).toBe('');
+        expect(sent).toHaveLength(1);
+        expect(made().usePick('param:gone', '{asset.path}/Pressure', 3)).toBe('Not saved. This param is gone.');
+        expect(made().usePick('param.new:p9', '{asset.path}/Pressure', 3)).toBe('Not saved. This param row is gone.');
+        expect(made().usePick('styleRule.path', '{asset.path}/Status', 3)).toBe('Not saved. The style rule is no longer open.');
+        expect(made().usePick('override:comms', '[default]a/b', 3)).toBe('Not saved. This path cannot take a pick.');
+        expect(sent).toHaveLength(1);
     });
 
     test('the row the card is open for takes the selection tint and its button says it is open', () => {

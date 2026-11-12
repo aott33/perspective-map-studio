@@ -13,7 +13,7 @@ import { MapItemRecord } from '../contract';
 import { RULE_ROW, applyRuleEdit, ownRule, refusalRest, ruleLabel } from '../itemOverrides';
 import {
     Fields, KeyValue, NO_RULE, OWN_PATH_TEXT, OWN_RULE_EMPTY, RuleDraft, UNSAVED_KEEPS, checkRule, overrideLineText, ownLineText, ownRuleStart,
-    ownRuleTypes, presetWord, readSetup, ruleDraft, ruleRefusalPlace, ruleWords, sameRule, showsNowText, unsavedText
+    draftSource, withSource, ownRuleTypes, presetWord, readSetup, ruleDraft, ruleRefusalPlace, ruleWords, sameRule, showsNowText, unsavedText
 } from '../kindSetup';
 import { ItemState } from '../live';
 import { ItemView } from '../placeholders';
@@ -770,5 +770,74 @@ describe('the shared editor (T12): what it draws, and what it sends', () => {
         (own as unknown as { state: { rule: RuleDraft } }).state = { rule: NO_RULE };
         (own as unknown as { commitRule(): void }).commitRule();
         expect(sent).toHaveLength(1);
+    });
+});
+
+describe('entry 13c: the tag button on the own rule\'s tag path, and a pick into the draft (C5)', () => {
+    const buttons = (html: string): string[] => html.match(/<button[^>]*mapstudio-tag-button[^>]*>/g) || [];
+
+    test('a full editor has the button beside the tag path; pressed, it names the item and its own rule', () => {
+        expect(buttons(styleOf(panel({ tab: 'style', style: facts({ ownRule: P2_RULE }) })))).toEqual([]);
+        const asked: unknown[] = [];
+        const html = styleOf(panel({ tab: 'style', style: facts({ ownRule: P2_RULE }), onBrowse: (tagFor, target) => asked.push([tagFor, target]) }));
+        expect(buttons(html)).toHaveLength(1);
+        expect(buttons(html)[0]).toContain('data-tag-for="own.styleRule.path"');
+        expect(buttons(html)[0]).toContain('aria-label="Pick a tag for the style rule" aria-haspopup="dialog" aria-expanded="false"');
+        const open = styleOf(panel({ tab: 'style', style: facts({ ownRule: P2_RULE }), onBrowse: noop, browsing: 'own.styleRule.path' }));
+        expect(buttons(open)[0]).toContain('aria-expanded="true"');
+        // The kind's rule in words has no path to pick.
+        expect(buttons(styleOf(panel({ tab: 'style', onBrowse: noop })))).toEqual([]);
+    });
+
+    const sent: Array<[Record<string, unknown> | null, number | null]> = [];
+    const make = (over: Partial<React.ComponentProps<typeof RuleEditor>>): RuleEditor => {
+        const editor = new RuleEditor({ kind: PAD, kpis: KPIS, stored: P2_RULE, version: 7, off: false, idBase: 'x', refusals: [], refused: false,
+            saving: false, done: 0, onClearRefusal: noop, own: true, onSend: (rule, base) => { sent.push([rule, base]); return true; }, ...over });
+        const raw = editor as unknown as { state: object; setState: (u: unknown, then?: () => void) => void };
+        raw.setState = (u: unknown, then?: () => void): void => {
+            raw.state = { ...raw.state, ...(typeof u === 'function' ? (u as (s: object) => object)(raw.state) : u as object) };
+            if (then) {
+                then();
+            }
+        };
+        return editor;
+    };
+
+    test('a pick goes into the draft as the tag path and the rule is sent when it is complete', () => {
+        sent.length = 0;
+        expect(make({}).usePath('[default]Mesa/P14/Status')).toBe('');
+        expect(sent).toEqual([[{ ...P2_RULE, source: { path: '[default]Mesa/P14/Status' } }, 7]]);
+    });
+
+    test('a rule not complete takes the path and says Not saved yet; nothing is sent', () => {
+        sent.length = 0;
+        const editor = make({ stored: null, initial: withSource({ ...ruleDraft(null), type: 'states' }, { from: 'path', path: '' }) });
+        expect(editor.usePath('[default]Mesa/P14/Status')).toBe('');
+        expect(sent).toEqual([]);
+        expect(editor.unsaved()).toBe(true);
+        expect(draftSource(editor.draft())).toEqual({ from: 'path', path: '[default]Mesa/P14/Status' });
+    });
+
+    test('an editor that takes no input, or a rule that reads no tag, says why', () => {
+        sent.length = 0;
+        expect(make({ off: true }).usePath('[default]a/b')).toBe('Not saved. The rule cannot be changed now.');
+        expect(make({ stored: { source: { instruments: 'worst' } }, kind: { ...PAD, geometry: 'line' } }).usePath('[default]a/b'))
+            .toBe('Not saved. This rule no longer reads a tag path.');
+        expect(sent).toEqual([]);
+    });
+
+    test('the value moved to a key value while the card is open: the card is told to close, and a pick is refused in words', () => {
+        sent.length = 0;
+        let gone = 0;
+        const onKpi = { ...P2_RULE, source: { kpi: KPIS[0].key } };
+        const editor = make({ stored: onKpi, browsing: true, onBrowseGone: () => { gone++; } });
+        editor.componentDidUpdate();
+        expect(gone).toBe(1);
+        expect(editor.usePath('[default]Mesa/P14/Status')).toBe('Not saved. This rule no longer reads a tag path.');
+        expect(sent).toEqual([]);
+        // While the rule shows its tag path field the card stays.
+        const onPath = make({ browsing: true, onBrowseGone: () => { gone++; } });
+        onPath.componentDidUpdate();
+        expect(gone).toBe(1);
     });
 });

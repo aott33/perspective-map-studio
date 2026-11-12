@@ -171,9 +171,10 @@ editorTest.describe('the tag browser at 1366 px', () => {
             await openKind(page, map, 'pad', TRACER.points.p2.key);
             await expect(field(page, 'preview').locator('.mapstudio-kindsetup-folder')).toHaveText('[default]Mesa/P14');
 
-            // The buttons: one at the end of each path of Key values, Comms and Alarms, and nowhere else.
+            // The buttons: one at the end of each path of Key values, Comms and Alarms and, from entry 13c, of the style rule's tag
+            // path (the pad's States rule reads {asset.path}/Status), and nowhere else.
             expect(await page.locator('.mapstudio-kindsetup .mapstudio-tag-button').evaluateAll((els) => els.map((e) => e.dataset.tagFor)))
-                .toEqual(['kpis.pressure.path', 'kpis.flow.path', 'comms.path', 'alarms.path']);
+                .toEqual(['kpis.pressure.path', 'kpis.flow.path', 'comms.path', 'alarms.path', 'styleRule.path']);
             const button = tagButton(page, 'kpis.flow.path');
             await expect(button).toHaveAttribute('title', 'Pick a tag');
             await expect(button).toHaveAttribute('aria-expanded', 'false');
@@ -269,7 +270,8 @@ editorTest.describe('the tag browser at 1366 px', () => {
             await expect(pressure).toHaveAttribute('data-picked', 'true');
             await expect(pressure).toHaveAttribute('aria-selected', 'true');
             await expect(card(page).locator('.mapstudio-tagbrowser-path input')).toHaveValue('[default]Mesa/P14/Pressure');
-            await expect(card(page).locator('.mapstudio-tagbrowser-path input')).toHaveAttribute('readonly', '');
+            // From entry 13c the field can be typed in (tagpicks.spec.mjs); a pick fills it.
+            await expect(card(page).locator('.mapstudio-tagbrowser-path input')).toBeEditable();
             await expect(note(page)).toHaveAttribute('data-save', '{asset.path}/Pressure', { timeout: REPLY_MS });
             await expect(note(page)).toHaveAttribute('data-tone', 'plain');
             await expect(note(page)).toContainText("Inside Point 2's asset folder - saved for every well pad as");

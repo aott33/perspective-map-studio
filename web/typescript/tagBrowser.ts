@@ -10,14 +10,40 @@
  */
 
 import { Kind } from './adapters';
+import { pathProblem } from './itemOverrides';
 import { lowerKind, resolveNote } from './kindSetup';
 import { TagChild, TagChildType, TagProvider } from './messages';
 
-/** The value a pick is for: a key value by its place among the rows (from 1), the comms heartbeat or the alarm source. */
+/**
+ * The value a pick is for. Of a kind's setup: a key value by its place among the rows (from 1), the comms heartbeat, the alarm
+ * source and, from entry 13c, the style rule's tag path (`rule`) and a popup view param's value (`param`). Of one item (entry
+ * 13c): a Live now row's override (`override`) and the item's own style rule (`ownRule`).
+ */
 export interface PickTarget {
-    part: 'kpi' | 'comms' | 'alarms';
+    part: 'kpi' | 'comms' | 'alarms' | 'rule' | 'param' | 'override' | 'ownRule';
     /** A key value's number among the kind's rows, stored and new, from 1. */
     index?: number;
+    /** A popup param's name ('' for a new row not named yet); an override's row name, "Casing pressure". */
+    name?: string;
+    /** An item target: the item's name, "P14". */
+    item?: string;
+    /** An override of the item's Alarms row: a folder is a pick, as for a kind's Alarms. */
+    folders?: boolean;
+}
+
+/** Whether the pick is for one item alone (an override row, the item's own rule): always its full path, never asked of the Gateway. */
+export function isItemTarget(target: PickTarget): boolean {
+    return target.part === 'override' || target.part === 'ownRule';
+}
+
+function targetOf(of: PickTarget | PickTarget['part']): PickTarget {
+    return typeof of === 'string' ? { part: of } : of;
+}
+
+/** Whether a folder or a UDT instance is a pick for the value: Alarms only, a kind's or an item's override of it. */
+function takesFolders(of: PickTarget | PickTarget['part']): boolean {
+    const target = targetOf(of);
+    return target.part === 'alarms' || (target.part === 'override' && target.folders === true);
 }
 
 /** What the Gateway said of one folder of one provider, or that it is being asked. */
@@ -31,7 +57,8 @@ export type FolderAnswer =
 export type PickAnswer =
     | { state: 'asking' }
     | { state: 'answered'; path: string; relative: boolean; n?: number; m?: number; failing?: readonly string[]; failingMore?: number }
-    | { state: 'failed'; message: string };
+    /** `code` is the Gateway's error code (`invalid` for a path it refuses), or `timeout`; absent from an older caller. */
+    | { state: 'failed'; message: string; code?: string };
 
 /** Everything the Gateway answered while the card is open: the providers, the folders by `browseKey`, the picks by full path. */
 export interface BrowseAnswers {
@@ -332,24 +359,31 @@ export function closeFolder(state: TreeState, id: string): TreeState {
 // ---- What is a pick ----
 
 /** Whether a row can be used for the value: a tag for any; for Alarms a folder or a UDT instance too (owner decision 5). */
-export function canPick(node: TagChild, part: PickTarget['part']): boolean {
-    return node.type === 'tag' || (part === 'alarms' && (node.type === 'folder' || node.type === 'udt-instance'));
+export function canPick(node: TagChild, of: PickTarget | PickTarget['part']): boolean {
+    return node.type === 'tag' || (takesFolders(of) && (node.type === 'folder' || node.type === 'udt-instance'));
 }
 
 /** Why a picked row cannot be used, or ''. */
-export function pickProblem(node: TagChild, part: PickTarget['part']): string {
-    if (canPick(node, part)) {
+export function pickProblem(node: TagChild, of: PickTarget | PickTarget['part']): string {
+    if (canPick(node, of)) {
         return '';
     }
-    if (part === 'alarms') {
+    if (takesFolders(of)) {
         return 'Pick a tag or a folder.';
     }
     return node.type === 'other' ? 'Pick a tag.' : 'Pick a tag, not a folder.';
 }
 
-/** The primary button: "Use this folder" for a folder or a UDT instance picked for Alarms, else "Use this tag". */
-export function useText(node: TagChild | null, part: PickTarget['part']): string {
-    return node && node.type !== 'tag' && canPick(node, part) ? 'Use this folder' : 'Use this tag';
+/**
+ * The primary button: "Use for P14" for one item's override or own rule (entry 13c); "Use this folder" for a folder or a UDT
+ * instance picked for a kind's Alarms; else "Use this tag".
+ */
+export function useText(node: TagChild | null, of: PickTarget | PickTarget['part']): string {
+    const target = targetOf(of);
+    if (isItemTarget(target)) {
+        return 'Use for ' + (target.item || 'this item');
+    }
+    return node && node.type !== 'tag' && canPick(node, target) ? 'Use this folder' : 'Use this tag';
 }
 
 // ---- Words ----
@@ -363,9 +397,25 @@ export function typeWord(type: TagChildType): string {
     return TYPE_WORDS[type] || TYPE_WORDS.other;
 }
 
-/** The For line: "For: Key value 2 of the Well pad kind", "For: Comms of the Well pad kind", "For: Alarms of the Well pad kind". */
+/**
+ * The For line: "For: Key value 2 of the Well pad kind", "For: Comms of the Well pad kind", "For: Alarms of the Well pad kind",
+ * and from entry 13c "For: Style rule of the Well pad kind", "For: Popup param wellId of the Well pad kind" (a new row not named
+ * yet: "For: A new popup param of the Well pad kind"), "For: Casing pressure on P14 only - an override" and
+ * "For: Style rule of P14 only".
+ */
 export function forLine(target: PickTarget, kind: Kind): string {
-    const what = target.part === 'kpi' ? 'Key value ' + (target.index || 1) : target.part === 'comms' ? 'Comms' : 'Alarms';
+    const item = target.item || 'this item';
+    if (target.part === 'override') {
+        return 'For: ' + (target.name || 'A path') + ' on ' + item + ' only - an override';
+    }
+    if (target.part === 'ownRule') {
+        return 'For: Style rule of ' + item + ' only';
+    }
+    const what = target.part === 'kpi' ? 'Key value ' + (target.index || 1)
+        : target.part === 'comms' ? 'Comms'
+        : target.part === 'alarms' ? 'Alarms'
+        : target.part === 'rule' ? 'Style rule'
+        : target.name ? 'Popup param ' + target.name : 'A new popup param';
     return 'For: ' + what + ' of the ' + kind.name + ' kind';
 }
 
@@ -446,10 +496,69 @@ export interface CardNote {
     resolve: { text: string; warning: boolean } | null;
     /** The path "Use this tag" saves, or null while it is inert. */
     save: string | null;
+    /** One item's pick (entry 13c): the note ends in the Override tag. */
+    override?: boolean;
 }
 
 function plain(text: string): CardNote {
     return { tone: 'plain', title: '', text, path: '', resolve: null, save: null };
+}
+
+function warning(text: string): CardNote {
+    return { tone: 'warning', title: '', text, path: '', resolve: null, save: null };
+}
+
+/** A path's last name, for the shared-tag sentence of a typed path: `[default]Plant/AmbientTemp` is `AmbientTemp`. */
+function lastName(path: string): string {
+    const split = splitFullPath(path);
+    const parts = (split ? split.folder : path).split('/').filter((p) => p !== '');
+    return parts.length > 0 ? parts[parts.length - 1] : path;
+}
+
+/** What every item of the kind does with one shared path, by the value it is for. */
+function sharedEnd(target: PickTarget, kind: string): string {
+    switch (target.part) {
+        case 'alarms':
+            return 'every ' + kind + ' shows the alarms below it.';
+        case 'rule':
+            return 'every ' + kind + "'s rule reads this one tag.";
+        case 'param':
+            return 'every ' + kind + "'s popup view gets this one path.";
+        default:
+            return 'every ' + kind + ' shows this one tag.';
+    }
+}
+
+/** The words of an item's pick: "Saved for P14 only, as the full path". */
+export function itemNoteText(item: string): string {
+    return 'Saved for ' + item + ' only, as the full path';
+}
+
+/**
+ * The note of one item's override or own rule (entry 13c, owner decisions 6 to 8): the card opens at that item's own asset
+ * folder (the default provider's top with no asset), every pick is its full path and nothing is asked of the Gateway; a typed
+ * path is checked by the override's own full-path check, in its words.
+ */
+function itemNote(o: { target: PickTarget; asset: AssetFolder | null; picked: TagChild | null; typed: string | null; assetProblem: string }): CardNote {
+    const item = o.target.item || 'this item';
+    const saved = (path: string): CardNote =>
+        ({ tone: 'plain', title: '', text: itemNoteText(item), path, resolve: null, save: path, override: true });
+    if (o.typed !== null && o.typed !== '') {
+        const problem = pathProblem(o.typed);
+        return problem !== '' ? warning(problem) : saved(o.typed);
+    }
+    if (o.picked) {
+        const problem = pickProblem(o.picked, o.target);
+        return problem !== '' ? plain(problem) : saved(o.picked.path);
+    }
+    const tail = ' A pick is saved for ' + item + ' only, as the full path.';
+    if (!o.asset) {
+        return plain(item + ' is not linked to an asset with a tag folder, so the tree starts at the top.' + tail);
+    }
+    if (o.assetProblem !== '') {
+        return plain(o.assetProblem + ' ' + item + "'s asset folder could not be opened, so the tree starts at the top." + tail);
+    }
+    return plain('Opened at ' + item + "'s asset folder." + tail);
 }
 
 /**
@@ -457,6 +566,11 @@ function plain(text: string): CardNote {
  * a row that is no pick says so; a pick waits for the Gateway's answer (`tags.resolve` with the preview item's asset): inside
  * the asset folder `{asset.path}/...` and what it resolves for, outside it the shared-tag note with the full path. With no
  * preview item there is nothing to ask and every pick is its full path (owner decision 10).
+ *
+ * From entry 13c a typed path (`typed`, not null while the Path field holds typed text) is answered as a pick is: the Gateway's
+ * answer to the text as typed, a full path and `{asset.path}/...` alike, kept under that text in `picks`; its refusal shows its
+ * own words and saves nothing. Where no asset can be asked (no linked item, or one item's target) the override's own full-path
+ * check answers. One item's target (`target.part` `override` or `ownRule`) is `itemNote`.
  */
 export function cardNote(o: {
     kind: Kind; part: PickTarget['part']; asset: AssetFolder | null; picked: TagChild | null; pick: PickAnswer | undefined;
@@ -464,12 +578,21 @@ export function cardNote(o: {
     assetProblem: string;
     /** The preview item's name when it has one whose asset's base path is no full tag path (no `asset` then); else absent. */
     noFolder?: string | null;
+    /** The whole target, for the words of the newer parts; `{part}` when absent. */
+    target?: PickTarget;
+    /** The text typed in the Path field, trimmed; null while the field shows the tree's pick (or nothing). */
+    typed?: string | null;
 }): CardNote {
+    const target = o.target || { part: o.part };
+    const typed = o.typed === undefined || o.typed === null || o.typed === '' ? null : o.typed;
+    if (isItemTarget(target)) {
+        return itemNote({ target, asset: o.asset, picked: o.picked, typed, assetProblem: o.assetProblem });
+    }
     const kind = lowerKind(o.kind);
     const shared = 'Same tag for every ' + kind;
     // Why there is no asset folder: no linked item of the kind, or a preview item whose asset names no tag folder.
     const none = o.noFolder ? o.noFolder + "'s asset has no tag folder" : 'No ' + kind + ' is linked to an asset';
-    if (!o.picked) {
+    if (!o.picked && typed === null) {
         if (!o.asset) {
             return plain(none + (o.noFolder ? ' to open, so the tree starts at the top.' : ', so there is no asset folder to open.')
                 + ' A pick is saved as the full path, the same tag for every ' + kind + '.');
@@ -480,25 +603,38 @@ export function cardNote(o: {
         return plain('Opened at ' + o.asset.name + "'s asset folder, the preview item. A tag in it is saved for every " + kind
             + ' as {asset.path}/.... Go up to pick a tag anywhere else.');
     }
-    const problem = pickProblem(o.picked, o.part);
-    if (problem !== '') {
-        return plain(problem);
+    if (o.picked && typed === null) {
+        const problem = pickProblem(o.picked, target);
+        if (problem !== '') {
+            return plain(problem);
+        }
     }
+    const full = typed !== null ? typed : (o.picked as TagChild).path;
+    const name = typed !== null ? lastName(typed) : (o.picked as TagChild).name;
     if (!o.asset) {
-        return { tone: 'shared', title: shared, text: none + ', so it is saved as the full path.', path: o.picked.path,
-            resolve: null, save: o.picked.path };
+        if (typed !== null) {
+            // Nothing can be asked: the browser's own full-path check answers, and a path under the asset is told why not here.
+            if (typed === '{asset.path}' || typed.indexOf('{asset.path}/') === 0) {
+                return warning(none + ', so ' + typed + ' cannot be checked here. Type a full path such as [default]Shared/GasPrice.');
+            }
+            const problem = pathProblem(typed);
+            if (problem !== '') {
+                return warning(problem);
+            }
+        }
+        return { tone: 'shared', title: shared, text: none + ', so it is saved as the full path.', path: full, resolve: null, save: full };
     }
     if (!o.pick || o.pick.state === 'asking') {
         return plain('Checking...');
     }
     if (o.pick.state === 'failed') {
-        return { tone: 'warning', title: '', text: 'Could not check this path: ' + o.pick.message, path: '', resolve: null, save: null };
+        // A typed path the Gateway refuses: its own words. Any other failure (no answer, the tag system) says the check failed.
+        return warning(typed !== null && o.pick.code === 'invalid' ? o.pick.message : 'Could not check this path: ' + o.pick.message);
     }
     if (!o.pick.relative) {
         return {
             tone: 'shared', title: shared,
-            text: o.picked.name + ' is outside ' + o.asset.name + "'s asset folder, so it is saved as the full path and every " + kind
-                + (o.part === 'alarms' ? ' shows the alarms below it.' : ' shows this one tag.'),
+            text: name + ' is outside ' + o.asset.name + "'s asset folder, so it is saved as the full path and " + sharedEnd(target, kind),
             path: o.pick.path, resolve: null, save: o.pick.path
         };
     }
@@ -510,26 +646,61 @@ export function cardNote(o: {
     };
 }
 
+/** How long the Path field waits after the last keystroke before a typed path is asked of the Gateway (Enter asks at once). */
+export const TYPED_PAUSE_MS = 400;
+
 // ---- The panel's side ----
 
-/** The id of a path's tag button: the path's field for a stored value, a new row by its own id. */
+/**
+ * The id of a path's tag button: the path's field for a stored value, a new row by its own id. From entry 13c also the style
+ * rule's path, a popup param by its name (a new one by its row id), and on one item an override's row and the item's own rule.
+ */
 export const TagFor = {
     comms: 'comms.path',
     alarms: 'alarms.path',
     kpi: (key: string): string => 'kpis.' + key + '.path',
-    newRow: (rowId: string): string => 'kpis.new:' + rowId
+    newRow: (rowId: string): string => 'kpis.new:' + rowId,
+    rule: 'styleRule.path',
+    param: (name: string): string => 'param:' + name,
+    newParam: (rowId: string): string => 'param.new:' + rowId,
+    override: (row: string): string => 'override:' + row,
+    ownRule: 'own.styleRule.path'
 } as const;
 
-/** What a tag button's id names: the comms or alarms path, a stored key value by its key, or a new row by its id. */
-export function readTagFor(tagFor: string): { part: 'comms' } | { part: 'alarms' } | { part: 'kpi'; key: string } | { part: 'new'; rowId: string } | null {
+/** What a tag button's id names. */
+export type TagForRead =
+    | { part: 'comms' } | { part: 'alarms' } | { part: 'kpi'; key: string } | { part: 'new'; rowId: string }
+    | { part: 'rule' } | { part: 'param'; name: string } | { part: 'newParam'; rowId: string }
+    | { part: 'override'; row: string } | { part: 'ownRule' };
+
+/**
+ * What a tag button's id names: the comms or alarms path, a stored key value by its key, a new row by its id, the style rule's
+ * path, a stored param by its name, a new param by its row id, an item's override by its Live now row, or the item's own rule.
+ */
+export function readTagFor(tagFor: string): TagForRead | null {
     if (tagFor === TagFor.comms) {
         return { part: 'comms' };
     }
     if (tagFor === TagFor.alarms) {
         return { part: 'alarms' };
     }
+    if (tagFor === TagFor.rule) {
+        return { part: 'rule' };
+    }
+    if (tagFor === TagFor.ownRule) {
+        return { part: 'ownRule' };
+    }
     if (tagFor.indexOf('kpis.new:') === 0) {
         return { part: 'new', rowId: tagFor.slice('kpis.new:'.length) };
+    }
+    if (tagFor.indexOf('param.new:') === 0) {
+        return { part: 'newParam', rowId: tagFor.slice('param.new:'.length) };
+    }
+    if (tagFor.indexOf('param:') === 0) {
+        return { part: 'param', name: tagFor.slice('param:'.length) };
+    }
+    if (tagFor.indexOf('override:') === 0) {
+        return { part: 'override', row: tagFor.slice('override:'.length) };
     }
     const m = /^kpis\.(.+)\.path$/.exec(tagFor);
     return m ? { part: 'kpi', key: m[1] } : null;

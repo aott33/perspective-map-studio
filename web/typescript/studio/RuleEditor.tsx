@@ -104,6 +104,17 @@ export interface RuleEditorProps {
     unsavedTail?: string;
     /** A draft left not saved when the editor last went (entry 12c3): it opens as it was left, in step with the store as it was. */
     kept?: RuleKeep | null;
+    /**
+     * The tag button beside the rule's tag path (entry 13c): pressed, the tag browser opens for the path. Absent, no button is
+     * drawn (anyone but a full editor in the studio).
+     */
+    onBrowse?: () => void;
+    /** The tag button's id (tagBrowser.ts `TagFor`), for the card's way back to it. */
+    browseFor?: string;
+    /** The tag browser is open for this rule's path: the button reads as expanded and the value takes the selection tint. */
+    browsing?: boolean;
+    /** The rule no longer shows a tag path field while its card is open (the value or the type changed): the card closes, nothing saved. */
+    onBrowseGone?: () => void;
     /** The element around the editor's box; the box alone when absent. */
     frame?: (body: React.ReactElement, info: RuleFrameInfo) => React.ReactElement;
 }
@@ -209,6 +220,9 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
     private focusRow: number | null = null;
 
     componentDidUpdate(): void {
+        if (this.props.browsing && this.props.onBrowseGone && !this.showsPath()) {
+            this.props.onBrowseGone();
+        }
         this.settle();
         this.foldStored();
         this.refocus();
@@ -235,6 +249,27 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
     /** Whether the rule is not saved: its draft is not complete, or is complete, not what is stored and not on its way. */
     unsaved(): boolean {
         return this.keep() !== null;
+    }
+
+    /**
+     * A path from the tag browser (entry 13c): it goes into the draft as the rule's tag path, as when it is typed and finished, so
+     * the rule is sent when it is complete and says "Not saved yet" until then. Returns '' when the draft took it, else why not.
+     */
+    usePath(path: string): string {
+        if (this.off()) {
+            return 'Not saved. The rule cannot be changed now.';
+        }
+        if (!this.showsPath()) {
+            return 'Not saved. This rule no longer reads a tag path.';
+        }
+        this.editRule((d) => withSource(d, { from: 'path', path }), true, false, false);
+        return '';
+    }
+
+    /** Whether the rule shows its tag path field: a type that reads a value, with "A tag path" as that value. */
+    private showsPath(): boolean {
+        const draft = this.draft();
+        return draft.type !== 'none' && draft.type !== 'instruments' && draftSource(draft).from === 'path';
     }
 
     /** After a row was removed the focus goes to the row before it (its Remove), or to Add: the keyboard keeps its place. */
@@ -502,8 +537,22 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
             : value.indexOf('kpi:') === 0 ? { from: 'kpi', key: value.slice(4) } : { from: '' });
         const stored = this.props.stored ? draftSource(ruleDraft(this.props.stored)) : null;
         const note = this.props.pathNote;
+        const onBrowse = this.props.onBrowse;
+        const browsing = this.props.browsing === true && source.from === 'path';
+        const pathInput = source.from === 'path' ? (
+            <input type="text" className="mapstudio-input mapstudio-kindsetup-input mapstudio-mono mapstudio-rule-path" value={source.path}
+                   placeholder={this.props.own ? '[default]Mesa/P12/Status' : '{asset.path}/Status'} aria-label="Tag path the rule reads"
+                   aria-invalid={m.invalid} disabled={this.off()}
+                   autoComplete="off" spellCheck={false}
+                   onChange={(ev) => {
+                       const path = ev.target.value;
+                       this.editRule((d) => withSource(d, { from: 'path', path }), false);
+                   }}
+                   onBlur={() => this.commitRule()} onKeyDown={this.onDraftKey} />
+        ) : null;
         return (
-            <div className="mapstudio-kindsetup-field mapstudio-rule-source" data-field={Fields.ruleSource} data-source={chosen}>
+            <div className={'mapstudio-kindsetup-field mapstudio-rule-source' + (browsing ? ' mapstudio-kindsetup-field--browsing' : '')}
+                 data-field={Fields.ruleSource} data-source={chosen}>
                 <label className="mapstudio-field-label" htmlFor={id}>Value</label>
                 <select id={id} className="mapstudio-input mapstudio-rule-source-select" value={chosen} disabled={this.off()}
                         aria-invalid={m.invalid} aria-describedby={m.ids.length > 0 ? m.ids.join(' ') : undefined}
@@ -522,17 +571,16 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
                     ))}
                     <option value="path">A tag path</option>
                 </select>
-                {source.from === 'path' ? (
-                    <input type="text" className="mapstudio-input mapstudio-kindsetup-input mapstudio-mono mapstudio-rule-path" value={source.path}
-                           placeholder={this.props.own ? '[default]Mesa/P12/Status' : '{asset.path}/Status'} aria-label="Tag path the rule reads"
-                           aria-invalid={m.invalid} disabled={this.off()}
-                           autoComplete="off" spellCheck={false}
-                           onChange={(ev) => {
-                               const path = ev.target.value;
-                               this.editRule((d) => withSource(d, { from: 'path', path }), false);
-                           }}
-                           onBlur={() => this.commitRule()} onKeyDown={this.onDraftKey} />
-                ) : null}
+                {pathInput && onBrowse ? (
+                    <div className="mapstudio-kindsetup-with-picker mapstudio-rule-pathline">
+                        {pathInput}
+                        <button type="button" className={'mapstudio-dock-button mapstudio-tag-button' + (browsing ? ' mapstudio-tag-button--open' : '')}
+                                data-tag-for={this.props.browseFor || ''} disabled={this.off()} title="Pick a tag"
+                                aria-label="Pick a tag for the style rule" aria-haspopup="dialog" aria-expanded={browsing} onClick={onBrowse}>
+                            <ChromeGlyph name="tag" size={16} />
+                        </button>
+                    </div>
+                ) : pathInput}
                 {m.nodes}
                 {note && source.from === 'path' && stored && stored.from === 'path' && stored.path === source.path.trim() ? note(stored.path) : null}
             </div>

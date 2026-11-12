@@ -18,6 +18,7 @@ import {
 import { ItemState } from '../live';
 import { MarkerColors, SpriteSymbol } from '../markers';
 import { ItemView } from '../placeholders';
+import { PickTarget, TagFor, readTagFor } from '../tagBrowser';
 import { ChromeGlyph } from './ChromeGlyph';
 import { RuleEditor, RuleKeep, RuleTile } from './RuleEditor';
 import { PAUSED_TEXT } from './UndoGroup';
@@ -276,6 +277,15 @@ export interface PropertiesPanelProps {
     onClearOverrideRefusal?: (itemId: string) => void;
     /** "Open <kind>'s setup": Kinds at this item's kind, the selection kept. */
     onOpenKindSetup?: () => void;
+    /**
+     * Entry 13c: a tag button pressed (an override row's, beside its field; the own rule's tag path): the tag browser opens for
+     * this item. No tag button without it (anyone but a full editor in the studio).
+     */
+    onBrowse?: (tagFor: string, target: PickTarget) => void;
+    /** The tag button whose card is open for this item (tagBrowser.ts `TagFor`), or null. */
+    browsing?: string | null;
+    /** The card's place is gone (its override field closed, the own rule reset): it closes and changes nothing. */
+    onBrowseGone?: () => void;
     /** Entry 12c2: the tab chosen (Details when absent) and a tab chosen; the component keeps it across items and Kinds. */
     tab?: PanelTab;
     onTab?: (tab: PanelTab) => void;
@@ -522,6 +532,12 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                 this.styleFocus = null;
                 (target as HTMLElement).focus();
             }
+        }
+        // Entry 13c: the open tag browser's place went with this draw (its override field closed, the own rule gone): it closes.
+        const browsing = this.props.browsing ? readTagFor(this.props.browsing) : null;
+        if (browsing && this.props.onBrowseGone && prev.browsing === this.props.browsing
+            && ((browsing.part === 'override' && this.state.overrideRow !== browsing.row) || (browsing.part === 'ownRule' && !this.ruleEditor.current))) {
+            this.props.onBrowseGone();
         }
         if (this.refocusRow !== null && this.state.overrideRow === null) {
             const row = this.refocusRow;
@@ -813,6 +829,11 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
 
     /** Override (or Change) on a Live now row (entry 12c1): its path becomes a text field starting from the path shown. */
     private startOverride(row: LiveNowRow): void {
+        const open = this.state.overrideRow;
+        if (open !== null && open !== row.id && this.rowOf(open)) {
+            // Another row's field is still open (its blur was skipped while its tag browser was open): finished first, as on a blur.
+            this.commitOverride(this.rowOf(open));
+        }
         if (this.props.overrideRefusal && this.props.onClearOverrideRefusal) {
             this.props.onClearOverrideRefusal(this.props.item.id);
         }
@@ -860,6 +881,48 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         this.setState({ overrideRow: null, overrideProblem: '' });
     }
 
+    /**
+     * A pick from the tag browser for this item (entry 13c, owner decision 6), always a full path. An override row takes it as
+     * its field's text and is finished as when typed (one item update, one Undo step; the path shown already sends nothing);
+     * the own rule's draft takes it and is sent when the rule is complete. Returns '' when it was taken, else why not.
+     */
+    usePick(tagFor: string, path: string): string {
+        const what = readTagFor(tagFor);
+        if (what && what.part === 'ownRule') {
+            const editor = this.ruleEditor.current;
+            return editor ? editor.usePath(path) : 'Not saved. The style rule is no longer open.';
+        }
+        if (!what || what.part !== 'override') {
+            return 'Not saved. This path cannot take a pick.';
+        }
+        const row = this.rowOf(what.row);
+        if (!row) {
+            return 'Not saved. This row is gone.';
+        }
+        if (this.props.paused || !this.props.kind || !this.props.onOverride) {
+            return 'Not saved. Editing is paused.';
+        }
+        const problem = pathProblem(path);
+        if (problem !== '') {
+            return 'Not saved: ' + problem;
+        }
+        // What the field's finish would not send is said here, so the card stays open with the reason.
+        if (path === row.path) {
+            return 'Not saved. ' + this.props.item.name + ' reads this tag already.';
+        }
+        const refusal = this.props.overrideRefusal;
+        if (refusal && refusal.row === row.id && refusal.path === path) {
+            return refusal.words;
+        }
+        this.setState({ overrideRow: row.id, overrideText: path, overrideProblem: '' }, () => {
+            // As Enter in the field: the focus goes back to the row's button once the field has closed.
+            this.enterCommit = true;
+            this.commitOverride(row);
+            this.enterCommit = false;
+        });
+        return '';
+    }
+
     /** Enter finishes the override's field, as leaving it does; Esc puts the path back, sends nothing and goes no further. */
     private onOverrideKey = (ev: React.KeyboardEvent<HTMLInputElement>): void => {
         if (ev.key === 'Enter') {
@@ -900,6 +963,9 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         const refusal = this.props.overrideRefusal && this.props.overrideRefusal.row === row.id ? this.props.overrideRefusal : null;
         const problem = editing ? this.state.overrideProblem : refusal ? refusal.words : '';
         const id = 'mapstudio-livenow-' + this.props.item.id + '-' + row.id;
+        const onBrowse = this.props.onBrowse;
+        const tagFor = TagFor.override(row.id);
+        const browsing = this.props.browsing === tagFor;
         return (
             <div key={row.id} className={'mapstudio-livenow-row' + (overridden ? ' mapstudio-livenow-row--override' : '')} data-row={row.id}
                  data-override={overridden ? 'true' : 'false'} data-off={row.off ? 'true' : 'false'} data-problem={problem}>
@@ -929,12 +995,33 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                     </span>
                 </div>
                 {editing ? (
-                    <input className="mapstudio-input mapstudio-mono mapstudio-override-input" type="text" value={this.state.overrideText} autoFocus
-                           spellCheck={false} aria-label={row.name + ' path for ' + this.props.item.name + ' only'}
-                           aria-invalid={problem !== ''} aria-describedby={problem !== '' ? id + '-problem' : undefined}
-                           onFocus={(ev) => ev.currentTarget.select()}
-                           onChange={(ev) => this.setState({ overrideText: ev.target.value })}
-                           onBlur={() => this.commitOverride(row)} onKeyDown={this.onOverrideKey} />
+                    // The field and, for a full editor, its tag button (entry 13c): the field is finished when the focus leaves
+                    // both, and not while the row's own tag browser is open.
+                    <div className={'mapstudio-override-line' + (browsing ? ' mapstudio-override-line--browsing' : '')}
+                         onBlur={(ev) => {
+                             const to = ev.relatedTarget as Node | null;
+                             if (!browsing && (!to || !ev.currentTarget.contains(to))) {
+                                 this.commitOverride(row);
+                             }
+                         }}>
+                        <input className="mapstudio-input mapstudio-mono mapstudio-override-input" type="text" value={this.state.overrideText} autoFocus
+                               spellCheck={false} aria-label={row.name + ' path for ' + this.props.item.name + ' only'}
+                               aria-invalid={problem !== ''} aria-describedby={problem !== '' ? id + '-problem' : undefined}
+                               onFocus={(ev) => ev.currentTarget.select()}
+                               onChange={(ev) => this.setState({ overrideText: ev.target.value })}
+                               onKeyDown={this.onOverrideKey} />
+                        {onBrowse ? (
+                            <button type="button" className={'mapstudio-dock-button mapstudio-tag-button' + (browsing ? ' mapstudio-tag-button--open' : '')}
+                                    data-tag-for={tagFor} disabled={frozen} title="Pick a tag"
+                                    aria-label={'Pick a tag for ' + row.name + ' on ' + this.props.item.name + ' only'}
+                                    aria-haspopup="dialog" aria-expanded={browsing}
+                                    // The press must not finish the field first (a browser that gives a pressed button no focus blurs it to nothing).
+                                    onMouseDown={(ev) => ev.preventDefault()}
+                                    onClick={() => onBrowse(tagFor, { part: 'override', name: row.name, item: this.props.item.name, folders: row.id === 'alarms' })}>
+                                <ChromeGlyph name="tag" size={16} />
+                            </button>
+                        ) : null}
+                    </div>
                 ) : (
                     <div className="mapstudio-livenow-pathline">
                         <span className="mapstudio-mono mapstudio-livenow-path">{row.path}</span>
@@ -1172,6 +1259,9 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                                         && this.props.onStyleRule(rule, base !== null ? base : undefined)}
                                     onClearRefusal={() => this.props.onClearOverrideRefusal && this.props.onClearOverrideRefusal(item.id)}
                                     symbols={style.symbols} colors={style.colors} own initial={this.state.ruleStart} kept={this.kept}
+                                    onBrowse={this.props.onBrowse ? () => (this.props.onBrowse as NonNullable<PropertiesPanelProps['onBrowse']>)(
+                                        TagFor.ownRule, { part: 'ownRule', item: item.name }) : undefined}
+                                    browseFor={TagFor.ownRule} browsing={this.props.browsing === TagFor.ownRule} onBrowseGone={this.props.onBrowseGone}
                                     unsavedTail={UNSAVED_KEEPS} undoing={this.props.undoing === true} />
                     ) : this.renderKindRule(kind, style)}
                     {own || editing ? (

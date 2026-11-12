@@ -808,9 +808,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     }
 
     /**
-     * A row picked in the tag browser (entry 13b, owner decision 3): `tags.resolve` with its full path and the preview item's
-     * asset, so the Gateway says how the path is saved (`{asset.path}/...` inside the asset folder, the full path outside it)
-     * and what it resolves for. A path already asked or answered is not asked twice, unless its check failed.
+     * A row picked in the tag browser (entry 13b, owner decision 3), or a path typed in its Path field (entry 13c): `tags.resolve`
+     * with the full path (a typed path as it was typed, `{asset.path}/...` too) and the preview item's asset, so the Gateway says
+     * how the path is saved (`{asset.path}/...` inside the asset folder, the full path outside it) and what it resolves for. A
+     * path already asked or answered is not asked twice, unless its check failed.
      */
     askPick(kindId: string, assetId: string, path: string): void {
         if (!this.mayBrowse() || path === '') {
@@ -824,7 +825,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         const timer = setTimeout(() => {
             this.pickAsks.delete(message.id);
             this.forget(message.id);
-            this.setPick(path, { state: 'failed', message: 'the Gateway did not answer in time.' });
+            this.setPick(path, { state: 'failed', code: TIMEOUT_CODE, message: 'the Gateway did not answer in time.' });
             console.info('[MapStudio] A tags.resolve did not answer.');
             this.notify();
         }, RESOLVE_TIMEOUT_MS);
@@ -845,7 +846,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         clearTimeout(ask.timer);
         this.pickAsks.delete(reply.id);
         if (reply.kind === 'error') {
-            this.setPick(ask.path, { state: 'failed', message: reply.body.message });
+            // The Gateway's code goes with its words: a typed path it refuses (`invalid`) shows them as they are (entry 13c).
+            this.setPick(ask.path, { state: 'failed', code: reply.body.code, message: reply.body.message });
         } else {
             const body = reply.body;
             this.setPick(ask.path, {

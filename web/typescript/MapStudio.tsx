@@ -183,9 +183,10 @@ export interface MapStudioState {
     /**
      * The tag browser's card (entry 13b; studio/TagBrowser.tsx), or null while it is closed: the kind whose setup it was opened
      * from, the tag button (tagBrowser.ts `TagFor`), the value being picked, and the setup's version seen when it opened, which
-     * the pick's save carries so another editor's save since meets the conflict.
+     * the pick's save carries so another editor's save since meets the conflict. From entry 13c it also opens on Items for one
+     * item (`itemId`: an override row of its Details, its own rule in its Style tab), `kindId` then the item's kind.
      */
-    tagPick: { kindId: string; tagFor: string; target: PickTarget; seen: number } | null;
+    tagPick: { kindId: string; tagFor: string; target: PickTarget; seen: number; itemId?: string } | null;
     /**
      * The geometry change in hand with Select (entry 5, drawing.ts): a chosen point of the selected line or area, or Move waiting
      * for a click; kept only for the selected item (selectionState) and dropped when a tool is picked (toolState).
@@ -2199,18 +2200,50 @@ export class MapStudio extends Component<Props, MapStudioState> {
     /** The kind setup panel in view: a pick is saved through it, as a typed path is. */
     private readonly kindPanel = React.createRef<KindSetupPanel>();
 
-    /** Whether the open card still has its place: Edit mode's studio, Kinds, and the kind it was opened from in view. */
+    /** The properties panel in view (entry 13c): one item's pick is saved through it, as its typed twin is. */
+    private readonly itemPanel = React.createRef<PropertiesPanel>();
+
+    /**
+     * Whether the open card still has its place: Edit mode's studio, Kinds, and the kind it was opened from in view; or, for one
+     * item's card (entry 13c), Items with that one item selected, its panel open on the tab the button is on and its kind unchanged.
+     */
     private tagPickShown(): boolean {
         const pick = this.state.tagPick;
         const delegate = this.props.delegate;
-        if (!pick || !delegate || !this.studioOn() || this.state.studio.surface !== 'kinds') {
+        if (!pick || !delegate || !this.studioOn()) {
+            return false;
+        }
+        if (pick.itemId !== undefined) {
+            const selected = this.state.selected;
+            const item = selected && selected.id === pick.itemId && this.state.panel === pick.itemId ? this.itemFor(pick.itemId) : undefined;
+            const tab: PanelTab = pick.target.part === 'ownRule' ? 'style' : 'details';
+            // Wherever the item's panel shows (every surface but Kinds, whose setup takes the panel's place).
+            return this.state.studio.surface !== 'kinds' && this.state.studio.selected.length < 2 && !!item && item.kind === pick.kindId
+                && this.state.panelTab === tab;
+        }
+        if (this.state.studio.surface !== 'kinds') {
             return false;
         }
         const kind = this.kindShown(delegate);
         return !!kind && kind.id === pick.kindId;
     }
 
-    /** Another kind, another surface or leaving Edit mode closes the card and changes nothing. */
+    /** One item's tag button pressed (entry 13c): the card opens for that item; pressed again for the open one, it closes. */
+    onItemTagBrowse = (tagFor: string, target: PickTarget): void => {
+        const selected = this.state.selected;
+        const item = selected ? this.itemFor(selected.id) : undefined;
+        if (!item) {
+            return;
+        }
+        const open = this.state.tagPick;
+        if (open && open.itemId === item.id && open.tagFor === tagFor) {
+            this.onTagClose();
+            return;
+        }
+        this.setState({ tagPick: { kindId: item.kind, tagFor, target, seen: item.version, itemId: item.id } });
+    };
+
+    /** Another kind, another surface, another selected item (entry 13c) or leaving Edit mode closes the card and changes nothing. */
     private dropTagPick(): void {
         if (this.state.tagPick && !this.tagPickShown()) {
             this.setState({ tagPick: null });
@@ -2252,6 +2285,19 @@ export class MapStudio extends Component<Props, MapStudioState> {
      */
     onTagUse = (path: string): string => {
         const pick = this.state.tagPick;
+        if (pick && pick.itemId !== undefined) {
+            // One item's pick (entry 13c): through its panel, as the override's field or the rule's path takes a typed one.
+            const itemPanel = this.itemPanel.current;
+            if (!itemPanel || !this.tagPickShown()) {
+                return 'Not saved. The item is no longer open.';
+            }
+            const words = itemPanel.usePick(pick.tagFor, path);
+            if (words !== '') {
+                return words;
+            }
+            this.setState({ tagPick: null }, () => this.focusTagButton(pick.tagFor));
+            return '';
+        }
         const panel = this.kindPanel.current;
         if (!pick || !panel || !this.tagPickShown()) {
             return 'Not saved. The kind\'s setup is no longer open.';
@@ -2287,6 +2333,24 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const pick = this.state.tagPick;
         if (!pick || !this.tagPickShown()) {
             return null;
+        }
+        if (pick.itemId !== undefined) {
+            // One item's card (entry 13c): at that item's own asset folder (the default provider's top with no asset in the asset
+            // list); every pick is its full path, so nothing is asked of tags.resolve.
+            const item = this.itemFor(pick.itemId);
+            const itemKind = item ? delegate.lists.kinds.find((k) => k.id === item.kind) : undefined;
+            if (!item || !itemKind) {
+                return null;
+            }
+            const asset = item.assetId !== null ? (delegate.lists.assets || []).find((a) => a.id === item.assetId) : undefined;
+            return (
+                <TagBrowser key={'item\n' + item.id + '\n' + pick.tagFor}
+                            kind={itemKind} tagFor={pick.tagFor} target={pick.target}
+                            preview={asset ? { name: item.name, folder: asset.basePath } : null}
+                            answers={delegate.browse || NO_BROWSE}
+                            onBrowse={this.onTagAsk} onAskPick={() => undefined}
+                            onUse={this.onTagUse} onClose={this.onTagClose} onGone={this.onTagGone} />
+            );
         }
         const kind = this.kindShown(delegate);
         if (!kind) {
@@ -2331,7 +2395,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         return (
             <KindSetupPanel key={'kind:' + id} ref={this.kindPanel}
                             browsing={this.state.tagPick && this.state.tagPick.kindId === id ? this.state.tagPick.tagFor : null}
-                            onBrowse={(tagFor, target, seen) => this.onTagBrowse(id, tagFor, target, seen)}
+                            onBrowse={(tagFor, target, seen) => this.onTagBrowse(id, tagFor, target, seen)} onBrowseGone={this.onTagClose}
                             symbols={this.symbols || {}}
                             colors={this.markerColors}
                             kind={kind}
@@ -2519,7 +2583,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const reverse = delegate.undo.pending;
         const undoing = reverse !== null && reverse.batch.ops.some((o) => o.entity === 'item' && o.id === item.id);
         return (
-            <PropertiesPanel key={item.id}
+            <PropertiesPanel key={item.id} ref={this.itemPanel}
+                             browsing={this.state.tagPick && this.state.tagPick.itemId === item.id ? this.state.tagPick.tagFor : null}
+                             onBrowse={this.onItemTagBrowse} onBrowseGone={this.onTagClose}
                              tab={this.state.panelTab}
                              onTab={this.onPanelTab}
                              style={style}
