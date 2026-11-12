@@ -3,8 +3,8 @@ title: "19a: units in the project setup: schema 2, the Designer's Units row, and
 type: 'feature'
 ticket: '19'
 created: '2026-11-12'
-status: 'draft'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: '93dae81f84073153e711f904e39b8b4056cfa24c'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
@@ -22,6 +22,8 @@ context: ['{project-root}/docs/setup.md', '{project-root}/docs/setup-editor.md',
 **Problem:** A project cannot say whether its map shows kilometres or miles (R27): the setup has no units field, the Designer's form has no row for it, and the browser is told nothing.
 
 **Approach:** The setup gains an optional `units` (`auto`, `metric` or `us`; absent means `auto`, the browser's locale), which takes the setup to schema 2. The Gateway reads schema 1 and 2; the Designer's Map section gains a Units row and writes schema 2 only when units is not auto; `map.load.reply`'s setup carries the units. This is the first half of entry 19; the map store's `settings` entity (Edit mode's override) is 19b.
+
+Decisions (owner, 2026-11-12, "approve and continue" on the split and the plan's ten picks): entry 19 is split in two; this is 19a. (1) `units` is `auto`, `metric` or `us`; absent means `auto`. (2) A schema 1 file that holds `units` is refused in the words every unknown field gets. (3) A schema 2 file with no `units`, or `auto` typed by hand, reads as auto. (4) The newer refusal reads "... (schema 3; this module reads 1 and 2)". (5) The Designer's row sits in the Map section after Alarm page: "Auto (the browser's locale)", "Metric", "US". (6) The Designer's schema label shows the number the save will write. (7) The reply's `setup.units` is always present, at every level; the browser reads it and does nothing with it until entry 20. (8) The dev project becomes schema 2 with `metric`; the showcase, perf and store-check setups stay schema 1. (9) The 0.3.0 refusal is tried with `ops/release-smoke.sh 0.3.0` here; if the published module cannot be fetched, the step goes in the playbook for the owner. (10) The Designer's proof is its Java tests, with a Designer check for the owner in playbook section 8s.
 
 ## Boundaries & Constraints
 
