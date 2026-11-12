@@ -4,7 +4,7 @@ type: 'feature'
 ticket: ''
 part_of: '13'
 created: '2026-11-12'
-status: 'draft'
+status: 'ready-for-dev'
 baseline_revision: ''
 route: 'full'
 route_source: 'auto'
@@ -23,6 +23,8 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.m
 **Problem:** The tag browser of entry 13b serves only a kind's Key values, Comms and Alarms, and its Path field is read only. The style rule's tag path, popup params, an item's override rows and an item's own rule are still typed by heart, and a path cannot be typed in the card when a provider cannot be browsed (R4).
 
 **Approach:** Give the same card four more targets, each with its own "For:" line, opening folder and saving rule, and make the Path field typed: a typed path is answered by the Gateway (`tags.resolve`) exactly as a tree pick is, and saved the same way.
+
+Decisions (owner, 2026-11-12, "approve and continue" on the plan and its thirteen picks; kept as one part): (1) the card sends a typed path to the Gateway and saves what comes back; a full path and `{asset.path}/...` both work. (2) A typed path is asked after a short pause or on Enter; the button waits for the answer. (3) Typing drops the tree's pick and the tree does not move; a click on a row replaces the typed text. (4) A bad typed path shows the Gateway's words, button inert. (5) An override's tag button sits beside the input, once Override or Change is pressed. (6) An override and an item's own rule always save the full path, "Saved for P14 only, as the full path", button "Use for P14"; the override is one Undo step as today. (7) `{asset.path}/...` typed for an item is refused with the override check's words. (8) An item with no asset opens the default provider's top; full-path picks. (9) A pick into a style rule goes into the draft, saved when the rule is complete, else "Not saved yet". (10) Popup params: inside the folder `{asset.path}/suffix`, outside the full path; no resolve note on param rows. (11) The For lines as Boundaries has them. (12) On Items the card sits in the same place and also closes when the selected item changes. (13) Backlog 39's link is not built here.
 
 ## Boundaries & Constraints
 
