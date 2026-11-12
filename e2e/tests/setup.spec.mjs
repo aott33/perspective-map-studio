@@ -5,11 +5,14 @@
 // No restart is checked, not assumed: the Gateway's uptime only grows and the
 // module's start time stays the same across the run, and the bad read logs exactly
 // one MapStudio.setup warning however many map.loads follow it.
+// Units (epic 4 entry 19a): map.load.reply's setup always holds `units`, read off the page's websocket
+// frames: the dev setup's `metric` for a viewer and an editor (U11), a schema 2 setup's `us` (U2), a
+// schema 1 setup's `auto` (U1), and `units` in a schema 1 file refused in the unknown-field words (U4).
 // The spec changes the committed dev setup and always puts it back (finally, and
 // the global setup after a crashed run). Screenshots at 1440 and 390 px.
 
 import { backUpSetup, committedSetup, gatewayRun, putBackSetup, scanProject, setupWarnings, writeSetup } from '../lib/gateway.mjs';
-import { EDITOR_USER, chipLines, editorTest, expect, openMap, shot, test } from './fixtures.mjs';
+import { EDITOR_USER, chipLines, editorTest, expect, openMap, shot, signedInContext, test } from './fixtures.mjs';
 
 /** How long a scanned change may take to reach a fresh map.load (seen well under 1 s, docs/platform-checks.md). */
 const APPLY_CAP_MS = 30_000;
@@ -42,6 +45,49 @@ async function reloadUntil(page, pagePath, want) {
 
 async function putBack() {
     await putBackSetup();
+}
+
+/**
+ * The texts of the frames a page receives that carry a map.load.reply (the Perspective session socket carries Map
+ * Studio's messages, as JSON or as an escaped JSON string).
+ */
+function loadReplyFrames(page) {
+    const frames = [];
+    page.on('websocket', (ws) => {
+        ws.on('framereceived', (f) => {
+            const text = typeof f.payload === 'string' ? f.payload : f.payload.toString('utf8');
+            if (text.includes('map.load.reply')) frames.push(text);
+        });
+    });
+    return frames;
+}
+
+/** The `units` of the newest map.load.reply's setup in `frames`, or null when none carries one. */
+function repliedUnits(frames) {
+    for (let i = frames.length - 1; i >= 0; i--) {
+        const m = /\\*"units\\*"\s*:\s*\\*"([^"\\]*)\\*"/.exec(frames[i]);
+        if (m) return m[1];
+    }
+    return null;
+}
+
+/** Open the page afresh and give the units its map.load.reply carried (null when the load failed or carried none). */
+async function loadedUnits(page, frames, pagePath) {
+    frames.length = 0;
+    const state = await loadedState(page, pagePath);
+    return state.load === 'loaded' ? repliedUnits(frames) : null;
+}
+
+/** Reload until the map.load.reply carries `want`, for at most APPLY_CAP_MS. */
+async function reloadUntilUnits(page, frames, pagePath, want) {
+    const deadline = Date.now() + APPLY_CAP_MS;
+    let seen;
+    for (;;) {
+        seen = await loadedUnits(page, frames, pagePath);
+        if (seen === want || Date.now() > deadline) break;
+        await page.waitForTimeout(1_000);
+    }
+    expect(seen, `map.load.reply's setup.units within ${APPLY_CAP_MS / 1000} s of the scan`).toBe(want);
 }
 
 test.describe('1440 px', () => {
@@ -92,6 +138,55 @@ test.describe('1440 px', () => {
         const after = await gatewayRun();
         expect(after.uptimeMs, 'the Gateway uptime did not reset').toBeGreaterThan(run.uptimeMs);
         expect(after.moduleStartupTime, 'the Map Studio module did not restart').toBe(run.moduleStartupTime);
+    });
+});
+
+test.describe('units in the setup (epic 4 entry 19a)', () => {
+    test.use({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+
+    test('map.load.reply carries the setup\'s units at every level; schema 1 reads as auto and refuses units', async ({ page, browser }) => {
+        backUpSetup();
+        const good = committedSetup();
+        expect(good, 'the dev setup is schema 2 and names metric').toMatchObject({ schemaVersion: 2, units: 'metric' });
+        const { units: _units, ...noUnits } = good;
+        const frames = loadReplyFrames(page);
+        try {
+            // U11: an anonymous viewer, then a full editor, get the dev setup's units.
+            expect(await loadedUnits(page, frames, '/'), 'a viewer\'s map.load.reply').toBe('metric');
+            const editorContext = await signedInContext(browser, EDITOR_USER, { viewport: { width: 1440, height: 900 } });
+            try {
+                const editorPage = await editorContext.newPage();
+                const editorFrames = loadReplyFrames(editorPage);
+                const state = await loadedState(editorPage, '/edit');
+                expect(state).toMatchObject({ load: 'loaded', level: 'full' });
+                expect(repliedUnits(editorFrames), 'a full editor\'s map.load.reply').toBe('metric');
+            } finally {
+                await editorContext.close();
+            }
+
+            // U2: a schema 2 setup naming us.
+            writeSetup({ ...good, units: 'us' });
+            await scanProject();
+            await reloadUntilUnits(page, frames, '/', 'us');
+
+            // U1: a schema 1 setup has no units; the reply still holds them, as auto.
+            writeSetup({ ...noUnits, schemaVersion: 1 });
+            await scanProject();
+            await reloadUntilUnits(page, frames, '/', 'auto');
+
+            // U4: units in a schema 1 file is refused in the words every unknown field gets.
+            writeSetup({ ...noUnits, schemaVersion: 1, units: 'metric' });
+            await scanProject();
+            await reloadUntil(page, '/', { load: 'failed' });
+            const status = page.locator('.mapstudio-chip[data-problem="store"]');
+            const words = 'Map store: The Map Studio setup of project mapstudio-dev cannot be read: '
+                + 'units is not a setup field of schema 1.';
+            await expect(status).toHaveAttribute('title', words);
+        } finally {
+            await putBack();
+        }
+        // The committed setup applies again, with its units.
+        await reloadUntilUnits(page, frames, '/', 'metric');
     });
 });
 

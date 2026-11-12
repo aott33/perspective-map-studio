@@ -243,7 +243,8 @@ public final class MapLoader {
     /**
      * The part of the setup the browser needs ({@code map.load.reply}'s optional
      * {@code setup}, since 0.2.0): never the connection, the roles, the functions or
-     * the token secret's name.
+     * the token secret's name. {@code units} (entry 19a, 0.4.0) is always there, at
+     * every level: {@code auto}, {@code metric} or {@code us}.
      */
     public static JsonObject setupJson(Setup setup) {
         JsonObject o = new JsonObject();
@@ -252,6 +253,7 @@ public final class MapLoader {
         setup.basemaps().forEach(basemaps::add);
         o.add("basemaps", basemaps);
         o.addProperty("alarmPage", setup.alarmPage());
+        o.addProperty("units", setup.units());
         return o;
     }
 

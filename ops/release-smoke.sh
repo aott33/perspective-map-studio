@@ -31,7 +31,9 @@
 #      database beside it (ops/docker-compose.yml plus ops/docker-compose.smoke.yml: no field
 #      simulator, broker or feedback stub, no allowunsignedmodules, so the Gateway's own signature
 #      check runs), its own compose project <MAPSTUDIO_CONTAINER>-smoke on port SMOKE_HTTP_PORT
-#      (default 9089) with fresh volumes;
+#      (default 9089) with fresh volumes; for a version older than 0.4.0, which reads setup schema 1
+#      only, the stack gets a schema 1 copy of the dev project's setup (schemaVersion 1, no units)
+#      through ops/docker-compose.smoke-setup1.yml, the repository's file untouched;
 #   5. GET /data/api/v1/modules/healthy lists the module ACTIVE at the version;
 #   6. e2e/rehearsal/release.spec.mjs: two Chromium instances signed in as the dev map editor on
 #      /edit; a line drawn in the first is on the second's map within 5 s with no reload;
@@ -148,6 +150,25 @@ fail() { err "$1"; exit 1; }
 
 rm -rf "${WORK:?}"
 mkdir -p "${SMOKE_MODULES_DIR}" "${WORK}/download"
+
+# A release older than 0.4.0 reads setup schema 1 only, and the dev project's setup is schema 2
+# (units, epic 4 entry 19a): give its stack a schema 1 copy, mounted over setup.json.
+if [[ "${VERSION}" != "0.4.0" && "$(printf '%s\n' "${VERSION}" 0.4.0 | sort -V | head -1)" == "${VERSION}" ]]; then
+  export SMOKE_SETUP_FILE="${WORK}/setup-schema-1.json"
+  python3 -I - "${PROJECT_ROOT}/ops/project/com.aoindustrial.perspective.mapstudio/setup/setup.json" "${SMOKE_SETUP_FILE}" <<'PY'
+import json, sys
+with open(sys.argv[1]) as f:
+    setup = json.load(f)
+setup["schemaVersion"] = 1
+setup.pop("units", None)
+with open(sys.argv[2], "w") as f:
+    json.dump(setup, f, indent=2)
+    f.write("\n")
+PY
+  chmod a+rw "${SMOKE_SETUP_FILE}"
+  COMPOSE+=(-f "${OPS_DIR}/docker-compose.smoke-setup1.yml")
+  info "Map Studio ${VERSION} reads setup schema 1 only: the stack gets a schema 1 copy of the dev setup (no units)."
+fi
 info "Release smoke for Map Studio ${VERSION} (image ${IMAGE}, compose project ${SMOKE_PROJECT}, port ${GATEWAY_HTTP_PORT})"
 
 info "Downloading the release's .sha256 asset ..."

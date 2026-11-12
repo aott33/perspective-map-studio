@@ -2,7 +2,7 @@
 
 A walk through what epic 4 has built so far, grouped by what you do, on the local development stack. Tick each box and note anything that looks or feels off in the Notes line under each section (a screenshot helps). Each note goes into `_bmad-output/initiative-flowmap/tickets/epic-editing/epic-editing.md` Notes or a new entry. The playbook grows as entries land; entry 18 (the 0.4.0 release) finishes it for the release test and the 30-minute test.
 
-Built so far (2026-11-10): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems) and 11a (the edit record, Gateway only). Also built: 11b (Recent changes and History), 12a (the Kinds surface and a kind's setup), 12b1 (the style rule editor and area tints, section 8l) 12b2 (the preview item on the map and the Live now note, section 8m) 12c1 (Details' Live now block and path overrides, section 8n) and 12c2 (the Style tab and an item's own style rule, section 8o). From 2026-11-11: 13a (one tag path rule, section 8p), 13b (the tag browser's card and tree, section 8q) and 13c (the tag browser for the style rule, popup params and an item's overrides, and the typed Path field, section 8r). Still to come: 19 and 20 (units), 17 (sweep), 18 (release).
+Built so far (2026-11-10): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems) and 11a (the edit record, Gateway only). Also built: 11b (Recent changes and History), 12a (the Kinds surface and a kind's setup), 12b1 (the style rule editor and area tints, section 8l) 12b2 (the preview item on the map and the Live now note, section 8m) 12c1 (Details' Live now block and path overrides, section 8n) and 12c2 (the Style tab and an item's own style rule, section 8o). From 2026-11-11: 13a (one tag path rule, section 8p), 13b (the tag browser's card and tree, section 8q) and 13c (the tag browser for the style rule, popup params and an item's overrides, and the typed Path field, section 8r). From 2026-11-12: 19a (units in the project setup, schema 2 and the Designer's Units row, section 8s). Still to come: 19b (Edit mode's units override) and 20 (units on the map), 17 (sweep), 18 (release).
 
 ## Results so far
 
@@ -31,6 +31,7 @@ Built so far (2026-11-10): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item li
 | 8m. The preview item on the map | | |
 | 8n. Live now and path overrides | | |
 | 8o. The Style tab and an item's own style rule | | |
+| 8s. Units in the project setup | | |
 | 9. View mode, unchanged | | |
 | 10. Phone (390 px) | | |
 | 11. Designer | | |
@@ -474,6 +475,24 @@ On `/edit` at 1366 px after **Seed the dev map**, in Edit mode as the map editor
 - [ ] **A provider it cannot browse.** Open a card from Heartbeat path. On the Gateway's web page disable the tag provider **Site2** and save. Choose Site2 in the card: "Can't browse Site2". Type `[default]Mesa/P14/Pressure` in Path: "Can't browse Site2" stays, the note reads `{asset.path}/Pressure` with its resolve line, and Use this tag saves it. Enable Site2 again.
 - [ ] As a viewer (not signed in) and as `mapoperator` at 390 px: no tag button anywhere, in Details either.
 - [ ] Press **Seed the dev map** to put the seed's setups and overrides back.
+
+Notes:
+
+## 8s. Units in the project setup (the Designer, and a 0.3.0 Gateway)
+
+Entry 19a: the setup may name the map's units, which makes it schema 2. Nothing on the map changes yet: distances follow the units from entry 20. No Designer runs in the build container, so the Designer steps are the owner's check; the Gateway's half is unit tested and run on the dev stack (`e2e/tests/setup.spec.mjs`). The dev project's setup is schema 2 with `"units": "metric"`. Each save below changes `ops/project/com.aoindustrial.perspective.mapstudio/setup/setup.json`; look at it with `git diff` and put it back at the end.
+
+- [ ] Open the dev project in the Designer and double-click **Map Studio Setup**. The Map section reads Basemaps, Alarm page, **Units**, Map token provider, Map token secret. Units is the Designer's own dropdown (not a field to type in) showing **Metric**; the header reads "Schema version 2".
+- [ ] Open the dropdown: "Auto (the browser's locale)", "Metric", "US", and nothing else. The label's tooltip says what the row does and that Metric or US saves the setup as schema 2.
+- [ ] **Clearing (U8).** Choose **Auto (the browser's locale)**: the header reads "Schema version 1" at once, the tab and the node read "(unsaved)". File > Save: `setup.json` starts `"schemaVersion": 1` and has no `units` line. The Gateway log has "Map Studio setup changed and applied" and the map at `/` still loads.
+- [ ] **Another edit (U9).** Change Refresh interval to 15 and save: the file is still schema 1, with only that line changed.
+- [ ] **Setting (U7).** Choose **US**: the header reads "Schema version 2". Save: the file starts `"schemaVersion": 2` and its last line before the brace is `"units": "us"`. The map at `/` still loads.
+- [ ] Choose **Metric**, set Refresh interval back to 10 and save: `git diff` shows no change to `setup.json`.
+- [ ] **A value typed by hand.** With the Designer closed, set `"units": "imperial"` in the file and run `ops/scan.sh`: the map says "units must be one of auto, metric, us, not "imperial"". Open the setup in the Designer: Units shows a fourth line, "imperial", with that reason under the row and "1 reason left" in the footer. Choose Metric and save: the reason goes and the map loads.
+- [ ] **Units in a schema 1 file (U4).** With the Designer closed, set `"schemaVersion": 1` and keep `"units": "metric"`, then `ops/scan.sh`: the map says "units is not a setup field of schema 1". In the Designer the setup shows as written, "This setup cannot be read: units is not a setup field of schema 1.", with Start from defaults. Do not press it; `git checkout` the file and scan.
+- [ ] **Newer (U10).** With the Designer closed, set `"schemaVersion": 3` and scan: the map says "setup.json is written for a newer Map Studio (schema 3; this module reads 1 and 2)". In the Designer: the banner "Read only. This setup was written by a newer Map Studio: schema 3 is newer than 2, the newest this Designer edits. It is shown as written and never rewritten here.", the header "Schema 3 - read only", the file as written, and a project save leaves it untouched. `git checkout` the file and scan.
+- [ ] **A 0.3.0 Gateway refuses schema 2 in words.** Seen on 2026-11-12 with the published 0.3.0 on the smoke stack (image 8.3.10) and the dev project's schema 2 setup: the module started ACTIVE and logged "The Map Studio setup of project mapstudio-dev cannot be read: setup.json is written for a newer Map Studio (schema 2; this module reads 1)." (the same for `mapstudio-empty`, which inherits the setup), and the map did not load ([platform-checks.md](platform-checks.md), "Epic 4 entry 19a"). `ops/release-smoke.sh` itself now gives a release older than 0.4.0 a schema 1 copy of the dev setup, so it no longer shows this; to see it yourself, install the published 0.3.0 on a scratch Gateway with a schema 2 setup, or trust the log line above.
+- [ ] `git status` shows no change under `ops/project` at the end.
 
 Notes:
 

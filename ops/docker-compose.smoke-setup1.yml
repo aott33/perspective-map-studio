@@ -1,0 +1,11 @@
+# The release smoke of a release older than 0.4.0 (ops/release-smoke.sh, epic 4 entry 19a).
+# The dev project's setup is schema 2 (it names its units), which Map Studio 0.3.0 and older refuse.
+# This overlay puts a schema 1 copy of it (schemaVersion 1, no units; written by the script under the
+# git-ignored e2e/out/smoke/) over setup.json in both mounts of ops/project. The repository's file is
+# never changed.
+
+services:
+  gateway:
+    volumes:
+      - ${SMOKE_SETUP_FILE:?set by ops/release-smoke.sh}:/usr/local/bin/ignition/data/projects/mapstudio-dev/com.aoindustrial.perspective.mapstudio/setup/setup.json
+      - ${SMOKE_SETUP_FILE:?set by ops/release-smoke.sh}:/usr/local/bin/ignition/data/projects/mapstudio-empty/com.aoindustrial.perspective.mapstudio/setup/setup.json

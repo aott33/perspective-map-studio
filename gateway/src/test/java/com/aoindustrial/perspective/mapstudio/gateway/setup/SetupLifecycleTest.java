@@ -81,8 +81,8 @@ class SetupLifecycleTest {
             registry.state(P).reason());
         SetupLifecycle.read(registry, P, List.of(setupResource(null)), "resource created");
         assertEquals("setup.json is missing from the setup resource.", registry.state(P).reason());
-        SetupLifecycle.read(registry, P, List.of(setupResource("{\"schemaVersion\":2,\"connection\":\"MapStudio\"}")), null);
-        assertEquals("setup.json is written for a newer Map Studio (schema 2; this module reads 1).",
+        SetupLifecycle.read(registry, P, List.of(setupResource("{\"schemaVersion\":3,\"connection\":\"MapStudio\"}")), null);
+        assertEquals("setup.json is written for a newer Map Studio (schema 3; this module reads 1 and 2).",
             registry.state(P).reason());
         assertEquals(3, log.warnings.size());
     }

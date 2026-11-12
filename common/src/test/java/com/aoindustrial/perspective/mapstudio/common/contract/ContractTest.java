@@ -107,6 +107,16 @@ class ContractTest {
         assertEquals(List.of("none", "osm"), s.basemaps());
         assertEquals("", s.kindsFunction());
         assertEquals("", s.tokenSecret());
+        assertEquals(1, s.schemaVersion());
+        assertEquals("auto", s.units(), "a schema 1 setup has no units: the browser's locale");
+    }
+
+    @Test
+    void setupVersionTwoMayNameTheUnits() throws Exception {
+        Setup s = Setup.parse("{\"schemaVersion\":2,\"connection\":\"MapStudio\",\"units\":\"us\"}");
+        assertEquals(2, s.schemaVersion());
+        assertEquals("us", s.units());
+        assertEquals("auto", Setup.parse("{\"schemaVersion\":2,\"connection\":\"MapStudio\"}").units());
     }
 
     @Test
@@ -115,8 +125,8 @@ class ContractTest {
             () -> Setup.parse("{\"schemaVersion\":1}"));
         assertTrue(noConnection.getMessage().contains("connection"));
         Setup.SetupException version = assertThrows(Setup.SetupException.class,
-            () -> Setup.parse("{\"schemaVersion\":2,\"connection\":\"MapStudio\"}"));
-        assertTrue(version.getMessage().contains("newer Map Studio (schema 2"));
+            () -> Setup.parse("{\"schemaVersion\":3,\"connection\":\"MapStudio\"}"));
+        assertTrue(version.getMessage().contains("newer Map Studio (schema 3"));
         assertThrows(Setup.SetupException.class, () -> Setup.parse("not json"));
         assertThrows(Setup.SetupException.class,
             () -> Setup.parse("{\"schemaVersion\":1,\"connection\":\"MapStudio\",\"roles\":{\"full\":\"MapEditor\"}}"));

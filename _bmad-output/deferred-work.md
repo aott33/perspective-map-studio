@@ -212,3 +212,7 @@
 - source_plan: `_bmad-output/initiative-flowmap/tickets/epic-editing/tickets/story-the-tag-browser-one-tree-for-every-tag-pick-asset-relative-p-plan.md`
   summary: The stored tag path report keyed by project and database connection, not by project name alone.
   evidence: Entry 13a's review: the report runs once per project name after a Gateway start, so a project whose setup is re-pointed to another database connection is not reported again until the module restarts.
+
+- source_plan: `_bmad-output/initiative-flowmap/tickets/epic-editing/tickets/story-units-in-the-setup-and-the-map-store-schema-2-the-designer-s-plan.md`
+  summary: `ops/release-smoke.sh` for a release older than 0.4.0 fails at its browser check from this tree, because the rehearsal's `drawLine` drives epic 4's draw toolbar, which an older component does not have.
+  evidence: Seen on 2026-11-12 with `ops/release-smoke.sh 0.3.0`: checksum, signature, module ACTIVE and the map's load passed (with the schema 1 setup copy from entry 19a), then `drawLine` in `e2e/tests/fixtures.mjs` timed out on `.mapstudio-tool--line`. Read from the code as older than entry 19a; not run at the earlier commit. A fix is the smoke running the spec from the release's own tag, or a draw step that knows the older button.

@@ -21,22 +21,24 @@ import com.inductiveautomation.ignition.common.gson.stream.JsonReader;
 import com.inductiveautomation.ignition.common.gson.stream.JsonToken;
 
 /**
- * A project's Map Studio setup (AD-5), schema version 1: the project resource
+ * A project's Map Studio setup (AD-5), schema version 2: the project resource
  * {@code com.aoindustrial.perspective.mapstudio/setup/setup.json}. Every field,
  * its type, default and rule: {@code docs/setup.md}.
  *
  * <pre>
- * {"schemaVersion": 1, "connection": "MapStudio",
+ * {"schemaVersion": 2, "connection": "MapStudio",
  *  "roles": {"full": ["MapEditor"], "phone": ["MapOperator"]},
  *  "kindsFunction": "", "assetsFunction": "", "refreshIntervalSeconds": 10,
- *  "alarmPage": "", "basemaps": ["none", "osm"], "tokenSecret": ""}
+ *  "alarmPage": "", "basemaps": ["none", "osm"], "tokenSecret": "", "units": "auto"}
  * </pre>
  *
  * Only {@code schemaVersion} and {@code connection} are required; every other
  * field has the default shown (owner decision, 2026-10-26). An unknown field is a
  * problem, so a misspelt field is never silently ignored; a new field bumps
- * {@code schemaVersion}. {@link #read} reports every problem at once; the Designer
- * setup form (entry 7) must use it rather than rules of its own.
+ * {@code schemaVersion}. Schema 2 (epic 4 entry 19a) added {@code units}; a schema 1
+ * file is still read, and {@code units} in one is an unknown field. {@link #read}
+ * reports every problem at once; the Designer setup form (entry 7) must use it
+ * rather than rules of its own.
  */
 public record Setup(
     int schemaVersion,
@@ -48,18 +50,27 @@ public record Setup(
     int refreshIntervalSeconds,
     String alarmPage,
     List<String> basemaps,
-    String tokenSecret) {
+    String tokenSecret,
+    String units) {
 
-    public static final int SCHEMA_VERSION = 1;
+    /** The newest schema version this module reads; it reads {@link #OLDEST_SCHEMA_VERSION} to this one. */
+    public static final int SCHEMA_VERSION = 2;
+    public static final int OLDEST_SCHEMA_VERSION = 1;
     public static final int DEFAULT_REFRESH_SECONDS = 10;
     public static final int MIN_REFRESH_SECONDS = 1;
     public static final int MAX_REFRESH_SECONDS = 3600;
     public static final List<String> DEFAULT_BASEMAPS = List.of("none", "osm");
     /** Every basemap a setup may offer (AD-12). */
     public static final List<String> BASEMAPS = List.of("none", "osm", "satellite", "mapbox");
+    /** The units of the map's distances: the browser's locale, kilometres, or miles (R27; schema 2). */
+    public static final List<String> UNITS = List.of("auto", "metric", "us");
+    public static final String DEFAULT_UNITS = "auto";
     /** Every field of schema version 1, in the order {@code docs/setup.md} lists them. */
-    public static final List<String> FIELDS = List.of("schemaVersion", "connection", "roles", "kindsFunction",
+    public static final List<String> FIELDS_SCHEMA_1 = List.of("schemaVersion", "connection", "roles", "kindsFunction",
         "assetsFunction", "refreshIntervalSeconds", "alarmPage", "basemaps", "tokenSecret");
+    /** Every field of the newest schema version (2), in the order {@code docs/setup.md} lists them. */
+    public static final List<String> FIELDS = List.of("schemaVersion", "connection", "roles", "kindsFunction",
+        "assetsFunction", "refreshIntervalSeconds", "alarmPage", "basemaps", "tokenSecret", "units");
     public static final List<String> ROLE_FIELDS = List.of("full", "phone");
 
     /** A project script function: a dotted name with at least one dot ({@code mapstudio.kinds.get}). */
@@ -127,25 +138,32 @@ public record Setup(
         // The parser keeps the last of two equal keys; a field set twice is a problem, never a silent choice.
         problems.addAll(duplicateKeys(text));
 
+        // The schema the file's fields are read by; the newest when the file does not name one this module reads.
+        int schema = SCHEMA_VERSION;
+        String versions = OLDEST_SCHEMA_VERSION + " or " + SCHEMA_VERSION;
         JsonElement version = present(o, "schemaVersion");
         if (version == null) {
-            problems.add(new SetupProblem("schemaVersion", "schemaVersion is missing; it must be " + SCHEMA_VERSION));
+            problems.add(new SetupProblem("schemaVersion", "schemaVersion is missing; it must be " + versions));
         } else {
             Integer v = wholeNumber(version);
             if (v != null && v > SCHEMA_VERSION) {
                 // A newer schema may have other fields: report only this.
                 return failed("schemaVersion", "setup.json is written for a newer Map Studio (schema " + v
-                    + "; this module reads " + SCHEMA_VERSION + ")");
+                    + "; this module reads " + OLDEST_SCHEMA_VERSION + " and " + SCHEMA_VERSION + ")");
             }
-            if (v == null || v != SCHEMA_VERSION) {
-                problems.add(new SetupProblem("schemaVersion", "schemaVersion must be " + SCHEMA_VERSION + ", not "
+            if (v == null || v < OLDEST_SCHEMA_VERSION) {
+                problems.add(new SetupProblem("schemaVersion", "schemaVersion must be " + versions + ", not "
                     + shown(version)));
+            } else {
+                schema = v;
             }
         }
 
+        // A field of a later schema is unknown to an earlier one: units in a schema 1 file is refused.
+        List<String> fields = schema == 1 ? FIELDS_SCHEMA_1 : FIELDS;
         for (Map.Entry<String, JsonElement> field : o.entrySet()) {
-            if (!FIELDS.contains(field.getKey())) {
-                problems.add(unknown(field.getKey(), "", FIELDS));
+            if (!fields.contains(field.getKey())) {
+                problems.add(unknown(field.getKey(), "", fields, schema));
             }
         }
 
@@ -172,7 +190,7 @@ public record Setup(
                 JsonObject r = roles.getAsJsonObject();
                 for (String key : r.keySet()) {
                     if (!ROLE_FIELDS.contains(key)) {
-                        problems.add(unknown(key, "roles.", ROLE_FIELDS));
+                        problems.add(unknown(key, "roles.", ROLE_FIELDS, schema));
                     }
                 }
                 full = roleNames(r, "full", problems);
@@ -230,11 +248,22 @@ public record Setup(
             }
         }
 
+        String units = DEFAULT_UNITS;
+        JsonElement u = fields.contains("units") ? present(o, "units") : null;
+        if (u != null) {
+            if (!isString(u) || !UNITS.contains(u.getAsString())) {
+                problems.add(new SetupProblem("units", "units must be one of " + String.join(", ", UNITS) + ", not "
+                    + shown(u)));
+            } else {
+                units = u.getAsString();
+            }
+        }
+
         if (!problems.isEmpty()) {
             return new Reading(null, List.copyOf(problems));
         }
-        return new Reading(new Setup(SCHEMA_VERSION, connection, full, phone, kindsFunction, assetsFunction, refresh,
-            alarmPage, basemaps, tokenSecret), List.of());
+        return new Reading(new Setup(schema, connection, full, phone, kindsFunction, assetsFunction, refresh,
+            alarmPage, basemaps, tokenSecret, units), List.of());
     }
 
     private static Reading failed(String field, String message) {
@@ -337,10 +366,10 @@ public record Setup(
         return s.length() <= MAX_SHOWN ? s : s.substring(0, MAX_SHOWN) + "...";
     }
 
-    private static SetupProblem unknown(String key, String prefix, List<String> known) {
+    private static SetupProblem unknown(String key, String prefix, List<String> known, int schema) {
         String hint = closest(key, known);
         String field = prefix + key;
-        return new SetupProblem(field, field + " is not a setup field of schema " + SCHEMA_VERSION
+        return new SetupProblem(field, field + " is not a setup field of schema " + schema
             + (hint == null ? "" : " (did you mean " + prefix + hint + "?)"));
     }
 

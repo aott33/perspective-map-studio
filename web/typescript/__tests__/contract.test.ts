@@ -69,7 +69,8 @@ describe('the 0.4.0 contract (0.3.0 plus epic 4 entry 2)', () => {
 
     test('map.load.reply may carry the part of the setup the browser needs (epic 2 entry 6)', () => {
         const setup = { refreshIntervalSeconds: 30, basemaps: ['none', 'osm'], alarmPage: '/alarms' };
-        expect(readMapLoadReply({ level: 'phone', seq: 2, items: [], setup })).toEqual({ level: 'phone', seq: 2, items: [], lists: NO_HOST_LISTS, setup });
+        expect(readMapLoadReply({ level: 'phone', seq: 2, items: [], setup }))
+            .toEqual({ level: 'phone', seq: 2, items: [], lists: NO_HOST_LISTS, setup: { ...setup, units: 'auto' } });
         // Absent (an older Gateway) or malformed: the reply stays usable, without setup.
         expect(readMapLoadReply({ level: 'full', seq: 0, items: [] })).toEqual({ level: 'full', seq: 0, items: [], lists: NO_HOST_LISTS });
         expect(readMapLoadReply({ level: 'full', seq: 0, items: [], setup: { refreshIntervalSeconds: 'ten' } }))
@@ -79,6 +80,18 @@ describe('the 0.4.0 contract (0.3.0 plus epic 4 entry 2)', () => {
         expect(readMapSetup({ ...setup, basemaps: [1] })).toBeNull();
         expect(readMapSetup({ ...setup, alarmPage: null })).toBeNull();
         expect(readMapSetup(null)).toBeNull();
+    });
+
+    test('the setup carries the project\'s units; absent or unknown reads as auto (epic 4 entry 19a)', () => {
+        const setup = { refreshIntervalSeconds: 10, basemaps: ['osm'], alarmPage: '' };
+        expect(readMapSetup({ ...setup, units: 'metric' })?.units).toBe('metric');
+        expect(readMapSetup({ ...setup, units: 'us' })?.units).toBe('us');
+        expect(readMapSetup({ ...setup, units: 'auto' })?.units).toBe('auto');
+        // An older Gateway sends none; a value this browser does not know never breaks the setup.
+        expect(readMapSetup(setup)?.units).toBe('auto');
+        expect(readMapSetup({ ...setup, units: 'imperial' })?.units).toBe('auto');
+        expect(readMapSetup({ ...setup, units: 2 })?.units).toBe('auto');
+        expect(readMapLoadReply({ level: 'none', seq: 0, items: [], setup: { ...setup, units: 'us' } })?.setup?.units).toBe('us');
     });
 
     test('edits.apply.reply carries the batch, seq and versions', () => {

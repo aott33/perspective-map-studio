@@ -234,15 +234,113 @@ class SetupFormTest {
 
     @Test
     void aNewerSchemaIsReadOnlyAndNeverRewritten() {
-        String in = "{\"schemaVersion\": 2, \"connection\": 5, \"newThing\": true}";
+        // U10
+        String in = "{\"schemaVersion\": 3, \"connection\": 5, \"newThing\": true, \"units\": \"us\"}";
         SetupForm form = SetupForm.fromJson(in);
         assertEquals(SetupForm.State.NEWER_SCHEMA, form.state());
         assertFalse(form.isEditable());
-        assertEquals("This setup was written by a newer Map Studio (schema 2). This Designer edits schema 1.",
-            form.stateReason());
-        assertEquals("2", form.schemaVersion());
+        assertEquals("This setup was written by a newer Map Studio: schema 3 is newer than 2,"
+            + " the newest this Designer edits.", form.stateReason());
+        assertEquals("3", form.schemaVersion());
         assertEquals(in, form.toJson());
+        assertEquals(in, form.copy().toJson());
+        assertEquals("3", form.copy().schemaVersion());
         assertFalse(form.canSave());
+    }
+
+    // Units (epic 4 entry 19a): schema 2 is written only when the units are not Auto.
+
+    private static final String SCHEMA_1 = "{\"schemaVersion\": 1, \"connection\": \"MapStudio\"}";
+
+    @Test
+    void aSchemaOneFileReadsAsAutoAndAnotherEditKeepsItSchemaOne() {
+        // U9
+        SetupForm form = SetupForm.fromJson(SCHEMA_1);
+        assertEquals("auto", form.text(SetupForm.UNITS));
+        assertEquals("1", form.schemaVersion());
+        String out = form.copy().setText(SetupForm.ALARM_PAGE, "/alarms").toJson();
+        assertTrue(out.startsWith("{\n  \"schemaVersion\": 1,\n"), out);
+        assertFalse(out.contains("units"), out);
+        assertTrue(Setup.read(out).ok());
+    }
+
+    @Test
+    void settingTheUnitsWritesSchemaTwoAndClearingThemWritesSchemaOne() throws Exception {
+        // U7
+        SetupForm metric = SetupForm.fromJson(SCHEMA_1).copy().setText(SetupForm.UNITS, "metric");
+        assertTrue(metric.canSave(), metric.reasons().toString());
+        assertEquals("2", metric.schemaVersion());
+        String out = metric.toJson();
+        assertTrue(out.startsWith("{\n  \"schemaVersion\": 2,\n"), out);
+        assertTrue(out.endsWith("  \"tokenSecret\": \"\",\n  \"units\": \"metric\"\n}\n"), out);
+        assertEquals("metric", Setup.parse(out).units());
+        assertNotEquals(SetupForm.fromJson(SCHEMA_1), metric);
+        // Read back, it is the same form and the same bytes.
+        SetupForm back = SetupForm.fromJson(out);
+        assertEquals(metric, back);
+        assertEquals("metric", back.text(SetupForm.UNITS));
+        assertEquals("2", back.schemaVersion());
+        assertEquals(out, back.toJson());
+        // U8
+        SetupForm auto = back.copy().setText(SetupForm.UNITS, "auto");
+        assertEquals("1", auto.schemaVersion());
+        String cleared = auto.toJson();
+        assertTrue(cleared.startsWith("{\n  \"schemaVersion\": 1,\n"), cleared);
+        assertFalse(cleared.contains("units"), cleared);
+        assertTrue(Setup.read(cleared).ok());
+        assertEquals("us", Setup.parse(back.copy().setText(SetupForm.UNITS, "us").toJson()).units());
+    }
+
+    @Test
+    void aSchemaTwoFileWithNoUnitsOrAutoReadsAsAutoAndIsNeverWrittenAsSchemaTwo() {
+        for (String in : List.of("{\"schemaVersion\": 2, \"connection\": \"MapStudio\"}",
+            "{\"schemaVersion\": 2, \"connection\": \"MapStudio\", \"units\": \"auto\"}",
+            "{\"schemaVersion\": 2, \"connection\": \"MapStudio\", \"units\": null}")) {
+            SetupForm form = SetupForm.fromJson(in);
+            assertTrue(form.isEditable(), in);
+            assertTrue(form.canSave(), in);
+            assertEquals("auto", form.text(SetupForm.UNITS), in);
+            assertEquals("1", form.schemaVersion(), in);
+            String out = form.copy().setText(SetupForm.ALARM_PAGE, "/alarms").toJson();
+            assertTrue(out.startsWith("{\n  \"schemaVersion\": 1,\n"), out);
+            assertFalse(out.contains("units"), out);
+        }
+    }
+
+    @Test
+    void unitsTheGatewayRefusesShowItsReasonBesideTheRow() {
+        SetupForm form = SetupForm.fromJson("{\"schemaVersion\": 2, \"connection\": \"MapStudio\", \"units\": \"imperial\"}");
+        assertTrue(form.isEditable());
+        assertEquals("imperial", form.text(SetupForm.UNITS));
+        assertEquals(Map.of(SetupForm.UNITS, List.of("units must be one of auto, metric, us, not \"imperial\".")),
+            form.reasons());
+        assertTrue(form.copy().setText(SetupForm.UNITS, "us").canSave());
+        assertEquals(SetupForm.UNITS, SetupForm.fieldOf("units"));
+    }
+
+    @Test
+    void unitsInASchemaOneFileIsUnreadableAsTheGatewayRefusesIt() {
+        // U4 in the Designer: never shown as a setup the Gateway would read.
+        String in = "{\"schemaVersion\": 1, \"connection\": \"MapStudio\", \"units\": \"metric\"}";
+        assertThrowsSetup(in);
+        SetupForm form = SetupForm.fromJson(in);
+        assertEquals(SetupForm.State.UNREADABLE, form.state());
+        assertEquals("This setup cannot be read: units is not a setup field of schema 1.", form.stateReason());
+        assertEquals(in, form.toJson());
+        assertEquals(SetupForm.State.UNREADABLE,
+            SetupForm.fromJson("{\"schemaVersion\": 2, \"connection\": \"MapStudio\", \"units\": 5}").state());
+        // With another problem too (no connection), or a value outside the three: still not readable,
+        // in the Gateway's words for that file, never "Schema version 2" with a reason of the form's own.
+        for (String other : List.of("{\"schemaVersion\": 1, \"units\": \"metric\"}",
+            "{\"schemaVersion\": 1, \"connection\": \"MapStudio\", \"units\": \"imperial\"}",
+            "{\"schemaVersion\": 1, \"connection\": \"MapStudio\", \"units\": null}")) {
+            SetupForm refused = SetupForm.fromJson(other);
+            assertEquals(SetupForm.State.UNREADABLE, refused.state(), other);
+            assertEquals("This setup cannot be read: units is not a setup field of schema 1.", refused.stateReason(), other);
+            assertEquals("1", refused.schemaVersion(), other);
+            assertEquals(other, refused.toJson());
+            assertFalse(refused.canSave(), other);
+        }
     }
 
     // Row: unreadable file.
@@ -263,11 +361,11 @@ class SetupFormTest {
         // Each reason is the Gateway's own message (docs/setup.md).
         assertEquals("This setup cannot be read: setup.json must be a JSON object {\"schemaVersion\": 1, ...}.",
             SetupForm.fromJson("[1]").stateReason());
-        assertEquals("This setup cannot be read: schemaVersion is missing; it must be 1.",
+        assertEquals("This setup cannot be read: schemaVersion is missing; it must be 1 or 2.",
             SetupForm.fromJson("{\"connection\": \"MapStudio\"}").stateReason());
-        assertEquals("This setup cannot be read: schemaVersion must be 1, not 0.",
+        assertEquals("This setup cannot be read: schemaVersion must be 1 or 2, not 0.",
             SetupForm.fromJson("{\"schemaVersion\": 0}").stateReason());
-        assertEquals("This setup cannot be read: schemaVersion must be 1, not \"1\".",
+        assertEquals("This setup cannot be read: schemaVersion must be 1 or 2, not \"1\".",
             SetupForm.fromJson("{\"schemaVersion\": \"1\"}").stateReason());
         assertEquals("This setup cannot be read: roles.full must be a list of role names, not \"MapEditor\".",
             SetupForm.fromJson("{\"schemaVersion\": 1, \"roles\": {\"full\": \"MapEditor\"}}").stateReason());

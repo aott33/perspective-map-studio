@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "connection": "MapStudio",
   "roles": {
     "full": ["MapEditor"],
@@ -10,5 +10,6 @@
   "refreshIntervalSeconds": 10,
   "alarmPage": "/alarms/{asset.id}",
   "basemaps": ["none", "osm", "satellite"],
-  "tokenSecret": "MapStudioFiles/map_token"
+  "tokenSecret": "MapStudioFiles/map_token",
+  "units": "metric"
 }

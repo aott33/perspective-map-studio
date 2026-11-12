@@ -41,8 +41,8 @@ public final class Messages {
     public static final String MAP_LOAD = "map.load";
     /**
      * Body {level, seq, items: [map item record], kinds, assets, adapters, readOnly: reason or null,
-     * setup?: {refreshIntervalSeconds, basemaps, alarmPage}}; {@code setup} is optional (added in
-     * 0.2.0 by epic 2 entry 6).
+     * setup?: {refreshIntervalSeconds, basemaps, alarmPage, units}}; {@code setup} is optional (added in
+     * 0.2.0 by epic 2 entry 6; {@code units} in 0.4.0 by epic 4 entry 19a).
      */
     public static final String MAP_LOAD_REPLY = "map.load.reply";
     /** Body {batchId, ops: [{op, entity, id, baseVersion, data}]}. */

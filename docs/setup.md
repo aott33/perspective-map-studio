@@ -1,4 +1,4 @@
-# Map Studio project setup, schema version 1
+# Map Studio project setup, schema version 2
 
 Each Ignition project that uses Map Studio has one setup: the project resource `com.aoindustrial.perspective.mapstudio/setup/`, a folder holding `setup.json` and a `resource.json` (AD-5). It says which database connection holds the project's map, which roles may edit it, and how the map behaves. This page is the reference for every field; the code that checks it is `Setup.read` in `common/src/main/java/com/aoindustrial/perspective/mapstudio/common/contract/Setup.java`, and the dev project's copy is `ops/project/com.aoindustrial.perspective.mapstudio/setup/`.
 
@@ -8,7 +8,7 @@ Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway (Ignition 8.3.10) by th
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "connection": "MapStudio",
   "roles": {
     "full": ["MapEditor"],
@@ -19,9 +19,12 @@ Labels: **[live 8.3.10]** seen on the `ops/` dev Gateway (Ignition 8.3.10) by th
   "refreshIntervalSeconds": 10,
   "alarmPage": "",
   "basemaps": ["none", "osm"],
-  "tokenSecret": ""
+  "tokenSecret": "",
+  "units": "auto"
 }
 ```
+
+Schema 2 (Map Studio 0.4.0, epic 4 entry 19a) added `units`. A schema 1 file is the same without `units` and is still read ("Versions", below); the Designer writes schema 2 only when the units are not Auto.
 
 `resource.json` beside it:
 
@@ -41,7 +44,7 @@ With that setup nobody may edit the map (both role lists are empty), and everyon
 
 | Field | Type | Required | Default | Rule |
 | --- | --- | --- | --- | --- |
-| `schemaVersion` | whole number | yes | | `1`. A higher number is a setup for a newer Map Studio and is refused as a whole. |
+| `schemaVersion` | whole number | yes | | `1` or `2`. A higher number is a setup for a newer Map Studio and is refused as a whole. |
 | `connection` | text | yes | | The name of a database connection of the Gateway (PostgreSQL). Not empty. |
 | `roles` | object | no | `{"full": [], "phone": []}` | Only the keys `full` and `phone`. |
 | `roles.full` | list of text | no | `[]` | Ignition role names, compared exactly, each at most once. A user holding one gets full editing. |
@@ -52,6 +55,7 @@ With that setup nobody may edit the map (both role lists are empty), and everyon
 | `alarmPage` | text | no | `""` | Empty, or a Perspective page path starting with `/`, with any number of placeholders (`/alarms/{item.name}`; the list in [kind-setup.md](kind-setup.md), epic 2 entry 9). |
 | `basemaps` | list of text | no | `["none", "osm"]` | At least one of `none`, `osm`, `satellite`, `mapbox`, each at most once. The first one listed is the project's default basemap, the one drawn when a viewer has chosen nothing, and a viewer gets a basemap switch (in the Legend) only when more than one is listed: with one, the basemap is the project's setting and there is no switch (owner review, item 3). The browser offers them in this order (epic 3 entry 6, [basemaps.md](basemaps.md)): `none` is the blank background, `osm` OpenStreetMap's public tiles, `satellite` Mapbox satellite imagery through the token below, on the client's own Mapbox account (below); `mapbox` (the vector style) is accepted but not drawn yet (deferred, AD-12). **OpenStreetMap's tile usage policy** (https://operations.osmfoundation.org/policies/tiles/): the tiles are a free service for light use, with the attribution the map shows always visible, no bulk downloading and no heavy use; a client site with many screens open all day, or no internet, should run its own tile server or choose `satellite` or `none`. **[live 8.3.10]** |
 | `tokenSecret` | text | no | `""` | The secret that holds the basemap token, as `<provider>/<name>` (for example `Internal/mapbox-token`): a secret provider's name and its secret's name, never the token itself. The Gateway reads it only when a browser picks the Satellite basemap and sends the value only inside the tile URL; it must be a **public** Mapbox token (`pk.`, restricted to the site's URLs in the Mapbox account), and anything else is refused in words ([contract.md](contract.md), "basemap.source") **[live 8.3.10]**. The Designer splits it at the first `/`; a value with no `/` (story 7 wrote one name) is read as a secret name with no provider and shows the warning "Name the secret provider too." A story 7 name that itself holds a `/` (such as `maps/token`) is read as `<provider>/<name>` (provider `maps`, name `token`); the Designer writes a name with a `/` and no provider as `/<name>` (for example `/maps/token`), which it reads back as that name with no provider. A provider with no secret name (`Internal/`) shows the warning "Name the secret too." Its value is never written to the Gateway log or into a message. **Satellite at a client site uses the client's own Mapbox account and public token** (owner decision 2026-11-03): the client accepts Mapbox's terms of service and pays for its own tile requests, and Map Studio ships no token; while Satellite is drawn the map shows the Mapbox logo and the attribution Mapbox requires ("(c) Mapbox (c) OpenStreetMap Improve this map (c) Maxar", [basemaps.md](basemaps.md)) **[live 8.3.10]** with a placeholder token and stubbed tiles. |
+| `units` | text | no | `"auto"` | Schema 2 only. The units of the map's distances (R27): `auto` (the browser's locale), `metric` (kilometres) or `us` (miles). Absent, `null` or `auto` typed by hand all read as `auto`. In a schema 1 file `units` is refused as every unknown field is. Sent to the browser in `map.load.reply`; nothing is drawn by it until epic 4 entry 20. Unit tested (`SetupValidationTest`) and seen on the dev Gateway (`e2e/tests/setup.spec.mjs`) **[live 8.3.10]**. |
 
 A field set to JSON `null` takes its default. Any other field is refused: a misspelt field is never silently ignored (owner decision, 2026-10-26). A new field in a later Map Studio bumps `schemaVersion`.
 
@@ -72,8 +76,8 @@ The messages, as `Setup.read` gives them (several are joined as "2 problems: fir
 | Not JSON | `setup.json is not valid JSON (line 3, column 17)` |
 | Not an object | `setup.json must be a JSON object {"schemaVersion": 1, ...}` |
 | No `setup.json` in the resource | `setup.json is missing from the setup resource.` |
-| Newer schema | `setup.json is written for a newer Map Studio (schema 2; this module reads 1)` |
-| Other schema | `schemaVersion must be 1, not "1"`; `schemaVersion is missing; it must be 1` |
+| Newer schema | `setup.json is written for a newer Map Studio (schema 3; this module reads 1 and 2)` |
+| Other schema | `schemaVersion must be 1 or 2, not "1"`; `schemaVersion is missing; it must be 1 or 2` |
 | Connection | `connection is missing; it must name a database connection of the Gateway`; `connection must be the name of a database connection, not ""` |
 | Roles | `roles must be an object {"full": [...], "phone": [...]}, not [...]`; `roles.full must be a list of role names, not "MapEditor"`; `roles.phone must hold only role names (non-empty text), not ""`; `roles.full lists MapEditor twice` |
 | Functions | `kindsFunction must be empty or a project script function name such as mapstudio.kinds.get, not "kinds"` |
@@ -82,7 +86,9 @@ The messages, as `Setup.read` gives them (several are joined as "2 problems: fir
 | Alarm page placeholder | `alarmPage: {item.foo} is not a placeholder Map Studio knows; use {item.id}, {item.name}, {asset.id}, {asset.path} or {item.properties.<field key>}.` |
 | Basemaps | `basemaps must be a list from none, osm, satellite, mapbox, not "osm"`; `basemaps must name at least one of none, osm, satellite, mapbox`; `basemaps has "google"; each entry must be one of none, osm, satellite, mapbox`; `basemaps lists osm twice` |
 | Token secret | `tokenSecret must be the name of a secret as text (its value is not shown)` |
-| Unknown field | `refreshInterval is not a setup field of schema 1 (did you mean refreshIntervalSeconds?)` (the value is not shown) |
+| Units | `units must be one of auto, metric, us, not "imperial"` |
+| Unknown field | `refreshInterval is not a setup field of schema 1 (did you mean refreshIntervalSeconds?)` (the value is not shown; the number is the file's `schemaVersion`) |
+| A schema 2 field in a schema 1 file | `units is not a setup field of schema 1` **[live 8.3.10]** |
 
 A project with no setup resource at all is not an error until something uses it: its first `map.load` or `applyEdits` after a Gateway start logs one warning, "Project P has no Map Studio setup ...", and answers `store-unreachable` **[live 8.3.10]**.
 
@@ -99,8 +105,15 @@ A change applies at the next call: an open map gets the new editing level, refre
 
 ## What the browser sees
 
-`map.load.reply` carries `setup: {refreshIntervalSeconds, basemaps, alarmPage}` (optional, contract 0.2.0; `docs/contract.md`). The connection, the roles, the function names and the token secret's name stay on the Gateway. The component shows the interval as `data-refresh-interval` on `.mapstudio-map`. From contract 0.3.0 the interval is also how often an open map gets its live values (`values.batch`, `docs/contract.md`): a changed tag reaches the icon within one interval, and `basemaps` is what the basemap control offers (the token's value reaches a browser only inside Satellite's tile URL, on request; `docs/contract.md`, "basemap.source").
+`map.load.reply` carries `setup: {refreshIntervalSeconds, basemaps, alarmPage, units}` (optional, contract 0.2.0; `units` from 0.4.0; `docs/contract.md`). `units` is always there, at every editing level: `auto`, `metric` or `us` (`auto` for a schema 1 setup) **[live 8.3.10]**. The browser reads it and draws nothing by it yet (entry 20). The connection, the roles, the function names and the token secret's name stay on the Gateway. The component shows the interval as `data-refresh-interval` on `.mapstudio-map`. From contract 0.3.0 the interval is also how often an open map gets its live values (`values.batch`, `docs/contract.md`): a changed tag reaches the icon within one interval, and `basemaps` is what the basemap control offers (the token's value reaches a browser only inside Satellite's tile URL, on request; `docs/contract.md`, "basemap.source").
 
 ## Versions
 
-The setup schema is part of Map Studio's public contract and follows semantic versioning (AD-9): a new field or rule that would refuse a setup that worked before needs a new `schemaVersion` and a module release that reads both. This module reads schema 1 only.
+The setup schema is part of Map Studio's public contract and follows semantic versioning (AD-9): a new field or rule that would refuse a setup that worked before needs a new `schemaVersion` and a module release that reads both. This module reads schema 1 and schema 2.
+
+| Schema | Since | What it added | Read by |
+| --- | --- | --- | --- |
+| 1 | Map Studio 0.2.0 | The first setup | Every release |
+| 2 | Map Studio 0.4.0 | `units` | 0.4.0 and later |
+
+Map Studio 0.3.0 and older refuse a schema 2 file as a whole, "setup.json is written for a newer Map Studio (schema 2; this module reads 1)", and the project's map store is unavailable there until the file is schema 1 again. So the Designer writes schema 2 only when it must: a setup whose units are Auto is saved as schema 1 with no `units`, and an edit to any other field never changes the schema ([setup-editor.md](setup-editor.md)). Before a downgrade to 0.3.0, set Units back to Auto and save.

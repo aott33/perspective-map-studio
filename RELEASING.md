@@ -57,7 +57,7 @@ Epic 3 entry 4 (owner, 2026-10-28), after the 0.2.0 release repeated the templat
 | --- | --- | --- |
 | Every pull request | Map Studio CI as now: build and unit tests, the web tests, the e2e suite on the dev stack, the signing check with a throwaway certificate, `check-contract-versions.sh` | CI |
 | Before a minor release's tag (`X.Y.0`) | one rehearsal on the template's test stack with a throwaway-signed build (`scripts/ci/build-signed.sh` with a certificate made on the spot, the template a scratch clone that is never pushed: [docs/template-install.md](docs/template-install.md), "0.2.0 rehearsal"); the performance run (`ops/perf.sh`, [docs/perf](docs/perf/README.md)) only when the write path, the map store or the browser bundle changed, otherwise `ops/perf.sh --only <the measures those changes touch>` or nothing | rehearsal about 30 min; perf about 30 min, `--only` 10 to 15 min |
-| After every tag, and for a patch release (`X.Y.Z`, Z > 0) | the short smoke: `ops/release-smoke.sh X.Y.Z` against the published release (below) | about 5 min on the 4-CPU agent box |
+| After every tag, and for a patch release (`X.Y.Z`, Z > 0) | the short smoke: `ops/release-smoke.sh X.Y.Z` against the published release (below). For a version older than 0.4.0, which reads setup schema 1 only, the script gives the stack a schema 1 copy of the dev project's setup (`schemaVersion` 1, no `units`); the repository's file is not changed | about 5 min on the 4-CPU agent box |
 | The template pull request (the module lock update, at the cutover) | the template's own CI (`local.sh`, `stack.yml`); nothing repeated here | the template's CI |
 
 A rehearsal or a smoke that fails stops the release: the defect becomes its own fix (plan rule of 0.2.0, kept).

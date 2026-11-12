@@ -107,11 +107,19 @@ export interface EditBatch {
     ops: EditOp[];
 }
 
+/** The units of the map's distances the project's setup names: `auto` is the browser's locale (setup schema 2). */
+export type MapUnits = 'auto' | 'metric' | 'us';
+
 /** The part of the project setup map.load sends the browser (optional; docs/setup.md). */
 export interface MapSetup {
     refreshIntervalSeconds: number;
     basemaps: string[];
     alarmPage: string;
+    /**
+     * The project's units (epic 4 entry 19a, 0.4.0), sent at every level. Read and kept; nothing draws by it
+     * until entry 20. Absent (an older Gateway) or not one of the three reads as `auto`.
+     */
+    units: MapUnits;
 }
 
 export interface MapLoadReplyBody {
@@ -286,7 +294,8 @@ export function readMapSetup(value: unknown): MapSetup | null {
     return {
         refreshIntervalSeconds: value.refreshIntervalSeconds,
         basemaps: value.basemaps as string[],
-        alarmPage: value.alarmPage
+        alarmPage: value.alarmPage,
+        units: value.units === 'metric' || value.units === 'us' ? value.units : 'auto'
     };
 }
 

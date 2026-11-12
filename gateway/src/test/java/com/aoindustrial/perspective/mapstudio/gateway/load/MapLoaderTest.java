@@ -223,7 +223,27 @@ class MapLoaderTest {
         assertEquals(10, setup.get("refreshIntervalSeconds").getAsInt());
         assertEquals("[\"none\",\"osm\"]", setup.get("basemaps").toString());
         assertEquals("", setup.get("alarmPage").getAsString());
-        assertEquals(3, setup.size(), "never the connection, the roles, the functions or the token secret");
+        assertEquals("auto", setup.get("units").getAsString(), "a schema 1 setup: the browser's locale");
+        assertEquals(4, setup.size(), "never the connection, the roles, the functions or the token secret");
+    }
+
+    @Test
+    void theReplysSetupAlwaysHoldsTheUnitsAtEveryLevel() throws Exception {
+        // U1: schema 1 (setUp's), auto at every level.
+        for (String level : List.of(Messages.LEVEL_NONE, Messages.LEVEL_PHONE, Messages.LEVEL_FULL)) {
+            assertEquals("auto", loader.mapLoadReply("mapstudio-dev", level).getAsJsonObject("setup")
+                .get("units").getAsString(), level);
+        }
+        // U2 and U11: a schema 2 setup's units, a viewer included.
+        setups.put("mapstudio-dev", Setup.parse("{\"schemaVersion\":2,\"connection\":\"MapStudio\",\"units\":\"us\"}"));
+        for (String level : List.of(Messages.LEVEL_NONE, Messages.LEVEL_PHONE, Messages.LEVEL_FULL)) {
+            assertEquals("us", loader.mapLoadReply("mapstudio-dev", level).getAsJsonObject("setup")
+                .get("units").getAsString(), level);
+        }
+        // U3: schema 2 with no units is auto, and still sent.
+        setups.put("mapstudio-dev", Setup.parse("{\"schemaVersion\":2,\"connection\":\"MapStudio\"}"));
+        assertEquals("auto", loader.mapLoadReply("mapstudio-dev", Messages.LEVEL_NONE).getAsJsonObject("setup")
+            .get("units").getAsString());
     }
 
     @Test

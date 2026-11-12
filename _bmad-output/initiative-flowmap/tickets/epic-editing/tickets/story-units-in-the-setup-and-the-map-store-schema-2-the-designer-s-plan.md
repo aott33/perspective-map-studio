@@ -3,14 +3,14 @@ title: "19a: units in the project setup: schema 2, the Designer's Units row, and
 type: 'feature'
 ticket: '19'
 created: '2026-11-12'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '93dae81f84073153e711f904e39b8b4056cfa24c'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/docs/setup.md', '{project-root}/docs/setup-editor.md', '{project-root}/docs/contract.md']
 ---
@@ -64,12 +64,12 @@ Decisions (owner, 2026-11-12, "approve and continue" on the split and the plan's
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `common/.../contract/Setup.java`, `ContractTest`, `SetupValidationTest` -- `units`, schema 1 and 2 read, the refusals -- U1 to U6, tests first.
-- [ ] `gateway/.../load/MapLoader.java`, `MapLoaderTest`; `web/typescript/contract.ts` and its test -- `units` in the reply's setup at every level, read by the browser -- U1, U2, U11.
-- [ ] `designer/.../setup/SetupForm.java`, `SetupPanel.java`, `MapStudioDesigner.properties`, their tests -- the Units row, the schema the save writes, the newer words -- U7 to U10.
-- [ ] `ops/project/.../setup/setup.json`, `e2e/tests/setup.spec.mjs` -- the dev setup at schema 2 with `metric`; a live check of U1, U2, U4 and U11.
-- [ ] `docs/setup.md`, `docs/setup-editor.md`, `docs/contract.md`, `docs/operations.md`, `CHANGELOG.md`, EXPERIENCE.md, the architecture's AD-5, `docs/test-playbook-0.4.0.md` section 8s (with the Designer steps and the 0.3.0 check for the owner).
-- [ ] `ops/release-smoke.sh 0.3.0` with a schema 2 setup, if the published module can be fetched here -- the 0.3.0 Gateway refuses it in words; if it cannot, say so and leave the step in the playbook.
+- [x] `common/.../contract/Setup.java`, `ContractTest`, `SetupValidationTest` -- `units`, schema 1 and 2 read, the refusals -- U1 to U6, tests first.
+- [x] `gateway/.../load/MapLoader.java`, `MapLoaderTest`; `web/typescript/contract.ts` and its test -- `units` in the reply's setup at every level, read by the browser -- U1, U2, U11.
+- [x] `designer/.../setup/SetupForm.java`, `SetupPanel.java`, `MapStudioDesigner.properties`, their tests -- the Units row, the schema the save writes, the newer words -- U7 to U10.
+- [x] `ops/project/.../setup/setup.json`, `e2e/tests/setup.spec.mjs` -- the dev setup at schema 2 with `metric`; a live check of U1, U2, U4 and U11.
+- [x] `docs/setup.md`, `docs/setup-editor.md`, `docs/contract.md`, `docs/operations.md`, `CHANGELOG.md`, EXPERIENCE.md, the architecture's AD-5, `docs/test-playbook-0.4.0.md` section 8s (with the Designer steps and the 0.3.0 check for the owner).
+- [x] `ops/release-smoke.sh 0.3.0` with a schema 2 setup, if the published module can be fetched here -- the 0.3.0 Gateway refuses it in words; if it cannot, say so and leave the step in the playbook.
 
 **Acceptance Criteria:**
 - Given the dev Gateway, when any role loads the map, then `map.load.reply`'s setup holds `units: "metric"`, and every existing e2e expectation holds.
@@ -79,9 +79,21 @@ Decisions (owner, 2026-11-12, "approve and continue" on the split and the plan's
 
 - Planner, 2026-11-12: the environment and identity rules are entry 13b's plan's first Implementation Note (`story-the-tag-browser-one-tree-for-every-tag-pick-asset-relative-p-plan-13b.md`); they hold here. Leave the work uncommitted; run the specs you touch, not the whole suite. The Designer form cannot be opened here: its tests are the proof, and the owner's Designer check is in the playbook.
 
+- Implementer, 2026-11-12: built as planned, left uncommitted. `Setup.SCHEMA_VERSION` is 2 (the newest read), `OLDEST_SCHEMA_VERSION` 1; `units` is the record's last component and the file's last known key. The unknown-field words name the file's own schema. In the Designer a schema 1 file that holds `units` shows as not readable (the existing guard: never show as valid a file the Gateway refuses), and a value that is none of the three shows as a fourth line with the Gateway's reason. Task 6: the published 0.3.0 was fetched; `ops/release-smoke.sh 0.3.0 --image inductiveautomation/ignition:8.3.10` stopped at its browser check (map load "failed"), and the same stack started by hand logged "setup.json is written for a newer Map Studio (schema 2; this module reads 1)." (`docs/platform-checks.md`, "Epic 4 entry 19a"). Consequence of pick 8: the release smoke mounts `ops/project`, so a smoke of 0.3.0 or older fails while the dev setup is schema 2; the script is unchanged. The image 8.3.9 the smoke defaults to is not on this box. ignition-lint is not installed here. Not run: `ops/up.sh --fresh` and the whole e2e suite (the orchestrator's); run: `setup.spec.mjs` (3 passed), `basemaps.spec.mjs` and `store.spec.mjs` (13 passed) on `ops/up.sh` without `--fresh`.
+- Implementer, 2026-11-12, after review: a schema 1 file that holds `units` is always not readable in the Designer, with the Gateway's words, whatever else is in it. `ops/release-smoke.sh` gives a version older than 0.4.0 a schema 1 copy of the dev setup (`ops/docker-compose.smoke-setup1.yml`), which supersedes the note above on pick 8; with it 0.3.0 reads the setup and loads the map, but the smoke of 0.3.0 still fails in its browser check, because the committed `drawLine` drives epic 4's toolbar, which 0.3.0 does not have (older than this entry, not fixed here).
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+Quick review, 2026-11-12 (one reviewer, by inspection). The acceptance criteria and U1 to U11 read as met; no em dash, no version bump, the other setups untouched. Four findings: 0 high, 2 medium, 2 low, 0 false, 0 maybe-false. Three routed patch, to the implementer; one rejected.
+
+- medium, patch: a schema 1 file that holds `units` opens editable in the Designer when it has another problem or a value outside the three (`SetupForm.fromJson`'s guard fires only when the form's own rewrite would be accepted), showing "Schema version 2" and a reason the Gateway never gave. It is shown as not readable with the Gateway's words in every case, as `docs/setup-editor.md` says.
+- medium, patch: `ops/release-smoke.sh` mounts `ops/project`, now schema 2, so the smoke of 0.3.x or older that `RELEASING.md` prescribes fails at its browser check, and neither says so. The script gives a release older than 0.4.0 a schema 1 copy of the setup, and `RELEASING.md` says it.
+- low, patch: `docs/setup.md`'s `units` row sits after the blank line that ends the Fields table, so it renders as loose text. Moved into the table.
+- low, rejected: EXPERIENCE.md's Newer schema row links a mockup with the older words. The text beside it says so, and the fix is a new mockup picture, not a correction.
+
+Outcome (2026-11-12): three patches applied, one finding rejected; one thing deferred (`_bmad-output/deferred-work.md`: the release smoke of a release older than 0.4.0 still fails at its browser check, in the rehearsal's draw step). The Designer's row was not seen in a real Designer (playbook 8s). The orchestrator's Verification on the patched code: tsc clean, Jest 1117 passed, Gradle BUILD SUCCESSFUL, both contract checks OK (setup schema 2), and on a fresh stack the whole suite 332 passed, 9 skipped (the store-check and Gateway-stop scenarios, run by hand), 0 failed in 1.3 h. This plan covers 19a only: the entry is not done until 19b.
 
 ## Verification
 

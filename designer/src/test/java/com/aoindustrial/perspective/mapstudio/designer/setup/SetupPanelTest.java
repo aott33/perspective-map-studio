@@ -2,6 +2,7 @@ package com.aoindustrial.perspective.mapstudio.designer.setup;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -91,16 +92,110 @@ class SetupPanelTest {
         assertTrue(panel.current().canSave());
     }
 
+    // Units (epic 4 entry 19a).
+
+    private static List<String> unitsOffered(SetupPanel panel) {
+        List<String> out = new java.util.ArrayList<>();
+        for (int i = 0; i < panel.unitsSelect().getItemCount(); i++) {
+            out.add(panel.unitsSelect().getItemAt(i).toString());
+        }
+        return out;
+    }
+
+    @Test
+    void theUnitsRowSitsInTheMapSectionAfterAlarmPage() {
+        SetupPanel panel = panel(null);
+        panel.show(SetupForm.fromJson(VALID), false, "");
+        layout(panel, 1000, 900);
+        assertEquals(List.of("Auto (the browser's locale)", "Metric", "US"), unitsOffered(panel));
+        assertEquals("Auto (the browser's locale)", panel.unitsSelect().getSelectedItem().toString());
+        assertFalse(panel.unitsSelect().isEditable(), "a select, not a field to type in");
+        assertSame(JComboBox.class, panel.unitsSelect().getClass());
+        assertPlainLook(panel.unitsSelect(), "ComboBoxUI");
+        assertEquals("Units", panel.labelText(SetupForm.UNITS));
+        int alarm = panel.rowY(SetupForm.ALARM_PAGE);
+        int units = panel.rowY(SetupForm.UNITS);
+        int token = panel.rowY(SetupForm.TOKEN_SECRET);
+        assertTrue(panel.rowY(SetupForm.BASEMAPS) < alarm && alarm < units && units < token,
+            alarm + " " + units + " " + token);
+    }
+
+    @Test
+    void pickingUnitsWritesSchemaTwoAndAutoWritesSchemaOneAndTheLabelSaysWhich() {
+        int[] edits = {0};
+        SetupPanel panel = panel(() -> edits[0]++);
+        SetupForm read = SetupForm.fromJson(VALID);
+        panel.show(read, false, "");
+        assertEquals("Schema version 1", panel.schemaText());
+        assertEquals(0, edits[0], "showing a setup is not an edit");
+        // U7
+        panel.unitsSelect().setSelectedIndex(1);
+        assertEquals(1, edits[0]);
+        assertEquals("Schema version 2", panel.schemaText());
+        assertEquals("", panel.reasonText(SetupForm.UNITS));
+        String metric = panel.current().toJson();
+        assertTrue(metric.startsWith("{\n  \"schemaVersion\": 2,\n"), metric);
+        assertTrue(metric.contains("\"units\": \"metric\""), metric);
+        assertNotEquals(read, panel.current());
+        panel.unitsSelect().setSelectedIndex(2);
+        assertTrue(panel.current().toJson().contains("\"units\": \"us\""));
+        // U8
+        panel.unitsSelect().setSelectedIndex(0);
+        assertEquals("Schema version 1", panel.schemaText());
+        assertEquals(read, panel.current());
+        assertFalse(panel.current().toJson().contains("units"));
+        // U9: another row changed leaves a schema 1 file schema 1.
+        panel.type(SetupForm.ALARM_PAGE, "/alarms");
+        assertEquals("Schema version 1", panel.schemaText());
+        assertTrue(panel.current().toJson().startsWith("{\n  \"schemaVersion\": 1,\n"));
+    }
+
+    @Test
+    void aSchemaTwoSetupShowsItsUnitsAndGivesItBackUnchanged() {
+        SetupPanel panel = panel(null);
+        SetupForm us = SetupForm.fromJson("{\"schemaVersion\": 2, \"connection\": \"MapStudio\", \"units\": \"us\"}");
+        panel.show(us, false, "");
+        assertEquals("US", panel.unitsSelect().getSelectedItem().toString());
+        assertEquals("Schema version 2", panel.schemaText());
+        assertEquals(us, panel.current());
+        // A locked (inherited) setup shows them and cannot change them.
+        panel.show(us, true, "Inherited");
+        assertEquals("US", panel.unitsSelect().getSelectedItem().toString());
+        assertFalse(panel.unitsSelect().isEnabled());
+        // The next setup shown starts from its own value.
+        panel.show(SetupForm.fromJson(VALID), false, "");
+        assertEquals("Auto (the browser's locale)", panel.unitsSelect().getSelectedItem().toString());
+        assertTrue(panel.unitsSelect().isEnabled());
+        panel.showNew();
+        assertEquals("Schema version 1", panel.schemaText());
+        assertEquals("Auto (the browser's locale)", panel.unitsSelect().getSelectedItem().toString());
+    }
+
+    @Test
+    void unitsTheGatewayRefusesAreShownAsWrittenWithTheReason() {
+        SetupPanel panel = panel(null);
+        panel.show(SetupForm.fromJson("{\"schemaVersion\": 2, \"connection\": \"MapStudio\", \"units\": \"imperial\"}"),
+            false, "");
+        assertEquals(List.of("Auto (the browser's locale)", "Metric", "US", "imperial"), unitsOffered(panel));
+        assertEquals("imperial", panel.unitsSelect().getSelectedItem().toString());
+        assertEquals("units must be one of auto, metric, us, not \"imperial\".", panel.reasonText(SetupForm.UNITS));
+        panel.unitsSelect().setSelectedIndex(1);
+        assertEquals("", panel.reasonText(SetupForm.UNITS));
+        panel.show(SetupForm.fromJson(VALID), false, "");
+        assertEquals(3, panel.unitsSelect().getItemCount(), "the extra line goes with the setup that had it");
+    }
+
     @Test
     void aNewerSchemaIsShownAsWrittenReadOnly() {
         SetupPanel panel = panel(null);
-        SetupForm form = SetupForm.fromJson("{\"schemaVersion\": 2}");
+        SetupForm form = SetupForm.fromJson("{\"schemaVersion\": 3}");
         panel.show(form, false, "");
         assertEquals(SetupPanel.Mode.RAW, panel.mode());
-        assertTrue(panel.bannerText().startsWith("Read only. This setup was written by a newer Map Studio (schema 2)."));
+        assertTrue(panel.bannerText().startsWith("Read only. This setup was written by a newer Map Studio:"
+            + " schema 3 is newer than 2, the newest this Designer edits."), panel.bannerText());
         assertTrue(panel.bannerText().endsWith("It is shown as written and never rewritten here."));
-        assertEquals("{\"schemaVersion\": 2}", panel.rawText());
-        assertEquals("Schema 2 - read only", panel.schemaText());
+        assertEquals("{\"schemaVersion\": 3}", panel.rawText());
+        assertEquals("Schema 3 - read only", panel.schemaText());
         assertFalse(panel.showsRefreshLists());
         assertFalse(panel.offersStartFromDefaults());
         assertEquals("", panel.footerText());
@@ -165,7 +260,7 @@ class SetupPanelTest {
     @Test
     void aReadOnlySetupIsHandedBackAsReadSoNothingIsWritten() throws Exception {
         SetupPanel panel = panel(null);
-        SetupForm newer = SetupForm.fromJson("{\"schemaVersion\": 2, \"x\": 1}");
+        SetupForm newer = SetupForm.fromJson("{\"schemaVersion\": 3, \"x\": 1}");
         panel.show(newer, false, "");
         assertSame(newer, SetupCommit.formToSave(panel, newer).form());
         SetupForm dev = SetupForm.fromJson(DEV);

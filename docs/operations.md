@@ -58,6 +58,14 @@ Map Studio's map store on database connection MapStudioCheck is at schema versio
 
 An editor's map says "Map store: read only. The map store was upgraded by a newer Map Studio (schema 999, this module knows 3); saving is off until the module is upgraded." (the save status row in Edit mode, the top-centre chip in View mode; a viewer's map shows no words for it and keeps the reason in `data-store-reason`) **[live 8.3.10]**. To downgrade for real, restore the `mapstudio_` tables from a backup taken before the upgrade; there is no down migration.
 
+**The project setup has a schema version of its own** ([setup.md](setup.md), "Versions"). Map Studio 0.4.0 reads setup schema 1 and 2; schema 2 is a setup that names its units (Metric or US in the Designer's Units row). Map Studio 0.3.0 and older read schema 1 only: on such a Gateway a schema 2 setup is refused, the project's map store is unavailable, and the log (`MapStudio.setup`) and the map say why:
+
+```text
+The Map Studio setup of project <project> cannot be read: setup.json is written for a newer Map Studio (schema 2; this module reads 1).
+```
+
+Seen with the published 0.3.0 and the dev project's schema 2 setup **[live 8.3.10]** ([platform-checks.md](platform-checks.md), "Epic 4 entry 19a"). Nothing in the database is touched. Before a downgrade to 0.3.0, set Units back to Auto in the Designer and save (the setup is written as schema 1 again), or edit `setup.json` by hand: `"schemaVersion": 1` and no `units`. A setup whose units are Auto is always saved as schema 1, so a project that never set its units needs nothing.
+
 ## A stored tag path the rule refuses
 
 From 0.4.0 (epic-editing entry 13a) every tag path is saved by the rule the tag lookups read it by: no empty part (`a//b`), no `[` or `]` after the provider, no brace in a suffix, no relative provider (`[~]`), at most 1024 characters ([kind-setup.md](kind-setup.md), "Tag paths"). Earlier versions saved such paths, so a store may hold some. Upgrading changes none of them: there is no migration, and nothing stored is rewritten or refused when it is read.

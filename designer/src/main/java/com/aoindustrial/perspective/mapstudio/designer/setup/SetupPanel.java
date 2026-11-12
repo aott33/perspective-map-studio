@@ -19,6 +19,7 @@ import java.util.function.BooleanSupplier;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
@@ -40,6 +41,7 @@ import javax.swing.text.JTextComponent;
 import com.inductiveautomation.ignition.common.util.LoggerEx;
 
 import com.aoindustrial.perspective.mapstudio.common.contract.Placeholders;
+import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 import com.aoindustrial.perspective.mapstudio.common.contract.SetupLists;
 
 /**
@@ -81,6 +83,17 @@ public final class SetupPanel extends JPanel {
 
     private static final List<String> BASEMAPS = List.of("none", "osm", "satellite", "mapbox");
 
+    /** One line of the Units select: the value {@code setup.json} holds and the words shown. */
+    record UnitsChoice(String value, String label) {
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
+    private static final List<UnitsChoice> UNITS = Setup.UNITS.stream()
+        .map(u -> new UnitsChoice(u, SetupForm.msg("setup.units." + u))).toList();
+
     private final SetupListSource source;
     private final SetupListSource.Async async;
     private final BooleanSupplier confirmStartFromDefaults;
@@ -95,6 +108,8 @@ public final class SetupPanel extends JPanel {
     private boolean filling;
     private Map<String, List<String>> shownReasons = Map.of();
     private Map<String, List<String>> shownWarnings = Map.of();
+    /** False while a newer schema's "read only" label is shown. */
+    private boolean schemaFollowsTheForm = true;
     private final List<String> basemapValues = new ArrayList<>();
 
     // Header
@@ -138,6 +153,8 @@ public final class SetupPanel extends JPanel {
     private final FormParts.Flow basemaps = new FormParts.Flow(16, 4);
     private final Map<String, JCheckBox> basemapBoxes = new LinkedHashMap<>();
     private final PickerField alarmPage = new PickerField(this::pageItems, true);
+    /** The Designer's own dropdown, not editable: Auto, Metric, US (epic 4 entry 19a). */
+    private final JComboBox<UnitsChoice> units = new JComboBox<>(UNITS.toArray(new UnitsChoice[0]));
     private final PickerField provider = new PickerField(this::providerItems, false);
     private final PickerField secretName = new PickerField(this::secretNameItems, false);
     private final Timer secretNamesTimer = new Timer(400, e -> loadSecretNames());
@@ -287,6 +304,7 @@ public final class SetupPanel extends JPanel {
         phoneRoles.setPlaceholder(SetupForm.msg("setup.placeholder.role"));
         secretName.setPlaceholder(SetupForm.msg("setup.placeholder.secretName"));
 
+        units.addActionListener(e -> edited());
         buildRefresh();
         for (String b : BASEMAPS) {
             basemapBoxes.put(b, basemapBox(b, SetupForm.msg("setup.basemap." + b)));
@@ -305,6 +323,7 @@ public final class SetupPanel extends JPanel {
         form.put(new FormParts.Heading(SetupForm.msg("setup.section.map")), Theme.SECTION_GAP);
         form.put(row(SetupForm.BASEMAPS, basemaps, basemapBoxes.get("none"), 420), 8);
         form.put(row(SetupForm.ALARM_PAGE, alarmPage, alarmPage.labelTarget(), Theme.FIELD), Theme.ROW_GAP);
+        form.put(row(SetupForm.UNITS, units, units, Theme.FIELD), Theme.ROW_GAP);
         // The map token as two labelled rows (owner review notes item 31): the provider, then the secret
         // name with the "Names only" line under it; still one setup.json value, tokenSecret <provider>/<name>.
         form.put(row(SetupForm.TOKEN_SECRET, provider, provider.labelTarget(), Theme.FIELD), 8);
@@ -527,6 +546,7 @@ public final class SetupPanel extends JPanel {
         boolean newer = setup.state() == SetupForm.State.NEWER_SCHEMA;
         schema.setText(newer ? SetupForm.msg("setup.schema.readOnly", setup.schemaVersion())
             : SetupForm.msg("setup.schema", setup.schemaVersion()));
+        schemaFollowsTheForm = !newer;
         cards.show(center, mode == Mode.RAW ? Mode.RAW.name() : Mode.EDIT.name());
         if (mode != Mode.RAW && built) {
             refreshLists();
@@ -555,6 +575,7 @@ public final class SetupPanel extends JPanel {
         setBanner("", null, false);
         startFromDefaults.setVisible(false);
         schema.setText(SetupForm.msg("setup.schema", base.schemaVersion()));
+        schemaFollowsTheForm = true;
         cards.show(center, Mode.EDIT.name());
         refreshLists();
         refreshChrome();
@@ -595,6 +616,7 @@ public final class SetupPanel extends JPanel {
             assetsFunction.fill(setup.text(SetupForm.ASSETS_FUNCTION));
             fillRefresh(setup.text(SetupForm.REFRESH));
             alarmPage.fill(setup.text(SetupForm.ALARM_PAGE));
+            fillUnits(setup.text(SetupForm.UNITS));
             String[] t = SetupForm.splitToken(setup.text(SetupForm.TOKEN_SECRET));
             provider.fill(t[0]);
             secretName.fill(t[1]);
@@ -615,7 +637,24 @@ public final class SetupPanel extends JPanel {
         }
     }
 
+    /** Selects the units; a value that is not one of the three gets a line of its own, as written. */
+    private void fillUnits(String value) {
+        while (units.getItemCount() > UNITS.size()) {
+            units.removeItemAt(units.getItemCount() - 1);
+        }
+        for (UnitsChoice c : UNITS) {
+            if (c.value().equals(value)) {
+                units.setSelectedItem(c);
+                return;
+            }
+        }
+        UnitsChoice other = new UnitsChoice(value, value);
+        units.addItem(other);
+        units.setSelectedItem(other);
+    }
+
     private void setEditable(boolean editable) {
+        units.setEnabled(editable);
         connection.setEditable(editable);
         fullRoles.setEditable(editable);
         phoneRoles.setEditable(editable);
@@ -641,6 +680,8 @@ public final class SetupPanel extends JPanel {
         f.setText(SetupForm.ASSETS_FUNCTION, assetsFunction.text());
         f.setText(SetupForm.REFRESH, refresh.getText());
         f.setText(SetupForm.ALARM_PAGE, alarmPage.text());
+        Object chosen = units.getSelectedItem();
+        f.setText(SetupForm.UNITS, chosen instanceof UnitsChoice c ? c.value() : SetupForm.UNITS_AUTO);
         f.setList(SetupForm.BASEMAPS, basemapValues);
         String original = base.text(SetupForm.TOKEN_SECRET);
         String[] t = SetupForm.splitToken(original);
@@ -836,6 +877,10 @@ public final class SetupPanel extends JPanel {
         }
         shownReasons = reasons;
         shownWarnings = warnings;
+        if (schemaFollowsTheForm) {
+            // The number the save will write: 2 once the units are not Auto, else 1.
+            schema.setText(SetupForm.msg("setup.schema", now.schemaVersion()));
+        }
         String[] tokenParts = SetupForm.splitToken(now.text(SetupForm.TOKEN_SECRET));
         for (Map.Entry<String, FormParts.Row> e : rows.entrySet()) {
             String field = e.getKey();
@@ -1140,6 +1185,21 @@ public final class SetupPanel extends JPanel {
 
     String rawText() {
         return raw.getText();
+    }
+
+    /** For tests: a row's label as shown. */
+    String labelText(String field) {
+        return rows.get(field).label.getText();
+    }
+
+    /** For tests: where a row sits in the form, from its top. */
+    int rowY(String field) {
+        return rows.get(field).getY();
+    }
+
+    /** For tests: the Units select. */
+    JComboBox<UnitsChoice> unitsSelect() {
+        return units;
     }
 
     boolean fieldsEditable() {

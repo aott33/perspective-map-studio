@@ -104,12 +104,57 @@ class SetupValidationTest {
 
     @Test
     void aNewerSchemaIsReportedAloneAndAnOtherVersionIsInvalid() {
-        SetupProblem p = only(Setup.read("{\"schemaVersion\":2,\"connection\":\"MapStudio\",\"newField\":true}"));
-        assertEquals("setup.json is written for a newer Map Studio (schema 2; this module reads 1)", p.message());
-        assertEquals("schemaVersion must be 1, not 0", only(Setup.read("{\"schemaVersion\":0,\"connection\":\"M\"}")).message());
-        assertEquals("schemaVersion must be 1, not \"1\"",
+        SetupProblem p = only(Setup.read("{\"schemaVersion\":3,\"connection\":\"MapStudio\",\"newField\":true}"));
+        assertEquals("setup.json is written for a newer Map Studio (schema 3; this module reads 1 and 2)", p.message());
+        assertEquals("schemaVersion must be 1 or 2, not 0", only(Setup.read("{\"schemaVersion\":0,\"connection\":\"M\"}")).message());
+        assertEquals("schemaVersion must be 1 or 2, not \"1\"",
             only(Setup.read("{\"schemaVersion\":\"1\",\"connection\":\"M\"}")).message());
-        assertEquals("schemaVersion is missing; it must be 1", only(Setup.read("{\"connection\":\"M\"}")).message());
+        assertEquals("schemaVersion must be 1 or 2, not 1.5",
+            only(Setup.read("{\"schemaVersion\":1.5,\"connection\":\"M\"}")).message());
+        assertEquals("schemaVersion is missing; it must be 1 or 2", only(Setup.read("{\"connection\":\"M\"}")).message());
+    }
+
+    @Test
+    void schemaOneAndTwoAreBothRead() {
+        // U1: a schema 1 file reads as before, its units the browser's locale.
+        Setup one = Setup.read("{" + BASE + "}").setup();
+        assertEquals(1, one.schemaVersion());
+        assertEquals("auto", one.units());
+        // U2 and U3: a schema 2 file may name the units; none, null or auto typed by hand is auto.
+        Setup two = Setup.read("{\"schemaVersion\":2,\"connection\":\"MapStudio\",\"units\":\"us\"}").setup();
+        assertEquals(2, two.schemaVersion());
+        assertEquals("us", two.units());
+        assertEquals("metric", Setup.read("{\"schemaVersion\":2.0,\"connection\":\"M\",\"units\":\"metric\"}").setup().units());
+        assertEquals("auto", Setup.read("{\"schemaVersion\":2,\"connection\":\"M\"}").setup().units());
+        assertEquals("auto", Setup.read("{\"schemaVersion\":2,\"connection\":\"M\",\"units\":null}").setup().units());
+        assertEquals("auto", Setup.read("{\"schemaVersion\":2,\"connection\":\"M\",\"units\":\"auto\"}").setup().units());
+    }
+
+    @Test
+    void unitsInASchemaOneFileIsAnUnknownField() {
+        // U4: in the words every unknown field gets, and reported once.
+        SetupProblem p = only(read("\"units\":\"metric\""));
+        assertEquals("units", p.field());
+        assertEquals("units is not a setup field of schema 1", p.message());
+        assertEquals("units is not a setup field of schema 1", only(read("\"units\":\"imperial\"")).message());
+        assertEquals("units is not a setup field of schema 1", only(read("\"units\":null")).message());
+    }
+
+    @Test
+    void unitsAreOneOfThree() {
+        // U5
+        SetupProblem p = only(Setup.read("{\"schemaVersion\":2,\"connection\":\"M\",\"units\":\"imperial\"}"));
+        assertEquals("units", p.field());
+        assertEquals("units must be one of auto, metric, us, not \"imperial\"", p.message());
+        assertEquals("units must be one of auto, metric, us, not \"Metric\"",
+            only(Setup.read("{\"schemaVersion\":2,\"connection\":\"M\",\"units\":\"Metric\"}")).message());
+        assertEquals("units must be one of auto, metric, us, not 1",
+            only(Setup.read("{\"schemaVersion\":2,\"connection\":\"M\",\"units\":1}")).message());
+        // An unknown field of a schema 2 file names schema 2, with the hint.
+        assertEquals("unit is not a setup field of schema 2 (did you mean units?)",
+            only(Setup.read("{\"schemaVersion\":2,\"connection\":\"M\",\"unit\":\"us\"}")).message());
+        assertEquals("roles.fulll is not a setup field of schema 2 (did you mean roles.full?)",
+            only(Setup.read("{\"schemaVersion\":2,\"connection\":\"M\",\"roles\":{\"fulll\":[]}}")).message());
     }
 
     @Test

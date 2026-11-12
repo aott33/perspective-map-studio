@@ -33,6 +33,11 @@ import com.aoindustrial.perspective.mapstudio.common.contract.SetupProblem;
  * {@link Setup#read(String)}, the Gateway's own reader, placing each of its
  * problems beside the field it names ({@link SetupProblem#field()}).
  *
+ * <p>The schema a save writes follows the units (epic 4 entry 19a): schema 2 with
+ * {@code units} only when the units are not Auto, else schema 1 with no
+ * {@code units}, so an unrelated edit never stops an older Gateway from reading
+ * the project. {@link #schemaVersion()} is that number.
+ *
  * <p>Writing keeps keys the form does not know (a later schema's or a hand-added
  * one) after the known keys, writes the known keys in story 1's order with
  * 2-space indents, lists of names on one line, and a newline at the end, so a
@@ -44,7 +49,7 @@ public final class SetupForm {
     public enum State {
         /** Read and editable. */
         OK,
-        /** {@code schemaVersion} above 1: shown read only, never written. */
+        /** {@code schemaVersion} above 2, the newest this Designer edits: shown read only, never written. */
         NEWER_SCHEMA,
         /** Not readable (not JSON, no version, a field of the wrong type): read only until the user starts from defaults. */
         UNREADABLE
@@ -61,17 +66,21 @@ public final class SetupForm {
     public static final String ALARM_PAGE = "alarmPage";
     public static final String BASEMAPS = "basemaps";
     public static final String TOKEN_SECRET = "tokenSecret";
+    /** The map's units (setup schema 2): {@link #UNITS_AUTO}, {@code metric} or {@code us}. */
+    public static final String UNITS = "units";
+    /** The browser's locale: the units of a setup that names none, and never written. */
+    public static final String UNITS_AUTO = Setup.DEFAULT_UNITS;
 
     /** The key of reasons that name no field; shown at the top of the form. */
     public static final String GENERAL = "";
 
     /** Editable fields, in the order of {@code setup.json} and of the form. */
     public static final List<String> FIELDS = List.of(CONNECTION, FULL_ROLES, PHONE_ROLES, KINDS_FUNCTION,
-        ASSETS_FUNCTION, REFRESH, ALARM_PAGE, BASEMAPS, TOKEN_SECRET);
+        ASSETS_FUNCTION, REFRESH, ALARM_PAGE, BASEMAPS, UNITS, TOKEN_SECRET);
 
-    /** The top-level keys of setup v1, in story 1's order. */
+    /** The top-level keys of the setup, in story 1's order, then schema 2's {@code units}. */
     private static final List<String> KNOWN_KEYS = List.of(SCHEMA_VERSION, CONNECTION, ROLES, KINDS_FUNCTION,
-        ASSETS_FUNCTION, REFRESH, ALARM_PAGE, BASEMAPS, TOKEN_SECRET);
+        ASSETS_FUNCTION, REFRESH, ALARM_PAGE, BASEMAPS, TOKEN_SECRET, UNITS);
 
     private static final Pattern FUNCTION_PATH = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+");
     private static final Pattern WHOLE_NUMBER = Pattern.compile("[0-9]{1,9}");
@@ -83,7 +92,8 @@ public final class SetupForm {
     private State state = State.OK;
     private String stateReason = "";
     private String originalText;
-    private String schemaVersionText = String.valueOf(Setup.SCHEMA_VERSION);
+    /** The schema a newer file names; an editable form's schema is the one its save writes. */
+    private String newerSchemaText = "";
 
     private String connection = "";
     private List<String> fullRoles = List.of();
@@ -94,6 +104,7 @@ public final class SetupForm {
     private String alarmPage = "";
     private List<String> basemaps = Setup.DEFAULT_BASEMAPS;
     private String tokenSecret = "";
+    private String units = UNITS_AUTO;
 
     private final LinkedHashMap<String, JsonElement> unknownKeys = new LinkedHashMap<>();
     private final LinkedHashMap<String, JsonElement> unknownRoleKeys = new LinkedHashMap<>();
@@ -136,14 +147,21 @@ public final class SetupForm {
                 SetupForm form = new SetupForm();
                 form.state = State.NEWER_SCHEMA;
                 form.originalText = text;
-                form.schemaVersionText = String.valueOf((long) v);
-                form.stateReason = msg("setup.state.newer", form.schemaVersionText);
+                form.newerSchemaText = String.valueOf((long) v);
+                form.stateReason = msg("setup.state.newer", form.newerSchemaText,
+                    String.valueOf(Setup.SCHEMA_VERSION));
                 return form;
             }
         }
         SetupProblem schema = problem(reading, SCHEMA_VERSION);
         if (schema != null) {
             return unreadable(text, schema.message());
+        }
+        // A schema 1 file that holds units is one the Gateway refuses as an unknown field, whatever
+        // else is in it: never editable (the form would write it as schema 2), always the Gateway's words.
+        SetupProblem units = problem(reading, UNITS);
+        if (units != null && o.has(UNITS) && version != null && version.getAsDouble() == Setup.OLDEST_SCHEMA_VERSION) {
+            return unreadable(text, units.message());
         }
         SetupForm form = new SetupForm();
         try {
@@ -180,6 +198,9 @@ public final class SetupForm {
             form.alarmPage = string(o, ALARM_PAGE, "");
             form.basemaps = names(o, BASEMAPS, BASEMAPS, Setup.DEFAULT_BASEMAPS);
             form.tokenSecret = string(o, TOKEN_SECRET, "");
+            // Absent, null or "auto" typed by hand is Auto. A value that is not one of the three is
+            // shown as written, with the Gateway's reason beside the row.
+            form.units = string(o, UNITS, UNITS_AUTO);
         } catch (NotShown ex) {
             // A value of a JSON type the field cannot show; the Gateway's problem says what it must be.
             SetupProblem p = problem(reading, ex.getMessage());
@@ -194,7 +215,8 @@ public final class SetupForm {
         // Guard: a file the Gateway refuses must never look valid here. If the form
         // read it into a setup the Gateway would accept (a key set twice, say), the
         // form misread it, and a save of the unchanged form would write nothing (the
-        // editor's equals test).
+        // editor's equals test). A schema 1 file that holds units is one: the Gateway
+        // refuses it as an unknown field, and the form would write it as schema 2.
         if (!reading.ok() && Setup.read(form.toJson()).ok()) {
             return unreadable(text, reading.problems().get(0).message());
         }
@@ -263,7 +285,7 @@ public final class SetupForm {
         c.state = state;
         c.stateReason = stateReason;
         c.originalText = originalText;
-        c.schemaVersionText = schemaVersionText;
+        c.newerSchemaText = newerSchemaText;
         c.connection = connection;
         c.fullRoles = fullRoles;
         c.phoneRoles = phoneRoles;
@@ -273,6 +295,7 @@ public final class SetupForm {
         c.alarmPage = alarmPage;
         c.basemaps = basemaps;
         c.tokenSecret = tokenSecret;
+        c.units = units;
         c.unknownKeys.putAll(unknownKeys);
         c.unknownRoleKeys.putAll(unknownRoleKeys);
         return c;
@@ -291,11 +314,23 @@ public final class SetupForm {
         return state == State.OK;
     }
 
+    /**
+     * The schema number the form's header shows: the one a save of this form writes (2 when
+     * the units are not Auto, else 1), or the number a newer file names.
+     */
     public String schemaVersion() {
-        return schemaVersionText;
+        return state == State.NEWER_SCHEMA ? newerSchemaText : String.valueOf(writtenSchema());
     }
 
-    /** The value of a text field ({@link #CONNECTION}, the functions, {@link #REFRESH}, {@link #ALARM_PAGE}, {@link #TOKEN_SECRET}). */
+    /** Schema 2 only when it is needed: a setup with units other than Auto. */
+    private int writtenSchema() {
+        return units.equals(UNITS_AUTO) ? Setup.OLDEST_SCHEMA_VERSION : Setup.SCHEMA_VERSION;
+    }
+
+    /**
+     * The value of a text field ({@link #CONNECTION}, the functions, {@link #REFRESH}, {@link #ALARM_PAGE},
+     * {@link #TOKEN_SECRET}, {@link #UNITS}).
+     */
     public String text(String field) {
         switch (field) {
             case CONNECTION: return connection;
@@ -304,6 +339,7 @@ public final class SetupForm {
             case REFRESH: return refreshText;
             case ALARM_PAGE: return alarmPage;
             case TOKEN_SECRET: return tokenSecret;
+            case UNITS: return units;
             default: throw new IllegalArgumentException("not a text field: " + field);
         }
     }
@@ -318,6 +354,7 @@ public final class SetupForm {
             case REFRESH: refreshText = v; break;
             case ALARM_PAGE: alarmPage = v; break;
             case TOKEN_SECRET: tokenSecret = v; break;
+            case UNITS: units = v.isEmpty() ? UNITS_AUTO : v; break;
             default: throw new IllegalArgumentException("not a text field: " + field);
         }
         return this;
@@ -560,7 +597,7 @@ public final class SetupForm {
             return originalText;
         }
         JsonObject o = new JsonObject();
-        o.addProperty(SCHEMA_VERSION, Setup.SCHEMA_VERSION);
+        o.addProperty(SCHEMA_VERSION, writtenSchema());
         o.addProperty(CONNECTION, connection);
         JsonObject roles = new JsonObject();
         roles.add("full", array(fullRoles));
@@ -577,6 +614,9 @@ public final class SetupForm {
         o.addProperty(ALARM_PAGE, alarmPage);
         o.add(BASEMAPS, array(basemaps));
         o.addProperty(TOKEN_SECRET, tokenSecret);
+        if (!units.equals(UNITS_AUTO)) {
+            o.addProperty(UNITS, units);
+        }
         unknownKeys.forEach(o::add);
         StringBuilder sb = new StringBuilder();
         write(sb, o, "");
