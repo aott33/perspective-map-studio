@@ -4,8 +4,8 @@ type: 'feature'
 ticket: ''
 part_of: '19'
 created: '2026-11-12'
-status: 'draft'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: '50504ea58d1dbcdab3a3caf3db67e5ee10f46e1e'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
@@ -24,7 +24,7 @@ context: ['{project-root}/docs/contract.md', '{project-root}/docs/operations.md'
 
 **Approach:** The map store's project row gains `settings` (migration 4, store schema 4). `edits.apply` takes a third entity, `settings`, with the one id `units` and data `{system, labels}`, full editing only, versioned like a kind setup and written to the edit record. `map.load.reply` and `map.changed` carry it at every level. Recent changes lists it with Revert. The browser keeps the value and draws nothing with it: entry 20 adds the Layers row and the distances. This is the second half of entry 19.
 
-Planner's picks, proposed for the owner's checkpoint (not yet decisions): (1) `system` is `auto`, `metric` or `us`, the setup's three; `labels` is `short` or `long`; both required. (2) Ops are create (at 0, or at a deleted version to restore), update and delete; a delete clears the override, so the setup's units apply again and labels are short. (3) Stored in `mapstudio_project.settings jsonb` as `{"units": {system, labels, version, deleted}}`. (4) The reply's `settings` is `{}` with no live override, else `{"units": {id, system, labels, version}}`, the same at every level. (5) A settings op is allowed when no kind list is in use. (6) Recent changes reads "Set the units to US, words", "Changed the units to Metric, symbols", "Cleared the units setting", with Revert: a create is reverted by a delete, a delete by a create, an update by the values before. A row that also holds a kind setup keeps no Revert. (7) A conflict names "the units setting". (8) `system.mapstudio.getMap` is unchanged; `applyEdits`' description names the third entity. (9) The script console check is the owner's, in playbook 8t; e2e sends the same op over the websocket.
+Decisions (owner, 2026-11-12, "approve and continue" on the plan kept whole and its nine picks): (1) `system` is `auto`, `metric` or `us`, the setup's three; `labels` is `short` or `long`; both required. (2) Ops are create (at 0, or at a deleted version to restore), update and delete; a delete clears the override, so the setup's units apply again and labels are short. (3) Stored in `mapstudio_project.settings jsonb` as `{"units": {system, labels, version, deleted}}`. (4) The reply's `settings` is `{}` with no live override, else `{"units": {id, system, labels, version}}`, the same at every level. (5) A settings op is allowed when no kind list is in use. (6) Recent changes reads "Set the units to US, words", "Changed the units to Metric, symbols", "Cleared the units setting", with Revert: a create is reverted by a delete, a delete by a create, an update by the values before. A row that also holds a kind setup keeps no Revert. (7) A conflict names "the units setting". (8) `system.mapstudio.getMap` is unchanged; `applyEdits`' description names the third entity. (9) The script console check is the owner's, in playbook 8t; e2e sends the same op over the websocket.
 
 ## Boundaries & Constraints
 
