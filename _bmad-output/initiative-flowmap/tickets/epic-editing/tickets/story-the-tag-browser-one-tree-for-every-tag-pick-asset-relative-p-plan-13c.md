@@ -1,0 +1,98 @@
+---
+title: "13c: the tag browser for the style rule, popup params and an item's overrides, and the typed Path field"
+type: 'feature'
+ticket: ''
+part_of: '13'
+created: '2026-11-12'
+status: 'draft'
+baseline_revision: ''
+route: 'full'
+route_source: 'auto'
+risk: 'medium'
+review: ''
+review_source: ''
+lenses_ran: []
+review_loop_iteration: 0
+context: ['{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/DESIGN.md', '{project-root}/_bmad-output/initiative-flowmap/ux-map-studio/EXPERIENCE.md', '{project-root}/docs/contract.md', '{project-root}/docs/kind-setup.md']
+---
+
+<frozen-after-approval reason="human-owned intent - do not modify unless human renegotiates">
+
+## Intent
+
+**Problem:** The tag browser of entry 13b serves only a kind's Key values, Comms and Alarms, and its Path field is read only. The style rule's tag path, popup params, an item's override rows and an item's own rule are still typed by heart, and a path cannot be typed in the card when a provider cannot be browsed (R4).
+
+**Approach:** Give the same card four more targets, each with its own "For:" line, opening folder and saving rule, and make the Path field typed: a typed path is answered by the Gateway (`tags.resolve`) exactly as a tree pick is, and saved the same way.
+
+## Boundaries & Constraints
+
+**Always:** **The button:** the 13b tag button beside the style rule's tag path (kind and item), each popup param's value (the new row too) and an override row's input in Live now; full editing role only. **Kind targets** (style rule, popup param) open at the preview item's asset folder and convert as 13b does: inside it `{asset.path}/...`, outside it the full path with the shared-tag note. **Item targets** (an override row, the item's own rule) open at that item's own asset folder (the default provider's top when it has no asset); every pick is the full path; the note reads "Saved for P14 only, as the full path"; the button reads "Use for P14". **For lines:** "For: Style rule of the Well pad kind", "For: Popup param wellId of the Well pad kind", "For: Casing pressure on P14 only - an override", "For: Style rule of P14 only". **Saving:** each pick goes through the path its typed twin takes today: the rule editor's draft (saved when the rule is complete, else "Not saved yet"), the param's value edit or new-row commit, the override's edit (one Undo step). **The Path field:** typed or filled by a tree pick; a typed path drops the tree's pick, is asked of the Gateway after a short pause or Enter, and the note and the primary button follow that answer as for a pick; the Gateway's refusal shows its words and saves nothing; where no asset can be asked (no linked item, an item target) the browser's own full-path check answers. It works while the tree is loading, empty, unreachable or refused. **Closing:** as 13b, and also when the selected item changes. Words brief and plain; no em dashes. Docs, DESIGN.md and EXPERIENCE.md "as built", playbook section 8r.
+
+**Never:** A TypeScript copy of `TagPaths.resolve`; a new message type or field; a contract version bump; a resolve note on popup param rows; a folder as a pick outside Alarms; backlog 39's link from a failing name to its item; a change to who may browse.
+
+## I/O & Edge-Case Matrix
+
+| Scenario | Input / State | Expected Output / Behavior | Error Handling |
+|----------|--------------|---------------------------|----------------|
+| C1 Kind rule | Well pad, States from a tag path, pick `P14/Status` | The draft holds `{asset.path}/Status`; saved if the rule is complete | "Not saved yet" otherwise |
+| C2 Param inside | A stored param, pick `P14/Pressure` | `{asset.path}/Pressure` saved as its value | No error expected |
+| C3 Param outside, new row | A new param row, pick `Plant/AmbientTemp` | The full path fills the value; the row commits as when typed | A row with no name stays a draft |
+| C4 Override | P14, Live now, Override on a row, pick in P14's folder | The full path saved, marked Override with Reset; one Undo step | No error expected |
+| C5 Own rule | P14's Style tab, a rule from a tag path, pick | The full path in the draft; saved when complete | "Not saved yet" otherwise |
+| C6 Item, no asset | An unlinked item's override | The default provider's top; full-path picks | No error expected |
+| C7 Typed full path | Key value card, type `[default]Mesa/P14/Pressure` | The note shows `{asset.path}/Pressure` with "Resolves for 4 of 5 well pads. Not for Point 3."; the button saves it | No error expected |
+| C8 Typed relative | Type `{asset.path}/Pressure` | The same note and save | On an item target: the override check's words, button inert |
+| C9 Typed bad path | Type `[default]Mesa//P14` | The Gateway's words in the note; button inert | Nothing saved |
+| C10 Unreachable | Site2 stopped and chosen, then a path typed | "Can't browse Site2" stays; the typed path is answered and saved | No error expected |
+| C11 Typed then picked | Type a path, then click a tree row | The field shows the row's path; the note follows the row | No error expected |
+| C12 Selection moves | The card open for P14's override, another item selected | The card closes; nothing saved | No error expected |
+
+</frozen-after-approval>
+
+## Code Map
+
+- `web/typescript/tagBrowser.ts` (536) -- `PickTarget` :17 (`part: 'kpi'|'comms'|'alarms'`), `canPick` :335, `pickProblem` :340, `useText` :351, `forLine` :367, `cardNote` :461 (needs a `TagChild` today; must take a typed path), `TagFor` :516, `readTagFor` :524, `assetFolderOf` :85. Add the parts here, pure, tests first.
+- `web/typescript/studio/TagBrowser.tsx` (458) -- the Path input :413-417 `readOnly`, fed by `state.tree.picked`; `pick()` :216-224 calls `onAskPick` only with an asset; `onCardKey` :284 (Esc). `answers.picks` is keyed by full path :347.
+- `web/typescript/MapStudioStoreDelegate.ts` -- `askPick(kindId, assetId, path)` :815, `onPickReply` :837 (`PickAnswer`: `path, relative, n, m, failing, failingMore`); an error reply for a pick must reach the card with its words. `mayBrowse` :729.
+- `web/typescript/MapStudio.tsx` (2842) -- `tagPick {kindId, tagFor, target, seen}` :188, `tagPickShown` :2203 (Kinds surface only: widen to Items with an item id), `dropTagPick` :2214, `onTagBrowse` :2221, `onTagUse` :2253 (only `kindPanel.usePick`), `focusTagButton` :2239, `renderTagBrowser` :2286, `onOverride` :1974, `onStyleRule` :2040.
+- `web/typescript/studio/KindSetupPanel.tsx` (1489) -- `tagButton` :667, `usePick` :688-741, `leftBrowsing` :249 (the new-row guard: new params need it, `renderNewParam` :975, row blur :996, `commitParam` :935), `renderParam` :1017 (`param.value` through `text`/`commit` :400), the `ruleEditor` ref :225, `send(Fields.styleRule, ...)` :1264.
+- `web/typescript/studio/RuleEditor.tsx` (713), shared by kind and item (`own`) -- the one tag path input `renderSource` :494, `.mapstudio-rule-path` :526-534; `editRule` :363, `commitRule` :398, `ruleBase` :171; needs an `onBrowse` prop and a public way to put a path into the draft. Its version is `ruleBase`, not the card's `seen`.
+- `web/typescript/studio/PropertiesPanel.tsx` (1499) -- `renderLiveRow` :897, `.mapstudio-override-input` :932 (shown after Override or Change, `startOverride` :815), `commitOverride` :826 with `itemOverrides.pathProblem` :137 (full path only); `renderStyle` :1129, `<RuleEditor own>` :1168.
+- Gateway (do not change): `TagLookups.resolveReply` :124 needs `kindId`, `assetId`, `path` (no asset, no resolve); `TagPaths.resolve` :193 answers a full path under the base path and a typed `{asset.path}/...` alike, `relative: true` with counts.
+- Tests: Jest `tagBrowser.test.ts`, `tagBrowserCard.test.ts`, `tagBrowserDelegate.test.ts`, `kindSetupPanel.test.ts`, `itemStyle.test.ts`, `itemPanel.test.ts`; e2e `tagbrowser.spec.mjs` (helpers `openCard`, `routeBrowse`, `settled`), `kindstyle.spec.mjs`, `overrides.spec.mjs` (`selectRow`, `typePath`, `expectOneBatch`), `itemstyle.spec.mjs`.
+- Docs that say "until 13c" or "read only": `docs/kind-setup.md` :38, :47; `docs/contract.md` :275; `CHANGELOG.md` :41; playbook 8n :367, 8o :386, 8q :433; DESIGN.md :520; EXPERIENCE.md :132, :181; `TagBrowser.tsx` :27.
+
+## Tasks & Acceptance
+
+**Execution:**
+- [ ] `web/typescript/tagBrowser.ts`, `tagBrowser.test.ts` -- the new targets (kind rule, param, new param, override, own rule), their For lines, button words and notes; the note from a typed path; the item target's full-path rule -- C4 to C9, tests first.
+- [ ] `web/typescript/studio/TagBrowser.tsx`, `MapStudioStoreDelegate.ts`, their tests -- the typed Path field, its ask with a pause, a refused ask's words, the field usable in every tree state -- C7 to C11.
+- [ ] `web/typescript/studio/RuleEditor.tsx`, `KindSetupPanel.tsx`, tests -- the tag button on the rule's path and on param values, picks into the draft and the param edits, the new-param guard -- C1 to C3, C5.
+- [ ] `web/typescript/studio/PropertiesPanel.tsx`, `MapStudio.tsx`, `mapstudio.css`, tests -- the tag button on an override row and the own rule, the card on the Items surface for one item, its closing and focus -- C4 to C6, C12.
+- [ ] `e2e/tests/tagbrowser.spec.mjs` (or a second spec beside it) -- C1 to C12 live on the dev Gateway, with a screenshot of each new state.
+- [ ] `docs/contract.md`, `docs/kind-setup.md`, `CHANGELOG.md`, DESIGN.md, EXPERIENCE.md, `docs/test-playbook-0.4.0.md` section 8r (and the 13c pointers in 8n, 8o, 8q) -- the "until 13c" lines made true.
+
+**Acceptance Criteria:**
+- Given a full editor on the dev Gateway, when they open the browser from P14's override row and pick a tag, then Live now shows the full path marked Override with Reset, and Undo takes it back.
+- Given Site2 stopped, when a path is typed in the card, then it is answered and saved without the tree.
+- Given a viewer or a phone editor, then none of the new tag buttons is drawn.
+
+## Implementation Notes
+
+- Planner, 2026-11-12: the environment and identity rules are 13b's plan's first Implementation Note; they hold here unchanged. Leave the work uncommitted; run the specs you touch, not the whole suite. The Code Map's line numbers are a guide.
+
+## Plan Change Log
+
+## Review Triage Log
+
+## Design Notes
+
+The Gateway answers a typed `{asset.path}/...` and a full path under the asset folder with the same reply, so the typed field needs no conversion code in the browser: it sends what was typed and saves what comes back. An item target never asks, since an override is a full path by rule and the browser's check already says so.
+
+## Verification
+
+**Commands:**
+- `cd web && npx tsc --noEmit && npx jest` -- expected: all pass
+- `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew clean build --offline --rerun-tasks` -- expected: BUILD SUCCESSFUL
+- `bash scripts/ci/check-contract-versions.sh` -- expected: OK
+- `ops/up.sh --fresh`, then `cd e2e && PW_CHROMIUM_PATH=/opt/pw-browsers/chromium npm test -- --trace off` -- expected: 0 failed
