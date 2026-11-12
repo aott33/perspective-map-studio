@@ -4,6 +4,7 @@
 // list's Clear the search (Esc), the waiting edits' Hide (Esc) and Details' Move while it waits), with `aria-keyshortcuts`; a
 // control that is off says why. The footer's delete is off for an item never saved and while a tool is in hand, and names Del
 // only while Del deletes the item.
+import { METRIC_UNITS } from '../geometry';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Kind } from '../adapters';
@@ -50,7 +51,7 @@ function toolbar(undo: UndoStack, paused = false): string {
 
 function panel(overrides: Partial<PropertiesPanelProps> = {}): string {
     return renderToStaticMarkup(React.createElement(PropertiesPanel, {
-        item: PAD, kind: KINDS[0], kinds: [KINDS[0]], assets: [], assetNames: [], assetStatus: null, items: [PAD], assetRows: [], kindStatus: null, saving: false,
+        item: PAD, kind: KINDS[0], kinds: [KINDS[0]], units: METRIC_UNITS, assets: [], assetNames: [], assetStatus: null, items: [PAD], assetRows: [], kindStatus: null, saving: false,
         newest: PAD.properties, pending: false, paused: false,
         autoFocusName: false, onNameFocused: noop, onClose: noop, onRename: noop, onMove: noop, canMoveByClick: true, moving: false,
         onMoveStart: noop, onLink: noop, onKind: noop, onProperty: noop, onDelete: noop, toolInHand: false, delKey: true,
@@ -80,14 +81,14 @@ describe('Undo and Redo name their keys (entry 25)', () => {
 describe('the bars name their keys (entry 25)', () => {
     test('the drawing bar: Cancel (Esc), Finish (Enter) once it may finish; an off Finish says why', () => {
         const two = withVertices(startDrawing('line', 'f', [[-104.99, 39.74]], null), [[-104.99, 39.74], [-104.98, 39.745]], null, '');
-        const html = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'line', drawing: two, kind: KINDS[1], snap: false, snapHint: '',
+        const html = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'line', drawing: two, kind: KINDS[1], units: METRIC_UNITS, snap: false, snapHint: '',
             onCancel: noop, onFinish: noop, onDone: noop }));
         expect(html).toContain('mapstudio-drawing-cancel" title="Cancel (Esc)" aria-keyshortcuts="Escape">Cancel</button>');
         expect(html).toContain('mapstudio-drawing-finish" title="Finish (Enter)" aria-keyshortcuts="Enter">Finish</button>');
         const one = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'line', drawing: startDrawing('line', 'f', [[-104.99, 39.74]], null),
-            kind: KINDS[1], snap: false, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
+            kind: KINDS[1], units: METRIC_UNITS, snap: false, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
         expect(one).toContain('mapstudio-drawing-finish" disabled="" title="A line needs two points" aria-keyshortcuts="Enter">Finish</button>');
-        const point = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'point', drawing: null, kind: KINDS[0], snap: false, snapHint: '',
+        const point = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'point', drawing: null, kind: KINDS[0], units: METRIC_UNITS, snap: false, snapHint: '',
             onCancel: noop, onFinish: noop, onDone: noop }));
         expect(point).toContain('title="Done (Esc)" aria-keyshortcuts="Escape">Done</button>');
     });

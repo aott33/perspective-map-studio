@@ -1,8 +1,9 @@
 // Edit mode's units override in the map store (epic-editing entry 19b, R27; map store schema 4), live on the dev stack: the
 // settings entity through edits.apply (the component's real session path, window.__mapStudioTest), since no browser control
-// sends one until entry 20. The plan's S1 to S10 with the map editor, a second map editor, the phone editor and an anonymous
-// viewer, and S12 and S13 in Recent changes. The browser keeps the value and draws nothing with it: the map carries it for
-// tests as data-units-override ("system,labels,version", '' with no override). Each test leaves the store without an override.
+// sends one until entry 20b. The plan's S1 to S10 with the map editor, a second map editor, the phone editor and an anonymous
+// viewer, and S12 and S13 in Recent changes. The browser keeps the value, and from entry 20a writes every distance by it
+// (units.spec.mjs): the map carries it for tests as data-units-override ("system,labels,version", '' with no override). Each
+// test leaves the store without an override.
 
 import { randomUUID } from 'node:crypto';
 import {

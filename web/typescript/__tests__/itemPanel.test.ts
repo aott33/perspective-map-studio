@@ -4,6 +4,7 @@
 // values read only with Kind alone taking input (while the kind list is in use; else its status message), a vanished asset said
 // under Asset, and the asset list's status message. From the review: a kind field sent and refused shows the record's value
 // again once the item's saves settle, and a field changed and changed back before the first reply sends the change back.
+import { METRIC_UNITS } from '../geometry';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AdapterStatus, Asset, AssetName, FormField, Kind } from '../adapters';
@@ -64,7 +65,7 @@ function record(extra: Partial<MapItemRecord> = {}): MapItemRecord {
 function props(overrides: Partial<PropertiesPanelProps> = {}): PropertiesPanelProps {
     const item = overrides.item || record();
     return {
-        item, kind: PAD, kinds: [PAD], assets: [], assetNames: NAMES, assetStatus: OK, items: [item], assetRows: ASSETS, kindStatus: KINDS_OK,
+        item, kind: PAD, kinds: [PAD], units: METRIC_UNITS, assets: [], assetNames: NAMES, assetStatus: OK, items: [item], assetRows: ASSETS, kindStatus: KINDS_OK,
         saving: false, newest: item.properties, pending: false, paused: false, autoFocusName: false, onNameFocused: noop, onClose: noop,
         onRename: noop, onMove: noop, canMoveByClick: true, moving: false, onMoveStart: noop, onLink: noop, onKind: noop, onProperty: noop,
         onDelete: noop, toolInHand: false, delKey: true, places: createPlaceSource(() => new Promise(() => undefined)), onZoomTo: noop,
@@ -400,6 +401,13 @@ describe('instruments in Details (entry 9)', () => {
         expect(tag(html, 'mapstudio-field-lng')).toContain('readonly=""');
         expect(html).not.toContain('mapstudio-field-move');
         expect(html).toContain('Drag it along the line, or type its distance.');
+        // The units in force (entry 20a): the place, the field's unit, its value and the length follow them; the stored metres stay.
+        const us = panel({ item: pt1, kind: TAP, kinds: [TAP, METER], canMoveByClick: false, onLine: { name: 'L-SWD', lengthM: 2936.4 },
+            units: { system: 'us', labels: 'short' } });
+        expect(us).toContain('On L-SWD at 3,750 ft');
+        expect(us).toContain('Distance along the line (ft)');
+        expect(tag(us, 'mapstudio-input mapstudio-field-distance')).toContain('value="3,750"');
+        expect(us).toContain('of 9,634 ft');
         expect(option(html, 'mapstudio-kind-pt1', 'meter')).toContain('>Meter<');
         expect(html).not.toContain('value="pad"');
     });
@@ -415,6 +423,53 @@ describe('instruments in Details (entry 9)', () => {
 });
 
 // Entry 12c1 (R5; DESIGN.md Properties panel, Override tag): the Live now block at the foot of Details.
+describe('the typed distance when the units in force change (entry 20a)', () => {
+    const TAP: Kind = { id: 'tap', name: 'Tap', geometry: 'point', icon: 'tap', labelRank: 2, fields: [], instrument: true };
+    const pt1 = record({ id: 'pt1', kind: 'tap', name: 'PT-1', assetId: null, attachment: { lineId: 'lswd', distanceM: 1143 } });
+    const base = (): PropertiesPanelProps => props({ item: pt1, kind: TAP, kinds: [TAP], canMoveByClick: false, onLine: { name: 'L-SWD', lengthM: 2936.4 } });
+    const state = (inst: PropertiesPanel) => inst.state as unknown as { distance: string; distanceProblem: string };
+
+    function panelOf(initial: PropertiesPanelProps): { inst: PropertiesPanel; update: (next: Partial<PropertiesPanelProps>) => void } {
+        const inst = new PropertiesPanel(initial);
+        const raw = inst as unknown as { state: object; props: PropertiesPanelProps; setState: (u: unknown) => void };
+        raw.setState = (u: unknown) => {
+            const patch = typeof u === 'function' ? (u as (s: object, p: object) => object)(raw.state, raw.props) : u;
+            raw.state = { ...raw.state, ...(patch as object) };
+        };
+        return { inst, update: (next) => {
+            const prev = raw.props;
+            raw.props = { ...prev, ...next };
+            inst.componentDidUpdate(prev);
+        } };
+    }
+
+    test('a draft typed and not finished is dropped: the field shows the stored value in the new unit, the refusal goes', () => {
+        const p = panelOf(base());
+        p.inst.setState({ distance: '1200', distanceProblem: 'Type a distance from 0 to 2,936 m' });
+        p.update({ units: { system: 'us', labels: 'short' } });
+        // Not "1200" kept to be read as feet (365.8 m): the stored 1143 m, in feet.
+        expect(state(p.inst)).toMatchObject({ distance: '3,750', distanceProblem: '' });
+        p.inst.setState({ distance: '4000' });
+        p.update({ units: { system: 'metric', labels: 'short' } });
+        expect(state(p.inst).distance).toBe('1143');
+        // A change of the labels alone drops it too; the same units keep a draft.
+        p.inst.setState({ distance: '900' });
+        p.update({ units: { system: 'metric', labels: 'short' } });
+        expect(state(p.inst).distance).toBe('900');
+        p.update({ units: { system: 'metric', labels: 'long' } });
+        expect(state(p.inst).distance).toBe('1143');
+    });
+
+    test('the field\'s label names the unit in the labels in force', () => {
+        const html = (units: PropertiesPanelProps['units']) => renderToStaticMarkup(React.createElement(PropertiesPanel, { ...base(), units }));
+        const long = html({ system: 'us', labels: 'long' });
+        expect(long).toContain('Distance along the line (feet)');
+        expect(long).toContain('of 9,634 feet');
+        expect(html({ system: 'metric', labels: 'long' })).toContain('Distance along the line (metres)');
+        expect(html({ system: 'us', labels: 'short' })).toContain('Distance along the line (ft)');
+    });
+});
+
 describe('the Live now block (entry 12c1)', () => {
     const SETUP = readSetup({
         comms: { path: '{asset.path}/Comms' },

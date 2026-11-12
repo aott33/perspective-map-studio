@@ -51,7 +51,7 @@ export interface ChangeState {
     /**
      * Edit mode's units override (epic 4 entry 19b): map.load.reply's `units` (every level), then every map.changed
      * settings op by the version rule. A cleared one is kept as its tombstone (`deleted`), so an older record never comes
-     * back over it; null when none was ever seen. `liveUnits` gives the override in force. Nothing draws by it until entry 20.
+     * back over it; null when none was ever seen. `liveUnits` gives the override in force; distances follow it from entry 20a.
      */
     units: UnitsSetting | null;
 }

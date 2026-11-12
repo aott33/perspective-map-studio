@@ -1,3 +1,4 @@
+import { DistanceUnits, METRIC_UNITS, distanceText } from '../geometry';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Kind } from '../adapters';
@@ -6,7 +7,7 @@ import { lineNodes, segmentAt, segmentNodes, splitAt } from '../features';
 import { lengthM } from '../geometry';
 import { LinePopup } from '../LinePopup';
 import {
-    PopupNode, distanceText, instrumentsComms, instrumentsHeading, lineAlarms, lineSubline, nodeValue, popupInstruments, popupNodes, rowName,
+    PopupNode, instrumentsComms, instrumentsHeading, lineAlarms, lineSubline, nodeValue, popupInstruments, popupNodes, rowName,
     segmentWords
 } from '../linePopup';
 import { LIVE_INITIAL, LiveState, LiveValue, KindDisplay } from '../live';
@@ -14,6 +15,7 @@ import { popupViewParams } from '../popupParams';
 
 /** L-SWD of the plan: 2,922 m from CTB1 to SWD1 with PT-1 at 1,143 m, LV-1 at 2,000 m and PT-2 at 2,841 m. */
 const SWD: Array<[number, number]> = [[-104.958, 39.7265], [-104.948, 39.723], [-104.925174, 39.719902]];
+const US: DistanceUnits = { system: 'us', labels: 'short' };
 const T = '2026-10-28T10:00:00Z';
 const NOW = Date.parse('2026-10-28T10:00:09Z');
 
@@ -102,13 +104,16 @@ describe('the line popup\'s words (DESIGN.md line-popup)', () => {
     const nodes = (): PopupNode[] => popupNodes(LINE, ITEMS, KINDS, LIVE, { fromId: 'pt1', toId: 'pt2' });
 
     test('distances, the subline and the row names', () => {
-        expect(distanceText(0)).toBe('0 km');
-        expect(distanceText(1143)).toBe('1.1 km');
-        expect(distanceText(2922)).toBe('2.9 km');
-        expect(distanceText(12345)).toBe('12 km');
-        expect(lineSubline('Gathering line', 6, 2922)).toBe('Gathering line - 6 in, 2.9 km');
-        expect(lineSubline('Gathering line', undefined, 0)).toBe('Gathering line');
-        expect(lineSubline('Gathering line', '4', 500)).toBe('Gathering line - 4 in, 0.5 km');
+        expect(distanceText(0, METRIC_UNITS)).toBe('0 m');
+        expect(distanceText(1143, METRIC_UNITS)).toBe('1.1 km');
+        expect(distanceText(2922, METRIC_UNITS)).toBe('2.9 km');
+        expect(distanceText(12345, METRIC_UNITS)).toBe('12 km');
+        expect(lineSubline('Gathering line', 6, 2922, METRIC_UNITS)).toBe('Gathering line - 6 in, 2.9 km');
+        expect(lineSubline('Gathering line', undefined, 0, METRIC_UNITS)).toBe('Gathering line');
+        expect(lineSubline('Gathering line', '4', 500, METRIC_UNITS)).toBe('Gathering line - 4 in, 500 m');
+        // The units in force (entry 20a): the length follows them, the pipe size stays inches.
+        expect(lineSubline('Gathering line', 6, 2922, US)).toBe('Gathering line - 6 in, 1.8 mi');
+        expect(lineSubline('Gathering line', 6, 2922, { system: 'us', labels: 'long' })).toBe('Gathering line - 6 in, 1.8 miles');
         const n = nodes();
         expect(n.map(rowName)).toEqual(['CTB1 outlet', 'PT-1', 'LV-1', 'PT-2', 'SWD1 inlet']);
         expect(n.map((x) => x.highlighted)).toEqual([false, true, false, true, false]);
@@ -161,13 +166,13 @@ describe('the line popup\'s words (DESIGN.md line-popup)', () => {
     test('a line with no measuring instrument has no segment box (owner review notes item 17)', () => {
         const bare = popupNodes({ ...LINE, ends: null }, [LINE], KINDS, LIVE, { fromId: 'start', toId: 'end' });
         expect(bare.map(rowName)).toEqual(['Line start', 'Line end']);
-        expect(segmentWords(bare, { fromId: 'start', toId: 'end' })).toBeNull();
+        expect(segmentWords(bare, { fromId: 'start', toId: 'end' }, METRIC_UNITS)).toBeNull();
         // A valve alone bounds no segment either.
         const valveOnly = popupNodes({ ...LINE, ends: null }, [LINE, LV1], KINDS, LIVE, { fromId: 'start', toId: 'end' });
-        expect(segmentWords(valveOnly, { fromId: 'start', toId: 'end' })).toBeNull();
+        expect(segmentWords(valveOnly, { fromId: 'start', toId: 'end' }, METRIC_UNITS)).toBeNull();
         const html = renderToStaticMarkup(React.createElement(LinePopup, {
             line: { id: 'l', name: 'Tracer line', kind: 'line', kindName: 'Gathering line', icon: 'pipeline', diameter: null, lengthM: 1800 },
-            display: LIVE.display.line, values: LIVE.items.l, nodes: bare, segment: { fromId: 'start', toId: 'end' }, now: NOW,
+            display: LIVE.display.line, values: LIVE.items.l, nodes: bare, segment: { fromId: 'start', toId: 'end' }, now: NOW, units: METRIC_UNITS,
             onClose: () => undefined
         }));
         expect(Array.from(html.matchAll(/data-part="([a-z]+)"/g)).map((m) => m[1])).toEqual(['header', 'kpis']);
@@ -177,20 +182,25 @@ describe('the line popup\'s words (DESIGN.md line-popup)', () => {
 
     test('the segment box: the span and the drop, or the stale line naming the instrument', () => {
         const n = nodes();
-        expect(segmentWords(n, { fromId: 'pt1', toId: 'pt2' })).toEqual({
+        expect(segmentWords(n, { fromId: 'pt1', toId: 'pt2' }, METRIC_UNITS)).toEqual({
             title: 'Segment PT-1 to PT-2', span: '1.1 to 2.8 km', line: '398 to 371 psi - drop 27 psi over 1.7 km', stale: false
         });
-        expect(segmentWords(n, { fromId: 'ctb1', toId: 'pt1' })).toEqual({
+        expect(segmentWords(n, { fromId: 'ctb1', toId: 'pt1' }, METRIC_UNITS)).toEqual({
             title: 'Segment CTB1 outlet to PT-1', span: '0 to 1.1 km', line: '412 to 398 psi - drop 14 psi over 1.1 km', stale: false
         });
-        expect(segmentWords(n, null)).toBeNull();
-        expect(segmentWords(n, { fromId: 'nope', toId: 'pt1' })).toBeNull();
+        // The units in force (entry 20a): the span and the drop's distance follow them, the unit named once where both share it.
+        expect(segmentWords(n, { fromId: 'pt1', toId: 'pt2' }, US)).toEqual({
+            title: 'Segment PT-1 to PT-2', span: '3,750 ft to 1.8 mi', line: '398 to 371 psi - drop 27 psi over 1.1 mi', stale: false
+        });
+        expect(segmentWords(n, { fromId: 'ctb1', toId: 'pt1' }, { system: 'metric', labels: 'long' })!.span).toBe('0 to 1.1 kilometres');
+        expect(segmentWords(n, null, METRIC_UNITS)).toBeNull();
+        expect(segmentWords(n, { fromId: 'nope', toId: 'pt1' }, METRIC_UNITS)).toBeNull();
         const staleLive: LiveState = { ...LIVE, items: { ...LIVE.items, pt2: { ...LIVE.items.pt2, kpis: { pressure: stale(371, 'Bad_Stale') } } } };
-        expect(segmentWords(popupNodes(LINE, ITEMS, KINDS, staleLive, null), { fromId: 'pt1', toId: 'pt2' })).toEqual({
+        expect(segmentWords(popupNodes(LINE, ITEMS, KINDS, staleLive, null), { fromId: 'pt1', toId: 'pt2' }, METRIC_UNITS)).toEqual({
             title: 'Segment PT-1 to PT-2', span: '1.1 to 2.8 km', line: 'Stale - drawn dashed until PT-2 updates', stale: true
         });
         const rise: LiveState = { ...LIVE, items: { ...LIVE.items, pt2: { ...LIVE.items.pt2, kpis: { pressure: good(400) } } } };
-        expect(segmentWords(popupNodes(LINE, ITEMS, KINDS, rise, null), { fromId: 'pt1', toId: 'pt2' })!.line)
+        expect(segmentWords(popupNodes(LINE, ITEMS, KINDS, rise, null), { fromId: 'pt1', toId: 'pt2' }, METRIC_UNITS)!.line)
             .toBe('398 to 400 psi - rise 2 psi over 1.7 km');
     });
 
@@ -234,7 +244,7 @@ describe('the line popup\'s words (DESIGN.md line-popup)', () => {
     test('the popup renders the parts in order with the highlighted rows and the values', () => {
         const html = renderToStaticMarkup(React.createElement(LinePopup, {
             line: { id: 'l', name: 'L-SWD', kind: 'line', kindName: 'Gathering line', icon: 'pipeline', diameter: 6, lengthM: 2922 },
-            display: LIVE.display.line, values: LIVE.items.l, nodes: nodes(), segment: { fromId: 'pt1', toId: 'pt2' }, now: NOW,
+            display: LIVE.display.line, values: LIVE.items.l, nodes: nodes(), segment: { fromId: 'pt1', toId: 'pt2' }, now: NOW, units: METRIC_UNITS,
             onClose: () => undefined
         }));
         // The pinned parts first, the instrument list last and alone scrolling (owner review notes item 19).

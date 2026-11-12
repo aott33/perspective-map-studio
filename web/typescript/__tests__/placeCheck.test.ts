@@ -3,6 +3,7 @@
 // a line within 1 km), the words, the swap rules, the loader that fetches once per page, and the place line in Details with Zoom to
 // location beside Move. A small fixture made here in the file's format (squares named after the matrix's places), never the
 // committed file.
+import { METRIC_UNITS } from '../geometry';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Kind } from '../adapters';
@@ -344,7 +345,7 @@ function pad(lat: number, lng: number): MapItemRecord {
 function props(overrides: Partial<PropertiesPanelProps> = {}): PropertiesPanelProps {
     const item = overrides.item || pad(32.7, -103.1);
     return {
-        item, kind: PAD, kinds: [PAD], assets: [], assetNames: [], assetStatus: null, items: [item], assetRows: [], kindStatus: null,
+        item, kind: PAD, kinds: [PAD], units: METRIC_UNITS, assets: [], assetNames: [], assetStatus: null, items: [item], assetRows: [], kindStatus: null,
         saving: false, newest: item.properties, pending: false, paused: false, autoFocusName: false, onNameFocused: noop, onClose: noop,
         onRename: noop, onMove: noop, canMoveByClick: true, moving: false, onMoveStart: noop, onLink: noop, onKind: noop, onProperty: noop,
         onDelete: noop, toolInHand: false, delKey: true, places: fixed(READY), onZoomTo: noop, ...overrides

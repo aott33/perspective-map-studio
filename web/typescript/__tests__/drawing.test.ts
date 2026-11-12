@@ -2,10 +2,12 @@ import { Kind } from '../adapters';
 import {
     CHOSEN_HINT, Drawing, MOVE_HINT, PLACE_HINT, REASON_SELF_INTERSECTS, barTitle, canFinish, deleteOffText, drawingEnds, drawnLengthM, endSnap,
     finishHint, geometryHint, geometryTitle, inField, isDrawingTool, minVertices, newItemText, noKindText, problemText, progressText, reasonText,
-    snapIndicatorText, snapTitle, splitOffText, startDrawing, startSnap, withVertices, INSTRUMENT_CLICK_PX, INSTRUMENT_HINT, distanceRangeText,
-    instrumentLocationText, instrumentTitle, metresText, offLineText, readDistance
+    snapIndicatorText, snapTitle, splitOffText, startDrawing, startSnap, withVertices, INSTRUMENT_CLICK_PX, INSTRUMENT_HINT,
+    instrumentLocationText, instrumentTitle, offLineText
 } from '../drawing';
-import { SnapTarget } from '../geometry';
+import { DistanceUnits, METRIC_UNITS, SnapTarget, distanceRangeText, exactDistanceText, readDistance } from '../geometry';
+
+const US: DistanceUnits = { system: 'us', labels: 'short' };
 
 const CTB1: SnapTarget = { itemId: 'ctb1', name: 'CTB1', position: [-105.012, 39.7262] };
 const SWD1: SnapTarget = { itemId: 'swd1', name: 'SWD1', position: [-104.983671, 39.715476] };
@@ -67,16 +69,19 @@ describe('the drawing in progress (epic 4 entry 4)', () => {
 
     test('the bar\'s words: the count, the length, the ends, the snapping state and the hints', () => {
         const one = startDrawing('line', 'f', [CTB1.position], CTB1);
-        expect(progressText(one)).toBe('1 point - 0 km - start snapped to CTB1');
+        expect(progressText(one, METRIC_UNITS)).toBe('1 point - 0 m - start snapped to CTB1');
         const two = withVertices(one, [CTB1.position, SWD1.position], null, '');
         expect(drawnLengthM(two)).toBeGreaterThan(2500);
         expect(drawnLengthM(two)).toBeLessThan(2800);
-        expect(progressText(two)).toBe('2 points - 2.7 km - start snapped to CTB1 - end floating');
+        expect(progressText(two, METRIC_UNITS)).toBe('2 points - 2.7 km - start snapped to CTB1 - end floating');
         const snapped = withVertices(one, [CTB1.position, SWD1.position], SWD1, '');
-        expect(progressText(snapped)).toBe('2 points - 2.7 km - start snapped to CTB1 - end snapped to SWD1');
-        expect(progressText(startDrawing('line', 'f', [A], null))).toBe('1 point - 0 km - start floating');
+        expect(progressText(snapped, METRIC_UNITS)).toBe('2 points - 2.7 km - start snapped to CTB1 - end snapped to SWD1');
+        expect(progressText(startDrawing('line', 'f', [A], null), METRIC_UNITS)).toBe('1 point - 0 m - start floating');
         const area: Drawing = withVertices(startDrawing('area', 'g', [A], null), [A, B], null, '');
-        expect(progressText(area)).toMatch(/^2 points - [0-9.]+ km$/);
+        expect(progressText(area, METRIC_UNITS)).toMatch(/^2 points - [0-9.]+ km$/);
+        // The units in force (entry 20a): the same drawing under US units.
+        expect(progressText(two, US)).toBe('2 points - 1.7 mi - start snapped to CTB1 - end floating');
+        expect(progressText(one, US)).toBe('1 point - 0 ft - start snapped to CTB1');
         expect(snapIndicatorText('CTB1')).toBe('Snap to CTB1 - click to connect');
         // Snap is the magnet glyph alone (entry 23): on or off is said in its hover title, no longer in words on the toolbar or the bar.
         expect(snapTitle(false)).toBe('Snap off');
@@ -176,24 +181,26 @@ describe('placing an instrument from its line (entry 9): the bar\'s words and th
         expect(INSTRUMENT_CLICK_PX).toBe(12);
         expect(instrumentTitle('Tap', 'L-SWD') + ' - ' + INSTRUMENT_HINT).toBe('New tap on L-SWD - click the line or type its distance');
         expect(offLineText('L-SWD')).toBe('Click on L-SWD: an instrument sits on its line');
-        expect(metresText(2936.4)).toBe('2,936 m');
-        expect(metresText(12)).toBe('12 m');
-        expect(metresText(1234567)).toBe('1,234,567 m');
-        expect(metresText(-3)).toBe('0 m');
-        expect(distanceRangeText(2936.4)).toBe('Type a distance from 0 to 2,936 m');
-        expect(instrumentLocationText('L-SWD', 1143)).toBe('On L-SWD at 1.1 km');
-        expect(instrumentLocationText('L-SWD', 2000)).toBe('On L-SWD at 2 km');
+        expect(exactDistanceText(2936.4, METRIC_UNITS)).toBe('2,936 m');
+        expect(exactDistanceText(12, METRIC_UNITS)).toBe('12 m');
+        expect(exactDistanceText(1234567, METRIC_UNITS)).toBe('1,234,567 m');
+        expect(exactDistanceText(-3, METRIC_UNITS)).toBe('0 m');
+        expect(distanceRangeText(2936.4, METRIC_UNITS)).toBe('Type a distance from 0 to 2,936 m');
+        expect(instrumentLocationText('L-SWD', 1143, METRIC_UNITS)).toBe('On L-SWD at 1.1 km');
+        expect(instrumentLocationText('L-SWD', 2000, METRIC_UNITS)).toBe('On L-SWD at 2 km');
+        expect(instrumentLocationText('L-SWD', 1143, US)).toBe('On L-SWD at 3,750 ft');
+        expect(instrumentLocationText('L-SWD', 2000, { system: 'us', labels: 'long' })).toBe('On L-SWD at 1.2 miles');
     });
 
     it('reads a distance from 0 to the line\'s length, refusing anything else', () => {
-        expect(readDistance('2841', 2936.4)).toEqual({ distanceM: 2841 });
-        expect(readDistance(' 2,841 ', 2936.4)).toEqual({ distanceM: 2841 });
-        expect(readDistance('1143.5 m', 2936.4)).toEqual({ distanceM: 1143.5 });
-        expect(readDistance('0', 2936.4)).toEqual({ distanceM: 0 });
+        expect(readDistance('2841', 2936.4, METRIC_UNITS)).toEqual({ distanceM: 2841 });
+        expect(readDistance(' 2,841 ', 2936.4, METRIC_UNITS)).toEqual({ distanceM: 2841 });
+        expect(readDistance('1143.5 m', 2936.4, METRIC_UNITS)).toEqual({ distanceM: 1143.5 });
+        expect(readDistance('0', 2936.4, METRIC_UNITS)).toEqual({ distanceM: 0 });
         // The length as the bar shows it places it at the end.
-        expect(readDistance('2936', 2935.7)).toEqual({ distanceM: 2935.7 });
+        expect(readDistance('2936', 2935.7, METRIC_UNITS)).toEqual({ distanceM: 2935.7 });
         for (const bad of ['99999', '-1', '', 'abc', '2937']) {
-            expect(readDistance(bad, 2936.4)).toEqual({ problem: 'Type a distance from 0 to 2,936 m' });
+            expect(readDistance(bad, 2936.4, METRIC_UNITS)).toEqual({ problem: 'Type a distance from 0 to 2,936 m' });
         }
     });
 });

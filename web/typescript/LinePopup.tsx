@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { SegmentRef } from './features';
+import { DistanceUnits, distanceText } from './geometry';
 import {
-    PopupNode, distanceText, instrumentsComms, instrumentsHeading, lineAlarms, lineSubline, nodeValue, rowName, segmentWords
+    PopupNode, instrumentsComms, instrumentsHeading, lineAlarms, lineSubline, nodeValue, rowName, segmentWords
 } from './linePopup';
 import { ItemValues, KindDisplay, alarmGlyphId, alarmStaleNote, alarmsText, commsText, itemState } from './live';
 import { Chrome, CloseButton, Glyph, KpiRows, NoteRow } from './popupParts';
@@ -28,6 +29,8 @@ export interface LinePopupProps {
     /** The segment the popup opened at, or null. */
     segment: SegmentRef | null;
     now: number;
+    /** The units in force (entry 20a): the subline's length, each row's distance and the segment's span follow them. */
+    units: DistanceUnits;
     onClose: () => void;
 }
 
@@ -142,7 +145,7 @@ export class LinePopup extends React.Component<LinePopupProps> {
     render(): React.ReactNode {
         const { line, display, values, nodes, segment } = this.props;
         const state = itemState(values, display);
-        const words = segmentWords(nodes, segment);
+        const words = segmentWords(nodes, segment, this.props.units);
         const anyStale = nodes.some((n) => n.role === 'instrument' && nodeValue(n).stale) || state.stale;
         const instruments = nodes.some((n) => n.role === 'instrument');
         return (
@@ -153,7 +156,7 @@ export class LinePopup extends React.Component<LinePopupProps> {
                     <span className="mapstudio-popup-glyph-disc"><Glyph id={line.icon || 'pipeline'} className="mapstudio-popup-glyph" /></span>
                     <div className="mapstudio-popup-title">
                         <div className="mapstudio-popup-name">{line.name}</div>
-                        <div className="mapstudio-popup-subline">{lineSubline(line.kindName, line.diameter, line.lengthM)}</div>
+                        <div className="mapstudio-popup-subline">{lineSubline(line.kindName, line.diameter, line.lengthM, this.props.units)}</div>
                     </div>
                     <span className="mapstudio-popup-link" data-link={display ? display.link : ''} aria-hidden="true" />
                     <CloseButton onClose={this.props.onClose} />
@@ -196,7 +199,7 @@ export class LinePopup extends React.Component<LinePopupProps> {
                                                     </svg>
                                                 )}
                                             <span className="mapstudio-popup-row-name">{rowName(node)}</span>
-                                            <span className="mapstudio-popup-row-distance">{distanceText(node.distanceM)}</span>
+                                            <span className="mapstudio-popup-row-distance">{distanceText(node.distanceM, this.props.units)}</span>
                                             <span className={'mapstudio-popup-value' + (v.hasValue && !v.stale ? ' mapstudio-popup-value--key' : '')}>
                                                 {v.alarm ? <Glyph id={alarmGlyphId(v.alarm.priority, v.alarm.unacked)} className={'mapstudio-popup-alarm-glyph mapstudio-popup-alarm-glyph--p' + v.alarm.priority} /> : null}
                                                 {v.alarm ? <span className={'mapstudio-popup-alarm-digit mapstudio-popup-alarm-glyph--p' + v.alarm.priority}>{v.alarm.priority}</span> : null}

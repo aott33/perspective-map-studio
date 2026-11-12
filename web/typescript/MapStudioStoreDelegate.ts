@@ -36,10 +36,12 @@
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
 import { MapChanges, MapChangedBody, liveUnits } from './changes';
-import { EditBatch, EditLevel, ErrorCodes, KindSetupRecord, LastChange, MapItemData, MapItemRecord, UNITS_ID, UnitsSetting, readUnitsData } from './contract';
+import {
+    EditBatch, EditLevel, ErrorCodes, KindSetupRecord, LastChange, MapItemData, MapItemRecord, MapUnits, UNITS_ID, UnitsSetting, readUnitsData
+} from './contract';
 import { KindRefusal, KindSaveState, ResolveState, SetupEdit, applyEdit, refusalPlace, resolveKey, ruleRefusalPlace, sameSetup, setupBatch } from './kindSetup';
 import {
-    Position, instrumentCreateBatch, instrumentMoveBatch, itemDeleteBatch, itemsDeleteBatch, lineGeometryBatch, pointMoveBatch, splitAtBatch, vertexDeleteBatch,
+    DistanceUnits, Position, browserLocale, sameUnits, unitsInForce, instrumentCreateBatch, instrumentMoveBatch, itemDeleteBatch, itemsDeleteBatch, lineGeometryBatch, pointMoveBatch, splitAtBatch, vertexDeleteBatch,
     vertexMoveBatch
 } from './geometry';
 import { HostLists, NO_HOST_LISTS } from './adapters';
@@ -50,7 +52,6 @@ import { BrowseAnswers, FolderAnswer, NO_BROWSE, PickAnswer, TIMEOUT_CODE, brows
 import {
     HISTORY_EMPTY, HISTORY_PAGE, HistoryState, failRead, mergeFirstPage, mergeOlderPage, readFailedText, revertBatch, revertLabel, rowSentence
 } from './history';
-import { browserLocale } from './linePopup';
 import {
     BasemapId, OSM_SOURCE, RasterSource, fallbackBasemap, initialBasemap, offeredBasemaps, refusedText, rememberBasemap,
     rememberedBasemap
@@ -199,9 +200,15 @@ export interface MapStudioDelegateState {
     /**
      * Edit mode's units override in force (entry 19b): map.load.reply's `settings.units` (every level), kept live by
      * map.changed's settings ops (changes.ts); null when none is set or it was cleared, and the setup's units apply.
-     * Kept only: nothing draws by it until entry 20.
      */
     units: UnitsSetting | null;
+    /** The project setup's units map.load reported (entry 19a), `auto` when not loaded or not sent; kept across a failed reload. */
+    setupUnits: MapUnits;
+    /**
+     * The units in force, which every distance is written in (entry 20a; geometry.ts `unitsInForce`): the override's, else
+     * the setup's, else the browser's locale. The same object while neither part changes, so a redraw can compare it.
+     */
+    distanceUnits: DistanceUnits;
     /** The session user map.load named, '' when none (a viewer, an anonymous session): the first-run checklist's kept flags are per project and user. */
     user: string;
     /**
@@ -315,6 +322,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private level: EditLevel | null = null;
     private refreshIntervalSeconds: number | null = null;
     private alarmPage = '';
+    private setupUnits: MapUnits = 'auto';
+    private distanceUnits: DistanceUnits = unitsInForce(null, 'auto', browserLocale());
     private load: MapStudioDelegateState['load'] = { state: 'loading', message: '' };
     private save: SaveState = SAVE_IDLE;
     private lists: HostLists = NO_HOST_LISTS;
@@ -469,6 +478,15 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         }
     }
 
+    /** The units in force now (entry 20a), the held object kept while they read the same. */
+    private unitsNow(): DistanceUnits {
+        const now = unitsInForce(liveUnits(this.changes.state), this.setupUnits, browserLocale());
+        if (!sameUnits(now, this.distanceUnits)) {
+            this.distanceUnits = now;
+        }
+        return this.distanceUnits;
+    }
+
     mapStateToProps(): MapStudioDelegateState {
         return {
             basemap: this.basemap,
@@ -505,6 +523,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             justAdded: this.justAdded,
             kindSetups: this.changes.state.kindSetups,
             units: liveUnits(this.changes.state),
+            setupUnits: this.setupUnits,
+            distanceUnits: this.unitsNow(),
             user: this.user,
             history: this.history,
             kindSaves: this.kindSaveStates(),
@@ -2229,7 +2249,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             return false;
         }
         // The undo step names the row as it reads ("Reverted ..." included).
-        const sentence = rowSentence(entry, this.history.entries, this.lists.kinds, browserLocale(), kpiLabelsOf(this.changes.state.kindSetups));
+        const sentence = rowSentence(entry, this.history.entries, this.lists.kinds, this.unitsNow(), kpiLabelsOf(this.changes.state.kindSetups));
         this.revertBatches.add(batch.batchId);
         if (batch.ops.every((op) => op.entity === 'settings')) {
             // A Revert of the units setting alone (entry 19b) is no Undo step: the toolbar's stack reverses map items only.
@@ -2325,6 +2345,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.user = reply.body.user || '';
             this.refreshIntervalSeconds = reply.body.setup ? reply.body.setup.refreshIntervalSeconds : null;
             this.alarmPage = reply.body.setup ? reply.body.setup.alarmPage : '';
+            // The project's units (entry 19a): what distances are written in while no override is live (entry 20a).
+            this.setupUnits = reply.body.setup ? reply.body.setup.units : 'auto';
             this.load = { state: 'loaded', message: '' };
             // The store answered: a pause from a save answered store-unreachable ends (entry 10).
             this.savePaused = false;

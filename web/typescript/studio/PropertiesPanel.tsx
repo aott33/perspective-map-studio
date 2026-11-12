@@ -6,9 +6,8 @@ import {
     missingText, nameTwins, readField, twinText, unknownKindText, vanishedText
 } from '../itemForm';
 import { PLACE_CREDIT, PlaceSource, placeLine } from '../placeCheck';
-import { instrumentLocationText, metresText, readDistance } from '../drawing';
-import { round1 } from '../geometry';
-import { distanceText } from '../linePopup';
+import { instrumentLocationText } from '../drawing';
+import { DistanceUnits, distanceInput, distanceText, exactDistanceText, readDistance, round1, sameUnits, typedUnitLabel } from '../geometry';
 import { Glyph } from '../popupParts';
 import { roundCoordinate } from '../save';
 import { FROM_KIND, LiveNowBlock, LiveNowRow, OVERRIDE, RULE_ROW, openSetupText, pathProblem } from '../itemOverrides';
@@ -265,6 +264,8 @@ export interface PropertiesPanelProps {
      * otherwise (a free point keeps its latitude and longitude).
      */
     onLine?: { name: string; lengthM: number };
+    /** The units in force (entry 20a): every distance of Details is written and read in them. */
+    units: DistanceUnits;
     /** The distance along the line typed (Enter or blur): the instrument moves there along it, one change. */
     onMoveAlong?: (distanceM: number) => void;
     /** Entry 12c1: the Live now block (itemOverrides.ts `liveNowBlock`, from the item's newest overrides); undefined for none. */
@@ -313,7 +314,7 @@ interface Drafts {
     name: string;
     lat: string;
     lng: string;
-    /** Entry 9: an instrument's distance along its line, in metres, as typed; '' for an item not on a line. */
+    /** Entry 9: an instrument's distance along its line as typed, in the units in force (entry 20a); '' for an item not on a line. */
     distance: string;
     /** Why the typed distance was not saved ("Type a distance from 0 to 2,936 m"), '' when none. */
     distanceProblem: string;
@@ -336,13 +337,13 @@ interface Drafts {
 type FixedField = 'name' | 'lat' | 'lng' | 'distance';
 
 /** The record's values as the fields show them. */
-function draftsOf(item: MapItemRecord): Drafts {
+function draftsOf(item: MapItemRecord, units: DistanceUnits): Drafts {
     const point = item.geometry.type === 'Point';
     return {
         name: item.name,
         lat: point ? String(item.geometry.coordinates[1]) : '',
         lng: point ? String(item.geometry.coordinates[0]) : '',
-        distance: item.attachment ? String(item.attachment.distanceM) : '',
+        distance: item.attachment ? distanceInput(item.attachment.distanceM, units) : '',
         distanceProblem: '',
         kindMenu: false,
         fields: {},
@@ -405,7 +406,7 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         this.kept = props.ruleKeep || null;
         const own = !!props.style && props.style.ownRule !== null;
         this.state = {
-            ...draftsOf(props.item),
+            ...draftsOf(props.item, props.units),
             // A kept draft of a rule not stored yet opens its editor again, still "Not saved yet".
             ruleStart: this.kept !== null && !!props.style && !own ? this.kept.draft : null,
             placed: props.autoFocusName && props.tab === 'style'
@@ -453,25 +454,33 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
     componentDidUpdate(prev: PropertiesPanelProps): void {
         if (prev.item.id !== this.props.item.id) {
             this.sent.clear();
-            this.setState(draftsOf(this.props.item));
-        } else if (prev.item.version !== this.props.item.version) {
+            this.setState(draftsOf(this.props.item, this.props.units));
+        } else if (prev.item.version !== this.props.item.version || !sameUnits(prev.units, this.props.units)) {
             // The record moved on (this field's save, a drag's move, an undo, another editor): a field the user has not
-            // touched (its draft is the previous record's value) follows it; a draft being typed keeps its keystrokes.
-            const before = draftsOf(prev.item);
-            const after = draftsOf(this.props.item);
+            // touched (its draft is the previous record's value) follows it; a draft being typed keeps its keystrokes. The same when
+            // the units in force change (entry 20a): the distance field shows the stored metres in the new unit.
+            const before = draftsOf(prev.item, prev.units);
+            const after = draftsOf(this.props.item, this.props.units);
             const next: Partial<Drafts> = {};
             for (const field of ['name', 'lat', 'lng', 'distance'] as const) {
                 if (this.state[field] === before[field]) {
                     next[field] = after[field];
                 }
             }
+            const unitsChanged = !sameUnits(prev.units, this.props.units);
+            if (unitsChanged) {
+                // A draft typed and not finished would be read in the new unit ("1200" metres as feet): it goes, and the field
+                // shows the stored value in the unit now shown.
+                next.distance = after.distance;
+            }
             if (next.distance !== undefined) {
+                // A refusal's words name the range in the unit shown then: they go with it.
                 next.distanceProblem = '';
             }
             // A kind field's draft goes once the record holds it (saved) or still holds what it had (not touched since).
             const fields: Record<string, string> = {};
             const problems: Record<string, string> = {};
-            for (const key of Object.keys(this.state.fields)) {
+            for (const key of prev.item.version === this.props.item.version ? [] : Object.keys(this.state.fields)) {
                 const text = this.state.fields[key];
                 if (text !== fieldText(prev.item.properties[key]) && text !== fieldText(this.props.item.properties[key])) {
                     fields[key] = text;
@@ -480,8 +489,10 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                     }
                 }
             }
-            next.fields = fields;
-            next.problems = problems;
+            if (prev.item.version !== this.props.item.version) {
+                next.fields = fields;
+                next.problems = problems;
+            }
             this.setState(next as Pick<Drafts, keyof Drafts>);
         }
         if (prev.item.id === this.props.item.id && prev.saving && !this.props.saving && this.sent.size > 0) {
@@ -609,7 +620,7 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
 
     /**
      * An instrument's distance along its line finished (entry 9, Enter or blur; the non-drag way to move it, WCAG 2.5.7): read in
-     * metres from 0 to the line's length, else the words beside the field and nothing saved; the stored distance saves nothing;
+     * the units in force (geometry.ts `readDistance`) from 0 to the line's length, else the words beside the field and nothing saved; the stored distance saves nothing;
      * else one move along the line.
      */
     private commitDistance = (): void => {
@@ -620,13 +631,13 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
         if (!onLine || !item.attachment || paused || !this.props.onMoveAlong) {
             return;
         }
-        const read = readDistance(this.state.distance, onLine.lengthM);
+        const read = readDistance(this.state.distance, onLine.lengthM, this.props.units);
         if ('problem' in read) {
             this.setState({ distanceProblem: read.problem });
             return;
         }
         const d = round1(read.distanceM);
-        this.setState({ distance: String(d), distanceProblem: '' });
+        this.setState({ distance: distanceInput(d, this.props.units), distanceProblem: '' });
         if (d !== item.attachment.distanceM) {
             this.props.onMoveAlong(d);
         }
@@ -711,7 +722,7 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                                 <button type="button" className="mapstudio-instrument-row" data-item-id={i.id} title={'Select ' + i.name}
                                         onClick={() => this.props.onSelectInstrument && this.props.onSelectInstrument(i.id)}>
                                     <span className="mapstudio-instrument-name">{i.name}</span>
-                                    <span className="mapstudio-instrument-at">{distanceText(i.distanceM)}</span>
+                                    <span className="mapstudio-instrument-at">{distanceText(i.distanceM, this.props.units)}</span>
                                 </button>
                             </li>
                         ))}
@@ -730,7 +741,7 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
             ev.preventDefault();
             ev.stopPropagation();
             this.escaped = field;
-            this.setState({ [field]: draftsOf(this.props.item)[field] } as Pick<Drafts, FixedField>);
+            this.setState({ [field]: draftsOf(this.props.item, this.props.units)[field] } as Pick<Drafts, FixedField>);
             if (field === 'distance') {
                 this.setState({ distanceProblem: '' });
             }
@@ -1491,9 +1502,9 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                         </div>
                         {onLine && item.attachment ? (
                             <>
-                                <span className="mapstudio-field-text mapstudio-field-on-line">{instrumentLocationText(onLine.name, item.attachment.distanceM)}</span>
+                                <span className="mapstudio-field-text mapstudio-field-on-line">{instrumentLocationText(onLine.name, item.attachment.distanceM, this.props.units)}</span>
                                 <label className="mapstudio-field-distance-row" htmlFor={distanceId}>
-                                    <span className="mapstudio-field-sublabel">Distance along the line (m)</span>
+                                    <span className="mapstudio-field-sublabel">Distance along the line ({typedUnitLabel(this.props.units)})</span>
                                 </label>
                                 <div className="mapstudio-field-pair mapstudio-field-pair--distance">
                                     <input id={distanceId} className="mapstudio-input mapstudio-field-distance" type="text" inputMode="decimal"
@@ -1501,7 +1512,7 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                                            aria-describedby={this.state.distanceProblem !== '' ? distanceId + '-problem' : undefined}
                                            onChange={(ev) => this.setState({ distance: ev.target.value })}
                                            onBlur={this.commitDistance} onKeyDown={this.onKey('distance')} />
-                                    <span className="mapstudio-field-text mapstudio-field-length">of {metresText(onLine.lengthM)}</span>
+                                    <span className="mapstudio-field-text mapstudio-field-length">of {exactDistanceText(onLine.lengthM, this.props.units)}</span>
                                 </div>
                                 {this.state.distanceProblem !== '' ? (
                                     <span id={distanceId + '-problem'} className="mapstudio-field-hint mapstudio-field-problem mapstudio-field-distance-problem"

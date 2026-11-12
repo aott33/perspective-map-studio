@@ -112,7 +112,7 @@ export type UnitLabels = 'short' | 'long';
 /**
  * Edit mode's units for the whole project (epic 4 entry 19b, R27; map store schema 4): the one stored setting, id
  * `units`, versioned and tombstoned like a kind setup. A deleted one is no override: the setup's units apply again.
- * Read and kept; nothing draws by it until entry 20.
+ * Every distance is written by it from entry 20a (geometry.ts `unitsInForce`).
  */
 export interface UnitsSetting {
     id: 'units';
@@ -173,8 +173,8 @@ export interface MapSetup {
     basemaps: string[];
     alarmPage: string;
     /**
-     * The project's units (epic 4 entry 19a, 0.4.0), sent at every level. Read and kept; nothing draws by it
-     * until entry 20. Absent (an older Gateway) or not one of the three reads as `auto`.
+     * The project's units (epic 4 entry 19a, 0.4.0), sent at every level: what distances are written in while no
+     * override is live (entry 20a). Absent (an older Gateway) or not one of the three reads as `auto`.
      */
     units: MapUnits;
 }

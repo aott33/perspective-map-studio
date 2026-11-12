@@ -9,11 +9,15 @@
 // ignored with one warning. A line has no Directions; a page with directions null (/live) shows View alarms alone. With the
 // position, the search's open list starts with an A-Z | Nearest switch (A-Z first): Nearest lists the ten nearest items
 // with their distance, a row chosen as any result; every Needs you row ends with its distance, the order by state
-// unchanged; with the location off, no switch and no distances. Words follow the browser locale: en-US in miles and
-// feet, else kilometres and metres. The spec leaves P12 quiet again and the template empty.
+// unchanged; with the location off, no switch and no distances. From entry 20a distances follow the units in force, so this
+// spec sets the dev setup's units to `auto` for itself: the words then follow the browser locale, en-US in miles and feet,
+// else kilometres and metres, by the one rounding rule (feet up to a mile). An override set while Nearest is open redraws
+// it with no reload. The spec leaves P12 quiet again, the template empty, the committed setup back and no override.
 
 import { TRACER, pagePixel } from '../lib/geo.mjs';
-import { EDITOR_USER, ensureSeeded, expect, mapLoaded, openMap, shot, signedInContext, test, view, watch } from './fixtures.mjs';
+import {
+    EDITOR_USER, clearUnits, ensureSeeded, expect, mapLoaded, openMap, restoreSetupUnits, setUnits, shot, signedInContext, test, useSetupUnits, view, watch
+} from './fixtures.mjs';
 
 /** Near CTB1 (-105.012, 39.7262), about 432 m north-east of it (as locate.spec.mjs). */
 const YOU = { latitude: 39.729, longitude: -105.0085, accuracy: 40 };
@@ -43,12 +47,33 @@ test.beforeAll(async ({ browser }) => {
     const seed = await ensureSeeded(browser);
     ids = { p1: seed.ids['tracer/p1'], ctb1: seed.ids['swd/ctb1'], line: seed.ids['tracer/l1'] };
     await livePress(browser, ['comms-on', 'pressure-high']);
+    // The locale decides only while the setup says `auto` and no override is live (entry 20a, the owner's pick 8).
+    await asEditor(browser, async (page) => {
+        await clearUnits(page);
+        await useSetupUnits(page, 'auto');
+    });
 });
 
 test.afterAll(async ({ browser }) => {
     // P12 quiet again for the specs after this one.
     await livePress(browser, ['pressure-low', 'comms-on', 'ack']);
+    await asEditor(browser, async (page) => {
+        await clearUnits(page);
+        await restoreSetupUnits(page);
+    });
 });
+
+/** Run `step` on the map editor's /edit page in its own context (the units override and the setup's units). */
+async function asEditor(browser, step) {
+    const context = await signedInContext(browser, EDITOR_USER);
+    try {
+        const page = await context.newPage();
+        await mapLoaded(await openMap(page, '/edit'));
+        await step(page);
+    } finally {
+        await context.close();
+    }
+}
 
 /** Press /live's dev buttons in order as the map editor (P12's tags: pressure, comms, acknowledge). */
 async function livePress(browser, buttons) {
@@ -245,12 +270,14 @@ test.describe('1366 px', () => {
             for (let i = 1; i < metres.length; i++) {
                 expect(metres[i]).toBeGreaterThanOrEqual(metres[i - 1]);
             }
-            // CTB1 first (432 m; L-SWD's end at CTB1 ties, after it by name), in miles for en-US.
+            // CTB1 first (432 m; L-SWD's end at CTB1 ties, after it by name), in feet under a mile for en-US (entry 20a).
+            await expect(map).toHaveAttribute('data-units', 'us');
+            await expect(map).toHaveAttribute('data-unit-labels', 'short');
             await expect(rows.nth(0)).toHaveAttribute('data-item-id', ids.ctb1);
-            await expect(rows.nth(0).locator('.mapstudio-search-distance')).toHaveText('0.3 mi');
+            await expect(rows.nth(0).locator('.mapstudio-search-distance')).toHaveText('1,420 ft');
             const words = await panel.locator('.mapstudio-search-distance').allTextContents();
             for (const w of words) {
-                expect(w).toMatch(/^(\d+ ft|\d+(\.\d)? mi)$/);
+                expect(w).toMatch(/^(\d{1,3}(,\d{3})? ft|\d+(\.\d)? mi)$/);
             }
             // The distance right-aligned at the row's end, in the secondary colour.
             const aligned = await rows.nth(0).evaluate((row) => {
@@ -326,9 +353,10 @@ test.describe('1366 px', () => {
         }
     });
 
-    test('Units: en-GB reads kilometres and metres where en-US reads miles and feet', async ({ browser }) => {
-        const { context, page } = await openPage(browser, '/locate', { locale: 'en-GB' });
+    test('Units: en-GB reads kilometres and metres where en-US reads miles and feet; an override redraws the open list', async ({ browser }) => {
+        const { context, page, map } = await openPage(browser, '/locate', { locale: 'en-GB' });
         try {
+            await expect(map).toHaveAttribute('data-units', 'metric');
             await page.locator('.mapstudio-search-chevron').click();
             await page.locator('.mapstudio-search-order-button[data-order="nearest"]').click();
             const first = page.locator('.mapstudio-search-option').first();
@@ -337,7 +365,19 @@ test.describe('1366 px', () => {
             for (const w of await page.locator('.mapstudio-search-distance').allTextContents()) {
                 expect(w).toMatch(/^(\d+ m|\d+(\.\d)? km)$/);
             }
+            // An override set by another session while Nearest is open (entry 20a): the list is drawn again in it, no reload.
+            const reloads = await map.getAttribute('data-map-reloads');
+            await asEditor(browser, (editor) => setUnits(editor, { system: 'us', labels: 'long' }));
+            await expect(first.locator('.mapstudio-search-distance')).toHaveText('1,420 feet', { timeout: BIND_MS });
+            await expect(map).toHaveAttribute('data-units', 'us');
+            await expect(map).toHaveAttribute('data-unit-labels', 'long');
+            await expect(page.locator('.mapstudio-search-panel')).toHaveAttribute('data-order', 'nearest');
+            await asEditor(browser, (editor) => clearUnits(editor));
+            await expect(first.locator('.mapstudio-search-distance')).toHaveText('430 m', { timeout: BIND_MS });
+            await expect(map).toHaveAttribute('data-units', 'metric');
+            expect(await map.getAttribute('data-map-reloads')).toBe(reloads);
         } finally {
+            await asEditor(browser, (editor) => clearUnits(editor));
             await context.close();
         }
     });
@@ -374,7 +414,7 @@ test.describe('390 px', () => {
             expect(Math.round(box.height)).toBeGreaterThanOrEqual(44);
             await nearest.click();
             await expect(page.locator('.mapstudio-search-option')).toHaveCount(10);
-            await expect(page.locator('.mapstudio-search-option').first().locator('.mapstudio-search-distance')).toHaveText('0.3 mi');
+            await expect(page.locator('.mapstudio-search-option').first().locator('.mapstudio-search-distance')).toHaveText('1,420 ft');
             await shot(page, 'mapstudio-nearest-390.png');
             await page.keyboard.press('Escape');
             const bar = page.locator('.mapstudio-needs');

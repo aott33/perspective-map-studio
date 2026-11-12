@@ -1,9 +1,10 @@
 import * as React from 'react';
 import { Kind } from '../adapters';
 import {
-    Drawing, INSTRUMENT_HINT, PLACE_HINT, barTitle, canFinish, endSnap, finishHint, instrumentTitle, isDrawingTool, metresText, noKindText, problemText,
+    Drawing, INSTRUMENT_HINT, PLACE_HINT, barTitle, canFinish, endSnap, finishHint, instrumentTitle, isDrawingTool, noKindText, problemText,
     progressText, snapIndicatorText, startSnap
 } from '../drawing';
+import { DistanceUnits, exactDistanceText, typedUnitLabel } from '../geometry';
 import { Glyph } from '../popupParts';
 import { StudioTool } from '../studio';
 import { ChromeGlyph } from './ChromeGlyph';
@@ -13,7 +14,7 @@ import { toolGlyph } from './DrawToolbar';
  * The drawing bar (epic 4 entries 4 and 23; DESIGN.md Drawing bar, EXPERIENCE.md Drawing bar and Snap): a floating bar
  * bottom-centre while any tool is in hand, the one place Edit mode talks (owner, 2026-11-05: no mode pill, no toast, no
  * status box). It shows the kind's glyph and the tool named in words ("New gathering line", "New well pad"). For the
- * Line and Area tools: the progress ("2 points - 0.7 km - start floating", or "start snapped to CTB1"; before the first
+ * Line and Area tools: the progress ("2 points - 700 m - start floating", or "start snapped to CTB1"; before the first
  * vertex, where to click), the indicator "Snap to CTB1 - click to connect" only while Snap is on and a target is within
  * reach of the pointer (the toolbar's magnet says on or off; entry 23 dropped the "Snap on" and "Snap off" words), then
  * what keeps it from finishing in plain words ("A line needs two points", "The edges cross - Backspace removes the last
@@ -31,6 +32,8 @@ export interface DrawingBarProps {
     snap: boolean;
     /** The name of the target within reach of the pointer, or ''. */
     snapHint: string;
+    /** The units in force (entry 20a): the progress's length is written in them. */
+    units: DistanceUnits;
     onCancel: () => void;
     onFinish: () => void;
     /** The Point tool's Done: the tool put down, as Esc. */
@@ -81,7 +84,7 @@ export function DrawingBar(props: DrawingBarProps): React.ReactElement {
             <BarGlyph tool={tool} kind={kind} />
             <span className="mapstudio-drawing-words">
                 <span className="mapstudio-drawing-title">{barTitle(tool, kind)}</span>
-                <span className="mapstudio-drawing-progress">{drawing ? progressText(drawing) : 'Click the map to add the first point'}</span>
+                <span className="mapstudio-drawing-progress">{drawing ? progressText(drawing, props.units) : 'Click the map to add the first point'}</span>
                 {target ? (
                     // Only while a target is within reach (entry 23): the toolbar's magnet says whether Snap is on.
                     <span className="mapstudio-drawing-snap mapstudio-drawing-snap--target" data-state="target">{snapIndicatorText(props.snapHint)}</span>
@@ -102,7 +105,7 @@ export function DrawingBar(props: DrawingBarProps): React.ReactElement {
 /**
  * The drawing bar while an instrument is placed (epic 4 entry 9; EXPERIENCE.md Instruments and Drawing bar): Add an instrument in a
  * line's Details armed its kind, and the bar is the one place that talks. "New tap on L-SWD - click the line or type its distance",
- * a distance field in metres with the line's length beside it ("of 2,936 m"), Place (Enter in the field too) and Cancel (Esc). A
+ * a distance field in the units in force with the line's length beside it ("of 2,936 m", "of 9,633 ft"), Place (Enter in the field too) and Cancel (Esc). A
  * click off the line or a distance outside it is refused here in words (`problem`), nothing saved. The field takes the focus when
  * the bar opens, so the placement works from the keyboard alone; Esc in it puts the placement down. Its attributes are what the e2e
  * suite reads.
@@ -112,6 +115,8 @@ export interface InstrumentBarProps {
     lineId: string;
     lineName: string;
     lengthM: number;
+    /** The units in force (entry 20a): the field's unit, the length beside it and a bare typed number are in them. */
+    units: DistanceUnits;
     /** Why the last click or typed distance was refused, in words; '' when none. */
     problem: string;
     onPlace: (text: string) => void;
@@ -152,11 +157,11 @@ export function InstrumentBar(props: InstrumentBarProps): React.ReactElement {
                 {problem !== '' ? <span id={problemId} className="mapstudio-drawing-hint mapstudio-drawing-hint--problem">{problem}</span> : null}
             </span>
             <span className="mapstudio-instrument-place">
-                <label className="mapstudio-visually-hidden" htmlFor={fieldId}>Distance along {lineName} (m)</label>
+                <label className="mapstudio-visually-hidden" htmlFor={fieldId}>Distance along {lineName} ({typedUnitLabel(props.units)})</label>
                 <input id={fieldId} ref={field} className="mapstudio-input mapstudio-instrument-distance" type="text" inputMode="decimal" value={text}
-                       placeholder="Metres" aria-invalid={problem !== ''} aria-describedby={problem !== '' ? problemId : undefined}
+                       placeholder={props.units.system === 'us' ? 'Feet' : 'Metres'} aria-invalid={problem !== ''} aria-describedby={problem !== '' ? problemId : undefined}
                        onChange={(ev) => setText(ev.target.value)} onKeyDown={onKey} />
-                <span className="mapstudio-instrument-length">of {metresText(props.lengthM)}</span>
+                <span className="mapstudio-instrument-length">of {exactDistanceText(props.lengthM, props.units)}</span>
             </span>
             <button type="button" className="mapstudio-button mapstudio-drawing-cancel" title="Cancel (Esc)" aria-keyshortcuts="Escape"
                     onClick={props.onCancel}>Cancel</button>

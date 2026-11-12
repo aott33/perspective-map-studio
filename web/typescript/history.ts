@@ -18,7 +18,7 @@
 import { Kind } from './adapters';
 import { EditBatch, EditOp, HistoryEntry, HistoryOp, ItemGeometry, MapItemData, readUnitsData } from './contract';
 import { distanceM } from './shared';
-import { distanceWords } from './linePopup';
+import { DistanceUnits, METRIC_UNITS, distanceText } from './geometry';
 import { clockText, fieldLabel, joinWords, moveWords, unitsWords } from './unsaved';
 import { FROM_KIND, KpiLabels, NO_LABELS, overrideChanges, overrideSentence } from './itemOverrides';
 
@@ -183,7 +183,7 @@ function attachedTo(record: Record<string, unknown> | null): string | null {
 }
 
 /** An update op in a sentence: what changed of one item. */
-function updateSentence(op: HistoryOp, kinds: Kind[], locale: string, split: boolean, labels: KpiLabels): string {
+function updateSentence(op: HistoryOp, kinds: Kind[], distanceUnits: DistanceUnits, split: boolean, labels: KpiLabels): string {
     const name = nameOf(op);
     if (notKept(op)) {
         return 'Changed ' + name;
@@ -199,7 +199,7 @@ function updateSentence(op: HistoryOp, kinds: Kind[], locale: string, split: boo
         const from = pointOf(before.geometry);
         const to = pointOf(after.geometry);
         if (from && to) {
-            return 'Moved ' + name + ' ' + moveWords(from, to, locale);
+            return 'Moved ' + name + ' ' + moveWords(from, to, distanceUnits);
         }
         return (split ? 'Split ' : 'Reshaped ') + name;
     }
@@ -316,7 +316,7 @@ function lowerFirst(text: string): string {
  * setup"; the units setting as `unitsSentence` (entry 19b), after whatever else the batch holds. The name each op carries is the
  * one used, so an old change reads the name the item had then.
  */
-export function batchSentence(entry: HistoryEntry, kinds: Kind[] = [], locale: string = '', labels: KpiLabels = NO_LABELS): string {
+export function batchSentence(entry: HistoryEntry, kinds: Kind[] = [], distanceUnits: DistanceUnits = METRIC_UNITS, labels: KpiLabels = NO_LABELS): string {
     const items = entry.ops.filter((o) => o.entity === 'item');
     const setups = entry.ops.filter((o) => o.entity === 'kindSetup');
     const units = entry.ops.find((o) => o.entity === 'settings');
@@ -329,12 +329,12 @@ export function batchSentence(entry: HistoryEntry, kinds: Kind[] = [], locale: s
         }
         return withUnits('Changed ' + setupWords(setups, kinds) + (setups.length > 1 ? ' in one change' : ''));
     }
-    const sentence = itemSentence(entry, items, kinds, locale, labels);
+    const sentence = itemSentence(entry, items, kinds, distanceUnits, labels);
     // A batch with kind setups too names them, so a row never hides one.
     return withUnits(setups.length === 0 ? sentence : sentence + ', and changed ' + setupWords(setups, kinds));
 }
 
-function itemSentence(entry: HistoryEntry, items: HistoryOp[], kinds: Kind[], locale: string, labels: KpiLabels): string {
+function itemSentence(entry: HistoryEntry, items: HistoryOp[], kinds: Kind[], distanceUnits: DistanceUnits, labels: KpiLabels): string {
     const lead = items[0];
     const sameKind = (ops: HistoryOp[]): string =>
         ops.every((o) => o.kind === ops[0].kind) ? kindWords(kinds, ops[0].kind) : 'item';
@@ -357,7 +357,7 @@ function itemSentence(entry: HistoryEntry, items: HistoryOp[], kinds: Kind[], lo
     const others = items.filter((o) => o.op !== 'delete');
     if (deletes.length > 0 && others.every((o) => o.op === 'update' && changedKeys(o).every((k) => k === 'ends'))) {
         // A delete that cleared the ends of lines that named the item (entry 25): the delete is the change.
-        return itemSentence(entry, deletes, kinds, locale, labels);
+        return itemSentence(entry, deletes, kinds, distanceUnits, labels);
     }
     if (items.every((o) => o.op === 'create')) {
         if (items.length === 1) {
@@ -373,7 +373,7 @@ function itemSentence(entry: HistoryEntry, items: HistoryOp[], kinds: Kind[], lo
         const lineIds = new Set([lead.id].concat(split ? items.filter((o) => o.op === 'create').map((o) => o.id) : []));
         const rest = items.filter((o) => o !== lead && !followsLead(o, lead, lineIds) && !(split && o.op === 'create'));
         if (rest.length === 0) {
-            return updateSentence(lead, kinds, locale, split, labels);
+            return updateSentence(lead, kinds, distanceUnits, split, labels);
         }
         const all = [lead].concat(rest);
         if (all.every((o) => o.op === 'update')) {
@@ -444,10 +444,10 @@ export function revertedOf(entry: HistoryEntry, entries: HistoryEntry[]): Histor
 }
 
 /** The row's sentence: its own, or "Reverted "..."" when it reverses an older loaded row. */
-export function rowSentence(entry: HistoryEntry, entries: HistoryEntry[], kinds: Kind[] = [], locale: string = '',
+export function rowSentence(entry: HistoryEntry, entries: HistoryEntry[], kinds: Kind[] = [], distanceUnits: DistanceUnits = METRIC_UNITS,
     labels: KpiLabels = NO_LABELS): string {
     const reverted = revertedOf(entry, entries);
-    return reverted ? 'Reverted "' + batchSentence(reverted, kinds, locale, labels) + '"' : batchSentence(entry, kinds, locale, labels);
+    return reverted ? 'Reverted "' + batchSentence(reverted, kinds, distanceUnits, labels) + '"' : batchSentence(entry, kinds, distanceUnits, labels);
 }
 
 /** The undo step's words for a Revert (undoStack.ts labels: lower case after "Undo: "): "revert "Moved P31 about 40 m north"". */
@@ -566,7 +566,7 @@ function lengthM(coords: Array<[number, number]>, closed: boolean): number {
 }
 
 /** A geometry in words: a point as latitude and longitude, a line or area as its points and length. */
-export function geometryWords(g: unknown, area: boolean, locale: string = ''): string {
+export function geometryWords(g: unknown, area: boolean, distanceUnits: DistanceUnits = METRIC_UNITS): string {
     const geometry = g as ItemGeometry | null;
     if (!geometry) {
         return NOT_SET;
@@ -577,7 +577,7 @@ export function geometryWords(g: unknown, area: boolean, locale: string = ''): s
     }
     if (geometry.type === 'LineString' && Array.isArray(geometry.coordinates)) {
         const coords = geometry.coordinates as Array<[number, number]>;
-        return coords.length + ' points, ' + distanceWords(lengthM(coords, area), locale) + (area ? ' around' : '');
+        return coords.length + ' points, ' + distanceText(lengthM(coords, area), distanceUnits) + (area ? ' around' : '');
     }
     return 'A shape';
 }
@@ -605,7 +605,7 @@ interface NameLookup {
     assetName: (id: string) => string;
     /** A map item's name by id (the loaded items), else ''. */
     itemName: (id: string) => string;
-    locale: string;
+    distanceUnits: DistanceUnits;
     /** A key value's label by kind and key (the stored kind setups), for an override's row. */
     kpiLabel: KpiLabels;
 }
@@ -629,7 +629,7 @@ function attachmentWords(value: unknown, look: NameLookup): string {
     if (!a || typeof a.lineId !== 'string') {
         return NOT_SET;
     }
-    const along = typeof a.distanceM === 'number' ? distanceWords(a.distanceM, look.locale) + ' along ' : 'On ';
+    const along = typeof a.distanceM === 'number' ? distanceText(a.distanceM, look.distanceUnits) + ' along ' : 'On ';
     return along + (look.itemName(a.lineId) || 'its line');
 }
 
@@ -653,7 +653,7 @@ function fieldsOf(op: HistoryOp, look: NameLookup): ExpandField[] {
             return gone;
         }
         if (key === 'geometry') {
-            return geometryWords(value, area, look.locale);
+            return geometryWords(value, area, look.distanceUnits);
         }
         if (key === 'kind') {
             const kind = kindOf(look.kinds, typeof value === 'string' ? value : null);
@@ -724,7 +724,7 @@ export function expandOps(entry: HistoryEntry, look: Partial<NameLookup> = {}): 
         assetName: look.assetName || ((id) => id),
         itemName: look.itemName || (() => ''),
         kpiLabel: look.kpiLabel || NO_LABELS,
-        locale: look.locale || ''
+        distanceUnits: look.distanceUnits || METRIC_UNITS
     };
     return entry.ops.map((op) => {
         if (op.entity === 'kindSetup') {
@@ -765,7 +765,7 @@ export interface HistoryRowData {
 }
 
 /** The rows, newest first, one per batch. */
-export function historyRows(entries: HistoryEntry[], kinds: Kind[] = [], locale: string = '', now: Date = new Date(),
+export function historyRows(entries: HistoryEntry[], kinds: Kind[] = [], distanceUnits: DistanceUnits = METRIC_UNITS, now: Date = new Date(),
     labels: KpiLabels = NO_LABELS): HistoryRowData[] {
     return entries.map((e) => ({
         seq: e.seq,
@@ -773,7 +773,7 @@ export function historyRows(entries: HistoryEntry[], kinds: Kind[] = [], locale:
         actor: e.actor,
         initial: initialOf(e.actor),
         when: whenText(e.at, now),
-        sentence: rowSentence(e, entries, kinds, locale, labels),
+        sentence: rowSentence(e, entries, kinds, distanceUnits, labels),
         blocked: revertBlocked(e),
         ops: e.ops.length
     }));

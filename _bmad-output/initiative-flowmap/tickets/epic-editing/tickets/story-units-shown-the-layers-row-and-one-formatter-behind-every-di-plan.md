@@ -3,14 +3,14 @@ title: "20a: one formatter behind every distance, following the units in force"
 type: 'feature'
 ticket: '20'
 created: '2026-11-12'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '933eb20b310afe0ccb8679ad32b90965f5401284'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/docs/contract.md', '{project-root}/_bmad-output/initiative-flowmap/tickets/epic-editing/tickets/story-the-tag-browser-one-tree-for-every-tag-pick-asset-relative-p-plan-13b.md']
 ---
@@ -66,13 +66,13 @@ All under `web/typescript/` unless a root is given.
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `geometry.ts`, a new `__tests__/units.test.ts` -- the formatter, the exact form, the parser, the in-force rule -- F1 to F7, F10, tests first.
-- [ ] `linePopup.ts`, `drawing.ts`, `history.ts`, `unsaved.ts` and their tests -- the old formatters removed, every caller on the one formatter.
-- [ ] `MapStudioStoreDelegate.ts`, `MapStudio.tsx` -- `setup.units` kept, the units in force in props, `data-units`, `data-unit-labels`.
-- [ ] `LinePopup.tsx`, `selection.tsx`, `studio/PropertiesPanel.tsx`, `studio/DrawingBar.tsx`, `editing.ts` -- the popup, the typed distance both ways -- F5 to F7.
-- [ ] `SearchControl.ts`, `NeedsYouControl.ts`, `itemsLayer.ts` -- the units by setter, an open list redrawn -- F8, F11.
-- [ ] `e2e/tests/units.spec.mjs` -- F2, F6, F8, F9 live with a second editor and a viewer, the setup at `us` and at `metric`; `directions.spec.mjs` and the sub-kilometre expectations updated.
-- [ ] Docs as Always lists; playbook 8u.
+- [x] `geometry.ts`, a new `__tests__/units.test.ts` -- the formatter, the exact form, the parser, the in-force rule -- F1 to F7, F10, tests first.
+- [x] `linePopup.ts`, `drawing.ts`, `history.ts`, `unsaved.ts` and their tests -- the old formatters removed, every caller on the one formatter.
+- [x] `MapStudioStoreDelegate.ts`, `MapStudio.tsx` -- `setup.units` kept, the units in force in props, `data-units`, `data-unit-labels`.
+- [x] `LinePopup.tsx`, `selection.tsx`, `studio/PropertiesPanel.tsx`, `studio/DrawingBar.tsx`, `editing.ts` -- the popup, the typed distance both ways -- F5 to F7.
+- [x] `SearchControl.ts`, `NeedsYouControl.ts`, `itemsLayer.ts` -- the units by setter, an open list redrawn -- F8, F11.
+- [x] `e2e/tests/units.spec.mjs` -- F2, F6, F8, F9 live with a second editor and a viewer, the setup at `us` and at `metric`; `directions.spec.mjs` and the sub-kilometre expectations updated.
+- [x] Docs as Always lists; playbook 8u.
 
 **Acceptance Criteria:**
 - Given the dev setup at `us`, when the line popup of L-SWD opens, then it reads 1.8 mi and PT-1 at 3,750 ft, and a typed 3750 in Details stores 1143 m.
@@ -82,10 +82,24 @@ All under `web/typescript/` unless a root is given.
 ## Implementation Notes
 
 - Planner, 2026-11-12: the environment and identity rules are entry 13b's plan's first Implementation Note; they hold here. Leave the work uncommitted; run the specs you touch, not the whole suite. Check `docker ps` before any stack work and start Docker as the hand-off note says if it stopped. Restore the dev setup and clear the override at the end of every spec that changes them.
+- Implementer, 2026-11-12: built as planned, left uncommitted. Where the build chose within the plan: (1) the formatter is `geometry.ts` `distanceText(metres, units)` with `distanceSpan`, `exactDistanceText`, `distanceInput`, `readDistance` and `unitsInForce`; `linePopup.ts`'s `distanceText`, `distanceWords`, `usesMiles` and `browserLocale` and `drawing.ts`'s `metresText`, `distanceRangeText` and `readDistance` are gone, and `history.ts` and `unsaved.ts` take the units where they took a locale. The delegate keeps `setupUnits` and gives the units in force as `distanceUnits`, the same object while they read the same. (2) The small or large unit is chosen after rounding, so 1,609.3 m under US units is "1 mile" (F3), not "5,280 ft"; a whole large unit has no ".0" ("2 km", "1 mile"), which is how the line popup wrote it and not how Nearest did ("2.0 km" before). (3) A span from 0 names the unit once ("0 to 1.1 km"), so the popup's first segment reads as before. (4) The distance field shows metres as stored, with no separator ("1143", as before, so no metric expectation changed), and feet to one decimal with one ("3,750", F6); to one decimal so the shown value typed back stores what was stored. The two forms differ on the separator: the owner may want one rule. (5) The parser also takes the words (metres, meters, feet, foot) and no longer takes an exponent ("1e3"). (6) A Revert's undo step is named in the units in force when it is made and keeps those words. (7) F5's "9,588 ft" is from the plan's 2,922.35 m; the seeded L-SWD measures a little under that and reads "of 9,587 ft" on the dev stack, which the spec and the docs use. (8) `directions.spec` sets the setup to `auto` for the whole file (pick 8) and gained the open Nearest list redrawn by an override; `fixtures.mjs` gained `setUnits`, `clearUnits`, `useSetupUnits` and `restoreSetupUnits`. After the review: the scale bar beside the Legend button (MapLibre's own control) takes the system in force, with its own short labels; a units change drops a typed, unfinished distance and the bar's refusal; the typed field's label names the unit in the labels in force. `docs/contract.md`'s Search and Needs you paragraphs (the Code Map's :240, :242) name no distance, so they are unchanged; the `userLocation` row and a new section, "Distances and the units in force", carry it. The whole e2e suite was not run here (the orchestrator's): `units`, `directions`, `linepopup`, `drawing`, `addinstrument`, `settings`, `setup`, `recentchanges`, `savestates` and `details` were.
 
 ## Plan Change Log
 
 ## Review Triage Log
+
+Quick review, 2026-11-12 (one reviewer, by inspection, and the orchestrator's reading of the formatter). F1 to F11 and the acceptance criteria read as met; no em dash, nothing of the Gateway, the store or the messages changed, no caller of the old formatters left. Eight findings: 0 high, 2 medium, 5 low, 1 false, 0 maybe-false. Seven routed patch, to the implementer; one rejected.
+
+- medium, patch: a typed, uncommitted bare number in Details' distance field or the drawing bar's is kept across a units change and read in the new unit ("1200" typed under metric stores 365.8 m once another editor sets `us`). The draft is dropped when the units in force change.
+- medium, patch (the orchestrator's, from the implementer's report): the scale bar, MapLibre's own control, stays metric under US units, the one distance on the map that does not follow (R27, "every distance Map Studio shows"). Its unit is set from the system in force; its labels stay the control's own.
+- low, patch: the drawing bar's refusal is kept as a string, so after a units change it names the old unit beside the new one. Cleared on a units change, as Details does.
+- low, patch: the typed-distance label always shows the symbol, "(ft)" beside "of 9,587 feet" under long labels. It names the unit in the labels in force.
+- low, patch: `MapStudio.tsx`: `applyUserLocation`'s JSDoc was left above `distanceUnits()`.
+- low, patch: `drawing.ts`'s header still gives "0.7 km" where the bar now reads "700 m".
+- low, patch: `directions.spec.mjs`'s en-GB test clears its override inline, so a failed assertion leaves it live for the file. Cleared in a `finally`.
+- false, rejected: "a whole large unit under metric no longer reads as it did" in the lists ("1.0 km" is now "1 km"). The frozen matrix decides it: F3 has "1 mile" and F10 "1.1 to 2 km", and the two old formatters disagreed (the popup wrote "2 km", the lists "2.0 km"), so one rule had to drop one. The owner is told in the summary.
+
+Outcome (2026-11-12): seven patches applied, one finding rejected; nothing deferred. Not seen live: the Needs you list redrawn while open, and the phone sheet under US units. The orchestrator's Verification on the patched code: tsc clean, Jest 1156 passed, Gradle BUILD SUCCESSFUL, the contract check OK (map store schema 4). The whole suite on a fresh stack: the first run 335 passed, 9 skipped, 1 failed (`tracer.spec.mjs` :24, the dev View page's click reply, which this entry does not touch; it passed 4 of 4 re-run alone and after the tags specs); the second run, again on a fresh stack, 336 passed, 9 skipped, 0 failed in 1.3 h. The Layers row is 20b.
 
 ## Verification
 

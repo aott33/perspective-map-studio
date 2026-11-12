@@ -22,6 +22,7 @@ jest.mock('@inductiveautomation/perspective-client', () => ({
     }
 }), { virtual: true });
 
+import { METRIC_UNITS, browserLocale, usesMiles } from '../geometry';
 import { AbstractUIElementStore } from '@inductiveautomation/perspective-client';
 import { EditBatch, HistoryEntry, MapItemRecord } from '../contract';
 import { MESSAGE_EVENT, MessageTypes } from '../messages';
@@ -228,7 +229,7 @@ describe('Revert (B4, B5)', () => {
         expect(state.undo.done).toBe(0);
         // S11 (entry 12b1): the entry is marked as a Revert, so its card offers only "Use mapoperator's version".
         expect(state.unsaved[0].revert).toBe(true);
-        const card = saveCardFor({ unsaved: state.unsaved, paused: false, dismissed: [], records: state.items, kinds: [], locale: '' });
+        const card = saveCardFor({ unsaved: state.unsaved, paused: false, dismissed: [], records: state.items, kinds: [], distanceUnits: METRIC_UNITS });
         expect(card).toMatchObject({ kind: 'conflict', who: 'mapoperator', onTop: false, blocked: '' });
         const before = ofType(MessageTypes.EDITS_APPLY).length;
         delegate.applyOnTop(sent.body.batchId);
@@ -246,7 +247,7 @@ describe('Revert (B4, B5)', () => {
         });
         const state = delegate.mapStateToProps();
         expect(state.unsaved[0].revert).toBeUndefined();
-        expect(saveCardFor({ unsaved: state.unsaved, paused: false, dismissed: [], records: state.items, kinds: [], locale: '' }))
+        expect(saveCardFor({ unsaved: state.unsaved, paused: false, dismissed: [], records: state.items, kinds: [], distanceUnits: METRIC_UNITS }))
             .toMatchObject({ kind: 'conflict', onTop: true });
     });
 
@@ -322,6 +323,42 @@ describe('the units setting (entry 19b, S12, S13)', () => {
         expect(unitsOf()).toEqual({ id: 'units', system: 'auto', labels: 'long', version: 4, deleted: false });
     });
 
+    test('the units in force (entry 20a): the live override, else the setup, else the locale; the Revert label follows', () => {
+        const inForce = () => delegate.mapStateToProps().distanceUnits;
+        // The override at metric, symbols; the load sent no setup.
+        expect(inForce()).toEqual({ system: 'metric', labels: 'short' });
+        expect(delegate.mapStateToProps().setupUnits).toBe('auto');
+        const held = inForce();
+        expect(delegate.mapStateToProps().distanceUnits).toBe(held);
+        reply(MessageTypes.MAP_CHANGED, 'c10', { seq: 10, ops: [{ op: 'update', entity: 'settings', id: 'units', version: 3,
+            record: { ...UNITS, system: 'us', labels: 'long', version: 3 } }] });
+        expect(inForce()).toEqual({ system: 'us', labels: 'long' });
+        // Cleared: the setup's units, which this load did not send, so the locale's (jsdom: en-US).
+        reply(MessageTypes.MAP_CHANGED, 'c11', { seq: 11, ops: [{ op: 'delete', entity: 'settings', id: 'units', version: 4,
+            record: { ...UNITS, version: 4, deleted: true } }] });
+        expect(inForce()).toEqual({ system: usesMiles(browserLocale()) ? 'us' : 'metric', labels: 'short' });
+        // A load with the setup at metric and no override: metric whatever the locale; then the setup at us.
+        const load = (units: string, settings: unknown): void => {
+            delegate.sendMapLoad();
+            reply(MessageTypes.MAP_LOAD_REPLY, lastOf(MessageTypes.MAP_LOAD).id, { level: 'full', seq: 12, items: [P31], user: 'mapeditor',
+                setup: { refreshIntervalSeconds: 10, basemaps: ['none'], alarmPage: '', units }, settings });
+        };
+        load('metric', {});
+        expect(delegate.mapStateToProps().setupUnits).toBe('metric');
+        expect(inForce()).toEqual({ system: 'metric', labels: 'short' });
+        load('us', {});
+        expect(inForce()).toEqual({ system: 'us', labels: 'short' });
+        // The override wins over the setup, and `auto` in it is the locale again.
+        load('us', { units: { id: 'units', system: 'metric', labels: 'long', version: 6 } });
+        expect(inForce()).toEqual({ system: 'metric', labels: 'long' });
+        // A Revert's undo step names the row in the units in force.
+        reply(MessageTypes.EDITS_HISTORY_REPLY, lastOf(MessageTypes.EDITS_HISTORY).id, page([moveOf(12, 2, AT, NORTH, 'mapoperator')]));
+        expect(delegate.revert(12)).toBe(true);
+        const sent = lastOf(MessageTypes.EDITS_APPLY);
+        reply(MessageTypes.EDITS_APPLY_REPLY, sent.id, { batchId: sent.body.batchId, seq: 13, results: [{ entity: 'item', id: 'p31', version: 3 }] });
+        expect(undoLabel(delegate.mapStateToProps().undo)).toBe('Undo: revert "Moved P31 about 40 metres north"');
+    });
+
     test('Revert sends the values before at the row\'s version, holds the saved value at once and makes no Undo step', () => {
         expect(delegate.revert(9)).toBe(true);
         const sent = lastOf(MessageTypes.EDITS_APPLY);
@@ -393,7 +430,7 @@ describe('the units setting (entry 19b, S12, S13)', () => {
         expect(state.unsaved).toHaveLength(1);
         expect(state.unsaved[0]).toMatchObject({ state: 'refused', revert: true });
         expect(state.unsaved[0].conflict![0].current).toEqual({ ...UNITS, system: 'auto', version: 3 });
-        const card = saveCardFor({ unsaved: state.unsaved, paused: false, dismissed: [], records: state.items, kinds: [], locale: '' });
+        const card = saveCardFor({ unsaved: state.unsaved, paused: false, dismissed: [], records: state.items, kinds: [], distanceUnits: METRIC_UNITS });
         expect(card).toMatchObject({ kind: 'conflict', who: 'mapoperator', onTop: false });
         expect(state.units).toEqual(UNITS);
         delegate.useTheirs(sent.body.batchId);

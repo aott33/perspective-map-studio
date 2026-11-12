@@ -125,7 +125,7 @@ test.describe('1366 px', () => {
             await page.mouse.click(x + 8, y + 6);
             await expect(bar).toHaveAttribute('data-points', '1');
             await expect(bar).toHaveAttribute('data-snap-start', 'CTB1');
-            await expect(bar.locator('.mapstudio-drawing-progress')).toHaveText('1 point - 0 km - start snapped to CTB1');
+            await expect(bar.locator('.mapstudio-drawing-progress')).toHaveText('1 point - 0 m - start snapped to CTB1');
             await expect(bar).toHaveAttribute('data-valid', 'false');
             await expect(bar).toHaveAttribute('data-reason', 'A line needs two points');
             await page.waitForTimeout(VERTEX_PAUSE_MS);
@@ -208,7 +208,7 @@ test.describe('1366 px', () => {
             await page.mouse.click(x + 12, y + 10);
             await expect(bar).toHaveAttribute('data-points', '1');
             await expect(bar).toHaveAttribute('data-snap-start', '');
-            await expect(bar.locator('.mapstudio-drawing-progress')).toHaveText('1 point - 0 km - start floating');
+            await expect(bar.locator('.mapstudio-drawing-progress')).toHaveText('1 point - 0 m - start floating');
             await page.waitForTimeout(VERTEX_PAUSE_MS);
             [x, y] = await pixelNow(map, SWD1);
             await page.mouse.click(x - 12, y + 8);

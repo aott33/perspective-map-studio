@@ -161,7 +161,7 @@ function harness(editMode: boolean): Harness {
         componentEvents: { fireComponentEvent: (name: string, payload: Record<string, unknown>): void => { sent.events.push([name, payload]); } }
     };
     const delegate = {
-        level: 'full', items: ITEMS, editing: 'on', load: { state: 'loaded', message: '' }, unsaved: [], itemsRevision: 1,
+        level: 'full', items: ITEMS, distanceUnits: { system: 'metric', labels: 'short' }, editing: 'on', load: { state: 'loaded', message: '' }, unsaved: [], itemsRevision: 1,
         live: { ...LIVE_INITIAL, fulls: 1, display: { pad: display('pad'), line: display('line'), fence: display('fence'), tap: display('tap') } },
         lists: { kinds: [PAD, LINE, FENCE, TAP], assets: [], assetNames: {} }
     };

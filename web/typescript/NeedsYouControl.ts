@@ -28,7 +28,7 @@
  */
 
 import { glyphSvg } from './controls';
-import { browserLocale, distanceWords } from './linePopup';
+import { DistanceUnits, METRIC_UNITS, distanceText, sameUnits } from './geometry';
 import { EMPTY_SUMMARY, LIST_UNKNOWN, NOTHING_NEEDS_YOU, NeedsYouRow, NeedsYouSummary, RANKED_NOTE, barKey, barModel, rowDistanceM, total } from './needsyou';
 
 /** The sprite the state and kind glyphs come from, as the default popup draws them (DefaultPopup.tsx). */
@@ -57,6 +57,8 @@ export class NeedsYouControl {
     private unknown = false;
     /** The user's position `[lng, lat]` (entry 16), or null: the rows' distances show only with one. */
     private position: [number, number] | null = null;
+    /** The units in force (entry 20a, `setUnits`): the rows' distances are written in them. */
+    private units: DistanceUnits = METRIC_UNITS;
     /** What the bar last drew (`barKey`), so it redraws only when its counts or look change (owner re-test R1). */
     private drawnKey = '';
     private readonly panelId = 'mapstudio-needs-' + Math.random().toString(36).slice(2, 8);
@@ -113,6 +115,17 @@ export class NeedsYouControl {
         this.unknown = unknown;
         this.renderBar();
         if (this.panel) {
+            this.renderList();
+        }
+    }
+
+    /** The units in force (entry 20a; MapStudio.tsx applyUnits): an open list showing distances is drawn again in them. */
+    setUnits(units: DistanceUnits): void {
+        if (sameUnits(units, this.units)) {
+            return;
+        }
+        this.units = units;
+        if (this.panel && this.position) {
             this.renderList();
         }
     }
@@ -303,7 +316,7 @@ export class NeedsYouControl {
                 const metres = rowDistanceM(row, this.position);
                 const distance = document.createElement('span');
                 distance.className = 'mapstudio-needs-distance';
-                distance.textContent = distanceWords(metres, browserLocale());
+                distance.textContent = distanceText(metres, this.units);
                 button.appendChild(distance);
                 button.setAttribute('data-distance-m', String(Math.round(metres)));
             }

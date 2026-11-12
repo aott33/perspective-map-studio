@@ -3,6 +3,7 @@
 // this screen does not draw included (K10). Then the matrix's logic: the edits (K2 to K4, K7, K9), the key from the label, a
 // refusal's words placed by the order the rows were sent in (K5, K6), the header's words (K1), the resolve notes (K8), and the
 // conflict card of a setup, which offers one choice (K11).
+import { METRIC_UNITS } from '../geometry';
 import { Asset, Kind } from '../adapters';
 import { Conflict, EditBatch, KindSetupRecord, MapItemRecord } from '../contract';
 import {
@@ -827,7 +828,7 @@ describe('a refused Revert in the queue (12b1, S11): its conflict card has one c
         expect(revert.revert).toBe(true);
         expect(onTopBatch(edit, 'new')).not.toBeNull();
         expect(onTopBatch(revert, 'new')).toBeNull();
-        const facts = { paused: false, dismissed: [], records: [theirs], kinds: [PAD], locale: '' };
+        const facts = { paused: false, dismissed: [], records: [theirs], kinds: [PAD], distanceUnits: METRIC_UNITS };
         expect(saveCardFor({ ...facts, unsaved: [edit] })).toMatchObject({ kind: 'conflict', onTop: true });
         expect(saveCardFor({ ...facts, unsaved: [revert] })).toMatchObject({ kind: 'conflict', batchId: 'batch-revert', who: 'mapeditor2', onTop: false,
             blocked: '', title: "Not saved - conflict with mapeditor2's change" });
@@ -888,7 +889,7 @@ describe('a setup save in the queue (K11): paused fields, and a conflict card wi
     test('the card names the other editor and the kind, keeps my change in words, and offers only their version', () => {
         expect(isSetupSave(refused)).toBe(true);
         expect(onTopBatch(refused, 'new')).toBeNull();
-        const card = saveCardFor({ unsaved: [refused], paused: false, dismissed: [], records: [], kinds: [PAD], locale: '' });
+        const card = saveCardFor({ unsaved: [refused], paused: false, dismissed: [], records: [], kinds: [PAD], distanceUnits: METRIC_UNITS });
         expect(card).toMatchObject({
             kind: 'conflict', batchId: 'batch-setup', who: 'mapeditor2', onTop: false, blocked: '',
             title: "Not saved - conflict with mapeditor2's change",

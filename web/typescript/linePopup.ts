@@ -9,7 +9,7 @@
 import { Kind } from './adapters';
 import { MapItemRecord } from './contract';
 import { LineNode, SegmentRef, lineNodes } from './features';
-import { instrumentsOn, lengthM } from './geometry';
+import { DistanceUnits, distanceSpan, distanceText, instrumentsOn, lengthM } from './geometry';
 import {
     ItemState, ItemValues, KindDisplay, LiveState, LiveValue, ageText, alarmsText, iconKpiOf, itemState, qualityWords, valueText
 } from './live';
@@ -27,64 +27,18 @@ export interface PopupNode extends LineNode {
     highlighted: boolean;
 }
 
-/** "0 km", "1.1 km", "2.9 km": one decimal, 0 as "0 km". */
-export function distanceText(metres: number): string {
-    if (!(metres > 0)) {
-        return '0 km';
-    }
-    const km = metres / 1000;
-    return (km >= 10 ? Math.round(km).toString() : (Math.round(km * 10) / 10).toString()) + ' km';
-}
-
-/** Metres in a mile and feet in a metre (international units). */
-const M_PER_MI = 1609.344;
-const FT_PER_M = 3.280839895;
-
-/** Whether a locale counts distances in miles: en-US (and its variants), as the browser's language says it. */
-export function usesMiles(locale: string): boolean {
-    return /^en-US\b/i.test(locale.trim());
-}
-
-/** The tenths below 10 of the large unit, whole numbers from 10: "2.3", "12". */
-function largeUnit(n: number): string {
-    const tenths = Math.round(n * 10) / 10;
-    return tenths >= 10 ? String(Math.round(n)) : tenths.toFixed(1);
-}
-
 /**
- * A distance from the user in words (epic 4 entry 16; EXPERIENCE.md Search and Needs you): with the locale en-US in miles,
- * under 0.1 mi in feet ("850 ft", "2.3 mi", "12 mi"); otherwise in kilometres, under 1 km in metres ("420 m", "1.1 km",
- * "12 km"). Feet and metres round to 10; the large unit takes tenths below 10 and whole numbers above. No units setting.
+ * "Gathering line - 6 in, 2.9 km": the kind, then the pipe size where the line has one and the length in the units in
+ * force (entry 20a; the pipe size stays inches).
  */
-export function distanceWords(metres: number, locale: string): string {
-    const m = metres > 0 && isFinite(metres) ? metres : 0;
-    if (usesMiles(locale)) {
-        if (m < M_PER_MI / 10) {
-            return Math.round((m * FT_PER_M) / 10) * 10 + ' ft';
-        }
-        return largeUnit(m / M_PER_MI) + ' mi';
-    }
-    const roundedM = Math.round(m / 10) * 10;
-    if (roundedM < 1000) {
-        return roundedM + ' m';
-    }
-    return largeUnit(m / 1000) + ' km';
-}
-
-/** The browser's language, the locale distances are written in ('' where there is none, which counts as metric). */
-export function browserLocale(): string {
-    return typeof navigator !== 'undefined' && typeof navigator.language === 'string' ? navigator.language : '';
-}
-
-/** "Gathering line - 6 in, 2.9 km": the kind, then the pipe size where the line has one and the length. */
-export function lineSubline(kindName: string, diameter: unknown, metres: number): string {
+export function lineSubline(kindName: string, diameter: unknown, metres: number, units: DistanceUnits): string {
     const parts: string[] = [];
     const n = typeof diameter === 'number' ? diameter : typeof diameter === 'string' ? Number(diameter) : NaN;
     if (isFinite(n) && n > 0) {
         parts.push(n + ' in');
     }
     if (metres > 0) {
-        parts.push(distanceText(metres));
+        parts.push(distanceText(metres, units));
     }
     return parts.length > 0 ? kindName + ' - ' + parts.join(', ') : kindName;
 }
@@ -205,7 +159,7 @@ export interface SegmentWords {
     stale: boolean;
 }
 
-export function segmentWords(nodes: PopupNode[], segment: SegmentRef | null): SegmentWords | null {
+export function segmentWords(nodes: PopupNode[], segment: SegmentRef | null, units: DistanceUnits): SegmentWords | null {
     if (!segment || !nodes.some((n) => n.role === 'instrument' && n.measures)) {
         // A line with no measuring instrument has no segment to show (owner review notes item 17).
         return null;
@@ -217,7 +171,7 @@ export function segmentWords(nodes: PopupNode[], segment: SegmentRef | null): Se
     }
     const name = (n: PopupNode): string => n.role === 'instrument' ? n.name : rowName(n);
     const title = 'Segment ' + name(from) + ' to ' + name(to);
-    const span = distanceText(from.distanceM).replace(' km', '') + ' to ' + distanceText(to.distanceM);
+    const span = distanceSpan(from.distanceM, to.distanceM, units);
     const a = nodeValue(from);
     const b = nodeValue(to);
     const staleOne = from.role === 'instrument' && a.stale ? from : to.role === 'instrument' && b.stale ? to : null;
@@ -227,7 +181,7 @@ export function segmentWords(nodes: PopupNode[], segment: SegmentRef | null): Se
     let line: string;
     if (a.number !== null && b.number !== null && a.unit === b.unit) {
         const drop = Math.round((a.number - b.number) * 10) / 10;
-        const over = ' over ' + distanceText(Math.abs(to.distanceM - from.distanceM));
+        const over = ' over ' + distanceText(Math.abs(to.distanceM - from.distanceM), units);
         const change = drop > 0 ? 'drop ' + drop : drop < 0 ? 'rise ' + Math.abs(drop) : 'no change';
         line = a.number + ' to ' + b.number + (a.unit ? ' ' + a.unit : '') + ' - ' + change
             + (drop !== 0 && a.unit ? ' ' + a.unit : '') + over;

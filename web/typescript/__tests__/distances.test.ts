@@ -1,7 +1,6 @@
 import { Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import { insideRing, itemDistanceM } from '../geometry';
-import { distanceWords, usesMiles } from '../linePopup';
 import { KindDisplay, LIVE_INITIAL, LiveState } from '../live';
 import { needsYou, rowDistanceM } from '../needsyou';
 import { NEAREST_COUNT, buildEntries, nearestEntries, positionRedraws } from '../search';
@@ -33,40 +32,6 @@ describe('the distance of an item from the user (epic 4 entry 16, geometry.ts)',
         expect(itemDistanceM([-0.003, 0.005], area, true)).toBeCloseTo(3 * MILLI_DEG_M, 0);
         // The same ring as a line is measured to the line, not filled.
         expect(itemDistanceM([0.005, 0.005], area, false)).toBeGreaterThan(0);
-    });
-});
-
-describe('a distance in words (linePopup.ts distanceWords)', () => {
-    test('en-US counts in miles, everything else in kilometres', () => {
-        expect(usesMiles('en-US')).toBe(true);
-        expect(usesMiles('en-us')).toBe(true);
-        expect(usesMiles('en-GB')).toBe(false);
-        expect(usesMiles('fr-CA')).toBe(false);
-        expect(usesMiles('')).toBe(false);
-    });
-
-    test('miles: under 0.1 mi in feet rounded to 10, tenths below 10, whole above', () => {
-        expect(distanceWords(100, 'en-US')).toBe('330 ft');
-        // The rule, not the plan's "850 ft" example: 850 ft is past 0.1 mi (528 ft), so it reads in miles.
-        expect(distanceWords(259, 'en-US')).toBe('0.2 mi');
-        expect(distanceWords(0, 'en-US')).toBe('0 ft');
-        expect(distanceWords(160, 'en-US')).toBe('520 ft');
-        expect(distanceWords(161, 'en-US')).toBe('0.1 mi');
-        expect(distanceWords(650, 'en-US')).toBe('0.4 mi');
-        expect(distanceWords(3701, 'en-US')).toBe('2.3 mi');
-        expect(distanceWords(19312, 'en-US')).toBe('12 mi');
-        expect(distanceWords(16050, 'en-US')).toBe('10 mi');
-    });
-
-    test('kilometres: under 1 km in metres rounded to 10, tenths below 10, whole above', () => {
-        expect(distanceWords(423, 'en-GB')).toBe('420 m');
-        expect(distanceWords(650, 'en-GB')).toBe('650 m');
-        expect(distanceWords(1100, 'de-DE')).toBe('1.1 km');
-        expect(distanceWords(996, 'en-GB')).toBe('1.0 km');
-        expect(distanceWords(12000, 'en-GB')).toBe('12 km');
-        expect(distanceWords(9970, 'en-GB')).toBe('10 km');
-        expect(distanceWords(-5, 'en-GB')).toBe('0 m');
-        expect(distanceWords(NaN, 'en-GB')).toBe('0 m');
     });
 });
 

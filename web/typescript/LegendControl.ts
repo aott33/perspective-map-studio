@@ -429,6 +429,13 @@ export class LegendControl implements IControl {
      * The you-are-here row (epic 4 entry 15): shown at the end of States while a position is known, in both places (the
      * panel and the rail's Legend tab); drawn again only when it changed.
      */
+    /** The scale bar in the system in force (entry 20a): MapLibre's own bar, feet and miles or metres and kilometres, its own short labels. */
+    setScaleUnit(system: 'metric' | 'us'): void {
+        if (this.scale) {
+            this.scale.setUnit(system === 'us' ? 'imperial' : 'metric');
+        }
+    }
+
     setYouAreHere(on: boolean): void {
         const { you: _was, ...rest } = this.key;
         this.setKey({ ...rest, ...withYou(on) });

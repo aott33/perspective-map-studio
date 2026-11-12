@@ -1,6 +1,7 @@
 // The save problems' card (epic 4 entry 10, R26): the conflict kept on the queued entry with the records my ops started from,
 // the other editor's change and mine in words, Apply mine on top's rebased batch, which card shows (unreachable, then the
 // conflicts oldest first with "1 of 2", then busy), and the card's markup.
+import { METRIC_UNITS } from '../geometry';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Kind } from '../adapters';
@@ -69,7 +70,7 @@ function busy(n: number): UnsavedEntry {
 }
 
 function card(over: { unsaved: UnsavedEntry[]; paused?: boolean; dismissed?: string[] }): SaveCardData | null {
-    return saveCardFor({ unsaved: over.unsaved, paused: !!over.paused, dismissed: over.dismissed || [], records: [pad()], kinds: KINDS, locale: '' });
+    return saveCardFor({ unsaved: over.unsaved, paused: !!over.paused, dismissed: over.dismissed || [], records: [pad()], kinds: KINDS, distanceUnits: METRIC_UNITS });
 }
 
 describe('the words', () => {
@@ -80,7 +81,7 @@ describe('the words', () => {
         expect(compassWord(P14_AT, P14_NORTH)).toBe('north');
         expect(compassWord(P14_AT, [P14_AT[0] - 0.001, P14_AT[1] - 0.001])).toBe('south-west');
         expect(moveWords(P14_AT, P14_NORTH)).toBe('about 40 m north');
-        expect(moveWords(P14_AT, P14_NORTH, 'en-US')).toBe('about 130 ft north');
+        expect(moveWords(P14_AT, P14_NORTH, { system: 'us', labels: 'short' })).toBe('about 130 ft north');
         expect(moveWords(P14_AT, P14_AT)).toBe('a little');
     });
 
@@ -102,7 +103,7 @@ describe('the words', () => {
     test('my change: the fields I changed from where I started, the name first on the busy card; an add as Undo names it', () => {
         const entry = mine(pad({ version: 4 }));
         expect(yourChangeText(entry, [pad()], KINDS)).toBe('label position Right, Gas rate switched on');
-        expect(yourChangeText(busy(1), [pad()], KINDS, '', true)).toBe('P14 label position Right');
+        expect(yourChangeText(busy(1), [pad()], KINDS, METRIC_UNITS, true)).toBe('P14 label position Right');
         const moved = updateBatch('p14', 'b-move', 3, { geometry: { type: 'Point', coordinates: P14_NORTH } });
         expect(yourChangeText(mine(null, {}, moved), [pad()], KINDS)).toBe('moved about 40 m north');
         const create: EditBatch = { batchId: 'b-add', ops: [{ op: 'create', entity: 'item', id: 'p99', baseVersion: 0,
@@ -118,10 +119,10 @@ describe('an override in the cards\' words (entry 12c1)', () => {
     test('a key value is named by its label, from the lookup the card is given; by its key without one', () => {
         const batch = updateBatch('p14', 'batch-over', 3, { overrides: OVER });
         const entry = mine(pad({ version: 4, overrides: { kpis: [{ key: 'pressure', path: '[default]Mesa/P15/Pressure' }], comms: { path: '[default]c' } } }), {}, batch);
-        expect(yourChangeText(entry, [pad()], KINDS, '', false, labels)).toBe('Pressure path [default]Mesa/P12/Pressure');
+        expect(yourChangeText(entry, [pad()], KINDS, METRIC_UNITS, false, labels)).toBe('Pressure path [default]Mesa/P12/Pressure');
         expect(yourChangeText(entry, [pad()], KINDS)).toBe('pressure path [default]Mesa/P12/Pressure');
-        expect(theirChangeText(entry, KINDS, '', [], labels)).toBe("Sam changed P14's comms path and Pressure path at 10:42");
-        const shown = saveCardFor({ unsaved: [entry], paused: false, dismissed: [], records: [pad()], kinds: KINDS, locale: '', kpiLabel: labels });
+        expect(theirChangeText(entry, KINDS, METRIC_UNITS, [], labels)).toBe("Sam changed P14's comms path and Pressure path at 10:42");
+        const shown = saveCardFor({ unsaved: [entry], paused: false, dismissed: [], records: [pad()], kinds: KINDS, distanceUnits: METRIC_UNITS, kpiLabel: labels });
         expect(shown && shown.kept).toBe('Your change, kept here and not saved: Pressure path [default]Mesa/P12/Pressure.');
         expect(shown && shown.text).toContain("Sam changed P14's comms path and Pressure path at 10:42");
     });

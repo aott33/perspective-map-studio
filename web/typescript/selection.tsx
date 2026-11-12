@@ -954,6 +954,7 @@ export function popupContentFor(host: SelectionHost, open: OpenPopup): React.Rea
                     nodes={nodes}
                     segment={open.segment}
                     now={host.state.clock}
+                    units={delegate.distanceUnits}
                     onClose={host.closePopup}
                 />
             );

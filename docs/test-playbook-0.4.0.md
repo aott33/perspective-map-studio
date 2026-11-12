@@ -164,13 +164,13 @@ On `/locate` (Directions on, the template field empty) with your position as in 
 - [ ] Press Directions on a computer: a new tab opens Google Maps with the route to Point 1 from where you are, ready to start. Nothing on the map changes and no route is drawn.
 - [ ] Click the Tracer line: its popup has no Directions. Click a pad with no alarm: Directions alone fills the footer. On `/live`, Point 1's footer is View alarms alone, filling the row.
 - [ ] Type `https://www.openstreetmap.org/directions?route=;{lat},{lng}` in the template field, press Tab, open Point 1 again and press Directions: that link opens with Point 1's coordinates. Type `javascript:alert(1)` instead: the Google route opens, and the browser console has one Map Studio warning that the template is ignored. Empty the field.
-- [ ] Open the search's chevron with no text: an **A-Z | Nearest** switch sits at the top, A-Z chosen. Press Nearest: ten items, the nearest first, each with its distance at the right in grey (miles and feet in an en-US browser, kilometres and metres otherwise). Choose one: the map zooms to it and opens it, as a search result does. Type a letter: the usual results, no switch; clear it: Nearest is still chosen.
+- [ ] Open the search's chevron with no text: an **A-Z | Nearest** switch sits at the top, A-Z chosen. Press Nearest: ten items, the nearest first, each with its distance at the right in grey, in the units in force (section 8u): on the dev stack, whose setup says `metric`, metres and kilometres in every browser. Choose one: the map zooms to it and opens it, as a search result does. Type a letter: the usual results, no switch; clear it: Nearest is still chosen.
 - [ ] Keyboard only: in the empty field, ArrowRight and ArrowLeft turn the switch; Tab reaches it; ArrowDown goes back to the list; Enter chooses.
 - [ ] Open Needs you: every row ends with its distance at the right; the order is still alarms, then comms lost, then stale.
 - [ ] Tick Location off: no switch on the search list and no distances on Needs you; Directions still shows in the popup.
 - [ ] At 390 px: the sheet's footer is Directions and View alarms at 44 px, with no Edit button; the switch parts are 44 px tall.
 - [ ] **On a real iPhone or iPad** (the Perspective mobile app, or Safari on an `https` address): Directions opens Apple Maps with the route to the pad, named. **On an Android phone**: Google Maps opens with the route. Note what opens (the app, or a browser tab) and whether the route starts from where you are; this hand-over is not checked by the suite.
-- [ ] Your browser's language set to English (UK) or another language: distances read in metres and kilometres ("430 m", "1.1 km"); English (US): feet and miles ("330 ft", "2.3 mi").
+- [ ] The browser's language decides only while the setup's `units` is `auto` and no override is live (section 8u). With `"units": "auto"` in the dev setup and the page reloaded: English (UK) or another language reads metres and kilometres ("430 m", "1.1 km"); English (US) reads feet up to a mile, then miles ("1,420 ft", "2.3 mi"). Put `"units": "metric"` back.
 
 Notes:
 
@@ -498,7 +498,7 @@ Notes:
 
 ## 8t. Edit mode's units override in the map store (the script console, and the upgrade from schema 3)
 
-Entry 19b: the map store keeps a map editor's override of the project's units, the third entity of `edits.apply` (`settings`, id `units`). Nothing on the map changes yet and no control sets it: the Layers row and the distances are entry 20's. So the override is set from a script here. The Gateway's half is unit tested and run on the dev stack (`e2e/tests/settings.spec.mjs`, which sends the same ops over the websocket); the script console step and the upgrade of your own store are the owner's check. The dev setup's own units stay `metric` throughout.
+Entry 19b: the map store keeps a map editor's override of the project's units, the third entity of `edits.apply` (`settings`, id `units`). No control sets it yet (the Layers row is entry 20b's); from entry 20a every distance on the map follows it (section 8u). So the override is set from a script here. The Gateway's half is unit tested and run on the dev stack (`e2e/tests/settings.spec.mjs`, which sends the same ops over the websocket); the script console step and the upgrade of your own store are the owner's check. The dev setup's own units stay `metric` throughout.
 
 The upgrade from schema 3:
 
@@ -517,6 +517,36 @@ The script console (Designer, Tools > Script Console runs in the Designer's scop
 - [ ] **Revert (S13).** Press Revert on "Changed the units to Metric, symbols": a new first row reads `Reverted "Changed the units to Metric, symbols"`, the map's `data-units-override` reads `us,long,3`, and the toolbar's Undo did not gain a step. Press Revert on the same row again: it is refused, the save status row and a card say "Not saved - conflict with mapeditor's change"; choose "Use mapeditor's version".
 - [ ] **A phone editor and a viewer (S6).** As the phone editor on `/edit`, and in the private window, `(await window.__mapStudioTest.send('edits.apply', {batchId: crypto.randomUUID(), ops: [{op: 'delete', entity: 'settings', id: 'units', baseVersion: 3}]})).body.code` is `role`.
 - [ ] **Clear (S3).** The script call with `'op': 'delete'`, `'baseVersion': 3` and no `data` returns version 4; both maps' `data-units-override` is empty and `map.load`'s `settings` is `{}`. Recent changes reads "Cleared the units setting". Leave the store so.
+
+Notes:
+
+## 8u. Distances in the units in force (the override from a script, the setup at metric and at us)
+
+Entry 20a: one formatter writes every distance, in the units in force: the store's override (section 8t), else the setup's `units` (section 8s), else the browser's language. No control sets the override yet (the Layers row is entry 20b's), so it is set from a script as in section 8t. Unit tested (`units.test.ts`) and run on the dev stack (`e2e/tests/units.spec.mjs`, `directions.spec.mjs`); this section is the same by hand. The seeded L-SWD is 2,922 m long with PT-1 at 1,143 m, LV-1 at 2,000 m and PT-2 at 2,841 m.
+
+The setup at `metric` (the dev setup as committed), no override:
+
+- [ ] In the console, `document.querySelector('.mapstudio-map').dataset.units` is `metric` and `dataset.unitLabels` is `short`.
+- [ ] As a viewer on `/`, click L-SWD between PT-1 and LV-1: the subline reads "Gathering line - 6 in, 2.9 km", the segment "1.1 to 2.8 km", the rows "0 m", "1.1 km", "2 km", "2.8 km", "2.9 km". Leave the popup open.
+- [ ] As the map editor on `/edit`, pick up the Line tool and click once: the bar reads "1 point - 0 m - start floating"; a second click some hundred metres on reads metres ("2 points - 700 m - ..."), further on kilometres. Esc.
+- [ ] Select PT-1: "On L-SWD at 1.1 km", "Distance along the line (m)", the field "1143", "of 2,922 m". L-SWD's Instruments row reads "PT-1 1.1 km", "LV-1 2 km", "PT-2 2.8 km".
+
+The override set while the popup is open (the script call of section 8t, `'data': {'system': 'us', 'labels': 'long'}`):
+
+- [ ] **Live (F8).** The viewer's open popup changes with no reload: "Gathering line - 6 in, 1.8 miles", "3,750 feet to 1.8 miles", the rows "0 feet", "3,750 feet", "1.2 miles", "1.8 miles", "1.8 miles". `dataset.units` is `us`, `dataset.unitLabels` is `long`. The pipe size still reads "6 in".
+- [ ] Change it to `{'system': 'us', 'labels': 'short'}`: "1.8 mi", "3,750 ft", "1.2 mi".
+- [ ] **Typed (F5 to F7).** On `/edit`, PT-1's Details read "On L-SWD at 3,750 ft", "Distance along the line (ft)", the field "3,750", "of 9,587 ft". Type `abc`, Enter: "Type a distance from 0 to 9,587 ft", nothing saved. Type `4000`, Enter: PT-1 moves (one Undo step "move PT-1"). Type `3750`, Enter: it is back, and `(await window.__mapStudioTest.send('map.load', {})).body.items.find(i => i.name === 'PT-1').attachment.distanceM` is `1143`. `3750 ft` and `1143 m` typed after another value store 1143 too.
+- [ ] Select L-SWD, Add an instrument, Tap: the bar's field says "Feet" with "of 9,587 ft" beside it; `99999`, Enter is refused in feet; Esc.
+- [ ] With a position (the `/locate` page), Nearest and the Needs you rows read feet and miles; an open Nearest list changes when the override does.
+- [ ] Recent changes: a pad moved some 40 m reads "Moved P31 about 130 ft north"; with `'labels': 'long'`, "about 130 feet north".
+- [ ] **Auto in the override.** `{'system': 'auto', 'labels': 'short'}`: an English (US) browser reads miles and feet, any other kilometres and metres, whatever the setup says.
+- [ ] **Cleared (F9).** Clear the override (the delete of section 8t): the viewer's popup reads kilometres again with no reload, PT-1's field "1143" and "of 2,922 m".
+
+The setup at `us`:
+
+- [ ] Set `"units": "us"` in `ops/project/com.aoindustrial.perspective.mapstudio/setup/setup.json`, scan the projects (or wait for the scan) and reload the pages. With no override: `dataset.units` is `us`; L-SWD's popup reads 1.8 mi and PT-1 at 3,750 ft; a typed 3750 in PT-1's Details (after another value) stores 1143 m.
+- [ ] Set the override to `{'system': 'metric', 'labels': 'long'}`: the open popup reads "2.9 kilometres": the override wins over the setup. Clear it: miles again.
+- [ ] Put `"units": "metric"` back and scan. Leave the store with no override.
 
 Notes:
 

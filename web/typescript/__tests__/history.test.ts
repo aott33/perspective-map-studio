@@ -3,6 +3,7 @@
 // B6 to B9 in pure functions; the delegate's reads and Revert are in historyDelegate.test.ts.
 
 import * as React from 'react';
+import { METRIC_UNITS } from '../geometry';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Kind } from '../adapters';
 import { HistoryEntry, HistoryOp } from '../contract';
@@ -68,12 +69,12 @@ describe('the sentence of a batch (B2, B6, B8)', () => {
         const RULE = { source: { path: '[default]Mesa/P14/Pressure' }, type: 'expression', expression: "'normal'" };
         const set = entry(6, [op({ op: 'update', id: 'p2', name: 'Point 2', before: { overrides: { styleRule: RULE } },
             after: { overrides: { styleRule: RULE, kpis: [{ key: 'pressure', path: '[default]Mesa/P12/Pressure' }] } } })]);
-        expect(batchSentence(set, KINDS, '', labels)).toBe("Changed Point 2's Pressure path");
+        expect(batchSentence(set, KINDS, METRIC_UNITS, labels)).toBe("Changed Point 2's Pressure path");
         // With no label known (the kind setups not loaded) the key is said.
         expect(batchSentence(set, KINDS)).toBe("Changed Point 2's pressure path");
         const reset = entry(7, [op({ op: 'update', id: 'p2', name: 'Point 2', before: { overrides: { comms: { path: '[default]c', on: true } } },
             after: { overrides: {} } })]);
-        expect(batchSentence(reset, KINDS, '', labels)).toBe("Reset Point 2's comms path");
+        expect(batchSentence(reset, KINDS, METRIC_UNITS, labels)).toBe("Reset Point 2's comms path");
         expect(batchSentence(entry(8, [op({ op: 'update', id: 'p2', name: 'Point 2', before: { overrides: {} }, after: { overrides: { styleRule: RULE } } })]), KINDS))
             .toBe("Changed Point 2's style rule");
         // A kind change that dropped the overrides in the same save (owner decision 2).
@@ -85,14 +86,14 @@ describe('the sentence of a batch (B2, B6, B8)', () => {
         // A switch changed alone (a script) is the part's override, not its path.
         const switched = entry(11, [op({ op: 'update', id: 'p2', name: 'Point 2', before: { overrides: { comms: { path: '[default]c', on: true } } },
             after: { overrides: { comms: { path: '[default]c', on: false } } } })]);
-        expect(batchSentence(switched, KINDS, '', labels)).toBe("Changed Point 2's comms override");
+        expect(batchSentence(switched, KINDS, METRIC_UNITS, labels)).toBe("Changed Point 2's comms override");
         expect(expandOps(switched, { kinds: KINDS, kpiLabel: labels })[0].fields.map((f) => f.label)).toEqual(['Comms override']);
         // The row expanded: each path before and after, "From kind" where the item had none of its own.
         expect(expandOps(set, { kinds: KINDS, kpiLabel: labels })[0].fields)
             .toEqual([{ label: 'Pressure path override', before: 'From kind', after: '[default]Mesa/P12/Pressure' }]);
         expect(expandOps(reset, { kinds: KINDS, kpiLabel: labels })[0].fields)
             .toEqual([{ label: 'Comms path override', before: '[default]c', after: 'From kind' }]);
-        expect(historyRows([set], KINDS, '', new Date('2026-11-09T10:43:00Z'), labels)[0].sentence).toBe("Changed Point 2's Pressure path");
+        expect(historyRows([set], KINDS, METRIC_UNITS, new Date('2026-11-09T10:43:00Z'), labels)[0].sentence).toBe("Changed Point 2's Pressure path");
     });
 
     test('a line deleted with its instruments in one change (EXPERIENCE.md Instruments)', () => {
@@ -174,7 +175,7 @@ describe('who and when (B2)', () => {
     });
 
     test('rows newest first, one per batch, each with who, what, when and Revert or why not', () => {
-        const rows = historyRows([move(2, 3, P14_NORTH, P14_AT, 'mapoperator'), move(1, 2, P14_AT, P14_NORTH)], KINDS, '', new Date(2026, 10, 9, 23, 0));
+        const rows = historyRows([move(2, 3, P14_NORTH, P14_AT, 'mapoperator'), move(1, 2, P14_AT, P14_NORTH)], KINDS, METRIC_UNITS, new Date(2026, 10, 9, 23, 0));
         expect(rows.map((r) => [r.seq, r.actor, r.initial, r.blocked])).toEqual([[2, 'mapoperator', 'M', ''], [1, 'mapeditor', 'M', '']]);
         expect(rows[1].sentence).toBe('Moved P14 about 40 m north');
     });
@@ -388,7 +389,7 @@ describe('the units setting in Recent changes (epic 4 entry 19b, S12 and S13)', 
             ops: [{ op: 'update', entity: 'settings', id: 'units', baseVersion: 2, data: { system: 'us', labels: 'long' } }] });
         expect(revertBatch(cleared, 'r3')).toEqual({ batchId: 'r3',
             ops: [{ op: 'create', entity: 'settings', id: 'units', baseVersion: 3, data: { system: 'metric', labels: 'short' } }] });
-        const rows = historyRows([cleared, changedUnits, set], KINDS, '', new Date('2026-11-09T12:00:00Z'));
+        const rows = historyRows([cleared, changedUnits, set], KINDS, METRIC_UNITS, new Date('2026-11-09T12:00:00Z'));
         expect(rows.map((r) => [r.sentence, r.blocked])).toEqual([
             ['Cleared the units setting', ''], ['Changed the units to Metric, symbols', ''], ['Set the units to US, words', '']]);
     });

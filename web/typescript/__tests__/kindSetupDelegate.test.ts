@@ -24,6 +24,7 @@ jest.mock('@inductiveautomation/perspective-client', () => ({
     }
 }), { virtual: true });
 
+import { METRIC_UNITS } from '../geometry';
 import { AbstractUIElementStore } from '@inductiveautomation/perspective-client';
 import { KindSetupRecord } from '../contract';
 import { resolveKey } from '../kindSetup';
@@ -318,7 +319,7 @@ describe('two editors (K11)', () => {
         const entry = state().unsaved[0];
         expect(entry).toMatchObject({ batchId: sent.batchId, state: 'refused', reason: { code: 'conflict', changedBy: 'mapeditor2' } });
         expect(isSetupSave(entry)).toBe(true);
-        const card = saveCardFor({ unsaved: state().unsaved, paused: false, dismissed: [], records: [], kinds: KINDS as never, locale: '' });
+        const card = saveCardFor({ unsaved: state().unsaved, paused: false, dismissed: [], records: [], kinds: KINDS as never, distanceUnits: METRIC_UNITS });
         expect(card).toMatchObject({ kind: 'conflict', who: 'mapeditor2', onTop: false });
         expect(saves('pad')).toMatchObject({ saving: ['link'], refusals: [{ field: 'link', code: 'conflict', words: '' }] });
         // Apply mine on top is not offered for a setup.

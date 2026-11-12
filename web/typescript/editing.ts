@@ -46,12 +46,12 @@ import { MapStudioStoreDelegate } from './MapStudioStoreDelegate';
 import { MapItemRecord } from './contract';
 import {
     Drawing, DrawingTool, GeometryPick, INSTRUMENT_CLICK_PX, REASON_SELF_INTERSECTS, drawingEnds, inField, isDrawingTool, minVertices, offLineText,
-    readDistance, startDrawing, withVertices
+    startDrawing, withVertices
 } from './drawing';
 import { Selection } from './features';
 import {
-    EDGES_CROSS, Position as LinePosition, SnapTarget, canDeleteVertex, endSideOf, lengthM, nearestSnap, placeAlong, project, ringCrosses, snapDistanceM,
-    snapTargets, snapTargetsForLine
+    EDGES_CROSS, METRIC_UNITS, Position as LinePosition, SnapTarget, canDeleteVertex, endSideOf, lengthM, nearestSnap, placeAlong, project, readDistance,
+    ringCrosses, snapDistanceM, snapTargets, snapTargetsForLine
 } from './geometry';
 import { StudioTool, armInstrument as armStudio, armedProblem, disarm, isDrawing, isPlacing, toolKind } from './studio';
 import { drawColor } from './theme';
@@ -1419,14 +1419,14 @@ export function onArmedClick(host: EditingHost, ev: MapMouseEvent): boolean {
     return true;
 }
 
-/** The drawing bar's Place (or Enter in its field, entry 9): the typed distance in metres places the instrument, else the words why not. */
+/** The drawing bar's Place (or Enter in its field, entry 9): the typed distance, read in the units in force (entry 20a), places the instrument, else the words why not. */
 export function placeTyped(host: EditingHost, text: string): void {
     const target = armedLine(host);
     if (!target) {
         disarmInstrument(host);
         return;
     }
-    const read = readDistance(text, lengthM(target.coords));
+    const read = readDistance(text, lengthM(target.coords), host.props.delegate ? host.props.delegate.distanceUnits : METRIC_UNITS);
     if ('problem' in read) {
         refuseArmed(host, read.problem);
         return;

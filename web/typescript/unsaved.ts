@@ -18,7 +18,7 @@ import { ErrorBody } from './messages';
 import { stepLabel } from './undoStack';
 import { Kind } from './adapters';
 import { distanceM } from './shared';
-import { distanceWords } from './linePopup';
+import { DistanceUnits, METRIC_UNITS, distanceText } from './geometry';
 import { KpiLabels, NO_LABELS, overrideChanges } from './itemOverrides';
 
 /** The storage the queue writes to: `localStorage` in the browser, a fake in tests. */
@@ -610,13 +610,13 @@ export function compassWord(from: [number, number], to: [number, number]): strin
     return COMPASS[Math.round(deg / 45) % 8];
 }
 
-/** A point's move in words: "about 40 m north" (linePopup.ts `distanceWords` in the locale), or "a little" under 5 m. */
-export function moveWords(from: [number, number], to: [number, number], locale: string = ''): string {
+/** A point's move in words: "about 40 m north" (geometry.ts `distanceText` in the units in force), or "a little" under 5 m. */
+export function moveWords(from: [number, number], to: [number, number], distanceUnits: DistanceUnits = METRIC_UNITS): string {
     const m = distanceM(from, to);
     if (m < 5) {
         return 'a little';
     }
-    return 'about ' + distanceWords(m, locale) + ' ' + compassWord(from, to);
+    return 'about ' + distanceText(m, distanceUnits) + ' ' + compassWord(from, to);
 }
 
 function same(a: unknown, b: unknown): boolean {
@@ -700,7 +700,7 @@ function opOf(entry: UnsavedEntry, c: Conflict): EditOp | undefined {
  * at 10:42", "Sam changed P14's name and Gas rate at 10:42", "Sam deleted P14 at 10:42"; with no `before` (an older entry) or
  * nothing it can name, "Sam changed P14 at 10:42". The first stale op is named, "and 2 more" after it when there are more.
  */
-export function theirChangeText(entry: UnsavedEntry, kinds: Kind[] = [], locale: string = '', records: MapItemRecord[] = [],
+export function theirChangeText(entry: UnsavedEntry, kinds: Kind[] = [], distanceUnits: DistanceUnits = METRIC_UNITS, records: MapItemRecord[] = [],
     labels: KpiLabels = NO_LABELS): string {
     const conflicts = entry.conflict || [];
     if (conflicts.length === 0) {
@@ -740,7 +740,7 @@ export function theirChangeText(entry: UnsavedEntry, kinds: Kind[] = [], locale:
     }
     const from = pointOf(mine);
     const to = pointOf(current);
-    const moved = from && to && !same(from, to) ? 'moved ' + name + ' ' + moveWords(from, to, locale) : '';
+    const moved = from && to && !same(from, to) ? 'moved ' + name + ' ' + moveWords(from, to, distanceUnits) : '';
     const reshaped = !moved && !same(mine.geometry, current.geometry) ? 'shape' : '';
     const fields = (reshaped ? [reshaped] : []).concat(fieldWords(mine, current, kinds, labels));
     if (moved && fields.length > 0) {
@@ -801,7 +801,7 @@ function valueWords(value: unknown): string {
 }
 
 /** One update op of mine in words: "label position Right, Gas rate switched on", "moved about 40 m north", "name P14b". */
-function updateWords(op: EditOp, mine: MapItemRecord | undefined, kinds: Kind[], locale: string, labels: KpiLabels = NO_LABELS): string[] {
+function updateWords(op: EditOp, mine: MapItemRecord | undefined, kinds: Kind[], distanceUnits: DistanceUnits, labels: KpiLabels = NO_LABELS): string[] {
     const data = op.data || {};
     const kindId = typeof data.kind === 'string' ? data.kind : mine ? mine.kind : '';
     const words: string[] = [];
@@ -821,7 +821,7 @@ function updateWords(op: EditOp, mine: MapItemRecord | undefined, kinds: Kind[],
             const from = pointOf(mine);
             const g = data.geometry;
             const to = g && g.type === 'Point' ? g.coordinates as [number, number] : null;
-            words.push(from && to ? 'moved ' + moveWords(from, to, locale) : to ? 'a new place' : 'a new shape');
+            words.push(from && to ? 'moved ' + moveWords(from, to, distanceUnits) : to ? 'a new place' : 'a new shape');
         } else if (key === 'properties') {
             const props = (value || {}) as Record<string, unknown>;
             const keys = mine ? changedKeys(mine.properties, props) : Object.keys(props);
@@ -851,7 +851,7 @@ function updateWords(op: EditOp, mine: MapItemRecord | undefined, kinds: Kind[],
  * card: "P14 label position Right"); an add or a delete as Undo names it ("Add Gathering line"). The first map item op; "and 2
  * more items" after it when the batch changes more.
  */
-export function yourChangeText(entry: UnsavedEntry, records: MapItemRecord[], kinds: Kind[] = [], locale: string = '',
+export function yourChangeText(entry: UnsavedEntry, records: MapItemRecord[], kinds: Kind[] = [], distanceUnits: DistanceUnits = METRIC_UNITS,
     named: boolean = false, labels: KpiLabels = NO_LABELS): string {
     const items = entry.batch.ops.filter((o) => o.entity === 'item');
     const op = items[0];
@@ -871,7 +871,7 @@ export function yourChangeText(entry: UnsavedEntry, records: MapItemRecord[], ki
         return label.charAt(0).toUpperCase() + label.slice(1) + more;
     }
     const mine = beforeOf(entry, op.id) || records.find((r) => r.id === op.id);
-    const words = updateWords(op, beforeOf(entry, op.id), kinds, locale, labels);
+    const words = updateWords(op, beforeOf(entry, op.id), kinds, distanceUnits, labels);
     const name = op.data && typeof op.data.name === 'string' && op.data.name !== '' ? op.data.name : mine && mine.name !== '' ? mine.name : 'an item';
     const detail = words.length > 0 ? words.join(', ') : 'a change to ' + name;
     return (named && words.length > 0 ? name + ' ' : '') + detail + more;
@@ -972,7 +972,7 @@ export interface SaveCardFacts {
     dismissed: readonly string[];
     records: MapItemRecord[];
     kinds: Kind[];
-    locale: string;
+    distanceUnits: DistanceUnits;
     /** A key value's label by kind and key (itemOverrides.ts `kpiLabelsOf` of the stored kind setups), for an override's words. */
     kpiLabel?: KpiLabels;
 }
@@ -1019,12 +1019,12 @@ export function saveCardFor(facts: SaveCardFacts): SaveCardData | null {
         const entry = open[0];
         const who = otherEditor(entry);
         const blocked = onTopBlockedText(entry);
-        const their = theirChangeText(entry, facts.kinds, facts.locale, facts.records, facts.kpiLabel);
+        const their = theirChangeText(entry, facts.kinds, facts.distanceUnits, facts.records, facts.kpiLabel);
         return {
             kind: 'conflict', batchId: entry.batchId,
             title: 'Not saved - conflict with ' + (who !== '' ? who + "'s" : "another editor's") + ' change',
             text: their + (blocked === '' ? ', while you were editing it.' : '. ' + blocked),
-            kept: 'Your change, kept here and not saved: ' + yourChangeText(entry, facts.records, facts.kinds, facts.locale, false, facts.kpiLabel) + '.',
+            kept: 'Your change, kept here and not saved: ' + yourChangeText(entry, facts.records, facts.kinds, facts.distanceUnits, false, facts.kpiLabel) + '.',
             position: conflicts.length >= 2 ? (conflicts.indexOf(entry) + 1) + ' of ' + conflicts.length : '',
             who, onTop: blocked === '' && onTopBatch(entry, 'check') !== null, blocked, count: n, closeKey: dismissKey(entry)
         };
@@ -1033,7 +1033,7 @@ export function saveCardFor(facts: SaveCardFacts): SaveCardData | null {
     if (busy && busy.reason) {
         return {
             kind: 'busy', batchId: busy.batchId, title: 'Not saved - Map Studio is busy', text: busy.reason.message,
-            kept: 'Your change, kept here: ' + yourChangeText(busy, facts.records, facts.kinds, facts.locale, true, facts.kpiLabel) + '.',
+            kept: 'Your change, kept here: ' + yourChangeText(busy, facts.records, facts.kinds, facts.distanceUnits, true, facts.kpiLabel) + '.',
             position: '', who: '', onTop: false, blocked: '', count: n, closeKey: dismissKey(busy)
         };
     }

@@ -1,7 +1,7 @@
 /**
  * The drawing in progress and the drawing bar's words (epic 4 entry 4; DESIGN.md Drawing bar, EXPERIENCE.md
  * Drawing bar, Draw and Snap): what the component holds while a line or an area is drawn vertex by vertex with
- * Terra Draw (editing.ts), and the words the bar bottom-centre shows for it ("2 points - 0.7 km - start floating",
+ * Terra Draw (editing.ts), and the words the bar bottom-centre shows for it ("2 points - 700 m - start floating",
  * "Snap to CTB1 - click to connect", "A line needs two points"). From entry 23 (owner, 2026-11-05) the bar is the one
  * place Edit mode talks, for every tool in hand: the Point tool's bar names the kind and "Click the map, then drag to
  * fine-tune" too, and there is no toast after an add and no Snap word (the toolbar's magnet says it on hover). Pure
@@ -10,9 +10,8 @@
  */
 
 import { Kind } from './adapters';
-import { Position, SnapTarget, canDeleteVertex, canSplitAt, endsFrom, lengthM, minVertexCount } from './geometry';
+import { DistanceUnits, Position, SnapTarget, canDeleteVertex, canSplitAt, distanceText, endsFrom, lengthM, minVertexCount } from './geometry';
 import { MapItemRecord } from './contract';
-import { distanceText } from './linePopup';
 import { StudioTool } from './studio';
 
 /** The tools that draw vertex by vertex: a line, or an area (a ring saved as an unclosed LineString, AD-20). */
@@ -112,12 +111,12 @@ export function endSnap(drawing: Drawing): SnapTarget | null {
 }
 
 /**
- * The bar's progress: "2 points - 0.7 km - start floating", "1 point - 0 km - start snapped to CTB1", and once the
+ * The bar's progress, its length in the units in force: "2 points - 700 m - start floating", "1 point - 0 m - start snapped to CTB1", and once the
  * line has an end "end snapped to SWD1" or "end floating" after it; an area names no ends.
  */
-export function progressText(drawing: Drawing): string {
+export function progressText(drawing: Drawing, units: DistanceUnits): string {
     const n = drawing.vertices.length;
-    const parts = [n + (n === 1 ? ' point' : ' points'), distanceText(drawnLengthM(drawing))];
+    const parts = [n + (n === 1 ? ' point' : ' points'), distanceText(drawnLengthM(drawing), units)];
     if (drawing.tool === 'line') {
         const start = startSnap(drawing);
         parts.push(start ? 'start snapped to ' + start.name : 'start floating');
@@ -254,17 +253,11 @@ const NOT_TYPED = ['checkbox', 'radio', 'button', 'submit', 'reset'];
 /**
  * Placing an instrument (epic 4 entry 9; EXPERIENCE.md Instruments, the drawing bar): Add an instrument in a line's Details arms
  * the kind, then a click within INSTRUMENT_CLICK_PX of the line places it at the click's projection, or a distance typed in
- * metres places it there; a click elsewhere or a distance outside the line is refused in words in the bar, nothing saved.
+ * the units in force places it there (geometry.ts `readDistance`); a click elsewhere or a distance outside the line is refused in words in the bar, nothing saved.
  */
 
 /** How near the line a click must be, in screen pixels, to place an instrument at its projection (the planner's pick, 2026-11-09). */
 export const INSTRUMENT_CLICK_PX = 12;
-
-/** Whole metres with thousands separators: "2,936 m" (metres until the units entries, 19 and 20). */
-export function metresText(metres: number): string {
-    const m = Math.round(metres > 0 && isFinite(metres) ? metres : 0);
-    return String(m).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' m';
-}
 
 /** The placement bar's title: "New tap on L-SWD". */
 export function instrumentTitle(kindName: string, lineName: string): string {
@@ -279,25 +272,7 @@ export function offLineText(lineName: string): string {
     return 'Click on ' + lineName + ': an instrument sits on its line';
 }
 
-/** A typed distance that is not a number from 0 to the line's length, refused in words: "Type a distance from 0 to 2,936 m". */
-export function distanceRangeText(lengthM: number): string {
-    return 'Type a distance from 0 to ' + metresText(lengthM);
-}
-
-/**
- * A distance along a line typed in metres ("2841", "2,841", "1143.5"): the number when it is from 0 to the line's length (to the
- * metre the bar shows it, the place kept at the end), else the problem in words; nothing typed is a problem too.
- */
-export function readDistance(text: string, lengthM: number): { distanceM: number } | { problem: string } {
-    const t = text.replace(/[,\s]/g, '').replace(/m$/i, '');
-    const n = Number(t);
-    if (t === '' || !Number.isFinite(n) || n < 0 || n > lengthM + 0.5) {
-        return { problem: distanceRangeText(lengthM) };
-    }
-    return { distanceM: Math.min(n, lengthM) };
-}
-
 /** An instrument's Location in Details (entry 9): "On L-SWD at 1.1 km", the distance as the line popup writes it. */
-export function instrumentLocationText(lineName: string, distanceM: number): string {
-    return 'On ' + lineName + ' at ' + distanceText(distanceM);
+export function instrumentLocationText(lineName: string, distanceM: number, units: DistanceUnits): string {
+    return 'On ' + lineName + ' at ' + distanceText(distanceM, units);
 }

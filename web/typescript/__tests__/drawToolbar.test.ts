@@ -1,3 +1,4 @@
+import { METRIC_UNITS } from '../geometry';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Kind } from '../adapters';
@@ -176,7 +177,7 @@ describe('the drawing bar (epic 4 entry 4)', () => {
     const ctb1 = { itemId: 'ctb1', name: 'CTB1', position: [-105.012, 39.7262] as [number, number] };
 
     test('the tool in hand with no vertex yet: where to click, the snap indicator only with a target in reach, Finish inert', () => {
-        const idle = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'line', drawing: null, kind: KINDS[1], snap: false, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
+        const idle = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'line', drawing: null, kind: KINDS[1], units: METRIC_UNITS, snap: false, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
         expect(idle).toContain('data-tool="line" data-points="0" data-valid="false" data-reason="" data-snap="off" data-snap-target=""');
         expect(idle).toContain('New gathering line');
         expect(idle).toContain('Click the map to add the first point');
@@ -184,17 +185,17 @@ describe('the drawing bar (epic 4 entry 4)', () => {
         expect(idle).toContain('mapstudio-drawing-finish" disabled=""');
         // No "Snap on" or "Snap off" words on the bar (entry 23): the toolbar's magnet says it.
         expect(idle).not.toContain('mapstudio-drawing-snap');
-        const on = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'line', drawing: null, kind: KINDS[1], snap: true, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
+        const on = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'line', drawing: null, kind: KINDS[1], units: METRIC_UNITS, snap: true, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
         expect(on).toContain('data-snap="on" data-snap-target=""');
         expect(on).not.toContain('mapstudio-drawing-snap');
         expect(on).not.toContain('Snap on');
-        const near = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'line', drawing: null, kind: KINDS[1], snap: true, snapHint: 'CTB1', onCancel: noop, onFinish: noop, onDone: noop }));
+        const near = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'line', drawing: null, kind: KINDS[1], units: METRIC_UNITS, snap: true, snapHint: 'CTB1', onCancel: noop, onFinish: noop, onDone: noop }));
         expect(near).toContain('data-snap="on" data-snap-target="CTB1"');
         expect(near).toContain('data-state="target">Snap to CTB1 - click to connect');
     });
 
     test('the Point tool in hand (entry 23): the kind\'s glyph, "New well pad", how to place it and Done, no Cancel or Finish', () => {
-        const html = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'point', drawing: null, kind: KINDS[0], snap: false, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
+        const html = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'point', drawing: null, kind: KINDS[0], units: METRIC_UNITS, snap: false, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
         expect(html).toContain('class="mapstudio-drawing-bar mapstudio-drawing-bar--point" role="group" aria-label="Adding a point" data-tool="point"');
         expect(html).toContain('#ms-well-pad');
         expect(html).toContain('<span class="mapstudio-drawing-title">New well pad</span>');
@@ -203,7 +204,7 @@ describe('the drawing bar (epic 4 entry 4)', () => {
         expect(html).not.toContain('mapstudio-drawing-finish');
         expect(html).not.toContain('mapstudio-drawing-cancel');
         // A kind list with no point kind: the bar says so as its problem.
-        const none = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'point', drawing: null, kind: null, snap: false, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
+        const none = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'point', drawing: null, kind: null, units: METRIC_UNITS, snap: false, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
         expect(none).toContain('data-reason="The kind list has no point kind"');
         expect(none).toContain('New point');
         expect(none).toContain('mapstudio-drawing-hint mapstudio-drawing-hint--problem">The kind list has no point kind');
@@ -211,7 +212,7 @@ describe('the drawing bar (epic 4 entry 4)', () => {
 
     test('a line tool with no line kind: the problem in the bar and Finish inert even with two points', () => {
         const drawing = withVertices(startDrawing('line', 'f', [[-104.99, 39.74]], null), [[-104.99, 39.74], [-104.98, 39.745]], null, '');
-        const html = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'line', drawing, kind: null, snap: false, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
+        const html = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'line', drawing, kind: null, units: METRIC_UNITS, snap: false, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
         expect(html).toContain('data-valid="false" data-reason="The kind list has no line kind"');
         expect(html).toContain('New line');
         expect(html).toContain('mapstudio-drawing-finish" disabled=""');
@@ -219,10 +220,10 @@ describe('the drawing bar (epic 4 entry 4)', () => {
 
     test('one vertex: the count, the floating start, what it needs, Finish inert', () => {
         const drawing = startDrawing('line', 'f', [[-104.99, 39.74]], null);
-        const html = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'line', drawing, kind: KINDS[1], snap: false, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
+        const html = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'line', drawing, kind: KINDS[1], units: METRIC_UNITS, snap: false, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
         expect(html).toContain('data-tool="line" data-points="1" data-valid="false" data-reason="A line needs two points" data-snap="off" data-snap-target="" data-snap-start="" data-snap-end=""');
         expect(html).toContain('New gathering line');
-        expect(html).toContain('1 point - 0 km - start floating');
+        expect(html).toContain('1 point - 0 m - start floating');
         expect(html).not.toContain('Snap off');
         expect(html).toContain('mapstudio-drawing-hint mapstudio-drawing-hint--problem">A line needs two points');
         expect(html).toContain('mapstudio-drawing-finish" disabled=""');
@@ -231,7 +232,7 @@ describe('the drawing bar (epic 4 entry 4)', () => {
 
     test('snapped ends, the indicator naming the target within reach, and the finish hint once it may finish', () => {
         const drawing = withVertices(startDrawing('line', 'f', [ctb1.position], ctb1), [ctb1.position, [-104.983671, 39.715476]], null, '');
-        const html = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'line', drawing, kind: KINDS[1], snap: true, snapHint: 'SWD1', onCancel: noop, onFinish: noop, onDone: noop }));
+        const html = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'line', drawing, kind: KINDS[1], units: METRIC_UNITS, snap: true, snapHint: 'SWD1', onCancel: noop, onFinish: noop, onDone: noop }));
         expect(html).toContain('data-points="2" data-valid="true" data-reason="" data-snap="on" data-snap-target="SWD1" data-snap-start="CTB1" data-snap-end=""');
         expect(html).toContain('2 points - 2.7 km - start snapped to CTB1 - end floating');
         expect(html).toContain('mapstudio-drawing-snap mapstudio-drawing-snap--target" data-state="target">Snap to SWD1 - click to connect');
@@ -241,7 +242,7 @@ describe('the drawing bar (epic 4 entry 4)', () => {
 
     test('an area: the close hint and no ends', () => {
         const drawing = withVertices(startDrawing('area', 'g', [[-104.99, 39.74]], null), [[-104.99, 39.74], [-104.98, 39.745], [-104.97, 39.74]], null, '');
-        const html = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'area', drawing, kind: KINDS[2], snap: false, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
+        const html = renderToStaticMarkup(React.createElement(DrawingBar, { tool: 'area', drawing, kind: KINDS[2], units: METRIC_UNITS, snap: false, snapHint: '', onCancel: noop, onFinish: noop, onDone: noop }));
         expect(html).toContain('data-tool="area" data-points="3" data-valid="true"');
         expect(html).toContain('New geofence');
         expect(html).toContain('Double-click or Enter to close');

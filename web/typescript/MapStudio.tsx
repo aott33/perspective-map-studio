@@ -12,7 +12,7 @@ import {
 import { ErrorEvent, Map as MapLibreMap, MapMouseEvent, Popup, setWorkerUrl } from 'maplibre-gl';
 import { TerraDraw, TerraDrawLineStringMode, TerraDrawPolygonMode, TerraDrawSelectMode } from 'terra-draw';
 import { Drawing, GeometryPick, inField } from './drawing';
-import { SnapTarget, instrumentsOn, lengthM } from './geometry';
+import { DistanceUnits, SnapTarget, browserLocale, instrumentsOn, lengthM, sameUnits, unitsInForce } from './geometry';
 import { EditLevel, MapItemRecord } from './contract';
 import { AdapterStatus, HostLists, NO_HOST_LISTS } from './adapters';
 import { BasemapId, RasterSource } from './basemaps';
@@ -36,7 +36,6 @@ import { PLACES } from './placeCheck';
 import { STORE_UNKNOWN, storeStateAttribute } from './storeState';
 import { SAVE_IDLE } from './save';
 import { saveCardFor, unsavedItems } from './unsaved';
-import { browserLocale } from './linePopup';
 import { ProblemFacts, chipProblem, editProblems, headerSaveWords } from './problems';
 import { PopupPoint, isSheetWidth, sheetBasisWidth } from './popupParams';
 import { CameraPadding, PopupAnchor, Rect } from './popupPlacement';
@@ -61,7 +60,7 @@ import * as editing from './editing';
 import * as basemap from './basemapLayer';
 import { TilesState } from './basemapLayer';
 import {
-    StudioState, StudioSurface, StudioTool, addMany, chooseKind, choosePreview, clearSelection, enterEdit, fromProps, instrumentKinds, isEditing, isMultiple,
+    StudioState, StudioSurface, StudioTool, addMany, armedProblem, chooseKind, choosePreview, clearSelection, enterEdit, fromProps, instrumentKinds, isEditing, isMultiple,
     keepArmed, kindsFor, leaveEdit, pickTool, select, selectMany, showSurface, toggleSelect, toolKind
 } from './studio';
 import { BoxSelect, DragShape, ShapeItem } from './multiSelect';
@@ -435,6 +434,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         // Locate me and the legend's row from the page's userLocation now; the marker once the layers exist (entry 15).
         this.applyUserLocation();
+        this.applyUnits();
         // Mapbox's "Improve this map" carries the map's position (its attribution guide): after the control
         // rebuilds its links (its listeners run first) and after every move.
         map.on('sourcedata', this.updateFeedbackLinks);
@@ -665,6 +665,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         // it was written with is in force (a mode set here takes effect on the next update).
         selection.readPageSelection(this, prevProps.props.selectedItem);
         this.applyUserLocation();
+        this.applyUnits();
         this.applyStudioControls();
         this.applyHistory();
         this.applyTopBar();
@@ -1436,6 +1437,37 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.publishFit();
     };
 
+    /** The units in force (entry 20a): the delegate's, or before it exists the browser locale's. */
+    private appliedUnits: DistanceUnits | null = null;
+
+    private distanceUnits(): DistanceUnits {
+        return this.props.delegate && this.props.delegate.distanceUnits ? this.props.delegate.distanceUnits : unitsInForce(null, 'auto', browserLocale());
+    }
+
+    /**
+     * The units in force reach the two controls drawn outside React (entry 20a): Nearest in the search and the Needs you rows'
+     * distances are written in them, and an open list is drawn again when a `map.changed` brings a new setting; the scale bar
+     * (MapLibre's own) takes the system. A refusal in the instrument bar names its range in the unit shown then, so it goes
+     * when the units change.
+     */
+    private applyUnits(): void {
+        const units = this.distanceUnits();
+        if (this.legendControl) {
+            this.legendControl.setScaleUnit(units.system);
+        }
+        const changed = this.appliedUnits !== null && !sameUnits(this.appliedUnits, units);
+        this.appliedUnits = units;
+        if (changed && this.state.studio.armed !== null && this.state.studio.armed.problem !== '') {
+            this.setState((prev) => ({ studio: armedProblem(prev.studio, '') }));
+        }
+        if (this.searchControl) {
+            this.searchControl.setUnits(units);
+        }
+        if (this.needsYouControl) {
+            this.needsYouControl.setUnits(units);
+        }
+    }
+
     /**
      * The page's userLocation (entry 15; userLocation.ts): read into one state, which draws the marker (moved with each new
      * position, the camera left where it is), sets Locate me and puts the legend's "You are here" row in or out, all three
@@ -1819,7 +1851,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     private renderSaveCard(delegate: MapStudioDelegateState, belowChip: boolean): React.ReactNode {
         const card = saveCardFor({
             unsaved: delegate.unsaved, paused: !!delegate.savePaused, dismissed: this.state.cardsClosed, records: delegate.items,
-            kinds: delegate.lists.kinds, locale: browserLocale(),
+            kinds: delegate.lists.kinds, distanceUnits: delegate.distanceUnits,
             kpiLabel: kpiLabelsOf(delegate.kindSetups)
         });
         if (!card) {
@@ -2425,13 +2457,13 @@ export class MapStudio extends Component<Props, MapStudioState> {
      */
     private renderHistory(delegate: MapStudioDelegateState, facts: ProblemFacts): React.ReactNode {
         const kinds = delegate.lists.kinds;
-        const locale = browserLocale();
+        const distanceUnits = delegate.distanceUnits;
         const stack = delegate.undo;
         const busy = busyText(stack, delegate.editInFlight);
         const names = new Map(delegate.lists.assetNames.map((a) => [a.id, a.name]));
         const expand = (entry: HistoryEntry) => expandOps(entry, {
             kinds,
-            locale,
+            distanceUnits,
             assetName: (id) => names.get(id) || id,
             itemName: (id) => {
                 const item = delegate.items.find((i) => i.id === id);
@@ -2448,7 +2480,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                               </header>
                           )}
                           history={delegate.history}
-                          rows={historyRows(delegate.history.entries, kinds, locale, new Date(), kpiLabelsOf(delegate.kindSetups))}
+                          rows={historyRows(delegate.history.entries, kinds, distanceUnits, new Date(), kpiLabelsOf(delegate.kindSetups))}
                           expand={expand}
                           lastStep={stack.done > 0 ? stack.steps[stack.done - 1].label : ''}
                           undoLabel={busy !== '' ? '' : undoLabel(stack)}
@@ -2584,6 +2616,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const undoing = reverse !== null && reverse.batch.ops.some((o) => o.entity === 'item' && o.id === item.id);
         return (
             <PropertiesPanel key={item.id} ref={this.itemPanel}
+                             units={delegate.distanceUnits}
                              browsing={this.state.tagPick && this.state.tagPick.itemId === item.id ? this.state.tagPick.tagFor : null}
                              onBrowse={this.onItemTagBrowse} onBrowseGone={this.onTagClose}
                              tab={this.state.panelTab}
@@ -2648,7 +2681,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
             return null;
         }
         return (
-            <InstrumentBar kind={kind} lineId={line.id} lineName={line.name} lengthM={lengthM(line.geometry.coordinates)} problem={problem}
+            // Keyed by the units in force (entry 20a): a number typed and not placed would be read in the new unit, so the bar
+            // is made again with its field empty when they change.
+            <InstrumentBar key={'instrument|' + delegate.distanceUnits.system + '|' + delegate.distanceUnits.labels} kind={kind} lineId={line.id} lineName={line.name} lengthM={lengthM(line.geometry.coordinates)} problem={problem}
+                           units={delegate.distanceUnits}
                            onPlace={this.onPlaceInstrument} onCancel={this.onCancelInstrument} />
         );
     }
@@ -2786,6 +2822,8 @@ export class MapStudio extends Component<Props, MapStudioState> {
                          data-store-seq={delegate && delegate.seq !== null ? String(delegate.seq) : ''}
                          data-map-reloads={delegate ? String(delegate.reloads) : '0'}
                          data-units-override={delegate && delegate.units ? delegate.units.system + ',' + delegate.units.labels + ',' + delegate.units.version : ''}
+                         data-units={this.distanceUnits().system}
+                         data-unit-labels={this.distanceUnits().labels}
                          data-store-state={storeStateAttribute(store)}
                          data-store-reason={store.reason}
                          data-save-state={save.state}
@@ -2847,6 +2885,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                         <DrawingBar tool={studio.tool}
                                     drawing={drawing}
                                     kind={inHand}
+                                    units={delegate.distanceUnits}
                                     snap={this.state.snap}
                                     snapHint={this.state.snapHint}
                                     onCancel={this.onCancelDrawing}

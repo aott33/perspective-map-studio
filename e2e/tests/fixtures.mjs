@@ -9,6 +9,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EDITOR2_USER, EDITOR_USER, OPERATOR_USER, editorStateFile, stateFile } from '../lib/editorAuth.mjs';
+import { backUpSetup, committedSetup, putBackSetup, scanProject, writeSetup } from '../lib/gateway.mjs';
 
 const signInCli = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'lib', 'signInCli.mjs');
 
@@ -177,6 +178,65 @@ export async function view(page, map, center, zoom) {
 export async function send(page, type, body) {
     await page.waitForFunction(() => Boolean(window.__mapStudioTest));
     return page.evaluate(([t, b]) => window.__mapStudioTest.send(t, b), [type, body]);
+}
+
+/**
+ * Clear Edit mode's units override when one is live (epic 4 entry 19b), as an editor through the test hook: the store
+ * then reads as a fresh one, `settings` {}, and the setup's units apply (entry 20a).
+ */
+export async function clearUnits(page) {
+    const load = await send(page, 'map.load', {});
+    expect(load.type, JSON.stringify(load.body)).toBe('map.load.reply');
+    const units = load.body.settings.units;
+    if (units) {
+        const reply = await send(page, 'edits.apply', {
+            batchId: randomUUID(), ops: [{ op: 'delete', entity: 'settings', id: 'units', baseVersion: units.version }] });
+        expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
+    }
+}
+
+/**
+ * Set the units override to `data` ({system, labels}), as an editor through the test hook (no control sends one until
+ * entry 20b): an update of the live one, else a create at 0 or at the cleared setting's version, which the create's
+ * conflict reports (a cleared one is not in map.load.reply).
+ */
+export async function setUnits(page, data) {
+    const op = (kind, baseVersion) => ({ batchId: randomUUID(), ops: [{ op: kind, entity: 'settings', id: 'units', baseVersion, data }] });
+    const load = await send(page, 'map.load', {});
+    expect(load.type, JSON.stringify(load.body)).toBe('map.load.reply');
+    const live = load.body.settings.units;
+    let reply = await send(page, 'edits.apply', live ? op('update', live.version) : op('create', 0));
+    if (reply.type === 'error' && reply.body.code === 'conflict' && !live) {
+        reply = await send(page, 'edits.apply', op('create', reply.body.conflicts[0].current.version));
+    }
+    expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
+}
+
+/**
+ * The dev setup with `units` (entry 19a) for a spec's own run: the committed file is kept (lib/gateway.mjs
+ * `backUpSetup`), the changed one scanned, and the wait ends once a map.load on `page` reports them. The spec puts
+ * the committed setup back with `restoreSetupUnits`.
+ */
+export async function useSetupUnits(page, units) {
+    backUpSetup();
+    writeSetup({ ...committedSetup(), units });
+    await scanProject();
+    await expectSetupUnits(page, units);
+}
+
+/** The committed dev setup back (`putBackSetup`), waited for on `page` when one is given. */
+export async function restoreSetupUnits(page) {
+    const units = committedSetup().units;
+    if (await putBackSetup() && page) {
+        await expectSetupUnits(page, units);
+    }
+}
+
+async function expectSetupUnits(page, units) {
+    await expect.poll(async () => {
+        const load = await send(page, 'map.load', {});
+        return load.type === 'map.load.reply' && load.body.setup ? load.body.setup.units : load.type;
+    }, { timeout: 90_000, intervals: [1_000] }).toBe(units);
 }
 
 /**

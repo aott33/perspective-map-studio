@@ -211,7 +211,7 @@ editorTest.describe('1440 px', () => {
             await expectOneLine(popup.locator('[data-part="comms"] .mapstudio-popup-value'));
             await expect(popup.locator('.mapstudio-popup-section-label')).toHaveText('Instruments, CTB1 to SWD1');
             expect(await rows(popup)).toEqual([
-                ['CTB1 outlet', '0 km', '412 psi', 'false'],
+                ['CTB1 outlet', '0 m', '412 psi', 'false'],
                 ['PT-1', '1.1 km', '398 psi', 'true'],
                 ['LV-1', '2 km', 'No value', 'false'],
                 ['PT-2', '2.8 km', '371 psi', 'true'],

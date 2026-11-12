@@ -31,7 +31,7 @@
 
 import { IControl, Map as MapLibreMap } from 'maplibre-gl';
 import { glyphSvg } from './controls';
-import { browserLocale, distanceWords } from './linePopup';
+import { DistanceUnits, METRIC_UNITS, distanceText, sameUnits } from './geometry';
 import {
     LIST_ORDERS, ListOrder, NO_MATCHES, SEARCH_LABEL, SEARCH_PLACEHOLDER, SearchEntry, SearchResult, allEntries, chosenText, nearestEntries,
     pagedCount, positionRedraws, searchEntries
@@ -61,6 +61,8 @@ export class SearchControl implements IControl {
     private active = -1;
     /** The user's position `[lng, lat]` (entry 16), or null: the switch and Nearest show only with one. */
     private position: [number, number] | null = null;
+    /** The units in force (entry 20a, `setUnits`): Nearest's distances are written in them. */
+    private units: DistanceUnits = METRIC_UNITS;
     /** The open list's order, A-Z at first and kept while the control lives (entry 16). */
     private order: ListOrder = 'az';
     /** The A-Z | Nearest switch while it is in the panel, kept across the list's redraws so its focus stays. */
@@ -192,6 +194,25 @@ export class SearchControl implements IControl {
         // Only the Nearest list and the switch follow the position: an A-Z list or typed results are left as they are, so a new
         // fix never rebuilds them or moves their scroll.
         if (panel && positionRedraws(empty, position !== null, this.switchEl !== null, this.order)) {
+            const scroll = panel.scrollTop;
+            this.search();
+            if (this.panel) {
+                this.panel.scrollTop = scroll;
+            }
+        }
+    }
+
+    /**
+     * The units in force (entry 20a; MapStudio.tsx applyUnits): an open list that shows distances is drawn again in them, its
+     * scroll kept; any other list is left as it is.
+     */
+    setUnits(units: DistanceUnits): void {
+        if (sameUnits(units, this.units)) {
+            return;
+        }
+        this.units = units;
+        const panel = this.panel;
+        if (panel && panel.querySelector('[data-distance-m]')) {
             const scroll = panel.scrollTop;
             this.search();
             if (this.panel) {
@@ -495,7 +516,7 @@ export class SearchControl implements IControl {
                 // Nearest (entry 16): the distance from the user, right-aligned in the secondary colour.
                 const distance = document.createElement('span');
                 distance.className = 'mapstudio-search-distance';
-                distance.textContent = distanceWords(result.distanceM, browserLocale());
+                distance.textContent = distanceText(result.distanceM, this.units);
                 li.appendChild(distance);
                 li.setAttribute('data-distance-m', String(Math.round(result.distanceM)));
             }

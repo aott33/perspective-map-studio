@@ -6,6 +6,7 @@
 // Entry 12c3 (the tab reordered, its words made plain, its flow mended): the order (U1), the action and own-rule lines (U2), the
 // Live now line (U3), a half-built rule kept when the panel goes (U4), Esc inside a rule not saved (U5), Enter keeping the
 // field (U6), Override by what the kind's rule needs (U10) and the selects in the tiles' words (U11).
+import { METRIC_UNITS } from '../geometry';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AdapterStatus, Kind } from '../adapters';
@@ -273,7 +274,7 @@ function facts(extra: Partial<StyleFacts> = {}): StyleFacts {
 function props(over: Partial<PropertiesPanelProps> = {}): PropertiesPanelProps {
     const item = over.item || record();
     return {
-        item, kind: PAD, kinds: [PAD], assets: [], assetNames: [], assetStatus: OK, items: [item], assetRows: [], kindStatus: OK,
+        item, kind: PAD, kinds: [PAD], units: METRIC_UNITS, assets: [], assetNames: [], assetStatus: OK, items: [item], assetRows: [], kindStatus: OK,
         saving: false, newest: item.properties, pending: false, paused: false, autoFocusName: false, onNameFocused: noop, onClose: noop,
         onRename: noop, onMove: noop, canMoveByClick: true, moving: false, onMoveStart: noop, onLink: noop, onKind: noop, onProperty: noop,
         onDelete: noop, toolInHand: false, delKey: true, places: createPlaceSource(() => new Promise(() => undefined)), onZoomTo: noop,

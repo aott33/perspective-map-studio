@@ -6,7 +6,9 @@
  * with the `ends` naming it cleared. Turf 7.4.0 (`length`, `along`, `nearestPointOnLine`, units metres, earth
  * radius 6371008.8 m); the Gateway checks the result with the same formulas
  * (common/.../contract/LineMeasure.java, shared test vectors). Pure, unit tested in node;
- * the drawing and editing tools of epic-editing call it, nothing draws here.
+ * the drawing and editing tools of epic-editing call it, nothing draws here. From entry 20a it holds the one
+ * formatter behind every distance the map shows or reads (`distanceText`, `exactDistanceText`, `distanceSpan`,
+ * `readDistance`) and the rule for the units in force (`unitsInForce`).
  */
 
 import { along } from '@turf/along';
@@ -14,7 +16,7 @@ import { lineString, point } from '@turf/helpers';
 import { length } from '@turf/length';
 import { nearestPointOnLine } from '@turf/nearest-point-on-line';
 
-import { EditBatch, EditOp, ItemGeometry, MapItemData, MapItemRecord } from './contract';
+import { EditBatch, EditOp, ItemGeometry, MapItemData, MapItemRecord, MapUnits, UnitLabels, UnitsSetting } from './contract';
 
 export type Position = [number, number];
 
@@ -645,4 +647,170 @@ export function itemDistanceM(position: Position, geometry: ItemGeometry, area: 
         return nearestPointOnLine(lineString(ring), point(position), METRES).properties.pointDistance;
     }
     return nearestPointOnLine(lineString(coords), point(position), METRES).properties.pointDistance;
+}
+
+/**
+ * The units every distance is written in (epic 4 entry 20a, R27): one of two systems, and how the unit reads, a symbol
+ * (`short`: km, m, mi, ft) or a word (`long`: kilometres, metres, miles, feet). Stored distances stay metres.
+ */
+export interface DistanceUnits {
+    system: 'metric' | 'us';
+    labels: UnitLabels;
+}
+
+/** Kilometres and metres with short labels: what a caller with no units at hand writes in. */
+export const METRIC_UNITS: DistanceUnits = { system: 'metric', labels: 'short' };
+
+/** Metres in a mile and in a foot (international units). */
+const M_PER_MI = 1609.344;
+const M_PER_FT = 0.3048;
+const FT_PER_MI = 5280;
+
+/** Whether a locale counts distances in miles: en-US (and its variants), as the browser's language says it. */
+export function usesMiles(locale: string): boolean {
+    return /^en-US\b/i.test(locale.trim());
+}
+
+/** The browser's language, the locale `auto` units follow ('' where there is none, which counts as metric). */
+export function browserLocale(): string {
+    return typeof navigator !== 'undefined' && typeof navigator.language === 'string' ? navigator.language : '';
+}
+
+/**
+ * The units in force (entry 20a, the owner's pick 1): the live override's system and labels (changes.ts `liveUnits`; a
+ * cleared one is no override); with none the setup's units and short labels. `auto`, from either, is the locale: miles
+ * for en-US, kilometres otherwise. A missing setup (an older Gateway) reads as `auto`.
+ */
+export function unitsInForce(override: UnitsSetting | null, setupUnits: MapUnits | undefined, locale: string): DistanceUnits {
+    const live = override && !override.deleted ? override : null;
+    const named: MapUnits = live ? live.system : setupUnits === 'metric' || setupUnits === 'us' ? setupUnits : 'auto';
+    const system = named === 'auto' ? (usesMiles(locale) ? 'us' : 'metric') : named;
+    return { system, labels: live && live.labels === 'long' ? 'long' : 'short' };
+}
+
+export function sameUnits(a: DistanceUnits, b: DistanceUnits): boolean {
+    return a.system === b.system && a.labels === b.labels;
+}
+
+/** A number with thousands separators: "3,750", "1,143.5". */
+function grouped(n: number): string {
+    const [whole, part] = String(n).split('.');
+    return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (part ? '.' + part : '');
+}
+
+/** A unit's label after its number: the symbol, or the word, singular at exactly 1 ("1 mile"). */
+function unitLabel(unit: 'km' | 'm' | 'mi' | 'ft', n: number, labels: UnitLabels): string {
+    if (labels !== 'long') {
+        return unit;
+    }
+    const one = n === 1;
+    switch (unit) {
+        case 'km': return one ? 'kilometre' : 'kilometres';
+        case 'm': return one ? 'metre' : 'metres';
+        case 'mi': return one ? 'mile' : 'miles';
+        default: return one ? 'foot' : 'feet';
+    }
+}
+
+/** A distance as the formatter writes it: its number in words, its unit's label, and whether that is the large unit. */
+interface DistanceParts {
+    number: string;
+    label: string;
+    large: boolean;
+}
+
+function metresOf(metres: number): number {
+    return metres > 0 && isFinite(metres) ? metres : 0;
+}
+
+/**
+ * The one rounding rule (the owner's pick 2): under one large unit the small one, rounded to 10; from one large unit,
+ * tenths under 10 and whole numbers above.
+ */
+function distanceParts(metres: number, units: DistanceUnits): DistanceParts {
+    const m = metresOf(metres);
+    const us = units.system === 'us';
+    const small = Math.round((us ? m / M_PER_FT : m) / 10) * 10;
+    if (small < (us ? FT_PER_MI : 1000)) {
+        return { number: grouped(small), label: unitLabel(us ? 'ft' : 'm', small, units.labels), large: false };
+    }
+    const n = m / (us ? M_PER_MI : 1000);
+    const tenths = Math.round(n * 10) / 10;
+    const shown = tenths >= 10 ? Math.round(n) : tenths;
+    return { number: grouped(shown), label: unitLabel(us ? 'mi' : 'km', shown, units.labels), large: true };
+}
+
+/**
+ * The one formatter behind every distance shown (entry 20a): "700 m", "1.1 km", "12 km"; under US units "3,750 ft",
+ * "1.8 mi"; with long labels "2.9 kilometres", "1 mile". A true 0, and anything that is not a distance, is "0 m" or "0 ft".
+ */
+export function distanceText(metres: number, units: DistanceUnits): string {
+    const parts = distanceParts(metres, units);
+    return parts.number + ' ' + parts.label;
+}
+
+/**
+ * Two distances as a span, the unit named once when both read in it ("1.1 to 2 km"), else each with its own
+ * ("700 m to 1.1 km"): the line popup's segment (the owner's pick 6). A span from 0 names the unit once too
+ * ("0 to 1.1 km"): nothing has a unit of its own.
+ */
+export function distanceSpan(fromM: number, toM: number, units: DistanceUnits): string {
+    const from = distanceParts(fromM, units);
+    const to = distanceParts(toM, units);
+    return from.number + (from.large === to.large || from.number === '0' ? '' : ' ' + from.label) + ' to ' + to.number + ' ' + to.label;
+}
+
+/**
+ * The exact form, where a distance is typed (the owner's pick 4): whole metres or whole feet, never the large unit:
+ * "2,922 m", "9,588 ft".
+ */
+export function exactDistanceText(metres: number, units: DistanceUnits): string {
+    const us = units.system === 'us';
+    const n = Math.round(metresOf(metres) / (us ? M_PER_FT : 1));
+    return grouped(n) + ' ' + unitLabel(us ? 'ft' : 'm', n, units.labels);
+}
+
+/** The unit a distance is typed in, in the labels in force, for a field's label: "m", "ft", "metres" or "feet". */
+export function typedUnitLabel(units: DistanceUnits): string {
+    return unitLabel(units.system === 'us' ? 'ft' : 'm', 0, units.labels);
+}
+
+/** The short label of the unit a distance is typed in, which a bare typed number is read in: "m" or "ft". */
+export function typedUnit(units: DistanceUnits): string {
+    return units.system === 'us' ? 'ft' : 'm';
+}
+
+/**
+ * What a distance field shows for stored metres, no unit: the metres as they are stored ("1143", "1143.5", as before
+ * entry 20a), or under US units the feet to one decimal ("3,750"), so the value typed back stores what was stored.
+ */
+export function distanceInput(metres: number, units: DistanceUnits): string {
+    const m = round1(metresOf(metres));
+    return units.system === 'us' ? grouped(round1(m / M_PER_FT)) : String(m);
+}
+
+/** A typed distance that is not a number from 0 to the line's length, refused in words: "Type a distance from 0 to 2,936 m". */
+export function distanceRangeText(lineLengthM: number, units: DistanceUnits): string {
+    return 'Type a distance from 0 to ' + exactDistanceText(lineLengthM, units);
+}
+
+/**
+ * A distance along a line as typed ("2841", "2,841", "1143.5", "3750 ft", "1143 m"): a bare number is in the shown unit,
+ * and a typed `m` or `ft` (or the word) is honoured whichever is shown. The metres, to 0.1 m as they are stored, when
+ * they are from 0 to the line's length (to the whole unit the bar shows it, the place kept at the end); else the
+ * problem in words, the range in the shown unit. Nothing typed is a problem too.
+ */
+export function readDistance(text: string, lineLengthM: number, units: DistanceUnits): { distanceM: number } | { problem: string } {
+    const match = /^(\d+(?:\.\d*)?|\.\d+)(m|metres?|meters?|ft|foot|feet)?$/i.exec(text.replace(/[,\s]/g, ''));
+    const problem = { problem: distanceRangeText(lineLengthM, units) };
+    if (!match) {
+        return problem;
+    }
+    const unit = (match[2] || typedUnit(units)).toLowerCase();
+    const feet = unit === 'ft' || unit === 'foot' || unit === 'feet';
+    const metres = round1(Number(match[1]) * (feet ? M_PER_FT : 1));
+    if (!Number.isFinite(metres) || metres > lineLengthM + 0.5) {
+        return problem;
+    }
+    return { distanceM: Math.min(metres, lineLengthM) };
 }
