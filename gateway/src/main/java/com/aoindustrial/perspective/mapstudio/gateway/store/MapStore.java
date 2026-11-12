@@ -9,6 +9,7 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
 
 import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
+import com.aoindustrial.perspective.mapstudio.common.contract.SettingsRecord;
 
 /**
  * The map store repository (AD-3): the only code that reads or writes the
@@ -31,7 +32,9 @@ public interface MapStore {
      * One edit record row (one per saved op). Since schema 3 (epic-editing entry 11a) it also keeps what the op did:
      * {@code before} and {@code after} (a create {@code after} only, a delete {@code before} only, an update the
      * top-level fields whose values differ), and the item's {@code name} and {@code kind} as written (the stored
-     * record's for a delete; a kind setup's kind id and no name). Any of the four may be null.
+     * record's for a delete; a kind setup's kind id and no name). Any of the four may be null. Since schema 4
+     * (entry 19b) {@code entity} may be {@code settings}: its kind is the settings id ({@code units}), it has no
+     * name, and its before and after hold {@code system} and {@code labels}.
      */
     record EditRow(String project, String batchId, long seq, String entity, String entityId, String op, int version,
                    String actor, String source, JsonObject before, JsonObject after, String name, String kind) {
@@ -112,5 +115,18 @@ public interface MapStore {
 
         /** Every kind setup of the project that is not deleted, ordered by kind id. */
         List<KindSetupRecord> liveKindSetups(String project) throws SQLException;
+
+        /**
+         * The stored setting of this id from the project row's {@code settings} (schema 4, epic-editing entry 19b),
+         * a deleted one included; empty when it was never set. A setting has no row of its own: the project row is
+         * its lock, so a write path calls this after {@link #nextSeq}, which holds that row until the transaction ends.
+         */
+        Optional<SettingsRecord> lockSetting(String project, String id) throws SQLException;
+
+        /** Write the setting under its id in the project's row, which {@link #nextSeq} made and locked. */
+        void writeSetting(String project, SettingsRecord setting) throws SQLException;
+
+        /** Every setting of the project that is not deleted, ordered by id; none for a project with no row yet. */
+        List<SettingsRecord> liveSettings(String project) throws SQLException;
     }
 }

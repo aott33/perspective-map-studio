@@ -13,6 +13,12 @@ import {
 } from '../history';
 import { HistoryPanel } from '../studio/HistoryPanel';
 
+/** A units op as the edit record keeps it (entry 19b): kind `units`, no name, `system` and `labels` before and after. */
+function unitsOp(o: 'create' | 'update' | 'delete', version: number, before: [string, string] | null, after: [string, string] | null): HistoryOp {
+    const values = (v: [string, string] | null) => (v ? { system: v[0], labels: v[1] } : null);
+    return { op: o, entity: 'settings', id: 'units', name: null, kind: 'units', version, before: values(before), after: values(after) };
+}
+
 const PAD: Kind = {
     id: 'pad', name: 'Well pad', geometry: 'point', icon: '', labelRank: 0,
     fields: [{ key: 'gasRate', label: 'Gas rate', type: 'number', required: false, choices: [] }]
@@ -355,5 +361,64 @@ describe('the panel (B1, B3, B7, B10)', () => {
         expect(html).toContain('Recent changes could not be read: busy.');
         expect(html).toContain('mapstudio-history-retry');
         expect(html).toContain('data-error="first"');
+    });
+});
+
+describe('the units setting in Recent changes (epic 4 entry 19b, S12 and S13)', () => {
+    const set = entry(20, [unitsOp('create', 1, null, ['us', 'long'])]);
+    const changedUnits = entry(21, [unitsOp('update', 2, ['us', 'long'], ['metric', 'short'])]);
+    const cleared = entry(22, [unitsOp('delete', 3, ['metric', 'short'], null)]);
+
+    test('the sentences, in words', () => {
+        expect(batchSentence(set, KINDS)).toBe('Set the units to US, words');
+        expect(batchSentence(changedUnits, KINDS)).toBe('Changed the units to Metric, symbols');
+        expect(batchSentence(cleared, KINDS)).toBe('Cleared the units setting');
+        expect(batchSentence(entry(23, [unitsOp('create', 4, null, ['auto', 'short'])]), KINDS)).toBe('Set the units to Auto, symbols');
+        // Beside a map item the row names both, so it never hides the setting.
+        const both = entry(24, [op({ op: 'create', id: 'p40', name: 'P40', after: record('P40', 'pad', point(P14_AT)) }), unitsOp('update', 5, ['auto', 'short'], ['us', 'long'])]);
+        expect(batchSentence(both, KINDS)).toBe('Added well pad P40, and changed the units to US, words');
+    });
+
+    test('each row has Revert: a set is cleared, a change sends the values before, a clear sets them again', () => {
+        for (const e of [set, changedUnits, cleared]) {
+            expect(revertBlocked(e)).toBe('');
+        }
+        expect(revertBatch(set, 'r1')).toEqual({ batchId: 'r1', ops: [{ op: 'delete', entity: 'settings', id: 'units', baseVersion: 1 }] });
+        expect(revertBatch(changedUnits, 'r2')).toEqual({ batchId: 'r2',
+            ops: [{ op: 'update', entity: 'settings', id: 'units', baseVersion: 2, data: { system: 'us', labels: 'long' } }] });
+        expect(revertBatch(cleared, 'r3')).toEqual({ batchId: 'r3',
+            ops: [{ op: 'create', entity: 'settings', id: 'units', baseVersion: 3, data: { system: 'metric', labels: 'short' } }] });
+        const rows = historyRows([cleared, changedUnits, set], KINDS, '', new Date('2026-11-09T12:00:00Z'));
+        expect(rows.map((r) => [r.sentence, r.blocked])).toEqual([
+            ['Cleared the units setting', ''], ['Changed the units to Metric, symbols', ''], ['Set the units to US, words', '']]);
+    });
+
+    test('a row that also holds a kind setup keeps no Revert; a change whose values before are missing has none either', () => {
+        const withSetup = entry(25, [unitsOp('update', 2, ['us', 'long'], ['metric', 'short']),
+            { op: 'update', entity: 'kindSetup', id: 'pad', name: null, kind: 'pad', version: 3, before: { setup: {} }, after: { setup: { link: '/p' } } }]);
+        expect(revertBlocked(withSetup)).toBe(KIND_SETUP_TEXT);
+        expect(revertBatch(withSetup, 'r')).toBeNull();
+        expect(batchSentence(withSetup, KINDS)).toBe('Changed the well pad kind setup, and changed the units to Metric, symbols');
+        const half: HistoryOp = { ...unitsOp('update', 2, null, ['metric', 'short']), before: { system: 'us' } };
+        expect(revertBlocked(entry(26, [half]))).toBe(NOT_KEPT_TEXT);
+    });
+
+    test('a Revert reads "Reverted ..." on its own row', () => {
+        const back = entry(22, [unitsOp('update', 3, ['metric', 'short'], ['us', 'long'])]);
+        expect(revertedOf(back, [back, changedUnits, set])).toBe(changedUnits);
+        expect(rowSentence(back, [back, changedUnits, set], KINDS)).toBe('Reverted "Changed the units to Metric, symbols"');
+        const unset = entry(21, [unitsOp('delete', 2, ['us', 'long'], null)]);
+        expect(rowSentence(unset, [unset, set], KINDS)).toBe('Reverted "Set the units to US, words"');
+        const again = entry(23, [unitsOp('create', 4, null, ['metric', 'short'])]);
+        expect(rowSentence(again, [again, cleared], KINDS)).toBe('Reverted "Cleared the units setting"');
+        // Other values, or a version further on, are a change of their own.
+        const other = entry(22, [unitsOp('update', 3, ['metric', 'short'], ['auto', 'long'])]);
+        expect(revertedOf(other, [other, changedUnits])).toBeNull();
+    });
+
+    test('expanded, the row shows the value before and after', () => {
+        expect(expandOps(set)).toEqual([{ title: 'The units setting - set', fields: [{ label: 'Units', before: 'Not set', after: 'US, words' }], note: '' }]);
+        expect(expandOps(changedUnits)[0].fields).toEqual([{ label: 'Units', before: 'US, words', after: 'Metric, symbols' }]);
+        expect(expandOps(cleared)[0]).toMatchObject({ title: 'The units setting - cleared', fields: [{ label: 'Units', before: 'Metric, symbols', after: 'Not set' }] });
     });
 });

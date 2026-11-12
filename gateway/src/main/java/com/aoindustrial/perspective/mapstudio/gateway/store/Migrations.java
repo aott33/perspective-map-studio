@@ -20,7 +20,7 @@ public final class Migrations {
 
     /** In version order: index 0 is version 1. */
     static final List<String> FILES = List.of("0001_first_schema.sql", "0002_instrument_attachment.sql",
-        "0003_edit_values.sql");
+        "0003_edit_values.sql", "0004_settings.sql");
 
     /** One migration: its version, file name and statements. */
     public record Migration(int version, String name, List<String> statements) {

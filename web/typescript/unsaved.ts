@@ -13,7 +13,7 @@
  */
 
 import { isRecord } from './json';
-import { Conflict, EditBatch, EditLevel, EditOp, ErrorCodes, MapItemRecord, readConflicts, readMapItem } from './contract';
+import { Conflict, EditBatch, EditLevel, EditOp, ErrorCodes, MapItemRecord, readConflicts, readMapItem, readUnitsData } from './contract';
 import { ErrorBody } from './messages';
 import { stepLabel } from './undoStack';
 import { Kind } from './adapters';
@@ -110,7 +110,7 @@ function readBatch(value: unknown): EditBatch | null {
     }
     for (const op of value.ops) {
         if (!isRecord(op) || (op.op !== 'create' && op.op !== 'update' && op.op !== 'delete')
-            || (op.entity !== 'item' && op.entity !== 'kindSetup') || typeof op.id !== 'string'
+            || (op.entity !== 'item' && op.entity !== 'kindSetup' && op.entity !== 'settings') || typeof op.id !== 'string'
             || typeof op.baseVersion !== 'number'
             || !(isRecord(op.data) || (op.op === 'delete' && op.data === undefined))) {
             // A delete carries no `data` (docs/contract.md); every other op carries an object.
@@ -118,6 +118,24 @@ function readBatch(value: unknown): EditBatch | null {
         }
     }
     return value as unknown as EditBatch;
+}
+
+/**
+ * A units value in words (epic 4 entry 19b, the owner's decision 6): "US, words", "Metric, symbols", "Auto, symbols";
+ * '' when it is not `{system, labels}`.
+ */
+export function unitsWords(value: unknown): string {
+    const data = readUnitsData(value);
+    if (!data) {
+        return '';
+    }
+    const system = data.system === 'us' ? 'US' : data.system === 'metric' ? 'Metric' : 'Auto';
+    return system + ', ' + (data.labels === 'long' ? 'words' : 'symbols');
+}
+
+/** The batch's units op (entry 19b), or undefined. */
+function unitsOp(batch: EditBatch): EditOp | undefined {
+    return batch.ops.find((o) => o.entity === 'settings');
 }
 
 function readReason(value: unknown): UnsavedReason | undefined {
@@ -531,12 +549,14 @@ export function waitingText(entries: UnsavedEntry[], level: EditLevel | null): s
  * Which edit a queued batch is, in Undo's words (undoStack.ts `stepLabel`; entry 24, each waiting edit named as the owner's
  * mock names it): its first map item op as "add Gathering line", "rename P14" (the new name), "move SWD1", "link P14",
  * "unlink P14", "edit P14" or "delete L-TEST"; the item's name from the batch's own data, else from the record `items`
- * holds, else "an item". A batch of kind setups alone is "edit a kind setup".
+ * holds, else "an item". A batch of kind setups alone is "edit a kind setup"; one of the units setting alone (entry 19b)
+ * "set the units" or "clear the units setting".
  */
 export function editLabel(batch: EditBatch, items: MapItemRecord[]): string {
     const op = batch.ops.find((o) => o.entity === 'item');
     if (!op) {
-        return 'edit a kind setup';
+        const units = unitsOp(batch);
+        return units ? (units.op === 'delete' ? 'clear the units setting' : 'set the units') : 'edit a kind setup';
     }
     const data = op.data || {};
     const record = items.find((i) => i.id === op.id);
@@ -693,6 +713,10 @@ export function theirChangeText(entry: UnsavedEntry, kinds: Kind[] = [], locale:
     const at = clockText(c.changedAt);
     const when = at !== '' ? ' at ' + at : '';
     const more = conflicts.length > 1 ? ' and ' + (conflicts.length - 1) + ' more' : '';
+    if (c.entity === 'settings') {
+        // The units setting (entry 19b), as the Gateway's conflict names it.
+        return who + (c.current && c.current.deleted ? ' cleared' : ' changed') + ' the units setting' + more + when;
+    }
     if (c.entity !== 'item') {
         const kind = kinds.find((k) => k.id === c.id);
         return who + ' changed the ' + (kind ? kind.name : c.id) + ' kind setup' + more + when;
@@ -736,7 +760,7 @@ export function theirChangeText(entry: UnsavedEntry, kinds: Kind[] = [], locale:
 function itemName(entry: UnsavedEntry, records: MapItemRecord[]): string {
     const op = entry.batch.ops.find((o) => o.entity === 'item');
     if (!op) {
-        return 'a kind setup';
+        return unitsOp(entry.batch) ? 'the units setting' : 'a kind setup';
     }
     const named = op.data && typeof op.data.name === 'string' && op.data.name !== '' ? op.data.name : '';
     const record = beforeOf(entry, op.id) || records.find((r) => r.id === op.id);
@@ -832,6 +856,11 @@ export function yourChangeText(entry: UnsavedEntry, records: MapItemRecord[], ki
     const items = entry.batch.ops.filter((o) => o.entity === 'item');
     const op = items[0];
     if (!op) {
+        const units = unitsOp(entry.batch);
+        if (units) {
+            const words = unitsWords(units.data);
+            return units.op === 'delete' ? 'the units setting cleared' : words !== '' ? 'the units set to ' + words : 'a change to the units';
+        }
         const setup = entry.batch.ops.find((o) => o.entity === 'kindSetup');
         const kind = setup ? kinds.find((k) => k.id === setup.id) : undefined;
         return kind ? 'a change to the ' + kind.name + ' kind setup' : 'Edit a kind setup';

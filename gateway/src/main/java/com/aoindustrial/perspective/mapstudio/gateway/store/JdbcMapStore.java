@@ -23,6 +23,7 @@ import com.inductiveautomation.ignition.common.gson.JsonParser;
 import com.aoindustrial.perspective.mapstudio.common.contract.Attachment;
 import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
+import com.aoindustrial.perspective.mapstudio.common.contract.SettingsRecord;
 
 /**
  * {@link MapStore} on PostgreSQL through a Gateway database connection. Prepared
@@ -429,6 +430,52 @@ public final class JdbcMapStore implements MapStore {
                 }
             }
             return setups;
+        }
+
+        @Override
+        public Optional<SettingsRecord> lockSetting(String project, String id) throws SQLException {
+            JsonObject settings = settings(project, " FOR UPDATE");
+            return settings.get(id) instanceof JsonObject stored ? Optional.of(SettingsRecord.fromStored(id, stored))
+                : Optional.empty();
+        }
+
+        @Override
+        public void writeSetting(String project, SettingsRecord setting) throws SQLException {
+            try (PreparedStatement ps = c.prepareStatement("UPDATE mapstudio_project SET settings = "
+                    + "settings || jsonb_build_object(?::text, ?::jsonb) WHERE project = ?")) {
+                ps.setString(1, setting.id());
+                ps.setString(2, setting.storedJson().toString());
+                ps.setString(3, project);
+                if (ps.executeUpdate() != 1) {
+                    throw new SQLException("mapstudio_project row " + project + " was not updated");
+                }
+            }
+        }
+
+        @Override
+        public List<SettingsRecord> liveSettings(String project) throws SQLException {
+            List<SettingsRecord> out = new ArrayList<>();
+            JsonObject settings = settings(project, "");
+            for (String id : new java.util.TreeSet<>(settings.keySet())) {
+                if (settings.get(id) instanceof JsonObject stored) {
+                    SettingsRecord record = SettingsRecord.fromStored(id, stored);
+                    if (!record.deleted()) {
+                        out.add(record);
+                    }
+                }
+            }
+            return out;
+        }
+
+        /** The project row's settings object, {@code {}} when the project has no row yet. */
+        private JsonObject settings(String project, String lock) throws SQLException {
+            try (PreparedStatement ps = c.prepareStatement(
+                    "SELECT settings::text FROM mapstudio_project WHERE project = ?" + lock)) {
+                ps.setString(1, project);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? JsonParser.parseString(rs.getString(1)).getAsJsonObject() : new JsonObject();
+                }
+            }
         }
 
         private static KindSetupRecord kindSetup(ResultSet rs) throws SQLException {

@@ -11,13 +11,15 @@
  * - Revert (`revertBatch`) is the batch's reverse, each op at the row's own `version` (after the op), so the Gateway's ordinary
  *   conflict check is the "changed since" rule: a create deleted, a delete created again from `before`, an update sending
  *   `before`'s fields. Not offered for a change from before the record kept values, nor one with a kind setup op (`revertBlocked`).
+ * - The units setting (entry 19b) reads "Set the units to US, words", "Changed the units to Metric, symbols", "Cleared the units
+ *   setting", and reverts like an item: a set by a clear, a clear by a set at the cleared version, a change by the values before.
  */
 
 import { Kind } from './adapters';
-import { EditBatch, EditOp, HistoryEntry, HistoryOp, ItemGeometry, MapItemData } from './contract';
+import { EditBatch, EditOp, HistoryEntry, HistoryOp, ItemGeometry, MapItemData, readUnitsData } from './contract';
 import { distanceM } from './shared';
 import { distanceWords } from './linePopup';
-import { clockText, fieldLabel, joinWords, moveWords } from './unsaved';
+import { clockText, fieldLabel, joinWords, moveWords, unitsWords } from './unsaved';
 import { FROM_KIND, KpiLabels, NO_LABELS, overrideChanges, overrideSentence } from './itemOverrides';
 
 /** The page size Recent changes asks for (the most `edits.history` gives). */
@@ -294,24 +296,42 @@ function setupWords(setups: HistoryOp[], kinds: Kind[]): string {
     return setups.length === 1 ? 'the ' + kindWords(kinds, setups[0].kind || setups[0].id) + ' kind setup' : setups.length + ' kind setups';
 }
 
+/** The units op in a sentence (entry 19b, decision 6): "Set the units to US, words", "Cleared the units setting". */
+function unitsSentence(op: HistoryOp): string {
+    if (op.op === 'delete') {
+        return 'Cleared the units setting';
+    }
+    const words = unitsWords(op.after);
+    return words === '' ? 'Changed the units' : (op.op === 'create' ? 'Set the units to ' : 'Changed the units to ') + words;
+}
+
+function lowerFirst(text: string): string {
+    return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
 /**
  * The batch in a sentence (EXPERIENCE.md Recent changes): its first map item op leads ("Moved P14 about 40 m north", "Renamed P14 to
  * P14 North", "Added well pad P40", "Deleted pipeline L-TEST and its 2 instruments in one change"); several items changed alike read
  * as a count ("Changed 20 well pads in one change", "Added 120 items in one change"); a kind setup as "Changed the well pad kind
- * setup". The name each op carries is the one used, so an old change reads the name the item had then.
+ * setup"; the units setting as `unitsSentence` (entry 19b), after whatever else the batch holds. The name each op carries is the
+ * one used, so an old change reads the name the item had then.
  */
 export function batchSentence(entry: HistoryEntry, kinds: Kind[] = [], locale: string = '', labels: KpiLabels = NO_LABELS): string {
     const items = entry.ops.filter((o) => o.entity === 'item');
     const setups = entry.ops.filter((o) => o.entity === 'kindSetup');
+    const units = entry.ops.find((o) => o.entity === 'settings');
+    // A batch with the units setting too names it last, so a row never hides it.
+    const withUnits = (sentence: string): string =>
+        !units ? sentence : sentence === '' ? unitsSentence(units) : sentence + ', and ' + lowerFirst(unitsSentence(units));
     if (items.length === 0) {
         if (setups.length === 0) {
-            return 'Saved a change with nothing in it';
+            return units ? withUnits('') : 'Saved a change with nothing in it';
         }
-        return 'Changed ' + setupWords(setups, kinds) + (setups.length > 1 ? ' in one change' : '');
+        return withUnits('Changed ' + setupWords(setups, kinds) + (setups.length > 1 ? ' in one change' : ''));
     }
     const sentence = itemSentence(entry, items, kinds, locale, labels);
     // A batch with kind setups too names them, so a row never hides one.
-    return setups.length === 0 ? sentence : sentence + ', and changed ' + setupWords(setups, kinds);
+    return withUnits(setups.length === 0 ? sentence : sentence + ', and changed ' + setupWords(setups, kinds));
 }
 
 function itemSentence(entry: HistoryEntry, items: HistoryOp[], kinds: Kind[], locale: string, labels: KpiLabels): string {
@@ -384,6 +404,17 @@ function reversesOp(later: HistoryOp, earlier: HistoryOp): boolean {
         || notKept(later) || notKept(earlier)) {
         return false;
     }
+    if (earlier.entity === 'settings') {
+        // The units setting (entry 19b): its values are `system` and `labels`, not a map item's fields.
+        if (earlier.op === 'create') {
+            return later.op === 'delete';
+        }
+        if (earlier.op === 'delete') {
+            return later.op === 'create' && same(readUnitsData(later.after), readUnitsData(earlier.before));
+        }
+        return later.op === 'update' && same(readUnitsData(later.after), readUnitsData(earlier.before))
+            && same(readUnitsData(later.before), readUnitsData(earlier.after));
+    }
     if (earlier.op === 'create') {
         return later.op === 'delete';
     }
@@ -432,13 +463,18 @@ export function revertBlocked(entry: HistoryEntry): string {
     if (entry.ops.length === 0 || entry.ops.some(notKept)) {
         return NOT_KEPT_TEXT;
     }
+    // A units change or clear goes back to the values before, which the row must hold whole (entry 19b).
+    if (entry.ops.some((o) => o.entity === 'settings' && o.op !== 'create' && readUnitsData(o.before) === null)) {
+        return NOT_KEPT_TEXT;
+    }
     return '';
 }
 
 /**
  * The batch that reverts `entry` as one step (the Gateway's ordinary edit, no message of its own): each op at the row's `version`,
  * so a change saved since is refused `conflict` naming who made it. A create is deleted, a delete created again from `before` (a
- * restore at the tombstone's version), an update sends `before`'s fields. Null when Revert is not offered (`revertBlocked`).
+ * restore at the tombstone's version), an update sends `before`'s fields. The units setting the same (entry 19b): a set is
+ * cleared, a clear set again and a change sent back with both values before. Null when Revert is not offered (`revertBlocked`).
  */
 export function revertBatch(entry: HistoryEntry, batchId: string): EditBatch | null {
     if (revertBlocked(entry) !== '') {
@@ -446,6 +482,13 @@ export function revertBatch(entry: HistoryEntry, batchId: string): EditBatch | n
     }
     const ops: EditOp[] = [];
     for (const op of entry.ops) {
+        if (op.entity === 'settings') {
+            const base = { entity: 'settings', id: op.id, baseVersion: op.version };
+            const reverse = op.op === 'create' ? { ...base, op: 'delete' }
+                : { ...base, op: op.op === 'delete' ? 'create' : 'update', data: readUnitsData(op.before) };
+            ops.push(reverse as unknown as EditOp);
+            continue;
+        }
         if (op.op === 'create') {
             ops.push({ op: 'delete', entity: 'item', id: op.id, baseVersion: op.version });
         } else if (op.op === 'delete') {
@@ -686,6 +729,14 @@ export function expandOps(entry: HistoryEntry, look: Partial<NameLookup> = {}): 
     return entry.ops.map((op) => {
         if (op.entity === 'kindSetup') {
             return { title: 'The ' + kindWords(full.kinds, op.kind || op.id) + ' kind setup', fields: [], note: KIND_SETUP_TEXT };
+        }
+        if (op.entity === 'settings') {
+            // The units setting (entry 19b): one row, the value before and after in the sentence's words.
+            const title = 'The units setting - ' + (op.op === 'create' ? 'set' : op.op === 'delete' ? 'cleared' : 'changed');
+            const before = op.op === 'create' ? 'Not set' : unitsWords(op.before);
+            const after = op.op === 'delete' ? 'Not set' : unitsWords(op.after);
+            const shown = before !== '' && after !== '';
+            return { title, fields: shown ? [{ label: 'Units', before, after }] : [], note: shown ? '' : 'Nothing it changed can be shown.' };
         }
         const verb = op.op === 'create' ? 'Added' : op.op === 'delete' ? 'Deleted' : 'Changed';
         const title = nameOf(op) + ' (' + kindWords(full.kinds, op.kind) + ') - ' + verb.toLowerCase();

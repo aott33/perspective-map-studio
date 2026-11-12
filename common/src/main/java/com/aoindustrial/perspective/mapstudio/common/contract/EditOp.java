@@ -11,7 +11,8 @@ import com.aoindustrial.perspective.mapstudio.common.Messages;
 /**
  * One op of an {@code edits.apply} batch (AD-2): {@code {op, entity, id, baseVersion, data}}.
  * {@code baseVersion} is 0 on create and the stored version otherwise; a create at a
- * deleted map item's version restores it. A delete carries no data.
+ * deleted map item's version restores it. A delete carries no data. {@code entity} is {@code item},
+ * {@code kindSetup} or, since entry 19b, {@code settings} (id {@code units}).
  */
 public record EditOp(String op, String entity, String id, int baseVersion, JsonObject data, int index) {
 
@@ -22,7 +23,10 @@ public record EditOp(String op, String entity, String id, int baseVersion, JsonO
     public static final String ENTITY_KIND_SETUP = "kindSetup";
 
     public static final Set<String> OPS = Set.of(CREATE, UPDATE, DELETE);
-    public static final Set<String> ENTITIES = Set.of(ENTITY_ITEM, ENTITY_KIND_SETUP);
+    /** A project setting (epic-editing entry 19b); its one id is {@link SettingsRecord#UNITS}. */
+    public static final String ENTITY_SETTINGS = "settings";
+
+    public static final Set<String> ENTITIES = Set.of(ENTITY_ITEM, ENTITY_KIND_SETUP, ENTITY_SETTINGS);
 
     /**
      * Read one op; checks its shape only (the data is checked by the write service).
@@ -41,7 +45,7 @@ public record EditOp(String op, String entity, String id, int baseVersion, JsonO
             throw invalid("Op " + index + ": op must be create, update or delete.", index, id);
         }
         if (entity == null || !ENTITIES.contains(entity)) {
-            throw invalid("Op " + index + ": entity must be item or kindSetup.", index, id);
+            throw invalid("Op " + index + ": entity must be item, kindSetup or settings.", index, id);
         }
         if (id == null || id.isBlank()) {
             throw invalid("Op " + index + ": id must be a non-empty string.", index, null);
@@ -49,6 +53,10 @@ public record EditOp(String op, String entity, String id, int baseVersion, JsonO
         if (ENTITY_KIND_SETUP.equals(entity) && id.length() > Rows.MAX_ID) {
             throw invalid("Op " + index + ": a kind setup id is a kind id, at most " + Rows.MAX_ID + " characters.",
                 index, id.substring(0, Rows.MAX_ID));
+        }
+        if (ENTITY_SETTINGS.equals(entity) && !SettingsRecord.UNITS.equals(id)) {
+            throw invalid("Op " + index + ": a settings id must be units.", index,
+                id.length() > Rows.MAX_ID ? id.substring(0, Rows.MAX_ID) : id);
         }
         if (ENTITY_ITEM.equals(entity) && !isUuid(id)) {
             throw invalid("Op " + index + ": a map item id must be a UUID string.", index, id);

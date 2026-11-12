@@ -1,6 +1,6 @@
 import {
     CONTRACT_VERSION, ErrorCodes, readConflicts, readEditsApplyReply, readKindSetup, readMapItem, readMapLoadReply,
-    readMapSetup
+    readEditsHistoryReply, readMapSetup, readUnitsData, readUnitsSetting
 } from '../contract';
 import { NO_HOST_LISTS } from '../adapters';
 import { MessageTypes, editsApply, mapLoad, readReply } from '../messages';
@@ -158,5 +158,50 @@ describe('kind setups (epic 2 story 9)', () => {
             changedBy: 'mapeditor', changedAt: '2026-10-27T10:00:00Z' }]);
         expect(c.current).toEqual(pad);
         expect(readKindSetup({ kindId: 'pad', setup: [], version: 1, deleted: false })).toBeNull();
+    });
+});
+
+describe('the units override (epic 4 entry 19b)', () => {
+    const units = { id: 'units', system: 'us', labels: 'long', version: 2, deleted: false };
+
+    test('map.load.reply carries the live override at every level; {} and an older Gateway read as none', () => {
+        for (const level of ['none', 'phone', 'full']) {
+            const reply = readMapLoadReply({ level, seq: 3, items: [], settings: { units: { id: 'units', system: 'us', labels: 'long', version: 2 } } });
+            expect(reply?.units).toEqual(units);
+        }
+        expect(readMapLoadReply({ level: 'none', seq: 3, items: [], settings: {} })?.units).toBeUndefined();
+        expect(readMapLoadReply({ level: 'none', seq: 3, items: [] })?.units).toBeUndefined();
+        // A malformed one, or another id, leaves the reply usable.
+        const odd = readMapLoadReply({ level: 'full', seq: 3, items: [], settings: { units: { ...units, system: 'imperial' }, theme: { id: 'theme' } } });
+        expect(odd).not.toBeNull();
+        expect(odd?.units).toBeUndefined();
+        // A tombstone is no override.
+        expect(readMapLoadReply({ level: 'full', seq: 3, items: [], settings: { units: { ...units, deleted: true } } })?.units).toBeUndefined();
+    });
+
+    test('the record and its data are read strictly', () => {
+        expect(readUnitsSetting(units)).toEqual(units);
+        expect(readUnitsSetting({ ...units, deleted: true })?.deleted).toBe(true);
+        expect(readUnitsSetting({ ...units, id: 'theme' })).toBeNull();
+        expect(readUnitsSetting({ ...units, labels: 'tiny' })).toBeNull();
+        expect(readUnitsSetting({ ...units, version: '2' })).toBeNull();
+        expect(readUnitsData({ system: 'auto', labels: 'short' })).toEqual({ system: 'auto', labels: 'short' });
+        expect(readUnitsData({ system: 'auto' })).toBeNull();
+        expect(readUnitsData(null)).toBeNull();
+    });
+
+    test('a conflict on the units setting reads its stored record', () => {
+        const [c] = readConflicts([{ index: 0, entity: 'settings', id: 'units', baseVersion: 1, current: units,
+            changedBy: 'mapeditor', changedAt: '2026-11-12T10:00:00Z' }]);
+        expect(c.entity).toBe('settings');
+        expect(c.current).toEqual(units);
+    });
+
+    test('edits.history reads a settings op, not as an unread entry', () => {
+        const page = readEditsHistoryReply({ more: false, entries: [{ seq: 9, batchId: 'b9', actor: 'mapeditor', at: '2026-11-12T10:00:00Z',
+            source: 'session', ops: [{ op: 'update', entity: 'settings', id: 'units', name: null, kind: 'units', version: 2,
+                before: { system: 'us', labels: 'long' }, after: { system: 'metric', labels: 'short' } }] }] });
+        expect(page?.unread).toBe(0);
+        expect(page?.entries[0].ops[0]).toMatchObject({ entity: 'settings', id: 'units', kind: 'units', name: null, version: 2 });
     });
 });

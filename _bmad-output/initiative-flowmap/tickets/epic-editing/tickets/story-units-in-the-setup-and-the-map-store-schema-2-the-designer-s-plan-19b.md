@@ -4,14 +4,14 @@ type: 'feature'
 ticket: ''
 part_of: '19'
 created: '2026-11-12'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '50504ea58d1dbcdab3a3caf3db67e5ee10f46e1e'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/docs/contract.md', '{project-root}/docs/operations.md', '{project-root}/_bmad-output/initiative-flowmap/tickets/epic-editing/tickets/story-the-tag-browser-one-tree-for-every-tag-pick-asset-relative-p-plan-13b.md']
 ---
@@ -71,15 +71,15 @@ Java under `gateway/src/main/java/.../gateway` (GW) and `common/src/main/java/..
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `.../migrations/0004_settings.sql`, `Migrations.java`, `MigrationsTest` -- the column and the widened check -- S14.
-- [ ] `CM/EditOp.java`, a new `CM/SettingsRecord.java`, their tests -- the entity, the id, the data rules -- S7, S8, tests first.
-- [ ] `GW/store/MapStore.java`, `JdbcMapStore.java`, `FakeMapStore.java` -- lock, read and write of the project row's settings.
-- [ ] `GW/write/WriteService.java`, `ConflictReport.java`, tests -- S1 to S8, S11.
-- [ ] `GW/load/MapLoader.java`, `MapStudioDelegateTest`, `MapLoaderTest` -- S9, S10, and a viewer's `map.changed`.
-- [ ] `web/typescript/contract.ts`, `changes.ts`, `unsaved.ts`, `history.ts`, `MapStudioStoreDelegate.ts`, their tests -- S12, S13, S15.
-- [ ] `e2e/tests/settings.spec.mjs` -- S1, S5, S6, S7, S9 live with two browsers and a viewer, and S12, S13 in Recent changes; leave the store without an override at the end.
-- [ ] `ops/store-checks.sh`, `e2e/tests/store-ops.spec.mjs` -- schema 4.
-- [ ] Docs as Always lists; playbook 8t with the script console step and the upgrade from schema 3.
+- [x] `.../migrations/0004_settings.sql`, `Migrations.java`, `MigrationsTest` -- the column and the widened check -- S14.
+- [x] `CM/EditOp.java`, a new `CM/SettingsRecord.java`, their tests -- the entity, the id, the data rules -- S7, S8, tests first.
+- [x] `GW/store/MapStore.java`, `JdbcMapStore.java`, `FakeMapStore.java` -- lock, read and write of the project row's settings.
+- [x] `GW/write/WriteService.java`, `ConflictReport.java`, tests -- S1 to S8, S11.
+- [x] `GW/load/MapLoader.java`, `MapStudioDelegateTest`, `MapLoaderTest` -- S9, S10, and a viewer's `map.changed`.
+- [x] `web/typescript/contract.ts`, `changes.ts`, `unsaved.ts`, `history.ts`, `MapStudioStoreDelegate.ts`, their tests -- S12, S13, S15.
+- [x] `e2e/tests/settings.spec.mjs` -- S1, S5, S6, S7, S9 live with two browsers and a viewer, and S12, S13 in Recent changes; leave the store without an override at the end.
+- [x] `ops/store-checks.sh`, `e2e/tests/store-ops.spec.mjs` -- schema 4.
+- [x] Docs as Always lists; playbook 8t with the script console step and the upgrade from schema 3.
 
 **Acceptance Criteria:**
 - Given a dev stack on a schema 3 store, when the module starts, then the store is at schema 4 and every existing e2e expectation holds.
@@ -88,10 +88,24 @@ Java under `gateway/src/main/java/.../gateway` (GW) and `common/src/main/java/..
 ## Implementation Notes
 
 - Planner, 2026-11-12: the environment and identity rules are entry 13b's plan's first Implementation Note; they hold here. Leave the work uncommitted; run the specs you touch, not the whole suite. Docker was not running at planning time: start it as the hand-off note says before any stack work.
+- Implementer, 2026-11-12: built as planned, left uncommitted. Where the build chose within the plan: (1) a settings update's edit row holds both `system` and `labels` in `before` and in `after`, changed or not (an item's and a kind setup's hold only what differs), so Revert can send the values before whole; a create holds `after` and a delete `before`, each `{system, labels}` and nothing else. (2) The record `map.changed` and a conflict carry is `{id, system, labels, version, deleted}`; the reply's `settings.units` is that without `deleted`. (3) The store has three `Tx` methods, `lockSetting`, `writeSetting`, `liveSettings`; a write merges the one id into the jsonb (`settings || jsonb_build_object`), run by hand on PostgreSQL 16 with migration 4. (4) Several stale ops with the units among them read "2 map items and the units setting were changed by others ...". (5) A missing `system` or `labels` gets the same words as a wrong one. (6) The browser keeps the record in `ChangeState.units`, a cleared one as its tombstone until the next load; the delegate's `units` is the live one, and `.mapstudio-map` carries `data-units-override` for tests (no rule, nothing drawn). (7) A Revert that holds a settings op is sent with no Undo step (the toolbar's stack reverses map items only); it queues, waits its turn and meets the conflict card as any Revert. (8) A row whose units change lacks its values before has no Revert ("The values of this change were not kept ..."). (9) Expanded, a units row shows one field, Units, before and after ("Not set" where there was none). (10) `ops/store-checks.sh upgrade` gained a third upgrade, schema 3 with edit rows and a project row to 4. (11) Playbook 8t says the Designer's own Script Console cannot call `system.mapstudio` (Gateway scope only) and points at a Gateway-scope script; the owner may want other words. Run here: tsc, Jest (1137), the Gradle build, both contract checks, `ops/store-checks.sh newer upgrade` (all three upgrades live), and on the dev stack `settings.spec.mjs` with `store`, `writepath`, `changes`, `kindsetup`, `history`, `recentchanges`, `setup` and `unsaved` (36 passed, 1 skipped). Not run: the whole e2e suite (the orchestrator's), the script console step (the owner's), and `docs/platform-checks.md` has no entry for this run. The stack came up on fresh volumes (no image or volume was left in the container), so the dev store itself was created at schema 4; the upgrade from 3 was seen on the check database. Docker Hub answered 429 for a while before the images came.
 
 ## Plan Change Log
 
 ## Review Triage Log
+
+Quick review, 2026-11-12 (one reviewer, by inspection). S1 to S15 read as met but for the two bugs below; no em dash, no version bump, `getMap` unchanged, migrations 1 to 3 untouched. Eight findings: 0 high, 2 medium, 5 low, 1 false, 0 maybe-false. Six routed patch, to the implementer; two rejected.
+
+- medium, patch: `ConflictReport.message()` counts every stale op under the first noun, so one stale map item and the stale units setting read "2 map items and the units setting" (pinned by `WriteServiceSettingsTest` :123). Each noun takes its own count; the test's expectation is corrected.
+- medium, patch: `MapStudioStoreDelegate.revert()` sends a Revert of a row that holds map items and the units setting with no Undo step, so the item changes lose their step and earlier steps for those items go stale (a script batch can make such a row). Only an all-settings Revert skips the step; a mixed one keeps a step for its map items.
+- low, patch: `[live 8.3.10]` on the schema 4 upgrade and the units setting in `docs/operations.md` and `docs/contract.md` with no record in `docs/platform-checks.md`. A section "Epic 4 entry 19b" records what was run and seen, and is cited.
+- low, patch: `docs/contract.md`'s rights sentence lost the joiner between its schema 2 and schema 3 items.
+- low, patch: `contract.ts`: `KindSetupOp`'s doc comment was left above the moved `MapUnits`.
+- low, patch: `StoredRecord`'s javadoc and `changes.ts`'s `ChangedOp.record` comment do not name the setting.
+- false, rejected: the first acceptance criterion "is not demonstrated". The upgrade of a schema 3 store with rows was seen by `ops/store-checks.sh upgrade` (its new 3 to 4 case), and the whole e2e suite is the orchestrator's Verification, run after the patches, not the implementer's.
+- low, rejected: `SettingsRecord.fromStored` throws on a stored value that lacks a field, failing the project's loads. Only a jsonb edited by hand or by another writer can lack one (the one writer, `writeSetting`, stores all four), and the fix is new guards and a report path, not a correction.
+
+Outcome (2026-11-12): six patches applied, two findings rejected; nothing deferred. Not seen live: a settings op from a Gateway script, migration 4 refused for a role that does not own the tables, and the upgrade of the owner's own schema 3 store (playbook 8t). The orchestrator's Verification on the patched code: tsc clean, Jest 1138 passed, Gradle BUILD SUCCESSFUL, both contract checks OK (map store schema 4), and on a fresh stack the whole suite 334 passed, 9 skipped (the store-check and Gateway-stop scenarios, run by hand), 0 failed in 1.3 h. With 19a this completes entry 19.
 
 ## Design Notes
 

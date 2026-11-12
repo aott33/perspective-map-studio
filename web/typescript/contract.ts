@@ -85,13 +85,17 @@ export interface KindSetupData {
 
 export interface EditOp {
     op: 'create' | 'update' | 'delete';
-    entity: 'item' | 'kindSetup';
+    /** `settings` since entry 19b: the id `units`, the data a `UnitsData` (`SettingsOp`). */
+    entity: 'item' | 'kindSetup' | 'settings';
     id: string;
     /** 0 on create, the stored version otherwise. */
     baseVersion: number;
     /** The record's fields (all of a create's, the changed ones of an update); a delete carries none. */
     data?: MapItemData;
 }
+
+/** The units of the map's distances the project's setup names: `auto` is the browser's locale (setup schema 2). */
+export type MapUnits = 'auto' | 'metric' | 'us';
 
 /** A kind setup op (epic 2 story 9): `id` is the kind id; a delete carries no data. */
 export interface KindSetupOp {
@@ -102,13 +106,66 @@ export interface KindSetupOp {
     data?: KindSetupData;
 }
 
+/** How a distance's unit reads under the units override: a symbol (`short`) or a word (`long`). */
+export type UnitLabels = 'short' | 'long';
+
+/**
+ * Edit mode's units for the whole project (epic 4 entry 19b, R27; map store schema 4): the one stored setting, id
+ * `units`, versioned and tombstoned like a kind setup. A deleted one is no override: the setup's units apply again.
+ * Read and kept; nothing draws by it until entry 20.
+ */
+export interface UnitsSetting {
+    id: 'units';
+    system: MapUnits;
+    labels: UnitLabels;
+    version: number;
+    deleted: boolean;
+}
+
+/** A units op's data: exactly these two, both required. */
+export interface UnitsData {
+    system: MapUnits;
+    labels: UnitLabels;
+}
+
+/** A settings op (entry 19b): `id` is `units`; a delete carries no data and clears the override. */
+export interface SettingsOp {
+    op: 'create' | 'update' | 'delete';
+    entity: 'settings';
+    id: 'units';
+    baseVersion: number;
+    data?: UnitsData;
+}
+
+/** The one settings id. */
+export const UNITS_ID = 'units';
+
+/** A units op's data, or null when it is not `{system, labels}` with known values. */
+export function readUnitsData(value: unknown): UnitsData | null {
+    if (!isRecord(value) || (value.system !== 'auto' && value.system !== 'metric' && value.system !== 'us')
+        || (value.labels !== 'short' && value.labels !== 'long')) {
+        return null;
+    }
+    return { system: value.system, labels: value.labels };
+}
+
+/**
+ * A units setting record from the Gateway (`map.changed`'s record, a conflict's `current`, `map.load.reply`'s
+ * `settings.units`, which has no `deleted`: it is live), or null when it is not one.
+ */
+export function readUnitsSetting(value: unknown): UnitsSetting | null {
+    const data = readUnitsData(value);
+    if (!data || !isRecord(value) || value.id !== UNITS_ID || typeof value.version !== 'number'
+        || (value.deleted !== undefined && typeof value.deleted !== 'boolean')) {
+        return null;
+    }
+    return { id: UNITS_ID, system: data.system, labels: data.labels, version: value.version, deleted: value.deleted === true };
+}
+
 export interface EditBatch {
     batchId: string;
     ops: EditOp[];
 }
-
-/** The units of the map's distances the project's setup names: `auto` is the browser's locale (setup schema 2). */
-export type MapUnits = 'auto' | 'metric' | 'us';
 
 /** The part of the project setup map.load sends the browser (optional; docs/setup.md). */
 export interface MapSetup {
@@ -147,6 +204,11 @@ export interface MapLoadReplyBody {
      * Sent at level `phone` and `full` only; absent for a viewer or from an older Gateway. Malformed entries are left out.
      */
     changed?: Record<string, LastChange>;
+    /**
+     * Edit mode's units override (epic 4 entry 19b, 0.4.0), sent at every level beside `setup.units`: the live record, or
+     * absent when there is none (the Gateway sends `settings` `{}`), from an older Gateway, or when it is malformed.
+     */
+    units?: UnitsSetting;
 }
 
 /** One item's last change: the actor the edit record names and when (ISO 8601, UTC). */
@@ -185,8 +247,8 @@ export interface Conflict {
     entity: string;
     id: string;
     baseVersion: number;
-    /** The stored map item, or the stored kind setup when `entity` is `kindSetup`. */
-    current: MapItemRecord | KindSetupRecord | null;
+    /** The stored map item, the stored kind setup when `entity` is `kindSetup`, the units setting when it is `settings`. */
+    current: MapItemRecord | KindSetupRecord | UnitsSetting | null;
     changedBy: string | null;
     changedAt: string | null;
 }
@@ -271,6 +333,10 @@ export function readMapLoadReply(body: Record<string, unknown>): MapLoadReplyBod
     if (changed) {
         reply.changed = changed;
     }
+    const units = isRecord(body.settings) ? readUnitsSetting(body.settings[UNITS_ID]) : null;
+    if (units && !units.deleted) {
+        reply.units = units;
+    }
     return reply;
 }
 
@@ -317,11 +383,12 @@ export function readEditsApplyReply(body: Record<string, unknown>): EditsApplyRe
 /**
  * One saved op in the edit record (epic-editing entry 11a, 0.4.0): `name` and `kind` as written (a kind setup's kind
  * id and no name); `before` and `after` what it changed (a create `after` only, a delete `before` only, an update the
- * top-level fields whose values differ), both null on a change saved before map store schema 3.
+ * top-level fields whose values differ), both null on a change saved before map store schema 3. A `settings` op
+ * (entry 19b) has the kind `units`, no name, and `system` and `labels` in `before` and `after`, both on an update.
  */
 export interface HistoryOp {
     op: 'create' | 'update' | 'delete';
-    entity: 'item' | 'kindSetup';
+    entity: 'item' | 'kindSetup' | 'settings';
     id: string;
     name: string | null;
     kind: string | null;
@@ -363,7 +430,7 @@ function readHistoryOp(value: unknown): HistoryOp | null {
         return null;
     }
     const { op, entity, id, name, kind, version, before, after } = value;
-    if ((op !== 'create' && op !== 'update' && op !== 'delete') || (entity !== 'item' && entity !== 'kindSetup')
+    if ((op !== 'create' && op !== 'update' && op !== 'delete') || (entity !== 'item' && entity !== 'kindSetup' && entity !== 'settings')
         || typeof id !== 'string' || typeof version !== 'number') {
         return null;
     }
@@ -427,7 +494,8 @@ export function readConflicts(value: unknown): Conflict[] {
             entity: c.entity,
             id: c.id,
             baseVersion: c.baseVersion,
-            current: c.entity === 'kindSetup' ? readKindSetup(c.current) : readMapItem(c.current),
+            current: c.entity === 'kindSetup' ? readKindSetup(c.current)
+                : c.entity === 'settings' ? readUnitsSetting(c.current) : readMapItem(c.current),
             changedBy: typeof c.changedBy === 'string' ? c.changedBy : null,
             changedAt: typeof c.changedAt === 'string' ? c.changedAt : null
         });

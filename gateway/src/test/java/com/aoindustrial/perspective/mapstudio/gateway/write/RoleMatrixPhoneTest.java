@@ -69,7 +69,10 @@ class RoleMatrixPhoneTest extends WriteFixture {
         assertPhoneRefused(update(point, 1, "{\"geometry\":" + LINE + "}"));
         assertPhoneRefused("{\"op\":\"update\",\"entity\":\"kindSetup\",\"id\":\"pad\",\"baseVersion\":1,"
             + "\"data\":{\"properties\":{}}}");
-        assertEquals(transactions + 9, store.transactions, "only the retry lookups ran before the shape refusals");
+        // Entry 19b: the units setting is full editing's alone.
+        assertPhoneRefused("{\"op\":\"create\",\"entity\":\"settings\",\"id\":\"units\",\"baseVersion\":0,"
+            + "\"data\":{\"system\":\"us\",\"labels\":\"long\"}}");
+        assertEquals(transactions + 10, store.transactions, "only the retry lookups ran before the shape refusals");
         assertNothingWritten(edits, seq);
     }
 

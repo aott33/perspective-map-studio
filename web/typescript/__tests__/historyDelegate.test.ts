@@ -290,3 +290,114 @@ describe('Revert (B4, B5)', () => {
         expect(ofType(MessageTypes.EDITS_APPLY)).toHaveLength(before);
     });
 });
+
+describe('the units setting (entry 19b, S12, S13)', () => {
+    const UNITS = { id: 'units', system: 'metric', labels: 'short', version: 2, deleted: false };
+    const changedUnits: HistoryEntry = {
+        seq: 9, batchId: 'b9', actor: 'mapoperator', at: '2026-11-12T10:42:05Z', source: 'script',
+        ops: [{ op: 'update', entity: 'settings', id: 'units', name: null, kind: 'units', version: 2,
+            before: { system: 'us', labels: 'long' }, after: { system: 'metric', labels: 'short' } }]
+    };
+
+    function unitsOf() {
+        return delegate.mapStateToProps().units;
+    }
+
+    beforeEach(() => {
+        reply(MessageTypes.MAP_CHANGED, 'c8', { seq: 8, ops: [{ op: 'create', entity: 'settings', id: 'units', version: 1,
+            record: { ...UNITS, system: 'us', labels: 'long', version: 1 } }] });
+        reply(MessageTypes.MAP_CHANGED, 'c9', { seq: 9, ops: [{ op: 'update', entity: 'settings', id: 'units', version: 2, record: UNITS }] });
+        delegate.setHistoryOpen(true);
+        reply(MessageTypes.EDITS_HISTORY_REPLY, lastOf(MessageTypes.EDITS_HISTORY).id, page([changedUnits]));
+    });
+
+    test('the override is kept from map.load.reply and from map.changed, and cleared by a delete', () => {
+        expect(unitsOf()).toEqual(UNITS);
+        reply(MessageTypes.MAP_CHANGED, 'c10', { seq: 10, ops: [{ op: 'delete', entity: 'settings', id: 'units', version: 3,
+            record: { ...UNITS, version: 3, deleted: true } }] });
+        expect(unitsOf()).toBeNull();
+        delegate.sendMapLoad();
+        reply(MessageTypes.MAP_LOAD_REPLY, lastOf(MessageTypes.MAP_LOAD).id, { level: 'none', seq: 11, items: [],
+            settings: { units: { id: 'units', system: 'auto', labels: 'long', version: 4 } } });
+        expect(unitsOf()).toEqual({ id: 'units', system: 'auto', labels: 'long', version: 4, deleted: false });
+    });
+
+    test('Revert sends the values before at the row\'s version, holds the saved value at once and makes no Undo step', () => {
+        expect(delegate.revert(9)).toBe(true);
+        const sent = lastOf(MessageTypes.EDITS_APPLY);
+        expect(sent.body.ops).toEqual([{ op: 'update', entity: 'settings', id: 'units', baseVersion: 2, data: { system: 'us', labels: 'long' } }]);
+        expect(delegate.mapStateToProps().unsaved.map((e) => e.batchId)).toEqual([sent.body.batchId]);
+        // A second press while it is saved sends nothing.
+        expect(delegate.revert(9)).toBe(false);
+        reply(MessageTypes.EDITS_APPLY_REPLY, sent.id, { batchId: sent.body.batchId, seq: 10, results: [{ entity: 'settings', id: 'units', version: 3 }] });
+        const state = delegate.mapStateToProps();
+        expect(state.units).toEqual({ id: 'units', system: 'us', labels: 'long', version: 3, deleted: false });
+        expect(state.unsaved).toHaveLength(0);
+        expect(state.undo.steps).toHaveLength(0);
+        expect(state.save).toMatchObject({ state: 'saved' });
+    });
+
+    test('a clear is reverted by a set at the cleared version, and a set by a clear whose saved tombstone is no override', () => {
+        const cleared: HistoryEntry = { ...changedUnits, seq: 10, batchId: 'b10',
+            ops: [{ op: 'delete', entity: 'settings', id: 'units', name: null, kind: 'units', version: 3, before: { system: 'metric', labels: 'short' }, after: null }] };
+        const set: HistoryEntry = { ...changedUnits, seq: 8, batchId: 'b8',
+            ops: [{ op: 'create', entity: 'settings', id: 'units', name: null, kind: 'units', version: 1, before: null, after: { system: 'us', labels: 'long' } }] };
+        reply(MessageTypes.MAP_CHANGED, 'c10', { seq: 10, ops: [{ op: 'delete', entity: 'settings', id: 'units', version: 3,
+            record: { ...UNITS, version: 3, deleted: true } }] });
+        reply(MessageTypes.EDITS_HISTORY_REPLY, lastOf(MessageTypes.EDITS_HISTORY).id, page([cleared, changedUnits, set]));
+        expect(delegate.revert(10)).toBe(true);
+        const restore = lastOf(MessageTypes.EDITS_APPLY);
+        expect(restore.body.ops).toEqual([{ op: 'create', entity: 'settings', id: 'units', baseVersion: 3, data: { system: 'metric', labels: 'short' } }]);
+        reply(MessageTypes.EDITS_APPLY_REPLY, restore.id, { batchId: restore.body.batchId, seq: 11, results: [{ entity: 'settings', id: 'units', version: 4 }] });
+        expect(unitsOf()).toMatchObject({ system: 'metric', labels: 'short', version: 4 });
+        // The first set, reverted at its own version 1: the Gateway refuses it as changed since (below); the op is a delete.
+        expect(delegate.revert(8)).toBe(true);
+        expect(lastOf(MessageTypes.EDITS_APPLY).body.ops).toEqual([{ op: 'delete', entity: 'settings', id: 'units', baseVersion: 1 }]);
+    });
+
+    test('a row holding a map item and the units setting: one batch, one Undo step that reverses the map item only', () => {
+        const mixed: HistoryEntry = {
+            seq: 10, batchId: 'b10', actor: 'cutover', at: '2026-11-12T10:50:00Z', source: 'script',
+            ops: [moveOf(10, 2, AT, NORTH, 'cutover').ops[0], changedUnits.ops[0]]
+        };
+        reply(MessageTypes.MAP_CHANGED, 'c10', { seq: 10, ops: [] });
+        reply(MessageTypes.EDITS_HISTORY_REPLY, lastOf(MessageTypes.EDITS_HISTORY).id, page([mixed]));
+        expect(delegate.revert(10)).toBe(true);
+        const sent = lastOf(MessageTypes.EDITS_APPLY);
+        expect(sent.body.ops).toEqual([
+            { op: 'update', entity: 'item', id: 'p31', baseVersion: 2, data: { geometry: { type: 'Point', coordinates: AT } } },
+            { op: 'update', entity: 'settings', id: 'units', baseVersion: 2, data: { system: 'us', labels: 'long' } }]);
+        reply(MessageTypes.EDITS_APPLY_REPLY, sent.id, { batchId: sent.body.batchId, seq: 11,
+            results: [{ entity: 'item', id: 'p31', version: 3 }, { entity: 'settings', id: 'units', version: 3 }] });
+        const state = delegate.mapStateToProps();
+        expect(state.units).toMatchObject({ system: 'us', labels: 'long', version: 3 });
+        expect(state.undo.steps).toHaveLength(1);
+        expect(undoLabel(state.undo)).toMatch(/^Undo: revert "/);
+        // Undo puts the map item back and leaves the units as they are.
+        delegate.undo();
+        expect(lastOf(MessageTypes.EDITS_APPLY).body.ops).toEqual([
+            { op: 'update', entity: 'item', id: 'p31', baseVersion: 3, data: { geometry: { type: 'Point', coordinates: NORTH } } }]);
+    });
+
+    test('changed since: refused conflict, kept as a Revert with who changed it, the stored value taken with "Use their version"', () => {
+        delegate.revert(9);
+        const sent = lastOf(MessageTypes.EDITS_APPLY);
+        reply(MessageTypes.ERROR, sent.id, {
+            code: 'conflict', message: 'The units setting was changed by mapoperator at 10:44 UTC since you loaded it. Nothing in this save was written.',
+            batchId: sent.body.batchId,
+            conflicts: [{ index: 0, entity: 'settings', id: 'units', baseVersion: 2, current: { ...UNITS, system: 'auto', version: 3 },
+                changedBy: 'mapoperator', changedAt: '2026-11-12T10:44:00Z' }]
+        });
+        const state = delegate.mapStateToProps();
+        expect(state.save).toMatchObject({ state: 'refused' });
+        expect(state.unsaved).toHaveLength(1);
+        expect(state.unsaved[0]).toMatchObject({ state: 'refused', revert: true });
+        expect(state.unsaved[0].conflict![0].current).toEqual({ ...UNITS, system: 'auto', version: 3 });
+        const card = saveCardFor({ unsaved: state.unsaved, paused: false, dismissed: [], records: state.items, kinds: [], locale: '' });
+        expect(card).toMatchObject({ kind: 'conflict', who: 'mapoperator', onTop: false });
+        expect(state.units).toEqual(UNITS);
+        delegate.useTheirs(sent.body.batchId);
+        expect(delegate.mapStateToProps().unsaved).toHaveLength(0);
+        expect(unitsOf()).toEqual({ ...UNITS, system: 'auto', version: 3 });
+    });
+});

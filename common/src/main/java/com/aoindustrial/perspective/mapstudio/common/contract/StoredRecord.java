@@ -4,7 +4,8 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
 
 /**
  * A record the map store keeps versioned and tombstoned (epic 2 story 9): a map item
- * ({@link MapItemRecord}) or a kind setup ({@link KindSetupRecord}). A conflict lists it
+ * ({@link MapItemRecord}), a kind setup ({@link KindSetupRecord}) or, from entry 19b, a setting
+ * ({@link SettingsRecord}). A conflict lists it
  * as {@code current}, and {@code map.changed} sends it as an op's {@code record}.
  */
 public interface StoredRecord {

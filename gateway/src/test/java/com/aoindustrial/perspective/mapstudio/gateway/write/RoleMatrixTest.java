@@ -28,6 +28,29 @@ class RoleMatrixTest {
     }
 
     @Test
+    void aSettingsOpIsFullEditingsAlone() {
+        // Entry 19b: the matrix needed no change; a phone editor and a viewer are refused role on the op's shape.
+        for (String json : List.of(
+                "{\"op\":\"create\",\"entity\":\"settings\",\"id\":\"units\",\"baseVersion\":0,"
+                    + "\"data\":{\"system\":\"us\",\"labels\":\"long\"}}",
+                "{\"op\":\"update\",\"entity\":\"settings\",\"id\":\"units\",\"baseVersion\":1,"
+                    + "\"data\":{\"system\":\"us\",\"labels\":\"long\"}}",
+                "{\"op\":\"delete\",\"entity\":\"settings\",\"id\":\"units\",\"baseVersion\":1}")) {
+            com.aoindustrial.perspective.mapstudio.common.contract.EditOp op =
+                com.aoindustrial.perspective.mapstudio.common.contract.EditOp.parse(
+                    com.inductiveautomation.ignition.common.gson.JsonParser.parseString(json), 0);
+            RoleMatrix.check(Messages.LEVEL_FULL, op);
+            for (String level : List.of(Messages.LEVEL_PHONE, Messages.LEVEL_NONE)) {
+                com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException ex =
+                    org.junit.jupiter.api.Assertions.assertThrows(
+                        com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException.class,
+                        () -> RoleMatrix.check(level, op));
+                assertEquals(Messages.CODE_ROLE, ex.code(), level);
+            }
+        }
+    }
+
+    @Test
     void roleNamesAreCaseSensitive() throws Exception {
         assertEquals(Messages.LEVEL_NONE, RoleMatrix.level(setup(), List.of("mapeditor")));
     }

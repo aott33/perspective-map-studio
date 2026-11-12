@@ -2,7 +2,7 @@ import { EditBatch } from '../contract';
 import { lineCreateBatch } from '../save';
 import {
     KeyValueStore, LocalReasons, SIGN_IN_TEXT, STORAGE_PREFIX, UnsavedQueue, entryText, isBusy, isTransient,
-    readEntries, reasonFromError, savedRecords, storageKey, summaryText, unsavedItems
+    editLabel, readEntries, reasonFromError, savedRecords, storageKey, summaryText, theirChangeText, unitsWords, unsavedItems, yourChangeText
 } from '../unsaved';
 
 /** A Map-backed store; `fail` makes every call throw (quota, private window). */
@@ -288,5 +288,48 @@ describe('the unsaved edits queue', () => {
         expect(records.map((r) => [r.id, r.version, r.kind])).toEqual([['item-1', 3, 'line']]);
         const update: EditBatch = { batchId: 'u', ops: [{ op: 'update', entity: 'item', id: 'x', baseVersion: 1, data: { name: 'n' } }] };
         expect(unsavedItems([{ batchId: 'u', batch: update, queuedAt: '', state: 'unsent' }])).toEqual([]);
+    });
+});
+
+describe('a units batch in the queue (epic 4 entry 19b, S15)', () => {
+    const set = { batchId: 'u-1', ops: [{ op: 'create', entity: 'settings', id: 'units', baseVersion: 0, data: { system: 'us', labels: 'long' } }] } as unknown as EditBatch;
+    const clear = { batchId: 'u-2', ops: [{ op: 'delete', entity: 'settings', id: 'units', baseVersion: 2 }] } as unknown as EditBatch;
+
+    test('a stored entry with a settings op is read, not dropped, and replays', () => {
+        const store = new FakeStore();
+        store.data.set(KEY, JSON.stringify([
+            { batchId: 'u-1', batch: set, queuedAt: T0.toISOString(), state: 'unsent' },
+            { batchId: 'u-2', batch: clear, queuedAt: T0.toISOString(), state: 'unsent' },
+            { batchId: 'x-1', batch: { batchId: 'x-1', ops: [{ op: 'create', entity: 'theme', id: 'units', baseVersion: 0, data: {} }] }, queuedAt: T0.toISOString(), state: 'unsent' }
+        ]));
+        const q = queue(store);
+        expect(q.list().map((e) => e.batchId)).toEqual(['u-1', 'u-2']);
+        expect(q.nextToReplay(new Set())!.batch).toEqual(set);
+        expect(readEntries(store.data.get(KEY) as string).map((e) => e.batchId)).toEqual(['u-1', 'u-2']);
+        // It draws nothing and saves no map item record.
+        expect(unsavedItems(q.list())).toEqual([]);
+        expect(savedRecords(set, [{ entity: 'settings', id: 'units', version: 1 }])).toEqual([]);
+    });
+
+    test('its words', () => {
+        expect(unitsWords({ system: 'us', labels: 'long' })).toBe('US, words');
+        expect(unitsWords({ system: 'metric', labels: 'short' })).toBe('Metric, symbols');
+        expect(unitsWords({ system: 'imperial', labels: 'short' })).toBe('');
+        expect(editLabel(set, [])).toBe('set the units');
+        expect(editLabel(clear, [])).toBe('clear the units setting');
+        const q = queue();
+        q.enqueue(set, T0);
+        q.enqueue(clear, T0);
+        expect(yourChangeText(q.list()[0], [])).toBe('the units set to US, words');
+        expect(yourChangeText(q.list()[1], [])).toBe('the units setting cleared');
+    });
+
+    test('a conflict names who and the units setting', () => {
+        const q = queue();
+        q.enqueue(set, T0);
+        q.failed('u-1', { code: 'conflict', message: 'The units setting was changed by mapoperator.' }, [{ index: 0, entity: 'settings', id: 'units',
+            baseVersion: 0, current: { id: 'units', system: 'metric', labels: 'short', version: 3, deleted: false }, changedBy: 'mapoperator',
+            changedAt: null }]);
+        expect(theirChangeText(q.list()[0])).toBe('mapoperator changed the units setting');
     });
 });

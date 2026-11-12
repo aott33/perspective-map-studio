@@ -24,6 +24,7 @@ import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
 import com.aoindustrial.perspective.mapstudio.common.contract.Rows;
+import com.aoindustrial.perspective.mapstudio.common.contract.SettingsRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 import com.aoindustrial.perspective.mapstudio.common.contract.StoredRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.StyleRule;
@@ -41,10 +42,11 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.StoreGate;
  * batch and its ops are well formed; a {@code batchId} already committed replays its
  * stored reply (same actor) or is refused; the level allows every op's shape; there is
  * an actor; the project's kind list is in use, read once for the batch, unless every op
- * is a delete (epic 2 story 9). Then one transaction takes the project's next {@code seq}
+ * is a delete (epic 2 story 9) or a settings op (epic-editing entry 19b: the units setting names no
+ * kind). Then one transaction takes the project's next {@code seq}
  * (locking the project row, which serialises a project's batches), looks for the
  * {@code batchId} again (found: roll back and replay), locks every map item and kind
- * setup, checks the level against each stored geometry, collects every stale op into one
+ * setup (a setting lives in the project row, locked already), checks the level against each stored geometry, collects every stale op into one
  * {@code conflict}, then checks each op's record against the kind list
  * ({@link ItemCheck}, {@link KindSetup}; {@code invalid} naming the op) and writes it,
  * one edit record row per op, then checks the instruments on lines on the state the batch
@@ -135,7 +137,8 @@ public final class WriteService {
                 }
                 List<Optional<? extends StoredRecord>> stored = new ArrayList<>();
                 for (EditOp op : batch.ops()) {
-                    stored.add(isItem(op) ? tx.lockItem(project, op.id()) : tx.lockKindSetup(project, op.id()));
+                    stored.add(isItem(op) ? tx.lockItem(project, op.id())
+                        : isSetting(op) ? tx.lockSetting(project, op.id()) : tx.lockKindSetup(project, op.id()));
                 }
                 for (EditOp op : batch.ops()) {
                     if (isItem(op)) {
@@ -154,6 +157,7 @@ public final class WriteService {
                 for (EditOp op : batch.ops()) {
                     StoredRecord current = stored.get(op.index()).orElse(null);
                     StoredRecord written = isItem(op) ? write(tx, project, op, (MapItemRecord) current, kinds)
+                        : isSetting(op) ? writeSetting(tx, project, op, (SettingsRecord) current)
                         : writeKindSetup(tx, project, op, (KindSetupRecord) current, kinds);
                     if (isItem(op)) {
                         items.add(new AttachmentRules.Written(op, (MapItemRecord) current, (MapItemRecord) written));
@@ -202,9 +206,17 @@ public final class WriteService {
      * record), an update {@code before} and {@code after} with only the top-level fields whose values differ, each
      * field's whole value ({@code version} left out: the row has its own). A map item's name and kind are the
      * written record's, the stored record's for a delete; a kind setup's kind is its id and it has no name.
+     * A setting (entry 19b, schema 4) has its id as kind, no name, and before and after of {@code system} and
+     * {@code labels}, both in each on an update, so the values before can be sent back whole.
      */
     static MapStore.EditRow editRow(String project, String batchId, long seq, EditOp op, StoredRecord current,
                                     StoredRecord written, Actor actor) {
+        if (isSetting(op)) {
+            JsonObject was = EditOp.CREATE.equals(op.op()) ? null : ((SettingsRecord) current).values();
+            JsonObject now = EditOp.DELETE.equals(op.op()) ? null : ((SettingsRecord) written).values();
+            return new MapStore.EditRow(project, batchId, seq, op.entity(), op.id(), op.op(), written.version(),
+                actor.name(), actor.source(), was, now, null, op.id());
+        }
         JsonObject before = null;
         JsonObject after = null;
         switch (op.op()) {
@@ -365,6 +377,29 @@ public final class WriteService {
         return next;
     }
 
+    /**
+     * Write one settings op whose version was checked (epic-editing entry 19b); returns the record as stored. A
+     * delete keeps the values and the version goes up, so a create at that version sets the units again.
+     */
+    private static SettingsRecord writeSetting(MapStore.Tx tx, String project, EditOp op, SettingsRecord current)
+            throws SQLException {
+        SettingsRecord next;
+        if (EditOp.DELETE.equals(op.op())) {
+            next = new SettingsRecord(current.id(), current.system(), current.labels(), current.version() + 1, true);
+        } else {
+            SettingsRecord.Values values;
+            try {
+                values = SettingsRecord.parse(op.data());
+            } catch (InvalidValue ex) {
+                throw invalid(op, ex.getMessage());
+            }
+            next = new SettingsRecord(op.id(), values.system(), values.labels(),
+                current == null ? 1 : current.version() + 1, false);
+        }
+        tx.writeSetting(project, next);
+        return next;
+    }
+
     /** The map item record checked and normalised against its kind. */
     private static MapItemRecord checked(MapItemRecord item, Map<String, Kind> kinds, EditOp op) {
         Kind kind = kinds.get(item.kind());
@@ -383,12 +418,12 @@ public final class WriteService {
 
     /**
      * The project's kind list in use, by id, read once for the batch. A batch of deletes only
-     * needs none (owner decision, 2026-10-27); any other batch is refused {@code invalid} when
+     * needs none (owner decision, 2026-10-27), and neither does a settings op (entry 19b); any other batch is refused {@code invalid} when
      * no list is in use (none read yet, the function returned none, or it never answered well).
      */
     private Map<String, Kind> kindList(String project, EditBatch batch) {
         Map<String, Kind> byId = new LinkedHashMap<>();
-        boolean needed = batch.ops().stream().anyMatch(op -> !EditOp.DELETE.equals(op.op()));
+        boolean needed = batch.ops().stream().anyMatch(op -> !EditOp.DELETE.equals(op.op()) && !isSetting(op));
         if (!needed) {
             return byId;
         }
@@ -407,9 +442,14 @@ public final class WriteService {
         return EditOp.ENTITY_ITEM.equals(op.entity());
     }
 
-    /** "map item <id>" or "the kind setup of <kind>", for a message. */
+    private static boolean isSetting(EditOp op) {
+        return EditOp.ENTITY_SETTINGS.equals(op.entity());
+    }
+
+    /** "map item <id>", "the kind setup of <kind>" or "the units setting", for a message. */
     private static String what(EditOp op) {
-        return isItem(op) ? "map item " + op.id() : "the kind setup of " + Rows.echo(op.id());
+        return isItem(op) ? "map item " + op.id()
+            : isSetting(op) ? "the " + op.id() + " setting" : "the kind setup of " + Rows.echo(op.id());
     }
 
     /**

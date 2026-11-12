@@ -15,8 +15,8 @@ class MigrationsTest {
     @Test
     void migrationOneCreatesTheWholeFirstSchema() {
         List<Migrations.Migration> all = Migrations.all();
-        assertEquals(3, all.size());
-        assertEquals(3, Migrations.latest());
+        assertEquals(4, all.size());
+        assertEquals(4, Migrations.latest());
         Migrations.Migration first = all.get(0);
         assertEquals(1, first.version());
         String joined = String.join("\n", first.statements());
@@ -57,6 +57,20 @@ class MigrationsTest {
             "ALTER TABLE mapstudio_edit ADD COLUMN name text",
             "ALTER TABLE mapstudio_edit ADD COLUMN kind text"),
             third.statements());
+    }
+
+    @Test
+    void migrationFourAddsTheSettingsColumnAndWidensTheEditEntityCheck() {
+        // Epic-editing entry 19b: additive; existing project rows read back with settings {}.
+        Migrations.Migration fourth = Migrations.all().get(3);
+        assertEquals(4, fourth.version());
+        assertEquals("0004_settings.sql", fourth.name());
+        assertEquals(List.of(
+            "ALTER TABLE mapstudio_project ADD COLUMN settings jsonb NOT NULL DEFAULT '{}'::jsonb",
+            "ALTER TABLE mapstudio_edit DROP CONSTRAINT mapstudio_edit_entity_check",
+            "ALTER TABLE mapstudio_edit ADD CONSTRAINT mapstudio_edit_entity_check\n"
+                + "    CHECK (entity IN ('item', 'kindSetup', 'settings'))"),
+            fourth.statements());
     }
 
     @Test

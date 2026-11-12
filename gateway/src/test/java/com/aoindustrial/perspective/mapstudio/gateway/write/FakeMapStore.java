@@ -13,6 +13,7 @@ import com.inductiveautomation.ignition.common.gson.JsonObject;
 
 import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
+import com.aoindustrial.perspective.mapstudio.common.contract.SettingsRecord;
 import com.aoindustrial.perspective.mapstudio.gateway.store.HistoryPage;
 import com.aoindustrial.perspective.mapstudio.gateway.store.MapStore;
 
@@ -34,6 +35,7 @@ public class FakeMapStore implements MapStore {
         public final Map<String, Long> seqs = new HashMap<>();
         public final Map<String, TreeMap<String, MapItemRecord>> items = new HashMap<>();
         public final Map<String, TreeMap<String, KindSetupRecord>> kindSetups = new HashMap<>();
+        public final Map<String, TreeMap<String, SettingsRecord>> settings = new HashMap<>();
         public final List<EditRow> edits = new ArrayList<>();
         public final List<String> editTimes = new ArrayList<>();
         public final Map<String, BatchRow> batches = new LinkedHashMap<>();
@@ -43,6 +45,7 @@ public class FakeMapStore implements MapStore {
             s.seqs.putAll(seqs);
             items.forEach((p, m) -> s.items.put(p, new TreeMap<>(m)));
             kindSetups.forEach((p, m) -> s.kindSetups.put(p, new TreeMap<>(m)));
+            settings.forEach((p, m) -> s.settings.put(p, new TreeMap<>(m)));
             s.edits.addAll(edits);
             s.editTimes.addAll(editTimes);
             s.batches.putAll(batches);
@@ -304,6 +307,31 @@ public class FakeMapStore implements MapStore {
                 throw new SQLException("no row", "02000");
             }
             m.put(setup.kindId(), setup);
+        }
+
+        @Override
+        public Optional<SettingsRecord> lockSetting(String project, String id) {
+            return Optional.ofNullable(s.settings.getOrDefault(project, new TreeMap<>()).get(id));
+        }
+
+        @Override
+        public void writeSetting(String project, SettingsRecord setting) throws SQLException {
+            maybeFail();
+            if (!s.seqs.containsKey(project)) {
+                throw new SQLException("no project row", "02000");
+            }
+            s.settings.computeIfAbsent(project, p -> new TreeMap<>()).put(setting.id(), setting);
+        }
+
+        @Override
+        public List<SettingsRecord> liveSettings(String project) {
+            List<SettingsRecord> out = new ArrayList<>();
+            for (SettingsRecord r : s.settings.getOrDefault(project, new TreeMap<>()).values()) {
+                if (!r.deleted()) {
+                    out.add(r);
+                }
+            }
+            return out;
         }
 
         @Override

@@ -102,6 +102,33 @@ class HistoryJdbcTest {
         }
     }
 
+    @Test
+    void aSettingIsReadFromAndWrittenToTheProjectRow() throws Exception {
+        // Entry 19b, schema 4: the value, its version and its tombstone live in mapstudio_project.settings.
+        answers.add(List.<Object[]>of(new Object[] {"{\"units\":{\"system\":\"us\",\"labels\":\"long\",\"version\":2,"
+            + "\"deleted\":false}}"}));
+        answers.add(List.<Object[]>of());
+        answers.add(List.<Object[]>of(new Object[] {"{\"units\":{\"system\":\"us\",\"labels\":\"long\",\"version\":3,"
+            + "\"deleted\":true}}"}));
+        answers.add(List.<Object[]>of(new Object[] {"{}"}));
+        var units = new com.aoindustrial.perspective.mapstudio.common.contract.SettingsRecord("units", "us", "long", 2,
+            false);
+        new JdbcMapStore(source()).inTransaction("MapStudio", tx -> {
+            assertEquals(java.util.Optional.of(units), tx.lockSetting("dev", "units"));
+            assertTrue(tx.lockSetting("fresh", "units").isEmpty(), "a project with no row");
+            tx.writeSetting("dev", units);
+            assertTrue(tx.liveSettings("dev").isEmpty(), "a cleared setting is not live");
+            assertTrue(tx.liveSettings("dev").isEmpty(), "never set");
+            return null;
+        });
+        assertEquals("SELECT settings::text FROM mapstudio_project WHERE project = ? FOR UPDATE", prepared.get(0));
+        assertEquals("UPDATE mapstudio_project SET settings = settings || jsonb_build_object(?::text, ?::jsonb)"
+            + " WHERE project = ?", prepared.get(2));
+        assertEquals(Map.of(1, "units", 2, "{\"system\":\"us\",\"labels\":\"long\",\"version\":2,\"deleted\":false}",
+            3, "dev"), bound.get(2));
+        assertEquals("SELECT settings::text FROM mapstudio_project WHERE project = ?", prepared.get(3));
+    }
+
     private ConnectionSource source() {
         return new ConnectionSource() {
             @Override

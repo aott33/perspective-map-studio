@@ -409,6 +409,31 @@ class EditHistoryTest {
     }
 
     @Test
+    void aUnitsOpListsWithItsIdAsKindNoNameAndBothValues() {
+        // Entry 19b, S12: set, change, clear, each one entry of one op.
+        String id = "\"entity\":\"settings\",\"id\":\"units\"";
+        save("alex", "{\"op\":\"create\"," + id + ",\"baseVersion\":0,\"data\":{\"system\":\"us\",\"labels\":\"long\"}}");
+        save("sam", "{\"op\":\"update\"," + id + ",\"baseVersion\":1,\"data\":{\"system\":\"metric\",\"labels\":\"long\"}}");
+        save("sam", "{\"op\":\"delete\"," + id + ",\"baseVersion\":2}");
+        JsonObject page = page("{}");
+        JsonObject cleared = op(entry(page, 0), 0);
+        assertEquals("settings", cleared.get("entity").getAsString());
+        assertEquals("units", cleared.get("id").getAsString());
+        assertEquals("units", cleared.get("kind").getAsString());
+        assertTrue(cleared.get("name").isJsonNull());
+        assertEquals(3, cleared.get("version").getAsInt());
+        assertEquals(json("{\"system\":\"metric\",\"labels\":\"long\"}"), cleared.get("before"));
+        assertTrue(cleared.get("after").isJsonNull());
+        JsonObject changed = op(entry(page, 1), 0);
+        assertEquals(json("{\"system\":\"us\",\"labels\":\"long\"}"), changed.get("before"));
+        assertEquals(json("{\"system\":\"metric\",\"labels\":\"long\"}"), changed.get("after"));
+        JsonObject set = op(entry(page, 2), 0);
+        assertTrue(set.get("before").isJsonNull());
+        assertEquals(json("{\"system\":\"us\",\"labels\":\"long\"}"), set.get("after"));
+        assertEquals("alex", entry(page, 2).get("actor").getAsString());
+    }
+
+    @Test
     void anEmptyRecordIsAnEmptyPage() {
         JsonObject page = page("{}");
         assertEquals(0, entries(page).size());

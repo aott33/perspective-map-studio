@@ -21,6 +21,7 @@ import com.aoindustrial.perspective.mapstudio.common.contract.KindSetupRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapItemRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.MapStudioException;
 import com.aoindustrial.perspective.mapstudio.common.contract.Rows;
+import com.aoindustrial.perspective.mapstudio.common.contract.SettingsRecord;
 import com.aoindustrial.perspective.mapstudio.common.contract.Setup;
 import com.aoindustrial.perspective.mapstudio.gateway.adapter.AdapterSnapshot;
 import com.aoindustrial.perspective.mapstudio.gateway.store.HistoryPage;
@@ -41,7 +42,9 @@ import com.aoindustrial.perspective.mapstudio.gateway.write.RoleMatrix;
  * the browser needs (epic 2 story 6). {@code kindSetups}, the project's live kind setups
  * (they hold tag paths), go to {@code phone} and {@code full} only, like the assets (owner
  * decision, 2026-10-27, epic 2 story 9). {@code changed}, who last changed each item and when (epic 4 entry 7a, 0.4.0),
- * goes to {@code phone} and {@code full} only, read in the load's transaction in one query.
+ * goes to {@code phone} and {@code full} only, read in the load's transaction in one query. {@code settings}
+ * (epic-editing entry 19b, 0.4.0), Edit mode's override of the setup's units, goes to every level, beside
+ * {@code setup.units}: {@code {}} with no live override.
  */
 public final class MapLoader {
 
@@ -52,7 +55,13 @@ public final class MapLoader {
      * asked for (an editor's map.load, entry 7a), who last changed each item and when ({@code changed}, else empty).
      */
     public record Snapshot(long seq, List<MapItemRecord> items, List<KindSetupRecord> kindSetups,
-                           Map<String, MapStore.LastEdit> changed) {
+                           Map<String, MapStore.LastEdit> changed, List<SettingsRecord> settings) {
+
+        /** A snapshot with no settings. */
+        public Snapshot(long seq, List<MapItemRecord> items, List<KindSetupRecord> kindSetups,
+                        Map<String, MapStore.LastEdit> changed) {
+            this(seq, items, kindSetups, changed, List.of());
+        }
 
         /** A snapshot with no last edits. */
         public Snapshot(long seq, List<MapItemRecord> items, List<KindSetupRecord> kindSetups) {
@@ -130,7 +139,7 @@ public final class MapLoader {
         try {
             Snapshot snapshot = store.inTransaction(setup.connection(),
                 tx -> new Snapshot(tx.currentSeq(project), tx.liveItems(project), tx.liveKindSetups(project),
-                    withChanged ? tx.lastEdits(project) : Map.of()));
+                    withChanged ? tx.lastEdits(project) : Map.of(), tx.liveSettings(project)));
             reportPaths(project, snapshot);
             return new Loaded(snapshot, readable.readOnly());
         } catch (SQLException ex) {
@@ -237,6 +246,7 @@ public final class MapLoader {
             body.addProperty("readOnly", loaded.readOnly());
         }
         body.add("setup", setupJson(setup));
+        body.add("settings", settingsJson(snapshot.settings()));
         return body;
     }
 
@@ -272,6 +282,18 @@ public final class MapLoader {
             e.addProperty("actor", edit.actor());
             e.addProperty("at", edit.at());
             o.add(item.id(), e);
+        }
+        return o;
+    }
+
+    /**
+     * {@code map.load.reply}'s {@code settings} (entry 19b, 0.4.0), the same at every level: {@code {}} with no live
+     * override, else {@code {"units": {id, system, labels, version}}}.
+     */
+    public static JsonObject settingsJson(List<SettingsRecord> settings) {
+        JsonObject o = new JsonObject();
+        for (SettingsRecord setting : settings) {
+            o.add(setting.id(), setting.liveJson());
         }
         return o;
     }

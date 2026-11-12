@@ -287,7 +287,7 @@ Entry 11a keeps what each change did and reads it with `edits.history`; entry 11
 - [ ] Delete a line with an instrument on it, then run the same line: one entry, its ops one delete per item, each with `before` (the record as it was) and `after` null.
 - [ ] Page back: `(await window.__mapStudioTest.send('edits.history', {before: <the last entry's seq>, limit: 3})).body` lists the three older batches and `more`.
 - [ ] Open `/` in a private window (no sign-in) and run `(await window.__mapStudioTest.send('edits.history', {})).body`: `{code: "role", ...}` and no names.
-- [ ] A store from before this build (schema 2) is upgraded once on the Gateway's start: the log says "applied version(s) [3], now at schema version 3", and the older changes are listed with `before` and `after` null.
+- [ ] A store from before this build (schema 2) is upgraded once on the Gateway's start: the log says "applied version(s) [3, 4], now at schema version 4" (migration 4 is entry 19b's, section 8t), and the older changes are listed with `before` and `after` null.
 
 Notes:
 
@@ -493,6 +493,30 @@ Entry 19a: the setup may name the map's units, which makes it schema 2. Nothing 
 - [ ] **Newer (U10).** With the Designer closed, set `"schemaVersion": 3` and scan: the map says "setup.json is written for a newer Map Studio (schema 3; this module reads 1 and 2)". In the Designer: the banner "Read only. This setup was written by a newer Map Studio: schema 3 is newer than 2, the newest this Designer edits. It is shown as written and never rewritten here.", the header "Schema 3 - read only", the file as written, and a project save leaves it untouched. `git checkout` the file and scan.
 - [ ] **A 0.3.0 Gateway refuses schema 2 in words.** Seen on 2026-11-12 with the published 0.3.0 on the smoke stack (image 8.3.10) and the dev project's schema 2 setup: the module started ACTIVE and logged "The Map Studio setup of project mapstudio-dev cannot be read: setup.json is written for a newer Map Studio (schema 2; this module reads 1)." (the same for `mapstudio-empty`, which inherits the setup), and the map did not load ([platform-checks.md](platform-checks.md), "Epic 4 entry 19a"). `ops/release-smoke.sh` itself now gives a release older than 0.4.0 a schema 1 copy of the dev setup, so it no longer shows this; to see it yourself, install the published 0.3.0 on a scratch Gateway with a schema 2 setup, or trust the log line above.
 - [ ] `git status` shows no change under `ops/project` at the end.
+
+Notes:
+
+## 8t. Edit mode's units override in the map store (the script console, and the upgrade from schema 3)
+
+Entry 19b: the map store keeps a map editor's override of the project's units, the third entity of `edits.apply` (`settings`, id `units`). Nothing on the map changes yet and no control sets it: the Layers row and the distances are entry 20's. So the override is set from a script here. The Gateway's half is unit tested and run on the dev stack (`e2e/tests/settings.spec.mjs`, which sends the same ops over the websocket); the script console step and the upgrade of your own store are the owner's check. The dev setup's own units stay `metric` throughout.
+
+The upgrade from schema 3:
+
+- [ ] Start this build on a stack whose store an earlier 0.4.0 build made (schema 3), with `ops/up.sh` (not `--fresh`). The Gateway log has one line "Map Studio upgraded its map store schema on database connection MapStudio: applied version(s) [4], now at schema version 4." and no Map Studio error.
+- [ ] `ops/psql.sh -c "SELECT project, seq, settings FROM mapstudio_project"`: every project has its `seq` as before and `settings` `{}`. Recent changes lists the older changes as it did.
+- [ ] On a store whose tables another role owns, the start fails with the error line naming `migration 4` and the store stays at schema 3 (`docs/operations.md`, "Database rights"); `ops/store-checks.sh upgrade` runs the three upgrades on the check database.
+
+The script console (Designer, Tools > Script Console runs in the Designer's scope, where `system.mapstudio` raises "runs in Gateway scope only"; use the Gateway's own: a Gateway event script, or a button on a Perspective view, as the dev project's `/edit` page does). Each line below is one call; `import uuid` first.
+
+- [ ] **Set (S1).** `system.mapstudio.applyEdits('mapstudio-dev', {'batchId': str(uuid.uuid4()), 'ops': [{'op': 'create', 'entity': 'settings', 'id': 'units', 'baseVersion': 0, 'data': {'system': 'us', 'labels': 'long'}}]}, 'playbook')` returns `results` `[{'entity': 'settings', 'id': 'units', 'version': 1}]` on a store that never had an override. If one was set and cleared before, the call raises `conflict: The units setting was deleted ...`; send the create at the version the conflict's `current` holds (`ex.conflicts()[0]['current']['version']`).
+- [ ] With `/edit` open as the map editor and `/` open in a private window (a viewer), both maps take it with no reload: in each browser's console `document.querySelector('.mapstudio-map').dataset.unitsOverride` reads `us,long,1`, and `(await window.__mapStudioTest.send('map.load', {})).body.settings` is `{units: {id: "units", system: "us", labels: "long", version: 1}}` in both, with `body.setup.units` still `metric`.
+- [ ] **Change (S2).** The same call with `'op': 'update'`, `'baseVersion': 1` and `{'system': 'metric', 'labels': 'short'}` returns version 2.
+- [ ] **Stale (S5).** Send that update at `'baseVersion': 1` again: it raises `conflict: The units setting was changed by playbook at <time> UTC since you loaded it. Nothing in this save was written.`
+- [ ] **A bad value (S7, S8).** `'system': 'imperial'` raises `invalid: Op 0 (units): system must be one of auto, metric, us`; `'labels': 'tiny'` names `short, long`; `'id': 'theme'` raises `invalid: Op 0: a settings id must be units.` Nothing is saved by any of them.
+- [ ] **Recent changes (S12).** As the map editor open History on `/edit`: the two rows read "Changed the units to Metric, symbols" and "Set the units to US, words", by playbook, each with Revert. Expanded, a row shows Units before and after.
+- [ ] **Revert (S13).** Press Revert on "Changed the units to Metric, symbols": a new first row reads `Reverted "Changed the units to Metric, symbols"`, the map's `data-units-override` reads `us,long,3`, and the toolbar's Undo did not gain a step. Press Revert on the same row again: it is refused, the save status row and a card say "Not saved - conflict with mapeditor's change"; choose "Use mapeditor's version".
+- [ ] **A phone editor and a viewer (S6).** As the phone editor on `/edit`, and in the private window, `(await window.__mapStudioTest.send('edits.apply', {batchId: crypto.randomUUID(), ops: [{op: 'delete', entity: 'settings', id: 'units', baseVersion: 3}]})).body.code` is `role`.
+- [ ] **Clear (S3).** The script call with `'op': 'delete'`, `'baseVersion': 3` and no `data` returns version 4; both maps' `data-units-override` is empty and `map.load`'s `settings` is `{}`. Recent changes reads "Cleared the units setting". Leave the store so.
 
 Notes:
 

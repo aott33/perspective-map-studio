@@ -376,6 +376,21 @@ class MapStudioDelegateTest {
     }
 
     @Test
+    void aViewerGetsTheSettingsRecordInFullWithTheActorBlank() {
+        // Entry 19b: a viewer's map takes the units too; only who set them is kept from it.
+        JsonObject body = com.inductiveautomation.ignition.common.gson.JsonParser.parseString("{\"seq\":8,"
+            + "\"actor\":\"mapeditor\",\"ops\":[{\"op\":\"update\",\"entity\":\"settings\",\"id\":\"units\","
+            + "\"version\":2,\"record\":{\"id\":\"units\",\"system\":\"us\",\"labels\":\"long\",\"version\":2,"
+            + "\"deleted\":false}}]}").getAsJsonObject();
+        JsonObject none = MapStudioDelegate.bodyFor(body, "none");
+        assertEquals("", none.get("actor").getAsString());
+        assertEquals("{\"id\":\"units\",\"system\":\"us\",\"labels\":\"long\",\"version\":2,\"deleted\":false}",
+            none.getAsJsonArray("ops").get(0).getAsJsonObject().get("record").toString());
+        assertEquals(body, MapStudioDelegate.bodyFor(body, "phone"));
+        assertEquals(body, MapStudioDelegate.bodyFor(body, "full"));
+    }
+
+    @Test
     void aViewerGetsMapItemRecordsWithoutTheirOverrides() {
         JsonObject body = com.inductiveautomation.ignition.common.gson.JsonParser.parseString("{\"seq\":7,"
             + "\"actor\":\"mapeditor\",\"ops\":[{\"op\":\"update\",\"entity\":\"item\",\"id\":\"4f6c\","

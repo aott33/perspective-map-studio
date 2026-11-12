@@ -35,8 +35,8 @@
  */
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
-import { MapChanges, MapChangedBody } from './changes';
-import { EditBatch, EditLevel, ErrorCodes, KindSetupRecord, LastChange, MapItemData, MapItemRecord } from './contract';
+import { MapChanges, MapChangedBody, liveUnits } from './changes';
+import { EditBatch, EditLevel, ErrorCodes, KindSetupRecord, LastChange, MapItemData, MapItemRecord, UNITS_ID, UnitsSetting, readUnitsData } from './contract';
 import { KindRefusal, KindSaveState, ResolveState, SetupEdit, applyEdit, refusalPlace, resolveKey, ruleRefusalPlace, sameSetup, setupBatch } from './kindSetup';
 import {
     Position, instrumentCreateBatch, instrumentMoveBatch, itemDeleteBatch, itemsDeleteBatch, lineGeometryBatch, pointMoveBatch, splitAtBatch, vertexDeleteBatch,
@@ -196,6 +196,12 @@ export interface MapStudioDelegateState {
      * for a viewer. The first-run checklist's step 1 is done while one exists.
      */
     kindSetups: KindSetupRecord[];
+    /**
+     * Edit mode's units override in force (entry 19b): map.load.reply's `settings.units` (every level), kept live by
+     * map.changed's settings ops (changes.ts); null when none is set or it was cleared, and the setup's units apply.
+     * Kept only: nothing draws by it until entry 20.
+     */
+    units: UnitsSetting | null;
     /** The session user map.load named, '' when none (a viewer, an anonymous session): the first-run checklist's kept flags are per project and user. */
     user: string;
     /**
@@ -498,6 +504,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             changed: this.changed,
             justAdded: this.justAdded,
             kindSetups: this.changes.state.kindSetups,
+            units: liveUnits(this.changes.state),
             user: this.user,
             history: this.history,
             kindSaves: this.kindSaveStates(),
@@ -1884,7 +1891,10 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         if (pending) {
             this.pendingSteps.delete(batchId);
             if (batch) {
-                this.undoStack = pushStep(this.undoStack, { label: pending.label, batch, before: pending.before, results, at: Date.now() });
+                // The step holds the batch's map item ops only (entry 19b): Undo reverses map items, so a units op saved in the
+                // same batch (a Revert of a row holding both) is left out of the step's reverse; Recent changes reverts it.
+                const items = { batchId: batch.batchId, ops: batch.ops.filter((op) => op.entity === 'item') };
+                this.undoStack = pushStep(this.undoStack, { label: pending.label, batch: items, before: pending.before, results, at: Date.now() });
             }
             return;
         }
@@ -1985,6 +1995,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             } else if (c.entity === 'kindSetup' && c.current) {
                 // A kind setup's stored record (entry 12a): the Kinds panel shows the other editor's version, a later one kept.
                 this.changes.savedKindSetup(c.current as KindSetupRecord);
+            } else if (c.entity === 'settings' && c.current) {
+                // The units setting's stored record (entry 19b), a later one kept.
+                this.changes.savedUnits(c.current as UnitsSetting);
             }
         }
     }
@@ -2191,7 +2204,9 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
      * Revert a row of Recent changes (entry 11b): its batch's reverse, each op at the row's own version (history.ts `revertBatch`),
      * sent through `sendBatch` as an ordinary edit and one undo step "revert "<sentence>"", so it is refused as any edit is (a change
      * saved since is a `conflict` naming who made it, on the conflict card, which offers only "Use <name>'s version": the batch is
-     * queued marked as a Revert, entry 12b1). Nothing for a row Revert is not offered for, or while editing is paused.
+     * queued marked as a Revert, entry 12b1). Nothing for a row Revert is not offered for, or while editing is paused. A row of the
+     * units setting alone (entry 19b) is sent with no undo step; a row holding map items and the units setting is one undo step
+     * whose reverse holds the map items only, the units op left out of it.
      */
     revert(seq: number): boolean {
         const entry = this.history.entries.find((e) => e.seq === seq);
@@ -2216,6 +2231,17 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         // The undo step names the row as it reads ("Reverted ..." included).
         const sentence = rowSentence(entry, this.history.entries, this.lists.kinds, browserLocale(), kpiLabelsOf(this.changes.state.kindSetups));
         this.revertBatches.add(batch.batchId);
+        if (batch.ops.every((op) => op.entity === 'settings')) {
+            // A Revert of the units setting alone (entry 19b) is no Undo step: the toolbar's stack reverses map items only.
+            // It saves, waits its turn and meets a conflict like any other batch; Recent changes lists it and reverts it.
+            // A Revert that holds map items too goes on as any Revert: its step reverses the map items (settleUndo).
+            if (this.undoRun !== null) {
+                this.undoRun = null;
+                console.info('[MapStudio] Undo to here stopped: another edit was made.');
+            }
+            this.dispatch(batch, batch.ops[0].id, null, new Date());
+            return true;
+        }
         this.sendBatch(batch, batch.ops[0].id, revertLabel(sentence));
         return true;
     }
@@ -2416,6 +2442,16 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
                             this.itemsRevision++;
                         }
                     }
+                }
+            }
+            // The units setting this session saved (entry 19b): held at the reply's version, ahead of the Gateway's map.changed.
+            for (const op of saved ? saved.ops : []) {
+                const result = reply.body.results.find((r) => r.entity === 'settings' && r.id === op.id);
+                const values = op.op === 'delete' ? this.changes.state.units : readUnitsData(op.data);
+                if (op.entity === 'settings' && op.id === UNITS_ID && result && values) {
+                    this.changes.savedUnits({
+                        id: UNITS_ID, system: values.system, labels: values.labels, version: result.version, deleted: op.op === 'delete'
+                    });
                 }
             }
             this.shapesSent.delete(reply.body.batchId);

@@ -1,4 +1,4 @@
-import { CHANGES_INITIAL, ChangeState, MapChanges, MapChangedBody, applyRecord, onChanged, onLoad, readMapChanged } from '../changes';
+import { CHANGES_INITIAL, ChangeState, MapChanges, MapChangedBody, applyRecord, applyUnits, liveUnits, onChanged, onLoad, onSavedUnits, readMapChanged } from '../changes';
 import { NO_HOST_LISTS } from '../adapters';
 import { MapItemRecord, MapLoadReplyBody } from '../contract';
 import { readReply } from '../messages';
@@ -213,5 +213,58 @@ describe('the store delegate\'s change handling (MapChanges)', () => {
         changes.loaded(loadReply(7, [item('L7')]));
         expect(changes.retryFailedLoad()).toBe(false);
         expect(changes.state.loaded).toBe(true);
+    });
+});
+
+describe('the units override in the change state (epic 4 entry 19b)', () => {
+    const units = (system: string, labels: string, version: number, deleted = false) => ({ id: 'units' as const, system, labels, version, deleted });
+    const settingsChanged = (seq: number, op: string, record: unknown, version: number): MapChangedBody =>
+        readMapChanged({ seq, batchId: 'u' + seq, actor: '', ops: [{ op, entity: 'settings', id: 'units', version, record }] }) as MapChangedBody;
+
+    test('a load takes the reply\'s override, or none', () => {
+        expect(loadedAt(4).units).toBeNull();
+        const s = onLoad(CHANGES_INITIAL, { ...loadReply(4), units: units('us', 'long', 1) as never }).state;
+        expect(liveUnits(s)).toEqual(units('us', 'long', 1));
+        // The next load without one clears it: a load is the store's word.
+        expect(onLoad(s, loadReply(6)).state.units).toBeNull();
+    });
+
+    test('map.changed sets, changes and clears it by the version rule, a viewer\'s too, and draws nothing', () => {
+        const state = loadedAt(4, [item('L1')]);
+        const set = onChanged(state, settingsChanged(5, 'create', units('us', 'long', 1), 1));
+        expect(set.action).toBe('apply');
+        expect(set.state.seq).toBe(5);
+        expect(set.state.items).toBe(state.items);
+        expect(liveUnits(set.state)).toEqual(units('us', 'long', 1));
+        const changedState = onChanged(set.state, settingsChanged(6, 'update', units('metric', 'short', 2), 2)).state;
+        expect(liveUnits(changedState)).toEqual(units('metric', 'short', 2));
+        const cleared = onChanged(changedState, settingsChanged(7, 'delete', units('metric', 'short', 3, true), 3)).state;
+        expect(liveUnits(cleared)).toBeNull();
+        expect(cleared.units).toEqual(units('metric', 'short', 3, true));
+        // An older record never comes back over the tombstone; a newer set does.
+        expect(applyUnits(cleared.units, units('metric', 'short', 2))).toBe(cleared.units);
+        expect(liveUnits({ ...cleared, units: applyUnits(cleared.units, units('auto', 'long', 4)) })).toEqual(units('auto', 'long', 4));
+    });
+
+    test('a record that cannot be read changes nothing and is no gap', () => {
+        const state = onLoad(CHANGES_INITIAL, { ...loadReply(4), units: units('us', 'long', 1) as never }).state;
+        const s = onChanged(state, settingsChanged(5, 'update', { id: 'units', system: 'imperial', labels: 'long', version: 2, deleted: false }, 2));
+        expect(s.action).toBe('apply');
+        expect(s.state.units).toBe(state.units);
+    });
+
+    test('this session\'s own save is held at once; its map.changed then changes nothing', () => {
+        const state = loadedAt(4);
+        const saved = onSavedUnits(state, units('us', 'long', 1) as never);
+        expect(liveUnits(saved)).toEqual(units('us', 'long', 1));
+        expect(saved.seq).toBe(4);
+        const s = onChanged(saved, settingsChanged(5, 'create', units('us', 'long', 1), 1));
+        expect(s.state.units).toBe(saved.units);
+        expect(onSavedUnits(saved, units('us', 'long', 1) as never)).toBe(saved);
+        const changes = new MapChanges(() => undefined);
+        changes.load();
+        changes.loaded(loadReply(4));
+        expect(changes.savedUnits(units('us', 'long', 1) as never)).toBe(true);
+        expect(changes.savedUnits(units('us', 'long', 1) as never)).toBe(false);
     });
 });

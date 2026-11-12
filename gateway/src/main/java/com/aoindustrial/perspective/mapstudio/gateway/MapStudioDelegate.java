@@ -235,7 +235,8 @@ public class MapStudioDelegate extends ComponentModelDelegate {
      * {@code phone} and {@code full}; for {@code none}, a copy with {@code actor}
      * blank, each kind setup record without its {@code setup} and each map item record
      * with {@code overrides} {@code {}} (both hold tag paths, which viewers do not get;
-     * epic 2 story 9). The bus's body is shared, so it is
+     * epic 2 story 9); a settings record goes whole (entry 19b: a viewer's map takes the
+     * units too). The bus's body is shared, so it is
      * never changed. Pure.
      */
     static JsonObject bodyFor(JsonObject body, String level) {

@@ -22,7 +22,8 @@ import com.aoindustrial.perspective.mapstudio.gateway.store.MapStore;
  * {@code conflict} refusal: the stored record of each, who changed it last and when,
  * and a plain-words message naming the map item or kind setup, or the count when there
  * are several. A kind setup is named by its kind's display name from the batch's kind
- * list (epic 2 story 12), or by its kind id when the kind is not in the list.
+ * list (epic 2 story 12), or by its kind id when the kind is not in the list. A setting
+ * (epic-editing entry 19b) is named "the units setting".
  */
 final class ConflictReport {
 
@@ -60,13 +61,29 @@ final class ConflictReport {
     String message() {
         if (conflicts.size() > 1) {
             long setups = conflicts.stream().filter(c -> EditOp.ENTITY_KIND_SETUP.equals(c.entity())).count();
-            String noun = setups == 0 ? "map items" : setups == conflicts.size() ? "kind setups"
-                : "map items and kind setups";
-            return conflicts.size() + " " + noun + " were changed by others since you loaded them."
-                + " Nothing in this save was written.";
+            long settings = conflicts.stream().filter(c -> EditOp.ENTITY_SETTINGS.equals(c.entity())).count();
+            if (settings == 0) {
+                String noun = setups == 0 ? "map items" : setups == conflicts.size() ? "kind setups"
+                    : "map items and kind setups";
+                return conflicts.size() + " " + noun + " were changed by others since you loaded them."
+                    + " Nothing in this save was written.";
+            }
+            // With the units setting among them (entry 19b) each noun is counted on its own; the setting takes no number.
+            long items = conflicts.size() - setups - settings;
+            List<String> nouns = new ArrayList<>();
+            if (items > 0) {
+                nouns.add(items + (items == 1 ? " map item" : " map items"));
+            }
+            if (setups > 0) {
+                nouns.add(setups + (setups == 1 ? " kind setup" : " kind setups"));
+            }
+            nouns.add("the units setting");
+            return String.join(", ", nouns.subList(0, nouns.size() - 1)) + " and " + nouns.get(nouns.size() - 1)
+                + " were changed by others since you loaded them. Nothing in this save was written.";
         }
         Conflict c = conflicts.get(0);
         String name = EditOp.ENTITY_KIND_SETUP.equals(c.entity()) ? kindSetupName(c.id())
+            : EditOp.ENTITY_SETTINGS.equals(c.entity()) ? "The units setting"
             : c.current() != null && !c.current().name().isBlank() ? c.current().name() : "Map item " + c.id();
         String who = c.changedBy() == null ? "" : " by " + c.changedBy()
             + (c.changedAt() == null ? "" : " at " + hhmm(c.changedAt()) + " UTC");

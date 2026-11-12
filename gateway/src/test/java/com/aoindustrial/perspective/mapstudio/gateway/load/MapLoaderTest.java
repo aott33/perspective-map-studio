@@ -279,6 +279,31 @@ class MapLoaderTest {
     }
 
     @Test
+    void theUnitsOverrideGoesToEveryLevelBesideTheSetupsUnits() throws Exception {
+        // Entry 19b, S10: a fresh store has no override.
+        for (String level : List.of(Messages.LEVEL_NONE, Messages.LEVEL_PHONE, Messages.LEVEL_FULL)) {
+            assertEquals("{}", loader.mapLoadReply("mapstudio-dev", level).get("settings").toString(), level);
+        }
+        setups.put("mapstudio-dev", Setup.parse("{\"schemaVersion\":2,\"connection\":\"MapStudio\",\"units\":\"metric\"}"));
+        writes.apply("mapstudio-dev", JsonParser.parseString("{\"batchId\":\"" + UUID.randomUUID() + "\",\"ops\":["
+            + "{\"op\":\"create\",\"entity\":\"settings\",\"id\":\"units\",\"baseVersion\":0,"
+            + "\"data\":{\"system\":\"us\",\"labels\":\"long\"}}]}"), Actor.script("t"), Messages.LEVEL_FULL);
+        // S9: the same record at every level, a viewer included; the setup's own units are unchanged.
+        for (String level : List.of(Messages.LEVEL_NONE, Messages.LEVEL_PHONE, Messages.LEVEL_FULL)) {
+            JsonObject body = loader.mapLoadReply("mapstudio-dev", level);
+            assertEquals(JsonParser.parseString("{\"units\":{\"id\":\"units\",\"system\":\"us\",\"labels\":\"long\","
+                + "\"version\":1}}"), body.get("settings"), level);
+            assertEquals("metric", body.getAsJsonObject("setup").get("units").getAsString(), level);
+        }
+        // S3: cleared, the reply's settings is {} again.
+        writes.apply("mapstudio-dev", JsonParser.parseString("{\"batchId\":\"" + UUID.randomUUID() + "\",\"ops\":["
+            + "{\"op\":\"delete\",\"entity\":\"settings\",\"id\":\"units\",\"baseVersion\":1}]}"),
+            Actor.script("t"), Messages.LEVEL_FULL);
+        assertEquals("{}", loader.mapLoadReply("mapstudio-dev", Messages.LEVEL_NONE).get("settings").toString());
+        assertEquals(0, loader.snapshot("mapstudio-dev").settings().size());
+    }
+
+    @Test
     void kindSetupsGoToEditorsOnlyAndTombstonesAreLeftOut() {
         writes.apply("mapstudio-dev", JsonParser.parseString("{\"batchId\":\"" + UUID.randomUUID() + "\",\"ops\":["
             + "{\"op\":\"create\",\"entity\":\"kindSetup\",\"id\":\"pad\",\"baseVersion\":0,"

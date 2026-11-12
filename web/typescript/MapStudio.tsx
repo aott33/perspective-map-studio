@@ -2785,6 +2785,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
                          data-load-message={load.message}
                          data-store-seq={delegate && delegate.seq !== null ? String(delegate.seq) : ''}
                          data-map-reloads={delegate ? String(delegate.reloads) : '0'}
+                         data-units-override={delegate && delegate.units ? delegate.units.system + ',' + delegate.units.labels + ',' + delegate.units.version : ''}
                          data-store-state={storeStateAttribute(store)}
                          data-store-reason={store.reason}
                          data-save-state={save.state}
