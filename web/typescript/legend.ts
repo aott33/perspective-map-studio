@@ -9,7 +9,7 @@
  */
 
 import { Kind } from './adapters';
-import { MapItemRecord } from './contract';
+import { MapItemRecord, MapUnits, UnitLabels, UnitsData } from './contract';
 import { KindDisplay, Preset, Tint } from './live';
 import { PRESET_WORDS } from './markers';
 
@@ -234,4 +234,69 @@ export function writeToggle(store: ToggleStore | null, toggle: LegendToggle, on:
     } catch (err) {
         // A browser that refuses storage keeps the toggles for the page only.
     }
+}
+
+/**
+ * A press of the Layers surface's Units row (epic 4 entry 20b, R27): a button of the System group (`setup` is From setup, which
+ * clears the override) or one of the Labels group.
+ */
+export type UnitsPress = { system: 'setup' | 'metric' | 'us' } | { labels: UnitLabels };
+
+/** One button of the Units row: what a press of it asks for, its word, and whether it is the one in force. */
+export interface UnitsButton<T> {
+    id: T;
+    label: string;
+    pressed: boolean;
+}
+
+/**
+ * The Units row as it is drawn (entry 20b): the System group with the setup's note under it, and the Labels group with its note
+ * ('' for none), each disabled or not.
+ */
+export interface UnitsRow {
+    system: Array<UnitsButton<'setup' | 'metric' | 'us'>>;
+    systemDisabled: boolean;
+    setupNote: string;
+    labels: Array<UnitsButton<UnitLabels>>;
+    labelsDisabled: boolean;
+    labelsNote: string;
+}
+
+/** The note under the Labels group while no override is set: labels are short then, and the group is disabled. */
+export const UNITS_LABELS_NOTE = 'Pick Metric or US to choose the labels.';
+
+/** What the setup gives, in words (entry 20b, decision 4), under the System group. */
+export function setupUnitsNote(setupUnits: MapUnits): string {
+    return setupUnits === 'metric' ? 'The setup says Metric.' : setupUnits === 'us' ? 'The setup says US.'
+        : "The setup follows each browser's language.";
+}
+
+/**
+ * The Units row for the override shown (the store's, or the press on its way; null for none), the setup's units, and whether
+ * editing is paused. With no override From setup is pressed, labels are Short and the Labels group is disabled with its note.
+ * An override of `auto` (only a script sets one) presses nothing in System and leaves both groups enabled. While editing is
+ * paused both groups are disabled.
+ */
+export function unitsRow(shown: UnitsData | null, setupUnits: MapUnits, paused: boolean): UnitsRow {
+    const labels: UnitLabels = shown ? shown.labels : 'short';
+    return {
+        system: [
+            { id: 'setup', label: 'From setup', pressed: shown === null },
+            { id: 'metric', label: 'Metric', pressed: shown !== null && shown.system === 'metric' },
+            { id: 'us', label: 'US', pressed: shown !== null && shown.system === 'us' }
+        ],
+        systemDisabled: paused,
+        setupNote: setupUnitsNote(setupUnits),
+        labels: [
+            { id: 'short', label: 'Short', pressed: labels === 'short' },
+            { id: 'long', label: 'Long', pressed: labels === 'long' }
+        ],
+        labelsDisabled: paused || shown === null,
+        labelsNote: shown === null ? UNITS_LABELS_NOTE : ''
+    };
+}
+
+/** Whether two Units rows draw the same (a redraw is skipped then). */
+export function sameUnitsRow(a: UnitsRow | null, b: UnitsRow | null): boolean {
+    return a === b || (a !== null && b !== null && JSON.stringify(a) === JSON.stringify(b));
 }

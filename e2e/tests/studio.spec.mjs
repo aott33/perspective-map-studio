@@ -1097,7 +1097,7 @@ for (const [width, height, listWidth] of [[1366, 768, 256], [1440, 900, 280]]) {
                 expect(Math.abs((box.y + box.height) - (scaleBox.y + scaleBox.height) - INSET), 'and from the bottom edge').toBeLessThanOrEqual(1);
 
                 // Layers: the dock titled Layers, as wide as the list, with two tabs under its header as the properties panel's,
-                // Layers first and open: Show, then Basemap (the dev setup lists three), and nothing else.
+                // Layers first and open: Show, then Basemap (the dev setup lists three), then Units (entry 20b), and nothing else.
                 await openLayers(page, map);
                 const dock = page.locator('.mapstudio-dock--layers');
                 await expect(dock.locator('.mapstudio-dock-title')).toHaveText('Layers');
@@ -1113,7 +1113,7 @@ for (const [width, height, listWidth] of [[1366, 768, 256], [1440, 900, 280]]) {
                 await expect(dock.locator('[role="tabpanel"]')).toHaveAttribute('aria-labelledby', await layersTab(page, 'layers').getAttribute('id'));
                 const legend = docked(page);
                 await expect(legend).toHaveAttribute('data-part', 'controls');
-                expect(await legend.locator('.mapstudio-legend-heading').allTextContents(), 'Show, then Basemap').toEqual(['Show', 'Basemap']);
+                expect(await legend.locator('.mapstudio-legend-heading').allTextContents(), 'Show, then Basemap, then Units').toEqual(['Show', 'Basemap', 'Units']);
                 await expect(legend.locator('.mapstudio-legend-key-row')).toHaveCount(0);
                 await expect(legend.locator('.mapstudio-legend-toggle[data-toggle="lines"]')).toBeChecked();
                 await expect(legend.locator('.mapstudio-legend-toggle[data-toggle="names"]')).toBeChecked();
@@ -1184,7 +1184,8 @@ for (const [width, height, listWidth] of [[1366, 768, 256], [1440, 900, 280]]) {
                 await expect(layersTab(page, 'legend')).toHaveAttribute('aria-selected', 'true');
                 expect(await legendContent(legend)).toEqual(key);
 
-                // One legend: View mode's panel draws the key, then Show and Basemap, from the same state.
+                // One legend: View mode's panel draws the key, then Show and Basemap, from the same state; the Units section is
+                // the Layers tab's alone (entry 20b).
                 await page.locator('.mapstudio-edit-switch-button').click();
                 await expect(map).toHaveAttribute('data-studio', 'off');
                 await expect(page.locator('.mapstudio-legend-dock')).toHaveCount(0);
@@ -1192,7 +1193,7 @@ for (const [width, height, listWidth] of [[1366, 768, 256], [1440, 900, 280]]) {
                 await legendButton(page).click();
                 await expect(legendPanel(page)).toBeVisible();
                 expect(await legendContent(legendPanel(page))).toEqual({
-                    headings: [...key.headings, ...controls.headings], words: [...key.words, ...controls.words],
+                    headings: [...key.headings, ...controls.headings.filter((h) => h !== 'Units')], words: [...key.words, ...controls.words],
                     toggles: controls.toggles, basemaps: controls.basemaps, note: controls.note
                 });
                 // A fresh entry to Edit mode opens Layers on its Layers tab.

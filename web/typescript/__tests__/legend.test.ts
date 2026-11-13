@@ -2,8 +2,8 @@ import { Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import { KindDisplay } from '../live';
 import {
-    KINDS_COLLAPSE_OVER, LINE_ROWS, STATE_ROWS, STYLE_ROWS, TOGGLE_KEYS, ToggleStore, kindsHeading, kindsStartCollapsed, legendKey, readToggle, sameLegendKey, showsYouRow,
-    writeToggle
+    KINDS_COLLAPSE_OVER, LINE_ROWS, STATE_ROWS, STYLE_ROWS, TOGGLE_KEYS, ToggleStore, kindsHeading, kindsStartCollapsed, legendKey, readToggle, sameLegendKey, sameUnitsRow, showsYouRow,
+    unitsRow, writeToggle
 } from '../legend';
 
 const PAD: Kind = { id: 'pad', name: 'Well pad', geometry: 'point', icon: 'well-pad', labelRank: 10, fields: [] };
@@ -139,5 +139,57 @@ describe('the you-are-here row (epic 4 entry 15)', () => {
         expect(showsYouRow(legendKey(ITEMS, [PAD], {}, true))).toBe(true);
         expect(showsYouRow(legendKey(ITEMS, [PAD], {}))).toBe(false);
         expect(showsYouRow({ kinds: [], states: [], lines: [], styles: [], tints: [], you: true })).toBe(false);
+    });
+});
+
+describe('the Units row of the Layers tab (epic 4 entry 20b)', () => {
+    const pressed = (buttons: Array<{ id: string; pressed: boolean }>) => buttons.filter((b) => b.pressed).map((b) => b.id);
+
+    test('U1: no override: From setup and Short pressed, Labels disabled with its note, the setup\'s units in words', () => {
+        const row = unitsRow(null, 'metric', false);
+        expect(row.system.map((b) => b.label)).toEqual(['From setup', 'Metric', 'US']);
+        expect(row.labels.map((b) => b.label)).toEqual(['Short', 'Long']);
+        expect(pressed(row.system)).toEqual(['setup']);
+        expect(pressed(row.labels)).toEqual(['short']);
+        expect(row.systemDisabled).toBe(false);
+        expect(row.labelsDisabled).toBe(true);
+        expect(row.labelsNote).toBe('Pick Metric or US to choose the labels.');
+        expect(row.setupNote).toBe('The setup says Metric.');
+        expect(unitsRow(null, 'us', false).setupNote).toBe('The setup says US.');
+        expect(unitsRow(null, 'auto', false).setupNote).toBe("The setup follows each browser's language.");
+    });
+
+    test('U7: an override presses its system and labels, Labels enabled with no note; the setup\'s note stays', () => {
+        const row = unitsRow({ system: 'us', labels: 'long' }, 'metric', false);
+        expect(pressed(row.system)).toEqual(['us']);
+        expect(pressed(row.labels)).toEqual(['long']);
+        expect(row.labelsDisabled).toBe(false);
+        expect(row.labelsNote).toBe('');
+        expect(row.setupNote).toBe('The setup says Metric.');
+        expect(pressed(unitsRow({ system: 'metric', labels: 'short' }, 'us', false).system)).toEqual(['metric']);
+    });
+
+    test('an override of auto (a script\'s) presses nothing in System and leaves both groups enabled', () => {
+        const row = unitsRow({ system: 'auto', labels: 'long' }, 'metric', false);
+        expect(pressed(row.system)).toEqual([]);
+        expect(pressed(row.labels)).toEqual(['long']);
+        expect(row.systemDisabled).toBe(false);
+        expect(row.labelsDisabled).toBe(false);
+    });
+
+    test('U10: while editing is paused both groups are disabled, what is pressed still shown', () => {
+        const row = unitsRow({ system: 'us', labels: 'long' }, 'metric', true);
+        expect(row.systemDisabled).toBe(true);
+        expect(row.labelsDisabled).toBe(true);
+        expect(pressed(row.system)).toEqual(['us']);
+        expect(unitsRow(null, 'metric', true).systemDisabled).toBe(true);
+    });
+
+    test('a row that reads the same is the same; no em dash in its words', () => {
+        expect(sameUnitsRow(unitsRow(null, 'metric', false), unitsRow(null, 'metric', false))).toBe(true);
+        expect(sameUnitsRow(unitsRow(null, 'metric', false), unitsRow(null, 'metric', true))).toBe(false);
+        expect(sameUnitsRow(null, unitsRow(null, 'metric', false))).toBe(false);
+        expect(sameUnitsRow(null, null)).toBe(true);
+        expect(JSON.stringify([unitsRow(null, 'auto', false), unitsRow({ system: 'us', labels: 'long' }, 'us', true)])).not.toContain('\u2014');
     });
 });

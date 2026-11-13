@@ -4,14 +4,14 @@ type: 'feature'
 ticket: ''
 part_of: '20'
 created: '2026-11-12'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '3fd2cd7da4d08dce2dc633e7042c793792171da2'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context: ['{project-root}/docs/contract.md', '{project-root}/_bmad-output/initiative-flowmap/tickets/epic-editing/tickets/story-the-tag-browser-one-tree-for-every-tag-pick-asset-relative-p-plan-13b.md']
 ---
@@ -65,12 +65,12 @@ Decisions (owner, 2026-11-13, "Approve" on the plan and its seven picks): (1) Pl
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `MapStudioStoreDelegate.ts` and a unit test -- `saveUnits(choice)`: the op built from the held record, one in flight, the wait, the put-back on a refusal -- U2 to U6, U8, U9, tests first.
-- [ ] `LegendControl.ts`, `mapstudio.css` and a unit test -- the Units section, its setter and callback, disabled states, the notes -- U1, U7, U10, U11.
-- [ ] `MapStudio.tsx` -- the control fed from the delegate's props; the callback wired to `saveUnits`.
-- [ ] `unsaved.ts`, `history.ts` and their tests -- decision 6's words.
-- [ ] `e2e/tests/units.spec.mjs` -- U1 to U5, U7, U11, U12 through the row with a second editor and a viewer.
-- [ ] Docs, the playbook's 8v, the changelog.
+- [x] `MapStudioStoreDelegate.ts` and a unit test -- `saveUnits(choice)`: the op built from the held record, one in flight, the wait, the put-back on a refusal -- U2 to U6, U8, U9, tests first.
+- [x] `LegendControl.ts`, `mapstudio.css` and a unit test -- the Units section, its setter and callback, disabled states, the notes -- U1, U7, U10, U11.
+- [x] `MapStudio.tsx` -- the control fed from the delegate's props; the callback wired to `saveUnits`.
+- [x] `unsaved.ts`, `history.ts` and their tests -- decision 6's words.
+- [x] `e2e/tests/units.spec.mjs` -- U1 to U5, U7, U11, U12 through the row with a second editor and a viewer.
+- [x] Docs, the playbook's 8v, the changelog.
 
 **Acceptance Criteria:**
 - Given the dev Gateway, when an editor presses US in the Layers row, then a second open browser and a viewer's map read miles with no reload, and Metric puts kilometres back.
@@ -80,10 +80,22 @@ Decisions (owner, 2026-11-13, "Approve" on the plan and its seven picks): (1) Pl
 ## Implementation Notes
 
 - Planner, 2026-11-12: the environment and identity rules are entry 13b's plan's first Implementation Note; they hold here. Leave the work uncommitted; run the specs you touch, not the whole suite. Check `docker ps` before any stack work and start Docker as the hand-off note says if it stopped. Clear the override at the end of every spec that sets it.
+- Implementer, 2026-11-13: built as planned, left uncommitted. Where the build chose within the plan: (1) `saveUnits(press)` takes the button pressed (`{system: 'setup' | 'metric' | 'us'}` or `{labels}`, `legend.ts` `UnitsPress`) and resolves it against what the row shows; a System press keeps the labels, short when there is no override. The press on its way is the delegate's state `unitsPress`, so the control keeps nothing at all. (2) Only the newest press waits behind the save in flight: a third quick press replaces the second. (3) A create at 0 that meets a setting cleared before the page loaded (`map.load.reply` sends no tombstone, so the page cannot know its version) is sent once more at the version the conflict reports, as a kind setup's is; without it the first press after a reload on a cleared store would always show a conflict card. Any other conflict takes the stored record at once and stays in the queue for the save card. (4) A press waits for a Revert of the units setting that is being saved, and is built on what it saved. (5) "Paused" for the row is the delegate's `editing` off, the map not loaded, or the connection lost or reloading. (6) Jest here is node only, so the row's model is pure (`legend.ts` `unitsRow`, tested in `legend.test.ts`) and `LegendControl` draws it; the DOM, the focus and the live follow are proved by `units.spec.mjs`. (7) The Units buttons and notes carry classes of their own (`mapstudio-units-button`, `-group`, `-note`) under the Basemap rules, since the suite counts `.mapstudio-basemap-button` and `.mapstudio-legend-note`. (8) `studio.spec.mjs` listed the Layers tab's headings as Show and Basemap: now with Units, and its one-legend comparison leaves Units out of View mode's panel. (9) U8, U9 and U10 are unit tested only (`unitsDelegate.test.ts`); the playbook's 8v has them by hand. `docs/platform-checks.md` keeps 19b's words as the record of that run. Run here: tsc clean, Jest 1175 passed, Gradle BUILD SUCCESSFUL, the contract check OK; on the running stack (not fresh) `units.spec.mjs`, `settings.spec.mjs`, `studio.spec.mjs` "legend in Layers" and `layout.spec.mjs` "Layers alone" passed. The whole suite on a fresh stack was not run here (the orchestrator's).
 
 ## Plan Change Log
 
 ## Review Triage Log
+
+Quick review, 2026-11-13 (one reviewer, by inspection, and the orchestrator's reading of the delegate and the row model). Six findings: 2 medium, 3 low, 1 false; no intent gap, no plan fault.
+
+- medium, patch: a row press refused for a conflict stays in the queue as an ordinary entry, so the save card offers Apply mine on top (`unsaved.ts` `onTopBatch` blocks only a Revert and a kind setup save); `applyOnTop` sends it with a label and the toolbar gains an Undo step that reverses nothing (against decision 7). A batch of settings ops alone is no longer offered on top; the row shows the stored value and is pressed again.
+- medium, patch: `unitsFlight` is cleared only by its own reply, Discard or Use their version. When another tab of the browser saves or drops the queued entry (`unsavedSender.ts` `storage`) the flight stays, the row keeps the stale press and no later press is sent until a reload. The flight is settled when the queue no longer holds its batch.
+- low, patch: `units.spec.mjs`: Metric is pressed only after From setup, so "Metric puts kilometres back" over a US override is never asserted in the second browser or the viewer. An assertion added.
+- low, patch: `units.spec.mjs` `finally`: `clearUnits` holds expects and runs before the contexts are closed, so a failed clear leaks three contexts. The closes run whatever the clear does.
+- low, patch: EXPERIENCE.md, the Layers row of the surfaces table: the Units text was put in so that "Legend with the key" reads as the tail of the "Never on" list. Reworded.
+- false, rejected: "the third acceptance criterion is not evidenced". The plan gives the whole suite to the orchestrator, after the review; it is run before the commit and recorded in the Outcome.
+
+Outcome (2026-11-13): five patches applied, one finding rejected; nothing deferred. Unit tested only, not seen live: a quick second press (U8), a conflict (U9) and the paused row (U10); playbook 8v has them by hand. Beyond the plan's wording: a create at 0 that meets a setting cleared before the page loaded is sent once more at the cleared version, as a kind setup's is; only the newest press waits behind the one in flight. The orchestrator's Verification on the patched code: tsc clean, Jest 1176 passed, Gradle BUILD SUCCESSFUL, the contract check OK (map store schema 4), and on a fresh stack the whole suite 337 passed, 9 skipped, 0 failed in 1.3 h. With 20a this completes entry 20.
 
 ## Verification
 

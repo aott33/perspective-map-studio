@@ -28,12 +28,19 @@
  * a toggle or a basemap picked there goes through the same callbacks. The docked copy is never "open":
  * it calls no `onToggle` (`data-legend-open`), `isOpen` is the panel's alone (a map click closes the panel only),
  * it takes no focus when it is drawn and it keeps its own focused control across a redraw.
+ *
+ * The Units row (epic 4 entry 20b, R27): the docked Layers tab alone gains a third section, Units, under Show and Basemap: a
+ * System group (From setup, Metric, US) and a Labels group (Short, Long) drawn as the Basemap buttons are, each with a small
+ * label and a note (legend.ts `unitsRow`). The control keeps nothing of it: `setUnits` gives the row to draw (null for none)
+ * and a press goes out through `onUnits`. Never in the panel, the phone sheet or the Legend tab.
  */
 
 import { IControl, Map as MapLibreMap, ScaleControl } from 'maplibre-gl';
 import { BASEMAP_LABELS, BasemapId, offersBasemapSwitch } from './basemaps';
 import { glyphSvg } from './controls';
-import { LegendKey, LegendToggle, ZOOM_NOTE, kindsHeading, kindsStartCollapsed, sameLegendKey, showsYouRow, withYou } from './legend';
+import {
+    LegendKey, LegendToggle, UnitsButton, UnitsPress, UnitsRow, ZOOM_NOTE, kindsHeading, kindsStartCollapsed, sameLegendKey, sameUnitsRow, showsYouRow, withYou
+} from './legend';
 import { DIMMED_OPACITY } from './markers';
 import { YOU_ARE_HERE_WORDS } from './userLocation';
 
@@ -89,13 +96,15 @@ interface LegendHost {
     checkboxes: Map<LegendToggle, HTMLInputElement>;
     kindsButton: HTMLButtonElement | null;
     closeButton: HTMLButtonElement | null;
+    /** The Units row's buttons (entry 20b; the docked Layers tab only). */
+    unitButtons: HTMLButtonElement[];
 }
 
 /** The part the Layers surface's tab shows (entry 22): `controls` on the Layers tab (Show, Basemap), `key` on the Legend tab. */
 export type DockPart = 'controls' | 'key';
 
 function newHost(root: HTMLDivElement, docked: boolean, part: 'all' | DockPart): LegendHost {
-    return { root, docked, part, body: null, basemapGroup: null, status: null, buttons: new Map(), checkboxes: new Map(), kindsButton: null, closeButton: null };
+    return { root, docked, part, body: null, basemapGroup: null, status: null, buttons: new Map(), checkboxes: new Map(), kindsButton: null, closeButton: null, unitButtons: [] };
 }
 
 export class LegendControl implements IControl {
@@ -115,9 +124,12 @@ export class LegendControl implements IControl {
     private panelId = 'mapstudio-legend-' + Math.random().toString(36).slice(2, 8);
     private key: LegendKey = EMPTY_KEY;
     private toggles: Record<LegendToggle, boolean> = { lines: true, names: true };
+    /** The Units row to draw on the docked Layers tab (entry 20b), or null for none (not a full editor's Edit mode). */
+    private units: UnitsRow | null = null;
 
     constructor(private readonly onChoose: (id: BasemapId) => void, private readonly onToggle: (open: boolean) => void,
-                private readonly onSwitch: (toggle: LegendToggle, on: boolean) => void = () => undefined) {}
+                private readonly onSwitch: (toggle: LegendToggle, on: boolean) => void = () => undefined,
+                private readonly onUnits: (press: UnitsPress) => void = () => undefined) {}
 
     onAdd(map: MapLibreMap): HTMLElement {
         const container = document.createElement('div');
@@ -328,6 +340,10 @@ export class LegendControl implements IControl {
                 basemap.appendChild(status);
                 this.renderBasemaps(host);
             }
+            if (host.docked && host.part === 'controls' && this.units) {
+                // The Layers tab alone (entry 20b): Units under Show and Basemap.
+                this.renderUnits(host, body, this.units);
+            }
         }
         body.scrollTop = scroll;
         if (focused) {
@@ -354,6 +370,8 @@ export class LegendControl implements IControl {
         }
         host.basemapGroup = null;
         host.status = null;
+        host.unitButtons.forEach((button) => button.removeEventListener('click', this.handleUnits));
+        host.unitButtons = [];
     }
 
     /** Close the panel; with `focusButton` the Legend button takes the focus back (Esc). */
@@ -433,6 +451,20 @@ export class LegendControl implements IControl {
     setScaleUnit(system: 'metric' | 'us'): void {
         if (this.scale) {
             this.scale.setUnit(system === 'us' ? 'imperial' : 'metric');
+        }
+    }
+
+    /**
+     * The Units row of the docked Layers tab (entry 20b): the row to draw, or null for none. The Layers tab is drawn again only
+     * when the row changed (another editor's change, a press on its way or put back, editing paused), its focused button kept.
+     */
+    setUnits(row: UnitsRow | null): void {
+        if (sameUnitsRow(this.units, row)) {
+            return;
+        }
+        this.units = row;
+        if (this.docked && this.docked.part === 'controls') {
+            this.fill(this.docked);
         }
     }
 
@@ -579,6 +611,53 @@ export class LegendControl implements IControl {
         show.appendChild(note);
     }
 
+    /**
+     * The Units section (entry 20b): the System group with what the setup gives under it, then the Labels group with its note
+     * while there is no override. Real buttons in a labelled group, the one in force pressed, as the Basemap buttons.
+     */
+    private renderUnits(host: LegendHost, panel: HTMLElement, row: UnitsRow): void {
+        const units = this.section(panel, 'Units', 'mapstudio-legend-section--units');
+        this.unitsGroup(host, units, 'System', 'system', row.system, row.systemDisabled, row.setupNote);
+        this.unitsGroup(host, units, 'Labels', 'labels', row.labels, row.labelsDisabled, row.labelsNote);
+    }
+
+    private unitsGroup(host: LegendHost, section: HTMLElement, title: string, name: 'system' | 'labels', buttons: Array<UnitsButton<string>>,
+                       disabled: boolean, note: string): void {
+        const part = document.createElement('div');
+        part.className = 'mapstudio-units-part mapstudio-units-part--' + name;
+        const label = document.createElement('div');
+        label.className = 'mapstudio-units-label';
+        label.id = this.panelId + '-units-' + name;
+        label.textContent = title;
+        part.appendChild(label);
+        const group = document.createElement('div');
+        group.className = 'mapstudio-units-group';
+        group.setAttribute('role', 'group');
+        group.setAttribute('aria-labelledby', label.id);
+        for (const b of buttons) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'mapstudio-ctrl-button mapstudio-units-button';
+            button.classList.toggle('mapstudio-units-button--on', b.pressed);
+            button.setAttribute('data-units-' + name, b.id);
+            button.setAttribute('data-focus-key', 'units-' + name + ':' + b.id);
+            button.setAttribute('aria-pressed', b.pressed ? 'true' : 'false');
+            button.disabled = disabled;
+            button.textContent = b.label;
+            button.addEventListener('click', this.handleUnits);
+            group.appendChild(button);
+            host.unitButtons.push(button);
+        }
+        part.appendChild(group);
+        if (note !== '') {
+            const words = document.createElement('div');
+            words.className = 'mapstudio-units-note';
+            words.textContent = note;
+            part.appendChild(words);
+        }
+        section.appendChild(part);
+    }
+
     private row(section: HTMLElement, box: SVGSVGElement, words: string, className: string, attrs: Record<string, string> = {}): void {
         const row = document.createElement('div');
         row.className = 'mapstudio-legend-key-row ' + className;
@@ -685,6 +764,20 @@ export class LegendControl implements IControl {
         const id = (ev.currentTarget as HTMLElement).getAttribute('data-basemap') as BasemapId | null;
         if (id) {
             this.onChoose(id);
+        }
+    };
+
+    /** A press of a Units button (entry 20b): reported; what is pressed follows from `setUnits`. */
+    private handleUnits = (ev: MouseEvent): void => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const button = ev.currentTarget as HTMLElement;
+        const system = button.getAttribute('data-units-system');
+        const labels = button.getAttribute('data-units-labels');
+        if (system === 'setup' || system === 'metric' || system === 'us') {
+            this.onUnits({ system });
+        } else if (labels === 'short' || labels === 'long') {
+            this.onUnits({ labels });
         }
     };
 

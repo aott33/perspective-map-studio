@@ -513,8 +513,8 @@ The script console (Designer, Tools > Script Console runs in the Designer's scop
 - [ ] **Change (S2).** The same call with `'op': 'update'`, `'baseVersion': 1` and `{'system': 'metric', 'labels': 'short'}` returns version 2.
 - [ ] **Stale (S5).** Send that update at `'baseVersion': 1` again: it raises `conflict: The units setting was changed by playbook at <time> UTC since you loaded it. Nothing in this save was written.`
 - [ ] **A bad value (S7, S8).** `'system': 'imperial'` raises `invalid: Op 0 (units): system must be one of auto, metric, us`; `'labels': 'tiny'` names `short, long`; `'id': 'theme'` raises `invalid: Op 0: a settings id must be units.` Nothing is saved by any of them.
-- [ ] **Recent changes (S12).** As the map editor open History on `/edit`: the two rows read "Changed the units to Metric, symbols" and "Set the units to US, words", by playbook, each with Revert. Expanded, a row shows Units before and after.
-- [ ] **Revert (S13).** Press Revert on "Changed the units to Metric, symbols": a new first row reads `Reverted "Changed the units to Metric, symbols"`, the map's `data-units-override` reads `us,long,3`, and the toolbar's Undo did not gain a step. Press Revert on the same row again: it is refused, the save status row and a card say "Not saved - conflict with mapeditor's change"; choose "Use mapeditor's version".
+- [ ] **Recent changes (S12).** As the map editor open History on `/edit`: the two rows read "Changed the units to Metric, short labels" and "Set the units to US, long labels", by playbook, each with Revert. Expanded, a row shows Units before and after.
+- [ ] **Revert (S13).** Press Revert on "Changed the units to Metric, short labels": a new first row reads `Reverted "Changed the units to Metric, short labels"`, the map's `data-units-override` reads `us,long,3`, and the toolbar's Undo did not gain a step. Press Revert on the same row again: it is refused, the save status row and a card say "Not saved - conflict with mapeditor's change"; choose "Use mapeditor's version".
 - [ ] **A phone editor and a viewer (S6).** As the phone editor on `/edit`, and in the private window, `(await window.__mapStudioTest.send('edits.apply', {batchId: crypto.randomUUID(), ops: [{op: 'delete', entity: 'settings', id: 'units', baseVersion: 3}]})).body.code` is `role`.
 - [ ] **Clear (S3).** The script call with `'op': 'delete'`, `'baseVersion': 3` and no `data` returns version 4; both maps' `data-units-override` is empty and `map.load`'s `settings` is `{}`. Recent changes reads "Cleared the units setting". Leave the store so.
 
@@ -522,7 +522,7 @@ Notes:
 
 ## 8u. Distances in the units in force (the override from a script, the setup at metric and at us)
 
-Entry 20a: one formatter writes every distance, in the units in force: the store's override (section 8t), else the setup's `units` (section 8s), else the browser's language. No control sets the override yet (the Layers row is entry 20b's), so it is set from a script as in section 8t. Unit tested (`units.test.ts`) and run on the dev stack (`e2e/tests/units.spec.mjs`, `directions.spec.mjs`); this section is the same by hand. The seeded L-SWD is 2,922 m long with PT-1 at 1,143 m, LV-1 at 2,000 m and PT-2 at 2,841 m.
+Entry 20a: one formatter writes every distance, in the units in force: the store's override (section 8t), else the setup's `units` (section 8s), else the browser's language. Here it is set from a script as in section 8t; the Layers row that sets it in Edit mode is section 8v. Unit tested (`units.test.ts`) and run on the dev stack (`e2e/tests/units.spec.mjs`, `directions.spec.mjs`); this section is the same by hand. The seeded L-SWD is 2,922 m long with PT-1 at 1,143 m, LV-1 at 2,000 m and PT-2 at 2,841 m.
 
 The setup at `metric` (the dev setup as committed), no override:
 
@@ -547,6 +547,27 @@ The setup at `us`:
 - [ ] Set `"units": "us"` in `ops/project/com.aoindustrial.perspective.mapstudio/setup/setup.json`, scan the projects (or wait for the scan) and reload the pages. With no override: `dataset.units` is `us`; L-SWD's popup reads 1.8 mi and PT-1 at 3,750 ft; a typed 3750 in PT-1's Details (after another value) stores 1143 m.
 - [ ] Set the override to `{'system': 'metric', 'labels': 'long'}`: the open popup reads "2.9 kilometres": the override wins over the setup. Clear it: miles again.
 - [ ] Put `"units": "metric"` back and scan. Leave the store with no override.
+
+Notes:
+
+## 8v. The Units row in Edit mode's Layers tab
+
+Entry 20b: the override of sections 8t and 8u set in the browser. Unit tested (`unitsDelegate.test.ts`, `legend.test.ts`) and run on the dev stack (`e2e/tests/units.spec.mjs`); this section is the same by hand. Start with no override (section 8t's delete) and the setup at `metric`. Keep three browsers open: the map editor on `/edit`, a second map editor on `/edit`, and a viewer on `/` with L-SWD's popup open (click it between PT-1 and LV-1).
+
+- [ ] **Shown (U1).** As the map editor press Layers on the rail. Under Show (and Basemap) the Layers tab has a Units section: "System" with From setup, Metric and US, From setup pressed, and under it "The setup says Metric."; "Labels" with Short and Long, Short pressed, both greyed, and under it "Pick Metric or US to choose the labels."
+- [ ] **Set (U2).** Press US. It is pressed at once, Labels is no longer greyed, and with no reload the viewer's popup reads "Gathering line - 6 in, 1.8 mi" and the second editor's row shows US pressed.
+- [ ] **Labels (U3).** Press Long: "1.8 miles" in the viewer's popup; Long pressed in both editors' rows.
+- [ ] **Same (U6).** Press Long again, then US: nothing is saved (History gains no row).
+- [ ] **Clear (U4).** Press From setup: the popup reads "2.9 km" again, Short is pressed and Labels greyed.
+- [ ] **Again (U5).** Press Metric: saved, no conflict card; Metric and Short pressed, Labels not greyed.
+- [ ] **Live (U7).** In the second editor's row press US, then Long: the first editor's row shows US and Long pressed with no reload, and the popup reads miles.
+- [ ] **Quick (U8).** Press Metric and at once Short: both are saved, and the row ends on Metric and Short in both browsers.
+- [ ] **Keyboard.** Tab to the row: each button takes the focus ring, Enter or Space presses it, and the focus stays on the pressed button.
+- [ ] **Elsewhere (U11).** The Legend tab has no Units section. Neither has the viewer's Legend panel, the Legend panel of an editor in View mode, nor the phone editor's Legend sheet (a phone-width window signed in as the phone editor).
+- [ ] **History (U12).** Open History: the presses read "Set the units to US, short labels", "Changed the units to US, long labels", "Cleared the units setting", "Set the units to Metric, short labels", each by the editor who pressed and each with Revert. The toolbar's Undo holds no step for any of them. Revert on the newest row puts the value before back, in the row too.
+- [ ] **Conflict (U9).** A save that lands between a press and its send is hard to time by hand; it is unit tested (`unitsDelegate.test.ts`). The same refusal by hand: in History press Revert on an older units row after a later change: the save card reads "Not saved - conflict" naming who changed the units setting, and after "Use their version" the row shows the stored value.
+- [ ] **Paused (U10).** Stop PostgreSQL (`docker stop <the -pg container>`), make an edit so the map says the store cannot be reached (section 8's pause), and open Layers: both groups are greyed and a press sends nothing. Start PostgreSQL again: the groups come back.
+- [ ] Leave the store with no override: press From setup.
 
 Notes:
 

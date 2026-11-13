@@ -12,7 +12,7 @@
 import { AttributionControl, Map as MapLibreMap } from 'maplibre-gl';
 import { BasemapId } from './basemaps';
 import { LegendControl } from './LegendControl';
-import { LegendToggle } from './legend';
+import { LegendToggle, UnitsPress } from './legend';
 import { MapboxLogoControl } from './mapboxLogo';
 import { NeedsYouControl } from './NeedsYouControl';
 import { NeedsYouRow } from './needsyou';
@@ -34,6 +34,8 @@ export interface ViewControlsHost {
     /** The legend's basemap choice (for the delegate) and its Lines and Names toggles. */
     onBasemapChoose(id: BasemapId): void;
     onLegendSwitch(toggle: LegendToggle, on: boolean): void;
+    /** A press of the Layers tab's Units row (epic 4 entry 20b). */
+    onUnitsPress(press: UnitsPress): void;
 }
 
 /** The handles the component keeps; `needsYou` is null when the search control gave no slot. */
@@ -79,7 +81,7 @@ export function addViewControls(map: MapLibreMap, host: ViewControlsHost, toggle
         if (host.mapContainer) {
             host.mapContainer.setAttribute('data-legend-open', open ? 'true' : 'false');
         }
-    }, host.onLegendSwitch);
+    }, host.onLegendSwitch, host.onUnitsPress);
     legend.setToggles(toggles.lines, toggles.names);
     map.addControl(legend, 'bottom-left');
     // The provider's attribution (R10, always shown with a basemap): small muted text along the bottom-right

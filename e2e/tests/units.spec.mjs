@@ -1,18 +1,23 @@
 // One formatter behind every distance, following the units in force (epic-editing entry 20a, R27), live on the dev stack
 // with the seeded L-SWD set (about 2,922.2 m, 9,587 ft; PT-1 at 1,143 m, LV-1 at 2,000 m, PT-2 at 2,841 m). The units in force are the
-// store's live override, else the setup's `units`, else the browser's locale; no control sets the override until entry
-// 20b, so it is set here through the component's real session path (fixtures.mjs `setUnits`, `clearUnits`).
+// store's live override, else the setup's `units`, else the browser's locale; no control sets the override in these
+// tests (the Layers row is entry 20b's, below), so it is set here through the component's real session path (fixtures.mjs `setUnits`, `clearUnits`).
 // With the setup at `metric`: a second editor and an anonymous viewer hold L-SWD's line popup open while the map editor
 // sets the override to US with words, then US with symbols, then clears it; both popups follow with no reload (F8, F9,
 // F2), and the map carries `data-units` and `data-unit-labels`. Under US units the editor's Details and drawing bar write
 // and read feet, and what is stored stays metres (F5 to F7). With the setup at `us` and no override the popup reads miles
 // and feet and a typed 3750 stores 1143 m; an override wins over the setup. The spec leaves the committed setup, no
 // override and the seed's own L-SWD set.
+//
+// The Units row of Edit mode's Layers tab (entry 20b): the map editor presses US, Long, From setup and Metric in the row, and
+// a second editor's row, that editor's open line popup in View mode and an anonymous viewer's follow with no reload (U1 to
+// U5, U7); a press of the pressed button sends nothing (U6); no Units section on the Legend tab, in View mode's legend or on
+// the phone sheet (U11); Recent changes lists the presses in the row's words, each with Revert and no Undo step (U12).
 
 import { pagePixel } from '../lib/geo.mjs';
 import {
-    EDITOR2_USER, EDITOR_USER, clearUnits, editorTest, expect, mapLoaded, openMap, removeStrays, restoreSetupUnits, runSeed, send, setUnits,
-    signedInContext, test, useSetupUnits, view
+    EDITOR2_USER, EDITOR_USER, OPERATOR_USER, clearUnits, editorTest, expect, mapLoaded, openMap, removeStrays, restoreSetupUnits, runSeed, send, setUnits,
+    shot, signedInContext, test, useSetupUnits, view
 } from './fixtures.mjs';
 
 const REPLY_MS = 20_000;
@@ -90,6 +95,11 @@ const US_SHORT = {
 };
 const US_LONG = {
     subline: 'Gathering line - 6 in, 1.8 miles', span: '3,750 feet to 1.8 miles', rows: ['0 feet', '3,750 feet', '1.2 miles', '1.8 miles', '1.8 miles']
+};
+
+const METRIC_LONG = {
+    subline: 'Gathering line - 6 in, 2.9 kilometres', span: '1.1 to 2.8 kilometres',
+    rows: ['0 metres', '1.1 kilometres', '2 kilometres', '2.8 kilometres', '2.9 kilometres']
 };
 
 async function expectUnits(map, system, labels) {
@@ -322,6 +332,224 @@ editorTest.describe('distances follow the units in force (entry 20a)', () => {
                 await clearUnits(page);
                 await restoreSetupUnits(page);
                 await viewerContext.close();
+            }
+        });
+});
+
+/** The Layers surface opened from the rail, on its Layers tab; returns the docked controls. */
+async function openLayers(page, map) {
+    await page.locator('.mapstudio-rail-item[data-surface="layers"]').click();
+    await expect(map).toHaveAttribute('data-surface', 'layers');
+    const dock = page.locator('.mapstudio-dock--layers .mapstudio-legend-dock');
+    await expect(dock).toHaveAttribute('data-part', 'controls');
+    return dock;
+}
+
+const unitsSection = (page) => page.locator('.mapstudio-dock--layers .mapstudio-legend-section--units');
+const systemButton = (page, id) => unitsSection(page).locator('button[data-units-system="' + id + '"]');
+const labelsButton = (page, id) => unitsSection(page).locator('button[data-units-labels="' + id + '"]');
+
+/** The row as it reads: the pressed System button ('' for none), the pressed Labels button, and whether Labels is disabled. */
+async function expectRow(page, system, labels, labelsDisabled) {
+    for (const id of ['setup', 'metric', 'us']) {
+        await expect(systemButton(page, id)).toHaveAttribute('aria-pressed', id === system ? 'true' : 'false', { timeout: REPLY_MS });
+        await expect(systemButton(page, id)).toBeEnabled();
+    }
+    for (const id of ['short', 'long']) {
+        await expect(labelsButton(page, id)).toHaveAttribute('aria-pressed', id === labels ? 'true' : 'false');
+        if (labelsDisabled) {
+            await expect(labelsButton(page, id)).toBeDisabled();
+        } else {
+            await expect(labelsButton(page, id)).toBeEnabled();
+        }
+    }
+    await expect(unitsSection(page).locator('.mapstudio-units-part--labels .mapstudio-units-note'))
+        .toHaveText(labelsDisabled ? ['Pick Metric or US to choose the labels.'] : []);
+}
+
+/** The store's units override and change sequence, through the test hook. */
+async function storedUnits(page) {
+    const body = (await send(page, 'map.load', {})).body;
+    return { seq: body.seq, units: body.settings.units || null };
+}
+
+editorTest.describe('the Units row of the Layers tab (entry 20b)', () => {
+    editorTest.use({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, actionTimeout: REPLY_MS });
+
+    editorTest('U1 to U7, U11, U12: a press saves at once and reaches a second editor\'s row and popup and a viewer\'s popup with no reload',
+        async ({ page, browser, watched }) => {
+            editorTest.setTimeout(420_000);
+            const map = await openEditor(page);
+            await clearUnits(page);
+            const otherContext = await signedInContext(browser, EDITOR2_USER, { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+            const viewerContext = await browser.newContext({
+                viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, storageState: { cookies: [], origins: [] }
+            });
+            const phoneContext = await signedInContext(browser, OPERATOR_USER, { viewport: { width: 390, height: 844 } });
+            try {
+                // A second editor twice: in Edit mode with the Layers tab open, and in View mode (/live) with L-SWD's popup open;
+                // and an anonymous viewer with the popup open.
+                const otherEdit = await otherContext.newPage();
+                const otherEditMap = await openMap(otherEdit, '/edit');
+                await mapLoaded(otherEditMap);
+                await expect(otherEditMap).toHaveAttribute('data-studio', 'on');
+                await openLayers(otherEdit, otherEditMap);
+                const other = await otherContext.newPage();
+                const otherMap = await openMap(other, '/live');
+                await mapLoaded(otherMap);
+                await expect(otherMap).toHaveAttribute('data-edit-level', 'full');
+                const viewer = await viewerContext.newPage();
+                const viewerMap = await openMap(viewer, '/');
+                await mapLoaded(viewerMap);
+                await expect(viewerMap).toHaveAttribute('data-edit-level', 'none');
+                const otherPopup = await openLinePopup(other, otherMap);
+                const viewerPopup = await openLinePopup(viewer, viewerMap);
+                const watching = [[otherMap, otherPopup], [viewerMap, viewerPopup]];
+                const everywhere = async (system, labels, popupReads) => {
+                    await expectUnits(map, system, labels);
+                    for (const [m, popup] of watching) {
+                        await expectUnits(m, system, labels);
+                        await expectPopup(popup, popupReads);
+                        await expect(popup).toBeVisible();
+                    }
+                };
+                const reloads = await Promise.all([otherEditMap, otherMap, viewerMap].map((m) => m.getAttribute('data-map-reloads')));
+
+                // U1: Units is the last section of the Layers tab, under Show (and Basemap when there is a choice); with no
+                // override From setup and Short are pressed, Labels is disabled with its note, and the setup's units are said.
+                const dock = await openLayers(page, map);
+                await expect(dock.locator('.mapstudio-legend-section').last()).toHaveClass(/mapstudio-legend-section--units/);
+                await expect(dock.locator('.mapstudio-legend-section--show')).toHaveCount(1);
+                await expect(unitsSection(page).locator('.mapstudio-legend-heading')).toHaveText('Units');
+                await expect(unitsSection(page).locator('.mapstudio-units-label')).toHaveText(['System', 'Labels']);
+                await expect(unitsSection(page).locator('[role="group"]')).toHaveCount(2);
+                await expect(unitsSection(page).getByRole('group', { name: 'System' }).locator('button')).toHaveText(['From setup', 'Metric', 'US']);
+                await expect(unitsSection(page).getByRole('group', { name: 'Labels' }).locator('button')).toHaveText(['Short', 'Long']);
+                await expectRow(page, 'setup', 'short', true);
+                await expect(unitsSection(page).locator('.mapstudio-units-part--system .mapstudio-units-note')).toHaveText('The setup says Metric.');
+                await expectRow(otherEdit, 'setup', 'short', true);
+                await everywhere('metric', 'short', METRIC);
+                await shot(page, 'mapstudio-layers-units-1440.png');
+                const start = await storedUnits(page);
+                expect(start.units).toBeNull();
+
+                // U2: US. One save, {us, short}; pressed here with Labels enabled, and miles in every browser, no reload.
+                await systemButton(page, 'us').click();
+                await expect(map).toHaveAttribute('data-units-override', /^us,short,\d+$/, { timeout: REPLY_MS });
+                await expectRow(page, 'us', 'short', false);
+                await expect(systemButton(page, 'us')).toBeFocused();
+                await everywhere('us', 'short', US_SHORT);
+                await expect(map).toHaveAttribute('data-unsaved-count', '0');
+                const set = await storedUnits(page);
+                expect(set.units).toMatchObject({ system: 'us', labels: 'short' });
+                expect(set.seq, 'one batch').toBe(start.seq + 1);
+                // U7: the second editor's row follows with no reload.
+                await expectRow(otherEdit, 'us', 'short', false);
+
+                // U3: Long is an update at the held version.
+                await labelsButton(page, 'long').click();
+                await expect(map).toHaveAttribute('data-units-override', 'us,long,' + (set.units.version + 1), { timeout: REPLY_MS });
+                await expectRow(page, 'us', 'long', false);
+                await everywhere('us', 'long', US_LONG);
+                await expectRow(otherEdit, 'us', 'long', false);
+                const long = await storedUnits(page);
+                expect(long.seq).toBe(set.seq + 1);
+                await shot(page, 'mapstudio-layers-units-us-long-1440.png');
+
+                // U6: the pressed buttons send nothing.
+                await labelsButton(page, 'long').click();
+                await systemButton(page, 'us').click();
+                await page.waitForTimeout(NOTHING_MS);
+                expect((await storedUnits(page)).seq, 'nothing was saved').toBe(long.seq);
+
+                // U11: the Legend tab has no Units section; back on the Layers tab it is there as it was.
+                await page.locator('.mapstudio-dock--layers [role="tab"][data-tab="legend"]').click();
+                await expect(page.locator('.mapstudio-dock--layers .mapstudio-legend-dock')).toHaveAttribute('data-part', 'key');
+                await expect(page.locator('.mapstudio-legend-section--units')).toHaveCount(0);
+                await page.locator('.mapstudio-dock--layers [role="tab"][data-tab="layers"]').click();
+                await expectRow(page, 'us', 'long', false);
+
+                // Metric over the US override puts kilometres back in every browser, the labels kept, no reload.
+                await systemButton(page, 'metric').click();
+                await expect(map).toHaveAttribute('data-units-override', 'metric,long,' + (set.units.version + 2), { timeout: REPLY_MS });
+                await expectRow(page, 'metric', 'long', false);
+                await everywhere('metric', 'long', METRIC_LONG);
+                await expectRow(otherEdit, 'metric', 'long', false);
+                const metric = await storedUnits(page);
+                expect(metric.seq).toBe(long.seq + 1);
+
+                // U4: From setup clears the override: the setup's kilometres, short labels, Labels disabled again.
+                await systemButton(page, 'setup').click();
+                await expect(map).toHaveAttribute('data-units-override', '', { timeout: REPLY_MS });
+                await expectRow(page, 'setup', 'short', true);
+                await everywhere('metric', 'short', METRIC);
+                await expectRow(otherEdit, 'setup', 'short', true);
+                const cleared = await storedUnits(page);
+                expect(cleared.units).toBeNull();
+                expect(cleared.seq).toBe(metric.seq + 1);
+
+                // U5: Metric after the clear is a create at the tombstone's version: saved, no conflict.
+                await systemButton(page, 'metric').click();
+                await expect(map).toHaveAttribute('data-units-override', 'metric,short,' + (set.units.version + 4), { timeout: REPLY_MS });
+                await expectRow(page, 'metric', 'short', false);
+                await expect(map).toHaveAttribute('data-unsaved-count', '0');
+                await expect(page.locator('.mapstudio-save-card')).toHaveCount(0);
+                await expectRow(otherEdit, 'metric', 'short', false);
+                expect((await storedUnits(page)).seq).toBe(cleared.seq + 1);
+
+                // U7: the second editor presses US and Long in their row: this row and every distance follow.
+                await systemButton(otherEdit, 'us').click();
+                await expectRow(page, 'us', 'short', false);
+                await labelsButton(otherEdit, 'long').click();
+                await expectRow(page, 'us', 'long', false);
+                await expectRow(otherEdit, 'us', 'long', false);
+                await everywhere('us', 'long', US_LONG);
+                await expect(otherEditMap).toHaveAttribute('data-unsaved-count', '0');
+
+                // U11: View mode's legend, a full editor's and a viewer's, and the phone editor's sheet have no Units section.
+                for (const p of [other, viewer]) {
+                    await p.locator('.mapstudio-legend-button').click();
+                    await expect(p.locator('.mapstudio-legend-panel .mapstudio-legend-section--show')).toHaveCount(1);
+                    await expect(p.locator('.mapstudio-legend-section--units')).toHaveCount(0);
+                    await expect(p.locator('[data-units-system], [data-units-labels]')).toHaveCount(0);
+                }
+                const phone = await phoneContext.newPage();
+                const phoneMap = await openMap(phone, '/edit');
+                await mapLoaded(phoneMap);
+                await expect(phoneMap).toHaveAttribute('data-edit-level', 'phone');
+                await expectUnits(phoneMap, 'us', 'long');
+                await phone.locator('.mapstudio-legend-button').click();
+                await expect(phone.locator('.mapstudio-legend-panel--sheet .mapstudio-legend-section--show')).toHaveCount(1);
+                await expect(phone.locator('.mapstudio-legend-section--units')).toHaveCount(0);
+                await expect(phone.locator('[data-units-system], [data-units-labels]')).toHaveCount(0);
+
+                // U12: Recent changes lists the presses of U2 to U4 in the row's words, each with Revert; no Undo step.
+                await page.locator('.mapstudio-rail-item[data-surface="history"]').click();
+                const history = page.locator('.mapstudio-history');
+                await expect(history).toBeVisible();
+                const row = (seq) => page.locator('.mapstudio-history-row[data-seq="' + seq + '"]');
+                await expect(row(cleared.seq)).toHaveCount(1, { timeout: REPLY_MS });
+                await expect(row(set.seq).locator('.mapstudio-history-sentence')).toHaveText('Set the units to US, short labels');
+                await expect(row(long.seq).locator('.mapstudio-history-sentence')).toHaveText('Changed the units to US, long labels');
+                await expect(row(metric.seq).locator('.mapstudio-history-sentence')).toHaveText('Changed the units to Metric, long labels');
+                await expect(row(cleared.seq).locator('.mapstudio-history-sentence')).toHaveText('Cleared the units setting');
+                await expect(row(cleared.seq + 1).locator('.mapstudio-history-sentence')).toHaveText('Set the units to Metric, short labels');
+                for (const seq of [set.seq, long.seq, metric.seq, cleared.seq]) {
+                    await expect(row(seq)).toHaveAttribute('data-actor', EDITOR_USER);
+                    await expect(row(seq).locator('.mapstudio-history-revert')).toHaveCount(1);
+                }
+                await expect(page.locator('.mapstudio-toolbar .mapstudio-undo')).toBeDisabled();
+                await shot(page, 'mapstudio-layers-units-history-1440.png');
+
+                expect(await Promise.all([otherEditMap, otherMap, viewerMap].map((m) => m.getAttribute('data-map-reloads')))).toEqual(reloads);
+                expect(watched.errors).toEqual([]);
+            } finally {
+                // The contexts close whatever the clear does.
+                try {
+                    await clearUnits(page);
+                } finally {
+                    await Promise.allSettled([otherContext.close(), viewerContext.close(), phoneContext.close()]);
+                }
             }
         });
 });

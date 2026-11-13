@@ -121,7 +121,8 @@ function readBatch(value: unknown): EditBatch | null {
 }
 
 /**
- * A units value in words (epic 4 entry 19b, the owner's decision 6): "US, words", "Metric, symbols", "Auto, symbols";
+ * A units value in words (epic 4 entry 19b, the owner's decision 6; the Layers row's words from entry 20b): "US, long labels",
+ * "Metric, short labels", "Auto, short labels";
  * '' when it is not `{system, labels}`.
  */
 export function unitsWords(value: unknown): string {
@@ -130,7 +131,7 @@ export function unitsWords(value: unknown): string {
         return '';
     }
     const system = data.system === 'us' ? 'US' : data.system === 'metric' ? 'Metric' : 'Auto';
-    return system + ', ' + (data.labels === 'long' ? 'words' : 'symbols');
+    return system + ', ' + (data.labels === 'long' ? 'long labels' : 'short labels');
 }
 
 /** The batch's units op (entry 19b), or undefined. */
@@ -895,12 +896,14 @@ function mergeOnto(stored: Record<string, unknown>, mine: Record<string, unknown
  * `current.version` with my op's data; `properties` and `overrides`, which an update carries whole, take only the keys I
  * changed from where I started (`before`) onto the stored ones, so a field the other editor changed and I did not stays
  * theirs. The other ops are as stored. Null when it is not offered: no conflict kept, they deleted the item or my add met
- * one that already exists (`onTopBlockedText`), the batch saves a kind setup (`isSetupSave`, entry 12a), or it is a Revert
- * (`revert`, entry 12b1). The stored entry is not changed: the caller discards it.
+ * one that already exists (`onTopBlockedText`), the batch saves a kind setup (`isSetupSave`, entry 12a), it is a Revert
+ * (`revert`, entry 12b1), or it holds settings ops only (the Units row's press, entry 20b: it is no Undo step, and the row is
+ * pressed again on the stored value instead). The stored entry is not changed: the caller discards it.
  */
 export function onTopBatch(entry: UnsavedEntry, batchId: string): EditBatch | null {
     const conflicts = entry.conflict || [];
-    if (conflicts.length === 0 || onTopBlockedText(entry) !== '' || isSetupSave(entry) || entry.revert === true) {
+    if (conflicts.length === 0 || onTopBlockedText(entry) !== '' || isSetupSave(entry) || entry.revert === true
+        || entry.batch.ops.every((op) => op.entity === 'settings')) {
         return null;
     }
     const ops: EditOp[] = [];

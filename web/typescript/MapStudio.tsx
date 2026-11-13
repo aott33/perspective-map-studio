@@ -18,7 +18,7 @@ import { AdapterStatus, HostLists, NO_HOST_LISTS } from './adapters';
 import { BasemapId, RasterSource } from './basemaps';
 import { EditSwitch } from './EditSwitch';
 import { DockPart, LegendControl } from './LegendControl';
-import { LegendToggle, readToggle, sessionStore, writeToggle } from './legend';
+import { LegendToggle, UnitsPress, readToggle, sessionStore, unitsRow, writeToggle } from './legend';
 import { NeedsYouControl } from './NeedsYouControl';
 import { NeedsYouRow } from './needsyou';
 import { readStartingArea, startingAreaKey } from './startingArea';
@@ -943,6 +943,17 @@ export class MapStudio extends Component<Props, MapStudioState> {
         this.applyLayerToggles();
     };
 
+    /**
+     * A press of the Layers tab's Units row (epic 4 entry 20b, R27): the delegate saves it at once as one settings op and shows
+     * the press meanwhile; nothing is kept here.
+     */
+    onUnitsPress = (press: UnitsPress): void => {
+        const delegate = this.props.store.delegate as MapStudioStoreDelegate | undefined;
+        if (delegate && this.studioOn()) {
+            delegate.saveUnits(press);
+        }
+    };
+
     private applyLayerToggles(): void {
         const map = this.map;
         if (!map || !this.itemsReady) {
@@ -1445,6 +1456,21 @@ export class MapStudio extends Component<Props, MapStudioState> {
     }
 
     /**
+     * The Layers tab's Units row (entry 20b), or null where it is not drawn (a viewer, a phone editor, View mode): the press on
+     * its way, else the override the store holds, so another editor's change shows live; the setup's units for the note; both
+     * groups disabled while editing is paused (the store or the Gateway down, a reload pending).
+     */
+    private unitsRowNow(): ReturnType<typeof unitsRow> | null {
+        const delegate = this.props.delegate;
+        if (!delegate || !this.studioOn()) {
+            return null;
+        }
+        const held = delegate.units ? { system: delegate.units.system, labels: delegate.units.labels } : null;
+        const paused = delegate.editing === 'off' || delegate.load.state !== 'loaded' || delegate.connection.lost || delegate.connection.frozen;
+        return unitsRow(delegate.unitsPress ? delegate.unitsPress.units : held, delegate.setupUnits, paused);
+    }
+
+    /**
      * The units in force reach the two controls drawn outside React (entry 20a): Nearest in the search and the Needs you rows'
      * distances are written in them, and an open list is drawn again when a `map.changed` brings a new setting; the scale bar
      * (MapLibre's own) takes the system. A refusal in the instrument bar names its range in the unit shown then, so it goes
@@ -1454,6 +1480,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         const units = this.distanceUnits();
         if (this.legendControl) {
             this.legendControl.setScaleUnit(units.system);
+            this.legendControl.setUnits(this.unitsRowNow());
         }
         const changed = this.appliedUnits !== null && !sameUnits(this.appliedUnits, units);
         this.appliedUnits = units;

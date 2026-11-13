@@ -11,7 +11,7 @@
  * - Revert (`revertBatch`) is the batch's reverse, each op at the row's own `version` (after the op), so the Gateway's ordinary
  *   conflict check is the "changed since" rule: a create deleted, a delete created again from `before`, an update sending
  *   `before`'s fields. Not offered for a change from before the record kept values, nor one with a kind setup op (`revertBlocked`).
- * - The units setting (entry 19b) reads "Set the units to US, words", "Changed the units to Metric, symbols", "Cleared the units
+ * - The units setting (entry 19b) reads "Set the units to US, long labels", "Changed the units to Metric, short labels", "Cleared the units
  *   setting", and reverts like an item: a set by a clear, a clear by a set at the cleared version, a change by the values before.
  */
 
@@ -296,7 +296,7 @@ function setupWords(setups: HistoryOp[], kinds: Kind[]): string {
     return setups.length === 1 ? 'the ' + kindWords(kinds, setups[0].kind || setups[0].id) + ' kind setup' : setups.length + ' kind setups';
 }
 
-/** The units op in a sentence (entry 19b, decision 6): "Set the units to US, words", "Cleared the units setting". */
+/** The units op in a sentence (entry 19b, decision 6): "Set the units to US, long labels", "Cleared the units setting". */
 function unitsSentence(op: HistoryOp): string {
     if (op.op === 'delete') {
         return 'Cleared the units setting';

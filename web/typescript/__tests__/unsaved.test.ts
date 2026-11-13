@@ -312,15 +312,15 @@ describe('a units batch in the queue (epic 4 entry 19b, S15)', () => {
     });
 
     test('its words', () => {
-        expect(unitsWords({ system: 'us', labels: 'long' })).toBe('US, words');
-        expect(unitsWords({ system: 'metric', labels: 'short' })).toBe('Metric, symbols');
+        expect(unitsWords({ system: 'us', labels: 'long' })).toBe('US, long labels');
+        expect(unitsWords({ system: 'metric', labels: 'short' })).toBe('Metric, short labels');
         expect(unitsWords({ system: 'imperial', labels: 'short' })).toBe('');
         expect(editLabel(set, [])).toBe('set the units');
         expect(editLabel(clear, [])).toBe('clear the units setting');
         const q = queue();
         q.enqueue(set, T0);
         q.enqueue(clear, T0);
-        expect(yourChangeText(q.list()[0], [])).toBe('the units set to US, words');
+        expect(yourChangeText(q.list()[0], [])).toBe('the units set to US, long labels');
         expect(yourChangeText(q.list()[1], [])).toBe('the units setting cleared');
     });
 

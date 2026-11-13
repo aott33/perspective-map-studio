@@ -36,8 +36,9 @@
 
 import { AbstractUIElementStore, ComponentStoreDelegate, JsObject } from '@inductiveautomation/perspective-client';
 import { MapChanges, MapChangedBody, liveUnits } from './changes';
+import { UnitsPress } from './legend';
 import {
-    EditBatch, EditLevel, ErrorCodes, KindSetupRecord, LastChange, MapItemData, MapItemRecord, MapUnits, UNITS_ID, UnitsSetting, readUnitsData
+    EditBatch, EditLevel, EditOp, ErrorCodes, KindSetupRecord, LastChange, MapItemData, MapItemRecord, MapUnits, SettingsOp, UNITS_ID, UnitsData, UnitsSetting, readUnitsData
 } from './contract';
 import { KindRefusal, KindSaveState, ResolveState, SetupEdit, applyEdit, refusalPlace, resolveKey, ruleRefusalPlace, sameSetup, setupBatch } from './kindSetup';
 import {
@@ -205,6 +206,11 @@ export interface MapStudioDelegateState {
     /** The project setup's units map.load reported (entry 19a), `auto` when not loaded or not sent; kept across a failed reload. */
     setupUnits: MapUnits;
     /**
+     * The Layers row's press on its way (entry 20b): what the last press of `saveUnits` asked for, `units` null for From setup,
+     * while its save is in flight or waiting; null once every press is saved or put back, and the row shows `units` again.
+     */
+    unitsPress: UnitsPressed | null;
+    /**
      * The units in force, which every distance is written in (entry 20a; geometry.ts `unitsInForce`): the override's, else
      * the setup's, else the browser's locale. The same object while neither part changes, so a redraw can compare it.
      */
@@ -243,6 +249,16 @@ export interface OverrideRefusal {
      * (kindSetup.ts `Fields`: the rule's box, its value, its expression or one case); absent for a path's row.
      */
     at?: string;
+}
+
+/** What a press asked for: the override's values, or null for none (From setup). */
+export interface UnitsPressed {
+    units: UnitsData | null;
+}
+
+/** Whether two values of the override read the same; null is no override. */
+function sameUnitsData(a: UnitsData | null, b: UnitsData | null): boolean {
+    return a === null || b === null ? a === b : a.system === b.system && a.labels === b.labels;
 }
 
 /** One override edit on its way: the item, the row and the path typed ('' for a Reset, and for the item's own style rule). */
@@ -405,6 +421,12 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     private kindWork = new Map<string, KindWork>();
     /** The kind setup batches this page sent, by id: their map.changed is this page's own, not another editor's. */
     private kindBatches = new Map<string, string>();
+    /**
+     * The Layers row's saves (entry 20b): the one in flight with what it asked for (`restored` once it was sent again at a
+     * tombstone's version), and the presses waiting their turn, the newest last.
+     */
+    private unitsFlight: { batchId: string; units: UnitsData | null; restored: boolean } | null = null;
+    private unitsWaiting: Array<{ units: UnitsData | null; restored: boolean }> = [];
     /** Entry 12c1: each override edit by the `overrides` object its update carries, and the refusals that stand, by item id. */
     private overrideEdits = new WeakMap<object, OverrideEdit>();
     private overrideRefusals: Record<string, OverrideRefusal> = {};
@@ -524,6 +546,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             kindSetups: this.changes.state.kindSetups,
             units: liveUnits(this.changes.state),
             setupUnits: this.setupUnits,
+            unitsPress: this.unitsPressed(),
             distanceUnits: this.unitsNow(),
             user: this.user,
             history: this.history,
@@ -692,6 +715,108 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         if (found) {
             this.settleKind(found.kindId, found.work, batchId);
         }
+    }
+
+    /** The press the row shows (entry 20b): the newest one waiting, else the one in flight, else none. */
+    private unitsPressed(): UnitsPressed | null {
+        const newest = this.unitsWaiting.length > 0 ? this.unitsWaiting[this.unitsWaiting.length - 1] : this.unitsFlight;
+        return newest ? { units: newest.units } : null;
+    }
+
+    /**
+     * A press of the Layers surface's Units row (epic 4 entry 20b, R27): the override set, changed or cleared for the whole
+     * project, saved at once as one settings op through `edits.apply` ("The units setting", docs/contract.md). A System press
+     * keeps the labels (short when there is no override); From setup clears the override; a Labels press keeps the system and
+     * means nothing without an override. The op is built when it is sent, from the record held then: one save is in flight, a
+     * later press waits and goes at the version that reply gave. It is no undo step (entry 19b's rule): Revert in Recent changes
+     * is the way back. False when nothing is taken: the pressed button, a Labels press with no override, or editing paused.
+     */
+    saveUnits(press: UnitsPress): boolean {
+        if (this.pausedFor('A units change')) {
+            return false;
+        }
+        const pressed = this.unitsPressed();
+        const live = liveUnits(this.changes.state);
+        const shown: UnitsData | null = pressed ? pressed.units : live ? { system: live.system, labels: live.labels } : null;
+        let units: UnitsData | null;
+        if ('labels' in press) {
+            if (!shown) {
+                console.info('[MapStudio] The labels were not changed: pick Metric or US first.');
+                return false;
+            }
+            units = { system: shown.system, labels: press.labels };
+        } else {
+            units = press.system === 'setup' ? null : { system: press.system, labels: shown ? shown.labels : 'short' };
+        }
+        if (sameUnitsData(units, shown)) {
+            return false;
+        }
+        // Only the newest press waits: the ones between it and the save in flight would be overwritten unseen.
+        this.unitsWaiting = [{ units, restored: false }];
+        this.pumpUnits();
+        this.notify();
+        return true;
+    }
+
+    /**
+     * The next waiting press sent, when no save of the units setting is in flight (the row's own, or a Revert's): a create at 0
+     * with no record held or at a tombstone's version, an update or a delete at the held version. A press that asks for what the
+     * store already holds sends nothing.
+     */
+    private pumpUnits(): void {
+        while (this.unitsFlight === null && this.unitsWaiting.length > 0 && !this.inFlightByItem.has(UNITS_ID)) {
+            const next = this.unitsWaiting.shift() as { units: UnitsData | null; restored: boolean };
+            const held = this.changes.state.units;
+            const live = liveUnits(this.changes.state);
+            if (sameUnitsData(next.units, live ? { system: live.system, labels: live.labels } : null)) {
+                continue;
+            }
+            const op: SettingsOp = next.units === null
+                ? { op: 'delete', entity: 'settings', id: UNITS_ID, baseVersion: (live as UnitsSetting).version }
+                : live
+                    ? { op: 'update', entity: 'settings', id: UNITS_ID, baseVersion: live.version, data: next.units }
+                    : { op: 'create', entity: 'settings', id: UNITS_ID, baseVersion: held ? held.version : 0, data: next.units };
+            const batch: EditBatch = { batchId: newId(), ops: [op as unknown as EditOp] };
+            this.unitsFlight = { batchId: batch.batchId, units: next.units, restored: next.restored };
+            // No label: a units change is not an Undo step (entry 19b).
+            this.dispatch(batch, UNITS_ID, null, new Date());
+        }
+    }
+
+    /** The row's save in flight left the queue, saved or dropped by a choice (Discard, Use their version): the next press goes. */
+    private unitsSettled(batchId: string): void {
+        if (this.unitsFlight && this.unitsFlight.batchId === batchId) {
+            this.unitsFlight = null;
+            this.pumpUnits();
+        }
+    }
+
+    /**
+     * The row's save answered with an error (entry 20b, decision 5). A transient one (the store unreachable, busy, read only, no
+     * answer) stays queued and replays, the press still shown. Anything else puts the press back, drops what waited behind it and
+     * stays in the queue for the save card, as every other edit; a conflict's stored record is taken at once, so the row shows the
+     * stored value. One exception, as a kind setup's: a create at 0 that met a setting cleared before this page loaded (map.load
+     * sends no tombstone) is sent again at the tombstone's version.
+     */
+    private unitsRefused(batchId: string, error: ErrorBody, transient: boolean): void {
+        const flight = this.unitsFlight;
+        if (!flight || flight.batchId !== batchId || transient) {
+            return;
+        }
+        this.unitsFlight = null;
+        const conflict = error.code === ErrorCodes.CONFLICT ? (error.conflicts || []).find((c) => c.entity === 'settings' && c.id === UNITS_ID) : undefined;
+        const stored = conflict && conflict.current ? conflict.current as UnitsSetting : null;
+        const unknown = this.changes.state.units === null;
+        if (stored) {
+            this.changes.savedUnits(stored);
+        }
+        if (stored && stored.deleted && unknown && !flight.restored && this.sender.discard(batchId)) {
+            console.info('[MapStudio] The units setting was cleared before: setting it again at the cleared version.');
+            this.unitsWaiting.unshift({ units: flight.units, restored: true });
+        } else {
+            this.unitsWaiting = [];
+        }
+        this.pumpUnits();
     }
 
     /**
@@ -1164,6 +1289,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             }
             this.dispatch(rebased, itemId, next.label, new Date());
         }
+        // A press of the Units row that waited on a Revert of the units setting goes now (entry 20b).
+        this.pumpUnits();
         this.releaseShapes();
     }
 
@@ -1934,6 +2061,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         }
         this.giveUp(batchId);
         this.kindDropped(batchId);
+        this.unitsSettled(batchId);
         this.checkStoreAfterDiscard();
         this.notify();
     }
@@ -1954,6 +2082,7 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
         this.takeStored(entry);
         this.giveUp(batchId);
         this.kindDropped(batchId);
+        this.unitsSettled(batchId);
         this.checkStoreAfterDiscard();
         this.notify();
     }
@@ -2043,6 +2172,14 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
     /** A `storage` event: another tab may have changed this queue. */
     onStorage(key: string | null): void {
         this.sender.storage(key);
+        // The Units row's save left the queue in another tab (saved or dropped there, entry 20b): its turn ends here too, so the
+        // row shows the stored value again and the next press is sent.
+        const unitsBatch = this.unitsFlight ? this.unitsFlight.batchId : null;
+        if (unitsBatch !== null && !this.unsaved.get(unitsBatch)) {
+            this.giveUp(unitsBatch);
+            this.unitsSettled(unitsBatch);
+            this.notify();
+        }
         // Another tab saved or discarded this tab's entries while saves were paused (entry 10): map.load checks the store.
         this.checkStoreAfterDiscard();
     }
@@ -2486,6 +2623,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             this.releaseFlight(reply.body.batchId, reply.body.results);
             // A kind setup save (entry 12a): the stored setup takes the reply's version, and the kind's next edit goes on top of it.
             this.kindSaved(reply.body.batchId, reply.body.results);
+            // The Units row's save (entry 20b): the press is saved, and the one that waited goes at this reply's version.
+            this.unitsSettled(reply.body.batchId);
             if (runStep) {
                 // After the save status and the item's turn moved on, so the next reverse starts its own Saving...
                 this.continueRun();
@@ -2509,6 +2648,8 @@ export class MapStudioStoreDelegate extends ComponentStoreDelegate {
             if (outcome.kind === 'failed') {
                 // A kind setup save (entry 12a): an invalid one leaves the queue, its words beside the field; the rest is entry 10's.
                 this.kindRefused(outcome.batchId, reply.body, isTransient(outcome.reason.code));
+                // The Units row's save (entry 20b): the press is put back, a conflict's stored value shown.
+                this.unitsRefused(outcome.batchId, reply.body, isTransient(outcome.reason.code));
                 // An item's override (entry 12c1): an invalid one leaves the queue too, its words beside the row's field.
                 this.overrideRefused(outcome.batchId, overrideEdit, reply.body, isTransient(outcome.reason.code));
             }

@@ -233,10 +233,10 @@ editorTest.describe('the units override in the map store (entry 19b)', () => {
                 // S12: two rows in words, each with Revert, the newest first.
                 await openHistory(page);
                 await expect(row(page, changed.seq)).toHaveCount(1, { timeout: REPLY_MS });
-                await expect(row(page, set.seq).locator('.mapstudio-history-sentence')).toHaveText('Set the units to US, words');
+                await expect(row(page, set.seq).locator('.mapstudio-history-sentence')).toHaveText('Set the units to US, long labels');
                 await expect(row(page, set.seq)).toHaveAttribute('data-actor', EDITOR_USER);
                 await expect(row(page, set.seq).locator('.mapstudio-history-revert')).toHaveCount(1);
-                await expect(row(page, changed.seq).locator('.mapstudio-history-sentence')).toHaveText('Changed the units to Metric, symbols');
+                await expect(row(page, changed.seq).locator('.mapstudio-history-sentence')).toHaveText('Changed the units to Metric, short labels');
                 await expect(row(page, changed.seq)).toHaveAttribute('data-actor', EDITOR2_USER);
                 await expect(row(page, changed.seq).locator('.mapstudio-history-revert')).toHaveCount(1);
                 await shot(page, 'mapstudio-recent-changes-units-1440.png');
@@ -249,7 +249,7 @@ editorTest.describe('the units override in the map store (entry 19b)', () => {
                 await expect(map).toHaveAttribute('data-unsaved-count', '0');
                 const top = page.locator('.mapstudio-history-row').first();
                 await expect(top.locator('.mapstudio-history-sentence'))
-                    .toHaveText('Reverted "Changed the units to Metric, symbols"', { timeout: REPLY_MS });
+                    .toHaveText('Reverted "Changed the units to Metric, short labels"', { timeout: REPLY_MS });
                 await expect(top).toHaveAttribute('data-actor', EDITOR_USER);
                 // No Undo step comes of it: the toolbar's stack reverses map items only.
                 await expect(page.locator('.mapstudio-toolbar .mapstudio-undo')).not.toHaveAttribute('data-step', /units/);
@@ -263,7 +263,7 @@ editorTest.describe('the units override in the map store (entry 19b)', () => {
                 await expect(card).toHaveAttribute('data-card', 'conflict', { timeout: REPLY_MS });
                 await expect(card.locator('.mapstudio-save-card-title')).toHaveText(`Not saved - conflict with ${EDITOR2_USER}'s change`);
                 await expect(card).toContainText(EDITOR2_USER + ' changed the units setting');
-                await expect(card).toContainText('Your change, kept here and not saved: the units set to US, words.');
+                await expect(card).toContainText('Your change, kept here and not saved: the units set to US, long labels.');
                 await expect(map).toHaveAttribute('data-save-code', 'conflict');
                 await expect(card).toHaveAttribute('data-on-top', 'false');
                 await shot(page, 'mapstudio-recent-changes-units-refused-1440.png');
