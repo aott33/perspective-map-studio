@@ -6,6 +6,12 @@
 // e2e/tests/review.spec.mjs reads the tokens' computed values from the showcase page in each theme
 // and checks every mark with these; docs/review-er27.md carries the result table. Unit tested in
 // contrast.test.mjs.
+//
+// Beside the map's marks, the studio's own parts (epic 4 entry 17b, R14): the focus ring, the pressed and
+// hover states of buttons, the tab underline, the selection marks and the toolbar glyphs, each against
+// the surface it is seen on (STUDIO_PARTS, checkParts). e2e/tests/keyboard.spec.mjs reads each part's
+// colours from the Edit mode page's computed styles in each theme; docs/platform-checks.md, "Epic 4
+// entry 17", carries the tables.
 
 /** sRGB channel (0 to 255) to linear light (WCAG 2.1, relative luminance). */
 export function linear(channel) {
@@ -206,6 +212,111 @@ export function markdownTable(theme, result) {
         const cell = (s) => m.ratios[s] === undefined ? '-' : m.ratios[s].toFixed(2) + (m.counted[s] ? (m.ratios[s] >= MINIMUM ? ' pass' : ' MISS') : '');
         lines.push('| ' + m.words + ' | `' + m.token + '` | ' + m.color + ' | ' + cell('blank') + ' | ' + cell('panel') + ' | ' + cell('raster')
             + ' | ' + (m.state ? 'yes' : 'no') + ' |');
+    }
+    return lines.join('\n');
+}
+
+// ---- The studio's own parts (epic 4 entry 17b, R14; WCAG 2.1 1.4.11 in Edit mode) ----
+
+/**
+ * The parts of the studio the check reads, each a non-text mark seen against a surface. `counted` parts must reach
+ * MINIMUM; the others are reported only (an inactive control is outside 1.4.11). A part is read on many controls: each
+ * reading names where. A reading may carry several marks of one state (a pressed button's fill and its edge): the state
+ * is seen by its strongest mark, so the best ratio counts and the row names that mark.
+ */
+export const STUDIO_PARTS = [
+    { id: 'focus-ring', words: 'The focus ring against the surface it is drawn on', counted: true },
+    { id: 'pressed', words: 'A pressed button: its fill or its edge against the surface around it', counted: true },
+    { id: 'pressed-glyph', words: 'A pressed button\'s glyph or words on its fill', counted: true },
+    { id: 'hover', words: 'A button under the pointer: its fill or its edge against the surface around it', counted: true },
+    { id: 'hover-glyph', words: 'A button\'s glyph or words on its hover fill', counted: true },
+    { id: 'tab-underline', words: 'The chosen tab\'s underline against the panel', counted: true },
+    { id: 'selection', words: 'A selection mark: its edge or its tint against the surface around it', counted: true },
+    { id: 'toolbar-glyph', words: 'A toolbar glyph against the toolbar', counted: true },
+    { id: 'toolbar-glyph-off', words: 'A toolbar glyph of a button that is off (inactive, not counted)', counted: false }
+];
+
+/**
+ * Colour layers, the top one first, each [r, g, b, a] as the page computed it, flattened to the `#RRGGBB` a viewer
+ * sees: each layer drawn over the ones under it. The bottom layer must be opaque (the page's own ground).
+ */
+export function flatten(layers) {
+    if (!Array.isArray(layers) || layers.length === 0) {
+        throw new Error('No colour layers to flatten');
+    }
+    const base = layers[layers.length - 1];
+    if (!(base[3] >= 0.999)) {
+        throw new Error('The bottom layer is not opaque: ' + JSON.stringify(base));
+    }
+    let seen = hex(base);
+    for (let i = layers.length - 2; i >= 0; i--) {
+        const [r, g, b, a] = layers[i];
+        seen = over(hex([r, g, b]), a, seen);
+    }
+    return seen;
+}
+
+/**
+ * The check of the studio's parts in one theme. `readings` is what the page gave: [{part, where, surface: layers,
+ * marks: [{what, layers}]}], a mark's layers ending in the surface it is drawn on. Returns one row per reading:
+ * {part, words, where, mark, color, surface, ratio, counted, pass}, the mark being the reading's strongest. A reading of
+ * an unknown part or with no mark fails the check instead of passing it.
+ */
+export function checkParts(readings) {
+    return readings.map((reading) => {
+        const part = STUDIO_PARTS.find((p) => p.id === reading.part);
+        if (!part) {
+            throw new Error('Not a studio part: ' + JSON.stringify(reading.part));
+        }
+        if (!Array.isArray(reading.marks) || reading.marks.length === 0) {
+            throw new Error('No mark read for ' + reading.part + ' on ' + reading.where);
+        }
+        const surface = flatten(reading.surface);
+        let best = null;
+        for (const mark of reading.marks) {
+            const color = flatten(mark.layers);
+            const ratio = Math.round(contrastRatio(color, surface) * 100) / 100;
+            if (best === null || ratio > best.ratio) {
+                best = { mark: mark.what, color, ratio };
+            }
+        }
+        return { part: part.id, words: part.words, where: reading.where, mark: best.mark, color: best.color, surface, ratio: best.ratio,
+            counted: part.counted, pass: !part.counted || best.ratio >= MINIMUM };
+    });
+}
+
+/** The rows of a checked theme that miss: counted parts under MINIMUM. */
+export function partMisses(rows) {
+    return rows.filter((r) => !r.pass);
+}
+
+/**
+ * The rows with the same part, mark, colours and ratio as one row, its places joined: a ring drawn alike on forty
+ * buttons is one line of the record.
+ */
+export function groupParts(rows) {
+    const groups = new Map();
+    for (const r of rows) {
+        const key = [r.part, r.mark, r.color, r.surface].join('|');
+        if (!groups.has(key)) {
+            groups.set(key, { ...r, where: [] });
+        }
+        const g = groups.get(key);
+        if (!g.where.includes(r.where)) {
+            g.where.push(r.where);
+        }
+    }
+    const order = STUDIO_PARTS.map((p) => p.id);
+    return [...groups.values()].sort((a, b) => order.indexOf(a.part) - order.indexOf(b.part) || a.ratio - b.ratio);
+}
+
+/** The studio parts of one theme as a Markdown table (docs/platform-checks.md, "Epic 4 entry 17"). */
+export function partsTable(theme, rows, places = 4) {
+    const lines = ['| Part | Mark | ' + theme + ' value | Surface | Ratio | Where |', '| --- | --- | --- | --- | --- | --- |'];
+    for (const g of groupParts(rows)) {
+        const where = g.where.length > places ? g.where.slice(0, places).join('; ') + '; and ' + (g.where.length - places) + ' more' : g.where.join('; ');
+        lines.push('| ' + g.words + ' | ' + g.mark + ' | ' + g.color + ' | ' + g.surface + ' | ' + g.ratio.toFixed(2)
+            + (g.counted ? (g.pass ? ' pass' : ' MISS') : ' (not counted)') + ' | ' + where + ' |');
     }
     return lines.join('\n');
 }

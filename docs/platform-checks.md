@@ -1185,3 +1185,236 @@ Labels: **[live 8.3.10]** seen on the dev stack; **[build]** unit tests; **[not 
 | A script's settings op | `system.mapstudio.applyEdits` with a settings op was not run on a Gateway; it is the same write service the spec reached over the websocket | **[not verified]** (the owner's check, playbook 8t) |
 | Migration 4 refused for a role that does not own the tables | Unit tested (`MigratorTest`); live only for migration 2 | **[build]**, **[not verified]** live |
 | A row of map items and the units setting reverted | One batch and one Undo step that reverses the map items only | `historyDelegate.test.ts` **[build]**, **[not verified]** live |
+
+## Epic 4 entry 17 - Edit mode by the keyboard alone, its targets and its contrast, live
+
+**Question (entry 17b, R14; prd NFR-3; WCAG 2.2: 2.1.1, 2.1.2, 2.4.7, 2.5.7, 2.5.8, 1.4.11):** does every tool and panel of Edit mode work by the keyboard, does Esc return to Select, is the mode named in words, is every target at least 24 px, has every drag a way without a drag, and do the studio's own non-text marks reach 3:1 in both themes? **Answer:** mostly, and not everywhere. Every surface is reached by Tab with no trap, every control that Tab reaches is worked by Enter, Space or the arrow keys, the mode is named in words, and every drag has a way without a drag. What fails is listed below as failing: Esc does not put a tool down while the focus is on the toolbar button that armed it, no key places or chooses a point on the map, the map shows no focus ring, the focus falls to the page in two places, the arrow keys do nothing on the Layers and Legend tabs, the toolbar, the rail and the list of instrument kinds, five kinds of target are under 24 px, and the pressed and hover fills are under 3:1. **Nothing was fixed here**: each failure is a candidate entry for the owner. Date: 2026-11-13. Gateway: `inductiveautomation/ignition:8.3.10`, container `ms-2a5e1993` on port 9088, PostgreSQL 16, the 0.4.0-SNAPSHOT build of this branch.
+
+Labels: **[live 8.3.10]** seen on the dev stack above by `e2e/tests/keyboard.spec.mjs`; **[build]** the e2e unit tests (`e2e/lib/contrast.test.mjs`); **[not verified]** not seen.
+
+How it was read:
+
+| What | How | Evidence |
+| --- | --- | --- |
+| The keys | One pass per width (1366 by 768 and 1440 by 900), Chromium, the map editor at level `full` on `/edit` with the seed's items. The spec makes no mouse call: the focus moves by Tab, Shift+Tab or an arrow key pressed until the control holds it, and every action is a key. A stored record is read through the test hook, which is also how the second editor of the conflict card saves | **[live 8.3.10]** |
+| Reached by Tab | A surface is walked from its first stop until the focus leaves it; every enabled, shown control of it must have held the focus, in the order of the page, with no `tabindex` above 0. A control taken out of the order on purpose (the rows of a tree or a menu, the tab not chosen) is reached by its arrow keys and checked there | **[live 8.3.10]** |
+| Focus ring seen | The computed outline of the focused element, or of the mark beside it, counted only when the focus brought it: before every key the page notes each control's outline without the focus, and an outline that is the same with and without it is not a ring. Where the ring is the browser's own (`outline-style: auto`) the record says so and gives no ratio, since the browser paints it and the computed colour may not be what is drawn | **[live 8.3.10]** |
+| Targets | The bounding box of every button, tab, switch, menu row, tree row and tick box of the surface, a tick box counted with its label when a click on the label works it; under 24 px either way is a failure | **[live 8.3.10]** |
+| Contrast | At 1440 px in the light theme and in the dark one (the session's theme switched by the dev `/styles` page's button from a second tab, by keys, then `/edit` reloaded): the computed colours of each part, each drawn over the fills under it down to the first opaque one, compared by the WCAG 2.1 ratio (`e2e/lib/contrast.mjs` `STUDIO_PARTS`, `checkParts`). A state with several marks (a fill and an edge) is read by its strongest. The pointer's hover is forced through the browser's inspector protocol, with no mouse. A control that is off is not read, but for the toolbar's glyphs, which are reported and not counted | **[live 8.3.10]**, **[build]** |
+| What holds and what fails | The spec asserts every check that holds and names every failing one (`KNOWN_FAILURES`, `KNOWN_MISSES`): a new failure fails it, and so does a listed one that no longer fails. No check is skipped or loosened. The tables below are written by the spec (`E2E_DOCS=1`) from what it read; the same go to `e2e/out/keyboard/record.md` on every run | **[live 8.3.10]** |
+
+In the tables a cell reads "yes (n checks)" when every check of it held, "FAILED k of n" when some did not (each is in the list under the tables), and words where the cell is an observation and not a check.
+
+<!-- keyboard-pass:start (generated by e2e/tests/keyboard.spec.mjs with E2E_DOCS=1; do not edit by hand) -->
+
+**1366 px, keys alone**
+
+| Surface | Reached by Tab | Operated by keys | Focus ring seen | Esc returns to Select or closes | Mode named in words | Smallest target | Each drag's non-drag way |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Rail | yes (6 checks) | FAILED 1 of 6 | yes (1 check) | yes (1 check) | yes (4 checks) | 59 x 52 px (View) | No drag. |
+| Toolbar | yes (3 checks) | FAILED 1 of 1 | yes (1 check) | Esc is each tool's own (the rows below): from the map it puts the tool down, from a toolbar button it does not. | The tool in hand is the pressed button (aria-pressed) and, for a drawing tool, the drawing bar's title. | 24 x 32 px (Undo history) | No drag on the toolbar itself. |
+| Select | yes (1 check) | yes (1 check) | yes (1 check) | yes (1 check) | yes (1 check) | 32 x 32 px (Select) | Shift-drag draws a box and Shift+Alt-drag a lasso: the non-drag way is the list's tick boxes and its "Select all" buttons, by Space and Enter. |
+| Kind buttons (Well pad, Gathering line, Geofence) | yes (6 checks) | yes (6 checks) | yes (6 checks) | FAILED 3 of 6 | yes (3 checks) | 32 x 32 px (Well pad: add a point by clicking the map) | As the Point, Line and Area tools they arm. |
+| Instrument tools (Tap, Line valve, Meter) | yes (3 checks) | FAILED 1 of 7 | yes (3 checks) | yes (3 checks) | yes (3 checks) | 277 x 28 px (Tap) | An instrument is dragged along its line: the non-drag way is its distance typed, when placed (the drawing bar's field) and after (Details), both by keys. |
+| Point tool | yes (4 checks) | FAILED 2 of 6 | yes (4 checks) | FAILED 1 of 3 | yes (2 checks) | 32 x 32 px (Point: add a point by clicking the map) | Placing is a click, not a drag, and no key does it. Moving: the drag of the pin, or Latitude and Longitude typed in Details (by keys), or Move then a click. |
+| Line tool | yes (2 checks) | FAILED 2 of 5 | yes (2 checks) | FAILED 1 of 2 | yes (1 check) | 32 x 32 px (Line: draw a line, click to add points) | Drawing is a click per point, not a drag, and no key does it. Reshaping: the drag of a handle, or a click on the handle, then Move and a click on the new place. |
+| Area tool | yes (2 checks) | FAILED 2 of 5 | yes (2 checks) | FAILED 1 of 2 | yes (1 check) | 32 x 32 px (Area: draw an area, click to add points) | As the Line tool: clicks to draw; a handle dragged, or clicked and moved with Move and a click. |
+| Snap | yes (1 check) | yes (2 checks) | yes (1 check) | yes (1 check) | yes (1 check) | 32 x 32 px (Snap) | No drag. |
+| Undo, Redo and the undo list | yes (3 checks) | FAILED 1 of 8 | yes (4 checks) | yes (1 check) | yes (1 check) | 24 x 32 px (Undo history) | No drag. |
+| Item list and its search | yes (12 checks) | yes (11 checks) | yes (10 checks) | FAILED 1 of 3. The filter's kinds are a disclosure, not a card: Esc leaves them open and Filter pressed again closes them. | yes (3 checks) | 16 x 16 px (Select Point 3); FAILED: 4 under 24 px | No drag in the list. The map's box and lasso (Shift-drag, Shift+Alt-drag) have the tick boxes and "Select all" as their way without a drag, by keys. |
+| Details | yes (10 checks) | FAILED 1 of 8. Delete (the footer's button and the Delete key) is delete.spec.mjs's; it was reached here and not pressed. | yes (8 checks) | yes (3 checks) | yes (1 check) | 72.4 x 24 px (Override the Comms path) | The pin is dragged on the map: Latitude and Longitude typed here are the way by keys (the Point tool's row); Move then a click is the way without a drag. |
+| Style | yes (9 checks) | yes (3 checks) | yes (5 checks) | yes (2 checks) | yes (1 check) | 114.4 x 24 px (Edit the kind's rule) | No drag. |
+| Tag browser | yes (6 checks) | yes (8 checks). A pick saved by keys ("Use this tag" by Enter) is tagbrowser.spec.mjs's B7; here the card was closed without a save. | yes (5 checks) | yes (1 check) | yes (1 check) | 350 x 24 px (_types_ Folder) | No drag. |
+| Kinds list | yes (4 checks) | yes (2 checks) | yes (2 checks) | yes (1 check) | yes (1 check) | 243 x 30 px (Well pad Point - 37 items) | No drag. |
+| Kind setup | yes (7 checks) | yes (4 checks) | yes (5 checks) | yes (2 checks) | yes (1 check) | 95.7 x 18.2 px (In popup); FAILED: 2 under 24 px | No drag. |
+| Rule editor | yes (6 checks) | yes (4 checks) | yes (4 checks) | yes (1 check) | yes (1 check) | 32 x 32 px (Pick a tag for the style rule) | No drag. |
+| Layers | yes (6 checks) | FAILED 1 of 4 | yes (4 checks) | yes (1 check) | yes (2 checks) | 53.8 x 24 px (Lines) | No drag. |
+| Legend | yes (4 checks) | yes (2 checks). The legend's key is read, not worked: beside the tab it holds no control at this width with the dev kinds. | yes (2 checks) | yes (1 check) | yes (1 check) | 39.7 x 34.2 px (Layers) | No drag. |
+| Units | yes (2 checks) | yes (3 checks) | yes (2 checks) | yes (1 check) | yes (1 check) | 100.2 x 32 px (From setup) | No drag. |
+| Recent changes | yes (6 checks) | yes (5 checks) | yes (4 checks) | yes (1 check) | yes (1 check) | 57.2 x 32 px (Undo) | No drag. |
+| Save card | yes (8 checks) | yes (5 checks) | yes (5 checks) | yes (2 checks) | yes (1 check) | 78.8 x 32 px (Try again) | No drag. |
+| Conflict card | yes (8 checks) | yes (5 checks) | yes (5 checks) | yes (1 check) | yes (1 check) | 171.4 x 32 px (Use mapeditor2's version) | No drag. |
+| Editing switch | yes (1 check) | yes (3 checks) | yes (1 check) | yes (1 check) | yes (2 checks) | 124.8 x 36 px (Editing: switch off to view the map) | No drag: the switch is pressed, never slid. |
+| The map itself | yes (1 check) | yes (1 check) | FAILED 1 of 1 | Esc on the map puts a tool down (the tools' rows) and closes Details (Details' row); with neither, it changes nothing. | yes (1 check) | 1038 x 618 px (the map, one target) | Panning is a drag: the arrow keys pan and + and - zoom (MapLibre's own keys), and the zoom card's buttons take Enter. |
+
+**1440 px, keys alone**
+
+| Surface | Reached by Tab | Operated by keys | Focus ring seen | Esc returns to Select or closes | Mode named in words | Smallest target | Each drag's non-drag way |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Rail | yes (6 checks) | FAILED 1 of 6 | yes (1 check) | yes (1 check) | yes (4 checks) | 59 x 52 px (View) | No drag. |
+| Toolbar | yes (3 checks) | FAILED 1 of 1 | yes (1 check) | Esc is each tool's own (the rows below): from the map it puts the tool down, from a toolbar button it does not. | The tool in hand is the pressed button (aria-pressed) and, for a drawing tool, the drawing bar's title. | 24 x 32 px (Undo history) | No drag on the toolbar itself. |
+| Select | yes (1 check) | yes (1 check) | yes (1 check) | yes (1 check) | yes (1 check) | 32 x 32 px (Select) | Shift-drag draws a box and Shift+Alt-drag a lasso: the non-drag way is the list's tick boxes and its "Select all" buttons, by Space and Enter. |
+| Kind buttons (Well pad, Gathering line, Geofence) | yes (6 checks) | yes (6 checks) | yes (6 checks) | FAILED 3 of 6 | yes (3 checks) | 32 x 32 px (Well pad: add a point by clicking the map) | As the Point, Line and Area tools they arm. |
+| Instrument tools (Tap, Line valve, Meter) | yes (3 checks) | FAILED 1 of 7 | yes (3 checks) | yes (3 checks) | yes (3 checks) | 297 x 28 px (Tap) | An instrument is dragged along its line: the non-drag way is its distance typed, when placed (the drawing bar's field) and after (Details), both by keys. |
+| Point tool | yes (4 checks) | FAILED 2 of 6 | yes (4 checks) | FAILED 1 of 3 | yes (2 checks) | 32 x 32 px (Point: add a point by clicking the map) | Placing is a click, not a drag, and no key does it. Moving: the drag of the pin, or Latitude and Longitude typed in Details (by keys), or Move then a click. |
+| Line tool | yes (2 checks) | FAILED 2 of 5 | yes (2 checks) | FAILED 1 of 2 | yes (1 check) | 32 x 32 px (Line: draw a line, click to add points) | Drawing is a click per point, not a drag, and no key does it. Reshaping: the drag of a handle, or a click on the handle, then Move and a click on the new place. |
+| Area tool | yes (2 checks) | FAILED 2 of 5 | yes (2 checks) | FAILED 1 of 2 | yes (1 check) | 32 x 32 px (Area: draw an area, click to add points) | As the Line tool: clicks to draw; a handle dragged, or clicked and moved with Move and a click. |
+| Snap | yes (1 check) | yes (2 checks) | yes (1 check) | yes (1 check) | yes (1 check) | 32 x 32 px (Snap) | No drag. |
+| Undo, Redo and the undo list | yes (3 checks) | FAILED 1 of 8 | yes (4 checks) | yes (1 check) | yes (1 check) | 24 x 32 px (Undo history) | No drag. |
+| Item list and its search | yes (12 checks) | yes (11 checks) | yes (10 checks) | FAILED 1 of 3. The filter's kinds are a disclosure, not a card: Esc leaves them open and Filter pressed again closes them. | yes (3 checks) | 16 x 16 px (Select Point 3); FAILED: 4 under 24 px | No drag in the list. The map's box and lasso (Shift-drag, Shift+Alt-drag) have the tick boxes and "Select all" as their way without a drag, by keys. |
+| Details | yes (10 checks) | FAILED 1 of 8. Delete (the footer's button and the Delete key) is delete.spec.mjs's; it was reached here and not pressed. | yes (8 checks) | yes (3 checks) | yes (1 check) | 72.4 x 24 px (Override the Comms path) | The pin is dragged on the map: Latitude and Longitude typed here are the way by keys (the Point tool's row); Move then a click is the way without a drag. |
+| Style | yes (9 checks) | yes (3 checks) | yes (5 checks) | yes (2 checks) | yes (1 check) | 114.4 x 24 px (Edit the kind's rule) | No drag. |
+| Tag browser | yes (6 checks) | yes (8 checks). A pick saved by keys ("Use this tag" by Enter) is tagbrowser.spec.mjs's B7; here the card was closed without a save. | yes (5 checks) | yes (1 check) | yes (1 check) | 350 x 24 px (_types_ Folder) | No drag. |
+| Kinds list | yes (4 checks) | yes (2 checks) | yes (2 checks) | yes (1 check) | yes (1 check) | 267 x 30 px (Well pad Point - 37 items) | No drag. |
+| Kind setup | yes (7 checks) | yes (4 checks) | yes (5 checks) | yes (2 checks) | yes (1 check) | 95.7 x 18.2 px (In popup); FAILED: 2 under 24 px | No drag. |
+| Rule editor | yes (6 checks) | yes (4 checks) | yes (4 checks) | yes (1 check) | yes (1 check) | 32 x 32 px (Pick a tag for the style rule) | No drag. |
+| Layers | yes (6 checks) | FAILED 1 of 4 | yes (4 checks) | yes (1 check) | yes (2 checks) | 53.8 x 24 px (Lines) | No drag. |
+| Legend | yes (4 checks) | yes (2 checks). The legend's key is read, not worked: beside the tab it holds no control at this width with the dev kinds. | yes (2 checks) | yes (1 check) | yes (1 check) | 39.7 x 34.2 px (Layers) | No drag. |
+| Units | yes (2 checks) | yes (3 checks) | yes (2 checks) | yes (1 check) | yes (1 check) | 108.2 x 32 px (From setup) | No drag. |
+| Recent changes | yes (6 checks) | yes (5 checks) | yes (4 checks) | yes (1 check) | yes (1 check) | 57.2 x 32 px (Undo) | No drag. |
+| Save card | yes (8 checks) | yes (5 checks) | yes (5 checks) | yes (2 checks) | yes (1 check) | 78.8 x 32 px (Try again) | No drag. |
+| Conflict card | yes (8 checks) | yes (5 checks) | yes (5 checks) | yes (1 check) | yes (1 check) | 171.4 x 32 px (Use mapeditor2's version) | No drag. |
+| Editing switch | yes (1 check) | yes (3 checks) | yes (1 check) | yes (1 check) | yes (2 checks) | 124.8 x 36 px (Editing: switch off to view the map) | No drag: the switch is pressed, never slid. |
+| The map itself | yes (1 check) | yes (1 check) | FAILED 1 of 1 | Esc on the map puts a tool down (the tools' rows) and closes Details (Details' row); with neither, it changes nothing. | yes (1 check) | 1088 x 750 px (the map, one target) | Panning is a drag: the arrow keys pan and + and - zoom (MapLibre's own keys), and the zoom card's buttons take Enter. |
+
+**What failed, keys alone** (26; each is a candidate entry for the owner, none fixed here)
+
+- The map itself (focus ring seen). Did not hold: the map shows a focus ring when Tab reaches it. Seen: no outline on the focused canvas.maplibregl-canvas (1366 and 1440 px).
+- Rail (operated by keys). Did not hold: the arrow keys move between the rail's items (K2). Seen: ArrowDown left the focus on Items: each item is its own Tab stop and takes no arrow key (1366 and 1440 px).
+- Toolbar (operated by keys). Did not hold: the arrow keys move along the toolbar, which has role "toolbar" (K2). Seen: ArrowRight left the focus on Select: each button is its own Tab stop and takes no arrow key (1366 and 1440 px).
+- Kind buttons (Well pad, Gathering line, Geofence) (esc returns to select or closes). Did not hold: Esc returns to Select with the focus on the Well pad button (where arming leaves it). Seen: the tool in hand stayed point (1366 and 1440 px).
+- Kind buttons (Well pad, Gathering line, Geofence) (esc returns to select or closes). Did not hold: Esc returns to Select with the focus on the Gathering line button (where arming leaves it). Seen: the tool in hand stayed line (1366 and 1440 px).
+- Kind buttons (Well pad, Gathering line, Geofence) (esc returns to select or closes). Did not hold: Esc returns to Select with the focus on the Geofence button (where arming leaves it). Seen: the tool in hand stayed area (1366 and 1440 px).
+- Point tool (esc returns to select or closes). Did not hold: Esc returns to Select with the focus on the Point button (where arming leaves it). Seen: the tool in hand stayed point (1366 and 1440 px).
+- Line tool (esc returns to select or closes). Did not hold: Esc returns to Select with the focus on the Line button (where arming leaves it). Seen: the tool in hand stayed line (1366 and 1440 px).
+- Area tool (esc returns to select or closes). Did not hold: Esc returns to Select with the focus on the Area button (where arming leaves it). Seen: the tool in hand stayed area (1366 and 1440 px).
+- Point tool (operated by keys). Did not hold: a point is made by keys alone (K4). Seen: Enter and Space on the map with the Point tool in hand placed nothing: no item was saved; a click on the map is the only way (1366 and 1440 px).
+- Line tool (operated by keys). Did not hold: a point of a line is placed by keys alone (K4). Seen: Enter and Space on the map with the Line tool in hand placed nothing: the bar still counts 0 points; a click on the map is the only way (1366 and 1440 px).
+- Area tool (operated by keys). Did not hold: a point of an area is placed by keys alone (K4). Seen: Enter and Space on the map with the Area tool in hand placed nothing: the bar still counts 0 points; a click on the map is the only way (1366 and 1440 px).
+- Point tool (operated by keys). Did not hold: the new place of Move is given by keys alone. Seen: ArrowRight, ArrowUp, Enter and Space on the map left the pad at [-104.965,39.7575] and Move still waiting ("Moving Shared A - Click the new place on the map - Esc to cancel"); the typed Latitude and Longitude are the way by keys (1366 and 1440 px).
+- Undo, Redo and the undo list (operated by keys). Did not hold: the focus is kept after the last step is undone (Undo is then off). Seen: the focus fell to the page's body: the next Tab starts from the top of the page (1366 and 1440 px).
+- Line tool (operated by keys). Did not hold: a line is reshaped by keys alone (K4). Seen: no key chooses one of its points (Enter, Space and Tab on the map chose none), so Move, Split here and Delete point, which need a chosen point, are not reached; Details says only "A line of 3 points" (1366 and 1440 px).
+- Area tool (operated by keys). Did not hold: an area is reshaped by keys alone (K4). Seen: no key chooses one of its points (Enter, Space and Tab on the map chose none), so Move, Split here and Delete point, which need a chosen point, are not reached; Details says only "A line of 4 points" (1366 and 1440 px).
+- Instrument tools (Tap, Line valve, Meter) (operated by keys). Did not hold: the arrow keys move in the list of kinds, which has role "menu" (K2). Seen: ArrowUp left the focus on Meter: each kind is a Tab stop and takes no arrow key (1366 and 1440 px).
+- Item list and its search (smallest target). Did not hold: at least 24 px both ways: mapstudio-panel-save-button is 21 px high. Seen: 41.6 x 20.8 px, for example "Saved" (1366 and 1440 px).
+- Item list and its search (smallest target). Did not hold: at least 24 px both ways: mapstudio-list-select-all is 19 px high. Seen: 132.2 x 19.4 px, for example "Select all in MESA FIELD" (1366 and 1440 px).
+- Item list and its search (smallest target). Did not hold: at least 24 px both ways: mapstudio-list-check is 16x16. Seen: 16 x 16 px, for example "Select South fence" (1366 and 1440 px).
+- Item list and its search (smallest target). Did not hold: at least 24 px both ways: mapstudio-list-select-all is 18 px high. Seen: 101.8 x 18.3 px, for example "Select all in group" (1366 and 1440 px).
+- Item list and its search (esc returns to select or closes). Did not hold: Esc returns to Select with the focus on Add item (where arming leaves it). Seen: the tool in hand stayed point (1366 and 1440 px).
+- Details (operated by keys). Did not hold: the focus is kept when Details closes. Seen: the focus fell to the page's body: the next Tab starts from the top of the page (1366 and 1440 px).
+- Kind setup (smallest target). Did not hold: at least 24 px both ways: mapstudio-switch is 18 px high. Seen: 202.6 x 18.2 px, for example "Show comms in the popup" (1366 and 1440 px).
+- Kind setup (smallest target). Did not hold: at least 24 px both ways: mapstudio-field-check is 18 px high. Seen: 121.7 x 18.2 px, for example "Alarm summary" (1366 and 1440 px).
+- Layers (operated by keys). Did not hold: the arrow keys move between the Layers and Legend tabs, as they do between Details and Style. Seen: ArrowRight left the focus on Layers: each of the two tabs is a Tab stop with no arrow keys (PanelTabs.tsx, no roving here) (1366 and 1440 px).
+
+**Contrast of the studio's parts, light theme** (439 readings at 1440 px; alike readings are one line)
+
+| Part | Mark | light value | Surface | Ratio | Where |
+| --- | --- | --- | --- | --- | --- |
+| The focus ring against the surface it is drawn on | ring | #229AD6 | #FAFAFA | 3.02 pass | Item list: Select Point 3; Item list: Select CTB1; Item list: Select LV-1; Item list: Select Point 1; and 76 more |
+| The focus ring against the surface it is drawn on | ring | #0C7BB3 | #DDEBF1 | 3.83 pass | Item list: CTB1; Toolbar: Select; Toolbar: Snap; Tag browser: a row of the tree; and 1 more |
+| The focus ring against the surface it is drawn on | ring | #0C7BB3 | #E8F4FA | 4.17 pass | Layers: None; Layers: From setup |
+| The focus ring against the surface it is drawn on | ring | #0C7BB3 | #FAFAFA | 4.47 pass | Item list: Search items by name, kind or asset; Item list: Sort by; Item list: Filter; Item list: Select all in MESA FIELD; and 216 more |
+| A pressed button: its fill or its edge against the surface around it | fill | #DDEBF1 | #FAFAFA | 1.17 MISS | Toolbar: Select; Toolbar: Snap |
+| A pressed button: its fill or its edge against the surface around it | fill | #D8D8D8 | #FAFAFA | 1.37 MISS | Rail: Items |
+| A pressed button: its fill or its edge against the surface around it | edge | #0C7BB3 | #FAFAFA | 4.47 pass | Layers: None; Layers: From setup |
+| A pressed button: its fill or its edge against the surface around it | fill | #323232 | #DDEBF1 | 10.52 pass | Kind setup: In popup |
+| A pressed button: its fill or its edge against the surface around it | top edge | #323232 | #DDEBF1 | 10.52 pass | Kind setup: Icon value |
+| A pressed button: its fill or its edge against the surface around it | fill | #323232 | #FAFAFA | 12.28 pass | Editing switch: Editing: switch off to view the map; Kind setup: In popup; Kind setup: Show comms in the popup |
+| A pressed button: its fill or its edge against the surface around it | top edge | #323232 | #FAFAFA | 12.28 pass | Kind setup: Icon value |
+| A pressed button: its fill or its edge against the surface around it | bottom edge | #323232 | #FAFAFA | 12.28 pass | Rule editor: States |
+| A pressed button's glyph or words on its fill | glyph | #0C7BB3 | #DDEBF1 | 3.83 pass | Toolbar: Select; Toolbar: Snap |
+| A pressed button's glyph or words on its fill | words | #0C7BB3 | #E8F4FA | 4.17 pass | Layers: None; Layers: From setup |
+| A pressed button's glyph or words on its fill | glyph | #323232 | #D8D8D8 | 9.00 pass | Rail: Items |
+| A pressed button's glyph or words on its fill | glyph | #323232 | #FAFAFA | 12.28 pass | Editing switch: Editing: switch off to view the map; Kind setup: Icon value |
+| A pressed button's glyph or words on its fill | words | #323232 | #FAFAFA | 12.28 pass | Rule editor: States |
+| A button under the pointer: its fill or its edge against the surface around it | no fill and no edge | #FAFAFA | #FAFAFA | 1.00 MISS | Details: Style; Rule editor: None; Layers: Legend |
+| A button under the pointer: its fill or its edge against the surface around it | fill | #D8D8D8 | #FAFAFA | 1.37 MISS | Rail: View; Toolbar: Point: add a point by clicking the map; Toolbar: Select; Item list: Point 3 Comms lost; and 12 more |
+| A button under the pointer: its fill or its edge against the surface around it | top edge | #BDBDBD | #FAFAFA | 1.80 MISS | Item list: Add item; Item list: Filter; Details: Override the Comms path; Kind setup: Add a key value; and 1 more |
+| A button under the pointer: its fill or its edge against the surface around it | fill | #0C7BB3 | #FAFAFA | 4.47 pass | Tag browser: Use this tag |
+| A button's glyph or words on its hover fill | glyph | #0C7BB3 | #D8D8D8 | 3.27 pass | Toolbar: Select |
+| A button's glyph or words on its hover fill | words | #0C7BB3 | #D8D8D8 | 3.27 pass | Item list: Select all in MESA FIELD |
+| A button's glyph or words on its hover fill | words | #FAFAFA | #0C7BB3 | 4.47 pass | Tag browser: Use this tag |
+| A button's glyph or words on its hover fill | glyph | #5E5E5E | #D8D8D8 | 4.55 pass | Rail: View; Item list: Point 3 Comms lost; Kinds list: Gathering line Line - 32 items; Tag browser: _types_ Folder |
+| A button's glyph or words on its hover fill | words | #5E5E5E | #D8D8D8 | 4.55 pass | Item list: Saved |
+| A button's glyph or words on its hover fill | words | #5E5E5E | #FAFAFA | 6.21 pass | Details: Style; Rule editor: None; Layers: Legend |
+| A button's glyph or words on its hover fill | glyph | #323232 | #D8D8D8 | 9.00 pass | Toolbar: Point: add a point by clicking the map; Item list: Add item; Item list: Filter; Details: Close; and 4 more |
+| A button's glyph or words on its hover fill | words | #323232 | #D8D8D8 | 9.00 pass | Details: Override the Comms path; Kind setup: Add a key value; Tag browser: Cancel; Layers: OpenStreetMap; and 2 more |
+| The chosen tab's underline against the panel | underline | #323232 | #FAFAFA | 12.28 pass | Details: Details; Rule editor: States; Layers: Layers |
+| A selection mark: its edge or its tint against the surface around it | left edge | #0C7BB3 | #FAFAFA | 4.47 pass | Item list: CTB1; Kinds list: Well pad Point - 37 items |
+| A selection mark: its edge or its tint against the surface around it | edge | #0C7BB3 | #FAFAFA | 4.47 pass | Kind setup: Pressure; Tag browser: Pressure Tag Float8 |
+| A toolbar glyph against the toolbar | glyph | #0C7BB3 | #DDEBF1 | 3.83 pass | Toolbar: Select; Toolbar: Snap |
+| A toolbar glyph against the toolbar | glyph | #323232 | #FAFAFA | 12.28 pass | Toolbar: Well pad: add a point by clicking the map; Toolbar: Gathering line: draw a line, click to add points; Toolbar: Geofence: draw an area, click to add points; Toolbar: Point: add a point by clicking the map; and 3 more |
+| A toolbar glyph of a button that is off (inactive, not counted) | glyph | #323232 | #FAFAFA | 12.28 (not counted) | Toolbar: Undo; Toolbar: Redo |
+
+**Under 3:1, light theme** (5)
+
+- hover | fill #D8D8D8 on #FAFAFA | 1.37
+- hover | no fill and no edge #FAFAFA on #FAFAFA | 1.00
+- hover | top edge #BDBDBD on #FAFAFA | 1.80
+- pressed | fill #D8D8D8 on #FAFAFA | 1.37
+- pressed | fill #DDEBF1 on #FAFAFA | 1.17
+
+**The browser's own focus ring, light theme** (outline auto: the browser paints it, so no colour is read and no ratio given): none; every ring read is the page's own.
+
+**Contrast of the studio's parts, dark theme** (439 readings at 1440 px; alike readings are one line)
+
+| Part | Mark | dark value | Surface | Ratio | Where |
+| --- | --- | --- | --- | --- | --- |
+| The focus ring against the surface it is drawn on | ring | #0C7BB3 | #161616 | 3.88 pass | Item list: Select Point 3; Item list: Select CTB1; Item list: Select LV-1; Item list: Select Point 1; and 76 more |
+| The focus ring against the surface it is drawn on | ring | #229AD6 | #0C2938 | 4.79 pass | Layers: None; Layers: From setup |
+| The focus ring against the surface it is drawn on | ring | #229AD6 | #17262D | 4.93 pass | Item list: CTB1; Toolbar: Select; Toolbar: Snap; Tag browser: a row of the tree; and 1 more |
+| The focus ring against the surface it is drawn on | ring | #229AD6 | #161616 | 5.74 pass | Item list: Search items by name, kind or asset; Item list: Sort by; Item list: Filter; Item list: Select all in MESA FIELD; and 216 more |
+| A pressed button: its fill or its edge against the surface around it | fill | #17262D | #161616 | 1.16 MISS | Toolbar: Select; Toolbar: Snap |
+| A pressed button: its fill or its edge against the surface around it | fill | #515151 | #161616 | 2.28 MISS | Rail: Items |
+| A pressed button: its fill or its edge against the surface around it | edge | #229AD6 | #161616 | 5.74 pass | Layers: None; Layers: From setup |
+| A pressed button: its fill or its edge against the surface around it | fill | #F4F4F4 | #17262D | 14.13 pass | Kind setup: In popup |
+| A pressed button: its fill or its edge against the surface around it | top edge | #F4F4F4 | #17262D | 14.13 pass | Kind setup: Icon value |
+| A pressed button: its fill or its edge against the surface around it | fill | #F4F4F4 | #161616 | 16.45 pass | Editing switch: Editing: switch off to view the map; Kind setup: In popup; Kind setup: Show comms in the popup |
+| A pressed button: its fill or its edge against the surface around it | top edge | #F4F4F4 | #161616 | 16.45 pass | Kind setup: Icon value |
+| A pressed button: its fill or its edge against the surface around it | bottom edge | #F4F4F4 | #161616 | 16.45 pass | Rule editor: States |
+| A pressed button's glyph or words on its fill | words | #229AD6 | #0C2938 | 4.79 pass | Layers: None; Layers: From setup |
+| A pressed button's glyph or words on its fill | glyph | #229AD6 | #17262D | 4.93 pass | Toolbar: Select; Toolbar: Snap |
+| A pressed button's glyph or words on its fill | glyph | #F4F4F4 | #515151 | 7.22 pass | Rail: Items |
+| A pressed button's glyph or words on its fill | glyph | #F4F4F4 | #161616 | 16.45 pass | Editing switch: Editing: switch off to view the map; Kind setup: Icon value |
+| A pressed button's glyph or words on its fill | words | #F4F4F4 | #161616 | 16.45 pass | Rule editor: States |
+| A button under the pointer: its fill or its edge against the surface around it | no fill and no edge | #161616 | #161616 | 1.00 MISS | Details: Style; Rule editor: None; Layers: Legend |
+| A button under the pointer: its fill or its edge against the surface around it | fill | #515151 | #161616 | 2.28 MISS | Rail: View; Toolbar: Point: add a point by clicking the map; Toolbar: Select; Item list: Point 3 Comms lost; and 12 more |
+| A button under the pointer: its fill or its edge against the surface around it | top edge | #5E5E5E | #161616 | 2.79 MISS | Item list: Add item; Item list: Filter; Details: Override the Comms path; Kind setup: Add a key value; and 1 more |
+| A button under the pointer: its fill or its edge against the surface around it | fill | #229AD6 | #161616 | 5.74 pass | Tag browser: Use this tag |
+| A button's glyph or words on its hover fill | glyph | #229AD6 | #515151 | 2.52 MISS | Toolbar: Select |
+| A button's glyph or words on its hover fill | words | #229AD6 | #515151 | 2.52 MISS | Item list: Select all in MESA FIELD |
+| A button's glyph or words on its hover fill | glyph | #BDBDBD | #515151 | 4.22 pass | Rail: View; Item list: Point 3 Comms lost; Kinds list: Gathering line Line - 32 items; Tag browser: _types_ Folder |
+| A button's glyph or words on its hover fill | words | #BDBDBD | #515151 | 4.22 pass | Item list: Saved |
+| A button's glyph or words on its hover fill | words | #161616 | #229AD6 | 5.74 pass | Tag browser: Use this tag |
+| A button's glyph or words on its hover fill | glyph | #F4F4F4 | #515151 | 7.22 pass | Toolbar: Point: add a point by clicking the map; Item list: Add item; Item list: Filter; Details: Close; and 4 more |
+| A button's glyph or words on its hover fill | words | #F4F4F4 | #515151 | 7.22 pass | Details: Override the Comms path; Kind setup: Add a key value; Tag browser: Cancel; Layers: OpenStreetMap; and 2 more |
+| A button's glyph or words on its hover fill | words | #BDBDBD | #161616 | 9.63 pass | Details: Style; Rule editor: None; Layers: Legend |
+| The chosen tab's underline against the panel | underline | #F4F4F4 | #161616 | 16.45 pass | Details: Details; Rule editor: States; Layers: Layers |
+| A selection mark: its edge or its tint against the surface around it | left edge | #229AD6 | #161616 | 5.74 pass | Item list: CTB1; Kinds list: Well pad Point - 37 items |
+| A selection mark: its edge or its tint against the surface around it | edge | #229AD6 | #161616 | 5.74 pass | Kind setup: Pressure; Tag browser: Pressure Tag Float8 |
+| A toolbar glyph against the toolbar | glyph | #229AD6 | #17262D | 4.93 pass | Toolbar: Select; Toolbar: Snap |
+| A toolbar glyph against the toolbar | glyph | #F4F4F4 | #161616 | 16.45 pass | Toolbar: Well pad: add a point by clicking the map; Toolbar: Gathering line: draw a line, click to add points; Toolbar: Geofence: draw an area, click to add points; Toolbar: Point: add a point by clicking the map; and 3 more |
+| A toolbar glyph of a button that is off (inactive, not counted) | glyph | #F4F4F4 | #161616 | 16.45 (not counted) | Toolbar: Undo; Toolbar: Redo |
+
+**Under 3:1, dark theme** (7)
+
+- hover | fill #515151 on #161616 | 2.28
+- hover | no fill and no edge #161616 on #161616 | 1.00
+- hover | top edge #5E5E5E on #161616 | 2.79
+- hover-glyph | glyph #229AD6 on #515151 | 2.52
+- hover-glyph | words #229AD6 on #515151 | 2.52
+- pressed | fill #17262D on #161616 | 1.16
+- pressed | fill #515151 on #161616 | 2.28
+
+**The browser's own focus ring, dark theme** (outline auto: the browser paints it, so no colour is read and no ratio given): none; every ring read is the page's own.
+
+<!-- keyboard-pass:end -->
+
+**The failures as candidate entries, for the owner.** The lists above are the spec's own words; these are the same findings put together.
+
+1. **Esc with a tool in hand and the focus off the map.** A tool armed by Enter or Space leaves the focus on its toolbar button (or on the list's Add item), and Esc there does nothing: the tool stays in hand. Esc on the map, the tool's button pressed again, Select, and the drawing bar's Cancel or Done all put it down. R14 says Esc always returns to Select; the tool's Esc listener is on the map's container only. Seen for all six drawing buttons and for Add item.
+2. **Drawing and reshaping by keys.** No key places a point, a point of a line or of an area, and no key chooses a point of a line or an area, so Move, Split here and Delete point are not reached by keys; Move from a pad's Details waits for a click. Every one of these has a way without a drag (a click), so 2.5.7 holds; 2.1.1 (keyboard) does not for them. What works by keys alone: a pad moved by its typed Latitude and Longitude, an instrument placed and moved by its typed distance, every delete, Undo and Redo.
+3. **The map's focus ring.** The map takes the focus by Tab (the arrow keys then pan it) and shows no outline, on the canvas or around it.
+4. **The focus falling to the page.** After the toolbar's Undo undoes its last step the button turns off under the focus, and after Details' Close the panel is gone: in both the focus is on the page's body, so the next Tab starts from the top. Esc closing Details sends the focus to the map; Revert, the cards and the tag browser keep or return it.
+5. **The arrow keys where a role leads to them.** K2 names the arrow keys. The Layers and Legend tabs are each a Tab stop and Enter or Space opens them; the arrow keys, Home and End, which move between Details and Style, do nothing here (`PanelTabs.tsx` without `roving`). The same holds for the toolbar (`role="toolbar"`), the rail's items and the list of instrument kinds (`role="menu"`): every button is its own Tab stop, reached and worked by Enter and Space, and no arrow key moves between them.
+6. **Targets under 24 px.** The list's tick boxes (16 by 16), "Select all" (18 and 19 high), the save status "Saved" (21 high), and a kind setup's tick boxes and switches with their labels (rows 18 high).
+7. **Contrast under 3:1.** By the letter of the pass (a pressed or hovered button's fill or edge against the panel): the open rail item's fill (1.37 light, 2.28 dark), the tool in hand and Snap on (1.17, 1.16), and every hover fill and edge (1.00 to 1.80 light, 1.00 to 2.79 dark; the tabs show no hover mark at all). Those states are also said without the fill: the tool in hand by its glyph in the selection hue and `aria-pressed`, the rail item by bold words, a tab by its underline (12.28 and 16.45), the pressed Units and Basemap buttons by a selection-hue edge (4.47 and 5.74). In the dark theme two marks on the hover fill are themselves under 3:1: the glyph of the tool in hand under the pointer and the words of "Select all" under the pointer (both 2.52). The focus ring passes everywhere it is drawn (3.02 at the least: the list's tick boxes in the light theme, a 1 px solid ring that comes with the focus and is not there without it; no ring read in either theme is the browser's own `auto` ring), and so do the tab underline, the selection edges and every toolbar glyph.
+
+Seen on the way, not R14's and not counted above:
+
+- In the page's order the toolbar comes after the map, the Editing switch and the zoom card, though it is drawn above them.
+- An area's Details reads "A line of 4 points" under Location.
+- The filter's kinds stay open on Esc: they are a disclosure under the Filter button, and Filter pressed again closes them. Kept as a note, not a failure.
+- Esc in a Details field after typing saved nothing and put the name back, at both widths: the deferred item that said otherwise is closed (`_bmad-output/deferred-work.md`).
+
+**[not verified]**: a screen reader's reading of any surface, and a real keyboard on a real Gateway and in a Designer preview (the owner's hand checks, [test-playbook-0.4.0.md](test-playbook-0.4.0.md) section 8w); a browser other than Chromium; a touch screen (2.5.8's 44 px on touch is not read here); the contrast of the save card and the conflict card (their buttons are the panels' buttons, read there) and of the store-unreachable card; the cards' keys while the store is truly unreachable (the busy and conflict cards were made through the socket gate, as `savestates.spec.mjs` makes them); a host theme other than the two bundled ones; **the selection marks on the map in Edit mode, which are not read here**: the selected item's ring and casing, the point handles of a line or an area being reshaped, the chosen point, and the box and the lasso while they are drawn. They are drawn by the map (MapLibre and Terra Draw), not as page elements, so the spec's computed styles do not reach them, and they come only with the pointer. Epic 3 entry 12's record above reads the View-mode selection ring's token against the blank map and the light raster as a mark that is not counted; it does not cover the handles, the box or the lasso. They are a hand check (playbook 8w).

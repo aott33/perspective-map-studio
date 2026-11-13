@@ -1,9 +1,10 @@
-// Unit tests of the contrast check (epic 3 entry 12): node --test lib/
+// Unit tests of the contrast check (epic 3 entry 12; the studio's parts, epic 4 entry 17b): node --test lib/
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-    MARKS, MINIMUM, OSM_LAND, TOKENS, checkTheme, contrastRatio, hex, luminance, markdownTable, misses, over, parseColor, quietColor
+    MARKS, MINIMUM, OSM_LAND, STUDIO_PARTS, TOKENS, checkParts, checkTheme, contrastRatio, flatten, groupParts, hex, luminance, markdownTable, misses, over,
+    parseColor, partMisses, partsTable, quietColor
 } from './contrast.mjs';
 
 test('colours parse from hex and rgb() forms; anything else is refused', () => {
@@ -89,4 +90,53 @@ test('the quiet OpenStreetMap paint (item 25) is applied to the raster sample as
         assert.equal(result.surfaces.raster, quiet);
         assert.deepEqual(misses(result).map((m) => m.id), [], theme + ' misses over the quiet tile');
     }
+});
+
+// ---- The studio's own parts (epic 4 entry 17b) ----
+
+const WHITE = [250, 250, 250, 1];
+
+test('colour layers flatten top down over an opaque ground; a ground that is not opaque is refused', () => {
+    assert.equal(flatten([[12, 123, 179, 1]]), '#0C7BB3');
+    assert.equal(flatten([[0, 0, 0, 0.5], [255, 255, 255, 1]]), '#808080');
+    // Two tints over the ground: each drawn over what is under it.
+    assert.equal(flatten([[0, 0, 0, 0.5], [0, 0, 0, 0.5], [255, 255, 255, 1]]), over('#000000', 0.5, '#808080'));
+    // A layer above an opaque one hides nothing of it but itself.
+    assert.equal(flatten([[0, 0, 0, 0], [50, 50, 50, 1]]), '#323232');
+    assert.throws(() => flatten([[0, 0, 0, 0.5]]));
+    assert.throws(() => flatten([]));
+});
+
+test('a studio part is checked at 3:1 against its surface; a faint fill misses and an inactive glyph is not counted', () => {
+    const rows = checkParts([
+        { part: 'focus-ring', where: 'Rail: Items', surface: [WHITE], marks: [{ what: 'ring', layers: [[12, 123, 179, 1]] }] },
+        { part: 'hover', where: 'Toolbar: Point', surface: [WHITE], marks: [{ what: 'fill', layers: [[0, 0, 0, 0.06], WHITE] }] },
+        { part: 'toolbar-glyph-off', where: 'Toolbar: Undo', surface: [WHITE], marks: [{ what: 'glyph', layers: [[200, 200, 200, 1]] }] }
+    ]);
+    assert.deepEqual(rows.map((r) => [r.part, r.pass, r.counted]), [['focus-ring', true, true], ['hover', false, true], ['toolbar-glyph-off', true, false]]);
+    assert.equal(rows[0].ratio, Math.round(contrastRatio('#0C7BB3', '#FAFAFA') * 100) / 100);
+    assert.ok(rows[1].ratio < MINIMUM && rows[2].ratio < MINIMUM);
+    assert.deepEqual(partMisses(rows).map((r) => r.where), ['Toolbar: Point']);
+    const table = partsTable('light', rows);
+    assert.ok(table.includes(' pass | Rail: Items |') && table.includes(' MISS | Toolbar: Point |') && table.includes('(not counted) | Toolbar: Undo |'));
+});
+
+test('a state with several marks is seen by its strongest: a faint fill with a strong edge passes, named by the edge', () => {
+    const [row] = checkParts([{ part: 'pressed', where: 'Layers: None', surface: [WHITE],
+        marks: [{ what: 'fill', layers: [[12, 123, 179, 0.1], WHITE] }, { what: 'edge', layers: [[12, 123, 179, 1]] }] }]);
+    assert.equal(row.mark, 'edge');
+    assert.equal(row.color, '#0C7BB3');
+    assert.equal(row.pass, true);
+});
+
+test('readings alike are one line of the table, their places joined; an unknown part or a reading with no mark is refused', () => {
+    const ring = (where) => ({ part: 'focus-ring', where, surface: [WHITE], marks: [{ what: 'ring', layers: [[12, 123, 179, 1]] }] });
+    const rows = checkParts(['a', 'b', 'c', 'd', 'e', 'a'].map(ring));
+    const groups = groupParts(rows);
+    assert.equal(groups.length, 1);
+    assert.deepEqual(groups[0].where, ['a', 'b', 'c', 'd', 'e']);
+    assert.ok(partsTable('dark', rows, 2).includes('| a; b; and 3 more |'));
+    assert.throws(() => checkParts([{ part: 'glow', where: 'x', surface: [WHITE], marks: [{ what: 'ring', layers: [WHITE] }] }]));
+    assert.throws(() => checkParts([{ part: 'hover', where: 'x', surface: [WHITE], marks: [] }]));
+    assert.ok(STUDIO_PARTS.every((p) => p.words !== '' && typeof p.counted === 'boolean'));
 });

@@ -2,7 +2,7 @@
 
 A walk through what epic 4 has built so far, grouped by what you do, on the local development stack. Tick each box and note anything that looks or feels off in the Notes line under each section (a screenshot helps). Each note goes into `_bmad-output/initiative-flowmap/tickets/epic-editing/epic-editing.md` Notes or a new entry. The playbook grows as entries land; entry 18 (the 0.4.0 release) finishes it for the release test and the 30-minute test.
 
-Built so far (2026-11-10): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems) and 11a (the edit record, Gateway only). Also built: 11b (Recent changes and History), 12a (the Kinds surface and a kind's setup), 12b1 (the style rule editor and area tints, section 8l) 12b2 (the preview item on the map and the Live now note, section 8m) 12c1 (Details' Live now block and path overrides, section 8n) and 12c2 (the Style tab and an item's own style rule, section 8o). From 2026-11-11: 13a (one tag path rule, section 8p), 13b (the tag browser's card and tree, section 8q) and 13c (the tag browser for the style rule, popup params and an item's overrides, and the typed Path field, section 8r). From 2026-11-12: 19a (units in the project setup, schema 2 and the Designer's Units row, section 8s). Still to come: 19b (Edit mode's units override) and 20 (units on the map), 17 (sweep), 18 (release).
+Built so far (2026-11-10): entries 1 to 6, 21 to 27, 14, 15, 16, 7a (the item list as designed), 7c (the layout), 7b (the checklist), 8 (selecting several), 9 (instruments), 10 (save problems) and 11a (the edit record, Gateway only). Also built: 11b (Recent changes and History), 12a (the Kinds surface and a kind's setup), 12b1 (the style rule editor and area tints, section 8l) 12b2 (the preview item on the map and the Live now note, section 8m) 12c1 (Details' Live now block and path overrides, section 8n) and 12c2 (the Style tab and an item's own style rule, section 8o). From 2026-11-11: 13a (one tag path rule, section 8p), 13b (the tag browser's card and tree, section 8q) and 13c (the tag browser for the style rule, popup params and an item's overrides, and the typed Path field, section 8r). From 2026-11-12: 19a (units in the project setup, schema 2 and the Designer's Units row, section 8s). Still to come: 19b (Edit mode's units override) and 20 (units on the map), 17 (sweep), 18 (release). From 2026-11-13: 17b (the keyboard and contrast pass, recorded in platform-checks.md; its hand checks are section 8w).
 
 ## Results so far
 
@@ -568,6 +568,45 @@ Entry 20b: the override of sections 8t and 8u set in the browser. Unit tested (`
 - [ ] **Conflict (U9).** A save that lands between a press and its send is hard to time by hand; it is unit tested (`unitsDelegate.test.ts`). The same refusal by hand: in History press Revert on an older units row after a later change: the save card reads "Not saved - conflict" naming who changed the units setting, and after "Use their version" the row shows the stored value.
 - [ ] **Paused (U10).** Stop PostgreSQL (`docker stop <the -pg container>`), make an edit so the map says the store cannot be reached (section 8's pause), and open Layers: both groups are greyed and a press sends nothing. Start PostgreSQL again: the groups come back.
 - [ ] Leave the store with no override: press From setup.
+
+Notes:
+
+## 8w. Keys alone, a screen reader, and contrast by eye
+
+Entry 17b: one pass of every Edit mode surface with the keyboard alone, at 1366 and 1440 px, with the target sizes and the contrast of the studio's own parts in both themes, is run on the dev stack by `e2e/tests/keyboard.spec.mjs` and recorded in [platform-checks.md](platform-checks.md), "Epic 4 entry 17", with what failed. This section is what that spec cannot do: a screen reader's reading, a real keyboard on a real Gateway, and an eye on the colours. Put the mouse away for the first two blocks. Note every surface where the reading or the keys let you down; each note is a candidate entry.
+
+A real keyboard, on a Gateway that is not the dev stack (the template stack or a test Gateway), Edit mode at level `full`:
+
+- [ ] **Round the page.** Tab from the page's top: the rail, the list, the map, the Editing switch, the zoom card, then the toolbar, each stop with a ring you can see; Shift+Tab goes back the same way; nothing holds the focus.
+- [ ] **The rail and the switch.** Enter or Space on Items, Kinds, Layers and History opens each; View leaves Edit mode and the Editing switch (Space or Enter) brings it back.
+- [ ] **A tool and Esc.** Enter on Line: the drawing bar names it ("New gathering line"). Press Esc with the focus still on the toolbar's button, then again with the focus on the map. The record says the first does nothing today: note whether you agree it should return to Select.
+- [ ] **Drawing.** With the Point, Line or Area tool in hand, try to place a point with no mouse. The record says no key does it: note how much that matters to you.
+- [ ] **Moving by typing.** Choose a pad in the list (the search, Tab to its row, Enter), Tab to Latitude, type a new value, Enter: the pad moves. Ctrl+Z on the map puts it back.
+- [ ] **An instrument.** Choose L-SWD, Tab to Add an instrument, Enter, pick Tap, type 1500, Enter: the tap is placed. In its Details type another distance: it moves. Undo both.
+- [ ] **The list.** Type in the search and press Esc; change Sort by with the arrow keys; open Filter and press Space on a kind; tick two rows with Space and press Esc.
+- [ ] **Details and Style.** On the Details tab the arrow keys, Home and End move between Details and Style. Type a name and press Esc: nothing is saved and the name is back.
+- [ ] **Kinds.** Open a kind, change a field and press Enter, change another and press Esc; open "Pick a tag" with Enter, walk the tree with the arrow keys, Enter on a tag, Esc: the focus is back on the tag button.
+- [ ] **Layers.** On the Layers tab press the right arrow. The record says it does not go to Legend (Tab does): note whether it should. Press a Units button with Space.
+- [ ] **History.** Enter on a row opens its before and after; Enter on Revert reverts it.
+- [ ] **The cards.** Make a conflict (two browsers, as section 8): Tab reaches the card's buttons, Enter chooses, Esc closes it and the edit stays on the save status row.
+- [ ] **The Designer's own keys.** In a Designer preview of the page the same keys work, and none of them is taken by the Designer.
+
+A screen reader (NVDA with Firefox or Chrome on Windows, or VoiceOver with Safari), each surface read once:
+
+- [ ] **Names.** Every button says what it does: the toolbar's tools ("Line: draw a line, click to add points"), Snap with on or off, Undo and Redo with their step, the rail's items, the list's tick boxes ("Select CTB1"), the tag buttons ("Pick a tag for Pressure").
+- [ ] **The mode in words.** Arming a tool is said (the pressed button, and the drawing bar's "New gathering line"); the Editing switch says on or off; the open tab says selected.
+- [ ] **What changed.** A save's "Saved", a refusal in the drawing bar ("A line needs two points"), the search's "No items match", the conflict card and the save card are read when they appear, without moving the focus.
+- [ ] **The tag browser.** The tree is read as a tree: each row with its level, open or closed, and "Tag" or "Folder"; the picked row is said as selected.
+- [ ] **Fields.** Each field of Details and of a kind's setup is read with its label, and a problem under a field is read with it.
+- [ ] **Recent changes.** A row is read as its change, who and when; opening it reads the before and after as a table.
+
+Contrast by eye, in the light and the dark theme (the dev `/styles` page's theme button switches the session; reload `/edit` after it):
+
+- [ ] **The focus ring** is plain to see on every stop, on the selected list row and on the pressed Units buttons too.
+- [ ] **Pressed and chosen.** The tool in hand, Snap on, the open rail item, the pressed Units and Basemap buttons, the open tab and the selected row each read apart from their neighbours at a glance. The record lists the fills that measure under 3:1 against the panel (the rail's and the toolbar's): note whether the glyph's colour, the weight of the words and the underline carry it for you.
+- [ ] **Under the pointer.** Hover over the toolbar, the rail, the list's rows and a few buttons: the hover fill is seen, and the glyph or words stay easy to read on it. In the dark theme look at Select in hand under the pointer (the record has its glyph at 2.52:1 there).
+- [ ] **The selection on the map.** The spec does not read these, so this is their only check. In Edit mode, on the blank map and on OpenStreetMap, in both themes: the selected item's ring (a pad) and casing (a line, an area) stand out from the ground and from the item; the point handles of a selected line or area, and the chosen one among them, are each plain to see; a box (Shift-drag) and a lasso (Shift+Alt-drag) show their edge the whole time they are drawn. Note any you have to look for.
+- [ ] **Small targets.** Click the list's tick boxes, "Select all", the save status ("Saved") and a kind setup's switches with a mouse and, if you have one, a touch screen at 768 px or wider: note any you miss.
 
 Notes:
 
