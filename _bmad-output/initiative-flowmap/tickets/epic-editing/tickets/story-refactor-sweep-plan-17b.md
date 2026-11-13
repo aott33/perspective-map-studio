@@ -4,8 +4,8 @@ type: 'chore'
 ticket: ''
 part_of: '17'
 created: '2026-11-13'
-status: 'draft'
-baseline_revision: ''
+status: 'in-progress'
+baseline_revision: 'dd0784b72432c81508f510b6c359894dc60a7c3d'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
@@ -24,7 +24,7 @@ context: ['{project-root}/docs/platform-checks.md', '{project-root}/_bmad-output
 
 **Approach:** One keyboard-only pass of every Edit mode surface at 1366 and 1440 px, run as a repeatable spec, with the contrast and target-size readings of the studio's own parts in both themes, recorded in `docs/platform-checks.md`. What fails is recorded as failing and brought to the owner; nothing is fixed here. The contract document's build history is taken out with its meaning unchanged, and the deferred-work list is brought up to date.
 
-Decisions (owner, pending at the checkpoint): (1) The pass is a new e2e spec that uses the keyboard alone (no mouse call), so the record can be made again; the screen reader's reading stays the owner's hand check in the playbook. (2) Surfaces: the rail; the toolbar and each tool (Select, the three instrument tools, point, line, area, snap, undo and redo with its list); the item list and its search; Details and Style with the tag browser; the Kinds list and a kind's setup with the rule editor; Layers with Legend and Units; Recent changes; the save card and the conflict card; the Editing switch. (3) Per surface the record says: reached by Tab, operated by keys, focus ring seen, Esc returns to Select or closes, the mode named in words, smallest target in px, and for each drag the non-drag way. (4) Contrast: the focus ring, the pressed and hover states of buttons, the tab underline, the selection marks and the toolbar glyphs against their surfaces, at 3:1, light and dark. (5) A failure is written in the record as a failure and listed for the owner as a candidate entry; the spec asserts what holds and never skips or weakens a check to pass. (6) `docs/contract.md`: "entry N", "epic N" and dated-decision asides come out where they only tell history; every rule, field, value and example stays word for word; line 3's "unreleased" stays for entry 18. (7) `_bmad-output/deferred-work.md`: a `resolved:` line on the items later entries built; no item is deleted.
+Decisions (owner, approved 2026-11-13): (1) The pass is a new e2e spec that uses the keyboard alone (no mouse call), so the record can be made again; the screen reader's reading stays the owner's hand check in the playbook. (2) Surfaces: the rail; the toolbar and each tool (Select, the three instrument tools, point, line, area, snap, undo and redo with its list); the item list and its search; Details and Style with the tag browser; the Kinds list and a kind's setup with the rule editor; Layers with Legend and Units; Recent changes; the save card and the conflict card; the Editing switch. (3) Per surface the record says: reached by Tab, operated by keys, focus ring seen, Esc returns to Select or closes, the mode named in words, smallest target in px, and for each drag the non-drag way. (4) Contrast: the focus ring, the pressed and hover states of buttons, the tab underline, the selection marks and the toolbar glyphs against their surfaces, at 3:1, light and dark. (5) A failure is written in the record as a failure and listed for the owner as a candidate entry; the spec asserts what holds and never skips or weakens a check to pass. (6) `docs/contract.md`: "entry N", "epic N" and dated-decision asides come out where they only tell history; every rule, field, value and example stays word for word; line 3's "unreleased" stays for entry 18. (7) `_bmad-output/deferred-work.md`: a `resolved:` line on the items later entries built; no item is deleted.
 
 ## Boundaries & Constraints
 
