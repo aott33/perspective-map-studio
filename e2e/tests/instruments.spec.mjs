@@ -6,7 +6,7 @@
 
 import { randomUUID } from 'node:crypto';
 import {
-    EDITOR_USER, OPERATOR_USER, editorTest, expect, mapLoaded, openMap, send, signedInContext
+    EDITOR_USER, OPERATOR_USER, editorTest, expect, mapLoaded, openMap, send, signedInContext, load, saved, del, update, batch, point, refused
 } from './fixtures.mjs';
 
 /** L-SWD of the plan: 2,922.35 m; PT-1 at 1,143 m and PT-2 at 2,841 m. */
@@ -18,31 +18,10 @@ const SWD_RESHAPED = [[-103.52, 31.92], [-103.505, 31.9223], [-103.490423, 31.92
 const PT1_RESHAPED = { at: [-103.508198, 31.92181], distanceM: 1131.9 };
 const PT2_RESHAPED = { at: [-103.491243, 31.925792], distanceM: 2793.8 };
 
-async function load(page) {
-    const reply = await send(page, 'map.load', {});
-    expect(reply.type, JSON.stringify(reply.body)).toBe('map.load.reply');
-    return reply.body;
-}
-
-const batch = (...ops) => ({ batchId: randomUUID(), ops });
-const point = (c) => ({ type: 'Point', coordinates: c });
 const lineGeometry = (c) => ({ type: 'LineString', coordinates: c });
 const create = (id, data, baseVersion = 0) => ({ op: 'create', entity: 'item', id, baseVersion, data });
-const update = (id, baseVersion, data) => ({ op: 'update', entity: 'item', id, baseVersion, data });
-const del = (id, baseVersion) => ({ op: 'delete', entity: 'item', id, baseVersion });
 const tap = (name, at, lineId, distanceM) => ({ kind: 'tap', name, geometry: point(at),
     attachment: { lineId, distanceM } });
-
-function saved(reply) {
-    expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
-    return reply.body;
-}
-
-function refused(reply, code) {
-    expect(reply.type, JSON.stringify(reply.body)).toBe('error');
-    expect(reply.body.code, reply.body.message).toBe(code);
-    return reply.body;
-}
 
 function version(body, id) {
     return body.results.find((r) => r.id === id).version;

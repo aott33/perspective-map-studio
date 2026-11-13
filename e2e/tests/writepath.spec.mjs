@@ -9,7 +9,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
 import {
-    EDITOR_USER, OPERATOR_USER, editorTest, expect, hookLineBatch, mapLoaded, nextFrames, openMap, send, signedInContext, watch
+    EDITOR_USER, OPERATOR_USER, editorTest, expect, hookLineBatch, mapLoaded, nextFrames, openMap, send, signedInContext, watch, expectRefused
 } from './fixtures.mjs';
 
 /** Send the same edits.apply body twice at once from the page. */
@@ -45,12 +45,6 @@ function update(id, baseVersion, data) {
 function expectSaved(reply, version) {
     expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
     if (version !== undefined) expect(reply.body.results[0].version).toBe(version);
-    return reply.body;
-}
-
-function expectRefused(reply, code) {
-    expect(reply.type, JSON.stringify(reply.body)).toBe('error');
-    expect(reply.body.code).toBe(code);
     return reply.body;
 }
 

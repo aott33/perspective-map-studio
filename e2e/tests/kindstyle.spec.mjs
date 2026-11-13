@@ -13,15 +13,9 @@
 
 import { randomUUID } from 'node:crypto';
 import {
-    EDITOR2_USER, EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot, signedInContext, test
+    EDITOR2_USER, EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot, signedInContext, test,
+    REPLY_MS, NOTHING_MS, openEditor, liveItem, setupOf, saveWords, settled, INTERVAL_MS
 } from './fixtures.mjs';
-
-/** The Gateway's answer to a save. */
-const REPLY_MS = 20_000;
-/** One refresh interval of the dev setup (10 s) with its round trips, as live.spec.mjs bounds it. */
-const INTERVAL_MS = 25_000;
-/** There is nothing to observe when nothing is sent: the time a stray batch would have to show in the map's seq. */
-const NOTHING_MS = 800;
 
 let seed;
 
@@ -53,27 +47,11 @@ async function restore(browser) {
     }
 }
 
-/** The stored kind setup record of a kind through the test hook, or undefined. */
-async function setupOf(page, kindId) {
-    const reply = await send(page, 'map.load', {});
-    expect(reply.type, JSON.stringify(reply.body)).toBe('map.load.reply');
-    return (reply.body.kindSetups || []).find((k) => k.kindId === kindId && !k.deleted);
-}
-
 /** A setup without the part an edit is allowed to change: what S10 says is stored unchanged. */
 function others(setup, part) {
     const out = { ...setup };
     delete out[part];
     return out;
-}
-
-async function openEditor(page) {
-    const map = await openMap(page, '/edit');
-    await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
-    await mapLoaded(map);
-    await expect(map).toHaveAttribute('data-edit-level', 'full');
-    await expect(map).toHaveAttribute('data-studio', 'on');
-    return map;
 }
 
 /** Kinds opened from the rail and a kind chosen: its setup in the properties panel's place, section 6 in view. */
@@ -95,8 +73,6 @@ const caseRow = (page, index) => rule(page).locator('.mapstudio-rule-case[data-i
 const unsaved = (page) => rule(page).locator('.mapstudio-rule-unsaved');
 const tints = (page) => rule(page).locator('[data-field="areaTints"]');
 const tintRow = (page, category) => tints(page).locator('.mapstudio-tint-row[data-category="' + category + '"]');
-const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
-const saveWords = (page) => page.locator('.mapstudio-kinds .mapstudio-panel-save');
 
 /** Nothing is missing: the note is one node that stays mounted (entry 12c3), with no words and not shown. */
 async function noUnsaved(page) {
@@ -109,12 +85,6 @@ async function noUnsaved(page) {
 async function type(locator, text) {
     await locator.fill(text);
     await locator.press('Enter');
-}
-
-/** The panel has nothing on its way and the header says Saved. */
-async function settled(page) {
-    await expect(page.locator('.mapstudio-kindsetup')).toHaveAttribute('data-saving', '', { timeout: REPLY_MS });
-    await expect(saveWords(page)).toHaveText('Saved', { timeout: REPLY_MS });
 }
 
 /** Nothing was sent: the store's seq and the kind's stored version stand. */

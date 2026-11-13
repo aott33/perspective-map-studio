@@ -10,24 +10,12 @@
 // phone editor at 1366 px and for a viewer no delete. A render of the footer for the docs under E2E_DOCS=1 (AD-15). The spec leaves the seed as it found it (each delete
 // undone, then the seed run again and the strays removed), since later specs read L-SWD.
 
-import { pagePixel } from '../lib/geo.mjs';
 import { randomUUID } from 'node:crypto';
 import {
-    EDITOR_USER, OPERATOR_USER, VERTEX_PAUSE_MS, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send,
-    shot as shotNow, signedInContext, test, view
+    EDITOR_USER, OPERATOR_USER, VERTEX_PAUSE_MS, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shotSettled as shot,
+    signedInContext, test, view, REPLY_MS, CTB1, SWD1, BEND, openEditor, pixelNow, seqOf, selectRow, expectOneBatch, expectNothingSent, storedAll,
+    endsAre, SWD_VIEW
 } from './fixtures.mjs';
-
-/** The Gateway's answer to a save. */
-const REPLY_MS = 20_000;
-/** There is nothing to observe when nothing is sent: the time a stray batch would have to show in the map's seq. */
-const NOTHING_MS = 800;
-
-// The L-SWD set (ops/project seed): its three points, the first on CTB1 and the last on SWD1.
-const CTB1 = [-105.012, 39.7262];
-const BEND = [-105.009441, 39.720791];
-const SWD1 = [-104.983671, 39.715476];
-// The line in view with Details docked (718 px of map at 1366 px), large enough that every handle is apart from the next.
-const SWD_VIEW = { center: [(CTB1[0] + SWD1[0]) / 2, (CTB1[1] + SWD1[1]) / 2 + 0.001], zoom: 13.5 };
 
 let seed;
 let ids;
@@ -57,46 +45,6 @@ async function restoreSeed(browser) {
     }
 }
 
-async function openEditor(page) {
-    const map = await openMap(page, '/edit');
-    await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
-    await mapLoaded(map);
-    await expect(map).toHaveAttribute('data-edit-level', 'full');
-    await expect(map).toHaveAttribute('data-studio', 'on');
-    return map;
-}
-
-/** The map's page pixel of a place, from the box and the view the map reports now (the stage resizes as panels open). */
-async function pixelNow(map, lngLat) {
-    const box = await map.boundingBox();
-    const center = (await map.getAttribute('data-center')).split(',').map(Number);
-    const zoom = Number(await map.getAttribute('data-zoom'));
-    return pagePixel(box, lngLat, center, zoom);
-}
-
-/** A render for the docs once the markers have taken the view's zoom. */
-async function shot(page, name) {
-    await page.waitForTimeout(800);
-    await shotNow(page, name);
-}
-
-/** The stored map items through the test hook, by id (map.load leaves a deleted item out). */
-async function storedAll(page) {
-    return Object.fromEntries((await send(page, 'map.load', {})).body.items.map((i) => [i.id, i]));
-}
-
-async function seqOf(map) {
-    return Number(await map.getAttribute('data-store-seq'));
-}
-
-/** One change saved as one batch: the toolbar's Undo names its step, and the map's seq moved on by exactly one. */
-async function expectOneBatch(page, map, seqBefore, step) {
-    await expect(page.locator('.mapstudio-toolbar .mapstudio-undo')).toHaveAttribute('data-step', 'Undo: ' + step, { timeout: REPLY_MS });
-    await expect(map).toHaveAttribute('data-store-seq', String(seqBefore + 1), { timeout: REPLY_MS });
-    await page.waitForTimeout(500);
-    await expect(map).toHaveAttribute('data-store-seq', String(seqBefore + 1));
-}
-
 /** One press (a toolbar button or a key) saved as one batch, after which `check` (a stored state) holds. */
 async function oneBatch(page, map, press, check) {
     const before = await seqOf(map);
@@ -105,25 +53,10 @@ async function oneBatch(page, map, press, check) {
     await expect.poll(async () => check(await storedAll(page)), { timeout: REPLY_MS }).toBe(true);
 }
 
-/** Nothing was sent: the map's seq stays where it was. */
-async function expectNothingSent(page, map, seqBefore) {
-    await page.waitForTimeout(NOTHING_MS);
-    await expect(map).toHaveAttribute('data-store-seq', String(seqBefore));
-}
-
 /** The fields a restore brings back as they were (its link, properties, kind and shape; the version moves on). */
 function same(a, b) {
     const pick = (r) => JSON.stringify([r.kind, r.name, r.geometry, r.properties, r.assetId, r.overrides, r.attachment]);
     return !!a && !!b && pick(a) === pick(b);
-}
-
-/** Whether a stored `ends` names these items (the store returns its keys in its own order). */
-const endsAre = (ends, start, end) => (ends && ends.start ? ends.start.itemId : null) === start && (ends && ends.end ? ends.end.itemId : null) === end;
-
-/** An item selected from the Items list, its Details open. */
-async function selectRow(page, id) {
-    await page.locator('.mapstudio-list-row[data-item-id="' + id + '"]').click();
-    await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', id);
 }
 
 test.describe('1366 px', () => {

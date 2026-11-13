@@ -10,15 +10,10 @@
 
 import { pagePixel } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot, signedInContext, test, view
+    EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot, signedInContext, test, view, REPLY_MS, CTB1,
+    SWD1, pixelNow, SWD_VIEW
 } from './fixtures.mjs';
 
-/** The Gateway's answer to a save, or a label an event script writes. */
-const REPLY_MS = 20_000;
-const CTB1 = [-105.012, 39.7262];
-const SWD1 = [-104.983671, 39.715476];
-/** L-SWD in view with its two pads (as editclick.spec.mjs views it). */
-const SWD_VIEW = { center: [(CTB1[0] + SWD1[0]) / 2, (CTB1[1] + SWD1[1]) / 2 + 0.001], zoom: 13.5 };
 /** The tracer's three pads (Point 1 to 3, linked to the Mesa assets P12, P14 and P15). */
 const TRACER = [[-104.9903, 39.7392], [-104.975, 39.75], [-104.955, 39.743]];
 const TRACER_VIEW = { center: [-104.973, 39.745], zoom: 13.5 };
@@ -96,14 +91,6 @@ async function shownRows(page) {
 /** The count's panel with several selected. */
 function countPanel(page) {
     return page.locator('.mapstudio-panel--several');
-}
-
-/** The map's page pixel of a place, from the box and the view the map reports now. */
-async function pixelNow(map, lngLat) {
-    const box = await map.boundingBox();
-    const center = (await map.getAttribute('data-center')).split(',').map(Number);
-    const zoom = Number(await map.getAttribute('data-zoom'));
-    return pagePixel(box, lngLat, center, zoom);
 }
 
 /** A drag with Shift (and Alt for a lasso) held, through the page pixels given, in small steps. */

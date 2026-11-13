@@ -67,7 +67,7 @@ export interface HostLists {
 
 const FIELD_TYPES: ReadonlySet<string> = new Set(['text', 'number', 'integer', 'boolean', 'choice']);
 
-function readField(value: unknown): FormField | null {
+function readFormField(value: unknown): FormField | null {
     if (!isRecord(value) || typeof value.key !== 'string' || typeof value.type !== 'string'
         || !FIELD_TYPES.has(value.type)) {
         return null;
@@ -90,7 +90,7 @@ export function readKind(value: unknown): Kind | null {
     const fields: FormField[] = [];
     if (Array.isArray(value.fields)) {
         for (const raw of value.fields) {
-            const f = readField(raw);
+            const f = readFormField(raw);
             if (f) {
                 fields.push(f);
             }

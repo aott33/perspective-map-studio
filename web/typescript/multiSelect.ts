@@ -13,6 +13,7 @@
  */
 
 import { Map as MapLibreMap } from 'maplibre-gl';
+import { SVG_NS } from './controls';
 
 export type Pixel = [number, number];
 
@@ -135,8 +136,6 @@ export interface BoxSelectHost {
     /** The ids a released box or lasso took, added to the selection (studio.ts `addMany`). */
     addToSelection(ids: string[], shape: DragShape): void;
 }
-
-const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /**
  * The Shift-drag box and Shift+Alt-drag lasso (entry 8). Started on a Shift press of the primary button on the map with the Select

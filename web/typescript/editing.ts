@@ -53,7 +53,7 @@ import {
     EDGES_CROSS, METRIC_UNITS, Position as LinePosition, SnapTarget, canDeleteVertex, endSideOf, lengthM, nearestSnap, placeAlong, project, readDistance,
     ringCrosses, snapDistanceM, snapTargets, snapTargetsForLine
 } from './geometry';
-import { StudioTool, armInstrument as armStudio, armedProblem, disarm, isDrawing, isPlacing, toolKind } from './studio';
+import { StudioTool, armInstrument, armedProblem, disarm, isDrawing, isPlacing, toolKind } from './studio';
 import { drawColor } from './theme';
 
 /** Terra Draw's mode names: idle, and the three tools'. */
@@ -970,7 +970,7 @@ export function applyEditing(host: EditingHost): void {
  * for it; the tool before it is put down (its drawing in progress goes with it, its placed pins too, their items
  * being saved already). Nothing happens while the store is unreachable.
  */
-export function pickTool(host: EditingHost, tool: StudioTool, kindId: string | null = null): void {
+export function pickUpTool(host: EditingHost, tool: StudioTool, kindId: string | null = null): void {
     if (!host.draw || (host.props.delegate && host.props.delegate.editing === 'off')) {
         return;
     }
@@ -981,11 +981,6 @@ export function pickTool(host: EditingHost, tool: StudioTool, kindId: string | n
     host.drawingReason = '';
     host.draw.setMode(modeFor(tool));
     host.setState((prev) => host.toolState(prev, tool, kindId));
-}
-
-/** The Point tool picked up (entry 2): one click places a point and saves it; a drag of the pin moves it; the tool stays until Esc or Select. */
-export function pickPointTool(host: EditingHost): void {
-    pickTool(host, 'point');
 }
 
 /** Select: every tool put down, Terra Draw idle (a drawing in progress dropped), the placed pins gone (their items are saved). */
@@ -1337,7 +1332,7 @@ export function onKeyDown(host: EditingHost, ev: KeyboardEvent): void {
 
 /*
  * Instruments (epic 4 entry 9; EXPERIENCE.md Instruments, owner 2026-11-06 and 2026-11-09): no toolbar tool. Add an instrument in a
- * selected line's Details arms its kind (`armInstrument`); the next click within INSTRUMENT_CLICK_PX of that line places it at the
+ * selected line's Details arms its kind (`startInstrument`); the next click within INSTRUMENT_CLICK_PX of that line places it at the
  * click's projection (`onArmedClick`), or a distance typed in the drawing bar places it there (`placeTyped`); a click elsewhere or a
  * distance outside the line is refused in words in the bar, nothing saved; Esc or Cancel puts it down. One create with its point
  * and attachment, one undo step, then the new instrument's Details with Name focused. A selected instrument drags along its line
@@ -1359,7 +1354,7 @@ function armedLine(host: EditingHost): { line: MapItemRecord; coords: LinePositi
  * Add an instrument (entry 9), its kind picked: armed on the selected line, the tool in hand put down (its drawing and pins go),
  * the chosen point or Move dropped; nothing while the store is unreachable or the line is not stored on the map.
  */
-export function armInstrument(host: EditingHost, lineId: string, kindId: string): void {
+export function startInstrument(host: EditingHost, lineId: string, kindId: string): void {
     const delegate = host.props.delegate;
     const line = host.liveItem(lineId);
     if (!delegate || delegate.editing === 'off' || !host.studioOn() || !line || line.geometry.type !== 'LineString' || line.version < 1) {
@@ -1371,7 +1366,7 @@ export function armInstrument(host: EditingHost, lineId: string, kindId: string)
     clearPlacedPoints(host);
     host.lastSnap = null;
     host.drawingReason = '';
-    host.setState((prev) => ({ drawing: null, snapHint: '', geometry: null, studio: armStudio(prev.studio, lineId, kindId) }));
+    host.setState((prev) => ({ drawing: null, snapHint: '', geometry: null, studio: armInstrument(prev.studio, lineId, kindId) }));
     console.info('[MapStudio] Add an instrument: ' + kindId + ' on ' + line.name + ', placed by a click on the line or a typed distance.');
 }
 

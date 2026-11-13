@@ -244,11 +244,6 @@ export function isPlacing(state: StudioState): boolean {
     return state.tool === 'point';
 }
 
-/** Today's selection: the one selected item's id, or null (the component keeps its kind and segment). */
-export function selectedId(state: StudioState): string | null {
-    return state.selected.length > 0 ? state.selected[state.selected.length - 1] : null;
-}
-
 /** The tool a kind is drawn with: Point for a point kind, Area for a line kind drawn closed (`area`), Line otherwise. */
 export function toolOf(kind: Kind): StudioTool {
     return kind.geometry === 'point' ? 'point' : kind.area ? 'area' : 'line';

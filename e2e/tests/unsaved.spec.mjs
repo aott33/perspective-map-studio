@@ -18,18 +18,11 @@ import { envFileValue, gatewayUrl } from '../lib/env.mjs';
 import { TRACER } from '../lib/geo.mjs';
 import { routeSockets } from '../lib/sockets.mjs';
 import {
-    EDITOR_USER, OPERATOR_USER, drawLine, editorTest, expect, mapLoaded, openMap, send, shot, signedInContext, test
+    EDITOR_USER, OPERATOR_USER, drawLine, editorTest, expect, mapLoaded, openMap, send, shot, signedInContext, test, KEY, storedQueue
 } from './fixtures.mjs';
 
-const PROJECT = 'mapstudio-dev';
-const KEY = `mapstudio.unsaved.v1:${PROJECT}:${EDITOR_USER}`;
 // The component's reply timeout is 15 s; the assertion waits a little longer.
 const UNSENT_TIMEOUT_MS = 25_000;
-
-/** The queue as stored for the map editor. */
-async function storedQueue(page) {
-    return page.evaluate((key) => JSON.parse(window.localStorage.getItem(key) || '[]'), KEY);
-}
 
 for (const [width, height] of [[1440, 900], [390, 844]]) {
     editorTest.describe(`${width} px`, () => {

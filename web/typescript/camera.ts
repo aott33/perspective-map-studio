@@ -25,7 +25,7 @@ import { NeedsYouRow } from './needsyou';
 import { VIEWPORT_CHANGED_EVENT, firePageEvent, viewportKey, viewportOf, writePageProp } from './pageEvents';
 import { Place, placeKey, readPlace, writePlace } from './place';
 import { PopupPoint } from './popupParams';
-import { CameraPadding, PopupAnchor, Rect, cameraPadding as paddingFor } from './popupPlacement';
+import { CameraPadding, PopupAnchor, Rect, paddingFor } from './popupPlacement';
 import { CHOSEN_POINT_ZOOM, SearchResult } from './search';
 import { SearchControl } from './SearchControl';
 import { sessionStore } from './legend';

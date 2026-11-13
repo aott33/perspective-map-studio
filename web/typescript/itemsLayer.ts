@@ -13,13 +13,14 @@
 import { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 import { TerraDraw } from 'terra-draw';
 import type { MapStudioState, Props } from './MapStudio';
+import { SPRITE_URL } from './controls';
 import { MapFeatures, buildFeatures } from './features';
 import { Place } from './place';
 import { LegendControl } from './LegendControl';
 import { legendKey } from './legend';
 import {
     SOURCE_ARROW, SOURCE_ITEM_AREAS, SOURCE_ITEM_LINES, SOURCE_ITEM_POINTS, SOURCE_LINE_ENDS, SOURCE_LINE_MARKS, SOURCE_UNSAVED_LINES,
-    SOURCE_UNSAVED_POINTS, SPRITE_URL
+    SOURCE_UNSAVED_POINTS
 } from './mapLayers';
 import { MarkerColors, SpriteSymbol, imageFor, parseSprite } from './markers';
 import { NeedsYouControl } from './NeedsYouControl';

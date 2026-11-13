@@ -63,7 +63,7 @@ export function providerLogo(selected: BasemapId | null, source: RasterSource | 
 export const IMPROVE_MAP_CLASS = 'mapbox-improve-map';
 
 /** Round to at most `places` decimals, with no trailing zeros. */
-function rounded(value: number, places: number): string {
+function roundedText(value: number, places: number): string {
     const f = Math.pow(10, places);
     return String(Math.round(value * f) / f);
 }
@@ -80,7 +80,7 @@ export function feedbackHref(href: string, center: { lng: number; lat: number },
     if (lng === -180 && center.lng > 0) {
         lng = 180;
     }
-    return base + '#/' + rounded(lng, 5) + '/' + rounded(center.lat, 5) + '/' + rounded(zoom, 2);
+    return base + '#/' + roundedText(lng, 5) + '/' + roundedText(center.lat, 5) + '/' + roundedText(zoom, 2);
 }
 
 /**

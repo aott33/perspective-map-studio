@@ -11,10 +11,9 @@
 // the mockups.
 
 import { pagePixel } from '../lib/geo.mjs';
-import { DRAW_MS, EDITOR_USER, expect, mapLoaded, openMap, runSeed, shot, signedInContext, test, view } from './fixtures.mjs';
-
-/** The bound for the seeded states to reach the map: one refresh interval (the showcase setup's 10 s) plus margin. */
-const INTERVAL_MS = 25_000;
+import {
+    DRAW_MS, EDITOR_USER, expect, mapLoaded, openMap, runSeed, shot, signedInContext, test, view, liveItem, bar, labelsPlaced, INTERVAL_MS
+} from './fixtures.mjs';
 
 /**
  * The showcase project and its field (mapstudio_showcase_seed): the page's starting area, P14's place,
@@ -36,9 +35,6 @@ const SHOWCASE = {
 
 let ids;
 
-const bar = (page) => page.locator('.mapstudio-needs');
-const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
-
 /** Open the showcase page and wait for the items, the first full batch and the labels of the starting zoom. */
 async function openShowcase(page) {
     const map = await openMap(page, '/', SHOWCASE.project);
@@ -54,17 +50,6 @@ async function threeStates(page) {
     await expect(liveItem(page, ids.p14)).toHaveAttribute('data-state', 'alarm');
     await expect(liveItem(page, ids.p21)).toHaveAttribute('data-state', 'comms-lost');
     await expect(liveItem(page, ids.swd1)).toHaveAttribute('data-state', 'stale');
-}
-
-/**
- * Wait until the map's labels of the current view hold every text in `texts` (the names and icon KPIs,
- * published on MapLibre's idle after a batch changed a marker), so a shot shows the labels settled.
- */
-async function labelsPlaced(map, texts) {
-    await expect.poll(async () => {
-        const labels = (await map.getAttribute('data-labels')) || '';
-        return texts.filter((t) => !labels.includes('"' + t + '"'));
-    }, { timeout: DRAW_MS }).toEqual([]);
 }
 
 /** No dev control or readout on the page: the component alone fills the view. */

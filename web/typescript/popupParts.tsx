@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { SPRITE_URL } from './controls';
 import { ItemValues, KindDisplay, LiveValue, NO_DATA, capitalised, qualityWords, staleWords, valueText } from './live';
 
 /**
@@ -12,7 +13,7 @@ export function Glyph(props: { id: string; className: string; size?: number }): 
     const size = props.size || 24;
     return (
         <svg className={props.className} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-            <use href={'/res/mapstudio/icons/mapstudio-icons.svg#ms-' + props.id} />
+            <use href={SPRITE_URL + '#ms-' + props.id} />
         </svg>
     );
 }

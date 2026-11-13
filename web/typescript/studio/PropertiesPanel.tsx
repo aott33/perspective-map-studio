@@ -19,6 +19,8 @@ import { MarkerColors, SpriteSymbol } from '../markers';
 import { ItemView } from '../placeholders';
 import { PickTarget, TagFor, readTagFor } from '../tagBrowser';
 import { ChromeGlyph } from './ChromeGlyph';
+import { panelTabs } from './PanelTabs';
+import { tagButton } from './TagButton';
 import { RuleEditor, RuleKeep, RuleTile } from './RuleEditor';
 import { PAUSED_TEXT } from './UndoGroup';
 
@@ -363,14 +365,14 @@ export function readCoordinate(text: string, limit: number): number | null {
 }
 
 /** A dictionary without one key (a copy). */
-function without(map: Record<string, string>, key: string): Record<string, string> {
+function copyWithout(map: Record<string, string>, key: string): Record<string, string> {
     const out = { ...map };
     delete out[key];
     return out;
 }
 
 /** Whether a field's new value is what the record holds already (nothing to save). */
-function sameValue(value: FieldValue, stored: unknown): boolean {
+function sameAsStored(value: FieldValue, stored: unknown): boolean {
     return value === null ? isUnset(stored) : value === stored;
 }
 
@@ -769,7 +771,7 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
             return;
         }
         if (this.props.paused || !this.props.kind) {
-            this.setState((prev) => ({ fields: without(prev.fields, field.key), problems: without(prev.problems, field.key) }));
+            this.setState((prev) => ({ fields: copyWithout(prev.fields, field.key), problems: copyWithout(prev.problems, field.key) }));
             return;
         }
         const read = readField(field, text);
@@ -778,12 +780,12 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
             this.setState((prev) => ({ problems: { ...prev.problems, [field.key]: problem } }));
             return;
         }
-        if (sameValue(read.value, this.props.newest[field.key])) {
+        if (sameAsStored(read.value, this.props.newest[field.key])) {
             // The value sent last (or stored): nothing to send; the draft shows it until the record holds it.
             const shown = fieldText(read.value);
             this.setState((prev) => ({
-                fields: this.sent.has(field.key) ? { ...prev.fields, [field.key]: shown } : without(prev.fields, field.key),
-                problems: without(prev.problems, field.key)
+                fields: this.sent.has(field.key) ? { ...prev.fields, [field.key]: shown } : copyWithout(prev.fields, field.key),
+                problems: copyWithout(prev.problems, field.key)
             }));
             if (this.sent.has(field.key)) {
                 this.sent.set(field.key, shown);
@@ -791,7 +793,7 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
             return;
         }
         const shown = fieldText(read.value);
-        this.setState((prev) => ({ fields: { ...prev.fields, [field.key]: shown }, problems: without(prev.problems, field.key) }));
+        this.setState((prev) => ({ fields: { ...prev.fields, [field.key]: shown }, problems: copyWithout(prev.problems, field.key) }));
         this.sent.set(field.key, shown);
         this.props.onProperty(field.key, read.value);
     };
@@ -805,7 +807,7 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
             ev.preventDefault();
             ev.stopPropagation();
             this.escaped = 'field:' + field.key;
-            this.setState((prev) => ({ fields: without(prev.fields, field.key), problems: without(prev.problems, field.key) }));
+            this.setState((prev) => ({ fields: copyWithout(prev.fields, field.key), problems: copyWithout(prev.problems, field.key) }));
             ev.currentTarget.blur();
             this.escaped = null;
         }
@@ -813,7 +815,7 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
 
     /** A choice or a checkbox (entry 6): saved at once, the draft showing it until the record holds it. */
     private chooseField(field: FormField, value: FieldValue): void {
-        if (this.props.paused || !this.props.kind || sameValue(value, this.props.newest[field.key])) {
+        if (this.props.paused || !this.props.kind || sameAsStored(value, this.props.newest[field.key])) {
             return;
         }
         const shown = fieldText(value);
@@ -1021,17 +1023,12 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
                                onFocus={(ev) => ev.currentTarget.select()}
                                onChange={(ev) => this.setState({ overrideText: ev.target.value })}
                                onKeyDown={this.onOverrideKey} />
-                        {onBrowse ? (
-                            <button type="button" className={'mapstudio-dock-button mapstudio-tag-button' + (browsing ? ' mapstudio-tag-button--open' : '')}
-                                    data-tag-for={tagFor} disabled={frozen} title="Pick a tag"
-                                    aria-label={'Pick a tag for ' + row.name + ' on ' + this.props.item.name + ' only'}
-                                    aria-haspopup="dialog" aria-expanded={browsing}
-                                    // The press must not finish the field first (a browser that gives a pressed button no focus blurs it to nothing).
-                                    onMouseDown={(ev) => ev.preventDefault()}
-                                    onClick={() => onBrowse(tagFor, { part: 'override', name: row.name, item: this.props.item.name, folders: row.id === 'alarms' })}>
-                                <ChromeGlyph name="tag" size={16} />
-                            </button>
-                        ) : null}
+                        {onBrowse ? tagButton({
+                            tagFor, open: browsing, disabled: frozen, label: 'Pick a tag for ' + row.name + ' on ' + this.props.item.name + ' only',
+                            // The press must not finish the field first (a browser that gives a pressed button no focus blurs it to nothing).
+                            onMouseDown: (ev) => ev.preventDefault(),
+                            onClick: () => onBrowse(tagFor, { part: 'override', name: row.name, item: this.props.item.name, folders: row.id === 'alarms' })
+                        }) : null}
                     </div>
                 ) : (
                     <div className="mapstudio-livenow-pathline">
@@ -1114,16 +1111,10 @@ export class PropertiesPanel extends React.Component<PropertiesPanelProps, Draft
 
     private renderTabs(): React.ReactElement {
         const now = this.tabNow();
-        return (
-            <div className="mapstudio-panel-tabs" role="tablist" aria-label={this.props.item.name}>
-                {PANEL_TABS.map(([tab, label]) => (
-                    <button key={tab} ref={(el) => { this.tabEls[tab] = el; }} type="button" role="tab" id={this.tabId(tab, 'tab')} data-tab={tab}
-                            aria-selected={now === tab} aria-controls={this.tabId(tab, 'panel')} tabIndex={now === tab ? 0 : -1}
-                            className={'mapstudio-panel-tab' + (now === tab ? ' mapstudio-panel-tab--active' : '')}
-                            onClick={() => this.chooseTab(tab)} onKeyDown={this.onTabKey}>{label}</button>
-                ))}
-            </div>
-        );
+        return panelTabs({
+            label: this.props.item.name, tabs: PANEL_TABS, now, tabId: (tab) => this.tabId(tab, 'tab'), panelId: (tab) => this.tabId(tab, 'panel'),
+            onChoose: (tab) => this.chooseTab(tab), roving: { onKeyDown: this.onTabKey, ref: (tab, el) => { this.tabEls[tab] = el; } }
+        });
     }
 
     /** The refusal of the item's own style rule that stands, or null. */

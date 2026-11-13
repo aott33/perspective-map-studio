@@ -5,6 +5,13 @@
  * colour from the theme and carry no colour of their own (AD-11). Unit tested in node.
  */
 
+/** The served sprite of the kind and state glyphs (docs/icons.md): the marker images, the popups, the controls and the stale mark draw from it. */
+export const SPRITE_URL = '/res/mapstudio/icons/mapstudio-icons.svg';
+/** The SVG namespace, for the elements the controls and the box and lasso build by hand. */
+export const SVG_NS = 'http://www.w3.org/2000/svg';
+/** The stylesheet's phone breakpoint: below it the search is the phone top bar and the legend the bottom sheet. */
+export const PHONE_QUERY = '(max-width: 767px)';
+
 /** The zoom level as the card shows it between plus and minus: "z 15" (the nearest whole level). */
 export function zoomLevelText(zoom: number): string {
     if (!Number.isFinite(zoom)) {

@@ -9,18 +9,10 @@
 
 import { randomUUID } from 'node:crypto';
 import { setTagProviderEnabled } from '../lib/gateway.mjs';
-import {
-    OPERATOR_USER, editorTest, expect, mapLoaded, openMap, send, signedInContext, test, watch
-} from './fixtures.mjs';
+import { OPERATOR_USER, editorTest, expect, mapLoaded, openMap, send, signedInContext, test, watch, expectRefused } from './fixtures.mjs';
 
 function expectReply(reply, type) {
     expect(reply.type, JSON.stringify(reply.body)).toBe(type);
-    return reply.body;
-}
-
-function expectRefused(reply, code) {
-    expect(reply.type, JSON.stringify(reply.body)).toBe('error');
-    expect(reply.body.code).toBe(code);
     return reply.body;
 }
 

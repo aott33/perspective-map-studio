@@ -12,7 +12,7 @@ import {
     isFullPath, itemsOfKind, keyFromLabel, LiveNowFacts,
     noPreviewText, overridesText, paramMissing, pathsToResolve, pausedText, placeholderList, presetsFor, previewKey, previewOf, previewOptions, readPreview,
     readSetup, refusalPlace, removeBlocked, resolveKey, resolveNote, rowMissing, ruleDraft, ruleKpi, ruleTypes, sameRule, sameSetup, sameTints, setupBatch,
-    shownKind, sourceName, tintRows, tintsDraft, typedNumber, typedValue, unsavedText, valueText, waitingSave, withSource, writePreview
+    shownKind, sourceName, tintRows, tintsDraft, typedNumber, typedValue, unsavedText, caseValueText as valueText, waitingSave, withSource, writePreview
 } from '../kindSetup';
 import { KeyValueStore, UnsavedEntry, UnsavedQueue, isSetupSave, onTopBatch, readEntries, saveCardFor, storageKey } from '../unsaved';
 import { headerSaveWords } from '../problems';

@@ -5,7 +5,7 @@ import { GLYPH_PATHS } from '../controls';
 import { Rail } from '../studio/Rail';
 import {
     KIND_BUTTONS, armInstrument, armedProblem, disarm, instrumentKinds, keepArmed, StudioState, clearSelection, enterEdit, fromProps, isDrawing, isEditing, isPlacing, kindButtons, kindsFor, leaveEdit, pickTool,
-    pointKind, select, selectedId, showSurface, toggleSelect, toolKind, toolOf, selectMany, addMany, isMultiple, rangeIds, sameIds, chooseKind, choosePreview
+    pointKind, select, showSurface, toggleSelect, toolKind, toolOf, selectMany, addMany, isMultiple, rangeIds, sameIds, chooseKind, choosePreview
 } from '../studio';
 
 describe('fromProps', () => {
@@ -18,7 +18,7 @@ describe('fromProps', () => {
         expect(isEditing(fromProps(false))).toBe(false);
         expect(isEditing(fromProps(true))).toBe(true);
         expect(isDrawing(fromProps(true))).toBe(false);
-        expect(selectedId(fromProps(true))).toBeNull();
+        expect(fromProps(true).selected).toEqual([]);
     });
 });
 
@@ -94,10 +94,8 @@ describe('select, toggleSelect and clearSelection', () => {
         let state: StudioState = fromProps(false);
         state = select(state, 'a');
         expect(state.selected).toEqual(['a']);
-        expect(selectedId(state)).toBe('a');
         state = select(state, 'b');
         expect(state.selected).toEqual(['b']);
-        expect(selectedId(state)).toBe('b');
     });
 
     it('select returns the same state for the item already selected alone', () => {
@@ -113,7 +111,6 @@ describe('select, toggleSelect and clearSelection', () => {
         expect(state.selected).toEqual(['b']);
         state = toggleSelect(state, 'b');
         expect(state.selected).toEqual([]);
-        expect(selectedId(state)).toBeNull();
     });
 
     it('clearSelection empties the selection, as a tap on the ground does, and keeps the mode and tool', () => {
@@ -143,7 +140,6 @@ describe('selecting several (entry 8): selectMany, addMany, isMultiple, rangeIds
     it('selectMany replaces the set, each id once in the order given, the last the current item', () => {
         const state = selectMany(select(fromProps(true), 'x'), ['a', 'b', 'a', 'c']);
         expect(state.selected).toEqual(['a', 'b', 'c']);
-        expect(selectedId(state)).toBe('c');
         expect(isMultiple(state)).toBe(true);
         expect(selectMany(state, ['a', 'b', 'c'])).toBe(state);
         expect(selectMany(state, []).selected).toEqual([]);
@@ -152,7 +148,6 @@ describe('selecting several (entry 8): selectMany, addMany, isMultiple, rangeIds
     it('addMany adds the ids not in the set at its end, keeping the others in place (a box, a lasso)', () => {
         const state = addMany(selectMany(fromProps(true), ['a', 'b']), ['c', 'a', 'd', 'c']);
         expect(state.selected).toEqual(['a', 'b', 'c', 'd']);
-        expect(selectedId(state)).toBe('d');
         expect(addMany(state, ['a', 'b'])).toBe(state);
         expect(addMany(state, [])).toBe(state);
     });

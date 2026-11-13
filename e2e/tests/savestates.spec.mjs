@@ -14,23 +14,15 @@ import { randomUUID } from 'node:crypto';
 import { envFileValue } from '../lib/env.mjs';
 import { BUSY_MESSAGE, openGate, routeSockets } from '../lib/sockets.mjs';
 import {
-    EDITOR_USER, OPERATOR_USER, drawLine, editorTest, expect, mapLoaded, openMap, send, shot, signedInContext, test
+    EDITOR_USER, OPERATOR_USER, drawLine, editorTest, expect, mapLoaded, openMap, send, shot, signedInContext, test, REPLY_MS, KEY, selectRow, stored,
+    storedQueue
 } from './fixtures.mjs';
 
-const PROJECT = 'mapstudio-dev';
-const KEY = `mapstudio.unsaved.v1:${PROJECT}:${EDITOR_USER}`;
-/** The Gateway's answer to a save, and the 15 s replay with room. */
-const REPLY_MS = 20_000;
 const REPLAY_MS = 30_000;
 /** A spot for the items this spec makes through the test hook, out of the tracer's view. */
 const AWAY = [-104.84, 39.64];
 /** About 40 m of latitude. */
 const NORTH_40M = 40 / 111_195;
-
-/** The queue as stored for the map editor. */
-async function storedQueue(page) {
-    return page.evaluate((key) => JSON.parse(window.localStorage.getItem(key) || '[]'), KEY);
-}
 
 async function openEditor(page) {
     const map = await openMap(page, '/edit');
@@ -38,11 +30,6 @@ async function openEditor(page) {
     await expect(map).toHaveAttribute('data-edit-level', 'full');
     await expect(map).toHaveAttribute('data-studio', 'on');
     return map;
-}
-
-/** The stored record of a live map item through the test hook, or undefined. */
-async function stored(page, id) {
-    return (await send(page, 'map.load', {})).body.items.find((i) => i.id === id && !i.deleted);
 }
 
 /** A create op of a pad at AWAY, a little apart per `n`. */
@@ -58,12 +45,6 @@ async function createPads(page, pads) {
     for (const [id] of pads) {
         await expect(page.locator('.mapstudio-list-row[data-item-id="' + id + '"]')).toHaveCount(1, { timeout: REPLY_MS });
     }
-}
-
-/** A list row clicked: the pad selected with its Details open. */
-async function selectRow(page, id) {
-    await page.locator('.mapstudio-list-row[data-item-id="' + id + '"]').click();
-    await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', id);
 }
 
 /** The pad's Operator field finished with Enter: one update through the queue. */

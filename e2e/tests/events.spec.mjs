@@ -13,27 +13,18 @@
 
 import { pagePixel } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, VERTEX_PAUSE_MS, WARNING_SETTLE_MS, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, send,
-    signedInContext, test, view
+    EDITOR_USER, VERTEX_PAUSE_MS, WARNING_SETTLE_MS, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, send, signedInContext, test,
+    view, REPLY_MS, CTB1, SWD1, CTB1_VIEW, pixelNow, expectDetails, expectNoPopup, SWD_VIEW
 } from './fixtures.mjs';
 
-/** The page's labels following an event script or a binding on the Gateway. */
-const REPLY_MS = 20_000;
 /** A popup's content (the default popup reads the item's live values) may take a moment on the dev stack. */
 const POPUP_MS = 30_000;
 /** There is nothing to observe when nothing more happens: the time a second event or a late move would have to show. */
 const SETTLE_MS = 2_500;
 
-// The seed's L-SWD set and the tracer's Point 2 (ops/project seed).
-const CTB1 = [-105.012, 39.7262];
-const SWD1 = [-104.983671, 39.715476];
 const P14 = [-104.975, 39.75];
-// CTB1 in the middle at zoom 15: a full disc to click.
-const CTB1_VIEW = { center: CTB1, zoom: 15 };
 // South-west of the dev field at zoom 13: P14 (Point 2) well off the map.
 const AWAY_VIEW = { center: [-105.06, 39.7], zoom: 13 };
-// The line in view, its points apart (as editclick.spec.mjs views it): the ground south of it for the Line tool's points.
-const SWD_VIEW = { center: [(CTB1[0] + SWD1[0]) / 2, (CTB1[1] + SWD1[1]) / 2 + 0.001], zoom: 13.5 };
 
 let seed;
 let ids;
@@ -116,30 +107,6 @@ async function expectPage(page, id, rowName) {
     await expect(page.locator('#mapstudio-events-selected')).toHaveText(id === null ? /^selectedItem:\s*$/ : 'selectedItem: ' + id, { timeout: REPLY_MS });
     await expect(page.locator('#mapstudio-events-table-selected')).toHaveText(rowName === null ? /^table:\s*$/ : 'table: ' + rowName,
         { timeout: REPLY_MS });
-}
-
-/** The map's page pixel of a place, from the box and the view the map reports now. */
-async function pixelNow(map, lngLat) {
-    const box = await map.boundingBox();
-    const center = (await map.getAttribute('data-center')).split(',').map(Number);
-    const zoom = Number(await map.getAttribute('data-zoom'));
-    return pagePixel(box, lngLat, center, zoom);
-}
-
-/** No popup of any kind: no card, no line popup, no sheet, no pick list. */
-async function expectNoPopup(page, map) {
-    await expect(map).toHaveAttribute('data-popup-mode', '');
-    await expect(map).toHaveAttribute('data-pick-open', 'false');
-    await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
-    await expect(page.locator('.mapstudio-sheet')).toHaveCount(0);
-}
-
-/** The item selected with its Details open beside the map. */
-async function expectDetails(page, map, id, name) {
-    await expect(map).toHaveAttribute('data-selected', id);
-    const panel = page.locator('.mapstudio-panel');
-    await expect(panel).toHaveAttribute('data-item-id', id);
-    await expect(panel.locator('.mapstudio-panel-name')).toHaveText(name);
 }
 
 /** The viewport the component last gave the page (`data-viewport`) in the dev labels' words (mapstudio_events.viewportText). */

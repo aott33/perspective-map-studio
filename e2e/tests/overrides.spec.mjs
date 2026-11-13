@@ -16,14 +16,11 @@
 
 import { randomUUID } from 'node:crypto';
 import {
-    EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot as shotNow, signedInContext, test
+    EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot as shotNow, signedInContext, test, REPLY_MS,
+    liveItem, seqOf, selectRow, expectNothingSent, press, stored, apply, openDev, undo, openItems, padCount
 } from './fixtures.mjs';
 
-/** The Gateway's answer to a save, and the next live update. */
-const REPLY_MS = 20_000;
 const LIVE_MS = 30_000;
-/** There is nothing to observe when nothing is sent: the time a stray batch would have to show in the map's seq. */
-const NOTHING_MS = 800;
 /** A spot for the items this spec makes through the test hook, out of the tracer's view. */
 const AWAY = [-104.82, 39.66];
 const P12 = '[default]Mesa/P12';
@@ -31,18 +28,6 @@ const P14 = '[default]Mesa/P14';
 const NOT_FULL = ' is not a tag path; use a full path such as [default]Shared/GasPrice.';
 
 let seed;
-
-/** Press a /live dev button and return its result (the label changes on every press, ranAt included). */
-async function press(page, button) {
-    const out = page.locator('#mapstudio-live-result');
-    const before = await out.innerText();
-    await page.locator('#mapstudio-live-' + button).click();
-    await expect.poll(() => out.innerText(), { timeout: 30_000 }).not.toBe(before);
-    const result = JSON.parse(await out.innerText());
-    expect(result.error, 'the dev button ' + button).toBeUndefined();
-    expect(result.refused, 'the dev button ' + button).toBeUndefined();
-    return result;
-}
 
 /** The dev tags this spec drives in their quiet state: P12 at 400 psi with no alarm, P14 at 400 psi, comms on, nothing unacknowledged. */
 async function quiet(page) {
@@ -97,39 +82,11 @@ async function openEditor(page) {
     return map;
 }
 
-/** The second tab, on /live: its dev buttons, and another open map to agree with. */
-async function openDev(context) {
-    const dev = await context.newPage();
-    await mapLoaded(await openMap(dev, '/live'));
-    return dev;
-}
-
-async function seqOf(map) {
-    return Number(await map.getAttribute('data-store-seq'));
-}
-
-/** The stored record of a live map item through the test hook, or undefined. */
-async function stored(page, id) {
-    return (await send(page, 'map.load', {})).body.items.find((i) => i.id === id && !i.deleted);
-}
-
-/** One batch through the test hook, saved. */
-async function apply(page, ops) {
-    const reply = await send(page, 'edits.apply', { batchId: randomUUID(), ops });
-    expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
-}
-
 /** A point map item made through the test hook at AWAY (a little apart per `n`), then its row in the list. */
 async function createPoint(page, id, kind, name, n, extra = {}) {
     await apply(page, [{ op: 'create', entity: 'item', id, baseVersion: 0, data: { kind, name, geometry: { type: 'Point',
         coordinates: [Number((AWAY[0] + n * 0.002).toFixed(6)), AWAY[1]] }, properties: {}, ...extra } }]);
     await expect(page.locator('.mapstudio-list-row[data-item-id="' + id + '"]')).toHaveCount(1, { timeout: REPLY_MS });
-}
-
-/** A list row clicked: the item selected with its Details open. */
-async function selectRow(page, id) {
-    await page.locator('.mapstudio-list-row[data-item-id="' + id + '"]').click();
-    await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', id);
 }
 
 const block = (page) => page.locator('.mapstudio-panel .mapstudio-livenow');
@@ -138,8 +95,6 @@ const value = (page, id) => row(page, id).locator('.mapstudio-livenow-value');
 const pathOf = (page, id) => row(page, id).locator('.mapstudio-livenow-path');
 const input = (page, id) => row(page, id).locator('.mapstudio-override-input');
 const problem = (page, id) => row(page, id).locator('.mapstudio-override-problem');
-const undo = (page) => page.locator('.mapstudio-toolbar .mapstudio-undo');
-const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
 
 /** Override (or Change) pressed on a row and a path typed, not yet finished. */
 async function typePath(page, id, path) {
@@ -156,11 +111,6 @@ async function expectOneBatch(page, map, seqBefore, step) {
     await expect(map).toHaveAttribute('data-store-seq', String(seqBefore + 1));
 }
 
-async function expectNothingSent(page, map, seqBefore) {
-    await page.waitForTimeout(NOTHING_MS);
-    await expect(map).toHaveAttribute('data-store-seq', String(seqBefore));
-}
-
 /** A render for the docs with the block in view. */
 async function shot(page, name) {
     await block(page).scrollIntoViewIfNeeded();
@@ -173,15 +123,6 @@ async function openKinds(page, map, kindId) {
     await expect(map).toHaveAttribute('data-surface', 'kinds');
     await page.locator('.mapstudio-kind-row[data-kind="' + kindId + '"]').click();
     await expect(page.locator('.mapstudio-kindsetup')).toHaveAttribute('data-kind', kindId);
-}
-
-async function openItems(page, map) {
-    await page.locator('.mapstudio-rail-item[data-surface="items"]').click();
-    await expect(map).toHaveAttribute('data-surface', 'items');
-}
-
-async function padCount(page) {
-    return (await send(page, 'map.load', {})).body.items.filter((i) => !i.deleted && i.kind === 'pad').length;
 }
 
 editorTest.describe('the Live now block and path overrides at 1366 px', () => {

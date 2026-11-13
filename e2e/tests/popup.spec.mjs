@@ -10,14 +10,12 @@
 
 import { TRACER, centerFor, pagePixel } from '../lib/geo.mjs';
 import {
-    DRAW_MS, EDITOR_USER, WARNING_SETTLE_MS, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, openMap, runSeed, send, shot,
-    signedInContext, test, view
+    DRAW_MS, EDITOR_USER, WARNING_SETTLE_MS, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, openMap, runSeed, send, shot, signedInContext,
+    test, view, INTERVAL_MS
 } from './fixtures.mjs';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-/** A kind setup change reaches an open map with its next batch: one refresh interval (10 s) plus margin. */
-const INTERVAL_MS = 25_000;
 /** The seed's first scale pad, no asset linked (ops/project/ignition/script-python/mapstudio_seed SCALE_PADS). */
 const PAD_1 = [-105.056215, 39.708958];
 

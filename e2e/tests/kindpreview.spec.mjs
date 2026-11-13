@@ -9,28 +9,17 @@
 // state and the seed is run again before and after, as styles.spec.mjs and live.spec.mjs expect.
 
 import { TRACER } from '../lib/geo.mjs';
-import { EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot, signedInContext, test } from './fixtures.mjs';
+import {
+    EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, shot, signedInContext, test, liveItem, setupOf,
+    openKinds, press, openDev, INTERVAL_MS
+} from './fixtures.mjs';
 
-/** One refresh interval of the dev setup (10 s) with its round trips, as live.spec.mjs bounds it. */
-const INTERVAL_MS = 25_000;
 /** A move of the map (300 ms) drawn and published. */
 const MOVE_MS = 20_000;
 /** There is nothing to observe when the map does not move: the time a move would have taken to show. */
 const STILL_MS = 800;
 
 let seed;
-
-/** Press a /live dev button and return its result (the label changes on every press, ranAt included). */
-async function press(page, button) {
-    const out = page.locator('#mapstudio-live-result');
-    const before = await out.innerText();
-    await page.locator('#mapstudio-live-' + button).click();
-    await expect.poll(() => out.innerText(), { timeout: 30_000 }).not.toBe(before);
-    const result = JSON.parse(await out.innerText());
-    expect(result.error, 'the dev button ' + button).toBeUndefined();
-    expect(result.refused, 'the dev button ' + button).toBeUndefined();
-    return result;
-}
 
 /** Every source this spec drives in its quiet state: Status 0, the pressure low (no alarm), comms on, nothing unacknowledged. */
 async function quiet(page) {
@@ -66,12 +55,6 @@ test.afterAll(async ({ browser }) => {
     await restore(browser);
 });
 
-async function setupOf(page, kindId) {
-    const reply = await send(page, 'map.load', {});
-    expect(reply.type, JSON.stringify(reply.body)).toBe('map.load.reply');
-    return (reply.body.kindSetups || []).find((k) => k.kindId === kindId && !k.deleted);
-}
-
 async function openEditor(page) {
     const map = await openMap(page, '/edit');
     await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
@@ -82,25 +65,12 @@ async function openEditor(page) {
     return map;
 }
 
-/** The second tab, on /live: its dev buttons, and another open map to agree with. */
-async function openDev(context) {
-    const dev = await context.newPage();
-    await mapLoaded(await openMap(dev, '/live'));
-    return dev;
-}
-
 const panel = (page) => page.locator('.mapstudio-kindsetup');
 const rule = (page) => page.locator('.mapstudio-kindsetup [data-section="styleRule"]');
 const note = (page) => rule(page).locator('.mapstudio-rule-live');
 const previewField = (page) => panel(page).locator('[data-field="preview"]');
 const previewSelect = (page) => previewField(page).locator('select');
 const showButton = (page) => previewField(page).locator('.mapstudio-kindsetup-show');
-const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
-
-async function openKinds(page, map) {
-    await page.locator('.mapstudio-rail-item[data-surface="kinds"]').click();
-    await expect(map).toHaveAttribute('data-surface', 'kinds');
-}
 
 async function chooseKind(page, kindId) {
     await page.locator('.mapstudio-kind-row[data-kind="' + kindId + '"]').click();

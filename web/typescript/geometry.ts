@@ -16,6 +16,7 @@ import { lineString, point } from '@turf/helpers';
 import { length } from '@turf/length';
 import { nearestPointOnLine } from '@turf/nearest-point-on-line';
 
+import { EARTH_RADIUS_M } from './shared';
 import { EditBatch, EditOp, ItemGeometry, MapItemData, MapItemRecord, MapUnits, UnitLabels, UnitsSetting } from './contract';
 
 export type Position = [number, number];
@@ -595,9 +596,6 @@ export function endsFrom(start: SnapTarget | null, end: SnapTarget | null): MapI
     }
     return { ...(start ? { start: { itemId: start.itemId } } : {}), ...(end ? { end: { itemId: end.itemId } } : {}) };
 }
-
-/** The earth's radius Turf measures with, in metres. */
-const EARTH_RADIUS_M = 6371008.8;
 
 /** The great-circle distance between two positions in metres (haversine, Turf's radius). */
 function haversineM(a: Position, b: Position): number {

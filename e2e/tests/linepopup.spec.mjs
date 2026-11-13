@@ -12,13 +12,9 @@
 
 import { pagePixel } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, editorTest, expect, mapLoaded, openMap, runSeed, send, shot, signedInContext, test, view
+    EDITOR_USER, editorTest, expect, mapLoaded, openMap, runSeed, send, shot, signedInContext, test, view, PUSH_MS, liveItem, press, INTERVAL_MS
 } from './fixtures.mjs';
 
-/** The bound for a change to reach the map: one refresh interval (the dev setup's 10 s) plus margin. */
-const INTERVAL_MS = 25_000;
-/** The bound for an open popup's push (250 ms on the Gateway, plus the round trip). */
-const PUSH_MS = 5_000;
 /** How long a redraw after a view change may take on the dev stack. */
 
 /**
@@ -40,21 +36,6 @@ const SWD = {
 const TRACER_MID = [(-104.9903 - 104.975) / 2, (39.7392 + 39.75) / 2];
 
 let ids;
-
-/** Press a /live dev button and return its result (the label changes on every press, ranAt included). */
-async function press(page, button) {
-    const out = page.locator('#mapstudio-live-result');
-    const before = await out.innerText();
-    await page.locator('#mapstudio-live-' + button).click();
-    await expect.poll(() => out.innerText(), { timeout: 30_000 }).not.toBe(before);
-    const result = JSON.parse(await out.innerText());
-    expect(result.error, 'the dev button ' + button).toBeUndefined();
-    expect(result.refused, 'the dev button ' + button).toBeUndefined();
-    return result;
-}
-
-/** The hidden live-state row of one map item. */
-const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
 
 /** The line's graded segments from its live row, keyed "from|to" by the seed keys of their nodes. */
 async function segments(page) {

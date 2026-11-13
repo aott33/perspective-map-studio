@@ -8,6 +8,7 @@ import { Preset } from '../live';
 import { MarkerColors, PRESET_WORDS, SpriteSymbol } from '../markers';
 import { Sample, presetSampleSvg } from '../StylePreview';
 import { ChromeGlyph } from './ChromeGlyph';
+import { tagButton } from './TagButton';
 
 /**
  * The style rule editor (epic 4 entries 12b1 and 12c2; DESIGN.md Kind setup, key screen 6 kinds-style), shared by a kind's
@@ -574,11 +575,7 @@ export class RuleEditor extends React.Component<RuleEditorProps, EditorState> {
                 {pathInput && onBrowse ? (
                     <div className="mapstudio-kindsetup-with-picker mapstudio-rule-pathline">
                         {pathInput}
-                        <button type="button" className={'mapstudio-dock-button mapstudio-tag-button' + (browsing ? ' mapstudio-tag-button--open' : '')}
-                                data-tag-for={this.props.browseFor || ''} disabled={this.off()} title="Pick a tag"
-                                aria-label="Pick a tag for the style rule" aria-haspopup="dialog" aria-expanded={browsing} onClick={onBrowse}>
-                            <ChromeGlyph name="tag" size={16} />
-                        </button>
+                        {tagButton({ tagFor: this.props.browseFor || '', open: browsing, disabled: this.off(), label: 'Pick a tag for the style rule', onClick: onBrowse })}
                     </div>
                 ) : pathInput}
                 {m.nodes}

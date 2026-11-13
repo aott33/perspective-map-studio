@@ -7,7 +7,8 @@
  * source. Pure, unit tested in node.
  */
 
-import { isRecord } from './json';
+import { finite, isRecord } from './json';
+import { EARTH_RADIUS_M } from './shared';
 
 /** Off (no prop, or the session's location not enabled), denied (permission refused), no fix yet, or a fix. */
 export type LocationState = 'off' | 'denied' | 'nofix' | 'fix';
@@ -23,10 +24,6 @@ export interface UserLocation {
 }
 
 export const NO_LOCATION: UserLocation = { state: 'off' };
-
-function finite(value: unknown): value is number {
-    return typeof value === 'number' && isFinite(value);
-}
 
 /**
  * The prop read by the rules of the plan: a position is known when `enabled` is true, `permissionGranted` is not false
@@ -87,8 +84,6 @@ export const LOCATE_ZOOM = 15;
 
 /** The accuracy circle's vertices. */
 export const CIRCLE_VERTICES = 64;
-/** The mean Earth radius, in metres (the circle is drawn on a sphere; at a pad's scale the error is far below a pixel). */
-const EARTH_RADIUS_M = 6371008.8;
 
 /**
  * The accuracy circle as a closed GeoJSON ring of `vertices` points (the first repeated last): `metres` from

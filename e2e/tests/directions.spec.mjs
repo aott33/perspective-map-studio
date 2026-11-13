@@ -16,15 +16,14 @@
 
 import { TRACER, pagePixel } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, clearUnits, ensureSeeded, expect, mapLoaded, openMap, restoreSetupUnits, setUnits, shot, signedInContext, test, useSetupUnits, view, watch
+    EDITOR_USER, clearUnits, ensureSeeded, expect, mapLoaded, openMap, restoreSetupUnits, setUnits, shot, signedInContext, test, useSetupUnits, view,
+    watch, INTERVAL_MS
 } from './fixtures.mjs';
 
 /** Near CTB1 (-105.012, 39.7262), about 432 m north-east of it (as locate.spec.mjs). */
 const YOU = { latitude: 39.729, longitude: -105.0085, accuracy: 40 };
 /** How long the client's position and the page's writes take to reach the map's binding on the dev stack. */
 const BIND_MS = 20_000;
-/** A refresh interval of the dev setup (10 s) plus margin: the alarm reaching the popup. */
-const INTERVAL_MS = 25_000;
 
 const AGENTS = {
     desktop: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',

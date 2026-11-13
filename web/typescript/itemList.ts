@@ -227,7 +227,7 @@ const byName = (a: ListRow, b: ListRow): number =>
     a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }) || a.id.localeCompare(b.id);
 
 /** A field's header words: the first path segment, upper case, "MESA FIELD". */
-export function fieldLabel(field: string): string {
+export function groupFieldLabel(field: string): string {
     return field.toUpperCase() + ' FIELD';
 }
 
@@ -490,7 +490,7 @@ export function groupRows(all: readonly ListRow[], view: ListView): ListItem[] {
     Array.from(fields.keys()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true })).forEach((field) => {
         const f = fields.get(field) as { sites: ListRow[]; wide: ListRow[] };
         const needing = f.sites.concat(f.wide).filter((r) => rank.get(r.id) !== null && rank.get(r.id) !== undefined).length;
-        out.push({ type: 'header', key: 'h:field:' + field, label: fieldLabel(field), right: attention ? attentionLabel(needing) : '', level: 'group' });
+        out.push({ type: 'header', key: 'h:field:' + field, label: groupFieldLabel(field), right: attention ? attentionLabel(needing) : '', level: 'group' });
         const sites = f.sites.slice().sort(ranked);
         // The divider follows the sites needing attention: none of them, no divider (a Field-wide row may still be counted).
         let divided = !attention || !sites.some((r) => rank.get(r.id) !== null && rank.get(r.id) !== undefined);

@@ -50,6 +50,10 @@ The map studio (epic-editing), unreleased. Contract 0.4.0; project setup schema 
 - Migration 3 (entry 11a) adds `before`, `after` (jsonb), `name` and `kind` (text) to `mapstudio_edit`; existing rows are untouched. Like migration 2, `ALTER TABLE` needs the role that **owns the `mapstudio_` tables**: until it runs the map store is unavailable with an error naming `migration 3`, and the store stays at schema 2. Take a backup first ([docs/operations.md](docs/operations.md)).
 - Migration 4 (entry 19b) adds `settings jsonb NOT NULL DEFAULT '{}'` to `mapstudio_project` and widens `mapstudio_edit`'s check on `entity` to take `settings`; existing rows are untouched and every project reads back with no override. Like migrations 2 and 3 it needs the role that **owns the `mapstudio_` tables**: until it runs the map store is unavailable with an error naming `migration 4`, and the store stays at schema 3. A store at schema 2 gets migrations 3 and 4 at one start.
 
+### Development
+
+- Internal cleanup, nothing a user or a page sees (entry 17a): each small helper the studio's surfaces repeated has one home (the sprite URL, the SVG namespace, the phone breakpoint, the earth's radius, `finite`, `same`, `without`, the op prefix, an op's data fields, the "Pick a tag" button, the tab list's markup), helpers of one name with different results are renamed apart (history's `historyWhenText` beside the list's `whenText`, the editing host's `pickUpTool`, `startInstrument` and `dropSelection` beside the model's `pickTool`, `armInstrument` and `clearSelection`, and others), three functions no code called are gone (`selectedId`, `pickPointTool`, `setupKind`), and the e2e helpers copied from spec to spec (`openEditor`, `liveItem`, `pixelNow`, `seqOf`, `selectRow`, `REPLY_MS` and some sixty more) live in `e2e/tests/fixtures.mjs`.
+
 ## 0.3.0
 
 Everyone reads live state from the map (epic-viewing). Contract 0.3.0; project setup schema 1; map store schema 2 (both unchanged, so no migration). Requires Ignition 8.3 and a PostgreSQL connection per project, as 0.2.0.

@@ -1,5 +1,5 @@
 import {
-    CONNECTED, CONNECTION_POLL_MS, ConnectionWatch, NO_CONNECTION, RECONNECTING, clockText, connectionChipText, connectionDetailText
+    CONNECTED, CONNECTION_POLL_MS, ConnectionWatch, NO_CONNECTION, RECONNECTING, clockTextAt as clockText, connectionChipText, connectionDetailText
 } from '../connection';
 
 const AT = new Date(2026, 10, 2, 14, 2, 30).getTime();

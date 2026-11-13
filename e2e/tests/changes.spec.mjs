@@ -9,25 +9,8 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { screenshotDir } from '../lib/env.mjs';
 import {
-    EDITOR_USER, OPERATOR_USER, drawLine, editorTest, expect, mapLoaded, nextFrames, openMap, signedInContext, watch
+    EDITOR_USER, OPERATOR_USER, drawLine, editorTest, expect, mapLoaded, nextFrames, openMap, signedInContext, watch, PUSH_MS, changedFrames
 } from './fixtures.mjs';
-
-/** The story's bound: a saved edit is on the other open map within 5 s. */
-const PUSH_MS = 5_000;
-
-/** Collect the text of every websocket frame the page receives that holds a map.changed. */
-function changedFrames(page) {
-    const frames = [];
-    page.on('websocket', (ws) => {
-        ws.on('framereceived', (f) => {
-            const text = typeof f.payload === 'string' ? f.payload : f.payload.toString('utf8');
-            if (text.includes('map.changed')) {
-                frames.push(text);
-            }
-        });
-    });
-    return frames;
-}
 
 /** A "setup" key in a frame, whether the message is sent as JSON or as an escaped JSON string. */
 const SETUP_KEY = /\\*"setup\\*"\s*:/;

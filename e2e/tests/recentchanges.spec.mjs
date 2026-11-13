@@ -3,37 +3,12 @@
 // second dev map editor (mapeditor2) in its own 1366 px browser with History open too, saving through its own session
 // (window.__mapStudioTest), so each sees the other's change, its own put back, and the revert listed first. Every item a test makes is gone at its end (its edit rows stay: the record keeps every change).
 
-import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { e2eProject } from '../lib/env.mjs';
 import {
-    EDITOR2_USER, EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, send, shot, signedInContext
+    EDITOR2_USER, EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, send, shot, signedInContext, REPLY_MS, saved, del, update, batch,
+    point, sql, create
 } from './fixtures.mjs';
-
-const REPLY_MS = 20_000;
-const PSQL = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'ops', 'psql.sh');
-
-/** One statement on the dev map store as its owner role (ops/psql.sh); the first line of its output. */
-function sql(statement) {
-    const run = spawnSync('bash', [PSQL, '-v', 'ON_ERROR_STOP=1', '-At', '-c', statement], { encoding: 'utf8', timeout: 60_000 });
-    if (run.status !== 0) {
-        throw new Error('psql failed: ' + (run.stderr || '').trim());
-    }
-    return run.stdout.trim().split('\n')[0];
-}
-
-const batch = (...ops) => ({ batchId: randomUUID(), ops });
-const point = (c) => ({ type: 'Point', coordinates: c });
-const create = (id, data) => ({ op: 'create', entity: 'item', id, baseVersion: 0, data });
-const update = (id, baseVersion, data) => ({ op: 'update', entity: 'item', id, baseVersion, data });
-const del = (id, baseVersion) => ({ op: 'delete', entity: 'item', id, baseVersion });
-
-function saved(reply) {
-    expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
-    return reply.body;
-}
 
 /** The stored record of a map item, or undefined (the map as `page`'s session loads it). */
 async function stored(page, id) {

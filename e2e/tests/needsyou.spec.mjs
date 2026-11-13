@@ -17,38 +17,21 @@
 import { randomUUID } from 'node:crypto';
 import { TRACER } from '../lib/geo.mjs';
 import {
-    DRAW_MS, EDITOR_USER, editorTest, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot, signedInContext, test, view
+    DRAW_MS, EDITOR_USER, editorTest, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot, signedInContext, test, view, liveItem,
+    legendPanel, legendButton, press, bar, INTERVAL_MS
 } from './fixtures.mjs';
 
-/** The bound for a change to reach the map: one refresh interval (the dev setup's 10 s) plus margin. */
-const INTERVAL_MS = 25_000;
 /** How long a redraw or a popup after a choice may take on the dev stack. */
 /** Where the three tracer points are all in view at zoom 14. */
 const TRACER_VIEW = { center: TRACER.center, zoom: 14 };
 
 let ids;
 
-const bar = (page) => page.locator('.mapstudio-needs');
 const panel = (page) => page.locator('.mapstudio-needs-panel');
 const rows = (page) => page.locator('.mapstudio-needs-row');
 // The point's default popup: the card at 1440 px, the bottom sheet below 768 px (entry 8).
 const popup = (page) => page.locator('.maplibregl-popup .mapstudio-popup--default, .mapstudio-sheet .mapstudio-popup--default');
-const legendButton = (page) => page.locator('.mapstudio-legend-button');
-const legendPanel = (page) => page.locator('.mapstudio-legend-panel');
 const toggle = (page, name) => page.locator('.mapstudio-legend-toggle[data-toggle="' + name + '"]');
-const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
-
-/** Press a /live dev button and return its result (the label changes on every press, ranAt included). */
-async function press(page, button) {
-    const out = page.locator('#mapstudio-live-result');
-    const before = await out.innerText();
-    await page.locator('#mapstudio-live-' + button).click();
-    await expect.poll(() => out.innerText(), { timeout: 30_000 }).not.toBe(before);
-    const result = JSON.parse(await out.innerText());
-    expect(result.error, 'the dev button ' + button).toBeUndefined();
-    expect(result.refused, 'the dev button ' + button).toBeUndefined();
-    return result;
-}
 
 /** Link a map item to an asset (or to none with null) through the component's real session path, as the editor. */
 async function link(page, id, assetId) {

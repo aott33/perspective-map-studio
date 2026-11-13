@@ -69,8 +69,6 @@ export const LAYER_ITEM_MARKERS = 'mapstudio-items-marker';
 export const LAYER_ARROW = 'mapstudio-arrow';
 /** How far apart the flow arrows sit along the selected line (item 22), in px. */
 const ARROW_SPACING_PX = 250;
-/** The served sprite the marker images are drawn from (docs/icons.md). */
-export const SPRITE_URL = '/res/mapstudio/icons/mapstudio-icons.svg';
 /** The served glyphs the text layers are set in (web/scripts/glyphs.mjs, docs/icons.md). */
 export const GLYPHS_URL = '/res/mapstudio/glyphs/{fontstack}/{range}.pbf';
 /** The chip's text offset, quantised to steps of this many ems for the data-driven text-offset. */

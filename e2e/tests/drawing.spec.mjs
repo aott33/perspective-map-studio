@@ -9,18 +9,12 @@
 // Undo is the toolbar's. Screenshots at 1366 px for the docs (AD-15).
 
 import { randomUUID } from 'node:crypto';
-import { TRACER, pagePixel } from '../lib/geo.mjs';
+import { TRACER } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, VERTEX_PAUSE_MS, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, send, shot, signedInContext, test, view
+    EDITOR_USER, VERTEX_PAUSE_MS, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, send, shot, signedInContext, test, view,
+    REPLY_MS, CTB1, SWD1, UUID, openEditor, pixelNow
 } from './fixtures.mjs';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-/** The Gateway's answer to a save. */
-const REPLY_MS = 20_000;
-
-// The L-SWD set's pads (ops/project seed, epic 3 entry 2): CTB1 and SWD1, 2.9 km apart, both in view at zoom 13.
-const CTB1 = [-105.012, 39.7262];
-const SWD1 = [-104.983671, 39.715476];
 const SWD_VIEW = { center: [(CTB1[0] + SWD1[0]) / 2, (CTB1[1] + SWD1[1]) / 2], zoom: 13 };
 // The tracer's view, where the ground north of Point 2 is clear of every seeded item at zoom 12.
 const TRACER_VIEW = { center: TRACER.center, zoom: TRACER.zoom };
@@ -38,23 +32,6 @@ test.beforeAll(async ({ browser }) => {
         await context.close();
     }
 });
-
-async function openEditor(page) {
-    const map = await openMap(page, '/edit');
-    await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
-    await mapLoaded(map);
-    await expect(map).toHaveAttribute('data-edit-level', 'full');
-    await expect(map).toHaveAttribute('data-studio', 'on');
-    return map;
-}
-
-/** The map's page pixel of a place, from the box and the view the map reports now (the stage resizes as panels open). */
-async function pixelNow(map, lngLat) {
-    const box = await map.boundingBox();
-    const center = (await map.getAttribute('data-center')).split(',').map(Number);
-    const zoom = Number(await map.getAttribute('data-zoom'));
-    return pagePixel(box, lngLat, center, zoom);
-}
 
 /** A page pixel `dx` from the map's centre and `fromTop` below its top edge now (under the toolbar on the top row, clear of the controls). */
 async function spot(map, dx, fromTop) {

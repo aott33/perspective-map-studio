@@ -14,35 +14,23 @@
 import { pagePixel } from '../lib/geo.mjs';
 import { frameText } from '../lib/valueBatch.mjs';
 import {
-    EDITOR_USER, VERTEX_PAUSE_MS, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot as shotNow,
-    signedInContext, test, view
+    EDITOR_USER, VERTEX_PAUSE_MS, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shotSettled as shot, signedInContext,
+    test, view, REPLY_MS, NOTHING_MS, CTB1, SWD1, BEND, CTB1_VIEW, pixelNow, seqOf, storedAll, insideRing, expectStageWidth, expectDetails,
+    expectNoPopup, drag, SWD_VIEW
 } from './fixtures.mjs';
 
-/** The Gateway's answer to a save, or a message reaching the socket. */
-const REPLY_MS = 20_000;
 /** A popup's content (the default popup reads the item's live values) may take a moment on the dev stack. */
 const POPUP_MS = 30_000;
-/** There is nothing to observe when nothing is sent: the time a stray message would have to show on the socket. */
-const NOTHING_MS = 800;
 /** The map's width at 1366 px with the rail and the list docked, and with the properties panel too (DESIGN.md spacing). */
 const STAGE = 1366 - 72 - 256;
 const STAGE_WITH_PANEL = STAGE - 320;
 
-// The L-SWD set and the shared pads (ops/project seed): CTB1, L-SWD's bend and SWD1; Shared A of the two pads 15 m apart.
-const CTB1 = [-105.012, 39.7262];
-const BEND = [-105.009441, 39.720791];
-const SWD1 = [-104.983671, 39.715476];
 const SHARED_A = [-104.965, 39.757];
 /** Point 2 of the tracer, linked to the dev asset P14. */
 const P14 = [-104.975, 39.75];
 /** The North fence (an area: four points, its category tint; epic 3 entry 1), clear of every point and line inside. */
 const FENCE_INSIDE = [-104.992, 39.732];
 const FENCE_VIEW = { center: FENCE_INSIDE, zoom: 15 };
-// The line in view with Details docked, its handles apart (as delete.spec.mjs and geometry.spec.mjs view it). CTB1 is then about
-// 290 px into the 1038 px stage: under the panel's 320 px strip once Details docks.
-const SWD_VIEW = { center: [(CTB1[0] + SWD1[0]) / 2, (CTB1[1] + SWD1[1]) / 2 + 0.001], zoom: 13.5 };
-// CTB1 in the stage's middle at zoom 15, a full disc: still in the stage, under the pointer, once Details docks.
-const CTB1_VIEW = { center: CTB1, zoom: 15 };
 /** The margin an item the docked panel covered is brought to inside the stage (selection.tsx IN_VIEW_MARGIN_PX). */
 const IN_VIEW_MARGIN = 48;
 
@@ -109,14 +97,6 @@ async function viewMode(page, map) {
     await expectStageWidth(map, 1366);
 }
 
-/** The map's page pixel of a place, from the box and the view the map reports now (the stage resizes as panels open). */
-async function pixelNow(map, lngLat) {
-    const box = await map.boundingBox();
-    const center = (await map.getAttribute('data-center')).split(',').map(Number);
-    const zoom = Number(await map.getAttribute('data-zoom'));
-    return pagePixel(box, lngLat, center, zoom);
-}
-
 /** A page pixel on L-SWD's body, a tenth of the way from its bend to SWD1: clear of its handles and of its instruments. */
 async function onLine(map) {
     const a = await pixelNow(map, BEND);
@@ -163,30 +143,6 @@ async function groundSpot(page, map) {
     throw new Error('No ground spot clear of the seeded items in this view.');
 }
 
-/** Whether a pixel is inside a ring of pixels (the even-odd rule; the ring unclosed, as an area is stored). */
-function insideRing([x, y], ring) {
-    let inside = false;
-    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-        const [xi, yi] = ring[i];
-        const [xj, yj] = ring[j];
-        if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-    }
-    return inside;
-}
-
-/** Wait until the stage has the width the docked panels leave it (the map resizes after a panel opens or closes). */
-async function expectStageWidth(map, width) {
-    await expect.poll(async () => Math.round((await map.boundingBox()).width), { timeout: 10_000 }).toBe(width);
-}
-
-/** No popup of any kind: no card, no line popup, no sheet, no pick list. */
-async function expectNoPopup(page, map) {
-    await expect(map).toHaveAttribute('data-popup-mode', '');
-    await expect(map).toHaveAttribute('data-pick-open', 'false');
-    await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
-    await expect(page.locator('.mapstudio-sheet')).toHaveCount(0);
-}
-
 /** The page's window on the selection (the dev page's labels of `selectedItem` and of the last `onItemSelected`). */
 async function expectPageSelection(page, id, name, kind) {
     await expect(page.locator('#mapstudio-dev-selected')).toHaveText('selectedItem: ' + id, { timeout: REPLY_MS });
@@ -199,40 +155,7 @@ function expectSamePixel(actual, expected, what) {
     expect(Math.abs(actual[1] - expected[1]), what + ' y').toBeLessThanOrEqual(1);
 }
 
-/** The item selected with its Details open beside the map. */
-async function expectDetails(page, map, id, name) {
-    await expect(map).toHaveAttribute('data-selected', id);
-    const panel = page.locator('.mapstudio-panel');
-    await expect(panel).toHaveAttribute('data-item-id', id);
-    await expect(panel.locator('.mapstudio-panel-name')).toHaveText(name);
-}
-
-/** A drag by the pointer, in a few moves, so Terra Draw and MapLibre see a drag and not a click. */
-async function drag(page, from, to) {
-    await page.mouse.move(from[0], from[1]);
-    await page.mouse.move(from[0] + 1, from[1] + 1);
-    await page.mouse.down();
-    await page.mouse.move(from[0] + (to[0] - from[0]) * 0.25, from[1] + (to[1] - from[1]) * 0.25, { steps: 4 });
-    await page.mouse.move(to[0], to[1], { steps: 8 });
-    await page.mouse.up();
-}
-
-/** The stored map items through the test hook, by id. */
-async function storedAll(page) {
-    return Object.fromEntries((await send(page, 'map.load', {})).body.items.map((i) => [i.id, i]));
-}
-
-async function seqOf(map) {
-    return Number(await map.getAttribute('data-store-seq'));
-}
-
 const same = (a, b) => Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6;
-
-/** A render for the docs once the markers have taken the view's zoom. */
-async function shot(page, name) {
-    await page.waitForTimeout(800);
-    await shotNow(page, name);
-}
 
 test.describe('1366 px', () => {
     test.use({ viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1 });

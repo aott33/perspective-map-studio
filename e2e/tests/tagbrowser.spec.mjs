@@ -13,13 +13,12 @@
 import { randomUUID } from 'node:crypto';
 import { setTagProviderEnabled } from '../lib/gateway.mjs';
 import { TRACER } from '../lib/geo.mjs';
+import { EVENT_FIRED, firedEvent } from '../lib/sockets.mjs';
 import {
-    EDITOR2_USER, EDITOR_USER, OPERATOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot, signedInContext, test
+    EDITOR2_USER, EDITOR_USER, OPERATOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot,
+    signedInContext, test, REPLY_MS, openEditor, setupOf, settled, field, input
 } from './fixtures.mjs';
 
-/** The Gateway's answer to a lookup or a save. */
-const REPLY_MS = 20_000;
-const EVENT_FIRED = 'event-fired:';
 const ROLE_WORDS = 'Browsing tags needs a full editing role. Ask for a Map Studio editing role.';
 const STOPPED_WORDS = 'The tag provider Site2 is on this Gateway but does not answer; it is stopped or faulted. '
     + "Start it on the Gateway's tag provider page.";
@@ -35,13 +34,6 @@ test.afterAll(async ({ browser }) => {
     await setTagProviderEnabled('Site2', true);
     await restore(browser);
 });
-
-/** The stored kind setup record of a kind through the test hook, or undefined. */
-async function setupOf(page, kindId) {
-    const reply = await send(page, 'map.load', {});
-    expect(reply.type, JSON.stringify(reply.body)).toBe('map.load.reply');
-    return (reply.body.kindSetups || []).find((k) => k.kindId === kindId && !k.deleted);
-}
 
 /** The seed's own items and kind setups again, no stray item and no Meter setup. */
 async function restore(browser) {
@@ -62,15 +54,6 @@ async function restore(browser) {
     }
 }
 
-async function openEditor(page) {
-    const map = await openMap(page, '/edit');
-    await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
-    await mapLoaded(map);
-    await expect(map).toHaveAttribute('data-edit-level', 'full');
-    await expect(map).toHaveAttribute('data-studio', 'on');
-    return map;
-}
-
 /** Kinds opened from the rail on a kind, with the preview item chosen when one is named (a seed key). */
 async function openKind(page, map, kindId, previewKey) {
     await page.locator('.mapstudio-rail-item[data-surface="kinds"]').click();
@@ -85,21 +68,12 @@ async function openKind(page, map, kindId, previewKey) {
     return panel;
 }
 
-const field = (page, id) => page.locator('.mapstudio-kindsetup [data-field="' + id + '"]');
-const input = (page, id) => field(page, id).locator('input[type="text"]');
 const tagButton = (page, tagFor) => page.locator('.mapstudio-kindsetup .mapstudio-tag-button[data-tag-for="' + tagFor + '"]');
 const card = (page) => page.locator('.mapstudio-tagbrowser');
 const row = (page, path) => card(page).locator('.mapstudio-tag-row[data-path="' + path + '"]');
 const note = (page) => card(page).locator('.mapstudio-tagbrowser-note');
 const use = (page) => card(page).locator('.mapstudio-tagbrowser-use');
-const saveWords = (page) => page.locator('.mapstudio-kinds .mapstudio-panel-save');
 const focusedPath = (page) => page.evaluate(() => (document.activeElement ? document.activeElement.getAttribute('data-path') : null));
-
-/** The panel has nothing on its way and the header says Saved. */
-async function settled(page) {
-    await expect(page.locator('.mapstudio-kindsetup')).toHaveAttribute('data-saving', '', { timeout: REPLY_MS });
-    await expect(saveWords(page)).toHaveText('Saved', { timeout: REPLY_MS });
-}
 
 /** The card opened from a tag button, its tree loaded at the asset folder (or the top level). */
 async function openCard(page, tagFor) {
@@ -113,17 +87,6 @@ async function openCard(page, tagFor) {
 /** A folder's chevron pressed: it opens (or closes) without being picked. */
 async function toggle(page, path) {
     await row(page, path).locator('.mapstudio-tag-chevron').click();
-}
-
-/** The Gateway's reply as Perspective delivers it (lib/sockets.mjs): a text frame `event-fired:` and JSON whose `event` is the envelope. */
-function firedEvent(message) {
-    if (typeof message !== 'string' || !message.startsWith(EVENT_FIRED)) return null;
-    try {
-        const frame = JSON.parse(message.slice(EVENT_FIRED.length));
-        return frame && frame.event && typeof frame.event.type === 'string' ? frame : null;
-    } catch (err) {
-        return null;
-    }
 }
 
 /**

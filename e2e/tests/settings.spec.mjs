@@ -5,28 +5,14 @@
 // (units.spec.mjs): the map carries it for tests as data-units-override ("system,labels,version", '' with no override). Each
 // test leaves the store without an override.
 
-import { randomUUID } from 'node:crypto';
 import {
-    EDITOR2_USER, EDITOR_USER, OPERATOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, send, shot, signedInContext
+    EDITOR2_USER, EDITOR_USER, OPERATOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, send, shot, signedInContext, REPLY_MS, load,
+    saved, batch, changedFrames
 } from './fixtures.mjs';
 
-const REPLY_MS = 20_000;
-
-const batch = (...ops) => ({ batchId: randomUUID(), ops });
 const unitsOp = (op, baseVersion, data) => (data === undefined
     ? { op, entity: 'settings', id: 'units', baseVersion }
     : { op, entity: 'settings', id: 'units', baseVersion, data });
-
-async function load(page) {
-    const reply = await send(page, 'map.load', {});
-    expect(reply.type, JSON.stringify(reply.body)).toBe('map.load.reply');
-    return reply.body;
-}
-
-function saved(reply) {
-    expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
-    return reply.body;
-}
 
 function refused(reply, code) {
     expect(reply.type, JSON.stringify(reply.body)).toBe('error');
@@ -72,20 +58,6 @@ async function openSecond(browser, user, level, viewport) {
     await mapLoaded(map);
     await expect(map).toHaveAttribute('data-edit-level', level);
     return { context, page, map };
-}
-
-/** Collect the text of every websocket frame the page receives that holds a map.changed. */
-function changedFrames(page) {
-    const frames = [];
-    page.on('websocket', (ws) => {
-        ws.on('framereceived', (f) => {
-            const text = typeof f.payload === 'string' ? f.payload : f.payload.toString('utf8');
-            if (text.includes('map.changed')) {
-                frames.push(text);
-            }
-        });
-    });
-    return frames;
 }
 
 async function openHistory(page) {

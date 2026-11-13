@@ -11,11 +11,9 @@ import { randomUUID } from 'node:crypto';
 import { TRACER } from '../lib/geo.mjs';
 import { DOWN_MESSAGE, openGate, routeSockets } from '../lib/sockets.mjs';
 import {
-    EDITOR_USER, chipLines, drawLine, editorTest, expect, mapLoaded, nextFrames, openMap, send, shot, test, watch
+    EDITOR_USER, chipLines, drawLine, editorTest, expect, mapLoaded, nextFrames, openMap, send, shot, test, storedQueue, lossTest
 } from './fixtures.mjs';
 
-const PROJECT = 'mapstudio-dev';
-const KEY = `mapstudio.unsaved.v1:${PROJECT}:${EDITOR_USER}`;
 /** The component's reply timeout is 15 s, its load retry and replay every 15 s; an assertion waits a little longer. */
 const RETRY_MS = 35_000;
 /** The Gateway's sentence for a setup it cannot read (setup.spec.mjs makes the real one). */
@@ -23,22 +21,6 @@ const SETUP = 'The Map Studio setup of project mapstudio-dev cannot be read: ref
 const READ_ONLY = 'The map store was upgraded by a newer Map Studio (schema 999, this module knows 2); saving is off until the module is upgraded.';
 /** How long the simulated loss lasts (the client's `__client.simulateLostConnection`). */
 const LOST_S = 6;
-
-/**
- * The client logs its own failed reconnect attempts while a lost connection is simulated ("Hello API call failed ...
- * Simulated disconnect", as connection.spec.mjs and studio.spec.mjs filter them); any other console or page error fails.
- */
-const SIMULATED = /Simulated disconnect/;
-const lossTest = editorTest.extend({
-    watched: [
-        async ({ page }, use) => {
-            const w = watch(page);
-            await use(w);
-            expect(w.errors.filter((e) => !SIMULATED.test(e)), 'browser console and page errors').toEqual([]);
-        },
-        { auto: true }
-    ]
-});
 
 const row = (page) => page.locator('.mapstudio-panel-save--row');
 const chip = (page) => page.locator('.mapstudio-chip');
@@ -49,11 +31,6 @@ async function openEditor(page) {
     await mapLoaded(map);
     await expect(map).toHaveAttribute('data-studio', 'on');
     return map;
-}
-
-/** The queue as stored for the map editor. */
-async function storedQueue(page) {
-    return page.evaluate((key) => JSON.parse(window.localStorage.getItem(key) || '[]'), KEY);
 }
 
 /**

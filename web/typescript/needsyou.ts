@@ -236,7 +236,7 @@ export function barModel(summary: NeedsYouSummary, unknown: boolean): BarModel {
         counts.push({ kind: 'stale', glyph: 'stale', n: String(summary.counts.stale) });
     }
     const n = total(summary.counts);
-    return { state: n === 0 ? 'ok' : 'needs', label: summaryText(summary.counts), bell: look.tone, counts };
+    return { state: n === 0 ? 'ok' : 'needs', label: needsYouSummaryText(summary.counts), bell: look.tone, counts };
 }
 
 /**
@@ -344,7 +344,7 @@ export function countParts(counts: NeedsYouCounts): Array<{ kind: NeedsYouState;
 }
 
 /** The whole bar as one line for the hover title and screen readers: "Needs you 3: 1 alarm, 1 comms lost, 1 stale", or the quiet line. */
-export function summaryText(counts: NeedsYouCounts): string {
+export function needsYouSummaryText(counts: NeedsYouCounts): string {
     const n = total(counts);
     if (n === 0) {
         return BAR_QUIET;

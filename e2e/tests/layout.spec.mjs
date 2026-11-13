@@ -15,14 +15,10 @@
 
 import { pagePixel } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, VERTEX_PAUSE_MS, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, signedInContext, test,
-    view
+    EDITOR_USER, VERTEX_PAUSE_MS, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, signedInContext, test, view,
+    REPLY_MS, CTB1, BEND, CTB1_VIEW, INSET, openEditor, pixelNow, insideRing, expectStageWidth
 } from './fixtures.mjs';
 
-/** The Gateway's answer to a save. */
-const REPLY_MS = 20_000;
-/** The floating controls' inset from the map's edge (DESIGN.md spacing map-inset). */
-const INSET = 12;
 /** The App Bar clearance kept at the stage's bottom-right corner (DESIGN.md spacing app-bar-clearance). */
 const APP_BAR_CLEARANCE = 76;
 /** The margin an item the docked panel covered is brought to inside the stage (selection.tsx IN_VIEW_MARGIN_PX). */
@@ -32,11 +28,6 @@ const KEPT_PX = 2;
 const RAIL = 72;
 /** A moment for MapLibre to place its symbols again after the stage changed size, before a marker is clicked. */
 const SETTLE_MS = 1000;
-
-// The L-SWD set (ops/project seed): CTB1 and L-SWD's bend; CTB1 in the stage's middle at zoom 15.
-const CTB1 = [-105.012, 39.7262];
-const BEND = [-105.009441, 39.720791];
-const CTB1_VIEW = { center: CTB1, zoom: 15 };
 
 /** Each width's panels (DESIGN.md spacing): the list and the properties panel; below 1280 px the list is not docked. */
 const WIDTHS = { 1440: { height: 900, list: 280, panel: 340 }, 1366: { height: 768, list: 256, panel: 320 }, 1200: { height: 768, list: 0, panel: 320 } };
@@ -64,29 +55,6 @@ async function restoreSeed(browser) {
     } finally {
         await context.close();
     }
-}
-
-/** /edit as the map editor at level `full`: the studio shows. */
-async function openEditor(page) {
-    const map = await openMap(page, '/edit');
-    await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
-    await mapLoaded(map);
-    await expect(map).toHaveAttribute('data-edit-level', 'full');
-    await expect(map).toHaveAttribute('data-studio', 'on');
-    return map;
-}
-
-/** Wait until the stage has the width the docked panels leave it. */
-async function expectStageWidth(map, width) {
-    await expect.poll(async () => Math.round((await map.boundingBox()).width), { timeout: 10_000 }).toBe(width);
-}
-
-/** The map's page pixel of a place, from the box and the view the map reports now. */
-async function pixelNow(map, lngLat) {
-    const box = await map.boundingBox();
-    const center = (await map.getAttribute('data-center')).split(',').map(Number);
-    const zoom = Number(await map.getAttribute('data-zoom'));
-    return pagePixel(box, lngLat, center, zoom);
 }
 
 /** A page pixel where it was, to `KEPT_PX`. */
@@ -133,17 +101,6 @@ async function groundSpots(page, map, { minX = 80, maxX = Infinity, count = 1 } 
         }
     }
     throw new Error('No ground spot clear of the seeded items in this view.');
-}
-
-/** Whether a pixel is inside a ring of pixels (the even-odd rule; the ring unclosed, as an area is stored). */
-function insideRing([x, y], ring) {
-    let inside = false;
-    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-        const [xi, yi] = ring[i];
-        const [xj, yj] = ring[j];
-        if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-    }
-    return inside;
 }
 
 /** The stored item, by id, once its create has saved. */

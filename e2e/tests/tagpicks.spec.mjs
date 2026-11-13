@@ -15,13 +15,10 @@ import { randomUUID } from 'node:crypto';
 import { setTagProviderEnabled } from '../lib/gateway.mjs';
 import { TRACER } from '../lib/geo.mjs';
 import {
-    EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot, signedInContext, test
+    EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot, signedInContext, test, REPLY_MS, NOTHING_MS,
+    openEditor, seqOf, selectRow, expectNothingSent, setupOf, stored, settled, undo, field, input
 } from './fixtures.mjs';
 
-/** The Gateway's answer to a lookup or a save. */
-const REPLY_MS = 20_000;
-/** There is nothing to observe when nothing is sent: the time a stray batch would have to show in the map's seq. */
-const NOTHING_MS = 800;
 /** A spot for the item this spec makes through the test hook, out of the tracer's view. */
 const AWAY = [-104.82, 39.66];
 const P14 = '[default]Mesa/P14';
@@ -40,18 +37,6 @@ test.afterAll(async ({ browser }) => {
     await setTagProviderEnabled('Site2', true);
     await restore(browser);
 });
-
-/** The stored kind setup record of a kind through the test hook, or undefined. */
-async function setupOf(page, kindId) {
-    const reply = await send(page, 'map.load', {});
-    expect(reply.type, JSON.stringify(reply.body)).toBe('map.load.reply');
-    return (reply.body.kindSetups || []).find((k) => k.kindId === kindId && !k.deleted);
-}
-
-/** The stored record of a live map item through the test hook, or undefined. */
-async function stored(page, id) {
-    return (await send(page, 'map.load', {})).body.items.find((i) => i.id === id && !i.deleted);
-}
 
 /** The seed's own items and kind setups again (Point 2's own rule among them), no override left on another seed item, no stray item. */
 async function restore(browser) {
@@ -75,15 +60,6 @@ async function restore(browser) {
     }
 }
 
-async function openEditor(page) {
-    const map = await openMap(page, '/edit');
-    await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
-    await mapLoaded(map);
-    await expect(map).toHaveAttribute('data-edit-level', 'full');
-    await expect(map).toHaveAttribute('data-studio', 'on');
-    return map;
-}
-
 /** Kinds opened from the rail on a kind, with the preview item chosen (a seed key). */
 async function openKind(page, map, kindId, previewKey) {
     await page.locator('.mapstudio-rail-item[data-surface="kinds"]').click();
@@ -96,8 +72,6 @@ async function openKind(page, map, kindId, previewKey) {
     return panel;
 }
 
-const field = (page, id) => page.locator('.mapstudio-kindsetup [data-field="' + id + '"]');
-const input = (page, id) => field(page, id).locator('input[type="text"]');
 const kindTag = (page, tagFor) => page.locator('.mapstudio-kindsetup .mapstudio-tag-button[data-tag-for="' + tagFor + '"]');
 const itemTag = (page, tagFor) => page.locator('.mapstudio-panel .mapstudio-tag-button[data-tag-for="' + tagFor + '"]');
 const card = (page) => page.locator('.mapstudio-tagbrowser');
@@ -106,17 +80,9 @@ const treeRow = (page, path) => card(page).locator('.mapstudio-tag-row[data-path
 const pathField = (page) => card(page).locator('.mapstudio-tagbrowser-path input');
 const note = (page) => card(page).locator('.mapstudio-tagbrowser-note');
 const use = (page) => card(page).locator('.mapstudio-tagbrowser-use');
-const saveWords = (page) => page.locator('.mapstudio-kinds .mapstudio-panel-save');
 const section = (page) => page.locator('.mapstudio-kindsetup [data-section="styleRule"]');
-const undo = (page) => page.locator('.mapstudio-toolbar .mapstudio-undo');
 const liveRow = (page, id) => page.locator('.mapstudio-panel .mapstudio-livenow .mapstudio-livenow-row[data-row="' + id + '"]');
 const style = (page) => page.locator('.mapstudio-panel .mapstudio-style');
-
-/** The kind's panel has nothing on its way and the header says Saved. */
-async function settled(page) {
-    await expect(page.locator('.mapstudio-kindsetup')).toHaveAttribute('data-saving', '', { timeout: REPLY_MS });
-    await expect(saveWords(page)).toHaveText('Saved', { timeout: REPLY_MS });
-}
 
 /** The card opened from a tag button, its tree loaded. */
 async function openCard(page, button, tagFor) {
@@ -132,27 +98,12 @@ async function toggle(page, path) {
     await treeRow(page, path).locator('.mapstudio-tag-chevron').click();
 }
 
-async function seqOf(map) {
-    return Number(await map.getAttribute('data-store-seq'));
-}
-
 /** One override saved as one batch: Undo names its step, and the map's seq moved on by exactly one. */
 async function expectOneBatch(page, map, seqBefore, step) {
     await expect(undo(page)).toHaveAttribute('data-step', 'Undo: ' + step, { timeout: REPLY_MS });
     await expect(map).toHaveAttribute('data-store-seq', String(seqBefore + 1), { timeout: REPLY_MS });
     await page.waitForTimeout(500);
     await expect(map).toHaveAttribute('data-store-seq', String(seqBefore + 1));
-}
-
-async function expectNothingSent(page, map, seqBefore) {
-    await page.waitForTimeout(NOTHING_MS);
-    await expect(map).toHaveAttribute('data-store-seq', String(seqBefore));
-}
-
-/** A list row clicked: the item selected with its Details open. */
-async function selectRow(page, id) {
-    await page.locator('.mapstudio-list-row[data-item-id="' + id + '"]').click();
-    await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', id);
 }
 
 editorTest.describe('the tag browser for the style rule, popup params and one item, and the typed Path field, at 1366 px', () => {

@@ -14,7 +14,8 @@ export const SHARED_M = 20;
  * 44 px hit area, so a close zoom shows each item where it is (two items 15 m apart split from zoom 18).
  */
 export const MARKER_APART_PX = 44;
-const EARTH_RADIUS_M = 6371008.8;
+/** The mean Earth radius Turf measures with, in metres: the haversine distances, the sweep's window and the accuracy circle use it. */
+export const EARTH_RADIUS_M = 6371008.8;
 /** Metres per degree of latitude, for the sweep's window. */
 const M_PER_DEG_LAT = (Math.PI / 180) * EARTH_RADIUS_M;
 /** The equator's length in metres, for the ground distance a pixel covers. */

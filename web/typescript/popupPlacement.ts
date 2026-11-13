@@ -145,7 +145,7 @@ export interface CameraPadding {
  * and an open card's own side (`card`, with its anchor) so a Return keeps it in view. Each side is
  * capped at 45 % of the map, so the visible area never closes.
  */
-export function cameraPadding(width: number, height: number, controls: { topBar: Rect | null; zoomCard: Rect | null; bottomRow: Rect | null },
+export function paddingFor(width: number, height: number, controls: { topBar: Rect | null; zoomCard: Rect | null; bottomRow: Rect | null },
                               sheet: Rect | null, card: { rect: Rect; anchor: PopupAnchor } | null): CameraPadding {
     const gap = PLACEMENT_MARGIN_PX;
     let top = controls.topBar ? controls.topBar.y + controls.topBar.h + gap : 0;

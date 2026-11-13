@@ -8,23 +8,13 @@
 // viewer no handles, no bar and no Move. Renders of the four mocked states for the docs under E2E_DOCS=1 (AD-15). The spec leaves the seed as it found it
 // (each change undone, then the seed run again and the strays removed), since later specs read L-SWD.
 
-import { pagePixel } from '../lib/geo.mjs';
 import { randomUUID } from 'node:crypto';
 import {
-    EDITOR_USER, OPERATOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot as shotNow, signedInContext,
-    test, view
+    EDITOR_USER, OPERATOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shotSettled as shot, signedInContext,
+    test, view, REPLY_MS, CTB1, SWD1, BEND, openEditor, pixelNow, seqOf, expectOneBatch, storedAll, undoOnce, drag, endsAre, SWD_VIEW
 } from './fixtures.mjs';
 
-/** The Gateway's answer to a save. */
-const REPLY_MS = 20_000;
-
-// The L-SWD set (ops/project seed): its three points, the first on CTB1 and the last on SWD1, and its instruments.
-const CTB1 = [-105.012, 39.7262];
-const BEND = [-105.009441, 39.720791];
-const SWD1 = [-104.983671, 39.715476];
 const SWD_LINE = [CTB1, BEND, SWD1];
-// The line in view with Details docked (718 px of map at 1366 px), large enough that every handle is apart from the next.
-const SWD_VIEW = { center: [(CTB1[0] + SWD1[0]) / 2, (CTB1[1] + SWD1[1]) / 2 + 0.001], zoom: 13.5 };
 // The North fence (four points, epic 3 entry 1) and a view of it.
 const FENCE_VIEW = { center: [-104.992, 39.732], zoom: 15 };
 
@@ -56,23 +46,6 @@ async function restoreSeed(browser) {
     }
 }
 
-async function openEditor(page) {
-    const map = await openMap(page, '/edit');
-    await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
-    await mapLoaded(map);
-    await expect(map).toHaveAttribute('data-edit-level', 'full');
-    await expect(map).toHaveAttribute('data-studio', 'on');
-    return map;
-}
-
-/** The map's page pixel of a place, from the box and the view the map reports now (the stage resizes as panels open). */
-async function pixelNow(map, lngLat) {
-    const box = await map.boundingBox();
-    const center = (await map.getAttribute('data-center')).split(',').map(Number);
-    const zoom = Number(await map.getAttribute('data-zoom'));
-    return pagePixel(box, lngLat, center, zoom);
-}
-
 /** The place under a page pixel, from the view the map reports now (Web Mercator, as MapLibre). */
 async function placeAt(map, [x, y]) {
     const box = await map.boundingBox();
@@ -86,48 +59,6 @@ async function placeAt(map, [x, y]) {
     const py = cy + (y - box.y - box.height / 2);
     const n = Math.PI - (2 * Math.PI * py) / scale;
     return [(px / scale) * 360 - 180, (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)))];
-}
-
-/** A render for the docs once the markers have taken the view's zoom (their images redraw a moment after a jump). */
-async function shot(page, name) {
-    await page.waitForTimeout(800);
-    await shotNow(page, name);
-}
-
-/** The stored map items through the test hook, by id. */
-async function storedAll(page) {
-    return Object.fromEntries((await send(page, 'map.load', {})).body.items.map((i) => [i.id, i]));
-}
-
-/** The map's change sequence number now. */
-async function seqOf(map) {
-    return Number(await map.getAttribute('data-store-seq'));
-}
-
-/** One change saved as one batch: the toolbar's Undo names its step, and the map's seq moved on by exactly one. */
-async function expectOneBatch(page, map, seqBefore, step) {
-    await expect(page.locator('.mapstudio-toolbar .mapstudio-undo')).toHaveAttribute('data-step', 'Undo: ' + step, { timeout: REPLY_MS });
-    await expect(map).toHaveAttribute('data-store-seq', String(seqBefore + 1), { timeout: REPLY_MS });
-    await page.waitForTimeout(500);
-    await expect(map).toHaveAttribute('data-store-seq', String(seqBefore + 1));
-}
-
-/** The toolbar's Undo, as one batch: the seq moves on by one and `check` (a stored state) holds again. */
-async function undoOnce(page, map, check) {
-    const before = await seqOf(map);
-    await page.locator('.mapstudio-toolbar .mapstudio-undo').click();
-    await expect(map).toHaveAttribute('data-store-seq', String(before + 1), { timeout: REPLY_MS });
-    await expect.poll(async () => check(await storedAll(page)), { timeout: REPLY_MS }).toBe(true);
-}
-
-/** A drag by the pointer, in a few moves, so Terra Draw and MapLibre see a drag and not a click. */
-async function drag(page, from, to) {
-    await page.mouse.move(from[0], from[1]);
-    await page.mouse.move(from[0] + 1, from[1] + 1);
-    await page.mouse.down();
-    await page.mouse.move(from[0] + (to[0] - from[0]) * 0.25, from[1] + (to[1] - from[1]) * 0.25, { steps: 4 });
-    await page.mouse.move(to[0], to[1], { steps: 8 });
-    await page.mouse.up();
 }
 
 /** L-SWD selected from the Items list, Details open, and the view where its handles are apart; returns the map. */
@@ -144,8 +75,6 @@ function onLine(items, lineId, names) {
 }
 
 const same = (a, b) => Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6;
-/** Whether a stored `ends` names these items (the store returns its keys in its own order). */
-const endsAre = (ends, start, end) => (ends && ends.start ? ends.start.itemId : null) === start && (ends && ends.end ? ends.end.itemId : null) === end;
 const sameLine = (coords, expected) => coords.length === expected.length && coords.every((c, i) => same(c, expected[i]));
 
 test.describe('1366 px', () => {

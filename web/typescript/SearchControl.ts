@@ -30,18 +30,12 @@
  */
 
 import { IControl, Map as MapLibreMap } from 'maplibre-gl';
-import { glyphSvg } from './controls';
+import { PHONE_QUERY, SPRITE_URL, SVG_NS, glyphSvg } from './controls';
 import { DistanceUnits, METRIC_UNITS, distanceText, sameUnits } from './geometry';
 import {
     LIST_ORDERS, ListOrder, NO_MATCHES, SEARCH_LABEL, SEARCH_PLACEHOLDER, SearchEntry, SearchResult, allEntries, chosenText, nearestEntries,
     pagedCount, positionRedraws, searchEntries
 } from './search';
-
-/** The width below which the control is the phone top bar (the stylesheet's phone breakpoint). */
-const PHONE_QUERY = '(max-width: 767px)';
-
-/** The sprite the kind glyphs come from, as the default popup draws them (DefaultPopup.tsx). */
-const SPRITE_URL = '/res/mapstudio/icons/mapstudio-icons.svg';
 
 export class SearchControl implements IControl {
     private container: HTMLDivElement | null = null;
@@ -494,13 +488,13 @@ export class SearchControl implements IControl {
             li.setAttribute('data-item-id', result.id);
             li.setAttribute('data-matched', result.matched);
             li.setAttribute('data-index', String(i));
-            const glyph = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            const glyph = document.createElementNS(SVG_NS, 'svg');
             glyph.setAttribute('class', 'mapstudio-search-kind-glyph');
             glyph.setAttribute('width', '20');
             glyph.setAttribute('height', '20');
             glyph.setAttribute('viewBox', '0 0 24 24');
             glyph.setAttribute('aria-hidden', 'true');
-            const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+            const use = document.createElementNS(SVG_NS, 'use');
             use.setAttribute('href', SPRITE_URL + '#ms-' + (result.icon || (result.geometry === 'line' ? 'pipeline' : 'point')));
             glyph.appendChild(use);
             li.appendChild(glyph);

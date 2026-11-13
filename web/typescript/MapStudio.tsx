@@ -42,8 +42,9 @@ import { CameraPadding, PopupAnchor, Rect } from './popupPlacement';
 import { SHARED_M } from './shared';
 import { TEST_VIEW_TIMEOUT_MS, registerTestView } from './testHook';
 import { MapboxLogoControl } from './mapboxLogo';
+import { SPRITE_URL } from './controls';
 import {
-    SPRITE_URL, THEME_TOKENS, addItemLayers, addPointerCursor, addTextLayers, addUnsavedLayers, addYouAreHereLayers, applyLayerToggles,
+    THEME_TOKENS, addItemLayers, addPointerCursor, addTextLayers, addUnsavedLayers, addYouAreHereLayers, applyLayerToggles,
     applyThemePaint, blankColors, createMap, markerColors, publishLabels, publishYouAreHere, setYouAreHere
 } from './mapLayers';
 import { LOCATE_ZOOM, NO_LOCATION, UserLocation, readUserLocation, userLocationKey } from './userLocation';
@@ -69,6 +70,7 @@ import { listRows } from './itemList';
 import { FieldValue, assetListKnown } from './itemForm';
 import { Rail } from './studio/Rail';
 import { ItemList, ListView, newListView } from './studio/ItemList';
+import { panelTabs } from './studio/PanelTabs';
 import { PanelTab, PropertiesPanel } from './studio/PropertiesPanel';
 import { RuleKeep } from './studio/RuleEditor';
 import { DrawToolbar } from './studio/DrawToolbar';
@@ -859,7 +861,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
         }
         if (selected && !this.itemFor(selected.id)) {
             console.info('[MapStudio] The selected item ' + selected.id + ' is no longer on the map.');
-            selection.clearSelection(this);
+            selection.dropSelection(this);
         }
     }
 
@@ -1552,7 +1554,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     };
 
     /** The properties panel's close (EXPERIENCE.md: closes with close or Esc): the selection goes. */
-    onPanelClose = (): void => selection.clearSelection(this);
+    onPanelClose = (): void => selection.dropSelection(this);
     onNameFocused = (): void => { this.focusNameId = null; };
 
     /** The Details fields, each saving when it is finished (one batch each, the delegate's). */
@@ -1590,10 +1592,10 @@ export class MapStudio extends Component<Props, MapStudioState> {
 
     /** The toolbar (entries 2 and 4): Select puts every tool down; a tool or kind button picks its tool up; Snap toggles. The bar's Done puts the Point tool down. */
     onSelectTool = (): void => editing.putToolDown(this);
-    onTool = (tool: StudioTool, kindId: string | null): void => editing.pickTool(this, tool, kindId);
+    onTool = (tool: StudioTool, kindId: string | null): void => editing.pickUpTool(this, tool, kindId);
     onSnap = (): void => editing.toggleSnap(this);
     /** The list footer's Add item (entry 7a): the generic Point tool picked up, as the toolbar's Point does. */
-    onAddItem = (): void => editing.pickTool(this, 'point', null);
+    onAddItem = (): void => editing.pickUpTool(this, 'point', null);
 
     /** The drawing bar (entry 4): Finish as Enter, Cancel as Esc. */
     onFinishDrawing = (): void => editing.finishDrawing(this);
@@ -1623,7 +1625,7 @@ export class MapStudio extends Component<Props, MapStudioState> {
     onAddInstrument = (kindId: string): void => {
         const selected = this.state.selected;
         if (selected) {
-            editing.armInstrument(this, selected.id, kindId);
+            editing.startInstrument(this, selected.id, kindId);
         }
     };
     /** The placement bar (entry 9): Place with the typed distance, Cancel as Esc. */
@@ -1962,14 +1964,9 @@ export class MapStudio extends Component<Props, MapStudioState> {
                         <div className="mapstudio-dock-title-row"><h2 className="mapstudio-dock-title">Layers</h2></div>
                         {this.renderProblemStatus(delegate, facts)}
                     </header>
-                    <div className="mapstudio-panel-tabs" role="tablist" aria-label="Layers">
-                        {LAYERS_TABS.map(([key, label]) => (
-                            <button key={key} type="button" role="tab" id={id + '-' + key} data-tab={key} aria-selected={tab === key}
-                                    aria-controls={id + '-panel'}
-                                    className={'mapstudio-panel-tab' + (tab === key ? ' mapstudio-panel-tab--active' : '')}
-                                    onClick={() => this.onLayersTab(key)}>{label}</button>
-                        ))}
-                    </div>
+                    {panelTabs({
+                        label: 'Layers', tabs: LAYERS_TABS, now: tab, tabId: (key) => id + '-' + key, panelId: () => id + '-panel', onChoose: this.onLayersTab
+                    })}
                     <div key={tab} id={id + '-panel'} className="mapstudio-dock-legend" role="tabpanel" aria-labelledby={id + '-' + tab}
                          ref={this.setLayersHost} />
                 </section>

@@ -23,7 +23,7 @@
 import { Asset, Kind } from './adapters';
 import { EditBatch, EditOp, ErrorCodes, KindSetupRecord, MapItemRecord } from './contract';
 import { isRecord } from './json';
-import { appliedParts, ownRuleApplied, pathProblem, refusalRest } from './itemOverrides';
+import { OP_PREFIX, appliedParts, ownRuleApplied, pathProblem, refusalRest, without } from './itemOverrides';
 import { ItemState, PRESETS, TINTS, itemPreset } from './live';
 import { ASSET_ID, ASSET_PATH, ITEM_ID, ITEM_NAME, ItemView, PROPERTY_PREFIX, fill } from './placeholders';
 import { plural } from './history';
@@ -147,15 +147,6 @@ export type SetupEdit =
     | { part: 'styleRule'; rule: Record<string, unknown> | null }
     /** An area kind's whole tints part: replaced, or removed with null (the property emptied). */
     | { part: 'areaTints'; tints: Record<string, unknown> | null };
-
-function without(setup: Record<string, unknown>, key: string): Record<string, unknown> {
-    if (!(key in setup)) {
-        return setup;
-    }
-    const out = { ...setup };
-    delete out[key];
-    return out;
-}
 
 /** A part's object with one value set, its other values (those this screen does not draw included) kept; the part made when absent. */
 function withIn(setup: Record<string, unknown>, part: string, key: string, value: unknown): Record<string, unknown> {
@@ -322,12 +313,6 @@ export function batchSetup(batch: EditBatch, kindId?: string): Record<string, un
     return data && isRecord(data.setup) ? data.setup : null;
 }
 
-/** The kind a batch of one kind setup op is for, or null (owner decision 6: such a batch's conflict card has one choice). */
-export function setupKind(batch: EditBatch): string | null {
-    const op = batch.ops.find((o) => o.entity === 'kindSetup');
-    return op ? op.id : null;
-}
-
 /**
  * A key value's `key`, made from its label when the row is first saved and never changed after (owner decision 1): the label's
  * letters and digits in lower case, "value" when it has none, at most 64 characters, and a number added on a clash with a key
@@ -412,9 +397,6 @@ export interface RefusalPlace {
     /** The Gateway's words, without "Op N (id):" and without the part's name when a colon follows it. */
     words: string;
 }
-
-/** "Op 0 (pad): " and, for the messages the Gateway writes with no id, "Op 0: ". */
-const OP_PREFIX = /^Op \d+(?: \(.*?\))?: /;
 
 /**
  * An `invalid` reply's message placed (owner decision c): the Gateway's "Op 0 (pad): kpis[1].path: ..." loses its "Op N (id):"
@@ -1064,7 +1046,7 @@ export function typedValue(typed: string): string | number | boolean | undefined
 }
 
 /** A stored States value as it is typed: a text that would read as something else (a number, true, nothing) in double quotes. */
-export function valueText(value: unknown): string {
+export function caseValueText(value: unknown): string {
     if (typeof value === 'number' || typeof value === 'boolean') {
         return String(value);
     }
@@ -1092,7 +1074,7 @@ export function ruleDraft(rule: Record<string, unknown> | null | undefined): Rul
     const sources = { states: source, bands: source, expression: source };
     const cases = Array.isArray(rule.cases) ? rule.cases.filter(isRecord) : [];
     if (rule.type === 'states') {
-        return { ...NO_RULE, type: 'states', sources, states: cases.map((c) => ({ value: valueText(c.value), preset: text(c.preset) })) };
+        return { ...NO_RULE, type: 'states', sources, states: cases.map((c) => ({ value: caseValueText(c.value), preset: text(c.preset) })) };
     }
     if (rule.type === 'bands') {
         return { ...NO_RULE, type: 'bands', sources,
@@ -1220,7 +1202,7 @@ function checkShape(draft: RuleDraft, kind: Kind, o: RuleOptions): RuleCheck {
             } else {
                 const twin = values.indexOf(value);
                 if (twin >= 0) {
-                    mark(i, 'Case ' + (i + 1) + ' has the same value as case ' + (twin + 1) + ' (' + valueText(value) + '): each value has one case.');
+                    mark(i, 'Case ' + (i + 1) + ' has the same value as case ' + (twin + 1) + ' (' + caseValueText(value) + '): each value has one case.');
                 }
             }
             values.push(value);

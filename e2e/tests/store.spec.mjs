@@ -6,9 +6,7 @@
 // so the editor's page is opened wide enough to draw and the viewer's line goes through the
 // test hook (the component's real session path, judged on the Gateway from the session's roles).
 
-import { EDITOR_USER, drawLine, editorTest, expect, hookLineBatch, mapLoaded, openMap, send, shot, test } from './fixtures.mjs';
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+import { EDITOR_USER, drawLine, editorTest, expect, hookLineBatch, mapLoaded, openMap, send, shot, test, UUID } from './fixtures.mjs';
 
 for (const [width, height] of [[1440, 900], [390, 844]]) {
     test.describe(`${width} px`, () => {

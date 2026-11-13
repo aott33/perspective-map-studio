@@ -7,7 +7,7 @@
  * and the map opens on its starting area as before. Pure apart from the store it is handed; unit tested in node.
  */
 
-import { isRecord } from './json';
+import { finite, isRecord } from './json';
 
 /** The selected item the place keeps: a point, or a line with the segment its popup showed. */
 export interface PlaceSelection {
@@ -38,10 +38,6 @@ const PREFIX = 'mapstudio.place.v1|';
 /** The key of one map's place: the project, the page path and the component's address on the page. */
 export function placeKey(project: string | null, pagePath: string, address: string): string {
     return PREFIX + (project || '') + '|' + pagePath + '|' + address;
-}
-
-function finite(v: unknown): v is number {
-    return typeof v === 'number' && isFinite(v);
 }
 
 function lngLatOf(v: unknown): [number, number] | null {

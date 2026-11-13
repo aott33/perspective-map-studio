@@ -11,7 +11,7 @@
 import { EditBatch, EditOp, MapItemData, MapItemRecord } from './contract';
 
 /** The fields of a record an op's data may carry, in record order. */
-const DATA_FIELDS: Array<keyof MapItemData> =
+export const DATA_FIELDS: Array<keyof MapItemData> =
     ['kind', 'name', 'geometry', 'properties', 'assetId', 'overrides', 'ends', 'attachment'];
 
 function dataOf(record: MapItemRecord): MapItemData {

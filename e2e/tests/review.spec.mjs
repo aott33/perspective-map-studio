@@ -17,10 +17,9 @@ import path from 'node:path';
 import { pagePixel } from '../lib/geo.mjs';
 import { TOKENS, checkTheme, markdownTable, misses } from '../lib/contrast.mjs';
 import { docsMode, outDir, repoRoot } from '../lib/env.mjs';
-import { DRAW_MS, EDITOR_USER, expect, mapLoaded, openMap, runSeed, shot, signedInContext, test, view } from './fixtures.mjs';
-
-/** The bound for a state change to reach the map: one refresh interval (the showcase setup's 10 s) plus margin. */
-const INTERVAL_MS = 25_000;
+import {
+    DRAW_MS, EDITOR_USER, expect, mapLoaded, openMap, runSeed, shot, signedInContext, test, view, liveItem, bar, labelsPlaced, clickPoint, INTERVAL_MS
+} from './fixtures.mjs';
 
 /** The showcase field (showcase.spec.mjs has the same places). */
 const SHOWCASE = {
@@ -41,9 +40,6 @@ const SHOWCASE = {
 const NEEDS_YOU = 'Needs you 8: 6 alarms, 1 comms lost, 1 stale';
 
 let ids;
-
-const bar = (page) => page.locator('.mapstudio-needs');
-const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
 
 /** Press a /styles dev button as the editor and return its result; the page is opened and closed here. */
 async function pressLive(browser, button) {
@@ -113,24 +109,6 @@ async function reviewStates(page) {
     await expect(liveItem(page, ids.pt2)).toHaveAttribute('data-alarm', '3:acked:1');
     await expect(liveItem(page, ids.p21)).toHaveAttribute('data-state', 'comms-lost');
     await expect(liveItem(page, ids.swd1)).toHaveAttribute('data-state', 'stale');
-}
-
-/** Wait until the map's labels hold every text in `texts` (names and KPIs placed after the batch). */
-async function labelsPlaced(map, texts) {
-    await expect.poll(async () => {
-        const labels = (await map.getAttribute('data-labels')) || '';
-        return texts.filter((t) => !labels.includes('"' + t + '"'));
-    }, { timeout: DRAW_MS }).toEqual([]);
-}
-
-/** Click a point on a map centred on `center` at `zoom` and return its open popup (card or sheet). */
-async function clickPoint(page, map, lngLat, center, zoom, selector) {
-    const box = await map.boundingBox();
-    const [x, y] = pagePixel(box, lngLat, center, zoom);
-    await page.mouse.click(x, y);
-    const popup = page.locator(selector);
-    await expect(popup).toBeVisible({ timeout: 30_000 });
-    return popup;
 }
 
 /**

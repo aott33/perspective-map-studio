@@ -86,11 +86,11 @@ export function problemText(drawing: Drawing): string {
     if (drawing.vertices.length < minVertices(drawing.tool)) {
         return drawing.tool === 'area' ? 'An area needs three points' : 'A line needs two points';
     }
-    return reasonText(drawing.reason);
+    return drawingReasonText(drawing.reason);
 }
 
 /** Terra Draw's validation reason in plain words (EXPERIENCE.md Voice and Tone); '' for none. */
-export function reasonText(reason: string): string {
+export function drawingReasonText(reason: string): string {
     if (reason === '') {
         return '';
     }

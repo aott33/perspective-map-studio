@@ -620,7 +620,7 @@ export function moveWords(from: [number, number], to: [number, number], distance
     return 'about ' + distanceText(m, distanceUnits) + ' ' + compassWord(from, to);
 }
 
-function same(a: unknown, b: unknown): boolean {
+export function same(a: unknown, b: unknown): boolean {
     return JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
 }
 
@@ -646,7 +646,7 @@ export function joinWords(words: string[]): string {
     return words.slice(0, -1).join(', ') + ' and ' + words[words.length - 1];
 }
 
-function pointOf(record: MapItemRecord | undefined): [number, number] | null {
+function recordPoint(record: MapItemRecord | undefined): [number, number] | null {
     return record && record.geometry.type === 'Point' ? record.geometry.coordinates as [number, number] : null;
 }
 
@@ -739,8 +739,8 @@ export function theirChangeText(entry: UnsavedEntry, kinds: Kind[] = [], distanc
     if (!current || !mine) {
         return who + ' changed ' + name + more + when;
     }
-    const from = pointOf(mine);
-    const to = pointOf(current);
+    const from = recordPoint(mine);
+    const to = recordPoint(current);
     const moved = from && to && !same(from, to) ? 'moved ' + name + ' ' + moveWords(from, to, distanceUnits) : '';
     const reshaped = !moved && !same(mine.geometry, current.geometry) ? 'shape' : '';
     const fields = (reshaped ? [reshaped] : []).concat(fieldWords(mine, current, kinds, labels));
@@ -819,7 +819,7 @@ function updateWords(op: EditOp, mine: MapItemRecord | undefined, kinds: Kind[],
         } else if (key === 'assetId') {
             words.push(value === null ? 'unlinked' : 'linked to an asset');
         } else if (key === 'geometry') {
-            const from = pointOf(mine);
+            const from = recordPoint(mine);
             const g = data.geometry;
             const to = g && g.type === 'Point' ? g.coordinates as [number, number] : null;
             words.push(from && to ? 'moved ' + moveWords(from, to, distanceUnits) : to ? 'a new place' : 'a new shape');

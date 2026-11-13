@@ -1,7 +1,7 @@
 import { Kind } from '../adapters';
 import {
     CHOSEN_HINT, Drawing, MOVE_HINT, PLACE_HINT, REASON_SELF_INTERSECTS, barTitle, canFinish, deleteOffText, drawingEnds, drawnLengthM, endSnap,
-    finishHint, geometryHint, geometryTitle, inField, isDrawingTool, minVertices, newItemText, noKindText, problemText, progressText, reasonText,
+    finishHint, geometryHint, geometryTitle, inField, isDrawingTool, minVertices, newItemText, noKindText, problemText, progressText, drawingReasonText as reasonText,
     snapIndicatorText, snapTitle, splitOffText, startDrawing, startSnap, withVertices, INSTRUMENT_CLICK_PX, INSTRUMENT_HINT,
     instrumentLocationText, instrumentTitle, offLineText
 } from '../drawing';

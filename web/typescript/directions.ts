@@ -84,7 +84,7 @@ export function currentAgent(): Agent {
 }
 
 /** The templates already warned about, so a template that is not used warns once, not on every render. */
-const warned = new Set<string>();
+const warnedTemplates = new Set<string>();
 
 /**
  * The link for a point at `[lng, lat]` named `name`, or null when Directions is off. A template the setting holds is
@@ -102,8 +102,8 @@ export function directionsLink(setting: DirectionsSetting, position: [number, nu
         if (templateUsable(setting.urlTemplate)) {
             return fillTemplate(setting.urlTemplate, lat, lng, name);
         }
-        if (!warned.has(setting.urlTemplate)) {
-            warned.add(setting.urlTemplate);
+        if (!warnedTemplates.has(setting.urlTemplate)) {
+            warnedTemplates.add(setting.urlTemplate);
             console.warn('[MapStudio] directions.urlTemplate is ignored: it must start with https://, http://, geo: or maps:. '
                 + 'The platform\'s maps link is used instead.');
         }
@@ -113,7 +113,7 @@ export function directionsLink(setting: DirectionsSetting, position: [number, nu
 
 /** Forget the templates warned about (tests). */
 export function resetDirectionsWarnings(): void {
-    warned.clear();
+    warnedTemplates.clear();
 }
 
 /**

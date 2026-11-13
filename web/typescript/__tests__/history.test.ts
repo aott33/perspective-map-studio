@@ -10,7 +10,7 @@ import { HistoryEntry, HistoryOp } from '../contract';
 import {
     HISTORY_EMPTY, HistoryPage, KIND_SETUP_TEXT, NOTHING_TO_UNDO_YET, NOT_KEPT_TEXT, REVERT_FOOTER, batchSentence, canShowOlder, expandOps,
     failRead, geometryWords, historyRows, initialOf, kindWords, mergeFirstPage, mergeOlderPage, nextUndoText, plural, readFailedText,
-    revertBatch, revertBlocked, revertLabel, revertedOf, rowSentence, whenText
+    revertBatch, revertBlocked, revertLabel, revertedOf, rowSentence, historyWhenText as whenText
 } from '../history';
 import { HistoryPanel } from '../studio/HistoryPanel';
 

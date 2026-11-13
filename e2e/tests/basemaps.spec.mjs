@@ -18,11 +18,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { repoRoot, sessionUrl } from '../lib/env.mjs';
 import { backUpSetup, committedSetup, gatewayRun, logLines, putBackSetup, scanProject, writeSetup } from '../lib/gateway.mjs';
-import { ensureSeeded, expect, mapLoaded, openMap, shot, test } from './fixtures.mjs';
+import { ensureSeeded, expect, mapLoaded, openMap, shot, test, OSM_TILES, TILE_PNG as PNG, legendPanel, legendButton } from './fixtures.mjs';
 
-/** A 1 by 1 PNG (one blue pixel, so a screenshot shows the tiles drawn), served for every tile the specs route. */
-const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
-const OSM_TILES = /^https:\/\/tile\.openstreetmap\.org\//;
 const MAPBOX_TILES = /^https:\/\/api\.mapbox\.com\/v4\/mapbox\.satellite\//;
 /** How long a basemap change (a Gateway round trip, the tiles' first idle) may take on the dev stack. */
 const CHANGE_MS = 30_000;
@@ -145,8 +142,6 @@ async function expectLogoPlaced(page, map) {
         expect(overlap(attrib, toggle), 'the attribution never covers the App Bar toggle').toBe(false);
     }
 }
-const legendButton = (page) => page.locator('.mapstudio-legend-button');
-const legendPanel = (page) => page.locator('.mapstudio-legend-panel');
 // Perspective's App Bar toggle (the page's fixed bottom-right button): the attribution sits under it, never over it.
 const appBarToggle = (page) => page.locator('.bar-reveal');
 

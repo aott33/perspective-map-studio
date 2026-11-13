@@ -18,8 +18,9 @@
 import { Kind } from './adapters';
 import { EditBatch, EditOp, HistoryEntry, HistoryOp, ItemGeometry, MapItemData, readUnitsData } from './contract';
 import { distanceM } from './shared';
+import { DATA_FIELDS } from './undo';
 import { DistanceUnits, METRIC_UNITS, distanceText } from './geometry';
-import { clockText, fieldLabel, joinWords, moveWords, unitsWords } from './unsaved';
+import { clockText, fieldLabel, joinWords, moveWords, same, unitsWords } from './unsaved';
 import { FROM_KIND, KpiLabels, NO_LABELS, overrideChanges, overrideSentence } from './itemOverrides';
 
 /** The page size Recent changes asks for (the most `edits.history` gives). */
@@ -36,9 +37,6 @@ export const NOT_KEPT_TEXT = 'The values of this change were not kept, so it can
 
 /** Why a row has no Revert: a kind setup, which changes from the Kinds screen. */
 export const KIND_SETUP_TEXT = 'Kind setups change from the Kinds screen, so this change has no Revert.';
-
-/** The fields of a map item an op's data may carry (undo.ts DATA_FIELDS), in record order. */
-const DATA_FIELDS: Array<keyof MapItemData> = ['kind', 'name', 'geometry', 'properties', 'assetId', 'overrides', 'ends', 'attachment'];
 
 /** What the surface holds of the edit record: the pages read so far, newest first, and the state of the reads. */
 export interface HistoryState {
@@ -161,12 +159,12 @@ export function notKept(op: HistoryOp): boolean {
     return op.before === null && op.after === null;
 }
 
-function changedKeys(op: HistoryOp): string[] {
+function opKeys(op: HistoryOp): string[] {
     const keys = Object.keys(op.after || {}).concat(Object.keys(op.before || {}));
     return keys.filter((k, i) => keys.indexOf(k) === i);
 }
 
-function pointOf(g: unknown): [number, number] | null {
+function geometryPoint(g: unknown): [number, number] | null {
     const geometry = g as ItemGeometry | null;
     return geometry && geometry.type === 'Point' && Array.isArray(geometry.coordinates)
         ? geometry.coordinates as [number, number] : null;
@@ -190,14 +188,14 @@ function updateSentence(op: HistoryOp, kinds: Kind[], distanceUnits: DistanceUni
     }
     const before = op.before || {};
     const after = op.after || {};
-    const keys = changedKeys(op);
+    const keys = opKeys(op);
     if (keys.length === 1 && keys[0] === 'name') {
         const was = typeof before.name === 'string' && before.name !== '' ? before.name : 'an item';
         return 'Renamed ' + was + ' to ' + (typeof after.name === 'string' && after.name !== '' ? after.name : 'an item');
     }
     if (keys.indexOf('geometry') >= 0 && keys.every((k) => k === 'geometry' || k === 'attachment' || k === 'ends')) {
-        const from = pointOf(before.geometry);
-        const to = pointOf(after.geometry);
+        const from = geometryPoint(before.geometry);
+        const to = geometryPoint(after.geometry);
         if (from && to) {
             return 'Moved ' + name + ' ' + moveWords(from, to, distanceUnits);
         }
@@ -226,7 +224,7 @@ function updateSentence(op: HistoryOp, kinds: Kind[], distanceUnits: DistanceUni
         } else if (key === 'assetId') {
             words.push('asset link');
         } else if (key === 'geometry') {
-            words.push(pointOf(after.geometry) ? 'location' : 'shape');
+            words.push(geometryPoint(after.geometry) ? 'location' : 'shape');
         } else if (key === 'properties') {
             const a = (before.properties || {}) as Record<string, unknown>;
             const b = (after.properties || {}) as Record<string, unknown>;
@@ -258,7 +256,7 @@ function updateSentence(op: HistoryOp, kinds: Kind[], distanceUnits: DistanceUni
     return words.length > 0 ? 'Changed ' + name + "'s " + joinWords(words) : 'Changed ' + name;
 }
 
-function coordsOf(g: unknown): Array<[number, number]> | null {
+function geometryLine(g: unknown): Array<[number, number]> | null {
     const geometry = g as ItemGeometry | null;
     return geometry && geometry.type === 'LineString' && Array.isArray(geometry.coordinates)
         ? geometry.coordinates as Array<[number, number]> : null;
@@ -278,17 +276,17 @@ function followsLead(op: HistoryOp, lead: HistoryOp, lineIds: Set<string>): bool
     }
     const before = op.before || {};
     const after = op.after || {};
-    const from = pointOf((lead.before || {}).geometry);
-    const to = pointOf((lead.after || {}).geometry);
-    const was = coordsOf(before.geometry);
-    const now = coordsOf(after.geometry);
-    if (from && to && was && now && changedKeys(op).every((k) => k === 'geometry' || k === 'ends')) {
+    const from = geometryPoint((lead.before || {}).geometry);
+    const to = geometryPoint((lead.after || {}).geometry);
+    const was = geometryLine(before.geometry);
+    const now = geometryLine(after.geometry);
+    if (from && to && was && now && opKeys(op).every((k) => k === 'geometry' || k === 'ends')) {
         const first = samePoint(was[0], from) && samePoint(now[0], to);
         const last = samePoint(was[was.length - 1], from) && samePoint(now[now.length - 1], to);
         return first || last;
     }
     const on = [attachedTo(after), attachedTo(before)].some((line) => line !== null && lineIds.has(line));
-    return on && changedKeys(op).every((k) => k === 'geometry' || k === 'attachment');
+    return on && opKeys(op).every((k) => k === 'geometry' || k === 'attachment');
 }
 
 /** The kind setups of a batch in words, for a sentence: "the well pad kind setup", "2 kind setups". */
@@ -355,7 +353,7 @@ function itemSentence(entry: HistoryEntry, items: HistoryOp[], kinds: Kind[], di
     }
     const deletes = items.filter((o) => o.op === 'delete');
     const others = items.filter((o) => o.op !== 'delete');
-    if (deletes.length > 0 && others.every((o) => o.op === 'update' && changedKeys(o).every((k) => k === 'ends'))) {
+    if (deletes.length > 0 && others.every((o) => o.op === 'update' && opKeys(o).every((k) => k === 'ends'))) {
         // A delete that cleared the ends of lines that named the item (entry 25): the delete is the change.
         return itemSentence(entry, deletes, kinds, distanceUnits, labels);
     }
@@ -382,10 +380,6 @@ function itemSentence(entry: HistoryEntry, items: HistoryOp[], kinds: Kind[], di
         return 'Changed ' + counted(all.length, 'item') + ' in one change';
     }
     return 'Changed ' + counted(items.length, 'item') + ' in one change';
-}
-
-function same(a: unknown, b: unknown): boolean {
-    return JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
 }
 
 function dataOnly(record: Record<string, unknown> | null): Record<string, unknown> {
@@ -518,7 +512,7 @@ export function initialOf(actor: string): string {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** When, in the browser's clock: "10:42" today, else "Nov 7, 10:42" (the year added when it is not this one); '' unreadable. */
-export function whenText(iso: string, now: Date = new Date()): string {
+export function historyWhenText(iso: string, now: Date = new Date()): string {
     const t = Date.parse(iso);
     if (!isFinite(t)) {
         return '';
@@ -554,7 +548,7 @@ function coordText(p: [number, number]): string {
     return p[1].toFixed(6) + ', ' + p[0].toFixed(6);
 }
 
-function lengthM(coords: Array<[number, number]>, closed: boolean): number {
+function pathLengthM(coords: Array<[number, number]>, closed: boolean): number {
     let m = 0;
     for (let i = 1; i < coords.length; i++) {
         m += distanceM(coords[i - 1], coords[i]);
@@ -571,13 +565,13 @@ export function geometryWords(g: unknown, area: boolean, distanceUnits: Distance
     if (!geometry) {
         return NOT_SET;
     }
-    const p = pointOf(geometry);
+    const p = geometryPoint(geometry);
     if (p) {
         return coordText(p);
     }
     if (geometry.type === 'LineString' && Array.isArray(geometry.coordinates)) {
         const coords = geometry.coordinates as Array<[number, number]>;
-        return coords.length + ' points, ' + distanceText(lengthM(coords, area), distanceUnits) + (area ? ' around' : '');
+        return coords.length + ' points, ' + distanceText(pathLengthM(coords, area), distanceUnits) + (area ? ' around' : '');
     }
     return 'A shape';
 }
@@ -639,7 +633,7 @@ function fieldsOf(op: HistoryOp, look: NameLookup): ExpandField[] {
     const after = op.after || {};
     const kindId = typeof after.kind === 'string' ? after.kind : typeof before.kind === 'string' ? before.kind : op.kind;
     const area = !!(kindOf(look.kinds, kindId) || { area: false }).area;
-    const shown = op.op === 'update' ? changedKeys(op) : DATA_FIELDS.filter((f) => f in (op.op === 'create' ? after : before));
+    const shown = op.op === 'update' ? opKeys(op) : DATA_FIELDS.filter((f) => f in (op.op === 'create' ? after : before));
     const fields: ExpandField[] = [];
     const empty = op.op === 'create' ? 'Not on the map' : '';
     const gone = op.op === 'delete' ? 'Deleted' : '';
@@ -709,7 +703,7 @@ function fieldsOf(op: HistoryOp, look: NameLookup): ExpandField[] {
                 continue;
             }
         }
-        const label = key === 'geometry' ? (pointOf(after.geometry || before.geometry) ? 'Location' : 'Shape')
+        const label = key === 'geometry' ? (geometryPoint(after.geometry || before.geometry) ? 'Location' : 'Shape')
             : key === 'assetId' ? 'Asset link' : key === 'attachment' ? 'Place on line'
                 : key === 'setup' ? 'Setup' : key.charAt(0).toUpperCase() + key.slice(1);
         fields.push({ label, before: words(key, pick(before, key, 'before'), 'before'), after: words(key, pick(after, key, 'after'), 'after') });
@@ -772,7 +766,7 @@ export function historyRows(entries: HistoryEntry[], kinds: Kind[] = [], distanc
         batchId: e.batchId,
         actor: e.actor,
         initial: initialOf(e.actor),
-        when: whenText(e.at, now),
+        when: historyWhenText(e.at, now),
         sentence: rowSentence(e, entries, kinds, distanceUnits, labels),
         blocked: revertBlocked(e),
         ops: e.ops.length

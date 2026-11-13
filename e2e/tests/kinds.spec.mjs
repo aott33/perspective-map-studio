@@ -13,16 +13,10 @@
 import { randomUUID } from 'node:crypto';
 import { TRACER, pagePixel } from '../lib/geo.mjs';
 import {
-    EDITOR2_USER, EDITOR_USER, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, openMap, removeStrays, runSeed, send, shot, signedInContext, test,
-    view
+    EDITOR2_USER, EDITOR_USER, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, openMap, removeStrays, runSeed, send, shot, signedInContext,
+    test, view, REPLY_MS, NOTHING_MS, openEditor, liveItem, setupOf, saveWords, settled, field, input, INTERVAL_MS
 } from './fixtures.mjs';
 
-/** The Gateway's answer to a save. */
-const REPLY_MS = 20_000;
-/** One refresh interval of the dev setup (10 s) with its round trips, as live.spec.mjs bounds it. */
-const INTERVAL_MS = 25_000;
-/** There is nothing to observe when nothing is sent: the time a stray batch would have to show in the map's seq. */
-const NOTHING_MS = 800;
 const ADAPTERS = '/adapters';
 /** The dev kind list (ops/project/ignition/script-python/mapstudio_dev): id and geometry word, in its order. */
 const KINDS = [['pad', 'point'], ['line', 'line'], ['geofence', 'area'], ['tap', 'point'], ['valve', 'point'], ['meter', 'point']];
@@ -66,22 +60,6 @@ async function restore(browser) {
     }
 }
 
-/** The stored kind setup record of a kind through the test hook, or undefined. */
-async function setupOf(page, kindId) {
-    const reply = await send(page, 'map.load', {});
-    expect(reply.type, JSON.stringify(reply.body)).toBe('map.load.reply');
-    return (reply.body.kindSetups || []).find((k) => k.kindId === kindId && !k.deleted);
-}
-
-async function openEditor(page) {
-    const map = await openMap(page, '/edit');
-    await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
-    await mapLoaded(map);
-    await expect(map).toHaveAttribute('data-edit-level', 'full');
-    await expect(map).toHaveAttribute('data-studio', 'on');
-    return map;
-}
-
 /** Kinds opened from the rail: the list in the dock, the first (or last chosen) kind's setup in the properties panel's place. */
 async function openKinds(page, map) {
     await page.locator('.mapstudio-rail-item[data-surface="kinds"]').click();
@@ -100,23 +78,12 @@ async function chooseKind(page, kindId) {
     return panel;
 }
 
-/** A field's wrapper in the setup panel (kindSetup.ts `Fields`). */
-const field = (page, id) => page.locator('.mapstudio-kindsetup [data-field="' + id + '"]');
-const input = (page, id) => field(page, id).locator('input[type="text"]');
 const section = (page, name) => page.locator('.mapstudio-kindsetup [data-section="' + name + '"]');
-const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
-const saveWords = (page) => page.locator('.mapstudio-kinds .mapstudio-panel-save');
 
 /** Type a text field's whole value and finish it with Enter. */
 async function type(page, id, text) {
     await input(page, id).fill(text);
     await input(page, id).press('Enter');
-}
-
-/** The panel has nothing on its way and the header says Saved. */
-async function settled(page) {
-    await expect(page.locator('.mapstudio-kindsetup')).toHaveAttribute('data-saving', '', { timeout: REPLY_MS });
-    await expect(saveWords(page)).toHaveText('Saved', { timeout: REPLY_MS });
 }
 
 editorTest.describe('the Kinds surface at 1366 px', () => {

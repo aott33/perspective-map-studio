@@ -7,11 +7,10 @@
 // corners; R7 a custom popup view under the close row is sized to its content, with no needless scroll bar.
 // With E2E_DOCS=1 the shots the docs name go to docs/screenshots/retest-*.png.
 
-import { centerFor, pagePixel } from '../lib/geo.mjs';
-import { DRAW_MS, EDITOR_USER, expect, mapLoaded, openMap, runSeed, shot, signedInContext, test, view } from './fixtures.mjs';
-
-/** The bound for the seeded states to reach the map: one refresh interval (the showcase setup's 10 s) plus margin. */
-const INTERVAL_MS = 25_000;
+import { centerFor } from '../lib/geo.mjs';
+import {
+    DRAW_MS, EDITOR_USER, expect, mapLoaded, openMap, runSeed, shot, signedInContext, test, view, liveItem, bar, clickPoint, INTERVAL_MS
+} from './fixtures.mjs';
 
 /** The showcase field (showcase.spec.mjs and review.spec.mjs have the same places). */
 const SHOWCASE = {
@@ -26,8 +25,6 @@ const SHOWCASE = {
 
 let ids;
 
-const bar = (page) => page.locator('.mapstudio-needs');
-const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
 const card = (page) => page.locator('.maplibregl-popup .mapstudio-popup');
 
 /** Open the showcase page and wait for the items, the first full batch and the three seeded states. */
@@ -38,16 +35,6 @@ async function openShowcase(page, pagePath = '/') {
     await expect(bar(page)).toHaveAttribute('aria-label', 'Needs you 3: 1 alarm, 1 comms lost, 1 stale', { timeout: INTERVAL_MS });
     await expect(liveItem(page, ids.swd1)).toHaveAttribute('data-state', 'stale');
     return map;
-}
-
-/** Click a point on a map centred on `center` at `zoom`; wait for its popup (card or sheet) of `selector`. */
-async function clickPoint(page, map, lngLat, center, zoom, selector) {
-    const box = await map.boundingBox();
-    const [x, y] = pagePixel(box, lngLat, center, zoom);
-    await page.mouse.click(x, y);
-    const popup = page.locator(selector);
-    await expect(popup).toBeVisible({ timeout: 30_000 });
-    return popup;
 }
 
 /** The element drawn on top at the centre of `locator`'s box, described by the nearest of `classes` it is inside. */

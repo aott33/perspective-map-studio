@@ -8,12 +8,14 @@ import {
     previewOf, previewOptions, readSetup, removeBlocked, resolveKey, resolveNote, rowMissing, ruleDraft, sameTints, showOnMapOff,
     storedRuleOf, tintRows, tintsDraft, unsavedText
 } from '../kindSetup';
+import { without } from '../itemOverrides';
 import { ItemState, Tint } from '../live';
 import { MarkerColors, SpriteSymbol, tintSampleSvg } from '../markers';
 import { Glyph } from '../popupParts';
 import { Sample } from '../StylePreview';
 import { PickTarget, TagFor, readTagFor } from '../tagBrowser';
 import { ChromeGlyph } from './ChromeGlyph';
+import { tagButton } from './TagButton';
 import { RuleEditor, ruleFields } from './RuleEditor';
 
 /**
@@ -166,15 +168,6 @@ interface PanelState {
 }
 
 type Result = SetupEdit | { problem: string };
-
-function without<T>(map: Record<string, T>, key: string): Record<string, T> {
-    if (!(key in map)) {
-        return map;
-    }
-    const out = { ...map };
-    delete out[key];
-    return out;
-}
 
 /** The star of the Icon value toggle: outlined, filled while on (DESIGN.md Icons: a 24 px grid, a 2 px stroke). */
 function Star(props: { on: boolean }): React.ReactElement {
@@ -681,13 +674,9 @@ export class KindSetupPanel extends React.Component<KindSetupPanelProps, PanelSt
             return null;
         }
         const open = this.props.browsing === tagFor;
-        return (
-            <button type="button" className={'mapstudio-dock-button mapstudio-tag-button' + (open ? ' mapstudio-tag-button--open' : '')}
-                    data-tag-for={tagFor} disabled={this.off()} title="Pick a tag" aria-label={'Pick a tag for ' + name}
-                    aria-haspopup="dialog" aria-expanded={open} onClick={() => onBrowse(tagFor, target, this.version())}>
-                <ChromeGlyph name="tag" size={16} />
-            </button>
-        );
+        return tagButton({
+            tagFor, open, disabled: this.off(), label: 'Pick a tag for ' + name, onClick: () => onBrowse(tagFor, target, this.version())
+        });
     }
 
     /**

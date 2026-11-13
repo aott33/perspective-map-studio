@@ -4,7 +4,7 @@
  * MapLibre. Two components on one page may open on different areas and show the same map items.
  */
 
-import { isRecord } from './json';
+import { finite, isRecord } from './json';
 
 export type StartingArea =
     | { kind: 'center'; center: [number, number]; zoom: number }
@@ -17,10 +17,6 @@ export const WORLD: StartingArea = { kind: 'center', center: [0, 0], zoom: 1 };
 export const FIT_PADDING_PX = 24;
 const MAX_LAT = 85;
 const MAX_ZOOM = 24;
-
-function finite(value: unknown): value is number {
-    return typeof value === 'number' && isFinite(value);
-}
 
 function lngOk(v: number): boolean {
     return v >= -180 && v <= 180;

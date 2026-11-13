@@ -20,18 +20,13 @@ import { TRACER, pagePixel } from '../lib/geo.mjs';
 import { randomUUID } from 'node:crypto';
 import {
     DRAW_MS, EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot as shotNow, signedInContext, test,
-    view
+    view, REPLY_MS, NOTHING_MS, openEditor, seqOf, selectRow, expectOneBatch, expectNothingSent, placePad, stored, apply, spotFromTop
 } from './fixtures.mjs';
 
-/** The Gateway's answer to a save. */
-const REPLY_MS = 20_000;
-/** There is nothing to observe when nothing is sent: the time a stray batch would have to show in the map's seq. */
-const NOTHING_MS = 800;
 /** A spot for the items this spec makes through the test hook, out of the tracer's view (the Point tool's clicks go there). */
 const AWAY = [-104.82, 39.66];
 const ADAPTERS = '/adapters';
 const ASSETS_FN = 'mapstudio_dev.assets';
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 let seed;
 
@@ -69,40 +64,16 @@ async function press(page, button, mode) {
     return JSON.parse(await result.textContent());
 }
 
-async function openEditor(page) {
-    const map = await openMap(page, '/edit');
-    await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
-    await mapLoaded(map);
-    await expect(map).toHaveAttribute('data-edit-level', 'full');
-    await expect(map).toHaveAttribute('data-studio', 'on');
-    return map;
-}
-
 /** A render for the docs once the panel has settled. */
 async function shot(page, name) {
     await page.waitForTimeout(500);
     await shotNow(page, name);
 }
 
-async function seqOf(map) {
-    return Number(await map.getAttribute('data-store-seq'));
-}
-
-/** The stored record of a live map item through the test hook, or undefined. */
-async function stored(page, id) {
-    return (await send(page, 'map.load', {})).body.items.find((i) => i.id === id && !i.deleted);
-}
-
 /** A create op of a point map item at AWAY (a little apart per `n`), unlinked unless `extra` links it. */
 function pointOp(id, kind, name, n, extra = {}) {
     return { op: 'create', entity: 'item', id, baseVersion: 0, data: { kind, name, geometry: { type: 'Point',
         coordinates: [Number((AWAY[0] + n * 0.002).toFixed(6)), AWAY[1]] }, properties: {}, ...extra } };
-}
-
-/** One batch through the test hook, saved. */
-async function apply(page, ops) {
-    const reply = await send(page, 'edits.apply', { batchId: randomUUID(), ops });
-    expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
 }
 
 /** Items made through the test hook in one batch, then their rows in the list (map.changed brings them). */
@@ -113,30 +84,10 @@ async function create(page, ops) {
     }
 }
 
-/** A list row clicked: the item selected with its Details open. */
-async function selectRow(page, id) {
-    await page.locator('.mapstudio-list-row[data-item-id="' + id + '"]').click();
-    await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', id);
-}
-
 /** A kind field's row in Details, and its input or select. */
 function field(page, key) {
     const row = page.locator('.mapstudio-panel .mapstudio-field--prop[data-field="' + key + '"]');
     return { row, input: row.locator('.mapstudio-field-prop') };
-}
-
-/** One change saved as one batch: Undo names its step, and the map's seq moved on by exactly one. */
-async function expectOneBatch(page, map, seqBefore, step) {
-    await expect(page.locator('.mapstudio-toolbar .mapstudio-undo')).toHaveAttribute('data-step', 'Undo: ' + step, { timeout: REPLY_MS });
-    await expect(map).toHaveAttribute('data-store-seq', String(seqBefore + 1), { timeout: REPLY_MS });
-    await page.waitForTimeout(500);
-    await expect(map).toHaveAttribute('data-store-seq', String(seqBefore + 1));
-}
-
-/** Nothing was sent: the map's seq stays where it was. */
-async function expectNothingSent(page, map, seqBefore) {
-    await page.waitForTimeout(NOTHING_MS);
-    await expect(map).toHaveAttribute('data-store-seq', String(seqBefore));
 }
 
 /** The saves a typed pair made settled (a latitude finished as the cursor moves to Longitude saves too): nothing saving, the seq still. */
@@ -147,31 +98,6 @@ async function settled(page, map) {
         await page.waitForTimeout(NOTHING_MS);
         return (await seqOf(map)) === seq && (await map.getAttribute('data-save-state')) !== 'saving';
     }, { timeout: REPLY_MS }).toBe(true);
-}
-
-/** A page pixel `dx` from the map's centre and `fromTop` below its top edge now: at the tracer's view, the clear ground north of its points. */
-async function spotFromTop(map, dx, fromTop) {
-    const box = await map.boundingBox();
-    return [box.x + box.width / 2 + dx, box.y + fromTop];
-}
-
-/** A pad placed with the Point tool at `at` and saved: its id (Details opens on it with Name focused). */
-async function placePad(page, map, at) {
-    if ((await map.getAttribute('data-tool')) !== 'point') {
-        await page.locator('.mapstudio-tool--point').click();
-        await expect(map).toHaveAttribute('data-tool', 'point');
-    }
-    const panel = page.locator('.mapstudio-panel');
-    const before = (await panel.count()) > 0 ? await panel.getAttribute('data-item-id') : null;
-    await page.mouse.click(at[0], at[1]);
-    await expect(panel).toBeVisible({ timeout: 15_000 });
-    if (before !== null) {
-        await expect(panel).not.toHaveAttribute('data-item-id', before, { timeout: 15_000 });
-    }
-    const id = await panel.getAttribute('data-item-id');
-    expect(id).toMatch(UUID);
-    await expect(panel).toHaveAttribute('data-pending', 'false', { timeout: REPLY_MS });
-    return id;
 }
 
 test.describe('1366 px', () => {

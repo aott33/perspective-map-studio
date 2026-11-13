@@ -1,7 +1,7 @@
 import { Kind } from '../adapters';
 import { MapItemRecord } from '../contract';
 import { KindDisplay, LIVE_INITIAL, LiveState, LiveValue } from '../live';
-import { BAR_QUIET, BAR_UNKNOWN, barKey, barModel, bellLook, countParts, countText, EMPTY_SUMMARY, needsYou, summaryText, total } from '../needsyou';
+import { BAR_QUIET, BAR_UNKNOWN, barKey, barModel, bellLook, countParts, countText, EMPTY_SUMMARY, needsYou, needsYouSummaryText as summaryText, total } from '../needsyou';
 
 const T = '2026-10-28T10:00:00Z';
 const NOW = Date.parse('2026-10-28T10:04:00Z');

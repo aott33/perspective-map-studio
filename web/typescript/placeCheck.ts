@@ -572,7 +572,7 @@ export function lookUp(data: PlaceData, lat: number, lng: number): PointPlace {
     return nearSea.feature >= 0 ? seaPlace(data, nearSea.feature, lat, px, py) : { kind: 'none' };
 }
 
-function join(parts: string[]): string {
+function joinPlace(parts: string[]): string {
     return parts.filter((p) => p !== '').join(', ');
 }
 
@@ -585,14 +585,14 @@ export function placeWords(place: PointPlace): string {
     switch (place.kind) {
         case 'county':
             // A county named as its state (the District of Columbia, a US Virgin Island) says the name once.
-            return join([place.county + nearWords(place.near), place.state !== place.county ? place.state : '', place.country]);
+            return joinPlace([place.county + nearWords(place.near), place.state !== place.county ? place.state : '', place.country]);
         case 'land':
-            return join([place.town !== '' ? 'Near ' + place.town : '', place.state !== '' ? place.state + nearWords(place.near) : '', place.country]);
+            return joinPlace([place.town !== '' ? 'Near ' + place.town : '', place.state !== '' ? place.state + nearWords(place.near) : '', place.country]);
         case 'sea':
             if (!place.off) {
                 return place.sea;
             }
-            return place.sea !== '' ? place.sea + ', off ' + join([place.off.state, place.off.country]) : 'Off ' + join([place.off.state, place.off.country]);
+            return place.sea !== '' ? place.sea + ', off ' + joinPlace([place.off.state, place.off.country]) : 'Off ' + joinPlace([place.off.state, place.off.country]);
         default:
             return PLACE_NONE;
     }

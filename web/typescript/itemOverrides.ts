@@ -162,7 +162,7 @@ export function pathProblem(path: string): string {
 }
 
 /** "Op 0 (id): " (or "Op 0: "), then "overrides: ", then the part's name and a colon. */
-const OP_PREFIX = /^Op \d+(?: \(.*?\))?: /;
+export const OP_PREFIX = /^Op \d+(?: \(.*?\))?: /;
 const PART_PREFIX = /^(?:comms\.path|alarms\.path|kpis\[\d+\]\.path): /;
 
 /**
@@ -318,11 +318,12 @@ export function openSetupText(kindName: string): string {
     return 'Open ' + kindName + "'s setup";
 }
 
-function withoutKey(o: Record<string, unknown>, key: string): Record<string, unknown> {
-    if (!(key in o)) {
-        return o;
+/** A dictionary without one key: the same dictionary when it has no such key, else a copy. */
+export function without<T>(map: Record<string, T>, key: string): Record<string, T> {
+    if (!(key in map)) {
+        return map;
     }
-    const out = { ...o };
+    const out = { ...map };
     delete out[key];
     return out;
 }
@@ -343,7 +344,7 @@ export function applyRowEdit(newest: Record<string, unknown> | null | undefined,
             return overrides;
         }
         if (path === null) {
-            return withoutKey(overrides, row);
+            return without(overrides, row);
         }
         const held = overrides[row];
         if (isRecord(held)) {
@@ -360,7 +361,7 @@ export function applyRowEdit(newest: Record<string, unknown> | null | undefined,
             return overrides;
         }
         const left = rows.filter((r) => !(isRecord(r) && r.key === key));
-        return left.length === 0 ? withoutKey(overrides, 'kpis') : { ...overrides, kpis: left };
+        return left.length === 0 ? without(overrides, 'kpis') : { ...overrides, kpis: left };
     }
     if (!has) {
         return { ...overrides, kpis: rows.concat([{ key, path }]) };
@@ -381,9 +382,9 @@ export const RULE_ROW = 'styleRule';
 export function applyRuleEdit(newest: Record<string, unknown> | null | undefined, rule: Record<string, unknown> | null): Record<string, unknown> {
     const overrides = newest || {};
     if (rule === null) {
-        return withoutKey(overrides, RULE_ROW);
+        return without(overrides, RULE_ROW);
     }
-    return same(overrides[RULE_ROW], rule) ? overrides : { ...overrides, [RULE_ROW]: rule };
+    return sameValues(overrides[RULE_ROW], rule) ? overrides : { ...overrides, [RULE_ROW]: rule };
 }
 
 /** The item's own style rule when the Gateway applies it (entry 12c2), else null: the kind's rule draws the item. */
@@ -467,7 +468,7 @@ export interface OverrideChange {
 
 const OTHER_PARTS: Record<string, string> = { styleRule: 'style rule', link: 'link', popupView: 'popup view', areaTints: 'area tints' };
 
-function same(a: unknown, b: unknown): boolean {
+function sameValues(a: unknown, b: unknown): boolean {
     return a === b || JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
 }
 
@@ -491,7 +492,7 @@ export function overrideChanges(before: unknown, after: unknown, label: (key: st
     const order = ['comms', 'kpis', 'alarms'];
     keys.sort((x, y) => (order.indexOf(x) < 0 ? order.length : order.indexOf(x)) - (order.indexOf(y) < 0 ? order.length : order.indexOf(y)));
     for (const part of keys) {
-        if (same(a[part], b[part])) {
+        if (sameValues(a[part], b[part])) {
             continue;
         }
         if (part === 'kpis') {
@@ -501,7 +502,7 @@ export function overrideChanges(before: unknown, after: unknown, label: (key: st
             for (const key of names.filter((k, i) => names.indexOf(k) === i)) {
                 const x = was.find((r) => r.key === key);
                 const y = now.find((r) => r.key === key);
-                if (!same(x, y)) {
+                if (!sameValues(x, y)) {
                     const moved = pathOf(x) !== pathOf(y);
                     out.push({ part, words: (label(key) || key) + (moved ? ' path' : ' override'), reset: y === undefined,
                         before: moved ? pathOf(x) : '', after: moved ? pathOf(y) : '' });

@@ -1,5 +1,5 @@
 import {
-    ANCHOR_ORDER, PLACEMENT_MARGIN_PX, PLACEMENT_MIN_HEIGHT_PX, Rect, cameraPadding, cardRect, insideMap, intersects, intoView, pageShift, placePopup,
+    ANCHOR_ORDER, PLACEMENT_MARGIN_PX, PLACEMENT_MIN_HEIGHT_PX, Rect, paddingFor as cameraPadding, cardRect, insideMap, intersects, intoView, pageShift, placePopup,
     placedMaxWidth
 } from '../popupPlacement';
 

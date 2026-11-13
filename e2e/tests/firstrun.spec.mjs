@@ -11,12 +11,8 @@
 
 import { randomUUID } from 'node:crypto';
 import { EMPTY_PROJECT } from '../lib/editorAuth.mjs';
-import { EDITOR_USER, ensureSeeded, expect, mapLoaded, openMap, send, shot, signedInContext, test, watch } from './fixtures.mjs';
+import { EDITOR_USER, ensureSeeded, expect, mapLoaded, openMap, send, shot, signedInContext, test, watch, REPLY_MS, INSET } from './fixtures.mjs';
 
-/** The Gateway's answer to a save, and a script's map.changed reaching the open map. */
-const REPLY_MS = 20_000;
-/** The floating controls' inset from the map's edge (DESIGN.md spacing map-inset). */
-const INSET = 12;
 /** The App Bar clearance kept at the stage's bottom-right corner (DESIGN.md spacing app-bar-clearance). */
 const APP_BAR_CLEARANCE = 76;
 const NOTE = 'Nothing on this map yet.';

@@ -4,7 +4,7 @@
 // the save, so the 15 s reply timer runs out), a map.changed dropped (a gap, so the map sends map.load), and a
 // map.load.reply turned into a store-unreachable error or given a read-only reason.
 
-const EVENT_FIRED = 'event-fired:';
+export const EVENT_FIRED = 'event-fired:';
 const SYNC = 'sync:';
 
 /** The Gateway's busy answer (MapStudioDelegate.busyReply). */
@@ -18,7 +18,7 @@ export const SAVE_DOWN_MESSAGE = 'The map store could not be reached to save thi
  * The Gateway's reply as Perspective delivers it ([observed in the 8.3.10 client]: a text
  * frame `event-fired:` and JSON whose `event` is the Map Studio envelope), or null.
  */
-function firedEvent(message) {
+export function firedEvent(message) {
     if (typeof message !== 'string' || !message.startsWith(EVENT_FIRED)) return null;
     try {
         const frame = JSON.parse(message.slice(EVENT_FIRED.length));

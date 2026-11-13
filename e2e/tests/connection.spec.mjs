@@ -7,14 +7,10 @@
 // for that long, which is what the suite uses (a real `docker stop` is the playbook's step).
 
 import { TRACER } from '../lib/geo.mjs';
-import { EDITOR_USER, expect, mapLoaded, openMap, runSeed, signedInContext, test as watchedTest, watch } from './fixtures.mjs';
+import {
+    EDITOR_USER, expect, mapLoaded, openMap, runSeed, signedInContext, test as watchedTest, watch, SIMULATED, liveItem, bar, INTERVAL_MS
+} from './fixtures.mjs';
 
-/**
- * The client logs its own failed reconnect attempts while the loss is simulated ("Hello API call
- * failed ... Simulated disconnect"): those are the loss itself, so they are left out; any other
- * console or page error still fails the test.
- */
-const SIMULATED = /Simulated disconnect/;
 const test = watchedTest.extend({
     watched: [
         async ({ page }, use) => {
@@ -26,16 +22,12 @@ const test = watchedTest.extend({
     ]
 });
 
-/** The bound for a state to reach the map: one refresh interval (the dev setup's 10 s) plus margin. */
-const INTERVAL_MS = 25_000;
 /** How long the simulated loss lasts. */
 const LOST_S = 8;
 
 let ids;
 
-const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
 const chip = (page) => page.locator('.mapstudio-connection');
-const bar = (page) => page.locator('.mapstudio-needs');
 /** The bar's label and title while the state is unknown (needsyou.ts `BAR_UNKNOWN`, `LIST_UNKNOWN`). */
 const UNKNOWN_LABEL = 'Needs you: state unknown, no connection to the Gateway';
 const UNKNOWN_LIST = 'State unknown - no connection to the Gateway';

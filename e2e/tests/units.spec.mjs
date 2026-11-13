@@ -16,13 +16,9 @@
 
 import { pagePixel } from '../lib/geo.mjs';
 import {
-    EDITOR2_USER, EDITOR_USER, OPERATOR_USER, clearUnits, editorTest, expect, mapLoaded, openMap, removeStrays, restoreSetupUnits, runSeed, send, setUnits,
-    shot, signedInContext, test, useSetupUnits, view
+    EDITOR2_USER, EDITOR_USER, OPERATOR_USER, clearUnits, editorTest, expect, mapLoaded, openMap, removeStrays, restoreSetupUnits, runSeed, send,
+    setUnits, shot, signedInContext, test, useSetupUnits, view, REPLY_MS, NOTHING_MS, openEditor, selectRow, storedAll
 } from './fixtures.mjs';
-
-const REPLY_MS = 20_000;
-/** How long a wait for "nothing was sent" lasts before the seq is read again. */
-const NOTHING_MS = 800;
 
 /** The seed's L-SWD: the point 1,500 m along it (between PT-1 and LV-1) and a view that puts it in the upper part of the map. */
 const BETWEEN = [-104.999729, 39.718789];
@@ -58,15 +54,6 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(async ({ browser }) => {
     await seedAgain(browser);
 });
-
-async function openEditor(page) {
-    const map = await openMap(page, '/edit');
-    await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
-    await mapLoaded(map);
-    await expect(map).toHaveAttribute('data-edit-level', 'full');
-    await expect(map).toHaveAttribute('data-studio', 'on');
-    return map;
-}
 
 /** L-SWD's line popup opened by a click between PT-1 and LV-1, on a View-mode page. */
 async function openLinePopup(page, map) {
@@ -105,16 +92,6 @@ const METRIC_LONG = {
 async function expectUnits(map, system, labels) {
     await expect(map).toHaveAttribute('data-units', system, { timeout: REPLY_MS });
     await expect(map).toHaveAttribute('data-unit-labels', labels);
-}
-
-/** The stored map items through the test hook, by id. */
-async function storedAll(page) {
-    return Object.fromEntries((await send(page, 'map.load', {})).body.items.map((i) => [i.id, i]));
-}
-
-async function selectRow(page, id) {
-    await page.locator('.mapstudio-list-row[data-item-id="' + id + '"]').click();
-    await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', id);
 }
 
 /** A distance typed in PT-1's Details and finished with Enter: one batch, and what the store then holds. */

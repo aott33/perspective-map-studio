@@ -26,14 +26,11 @@
 
 import { randomUUID } from 'node:crypto';
 import {
-    EDITOR2_USER, EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot as shotNow, signedInContext, test
+    EDITOR2_USER, EDITOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, runSeed, send, shot as shotNow, signedInContext,
+    test, REPLY_MS, liveItem, seqOf, selectRow, expectNothingSent, openKinds, press, stored, apply, openDev, undo, openItems, padCount
 } from './fixtures.mjs';
 
-/** The Gateway's answer to a save, and the next live update. */
-const REPLY_MS = 20_000;
 const LIVE_MS = 30_000;
-/** There is nothing to observe when nothing is sent: the time a stray batch would have to show in the map's seq. */
-const NOTHING_MS = 800;
 /** A spot for the item this spec makes through the test hook, out of the tracer's view. */
 const AWAY = [-104.82, 39.66];
 const P12 = '[default]Mesa/P12';
@@ -41,18 +38,6 @@ const P14 = '[default]Mesa/P14';
 const PAD_CASES = [{ value: 1, preset: 'attention' }, { value: 2, preset: 'warning' }, { value: 3, preset: 'fault' }, { value: 4, preset: 'dimmed' }];
 
 let seed;
-
-/** Press a /live dev button and return its result (the label changes on every press, ranAt included). */
-async function press(page, button) {
-    const out = page.locator('#mapstudio-live-result');
-    const before = await out.innerText();
-    await page.locator('#mapstudio-live-' + button).click();
-    await expect.poll(() => out.innerText(), { timeout: 30_000 }).not.toBe(before);
-    const result = JSON.parse(await out.innerText());
-    expect(result.error, 'the dev button ' + button).toBeUndefined();
-    expect(result.refused, 'the dev button ' + button).toBeUndefined();
-    return result;
-}
 
 /** The dev tags this spec drives in their quiet state: P12's status 0 at 400 psi with no alarm, comms on, nothing unacknowledged. */
 async function quiet(page) {
@@ -106,34 +91,6 @@ async function openEditor(page) {
     return map;
 }
 
-/** The second tab, on /live: its dev buttons, and another open map to agree with. */
-async function openDev(context) {
-    const dev = await context.newPage();
-    await mapLoaded(await openMap(dev, '/live'));
-    return dev;
-}
-
-async function seqOf(map) {
-    return Number(await map.getAttribute('data-store-seq'));
-}
-
-/** The stored record of a live map item through the test hook, or undefined. */
-async function stored(page, id) {
-    return (await send(page, 'map.load', {})).body.items.find((i) => i.id === id && !i.deleted);
-}
-
-/** One batch through the test hook, saved. */
-async function apply(page, ops) {
-    const reply = await send(page, 'edits.apply', { batchId: randomUUID(), ops });
-    expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
-}
-
-/** A list row clicked: the item selected with its panel open. */
-async function selectRow(page, id) {
-    await page.locator('.mapstudio-list-row[data-item-id="' + id + '"]').click();
-    await expect(page.locator('.mapstudio-panel')).toHaveAttribute('data-item-id', id);
-}
-
 const tab = (page, name) => page.locator('.mapstudio-panel .mapstudio-panel-tabs .mapstudio-panel-tab[data-tab="' + name + '"]');
 const style = (page) => page.locator('.mapstudio-panel .mapstudio-style');
 const rule = (page) => style(page).locator('.mapstudio-style-rule');
@@ -154,8 +111,6 @@ async function noUnsaved(page) {
     await expect(unsaved(page)).toHaveText('');
     await expect(unsaved(page)).toBeHidden();
 }
-const undo = (page) => page.locator('.mapstudio-toolbar .mapstudio-undo');
-const liveItem = (page, id) => page.locator('.mapstudio-live-item[data-item-id="' + id + '"]');
 
 /** One rule edit saved as one batch: Undo names its step, and the map's seq moved on by exactly one. */
 async function expectOneBatch(page, map, seqBefore, step) {
@@ -165,30 +120,11 @@ async function expectOneBatch(page, map, seqBefore, step) {
     await expect(map).toHaveAttribute('data-store-seq', String(seqBefore + 1));
 }
 
-async function expectNothingSent(page, map, seqBefore) {
-    await page.waitForTimeout(NOTHING_MS);
-    await expect(map).toHaveAttribute('data-store-seq', String(seqBefore));
-}
-
 /** A render for the docs with `target` in view (the rule's heading when none is given). */
 async function shot(page, name, target = rule(page).locator('.mapstudio-style-rule-head')) {
     await target.evaluate((el) => el.scrollIntoView({ block: 'nearest' }));
     await page.waitForTimeout(500);
     await shotNow(page, name);
-}
-
-async function openKinds(page, map) {
-    await page.locator('.mapstudio-rail-item[data-surface="kinds"]').click();
-    await expect(map).toHaveAttribute('data-surface', 'kinds');
-}
-
-async function openItems(page, map) {
-    await page.locator('.mapstudio-rail-item[data-surface="items"]').click();
-    await expect(map).toHaveAttribute('data-surface', 'items');
-}
-
-async function padCount(page) {
-    return (await send(page, 'map.load', {})).body.items.filter((i) => !i.deleted && i.kind === 'pad').length;
 }
 
 editorTest.describe('the Style tab and an item\'s own style rule at 1366 px', () => {

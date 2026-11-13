@@ -6,15 +6,8 @@
 // every save but a delete is refused.
 
 import { randomUUID } from 'node:crypto';
-import { OPERATOR_USER, editorTest, expect, mapLoaded, openMap, send, signedInContext, test } from './fixtures.mjs';
+import { OPERATOR_USER, editorTest, expect, mapLoaded, openMap, send, signedInContext, test, load, batch } from './fixtures.mjs';
 
-async function load(page) {
-    const reply = await send(page, 'map.load', {});
-    expect(reply.type, JSON.stringify(reply.body)).toBe('map.load.reply');
-    return reply.body;
-}
-
-const batch = (...ops) => ({ batchId: randomUUID(), ops });
 const point = { type: 'Point', coordinates: [-104.968, 39.737] };
 const line = { type: 'LineString', coordinates: [[-104.99, 39.74], [-104.98, 39.75]] };
 const createItem = (data) => ({ op: 'create', entity: 'item', id: randomUUID(), baseVersion: 0, data });

@@ -37,16 +37,12 @@
 
 import { IControl, Map as MapLibreMap, ScaleControl } from 'maplibre-gl';
 import { BASEMAP_LABELS, BasemapId, offersBasemapSwitch } from './basemaps';
-import { glyphSvg } from './controls';
+import { PHONE_QUERY, SPRITE_URL, SVG_NS, glyphSvg } from './controls';
 import {
     LegendKey, LegendToggle, UnitsButton, UnitsPress, UnitsRow, ZOOM_NOTE, kindsHeading, kindsStartCollapsed, sameLegendKey, sameUnitsRow, showsYouRow, withYou
 } from './legend';
 import { DIMMED_OPACITY } from './markers';
 import { YOU_ARE_HERE_WORDS } from './userLocation';
-
-/** The sprite the kind and state glyphs come from, as the default popup draws them (DefaultPopup.tsx). */
-const SPRITE_URL = '/res/mapstudio/icons/mapstudio-icons.svg';
-const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const EMPTY_KEY: LegendKey = { kinds: [], states: [], lines: [], styles: [], tints: [] };
 
@@ -71,9 +67,6 @@ function use(id: string, x: number, y: number, size: number, className = ''): SV
     }
     return el;
 }
-
-/** The width below which the legend is the phone's bottom sheet (the stylesheet's phone breakpoint). */
-const PHONE_QUERY = '(max-width: 767px)';
 
 /** The scale bar's longest length, in px (DESIGN.md: the scale bar beside the Legend button). */
 export const SCALE_MAX_WIDTH_PX = 80;

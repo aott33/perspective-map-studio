@@ -27,13 +27,9 @@
  * the secondary colour at the small size; the order stays by state. With none, no distance.
  */
 
-import { glyphSvg } from './controls';
+import { SPRITE_URL, SVG_NS, glyphSvg } from './controls';
 import { DistanceUnits, METRIC_UNITS, distanceText, sameUnits } from './geometry';
 import { EMPTY_SUMMARY, LIST_UNKNOWN, NOTHING_NEEDS_YOU, NeedsYouRow, NeedsYouSummary, RANKED_NOTE, barKey, barModel, rowDistanceM, total } from './needsyou';
-
-/** The sprite the state and kind glyphs come from, as the default popup draws them (DefaultPopup.tsx). */
-const SPRITE_URL = '/res/mapstudio/icons/mapstudio-icons.svg';
-const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /** A sprite symbol inline through `<use>`, in `currentColor`, hidden from assistive technology. */
 function spriteGlyph(id: string, className: string, size: number): SVGSVGElement {

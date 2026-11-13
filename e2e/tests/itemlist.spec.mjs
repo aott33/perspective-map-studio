@@ -5,13 +5,12 @@
 // footer's Add item and "N unlinked"; and map.load.reply's `changed` at the phone and full levels only (contract 0.4.0).
 // Run on the seeded dev map as mapeditor at 1440 and 1366 px.
 import {
-    EDITOR_USER, OPERATOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, send, shot, signedInContext, test, view
+    EDITOR_USER, OPERATOR_USER, editorTest, ensureSeeded, expect, mapLoaded, openMap, removeStrays, send, shot, signedInContext, test, view, REPLY_MS,
+    openEditor
 } from './fixtures.mjs';
 
 /** One refresh interval of the dev setup (10 s) and the next full batch, with margin. */
 const INTERVAL_MS = 40_000;
-/** The Gateway's answer to a save. */
-const REPLY_MS = 20_000;
 /** A spot east of the scale set with nothing on it (as other specs use it). */
 const AWAY = [-104.82, 39.66];
 
@@ -28,15 +27,6 @@ test.beforeAll(async ({ browser }) => {
         await context.close();
     }
 });
-
-async function openEditor(page) {
-    const map = await openMap(page, '/edit');
-    await expect(page.locator('#mapstudio-dev-user')).toContainText('Signed in as ' + EDITOR_USER);
-    await mapLoaded(map);
-    await expect(map).toHaveAttribute('data-edit-level', 'full');
-    await expect(map).toHaveAttribute('data-studio', 'on');
-    return map;
-}
 
 /** Press a /live dev button and wait for its result (needsyou.spec.mjs's press). */
 async function press(page, button) {

@@ -3,13 +3,11 @@
 // the phone editor each move a pad (two editors, two actors); a viewer is refused. Every item a test makes is deleted
 // at its end, so the map other specs count is unchanged (their edit rows stay: the record keeps every change).
 
-import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { e2eProject } from '../lib/env.mjs';
 import {
-    EDITOR_USER, OPERATOR_USER, editorTest, expect, mapLoaded, openMap, send, signedInContext, test
+    EDITOR_USER, OPERATOR_USER, editorTest, expect, mapLoaded, openMap, send, signedInContext, test, saved, del, update, batch, point, sql, create,
+    refused
 } from './fixtures.mjs';
 
 /** L-SWD of instruments.spec: PT-1 at 1,143 m and PT-2 at 2,841 m, the points Turf puts there. */
@@ -17,34 +15,6 @@ const SWD = [[-103.52, 31.92], [-103.505, 31.9205], [-103.490423, 31.926]];
 const PT1_AT = [-103.507899, 31.920404];
 const PT2_AT = [-103.491211, 31.925703];
 const ISO_SECOND = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/;
-
-const PSQL = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'ops', 'psql.sh');
-
-/** One statement on the dev map store as its owner role (ops/psql.sh); returns the first line of its unaligned output (a RETURNING value; psql adds the command tag after it). */
-function sql(statement) {
-    const run = spawnSync('bash', [PSQL, '-v', 'ON_ERROR_STOP=1', '-At', '-c', statement], { encoding: 'utf8', timeout: 60_000 });
-    if (run.status !== 0) {
-        throw new Error('psql failed: ' + (run.stderr || '').trim());
-    }
-    return run.stdout.trim().split('\n')[0];
-}
-
-const batch = (...ops) => ({ batchId: randomUUID(), ops });
-const point = (c) => ({ type: 'Point', coordinates: c });
-const create = (id, data) => ({ op: 'create', entity: 'item', id, baseVersion: 0, data });
-const update = (id, baseVersion, data) => ({ op: 'update', entity: 'item', id, baseVersion, data });
-const del = (id, baseVersion) => ({ op: 'delete', entity: 'item', id, baseVersion });
-
-function saved(reply) {
-    expect(reply.type, JSON.stringify(reply.body)).toBe('edits.apply.reply');
-    return reply.body;
-}
-
-function refused(reply, code) {
-    expect(reply.type, JSON.stringify(reply.body)).toBe('error');
-    expect(reply.body.code, reply.body.message).toBe(code);
-    return reply.body;
-}
 
 /** One page of the record as `page`'s session reads it. */
 async function history(page, body = {}) {

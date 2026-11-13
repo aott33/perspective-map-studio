@@ -3,7 +3,7 @@ import { ChromeGlyph } from './ChromeGlyph';
 import { deleteButton } from './PropertiesPanel';
 
 /** The count's words (DESIGN.md Properties panel, the owner's pick of 2026-11-08): "3 selected". */
-export function countText(count: number): string {
+export function selectionCountText(count: number): string {
     return count + ' selected';
 }
 
@@ -29,7 +29,7 @@ export interface SelectionCountProps {
  */
 export function SelectionCount(props: SelectionCountProps): React.ReactElement {
     const remove = deleteButton(props.paused, props.deletable === 0, props.toolInHand, true);
-    const words = countText(props.count);
+    const words = selectionCountText(props.count);
     return (
         <section className="mapstudio-panel mapstudio-panel--several" aria-label={words} data-selected-count={String(props.count)}>
             <header className="mapstudio-panel-header mapstudio-several-header">

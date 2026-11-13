@@ -29,16 +29,12 @@ import { TRACER, pagePixel } from '../lib/geo.mjs';
 import { randomUUID } from 'node:crypto';
 import {
     DRAW_MS, EDITOR_USER, VERTEX_PAUSE_MS, WARNING_SETTLE_MS, editorTest, ensureSeeded, expect, loadedCounts, mapLoaded, openMap, removeStrays, send,
-    shot, signedInContext, test, view, watch
+    shot, signedInContext, test, view, watch, REPLY_MS, UUID, PUSH_MS, INSET, OSM_TILES, TILE_PNG, pixelNow, insideRing, expectStageWidth, placePad,
+    legendPanel, legendButton, spotFromTop, lossTest
 } from './fixtures.mjs';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-/** The story's bound: a saved edit is on another open map within 5 s (changes.spec.mjs). */
-const PUSH_MS = 5_000;
 /** The dev setup refreshes every 10 s; the next full batch after a link, with margin. */
 const INTERVAL_MS = 40_000;
-/** The Gateway's answer to a save, or the page's binding following a prop write. */
-const REPLY_MS = 20_000;
 
 /** The width the stage has at 1366 px with the rail, the list and the properties panel docked (DESIGN.md spacing). */
 const STAGE_WITH_PANEL = 1366 - 72 - 256 - 320;
@@ -56,14 +52,6 @@ test.beforeAll(async ({ browser }) => {
         await context.close();
     }
 });
-
-/** The map's page pixel of a place, from the box and the view the map reports now (the stage resizes as panels open). */
-async function pixelNow(map, lngLat) {
-    const box = await map.boundingBox();
-    const center = (await map.getAttribute('data-center')).split(',').map(Number);
-    const zoom = Number(await map.getAttribute('data-zoom'));
-    return pagePixel(box, lngLat, center, zoom);
-}
 
 /**
  * A page pixel on the ground: at least 44 px from every seeded point and 24 px from every line segment at the
@@ -110,22 +98,6 @@ async function groundSpot(page, map) {
         }
     }
     throw new Error('No ground spot clear of the seeded items in this view.');
-}
-
-/** Whether a pixel is inside a ring of pixels (the even-odd rule; the ring unclosed, as an area is stored). */
-function insideRing([x, y], ring) {
-    let inside = false;
-    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-        const [xi, yi] = ring[i];
-        const [xj, yj] = ring[j];
-        if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-    }
-    return inside;
-}
-
-/** Wait until the stage has the width the docked panels leave it (the map resizes after a panel opens or closes). */
-async function expectStageWidth(map, width) {
-    await expect.poll(async () => Math.round((await map.boundingBox()).width), { timeout: 10_000 }).toBe(width);
 }
 
 async function openEditor(page) {
@@ -462,34 +434,9 @@ test.describe('1366 px', () => {
 
 // ---- Undo and its history on the toolbar (entry 23) ----
 
-/** A page pixel `dx` from the map's centre and `fromTop` below its top edge now: at the tracer's view, the clear ground north of its points. */
-async function spotFromTop(map, dx, fromTop) {
-    const box = await map.boundingBox();
-    return [box.x + box.width / 2 + dx, box.y + fromTop];
-}
-
 /** The stored record of a live map item through the test hook, or undefined once it is deleted. */
 async function storedItem(page, id) {
     return (await send(page, 'map.load', {})).body.items.find((i) => i.id === id && !i.deleted);
-}
-
-/** A pad placed with the Point tool at `at` and saved: its id (Details opens on it with Name focused). */
-async function placePad(page, map, at) {
-    if ((await map.getAttribute('data-tool')) !== 'point') {
-        await page.locator('.mapstudio-tool--point').click();
-        await expect(map).toHaveAttribute('data-tool', 'point');
-    }
-    const panel = page.locator('.mapstudio-panel');
-    const before = (await panel.count()) > 0 ? await panel.getAttribute('data-item-id') : null;
-    await page.mouse.click(at[0], at[1]);
-    await expect(panel).toBeVisible({ timeout: 15_000 });
-    if (before !== null) {
-        await expect(panel).not.toHaveAttribute('data-item-id', before, { timeout: 15_000 });
-    }
-    const id = await panel.getAttribute('data-item-id');
-    expect(id).toMatch(UUID);
-    await expect(panel).toHaveAttribute('data-pending', 'false', { timeout: REPLY_MS });
-    return id;
 }
 
 /** The focused Name field renamed and finished with Enter; the step is saved once Undo names it. */
@@ -694,26 +641,8 @@ test.describe('1366 px, Undo and its history on the toolbar', () => {
 
 // ---- Edit mode's top row (entry 21) ----
 
-/**
- * The client logs its own failed reconnect attempts while a lost connection is simulated ("Hello API call failed ...
- * Simulated disconnect", as connection.spec.mjs filters them): those are the loss itself; any other console or page
- * error still fails the test.
- */
-const SIMULATED = /Simulated disconnect/;
-const lossTest = editorTest.extend({
-    watched: [
-        async ({ page }, use) => {
-            const w = watch(page);
-            await use(w);
-            expect(w.errors.filter((e) => !SIMULATED.test(e)), 'browser console and page errors').toEqual([]);
-        },
-        { auto: true }
-    ]
-});
 /** How long the simulated loss lasts (the client's `__client.simulateLostConnection`). */
 const LOST_S = 6;
-/** The floating controls' distance from the map's edge (DESIGN.md spacing map-inset). */
-const INSET = 12;
 
 /** The rows the list shows, by item id, in its order. */
 async function listIds(page) {
@@ -1030,15 +959,10 @@ test.describe('1200 px, below the list\'s collapse width', () => {
 
 // ---- The legend in the rail's Layers surface (entry 22) ----
 
-const legendButton = (page) => page.locator('.mapstudio-legend-button');
-const legendPanel = (page) => page.locator('.mapstudio-legend-panel');
 /** The legend docked in the rail's Layers surface (the control's wrapper inside the dock). */
 const docked = (page) => page.locator('.mapstudio-dock--layers .mapstudio-legend-dock');
 /** How long a basemap change (a Gateway round trip, the tiles' first idle) may take on the dev stack (basemaps.spec.mjs). */
 const CHANGE_MS = 30_000;
-/** A 1 by 1 PNG, served for every OpenStreetMap tile as basemaps.spec.mjs serves them (the box may not reach the provider). */
-const TILE_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
-const OSM_TILES = /^https:\/\/tile\.openstreetmap\.org\//;
 const TILES_FAILED = 'OpenStreetMap tiles are not loading; check the network.';
 
 /**

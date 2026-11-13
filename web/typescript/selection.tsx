@@ -183,7 +183,7 @@ export function onRootKeyDown(host: SelectionHost, ev: React.KeyboardEvent<HTMLD
             // The Details panel closes with close or Esc (EXPERIENCE.md Properties panel, epic 4 entry 2): the selection goes. In Edit
             // mode Esc outside a field empties the set too, Details or none (entry 8: ticked rows, a box, the count's panel).
             ev.preventDefault();
-            clearSelection(host);
+            dropSelection(host);
             if (host.map) {
                 host.map.getCanvas().focus({ preventScroll: true });
             }
@@ -322,7 +322,7 @@ export function onMapClick(host: SelectionHost, ev: MapMouseEvent): void {
             return;
         }
     }
-    clearSelection(host);
+    dropSelection(host);
 }
 
 /**
@@ -542,7 +542,7 @@ export function openLinePopup(host: SelectionHost, id: string, segment: SegmentR
  * open Details undocks as the selection goes and the stage widens: the whole ground keeps its place on the page (entry 7c,
  * `dockChange` with no place); in View mode no box moves, so nothing pans.
  */
-export function clearSelection(host: SelectionHost): void {
+export function dropSelection(host: SelectionHost): void {
     closePopup(host);
     if (host.state.selected !== null || host.state.pick !== null) {
         dockChange(host, (prev) => ({ ...host.selectionState(prev, null), pick: null }));
@@ -1182,7 +1182,7 @@ export function applyPageSelection(host: SelectionHost): void {
     if (want.id === null) {
         host.pageSelection = null;
         host.openedBy = null;
-        clearSelection(host);
+        dropSelection(host);
         return;
     }
     if (delegate.load.state !== 'loaded') {
@@ -1193,7 +1193,7 @@ export function applyPageSelection(host: SelectionHost): void {
     if (!item) {
         host.pageSelection = null;
         console.warn('[MapStudio] The page selected ' + want.id + ', which is not on the map: the selection was cleared.');
-        clearSelection(host);
+        dropSelection(host);
         return;
     }
     if (!studio && delegate.live.fulls === 0 && Date.now() - want.since < RESTORE_WAIT_MS) {

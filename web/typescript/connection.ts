@@ -30,7 +30,7 @@ export const CONNECTION_POLL_MS = 1000;
 export const NO_CONNECTION = 'No connection';
 
 /** "14:02" in the browser's local time, two digits each. */
-export function clockText(epochMs: number): string {
+export function clockTextAt(epochMs: number): string {
     const d = new Date(epochMs);
     const two = (n: number): string => (n < 10 ? '0' : '') + n;
     return two(d.getHours()) + ':' + two(d.getMinutes());
@@ -45,7 +45,7 @@ export function connectionChipText(state: ConnectionState): string {
         return '';
     }
     const head = state.lost ? NO_CONNECTION : RECONNECTING;
-    return state.valuesAt === null ? head + ' - no values yet' : head + ' - values from ' + clockText(state.valuesAt);
+    return state.valuesAt === null ? head + ' - no values yet' : head + ' - values from ' + clockTextAt(state.valuesAt);
 }
 
 /** The long form for the chip's tooltip. */
@@ -53,7 +53,7 @@ export function connectionDetailText(state: ConnectionState): string {
     if (!state.lost && !state.frozen) {
         return '';
     }
-    const from = state.valuesAt === null ? 'no values have arrived' : 'the values shown are from ' + clockText(state.valuesAt);
+    const from = state.valuesAt === null ? 'no values have arrived' : 'the values shown are from ' + clockTextAt(state.valuesAt);
     return state.lost
         ? 'The Gateway cannot be reached: ' + from + ', and every value is shown as stale until the connection is back, when the map reloads.'
         : 'The Gateway is back: ' + from + ', shown as stale until the reload\'s values arrive.';
