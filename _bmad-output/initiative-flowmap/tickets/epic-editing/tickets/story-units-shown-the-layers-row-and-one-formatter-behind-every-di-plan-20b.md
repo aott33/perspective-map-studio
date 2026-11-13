@@ -4,7 +4,7 @@ type: 'feature'
 ticket: ''
 part_of: '20'
 created: '2026-11-12'
-status: 'draft'
+status: 'ready-for-dev'
 baseline_revision: ''
 route: 'full'
 route_source: 'auto'
@@ -24,7 +24,7 @@ context: ['{project-root}/docs/contract.md', '{project-root}/_bmad-output/initia
 
 **Approach:** The Layers tab of the Layers surface gains a Units section under Show and Basemap: a System group (From setup, Metric, US) and a Labels group (Short, Long), drawn as the Basemap buttons are. A press saves at once as one settings op through the delegate; the row shows the override the store holds, so it follows another editor live.
 
-Decisions (owner, pending at the checkpoint): (1) Place: a third section, "Units", on the Layers tab only; never on the Legend tab, View mode's legend panel or the phone sheet. (2) Form: two button groups in the Basemap buttons' style, each with a small label ("System", "Labels"); the one in force is pressed. (3) From setup clears the override (a delete op). Labels are then Short and the Labels group is disabled, with the note "Pick Metric or US to choose the labels." (4) A note under System says what the setup gives: "The setup says Metric.", "The setup says US.", or "The setup follows each browser's language." (5) A press shows as pressed at once and is put back if the save is refused; a refused or unsent save is told by the save card as every other edit is; no new status words in the Layers header. (6) Words: the row says Short and Long, and Recent changes follows it ("Metric, short labels", "US, long labels") in place of 19b's "symbols" and "words". (7) No Undo step (19b's rule); Revert in Recent changes is the way back.
+Decisions (owner, 2026-11-13, "Approve" on the plan and its seven picks): (1) Place: a third section, "Units", on the Layers tab only; never on the Legend tab, View mode's legend panel or the phone sheet. (2) Form: two button groups in the Basemap buttons' style, each with a small label ("System", "Labels"); the one in force is pressed. (3) From setup clears the override (a delete op). Labels are then Short and the Labels group is disabled, with the note "Pick Metric or US to choose the labels." (4) A note under System says what the setup gives: "The setup says Metric.", "The setup says US.", or "The setup follows each browser's language." (5) A press shows as pressed at once and is put back if the save is refused; a refused or unsent save is told by the save card as every other edit is; no new status words in the Layers header. (6) Words: the row says Short and Long, and Recent changes follows it ("Metric, short labels", "US, long labels") in place of 19b's "symbols" and "words". (7) No Undo step (19b's rule); Revert in Recent changes is the way back.
 
 ## Boundaries & Constraints
 
