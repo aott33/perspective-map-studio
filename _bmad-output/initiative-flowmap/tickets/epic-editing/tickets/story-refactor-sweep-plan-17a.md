@@ -4,7 +4,7 @@ type: 'refactor'
 ticket: ''
 part_of: '17'
 created: '2026-11-13'
-status: 'draft'
+status: 'ready-for-dev'
 baseline_revision: ''
 route: 'full'
 route_source: 'auto'
@@ -24,7 +24,7 @@ context: ['{project-root}/_bmad-output/initiative-flowmap/tickets/epic-editing/t
 
 **Approach:** Cleanup only: each repeated helper gets one home and the copies import it; the model's unused and same-named leftovers are removed or renamed; the copied e2e helpers move to the shared fixtures. Nothing a user sees and nothing in the contract changes; every existing test passes with its expectations untouched.
 
-Decisions (owner, pending at the checkpoint): (1) Entry 17 is split: this is 17a, the code and the test helpers; 17b is the keyboard and contrast pass, the contract docs' wording and the deferred-work housekeeping. (2) `drawing` and `selected` stay their own state fields beside `studio`; folding them into the model is not done (a wide change before a release for no gain a user sees). (3) Helpers of the same name that give different results (`whenText`, `lengthM`) are renamed apart, never merged. (4) The Layers and Legend tabs share the Details and Style tabs' markup helper only where that changes no key handling; arrow keys for them are 17b's finding, not this entry's. (5) Behaviour changes found on the way are written to `_bmad-output/deferred-work.md`, never fixed here.
+Decisions (owner, 2026-11-13, "Get a new agent to do the sweep. Make sure it's very thorough", taken as approval of the plan and its five picks): (1) Entry 17 is split: this is 17a, the code and the test helpers; 17b is the keyboard and contrast pass, the contract docs' wording and the deferred-work housekeeping. (2) `drawing` and `selected` stay their own state fields beside `studio`; folding them into the model is not done (a wide change before a release for no gain a user sees). (3) Helpers of the same name that give different results (`whenText`, `lengthM`) are renamed apart, never merged. (4) The Layers and Legend tabs share the Details and Style tabs' markup helper only where that changes no key handling; arrow keys for them are 17b's finding, not this entry's. (5) Behaviour changes found on the way are written to `_bmad-output/deferred-work.md`, never fixed here.
 
 ## Boundaries & Constraints
 
@@ -62,6 +62,7 @@ Decisions (owner, pending at the checkpoint): (1) Entry 17 is split: this is 17a
 ## Implementation Notes
 
 - Planner, 2026-11-13: the environment and identity rules are entry 13b's plan's first Implementation Note; they hold here. Leave the work uncommitted; run the unit tests and the specs you touch in groups, not the whole suite at once. Check `docker ps` before any stack work and start Docker as the hand-off note says if it stopped. When two copies turn out to differ in any way, leave both and note it here.
+- Planner, 2026-11-13 (the owner asked for a very thorough sweep): the Code Map is where the survey found repeats, not the limit. Before changing anything, search all of `web/typescript` and `e2e` yourself for every helper defined more than once (same name or same body) and for exports nothing imports, and list what you found here with each one's verdict: moved, renamed apart, or left and why. Compare the bodies of every copy character by character before a move. Run the unit tests after each group of moves, and every spec whose file you touched before you report; say which ran and their counts.
 
 ## Plan Change Log
 
